@@ -14,6 +14,7 @@ the shipment). Invoices (1.1) are not issued here at all: AADE decision
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
@@ -924,3 +925,107 @@ class TestReceiptNetOfRefundsMadeBeforeIt:
 
             assert generate_invoice(order).pk == invoice.pk
         assert Invoice.objects.get(order=order).total == _eur("100.00")
+
+
+class TestTheReceiptRowIsTheCutOff:
+    """ONE cut-off moment: the receipt row's creation. A new receipt nets
+    what was returned before it; a row that exists keeps its figures and is
+    never recomputed; credits cover what came after."""
+
+    @pytest.fixture(autouse=True)
+    def _stripe(self):
+        with FakeStripeRefunds():
+            yield
+
+    def _failed_render(self, order):
+        """Issue the receipt with a render that dies after the row was
+        committed (the row exists, with no document)."""
+        _mark_shipped(order)
+        with (
+            mydata_enabled(),
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                side_effect=RuntimeError("x"),
+            ),
+            pytest.raises(RuntimeError),
+        ):
+            generate_invoice(order)
+        invoice = Invoice.objects.get(order=order)
+        assert not invoice.has_document()
+        return invoice
+
+    def test_a_refund_after_a_failed_render_is_credited_not_netted(self):
+        order = _order(lines=(("24", "100.00"),))
+        OrderService.refund_order(order, amount=_eur("30.00"))
+        invoice = self._failed_render(order)
+        assert invoice.total == _eur("70.00")
+        OrderService.refund_order(order, amount=_eur("20.00"))
+
+        with mydata_enabled(), FakeAade() as aade:
+            generate_invoice(order)
+            send_invoice_to_mydata(order.id)
+
+        invoice.refresh_from_db()
+        assert invoice.total == _eur("70.00")
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("70.00")
+        [credit] = _credits(order)
+        assert credit.total == _eur("20.00")
+        assert [c.gross for c in aade.credits] == [Decimal("20.00")]
+
+    def test_force_on_an_unregistered_row_behaves_the_same(self):
+        order = _order(lines=(("24", "100.00"),))
+        OrderService.refund_order(order, amount=_eur("30.00"))
+        with mydata_enabled(), FakeAade():
+            _mark_shipped(order)
+            generate_invoice(order)
+            OrderService.refund_order(order, amount=_eur("20.00"))
+
+            invoice = generate_invoice(order, force=True)
+
+            assert invoice.total == _eur("70.00")
+            send_invoice_to_mydata(order.id)
+            assert [c.total for c in _credits(order)] == [_eur("20.00")]
+
+    def test_a_full_refund_before_a_retried_row_is_refused(self):
+        """A row left by an older release, issued for the full total, whose
+        order was then refunded in full before the retry: no zero receipt."""
+        from order.invoicing import ReceiptNotIssuable
+
+        order = _order(lines=(("24", "100.00"),))
+        invoice = self._failed_render(order)
+        OrderService.refund_order(order)
+        # The row is later than the refund (an older release's row).
+        Invoice.objects.filter(pk=invoice.pk).update(
+            created_at=invoice.created_at + timedelta(days=1)
+        )
+
+        with mydata_enabled(), FakeAade() as aade:
+            with pytest.raises(ReceiptNotIssuable, match="refunded in full"):
+                generate_invoice(order)
+            with pytest.raises(ReceiptNotIssuable, match="refunded in full"):
+                generate_invoice(order, force=True)
+
+        assert aade.sent == []
+
+    def test_a_refund_after_the_row_never_triggers_the_guard(self):
+        order = _order(lines=(("24", "100.00"),))
+        self._failed_render(order)
+        OrderService.refund_order(order)
+
+        with mydata_enabled(), FakeAade() as aade:
+            generate_invoice(order)
+            send_invoice_to_mydata(order.id)
+
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("100.00")
+        assert [c.total for c in _credits(order)] == [_eur("100.00")]
+
+    def test_a_registered_receipt_is_frozen(self):
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            invoice = _receipt(order)
+            OrderService.refund_order(order)
+
+            assert generate_invoice(order, force=True).total == _eur("100.00")
+        assert invoice.mydata_mark

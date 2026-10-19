@@ -40,6 +40,7 @@ are documented in ``INVOICE_SELLER_SETTING_KEYS`` below.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -189,10 +190,18 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     return _net_of(rows, min(refunded, _gross(rows)))
 
 
-def refunded_before_receipt(order: Order) -> Decimal:
+def refunded_before_receipt(
+    order: Order, *, before: datetime | None = None
+) -> Decimal:
     """What was paid back for *order* before its receipt exists: provider
     and cash refunds on the payment ledger, net of those a provider
     reported failed, plus the value returned onto gift cards and points.
+
+    The cut-off is the receipt row's creation: a NEW receipt nets
+    everything returned so far (``before=None``); a row that exists is
+    never recomputed, and where its cut-off is needed (the full-refund
+    guard) *before* is its creation, so a refund made after it is left to
+    its credit document and is never counted twice.
 
     A retail receipt documents the sale for the consideration actually
     paid, so money returned before it is issued reduces what it says, and
@@ -203,8 +212,8 @@ def refunded_before_receipt(order: Order) -> Decimal:
     """
     from order.payment_ledger import PaymentLedger
 
-    return PaymentLedger.refunded(order) + (
-        PaymentLedger.stored_value(order).returned
+    return PaymentLedger.refunded(order, before=before) + (
+        PaymentLedger.stored_value(order, before=before).returned
     )
 
 
@@ -244,10 +253,16 @@ def _net_of(
     return out
 
 
-def fully_refunded_before_receipt(order: Order) -> bool:
-    """True when what was paid back already covers the whole sale, so there
-    is no consideration left to document and no receipt is issued."""
-    refunded = refunded_before_receipt(order)
+def fully_refunded_before_receipt(
+    order: Order, existing: Invoice | None = None
+) -> bool:
+    """True when what was paid back before the receipt covers the whole
+    sale, so there is no consideration left to document and no receipt is
+    issued. For a row that exists (a retry of one whose render failed) the
+    cut-off is its creation."""
+    refunded = refunded_before_receipt(
+        order, before=existing.created_at if existing else None
+    )
     return refunded > 0 and refunded >= _gross(
         breakdown_by_rate(order_vat_lines(order))
     )
@@ -491,12 +506,15 @@ def _persist_invoice_row(
         invoice_number = InvoiceCounter.allocate(issue_date.year)
         invoice = Invoice(order=order)
 
-    if existing is not None and existing.mydata_mark:
-        # Once transmitted to AADE (has a MARK) the invoice's financial
-        # values are LEGALLY frozen. A corrective PDF regen must reuse the
-        # persisted breakdown/totals rather than recompute from the
-        # possibly-changed order, or the PDF would disagree with the
-        # AADE-registered invoice (G0263).
+    if existing is not None:
+        # A row that exists keeps the figures it was issued with, MARK or
+        # not. Once transmitted to AADE (has a MARK) they are LEGALLY
+        # frozen (G0263: a corrective regen must not disagree with the
+        # registered invoice); before that they are still the receipt's
+        # cut-off: it netted what was returned before the row existed, and
+        # money returned since is credited (``order.credit_documents``), so
+        # recomputing on a retry or a forced regeneration would count it
+        # twice.
         vat_breakdown = existing.vat_breakdown
         # EVERY key ``_order_totals`` produces, or the PDF silently loses
         # rows: the template renders shipping/payment_fee/discount behind
@@ -542,6 +560,23 @@ def _persist_invoice_row(
     return invoice, vat_breakdown, totals
 
 
+def _refuse_if_fully_refunded(order: Order, existing: Invoice | None) -> None:
+    """Refuse a receipt that would document nothing: everything was
+    returned before its row was created. Applies to any receipt not yet
+    registered (a new one, or a row whose render is being retried); one with
+    a MARK is frozen."""
+    if (existing is None or not existing.mydata_mark) and (
+        fully_refunded_before_receipt(order, existing)
+    ):
+        raise ReceiptNotIssuable(
+            _(
+                "Order #%(order_id)s was refunded in full before its "
+                "receipt was issued, so there is no sale to document."
+            )
+            % {"order_id": order.id}
+        )
+
+
 def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     """Idempotent invoice generation for a single order.
 
@@ -585,6 +620,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
                 _("Order #%(order_id)s has no receipt to regenerate.")
                 % {"order_id": order.id}
             )
+        _refuse_if_fully_refunded(order, existing)
     else:
         if not receipt_issuable(order):
             raise ReceiptNotIssuable(
@@ -599,14 +635,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
                     "status": order.get_status_display(),
                 }
             )
-        if existing is None and fully_refunded_before_receipt(order):
-            raise ReceiptNotIssuable(
-                _(
-                    "Order #%(order_id)s was refunded in full before its "
-                    "receipt was issued, so there is no sale to document."
-                )
-                % {"order_id": order.id}
-            )
+        _refuse_if_fully_refunded(order, existing)
         if not load_mydata_config().is_ready():
             raise ReceiptNotIssuable(
                 _(

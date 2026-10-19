@@ -1785,6 +1785,19 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 24,
     },
     {
+        "name": "ORDER_MAX_UNPAID_ONLINE_ORDERS",
+        "type": "int",
+        "value": 5,
+        "description": (
+            "How many online-payment orders still waiting for their "
+            "payment one customer (the account, or the email for a "
+            "guest) can have at once. Each holds its stock until it is "
+            "paid or auto-canceled (ORDER_AUTO_CANCEL_PENDING_HOURS), so "
+            "this bounds the stock a customer can lock without paying. "
+            "0 turns the limit off."
+        ),
+    },
+    {
         "name": "ORDER_FOLLOW_UP_DAYS",
         "type": "int",
         "value": 7,

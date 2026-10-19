@@ -39,7 +39,7 @@ def carry_over(apps, _schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("order", "0081_order_payment_hold_expires_at"),
+        ("order", "0082_order_payment_hold_expires_at"),
         ("pay_way", "0001_initial"),
         # The Setting model must exist before its rows are deleted.
         ("extra_settings", "0001_initial"),

@@ -23,7 +23,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 ### 2. Authentication & Authorization
 - Every ViewSet must have explicit `permission_classes` or use `get_permissions()` — flag ViewSets relying only on default permissions
 - `IsOwnerOrAdmin` / `IsOwnerOrAdminOrGuest` checks: verify the ownership field (`user`, `owner`, `created_by`) matches what the permission class checks
-- Knox token auth: tokens have 20-day TTL — verify no endpoint bypasses `TokenAuthentication`
+- Knox token auth (7-day TTL, auto-refresh, 30-day absolute max): verify no endpoint bypasses `TokenAuthentication`
 - Django Allauth + WebAuthn/FIDO2: verify MFA enforcement where expected
 - `force_authenticate()` should only appear in test files
 
@@ -55,7 +55,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Check that UUID-based lookups enforce ownership (not just UUID knowledge)
 - Verify `get_queryset()` filters by `request.user` where appropriate
 - Check order/cart/payment endpoints cannot access other users' data
-- Verify admin-only endpoints use `IsAdminUser` or equivalent
+- Admin-only endpoints use `StoreStaffModelPermissions` (or `tenant.membership.is_store_staff`), or `IsPlatformSuperuser` for platform routes; flag any DRF `IsAdminUser` or `request.user.is_staff` check (`docs/api-staff-identity.md`)
 
 ### 8. Information Disclosure
 - Error responses: verify `DEBUG = False` in production settings (`SYSTEM_ENV != 'dev'`)
@@ -65,7 +65,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 
 ### 9. WebSocket Security
 - Verify `ws/notifications/` enforces authentication via `TokenAuthMiddleware`
-- Check channel group assignment (`user_{id}`, `admins`) cannot be spoofed
+- Check that group assignment (`tenant_{schema}_user_{id}`, `notification/groups.py`) cannot be spoofed across users or tenants; the socket authenticates only by a single-use `?ticket=`
 - Verify message content is not user-controlled HTML
 
 ### 10. Meilisearch & Search

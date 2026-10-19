@@ -73,5 +73,5 @@ After scaffolding, verify:
 - [ ] FilterSet composes appropriate core mixins
 - [ ] Admin is registered with django-unfold's `ModelAdmin`
 - [ ] Factory extends `CustomDjangoModelFactory` with proper translation handling
-- [ ] App is in `LOCAL_APPS` in `settings.py`
+- [ ] App is in `TENANT_APPS` (store data) or `SHARED_APPS` (public schema) in `settings.py`
 - [ ] URLs are included in `core/urls.py` under `api/v1/`

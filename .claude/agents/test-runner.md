@@ -51,7 +51,7 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 ## Prerequisites
 
 - PostgreSQL must be running (tests use a real database)
-- Redis must be running (used for caching, even though `DISABLE_CACHE = True` is set in conftest)
+- Redis must be running (`tests/settings.py` declares `CACHES` as the Redis-backed `tests.cache.WorkerScopedCache`)
 - Meilisearch is NOT required (tests run with `MEILISEARCH["OFFLINE"] = True`)
 - Celery tasks run synchronously (`CELERY_TASK_ALWAYS_EAGER = True`)
 
@@ -90,8 +90,8 @@ signal to check for contention first.
 
 - Tests run in parallel by default (`-n auto` via pytest-xdist)
 - Test timeout is 600 seconds per test
-- Password hashing uses MD5 (faster than default bcrypt)
-- Coverage minimum is 50% (`fail_under = 50`)
+- Password hashing uses MD5 (faster than the production Argon2 hasher)
+- Coverage minimum is 70% (`fail_under = 70`, enforced on the combined CI shards)
 - Query counts use Django's `CaptureQueriesContext` (`len(ctx)`) and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
 - Running tests beside another pytest session: give it its own `DB_NAME=…` (or `-n0`), or the two truncate each other's `test_<DB_NAME>_gwN` databases
 - Durations that are exact multiples of ~30 s on Windows mean the Docker Desktop `localhost` IPv6 stall — rerun with `REDIS_HOST=127.0.0.1`

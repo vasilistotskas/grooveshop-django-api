@@ -72,6 +72,38 @@ against public.
 **So the API has no sound notion of "store staff" at all.** That is the
 gap, and it cannot be patched with a permission class.
 
+## The store team admin
+
+Staff identities live in the public schema and are shared by every store,
+so anything on a store host that lists accounts lists the whole platform.
+The team page (`UserTenantMembershipAdmin`) therefore never offers a
+chooser of accounts to a store role:
+
+- **Adding a person** is by exact email (`StoreTeamMemberForm`): the
+  address must match one existing platform account, case aside, and the
+  person is bound to the store being served. Nothing is listed, searched
+  by prefix or suggested, and the store is not a field. An unknown address
+  is refused with one message. The one thing this confirms is that an
+  address the caller already knows holds a platform account.
+- **The list** has no Store column, no Store filter and no search box on a
+  store host: the join to the user table resolves to that store's shoppers
+  there, not to the team. The member is read from the public schema
+  (`UserTenantMembership.member`).
+- **The platform console** keeps the account and store pickers.
+
+### The last owner
+
+A store must keep at least one active OWNER. `UserTenantMembership`
+enforces it, so no path walks around it: `save()` (demote, deactivate,
+move), `delete()`, `clean()` (a form error), and the bulk
+`QuerySet.delete()` / `update()` (the admin's bulk delete, a
+`filter().update()`). The check locks the tenant row, so two owners
+demoting each other at once cannot both pass. A store with no active owner
+already is not blocked from other edits. Deleting a whole store or a
+platform identity cascades through the collector and is not blocked:
+destroying a store must still work. Deactivating the owner's *account*
+(`UserAccount.is_active`) is not a membership change and is not covered.
+
 ## The design, when it is needed
 
 Mirror the admin exactly. The admin already solved this problem; the API

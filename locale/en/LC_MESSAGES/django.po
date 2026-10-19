@@ -21974,6 +21974,21 @@ msgstr "The same value as ``reason``."
 msgid "The same value as ``error.type``."
 msgstr "The same value as ``error.type``."
 
+msgid "A store must keep at least one active owner."
+msgstr "A store must keep at least one active owner."
+
+msgid "Email address"
+msgstr "Email address"
+
+msgid "The exact email address of the person's existing platform account."
+msgstr "The exact email address of the person's existing platform account."
+
+msgid "No platform account uses this email address."
+msgstr "No platform account uses this email address."
+
+msgid "This person is already on the team."
+msgstr "This person is already on the team."
+
 #~ msgid "Total Posts"
 #~ msgstr "Total"
 

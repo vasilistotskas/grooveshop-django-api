@@ -1,142 +1,208 @@
-"""Tests for ``UserTenantMembershipAdmin.formfield_for_foreignkey``.
+"""Tests for the store-side team form of ``UserTenantMembershipAdmin``.
 
-``UserAccount`` is mirrored per-schema — this admin only ever
-references PUBLIC-schema users (platform identities), so the ``user``
-FK dropdown must be pinned to that schema rather than whatever schema
-the connection happens to be pinned to when the form is built.
+Staff identities are shared across every store, so a store's Admin never
+gets a chooser of accounts: the person is named by their exact email
+(``StoreTeamMemberForm``) and the store is always the one being served.
+The cross-schema behaviour on a real store host is covered by
+``tests_mt/test_store_admin_shows_only_its_own_people_and_no_secrets.py``.
 """
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 from django.contrib.admin import site as admin_site
 from django.test import RequestFactory
+from django.utils.translation import gettext
 
-from tenant.admin import (
-    PublicSchemaModelChoiceField,
-    UserTenantMembershipAdmin,
-)
-from tenant.models import UserTenantMembership
+from tenant.admin import StoreTeamMemberForm, UserTenantMembershipAdmin
+from tenant.models import TenantMembershipRole, UserTenantMembership
+from tests.utils.staff import store_tenant
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
 
+ADD = "/admin/tenant/usertenantmembership/add/"
+
+
+@pytest.fixture
+def tenant():
+    return store_tenant("team_form_tenant")
+
 
 def _admin():
-    # A real, registered admin_site is required for FK fields that
-    # fall through to Django's default formfield_for_foreignkey (e.g.
-    # "tenant" below) — it calls self.admin_site.get_model_admin(...).
     return UserTenantMembershipAdmin(UserTenantMembership, admin_site)
 
 
-def _user_field(model_admin, request):
-    db_field = UserTenantMembership._meta.get_field("user")
-    return model_admin.formfield_for_foreignkey(db_field, request)
+def _form(data, tenant):
+    with mock.patch("tenant.admin.bound_tenant", return_value=tenant):
+        form = StoreTeamMemberForm(data)
+        form.is_valid()
+    return form
 
 
-class TestUserFieldQueryset:
-    def test_queryset_contains_public_users(self):
-        staff = UserAccountFactory(is_staff=True)
-        request = RequestFactory().get(
-            "/admin/tenant/usertenantmembership/add/"
+class TestStoreTeamMemberForm:
+    def test_an_exact_email_binds_that_account_to_this_store(self, tenant):
+        person = UserAccountFactory(email="exact.person@example.com")
+
+        form = _form(
+            {
+                "email": "exact.person@example.com",
+                "role": TenantMembershipRole.STAFF,
+                "is_active": True,
+            },
+            tenant,
         )
-        field = _user_field(_admin(), request)
-        assert staff in field.queryset
 
-    def test_queryset_is_scoped_to_user_model(self):
-        request = RequestFactory().get(
-            "/admin/tenant/usertenantmembership/add/"
+        assert form.is_valid(), form.errors
+        assert form.instance.user == person
+        assert form.instance.tenant == tenant
+
+    def test_the_match_ignores_case(self, tenant):
+        person = UserAccountFactory(email="mixed.case@example.com")
+
+        form = _form(
+            {
+                "email": "Mixed.Case@Example.com",
+                "role": TenantMembershipRole.STAFF,
+            },
+            tenant,
         )
-        field = _user_field(_admin(), request)
-        assert field.queryset.model is UserAccountFactory._meta.model
 
-    def test_other_fk_fields_use_default_behaviour(self):
-        """Only ``user`` gets the schema pin.
+        assert form.instance.user == person
 
-        ``tenant`` keeps the default behaviour on the PLATFORM console,
-        which is what this request represents. It IS narrowed to the
-        operator's own store on a tenant host — see
-        ``test_admin_self_service.py`` — so that a store ADMIN cannot
-        grant themselves membership in someone else's store.
-        """
-        request = RequestFactory().get(
-            "/admin/tenant/usertenantmembership/add/"
+    @pytest.mark.parametrize(
+        "typed", ["person@example.com", "xact.person@example.com"]
+    )
+    def test_a_fragment_matches_nobody(self, tenant, typed):
+        UserAccountFactory(email="exact.person@example.com")
+
+        form = _form(
+            {"email": typed, "role": TenantMembershipRole.STAFF}, tenant
         )
-        db_field = UserTenantMembership._meta.get_field("tenant")
-        field = _admin().formfield_for_foreignkey(db_field, request)
-        assert field is not None
+
+        assert not form.is_valid()
+        assert form.instance.user_id is None
+
+    def test_an_unknown_email_is_refused(self, tenant):
+        form = _form(
+            {
+                "email": "nobody@example.com",
+                "role": TenantMembershipRole.STAFF,
+            },
+            tenant,
+        )
+
+        assert form.errors["email"] == [
+            gettext("No platform account uses this email address.")
+        ]
+
+    def test_a_person_already_on_the_team_is_refused(self, tenant):
+        person = UserAccountFactory(email="already@example.com")
+        UserTenantMembership.objects.create(
+            user=person, tenant=tenant, role=TenantMembershipRole.STAFF
+        )
+
+        form = _form(
+            {
+                "email": "already@example.com",
+                "role": TenantMembershipRole.ADMIN,
+            },
+            tenant,
+        )
+
+        assert form.errors["email"] == [
+            gettext("This person is already on the team.")
+        ]
+
+    def test_the_form_has_no_account_or_store_chooser(self):
+        assert set(StoreTeamMemberForm.base_fields) == {
+            "email",
+            "role",
+            "is_active",
+        }
 
 
-class TestUserFieldSchemaPinOnTenantHost:
-    """On a tenant host the ``user`` field must be pinned to the public
-    schema so it lists platform identities, never that store's shoppers
-    (whose colliding pks would misbind the membership)."""
-
+class TestFormSelectionByHost:
     def _request(self):
-        return RequestFactory().get("/admin/tenant/usertenantmembership/add/")
+        request = RequestFactory().get(ADD)
+        request.user = UserAccountFactory(is_staff=True)
+        return request
 
-    def test_field_is_public_pinned_on_a_tenant_host(self):
-        from unittest import mock
+    def test_a_store_host_gets_the_email_form(self, tenant):
+        with mock.patch(
+            "tenant.admin.self_service_tenant", return_value=tenant
+        ):
+            form = _admin().get_form(self._request(), None)
 
+        assert issubclass(form, StoreTeamMemberForm)
+
+    def test_the_platform_host_keeps_the_account_chooser(self):
+        with mock.patch("tenant.admin.self_service_tenant", return_value=None):
+            form = _admin().get_form(self._request(), None)
+
+        assert not issubclass(form, StoreTeamMemberForm)
+        assert "user" in form.base_fields
+        assert "tenant" in form.base_fields
+
+    def test_a_store_host_lists_neither_stores_nor_a_search_box(self):
         with mock.patch(
             "tenant.admin.self_service_tenant", return_value=object()
         ):
-            field = _user_field(_admin(), self._request())
-        assert isinstance(field, PublicSchemaModelChoiceField)
+            request = self._request()
+            columns = _admin().get_list_display(request)
+            filters = _admin().get_list_filter(request)
+            search = _admin().get_search_fields(request)
 
-    def test_field_is_plain_on_the_platform_host(self):
-        from unittest import mock
+        assert "tenant" not in columns
+        assert "tenant" not in [entry[0] for entry in filters]
+        assert search == []
 
+    def test_the_platform_host_keeps_all_of_them(self):
         with mock.patch("tenant.admin.self_service_tenant", return_value=None):
-            field = _user_field(_admin(), self._request())
-        assert not isinstance(field, PublicSchemaModelChoiceField)
+            request = self._request()
+            columns = _admin().get_list_display(request)
+            filters = _admin().get_list_filter(request)
+            search = _admin().get_search_fields(request)
 
-    def test_autocomplete_for_user_is_dropped_on_a_tenant_host(self):
-        from unittest import mock
+        assert "tenant" in columns
+        assert "tenant" in [entry[0] for entry in filters]
+        assert search
 
+    def test_an_existing_member_is_shown_not_chosen(self):
         with mock.patch(
             "tenant.admin.self_service_tenant", return_value=object()
         ):
-            fields = _admin().get_autocomplete_fields(self._request())
-        assert "user" not in fields
-        assert "tenant" in fields
+            request = self._request()
+            fields = _admin().get_fields(request, object())
+            readonly = _admin().get_readonly_fields(request, object())
 
-    def test_autocomplete_for_user_is_kept_on_the_platform_host(self):
-        from unittest import mock
-
-        with mock.patch("tenant.admin.self_service_tenant", return_value=None):
-            fields = _admin().get_autocomplete_fields(self._request())
-        assert "user" in fields
+        assert fields == ["member", "role", "is_active"]
+        assert "member" in readonly
 
 
-class TestPublicSchemaModelChoiceFieldPins:
-    """The field wraps every DB touch in schema_context(public)."""
+class TestLoadMembers:
+    def test_a_page_of_members_reads_the_accounts_in_one_query(self, tenant):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
-    def _field(self):
-        from django.contrib.auth import get_user_model
+        rows = [
+            UserTenantMembership.objects.create(
+                user=UserAccountFactory(),
+                tenant=tenant,
+                role=TenantMembershipRole.STAFF,
+            )
+            for _ in range(4)
+        ]
+        fresh = list(UserTenantMembership.objects.filter(tenant=tenant))
 
-        return PublicSchemaModelChoiceField(
-            queryset=get_user_model().objects.all()
-        )
+        with CaptureQueriesContext(connection) as captured:
+            UserTenantMembership.load_members(fresh)
+            labels = {row.pk: str(row.member) for row in fresh}
 
-    def test_to_python_enters_public_schema(self):
-        from unittest import mock
-
-        field = self._field()
-        with mock.patch("tenant.admin._public_schema_context") as ctx:
-            field.to_python("")  # empty value still wraps the call
-        ctx.assert_called_once()
-
-    def test_valid_value_enters_public_schema(self):
-        from unittest import mock
-
-        staff = UserAccountFactory(is_staff=True)
-        field = self._field()
-        with mock.patch("tenant.admin._public_schema_context") as ctx:
-            field.valid_value(staff)
-        assert ctx.called
-
-    def test_to_python_resolves_a_public_user(self):
-        staff = UserAccountFactory(is_staff=True)
-        field = self._field()
-        assert field.to_python(str(staff.pk)) == staff
+        reads = [
+            q["sql"] for q in captured if 'FROM "user_useraccount"' in q["sql"]
+        ]
+        assert len(reads) == 1
+        assert labels == {row.pk: str(row.user) for row in rows}

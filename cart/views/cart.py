@@ -466,7 +466,7 @@ class CartViewSet(BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(
-                {"detail": _("Cart not found")},
+                {"detail": _("Cart not found"), "code": "cart_not_found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -482,7 +482,11 @@ class CartViewSet(BaseModelViewSet):
             )
         except CouponError as exc:
             return Response(
-                {"detail": exc.message, "reason": exc.reason},
+                {
+                    "detail": exc.message,
+                    "reason": exc.reason,
+                    "code": exc.reason,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return self._cart_detail_response(cart)
@@ -495,7 +499,7 @@ class CartViewSet(BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(
-                {"detail": _("Cart not found")},
+                {"detail": _("Cart not found"), "code": "cart_not_found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         CouponService.remove(cart)
@@ -545,7 +549,10 @@ class CartViewSet(BaseModelViewSet):
         """
         if not isinstance(request.auth, get_token_model()):
             return Response(
-                {"detail": _("A signed-in session is required.")},
+                {
+                    "detail": _("A signed-in session is required."),
+                    "code": "session_required",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
         cart = self.cart_service.get_or_create_cart()
@@ -575,7 +582,8 @@ class CartViewSet(BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(
-                {"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Cart not found", "code": "cart_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Get cart items with product information
@@ -584,7 +592,8 @@ class CartViewSet(BaseModelViewSet):
         if not cart_items:
             return Response(
                 {
-                    "detail": "Cart is empty. Cannot reserve stock for empty cart."
+                    "detail": "Cart is empty. Cannot reserve stock for empty cart.",
+                    "code": "cart_empty",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -649,6 +658,7 @@ class CartViewSet(BaseModelViewSet):
                 {
                     "detail": "Insufficient stock for one or more items",
                     "failed_items": failed_items,
+                    "code": "insufficient_stock",
                 },
                 status=status.HTTP_409_CONFLICT,
             )
@@ -701,14 +711,17 @@ class CartViewSet(BaseModelViewSet):
                 else "reservation_ids must be a list of integers"
             )
             return Response(
-                {"detail": detail},
+                {"detail": detail, "code": "invalid_reservation_ids"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         reservation_ids = request_serializer.validated_data["reservation_ids"]
 
         if not reservation_ids:
             return Response(
-                {"detail": "reservation_ids is required"},
+                {
+                    "detail": "reservation_ids is required",
+                    "code": "reservation_ids_required",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -842,14 +855,16 @@ class CartViewSet(BaseModelViewSet):
         if not cart:
             logger.error("Cart not found")
             return Response(
-                {"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": "Cart not found", "code": "cart_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         if not cart.items.exists():
             logger.error("Cart is empty")
             return Response(
                 {
-                    "detail": "Cart is empty. Cannot create payment intent for empty cart."
+                    "detail": "Cart is empty. Cannot create payment intent for empty cart.",
+                    "code": "cart_empty",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -868,7 +883,8 @@ class CartViewSet(BaseModelViewSet):
                             "The order total is below this wholesale "
                             "tier's minimum of {minimum}."
                         ).format(minimum=unmet_minimum)
-                    )
+                    ),
+                    "code": "wholesale_minimum_not_met",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -906,7 +922,10 @@ class CartViewSet(BaseModelViewSet):
         except PayWay.DoesNotExist:
             logger.error(f"Payment method with ID {pay_way_id} not found")
             return Response(
-                {"detail": f"Payment method with ID {pay_way_id} not found"},
+                {
+                    "detail": f"Payment method with ID {pay_way_id} not found",
+                    "code": "pay_way_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -942,6 +961,7 @@ class CartViewSet(BaseModelViewSet):
                         "for this order."
                     ),
                     "reason": "pay_way_unavailable",
+                    "code": "pay_way_unavailable",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -972,6 +992,7 @@ class CartViewSet(BaseModelViewSet):
                         "with a card on this page."
                     ),
                     "reason": "pay_way_not_intent_capable",
+                    "code": "pay_way_not_intent_capable",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1016,6 +1037,7 @@ class CartViewSet(BaseModelViewSet):
                 {
                     "detail": _("Invalid order data"),
                     "field_errors": exc.field_errors,
+                    "code": "invalid_order_data",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1054,6 +1076,7 @@ class CartViewSet(BaseModelViewSet):
                             "Loyalty redemption requires a signed-in customer."
                         ),
                         "reason": "loyalty_requires_authentication",
+                        "code": "loyalty_requires_authentication",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -1078,6 +1101,7 @@ class CartViewSet(BaseModelViewSet):
                     {
                         "detail": message,
                         "reason": "loyalty_redemption_invalid",
+                        "code": "loyalty_redemption_invalid",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -1102,7 +1126,11 @@ class CartViewSet(BaseModelViewSet):
                 )
             except GiftCardError as exc:
                 return Response(
-                    {"detail": exc.message, "reason": exc.reason},
+                    {
+                        "detail": exc.message,
+                        "reason": exc.reason,
+                        "code": exc.reason,
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             cart_total = Money(
@@ -1115,15 +1143,19 @@ class CartViewSet(BaseModelViewSet):
             # a full loyalty redemption cover everything. The frontend
             # must skip the PaymentIntent and submit the order with
             # the deductions alone; the order-first path settles it.
+            reason = (
+                "gift_card_covers_total"
+                if gift_card_codes
+                else "nothing_to_charge"
+            )
             return Response(
                 {
                     "detail": _(
                         "The applied discounts and gift cards cover "
                         "the full total; no payment intent is needed."
                     ),
-                    "reason": "gift_card_covers_total"
-                    if gift_card_codes
-                    else "nothing_to_charge",
+                    "reason": reason,
+                    "code": reason,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1133,7 +1165,10 @@ class CartViewSet(BaseModelViewSet):
         if not provider:
             logger.error("Stripe payment provider not available")
             return Response(
-                {"detail": "Stripe payment provider not available"},
+                {
+                    "detail": "Stripe payment provider not available",
+                    "code": "payment_provider_unavailable",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -1175,6 +1210,7 @@ class CartViewSet(BaseModelViewSet):
                     {
                         "detail": _("Failed to create payment intent."),
                         "reason": "payment_intent_failed",
+                        "code": "payment_intent_failed",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -1211,6 +1247,9 @@ class CartViewSet(BaseModelViewSet):
         except Exception:
             logger.exception("Error creating payment intent from cart")
             return Response(
-                {"detail": "An error occurred while creating payment intent"},
+                {
+                    "detail": "An error occurred while creating payment intent",
+                    "code": "payment_intent_failed",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

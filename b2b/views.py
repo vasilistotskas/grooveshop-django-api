@@ -115,6 +115,7 @@ class B2BViewSet(BaseModelViewSet):
                 {
                     "detail": _("No business profile yet."),
                     "reason": "no_business_profile",
+                    "code": "no_business_profile",
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )

@@ -28,6 +28,9 @@ class GiftCardErrorResponseSerializer(serializers.Serializer):
     reason = serializers.CharField(
         help_text=_("Machine-readable reason, e.g. gift_card_invalid")
     )
+    code = serializers.CharField(
+        required=False, help_text=_("The same value as ``reason``.")
+    )
 
 
 class GiftCardPurchaseRequestSerializer(serializers.Serializer):

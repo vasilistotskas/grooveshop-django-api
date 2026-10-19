@@ -750,7 +750,8 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
                     "shipping_provider_code": _(
                         "shipping_provider_code is required for pickup_point."
                     )
-                }
+                },
+                code="shipping_provider_required",
             )
         # Normalise empty string → not present so the view's
         # downstream None-check stays clean.
@@ -778,6 +779,9 @@ class CouponErrorResponseSerializer(serializers.Serializer):
             "Machine-readable rejection reason (ACP discount-extension "
             "vocabulary, e.g. discount_code_invalid)"
         ),
+    )
+    code = serializers.CharField(
+        required=False, help_text=_("The same value as ``reason``.")
     )
 
 

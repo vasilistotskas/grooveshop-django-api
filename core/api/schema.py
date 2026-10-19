@@ -133,3 +133,65 @@ def postprocess_schema_parameters_to_accept_strings(
 
     process_schema_recursive(result)
     return result
+
+
+#: The error body every API error carries (``core.api.exception_handler``).
+#: Published as components because no operation references them: an error
+#: response is never declared per operation, and a client types its error
+#: handling from these.
+ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
+    "ApiFieldError": {
+        "type": "object",
+        "description": (
+            "One message under a field and its stable code. Show "
+            "``message``; branch on ``code``."
+        ),
+        "properties": {
+            "message": {"type": "string"},
+            "code": {"type": "string"},
+        },
+        "required": ["message", "code"],
+    },
+    "ApiError": {
+        "type": "object",
+        "description": (
+            "A plain API error. ``code`` is stable; ``detail`` is in "
+            "the request's language."
+        ),
+        "properties": {
+            "detail": {"type": "string"},
+            "code": {"type": "string"},
+        },
+        "required": ["detail", "code"],
+    },
+    "ApiValidationError": {
+        "type": "object",
+        "description": (
+            "A validation error: the field keys DRF always sent, plus "
+            "``code`` (the one code all errors share, else ``invalid``; "
+            "absent when a field is itself named ``code``) and ``fields``, "
+            "each field's messages with their codes. A field of a nested "
+            "serializer holds the nested object."
+        ),
+        "properties": {
+            "code": {"type": "string"},
+            "fields": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/ApiFieldError"},
+                },
+            },
+        },
+        "additionalProperties": True,
+        "required": ["fields"],
+    },
+}
+
+
+def publish_error_schemas(
+    result: dict[str, Any], generator: Any, request: Any, public: bool
+) -> dict[str, Any]:
+    schemas = result.setdefault("components", {}).setdefault("schemas", {})
+    schemas.update(ERROR_SCHEMAS)
+    return result

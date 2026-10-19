@@ -562,7 +562,8 @@ class OrderViewSet(BaseModelViewSet):
                 *GUEST_UUID_QUERY_ACTIONS,
             }:
                 raise PermissionDenied(
-                    _("Guest orders can only be accessed via UUID.")
+                    _("Guest orders can only be accessed via UUID."),
+                    code="guest_order_requires_uuid",
                 )
             # The path param (order/uuid/<uuid>) is authoritative where
             # present — the pk-addressed payment/cancel actions supply
@@ -572,20 +573,23 @@ class OrderViewSet(BaseModelViewSet):
             )
             if not (request_uuid and str(obj.uuid) == str(request_uuid)):
                 raise PermissionDenied(
-                    _("Guest orders can only be accessed via UUID.")
+                    _("Guest orders can only be accessed via UUID."),
+                    code="guest_order_requires_uuid",
                 )
             return
 
         if request.user and request.user.is_authenticated:
             if obj.user_id != request.user.id:
                 raise PermissionDenied(
-                    _("You do not have permission to access this order.")
+                    _("You do not have permission to access this order."),
+                    code="order_access_denied",
                 )
             super().check_object_permissions(request, obj)
             return
 
         raise PermissionDenied(
-            _("You do not have permission to access this order.")
+            _("You do not have permission to access this order."),
+            code="order_access_denied",
         )
 
     def get_object(self):
@@ -603,7 +607,8 @@ class OrderViewSet(BaseModelViewSet):
             raise NotFound(
                 _("Order with ID {order_id} not found").format(
                     order_id=order_id
-                )
+                ),
+                code="order_not_found",
             ) from e
 
     def _validate_pay_way_for_order(self, pay_way, validated_data):
@@ -662,7 +667,8 @@ class OrderViewSet(BaseModelViewSet):
                             "for this order."
                         )
                     ]
-                }
+                },
+                code="pay_way_unavailable",
             )
 
         if pay_way.provider_code and not PayWayService.is_provider_configured(
@@ -682,7 +688,8 @@ class OrderViewSet(BaseModelViewSet):
                             "this store."
                         )
                     ]
-                }
+                },
+                code="pay_way_unavailable",
             )
 
     def _payment_start_refusal(self, order) -> Response | None:
@@ -699,7 +706,10 @@ class OrderViewSet(BaseModelViewSet):
             detail = _("This order is no longer open for payment.")
         else:
             return None
-        return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": detail, "code": "order_not_payable"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     @staticmethod
     def _order_changed_during_payment(order) -> Response:
@@ -717,7 +727,8 @@ class OrderViewSet(BaseModelViewSet):
                 "detail": _(
                     "This order changed while the payment was being "
                     "prepared. Reload it and try again."
-                )
+                ),
+                "code": "order_changed_during_payment",
             },
             status=status.HTTP_409_CONFLICT,
         )
@@ -799,7 +810,8 @@ class OrderViewSet(BaseModelViewSet):
                                 "Payment method with ID {pay_way_id} not found"
                             ).format(pay_way_id=pay_way_id)
                         ]
-                    }
+                    },
+                    code="pay_way_not_found",
                 )
 
             self._validate_pay_way_for_order(pay_way, validated_data)
@@ -852,6 +864,7 @@ class OrderViewSet(BaseModelViewSet):
                         "available": e.available,
                         "requested": e.requested,
                     },
+                    "code": OrderCreateErrorType.INSUFFICIENT_STOCK,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -872,6 +885,9 @@ class OrderViewSet(BaseModelViewSet):
                             else OrderCreateErrorType.CART_INVALID
                         ),
                     },
+                    "code": OrderCreateErrorType.INSUFFICIENT_STOCK
+                    if e.insufficient_stock
+                    else OrderCreateErrorType.CART_INVALID,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -889,6 +905,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCreateErrorType.RESERVATION_UNAVAILABLE,
                     },
+                    "code": OrderCreateErrorType.RESERVATION_UNAVAILABLE,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -922,6 +939,7 @@ class OrderViewSet(BaseModelViewSet):
                         "code": e.code,
                         "reason": e.reason,
                     },
+                    "code": OrderCreateErrorType.INVALID_COUPON,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -937,6 +955,7 @@ class OrderViewSet(BaseModelViewSet):
                         "type": OrderCreateErrorType.INVALID_GIFT_CARD,
                         "reason": e.reason,
                     },
+                    "code": OrderCreateErrorType.INVALID_GIFT_CARD,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -949,6 +968,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCreateErrorType.PAYMENT_NOT_FOUND,
                     },
+                    "code": OrderCreateErrorType.PAYMENT_NOT_FOUND,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -961,6 +981,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCreateErrorType.PAYMENT_VERIFICATION
                     },
+                    "code": OrderCreateErrorType.PAYMENT_VERIFICATION,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -977,6 +998,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCreateErrorType.PAYMENT_AMOUNT_MISMATCH,
                     },
+                    "code": OrderCreateErrorType.PAYMENT_AMOUNT_MISMATCH,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -995,6 +1017,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCreateErrorType.PAYMENT_CURRENCY_MISMATCH,
                     },
+                    "code": OrderCreateErrorType.PAYMENT_CURRENCY_MISMATCH,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1016,7 +1039,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "You do not have permission to perform this action."
-                    )
+                    ),
+                    "code": "permission_denied",
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -1024,7 +1048,10 @@ class OrderViewSet(BaseModelViewSet):
         except Exception:
             logger.exception("Unexpected error creating order")
             return Response(
-                {"detail": _("An unexpected error occurred")},
+                {
+                    "detail": _("An unexpected error occurred"),
+                    "code": "server_error",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -1054,7 +1081,8 @@ class OrderViewSet(BaseModelViewSet):
                             "Payment intent ID is required for online payment methods"
                         )
                     ]
-                }
+                },
+                code="payment_intent_required",
             )
 
         # Step 3: Validate cart is ready for checkout
@@ -1074,7 +1102,8 @@ class OrderViewSet(BaseModelViewSet):
             raise ValidationError(
                 e.message_dict
                 if hasattr(e, "message_dict")
-                else {"detail": _("Invalid shipping address")}
+                else {"detail": _("Invalid shipping address")},
+                code="invalid_shipping_address",
             )
 
         # Step 5: Get loyalty points to redeem (if any)
@@ -1153,7 +1182,8 @@ class OrderViewSet(BaseModelViewSet):
             raise ValidationError(
                 e.message_dict
                 if hasattr(e, "message_dict")
-                else {"detail": _("Invalid shipping address")}
+                else {"detail": _("Invalid shipping address")},
+                code="invalid_shipping_address",
             )
 
         # Step 4: Get loyalty points to redeem (if any)
@@ -1222,7 +1252,8 @@ class OrderViewSet(BaseModelViewSet):
                             "Cart not found. Please add items to cart before checkout."
                         )
                     ]
-                }
+                },
+                code="cart_not_found",
             )
 
         # Verify cart has items
@@ -1232,7 +1263,8 @@ class OrderViewSet(BaseModelViewSet):
                     "cart": [
                         _("Cart is empty. Please add items before checkout.")
                     ]
-                }
+                },
+                code="cart_empty",
             )
 
         # Get user (None for guest orders)
@@ -1241,7 +1273,8 @@ class OrderViewSet(BaseModelViewSet):
         # Verify cart ownership for authenticated users
         if user and cart.user and cart.user.id != user.id:
             raise PermissionDenied(
-                _("You do not have permission to access this cart.")
+                _("You do not have permission to access this cart."),
+                code="cart_access_denied",
             )
 
         return cart, user
@@ -1350,7 +1383,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "This order is not configured for Stripe payments."
-                    )
+                    ),
+                    "code": "order_not_stripe",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1384,6 +1418,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Failed to create payment intent."),
                     "error": payment_response,
+                    "code": "payment_intent_failed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1429,7 +1464,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "This order's payment status does not allow a retry."
-                    )
+                    ),
+                    "code": "payment_retry_not_allowed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1445,7 +1481,10 @@ class OrderViewSet(BaseModelViewSet):
                 getattr(order.pay_way, "provider_code", None),
             )
             return Response(
-                {"detail": _("Retry is only supported for Stripe payments.")},
+                {
+                    "detail": _("Retry is only supported for Stripe payments."),
+                    "code": "payment_retry_stripe_only",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1474,6 +1513,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Failed to create payment intent."),
                     "error": payment_response,
+                    "code": "payment_intent_failed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1571,7 +1611,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "This order is not configured for online payments."
-                    )
+                    ),
+                    "code": "order_not_online_payment",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1589,7 +1630,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "This payment method is not available for this store."
-                    )
+                    ),
+                    "code": "pay_way_unavailable",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1641,6 +1683,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Failed to create checkout session."),
                     "error": checkout_response,
+                    "code": "checkout_session_failed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1703,7 +1746,8 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "Agent-delegated payments are not enabled for "
                         "this store."
-                    )
+                    ),
+                    "code": "delegated_payments_disabled",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1729,7 +1773,8 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "Delegated card payment is not configured for "
                         "this store."
-                    )
+                    ),
+                    "code": "delegated_card_unconfigured",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1754,7 +1799,8 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "This order is not configured for Stripe payments."
-                    )
+                    ),
+                    "code": "order_not_stripe",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1778,6 +1824,7 @@ class OrderViewSet(BaseModelViewSet):
                 {
                     "detail": _("Failed to charge the shared payment token."),
                     "error": payment_response,
+                    "code": "delegated_charge_failed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1819,13 +1866,16 @@ class OrderViewSet(BaseModelViewSet):
         """Retrieve an order by UUID."""
         uuid_str = kwargs.get("uuid")
         if not uuid_str:
-            raise NotFound(_("UUID parameter is required"))
+            raise NotFound(
+                _("UUID parameter is required"), code="uuid_required"
+            )
 
         try:
             order = OrderService.get_order_by_uuid(uuid_str)
         except Order.DoesNotExist as e:
             raise NotFound(
-                _("Order with UUID {uuid} not found").format(uuid=uuid_str)
+                _("Order with UUID {uuid} not found").format(uuid=uuid_str),
+                code="order_not_found",
             ) from e
 
         self.check_object_permissions(request, order)
@@ -1851,7 +1901,8 @@ class OrderViewSet(BaseModelViewSet):
 
         if not (is_admin or is_owner or is_guest_order):
             raise PermissionDenied(
-                _("You do not have permission to cancel this order")
+                _("You do not have permission to cancel this order"),
+                code="order_cancel_denied",
             )
 
         request_serializer_class = self.get_request_serializer()
@@ -1901,6 +1952,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCancelErrorType.COURIER_UNREACHABLE,
                     },
+                    "code": OrderCancelErrorType.COURIER_UNREACHABLE,
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
@@ -1919,6 +1971,7 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": OrderCancelErrorType.PARCEL_WITH_COURIER,
                     },
+                    "code": OrderCancelErrorType.PARCEL_WITH_COURIER,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1929,16 +1982,22 @@ class OrderViewSet(BaseModelViewSet):
             # treat it as a conflict (refresh + toast) rather than the
             # generic "unexpected error" branch.
             logger.warning("Order %s cancel rejected: %s", order.id, e.reason)
-            raise ValidationError({"detail": str(e.reason)}) from e
+            raise ValidationError(
+                {"detail": str(e.reason)}, code="order_cancel_refused"
+            ) from e
         except ValueError as e:
             logger.warning("Error canceling order: %s", e)
             raise ValidationError(
-                {"detail": _("Unable to cancel this order.")}
+                {"detail": _("Unable to cancel this order.")},
+                code="order_cancel_failed",
             ) from e
         except Exception:
             logger.exception("Error canceling order")
             return Response(
-                {"detail": _("An unexpected error occurred")},
+                {
+                    "detail": _("An unexpected error occurred"),
+                    "code": "server_error",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -2019,7 +2078,12 @@ class OrderViewSet(BaseModelViewSet):
         order_code = request.query_params.get("s", "").strip()
         if not transaction_id and not order_code:
             return Response(
-                {"detail": _("Missing transaction id (t) or order code (s).")},
+                {
+                    "detail": _(
+                        "Missing transaction id (t) or order code (s)."
+                    ),
+                    "code": "transaction_id_required",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -2104,7 +2168,8 @@ class OrderViewSet(BaseModelViewSet):
             raise NotFound(
                 _("No order found for transaction id {t}").format(
                     t=transaction_id or order_code
-                )
+                ),
+                code="order_not_found",
             )
 
         logger.info(
@@ -2157,7 +2222,10 @@ class OrderViewSet(BaseModelViewSet):
         order = self.get_object()
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.is_deliverable():
-            raise NotFound(_("This order has no registered receipt."))
+            raise NotFound(
+                _("This order has no registered receipt."),
+                code="receipt_missing",
+            )
         serializer = InvoiceDownloadResponseSerializer(
             invoice, context={"request": request}
         )
@@ -2186,7 +2254,10 @@ class OrderViewSet(BaseModelViewSet):
         order = self.get_object()
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.is_deliverable():
-            raise NotFound(_("This order has no registered receipt."))
+            raise NotFound(
+                _("This order has no registered receipt."),
+                code="receipt_missing",
+            )
         return FileResponse(
             invoice.document_file.open("rb"),
             content_type="application/pdf",
@@ -2206,7 +2277,10 @@ class OrderViewSet(BaseModelViewSet):
         try:
             pdf_bytes = render_specimen_pdf(order)
         except SpecimenNotAvailable as exc:
-            raise NotFound(_("This order has no specimen receipt.")) from exc
+            raise NotFound(
+                _("This order has no specimen receipt."),
+                code="specimen_receipt_missing",
+            ) from exc
         return FileResponse(
             io.BytesIO(pdf_bytes),
             content_type="application/pdf",
@@ -2226,7 +2300,8 @@ class OrderViewSet(BaseModelViewSet):
             )
         if order.user_id != user.id and not is_store_staff(user):
             raise PermissionDenied(
-                _("You can only reorder your own past orders.")
+                _("You can only reorder your own past orders."),
+                code="reorder_not_owner",
             )
 
         result = OrderService.reorder_to_cart(
@@ -2247,7 +2322,9 @@ class OrderViewSet(BaseModelViewSet):
         order = self.get_object()
 
         if not is_store_staff(request.user):
-            raise PermissionDenied(_("Only staff can add tracking information"))
+            raise PermissionDenied(
+                _("Only staff can add tracking information"), code="staff_only"
+            )
 
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
@@ -2274,7 +2351,10 @@ class OrderViewSet(BaseModelViewSet):
         except Exception:
             logger.exception("Error adding tracking information")
             return Response(
-                {"detail": _("An unexpected error occurred")},
+                {
+                    "detail": _("An unexpected error occurred"),
+                    "code": "server_error",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -2284,7 +2364,9 @@ class OrderViewSet(BaseModelViewSet):
         order = self.get_object()
 
         if not is_store_staff(request.user):
-            raise PermissionDenied(_("Only staff can update order status"))
+            raise PermissionDenied(
+                _("Only staff can update order status"), code="staff_only"
+            )
 
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
@@ -2312,7 +2394,8 @@ class OrderViewSet(BaseModelViewSet):
                     "current_status": e.current_status,
                     "new_status": e.new_status,
                     "allowed_transitions": e.allowed,
-                }
+                },
+                code="invalid_status_transition",
             ) from e
         except ValueError as e:
             logger.error("Error updating order status: %s", e)
@@ -2321,12 +2404,16 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "An error occurred while processing your request."
                     )
-                }
+                },
+                code="order_update_failed",
             ) from e
         except Exception:
             logger.exception("Error updating order status")
             return Response(
-                {"detail": _("An unexpected error occurred")},
+                {
+                    "detail": _("An unexpected error occurred"),
+                    "code": "server_error",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -2355,7 +2442,10 @@ class OrderViewSet(BaseModelViewSet):
                 e,
             )
             return Response(
-                {"detail": _("Unable to retrieve payment status.")},
+                {
+                    "detail": _("Unable to retrieve payment status."),
+                    "code": "payment_status_unavailable",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception:
@@ -2368,6 +2458,7 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "An error occurred while fetching payment status."
                     ),
+                    "code": "payment_status_failed",
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -2387,7 +2478,10 @@ class OrderViewSet(BaseModelViewSet):
 
         shipment = getattr(order, "boxnow_shipment", None)
         if shipment is None:
-            raise NotFound(_("This order does not have a BoxNow shipment."))
+            raise NotFound(
+                _("This order does not have a BoxNow shipment."),
+                code="shipment_missing",
+            )
 
         reason: str = request.data.get("reason", "")
 
@@ -2437,7 +2531,8 @@ class OrderViewSet(BaseModelViewSet):
         shipment = getattr(order, "boxnow_shipment", None)
         if shipment is None or not shipment.parcel_id:
             raise NotFound(
-                _("No BoxNow shipment or parcel ID found for this order.")
+                _("No BoxNow shipment or parcel ID found for this order."),
+                code="shipment_missing",
             )
 
         label_bytes: bytes = BoxNowService.fetch_label_bytes(shipment)
@@ -2463,7 +2558,10 @@ class OrderViewSet(BaseModelViewSet):
 
         shipment = getattr(order, "acs_shipment", None)
         if shipment is None:
-            raise NotFound(_("This order does not have an ACS shipment."))
+            raise NotFound(
+                _("This order does not have an ACS shipment."),
+                code="shipment_missing",
+            )
 
         reason: str = request.data.get("reason", "")
         try:
@@ -2482,7 +2580,8 @@ class OrderViewSet(BaseModelViewSet):
             return Response(
                 {
                     "detail": exc.error_message
-                    or _("ACS rejected the cancellation.")
+                    or _("ACS rejected the cancellation."),
+                    "code": "acs_cancellation_rejected",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -2510,7 +2609,8 @@ class OrderViewSet(BaseModelViewSet):
         shipment = getattr(order, "acs_shipment", None)
         if shipment is None or not shipment.voucher_no:
             raise NotFound(
-                _("No ACS shipment or voucher found for this order.")
+                _("No ACS shipment or voucher found for this order."),
+                code="shipment_missing",
             )
 
         label_bytes: bytes = AcsService.fetch_label_bytes(shipment)
@@ -2542,10 +2642,16 @@ class OrderViewSet(BaseModelViewSet):
 
         adapter = ShippingService.adapter_for_order(order)
         if adapter is None:
-            raise NotFound(_("No carrier shipment found for this order."))
+            raise NotFound(
+                _("No carrier shipment found for this order."),
+                code="shipment_missing",
+            )
         shipment = adapter.shipment_for_order(order)
         if shipment is None:
-            raise NotFound(_("No carrier shipment found for this order."))
+            raise NotFound(
+                _("No carrier shipment found for this order."),
+                code="shipment_missing",
+            )
 
         label_bytes: bytes = adapter.fetch_label_bytes(shipment)
         provider_code = order.shipping_provider.code
@@ -2578,10 +2684,16 @@ class OrderViewSet(BaseModelViewSet):
 
         adapter = ShippingService.adapter_for_order(order)
         if adapter is None:
-            raise NotFound(_("No carrier shipment found for this order."))
+            raise NotFound(
+                _("No carrier shipment found for this order."),
+                code="shipment_missing",
+            )
         shipment = adapter.shipment_for_order(order)
         if shipment is None:
-            raise NotFound(_("No carrier shipment found for this order."))
+            raise NotFound(
+                _("No carrier shipment found for this order."),
+                code="shipment_missing",
+            )
 
         reason: str = request.data.get("reason", "")
         try:
@@ -2604,7 +2716,7 @@ class OrderViewSet(BaseModelViewSet):
                 or _("The carrier rejected the cancellation.")
             )
             return Response(
-                {"detail": detail},
+                {"detail": detail, "code": "carrier_cancellation_rejected"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

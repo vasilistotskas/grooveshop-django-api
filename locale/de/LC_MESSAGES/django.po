@@ -10556,3 +10556,12 @@ msgstr "Der free_threshold_value des Warenkorbs: die Produkte nach Rabatten, ohn
 #: .\cart\serializers\cart.py
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Der Wert, nach dem kostenloser Versand und eine kostenlose Zahlungsgebühr beurteilt werden: die Produkte nach Aktions- und Gutscheinrabatten, ohne Versand und Gebühren. Vergleichen Sie eine Grenze „kostenlos ab“ damit, nie mit total_price."
+
+msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
+msgstr ""
+
+msgid "The same value as ``reason``."
+msgstr ""
+
+msgid "The same value as ``error.type``."
+msgstr ""

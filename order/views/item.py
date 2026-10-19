@@ -136,7 +136,8 @@ class OrderItemViewSet(BaseModelViewSet):
 
         if not order.user or order.user.id != user.id:
             raise PermissionDenied(
-                _("You do not have permission to access this order.")
+                _("You do not have permission to access this order."),
+                code="order_access_denied",
             )
 
     def perform_create(self, serializer):
@@ -199,7 +200,9 @@ class OrderItemViewSet(BaseModelViewSet):
         # customer self-service (which would let an order owner restock
         # stock and mark items returned).
         if not is_store_staff(request.user):
-            raise PermissionDenied(_("Only staff can restock order items."))
+            raise PermissionDenied(
+                _("Only staff can restock order items."), code="staff_only"
+            )
 
         order_item = self.get_object()
 

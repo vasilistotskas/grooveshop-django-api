@@ -8,6 +8,7 @@ still carries the verified-purchase badge.
 import pytest
 from django.conf import settings
 from django.urls import reverse
+from django.utils import translation
 from rest_framework.test import APIClient
 
 from order.enum.status import OrderStatus
@@ -21,9 +22,13 @@ from user.factories.account import UserAccountFactory
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
-def _review(client, product):
+def _review(client, product, language=None):
+    # The unprefixed route: under the pinned English a reverse() carries
+    # the /en/ prefix, which would win over the X-Language header.
+    with translation.override(settings.LANGUAGE_CODE):
+        url = reverse("product-review-list")
     return client.post(
-        reverse("product-review-list"),
+        url,
         data={
             "product": product.id,
             "rate": 4,
@@ -32,6 +37,7 @@ def _review(client, product):
             },
         },
         format="json",
+        headers={"x-language": language} if language else {},
     )
 
 
@@ -58,6 +64,34 @@ def test_a_customer_who_did_not_buy_is_refused_by_default(product):
     assert response.status_code == 400
     assert "product" in response.data
     assert not ProductReview.objects.filter(product=product).exists()
+
+
+def test_the_refusal_names_a_stable_code_and_says_it_in_english(product):
+    response = _review(_signed_in(), product, "en")
+
+    body = response.json()
+    assert body["code"] == "must_have_purchased"
+    assert body["product"] == (
+        "You must have purchased this product to review it."
+    )
+    assert body["fields"]["product"] == [
+        {"message": body["product"], "code": "must_have_purchased"}
+    ]
+
+
+def test_the_refusal_is_said_in_the_shoppers_language(product):
+    response = _review(_signed_in(), product, "el")
+
+    body = response.json()
+    assert body["code"] == "must_have_purchased"
+    with translation.override("el"):
+        greek = str(
+            translation.gettext(
+                "You must have purchased this product to review it."
+            )
+        )
+    assert body["product"] == greek
+    assert greek != "You must have purchased this product to review it."
 
 
 def test_any_signed_in_customer_may_review_when_the_store_allows_it(product):

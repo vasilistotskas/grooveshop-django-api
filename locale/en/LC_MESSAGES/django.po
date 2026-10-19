@@ -13083,7 +13083,7 @@ msgid "Get detailed information about the product this review is for."
 msgstr ""
 
 #: .\product\views\review.py:132
-msgid "must_have_purchased"
+msgid "You must have purchased this product to review it."
 msgstr ""
 
 #: .\product\views\review.py:151
@@ -20689,4 +20689,13 @@ msgstr ""
 
 #: .\cart\serializers\cart.py
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
+msgstr ""
+
+msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
+msgstr ""
+
+msgid "The same value as ``reason``."
+msgstr ""
+
+msgid "The same value as ``error.type``."
 msgstr ""

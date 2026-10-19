@@ -465,6 +465,9 @@ PASSWORD_HASHERS = [
 
 # Rest Framework
 REST_FRAMEWORK = {
+    # Every error gains ``code`` (and ``fields`` for validation); see
+    # core/api/exception_handler.py.
+    "EXCEPTION_HANDLER": "core.api.exception_handler.exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.api.tokens.BoundedTokenAuthentication",
         # Platform staff tokens — engages ONLY on the ``StaffBearer``
@@ -3797,6 +3800,7 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api.schema.postprocess_schema_parameters_to_accept_strings",
+        "core.api.schema.publish_error_schemas",
         "page_config.openapi.publish_section_schemas",
     ],
     "PREPROCESSING_HOOKS": [

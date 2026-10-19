@@ -111,7 +111,7 @@ class BlogPostDetailSerializer(BlogPostSerializer):
         lazy_serializer("blog.serializers.author.BlogAuthorDetailSerializer")()
     )
     def get_author(self, obj: BlogPost):
-        from blog.serializers.author import BlogAuthorDetailSerializer  # noqa: I001
+        from blog.serializers.author import BlogAuthorDetailSerializer
 
         return BlogAuthorDetailSerializer(obj.author, context=self.context).data
 
@@ -121,7 +121,7 @@ class BlogPostDetailSerializer(BlogPostSerializer):
         )()
     )
     def get_category(self, obj: BlogPost):
-        from blog.serializers.category import BlogCategoryDetailSerializer  # noqa: I001
+        from blog.serializers.category import BlogCategoryDetailSerializer
 
         return BlogCategoryDetailSerializer(
             obj.category, context=self.context

@@ -97,7 +97,7 @@ class ProductCategory(
 
     @property
     def main_image(self):
-        from product.models.category_image import ProductCategoryImage  # noqa: I001
+        from product.models.category_image import ProductCategoryImage
 
         # Use the prefetched main image when the queryset supplied one
         # (CategoryQuerySet.with_main_image, mirroring Product) — without

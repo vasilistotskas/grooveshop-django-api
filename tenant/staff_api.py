@@ -39,7 +39,7 @@ class PlatformStaffLoginView(APIView):
     attack surface, not a security boundary.
     """
 
-    authentication_classes: list = []
+    authentication_classes = []
     permission_classes = [AllowAny]
     # Fails CLOSED while Redis is unreachable — see core.api.throttling.
     throttle_classes = [StaffLoginThrottle]

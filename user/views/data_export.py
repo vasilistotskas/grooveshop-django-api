@@ -29,7 +29,7 @@ class UserDataExportDownloadView(APIView):
     """``GET /api/v1/user/data_export/{token}/download``."""
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    authentication_classes = []
 
     @extend_schema(
         operation_id="downloadUserDataExport",

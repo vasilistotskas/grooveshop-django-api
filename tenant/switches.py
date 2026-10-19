@@ -138,7 +138,9 @@ def on_switch_change(
             return
         # Passed only when set, so every other switch queues the very
         # call it always did.
-        options = {"countdown": plan_countdown} if plan_countdown else {}
+        options: dict[str, Any] = (
+            {"countdown": plan_countdown} if plan_countdown else {}
+        )
         dispatch_on_commit(
             import_string(task), schema_name=instance.schema_name, **options
         )

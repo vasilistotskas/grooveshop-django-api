@@ -3,6 +3,24 @@
 
 
 
+## v3.140.1 (2026-10-19)
+
+### Bug fixes
+
+* fix(giftcard): cap the gift-card value a staff member can create in one step (#263)
+
+A staff role could issue a gift card of any value, or add any amount to a
+balance, and gift-card value is spendable money.
+
+GIFT_CARD_STAFF_ISSUE_LIMIT (a per-store setting, default 500, 0 turns it
+off) now caps one step. Above it only the store's owner or a platform
+superuser can issue the card or add to the balance; an admin or staff role
+cannot. The ledger row says it was above the limit and who did it
+(created_by), an adjustment also adds an admin log entry, and a refusal is
+logged.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`05069a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05069a4f9e1c2ce1e83e94b60d0d21e80cddcee2))
+
 ## v3.140.0 (2026-10-19)
 
 ### Bug fixes

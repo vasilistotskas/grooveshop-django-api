@@ -7,6 +7,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from core.models import TimeStampMixinModel, UUIDModel
 from loyalty.enum import TransactionType
 from loyalty.managers.transaction import PointsTransactionManager
+from tenant.staff_actors import StaffActor
 
 
 class PointsTransaction(TimeStampMixinModel, UUIDModel):
@@ -50,15 +51,15 @@ class PointsTransaction(TimeStampMixinModel, UUIDModel):
             "this row is one."
         ),
     )
-    created_by = models.ForeignKey(
-        "user.UserAccount",
-        related_name="points_adjustments_made",
+    created_by_id = models.BigIntegerField(
+        _("Created By"),
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
-        help_text=_("Admin user who created this adjustment"),
-        verbose_name=_("Created By"),
+        help_text=_(
+            "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+        ),
     )
+    created_by = StaffActor()
 
     objects: PointsTransactionManager = PointsTransactionManager()
 

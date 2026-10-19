@@ -15,7 +15,6 @@ payout money is ever visible only in a log or an email.
 
 from __future__ import annotations
 
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -25,6 +24,7 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
 from core.models import TimeStampMixinModel
+from tenant.staff_actors import StaffActor
 
 
 class AcsCodPayout(TimeStampMixinModel):
@@ -162,22 +162,15 @@ class AcsCodPayout(TimeStampMixinModel):
             "attention until then."
         ),
     )
-    reconciled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+    reconciled_by_id = models.BigIntegerField(
+        _("Reconciled by"),
         null=True,
         blank=True,
-        related_name="acs_cod_payouts_reconciled",
-        verbose_name=_("Reconciled by"),
-        # ORM-only, like AcsShipment.cod_received_outside_acs_by: the
-        # operator is a PLATFORM-PUBLIC identity and this row lives in
-        # the tenant schema.
-        db_constraint=False,
         help_text=_(
-            "Operator who reconciled the payout. Stores a "
-            "PLATFORM-schema user id; not FK-enforced."
+            "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
         ),
     )
+    reconciled_by = StaffActor()
     reconciliation_note = models.TextField(
         _("Reconciliation note"),
         blank=True,

@@ -12,6 +12,7 @@ from shipping.querysets import ShipmentQuerySet
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
+from tenant.staff_actors import history_user_getter, history_user_setter
 
 _TERMINAL_STATES = frozenset(
     {
@@ -184,19 +185,11 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
             "last_polled_at",
             "updated_at",
         ],
-        # history_user is written from ``request.user`` during admin
-        # actions, and on a tenant host EVERY admin user is a
-        # PLATFORM-PUBLIC identity by construction
-        # (PlatformStaffBackend). This table lives in the tenant schema,
-        # so a real FK would point that public id at the TENANT's user
-        # table: either a ForeignKeyViolation when no such id exists
-        # there, or — worse — a silent match attributing the action to
-        # an unrelated shopper who happens to share the pk.
-        #
-        # The relation stays usable through the ORM; it just is not
-        # enforced by PostgreSQL, which cannot express a cross-schema
-        # FK anyway. Same reasoning as UserAccount.loyalty_tier.
-        user_db_constraint=False,
+        # A staff id, not a relation to the store's shoppers: see
+        # ``tenant.staff_actors``.
+        history_user_id_field=models.BigIntegerField(null=True),
+        history_user_getter=history_user_getter,
+        history_user_setter=history_user_setter,
     )
 
     objects = ShipmentQuerySet.as_manager()

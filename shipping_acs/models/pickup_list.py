@@ -1,10 +1,10 @@
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
+from tenant.staff_actors import StaffActor
 
 
 class AcsPickupList(TimeStampMixinModel):
@@ -29,28 +29,15 @@ class AcsPickupList(TimeStampMixinModel):
         help_text=_("PickupList_No returned by ACS_Issue_Pickup_List."),
     )
     issued_at = models.DateTimeField(_("Issued at"))
-    issued_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+    issued_by_id = models.BigIntegerField(
+        _("Issued by"),
         null=True,
         blank=True,
-        related_name="acs_pickup_lists_issued",
-        verbose_name=_("Issued by"),
-        # ORM-only, like UserAccount.loyalty_tier. This row lives in the
-        # tenant schema, but the admin who triggers a manual issue is a
-        # PLATFORM-PUBLIC identity by construction (PlatformStaffBackend
-        # is the only backend that opens a tenant's admin). A real FK
-        # would point that public id at the TENANT's user table: a
-        # ForeignKeyViolation when no such id exists there, or a silent
-        # match attributing the action to an unrelated shopper with the
-        # same pk. PostgreSQL cannot express a cross-schema FK anyway.
-        db_constraint=False,
         help_text=_(
-            "Admin who triggered the manual issue. Null when the daily "
-            "Celery beat task issued the list. Stores a PLATFORM-schema "
-            "user id; not FK-enforced (see db_constraint above)."
+            "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
         ),
     )
+    issued_by = StaffActor()
     billing_code = models.CharField(
         _("Billing code"),
         max_length=32,

@@ -48,7 +48,9 @@ class PointsTransactionQuerySet(OptimizedQuerySet):
         ).exclude(Exists(has_expire))
 
     def for_list(self) -> Self:
-        return self.select_related("user", "reference_order", "created_by")
+        return self.select_related("user", "reference_order").prefetch_related(
+            "created_by"
+        )
 
     def for_detail(self) -> Self:
         return self.for_list()

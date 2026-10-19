@@ -121,12 +121,11 @@ class TransactionsTableSection(TableSection):
 class LedgerDatasetAdmin(RelatedDatasetAdmin):
     parent_field = "gift_card"
     list_display = ("kind", "amount", "order", "created_by", "created_at")
+    staff_actor_fields = ("created_by",)
     ordering = ("-created_at",)
 
     def get_queryset(self, request):
-        return (
-            super().get_queryset(request).select_related("order", "created_by")
-        )
+        return super().get_queryset(request).select_related("order")
 
 
 class LedgerDataset(BaseDataset):
@@ -401,7 +400,8 @@ class GiftCardTransactionAdmin(ExportActionMixin, BaseModelAdmin):
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("gift_card__code", "description")
-    list_select_related = ("gift_card", "order", "created_by")
+    list_select_related = ("gift_card", "order")
+    staff_actor_fields = ("created_by",)
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
     list_per_page = 50

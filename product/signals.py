@@ -109,8 +109,11 @@ def post_create_historical_record_callback(
             else StockLog.OPERATION_DECREMENT
         )
 
-        # Get the user who made the change from history_instance
-        performed_by = getattr(history_instance, "history_user", None)
+        # The staff member who made the change, as the id the history row
+        # holds (resolving the user would cost a query to read one number).
+        performed_by_staff_id = getattr(
+            history_instance, "history_user_id", None
+        )
 
         # Create stock log entry for manual admin changes
         StockLog.objects.create(
@@ -120,7 +123,7 @@ def post_create_historical_record_callback(
             stock_before=old_stock,
             stock_after=new_stock,
             reason="Manual stock adjustment via admin panel",
-            performed_by=performed_by,
+            performed_by_staff_id=performed_by_staff_id,
             order=None,
         )
 

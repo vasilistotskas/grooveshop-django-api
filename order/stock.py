@@ -12,6 +12,7 @@ from order.exceptions import (
 )
 from order.models import StockLog, StockReservation
 from product.models import Product
+from tenant.staff_actors import staff_id
 
 
 class StockManager:
@@ -646,7 +647,7 @@ class StockManager:
             stock_before=stock_before,
             stock_after=product.stock,
             reason=reason,
-            performed_by=performed_by,
+            performed_by_staff_id=staff_id(performed_by),
         )
 
     @classmethod
@@ -720,7 +721,7 @@ class StockManager:
                 if applied == delta
                 else f"{reason} (requested {delta}, floored at 0)"
             ),
-            performed_by=performed_by,
+            performed_by_staff_id=staff_id(performed_by),
         )
 
     @classmethod

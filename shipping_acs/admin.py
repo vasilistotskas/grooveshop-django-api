@@ -786,6 +786,7 @@ class AcsStationAdmin(BaseModelAdmin):
 
 @admin.register(AcsPickupList)
 class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
+    staff_actor_fields = ("issued_by",)
     list_display = (
         "pickup_list_no",
         "issued_at",

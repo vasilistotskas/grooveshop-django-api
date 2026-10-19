@@ -1034,11 +1034,20 @@ msgstr "Admin display name for this layout."
 msgid "Admin user who created this adjustment"
 msgstr "Admin user who created this adjustment"
 
+msgid "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
 msgid "Admin who made a manual adjustment"
 msgstr "Admin who made a manual adjustment"
 
+msgid "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
 msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 msgstr "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
+
+msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
 msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
 msgstr "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
@@ -6074,6 +6083,9 @@ msgstr "Icon"
 msgid "Icon Image"
 msgstr "Icon Image"
 
+msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
+msgstr "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
+
 msgid "Idempotency key"
 msgstr "Idempotency key"
 
@@ -7954,6 +7966,12 @@ msgstr "Operational note from BoxNow"
 msgid "Operator identity recorded for accountability (art. 5(2))."
 msgstr "Operator identity recorded for accountability (art. 5(2))."
 
+msgid "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
+msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
 msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 
@@ -8831,6 +8849,9 @@ msgstr "Performance"
 
 msgid "Performed By"
 msgstr "Performed By"
+
+msgid "Performed By (staff)"
+msgstr "Performed By (staff)"
 
 msgid "Period"
 msgstr "Period"
@@ -9793,6 +9814,9 @@ msgstr "Recommendations"
 
 msgid "Recommendations Enabled"
 msgstr "Recommendations Enabled"
+
+msgid "Reconciled by"
+msgstr "Reconciled by"
 
 msgid "Reconciliation"
 msgstr "Reconciliation"
@@ -10885,6 +10909,9 @@ msgstr "Shop"
 msgid "Shop kind"
 msgstr "Shop kind"
 
+msgid "Shopper whose reservation this was (null otherwise)"
+msgstr "Shopper whose reservation this was (null otherwise)"
+
 msgid "Shoppers still waiting for their parcel"
 msgstr "Shoppers still waiting for their parcel"
 
@@ -11086,6 +11113,12 @@ msgstr "Stackable promotions combine with each other; a non-stackable promotion 
 
 msgid "Staff"
 msgstr "Staff"
+
+msgid "Staff member who last changed the product from the admin. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Staff member who last changed the product from the admin. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
+msgid "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
 #, python-format
 msgid "Staff token %(key)s: %(user)s"

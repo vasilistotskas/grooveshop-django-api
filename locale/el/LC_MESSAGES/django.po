@@ -1047,11 +1047,20 @@ msgstr "Όνομα εμφάνισης αυτής της διάταξης στη 
 msgid "Admin user who created this adjustment"
 msgstr "Χρήστης διαχειριστής που δημιούργησε αυτή την προσαρμογή"
 
+msgid "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Διαχειριστής που δημιούργησε αυτή την προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+
 msgid "Admin who made a manual adjustment"
 msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή"
 
+msgid "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+
 msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 msgstr "Διαχειριστής που ενεργοποίησε τη χειροκίνητη έκδοση. Null όταν η λίστα εκδόθηκε από την καθημερινή εργασία Celery beat. Αποθηκεύει ID χρήστη του schema της ΠΛΑΤΦΟΡΜΑΣ· δεν επιβάλλεται ως FK (δείτε το db_constraint παραπάνω)."
+
+msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Διαχειριστής που ενεργοποίησε την χειροκίνητη έκδοση· κενό όταν τη λίστα εξέδωσε η ημερήσια προγραμματισμένη εργασία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
 msgid "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list."
 msgstr "Μόνο για διαχειριστές. Καλεί το ACS_Delete_Voucher. Έγκυρο μόνο πριν το voucher οριστικοποιηθεί σε λίστα παραλαβής."
@@ -6125,6 +6134,9 @@ msgstr "Εικονίδιο"
 msgid "Icon Image"
 msgstr "Εικόνα εικονιδίου"
 
+msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που έκανε την αλλαγή (public schema, όχι χρήστης του καταστήματος)."
+
 msgid "Idempotency key"
 msgstr "Κλειδί μοναδικότητας αιτήματος"
 
@@ -8028,8 +8040,14 @@ msgstr "Λειτουργική σημείωση από BoxNow"
 msgid "Operator identity recorded for accountability (art. 5(2))."
 msgstr "Ταυτότητα του χειριστή που καταγράφεται για λόγους λογοδοσίας (άρθ. 5(2))."
 
+msgid "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Χειριστής που συμφιλίωσε την πληρωμή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+
 msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
+
+msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Χειριστής που κατέγραψε τον διακανονισμό. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
 msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Ο χειριστής που κατέγραψε την εκκαθάριση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
@@ -8922,6 +8940,9 @@ msgstr "Απόδοση"
 
 msgid "Performed By"
 msgstr "Εκτελέστηκε από"
+
+msgid "Performed By (staff)"
+msgstr "Εκτελέστηκε από (προσωπικό)"
 
 msgid "Period"
 msgstr "Περίοδος"
@@ -11006,6 +11027,9 @@ msgstr "Κατάστημα"
 msgid "Shop kind"
 msgstr "Είδος καταστήματος"
 
+msgid "Shopper whose reservation this was (null otherwise)"
+msgstr "Αγοραστής στον οποίο ανήκε η κράτηση (κενό σε άλλες περιπτώσεις)"
+
 msgid "Shoppers still waiting for their parcel"
 msgstr "Πελάτες που περιμένουν ακόμη το δέμα τους"
 
@@ -11207,6 +11231,12 @@ msgstr "Οι συνδυάσιμες προσφορές συνδυάζονται 
 
 msgid "Staff"
 msgstr "Προσωπικό"
+
+msgid "Staff member who last changed the product from the admin. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Μέλος του προσωπικού που άλλαξε τελευταίο το προϊόν από το διαχειριστικό. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+
+msgid "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Μέλος του προσωπικού που έλεγξε την εταιρεία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
 #, python-format
 msgid "Staff token %(key)s: %(user)s"

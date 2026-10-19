@@ -9,6 +9,7 @@ import pytest
 
 from order.models.stock_log import StockLog
 from product.factories import ProductFactory
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 
@@ -18,7 +19,7 @@ class TestStockChangeSignals:
 
     def test_stock_increase_creates_log(self):
         """Test that increasing stock creates an INCREMENT log entry."""
-        user = UserAccountFactory()
+        user = stamp_platform_identity(UserAccountFactory())
         product = ProductFactory(stock=10)
 
         # Simulate admin panel stock change
@@ -36,12 +37,13 @@ class TestStockChangeSignals:
         assert log.stock_before == 10
         assert log.stock_after == 15
         assert log.reason == "Manual stock adjustment via admin panel"
-        assert log.performed_by == user
+        assert log.performed_by_staff_id == user.pk
+        assert log.performed_by is None
         assert log.order is None
 
     def test_stock_decrease_creates_log(self):
         """Test that decreasing stock creates a DECREMENT log entry."""
-        user = UserAccountFactory()
+        user = stamp_platform_identity(UserAccountFactory())
         product = ProductFactory(stock=20)
 
         # Simulate admin panel stock change
@@ -59,7 +61,8 @@ class TestStockChangeSignals:
         assert log.stock_before == 20
         assert log.stock_after == 15
         assert log.reason == "Manual stock adjustment via admin panel"
-        assert log.performed_by == user
+        assert log.performed_by_staff_id == user.pk
+        assert log.performed_by is None
 
     def test_no_log_when_stock_unchanged(self):
         """Test that no log is created when stock doesn't change."""
@@ -75,7 +78,7 @@ class TestStockChangeSignals:
 
     def test_multiple_stock_changes_create_multiple_logs(self):
         """Test that multiple stock changes create separate log entries."""
-        user = UserAccountFactory()
+        user = stamp_platform_identity(UserAccountFactory())
         product = ProductFactory(stock=10)
 
         # First change: increase

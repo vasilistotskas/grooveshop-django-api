@@ -145,7 +145,11 @@ class GiftCardViewSet(BaseModelViewSet):
             card = GiftCardService.check(serializer.validated_data["code"])
         except GiftCardError as exc:
             return Response(
-                {"detail": exc.message, "reason": exc.reason},
+                {
+                    "detail": exc.message,
+                    "reason": exc.reason,
+                    "code": exc.reason,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -181,6 +185,7 @@ class GiftCardViewSet(BaseModelViewSet):
                 {
                     "detail": _("Gift cards are not available."),
                     "reason": "gift_card_invalid",
+                    "code": "gift_card_invalid",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -200,6 +205,7 @@ class GiftCardViewSet(BaseModelViewSet):
                 {
                     "detail": _("Buyer email is required."),
                     "reason": "gift_card_buyer_email_required",
+                    "code": "gift_card_buyer_email_required",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -208,7 +214,11 @@ class GiftCardViewSet(BaseModelViewSet):
             GiftCardService.validate_purchase_amount(data["amount"])
         except GiftCardError as exc:
             return Response(
-                {"detail": exc.message, "reason": exc.reason},
+                {
+                    "detail": exc.message,
+                    "reason": exc.reason,
+                    "code": exc.reason,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -219,6 +229,7 @@ class GiftCardViewSet(BaseModelViewSet):
                         "Gift card purchase is not available for this store."
                     ),
                     "reason": "gift_card_purchase_unavailable",
+                    "code": "gift_card_purchase_unavailable",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -297,6 +308,7 @@ class GiftCardViewSet(BaseModelViewSet):
                 {
                     "detail": _("Failed to start the payment."),
                     "reason": "gift_card_payment_failed",
+                    "code": "gift_card_payment_failed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

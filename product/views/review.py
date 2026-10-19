@@ -132,7 +132,14 @@ class ProductReviewViewSet(BaseModelViewSet):
                 user=self.request.user, product=product
             ).exists()
         ):
-            raise ValidationError({"product": _("must_have_purchased")})
+            raise ValidationError(
+                {
+                    "product": _(
+                        "You must have purchased this product to review it."
+                    )
+                },
+                code="must_have_purchased",
+            )
         serializer.save(user=self.request.user)
 
     @action(detail=True, methods=["GET"])
@@ -151,7 +158,10 @@ class ProductReviewViewSet(BaseModelViewSet):
 
         except ProductReview.DoesNotExist:
             return Response(
-                {"detail": _("Review does not exist")},
+                {
+                    "detail": _("Review does not exist"),
+                    "code": "review_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 

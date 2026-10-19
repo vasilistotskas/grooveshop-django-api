@@ -14,6 +14,9 @@ class B2BErrorResponseSerializer(serializers.Serializer):
     reason = serializers.CharField(
         help_text=_("Machine-readable reason, e.g. no_business_profile")
     )
+    code = serializers.CharField(
+        required=False, help_text=_("The same value as ``reason``.")
+    )
 
 
 class BusinessProfileSerializer(serializers.ModelSerializer):

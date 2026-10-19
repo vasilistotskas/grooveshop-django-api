@@ -284,6 +284,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         self.assertIn(
             "You have already reviewed this product", str(response.data)
         )
+        self.assertEqual(response.data["code"], "already_reviewed")
 
     def test_user_product_review_endpoint(self):
         url = self.get_user_product_review_url(pk=self.product.id)

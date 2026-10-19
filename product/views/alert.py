@@ -101,7 +101,10 @@ class ProductAlertViewSet(BaseModelViewSet):
                 )
             except Product.DoesNotExist:
                 return Response(
-                    {"detail": _("Product not found.")},
+                    {
+                        "detail": _("Product not found."),
+                        "code": "product_not_found",
+                    },
                     status=status.HTTP_404_NOT_FOUND,
                 )
             if not product.price_drop_alerts_enabled:
@@ -109,7 +112,8 @@ class ProductAlertViewSet(BaseModelViewSet):
                     {
                         "detail": _(
                             "Price-drop alerts are not enabled for this product."
-                        )
+                        ),
+                        "code": "price_drop_alerts_unavailable",
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
@@ -124,7 +128,8 @@ class ProductAlertViewSet(BaseModelViewSet):
                     {
                         "detail": _(
                             "An email address is required for guest alerts."
-                        )
+                        ),
+                        "code": "alert_email_required",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -138,7 +143,8 @@ class ProductAlertViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "You already have an active alert of this kind for this product."
-                    )
+                    ),
+                    "code": "alert_exists",
                 },
                 status=status.HTTP_409_CONFLICT,
             )

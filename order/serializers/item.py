@@ -76,7 +76,8 @@ class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
-                _("Quantity must be a positive number.")
+                _("Quantity must be a positive number."),
+                code="quantity_not_positive",
             )
         return value
 
@@ -92,7 +93,8 @@ class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
                     ).format(
                         product_stock=product.stock,
                     )
-                }
+                },
+                code="insufficient_stock",
             )
 
         return attrs
@@ -110,7 +112,8 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
-                _("Quantity must be a positive number.")
+                _("Quantity must be a positive number."),
+                code="quantity_not_positive",
             )
         return value
 
@@ -126,7 +129,8 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
                     ).format(
                         product_stock=product.stock,
                     )
-                }
+                },
+                code="insufficient_stock",
             )
 
         return attrs
@@ -154,7 +158,8 @@ class OrderItemRestockSerializer(serializers.Serializer):
 
         if not item:
             raise serializers.ValidationError(
-                _("Order item is required for restock operation")
+                _("Order item is required for restock operation"),
+                code="order_item_required",
             )
 
         if quantity and quantity > item.quantity - item.refunded_quantity:
@@ -163,7 +168,8 @@ class OrderItemRestockSerializer(serializers.Serializer):
                     "Cannot restock more than the available quantity. Available: {available_quantity}"
                 ).format(
                     available_quantity=item.quantity - item.refunded_quantity
-                )
+                ),
+                code="restock_exceeds_available",
             )
 
         return attrs

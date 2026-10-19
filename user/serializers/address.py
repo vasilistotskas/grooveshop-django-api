@@ -88,7 +88,8 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
 
                 if existing_main.exists():
                     raise serializers.ValidationError(
-                        _("A main address already exists for this user")
+                        _("A main address already exists for this user"),
+                        code="main_address_exists",
                     )
 
         # The same delivery-address rules as checkout, since a saved

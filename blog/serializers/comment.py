@@ -300,7 +300,8 @@ class BlogCommentWriteSerializer(
             and parent.post_id != post.pk
         ):
             raise serializers.ValidationError(
-                {"parent": _("Parent comment must belong to the same post.")}
+                {"parent": _("Parent comment must belong to the same post.")},
+                code="parent_comment_mismatch",
             )
         return attrs
 
@@ -335,11 +336,13 @@ class BlogCommentLikedCommentsRequestSerializer(serializers.Serializer):
     def validate_comment_ids(self, value: list) -> list:
         if not value:
             raise serializers.ValidationError(
-                _("At least one comment ID is required.")
+                _("At least one comment ID is required."),
+                code="comment_ids_required",
             )
         if len(value) > 100:
             raise serializers.ValidationError(
-                _("Cannot check more than 100 comments at once.")
+                _("Cannot check more than 100 comments at once."),
+                code="too_many_comment_ids",
             )
         return value
 

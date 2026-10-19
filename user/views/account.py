@@ -444,7 +444,10 @@ class UserAccountViewSet(BaseModelViewSet):
             user.save(update_fields=["username"])
         except IntegrityError:
             return Response(
-                {"detail": _("Username already taken.")},
+                {
+                    "detail": _("Username already taken."),
+                    "code": "username_taken",
+                },
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -538,7 +541,10 @@ class UserAccountViewSet(BaseModelViewSet):
 
         if request.user != user and not is_store_staff(request.user):
             return Response(
-                {"detail": _("You can only delete your own account.")},
+                {
+                    "detail": _("You can only delete your own account."),
+                    "code": "account_delete_forbidden",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -546,7 +552,10 @@ class UserAccountViewSet(BaseModelViewSet):
         # Staff acting on behalf of another user are exempt.
         if request.user == user and not did_recently_authenticate(request):
             return Response(
-                {"detail": _("Re-authentication required.")},
+                {
+                    "detail": _("Re-authentication required."),
+                    "code": "reauthentication_required",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 

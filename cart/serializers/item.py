@@ -155,10 +155,13 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
-                _("Quantity must be greater than zero.")
+                _("Quantity must be greater than zero."),
+                code="quantity_not_positive",
             )
         if value > 999:
-            raise serializers.ValidationError(_("Quantity cannot exceed 999."))
+            raise serializers.ValidationError(
+                _("Quantity cannot exceed 999."), code="quantity_too_large"
+            )
         return value
 
     def validate(self, attrs: dict) -> dict:
@@ -172,7 +175,8 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                         product_name=product.safe_translation_getter(
                             "name", any_language=True
                         ),
-                    )
+                    ),
+                    code="product_unavailable",
                 )
 
             # Adding to an existing line stacks onto the current quantity
@@ -203,7 +207,8 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                         ),
                         product_stock=product.stock,
                         quantity=requested_total,
-                    )
+                    ),
+                    code="insufficient_stock",
                 )
         return attrs
 
@@ -215,7 +220,9 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
         quantity = validated_data.get("quantity")
 
         if not cart:
-            raise serializers.ValidationError(_("Cart is not provided."))
+            raise serializers.ValidationError(
+                _("Cart is not provided."), code="cart_missing"
+            )
 
         if "attribution" in validated_data:
             request = self.context["request"]
@@ -268,10 +275,13 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
-                _("Quantity must be greater than zero.")
+                _("Quantity must be greater than zero."),
+                code="quantity_not_positive",
             )
         if value > 999:
-            raise serializers.ValidationError(_("Quantity cannot exceed 999."))
+            raise serializers.ValidationError(
+                _("Quantity cannot exceed 999."), code="quantity_too_large"
+            )
         return value
 
     def validate(self, attrs: dict) -> dict:
@@ -290,7 +300,8 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
                         ),
                         product_stock=product.stock,
                         quantity=quantity,
-                    )
+                    ),
+                    code="insufficient_stock",
                 )
         return attrs
 

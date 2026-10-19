@@ -1290,12 +1290,15 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     def validate_email(self, value: str) -> str:
         """Validate email is not from disposable domain."""
         if not value:
-            raise serializers.ValidationError(_("Email is required."))
+            raise serializers.ValidationError(
+                _("Email is required."), code="email_required"
+            )
 
         email_domain = value.split("@")[-1]
         if is_disposable_domain(email_domain):
             raise serializers.ValidationError(
-                _("Try using a different email address.")
+                _("Try using a different email address."),
+                code="email_disposable",
             )
         return value
 
@@ -1317,13 +1320,15 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 _(
                     "Greek ΑΦΜ must be exactly 9 digits "
                     "(optionally prefixed with EL or GR)."
-                )
+                ),
+                code="vat_id_invalid_format",
             )
         from b2b.validators import is_valid_greek_vat
 
         if not is_valid_greek_vat(cleaned):
             raise serializers.ValidationError(
-                _("Enter a valid Greek VAT number (ΑΦΜ).")
+                _("Enter a valid Greek VAT number (ΑΦΜ)."),
+                code="vat_id_invalid",
             )
         return cleaned
 
@@ -1334,7 +1339,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         cleaned = value.strip().upper()
         if len(cleaned) != 2 or not cleaned.isalpha():
             raise serializers.ValidationError(
-                _("Country must be a 2-letter ISO code (e.g. GR).")
+                _("Country must be a 2-letter ISO code (e.g. GR)."),
+                code="country_code_invalid",
             )
         return cleaned
 
@@ -1358,7 +1364,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
             raise serializers.ValidationError(
-                {"country_id": _("Select a valid country.")}
+                {"country_id": _("Select a valid country.")},
+                code="country_invalid",
             )
         region = None
         if attrs.get("region_id"):
@@ -1380,7 +1387,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "B2B_INVOICING_ENABLED", default=True
         ):
             raise serializers.ValidationError(
-                {"document_type": _("B2B invoicing is currently disabled.")}
+                {"document_type": _("B2B invoicing is currently disabled.")},
+                code="invoicing_disabled",
             )
         if document_type == "INVOICE" and not billing_vat_id:
             raise serializers.ValidationError(
@@ -1389,7 +1397,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                         "A valid ΑΦΜ is required when requesting an "
                         "invoice (document_type=INVOICE)."
                     )
-                }
+                },
+                code="vat_id_required",
             )
         if document_type == "INVOICE":
             # A Greek invoice must name the counterparty: company,
@@ -1403,7 +1412,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 if not (attrs.get(field) or "").strip():
                     errors[field] = label
             if errors:
-                raise serializers.ValidationError(errors)
+                raise serializers.ValidationError(errors, code="required")
             # Blank billing address ⇒ the buyer said "same as delivery".
             # Copy EXPLICITLY so the Order row snapshots the invoice
             # address instead of relying on read-time fallbacks. A
@@ -1425,7 +1434,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     if not (attrs.get(field) or "").strip():
                         address_errors[field] = label
                 if address_errors:
-                    raise serializers.ValidationError(address_errors)
+                    raise serializers.ValidationError(
+                        address_errors, code="required"
+                    )
         else:
             # A retail receipt carries NO buyer tax identity — blank
             # anything a stale or hand-crafted client smuggled in, or
@@ -1459,7 +1470,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                         "A shipping provider is required for locker / "
                         "pickup-point delivery."
                     )
-                }
+                },
+                code="shipping_provider_required",
             )
 
         # ``ShippingProvider.is_active`` is the master switch — a provider
@@ -1480,7 +1492,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                             "The selected shipping provider is currently "
                             "unavailable."
                         )
-                    }
+                    },
+                    code="shipping_provider_unavailable",
                 )
 
         # BoxNow-specific carrier field. The service-layer
@@ -1494,7 +1507,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     "boxnow_locker_id": _(
                         "Locker ID required when shipping method is BoxNow"
                     )
-                }
+                },
+                code="locker_required",
             )
 
         # NOTE: pay-way active + carrier-compatibility is enforced in the
@@ -1529,12 +1543,15 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
     def validate_email(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError(_("Email is required."))
+            raise serializers.ValidationError(
+                _("Email is required."), code="email_required"
+            )
 
         email_domain = value.split("@")[-1]
         if is_disposable_domain(email_domain):
             raise serializers.ValidationError(
-                _("Try using a different email address.")
+                _("Try using a different email address."),
+                code="email_disposable",
             )
         return value
 
@@ -1559,7 +1576,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             and attrs[field] != getattr(self.instance, field)
         }
         if locked:
-            raise serializers.ValidationError(locked)
+            raise serializers.ValidationError(locked, code="order_field_locked")
         errors = address_rules.address_update_errors(attrs, self.instance)
         if errors:
             raise serializers.ValidationError(errors)
@@ -1711,7 +1728,8 @@ class CreatePaymentIntentRequestSerializer(serializers.Serializer):
         if clashes:
             raise serializers.ValidationError(
                 _("These keys are reserved and cannot be sent: %(keys)s")
-                % {"keys": ", ".join(clashes)}
+                % {"keys": ", ".join(clashes)},
+                code="reserved_payment_data_keys",
             )
         return value
 
@@ -1817,12 +1835,14 @@ class RefundOrderRequestSerializer(serializers.Serializer):
 
         if amount is not None and not currency:
             raise serializers.ValidationError(
-                {"currency": _("Currency is required when amount is provided")}
+                {"currency": _("Currency is required when amount is provided")},
+                code="currency_required",
             )
 
         if amount is not None and amount <= 0:
             raise serializers.ValidationError(
-                {"amount": _("Refund amount must be greater than 0")}
+                {"amount": _("Refund amount must be greater than 0")},
+                code="refund_amount_invalid",
             )
 
         return attrs
@@ -1923,6 +1943,9 @@ class OrderCancelErrorSerializer(serializers.Serializer):
     """
 
     detail = serializers.CharField(required=False)
+    code = serializers.CharField(
+        required=False, help_text=_("The same value as ``error.type``.")
+    )
     error = OrderCancelErrorDetailSerializer(required=False)
 
 
@@ -1962,6 +1985,9 @@ class OrderCreateErrorSerializer(serializers.Serializer):
     """
 
     detail = serializers.CharField(required=False)
+    code = serializers.CharField(
+        required=False, help_text=_("The same value as ``error.type``.")
+    )
     error = OrderCreateErrorDetailSerializer(required=False)
     cart = serializers.ListField(
         child=serializers.CharField(),

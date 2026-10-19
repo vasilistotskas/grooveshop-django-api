@@ -428,6 +428,7 @@ class TestACustomerCancelTheCourierDoesNotConfirm:
         assert response.data["error"]["type"] == (
             OrderCancelErrorType.PARCEL_WITH_COURIER
         )
+        assert response.data["code"] == OrderCancelErrorType.PARCEL_WITH_COURIER
         assert viva.sent == []
         assert _row(order)["status"] == OrderStatus.PROCESSING
 

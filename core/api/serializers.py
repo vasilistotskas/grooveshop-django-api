@@ -153,6 +153,13 @@ class HealthCheckResponseSerializer(serializers.Serializer):
 
 class DetailSerializer(serializers.Serializer):
     detail = serializers.CharField()
+    code = serializers.CharField(
+        required=False,
+        help_text=_(
+            "Stable error code. Branch on this, never on ``detail``, "
+            "which is in the request's language."
+        ),
+    )
 
 
 @extend_schema_field(

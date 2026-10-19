@@ -70,7 +70,8 @@ class ProductAlertSerializer(serializers.ModelSerializer[ProductAlert]):
                     "target_price": _(
                         "target_price is required for price-drop alerts."
                     )
-                }
+                },
+                code="target_price_required",
             )
         return attrs
 

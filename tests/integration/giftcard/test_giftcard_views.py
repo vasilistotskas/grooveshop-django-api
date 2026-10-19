@@ -111,6 +111,7 @@ class TestCheck:
         assert response.data == {
             "detail": "Unknown gift card code.",
             "reason": "gift_card_invalid",
+            "code": "gift_card_invalid",
         }
 
     def test_merchant_toggle_off_is_404_even_for_a_real_code(self):
@@ -204,6 +205,7 @@ class TestPurchaseRefusals:
         assert response.json() == {
             "detail": "Buyer email is required.",
             "reason": "gift_card_buyer_email_required",
+            "code": "gift_card_buyer_email_required",
         }
         assert not GiftCardPurchase.objects.exists()
 
@@ -220,6 +222,7 @@ class TestPurchaseRefusals:
         assert response.json() == {
             "detail": "Gift card amount must be between 10 and 500 EUR.",
             "reason": "gift_card_invalid_amount",
+            "code": "gift_card_invalid_amount",
         }
         assert not GiftCardPurchase.objects.exists()
 
@@ -244,6 +247,7 @@ class TestPurchaseRefusals:
         assert response.json() == {
             "detail": "Gift card purchase is not available for this store.",
             "reason": "gift_card_purchase_unavailable",
+            "code": "gift_card_purchase_unavailable",
         }
         provider.process_payment.assert_not_called()
         assert not GiftCardPurchase.objects.exists()
@@ -288,6 +292,7 @@ class TestPurchaseRefusals:
         assert response.json() == {
             "detail": "Failed to start the payment.",
             "reason": "gift_card_payment_failed",
+            "code": "gift_card_payment_failed",
         }
         purchase = GiftCardPurchase.objects.get()
         assert purchase.status == GiftCardPurchaseStatus.FAILED

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ErrorDetail
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
@@ -71,6 +72,15 @@ def postcode_matches(country: Country, value: str) -> bool:
     return _compiled(pattern).fullmatch(postcode) is not None
 
 
+def _coded(code: str, message: StrOrPromise) -> ErrorDetail:
+    """A message that keeps its stable code through ``ValidationError``.
+
+    The rules below serve a DRF serializer and a model ``clean()`` alike;
+    DRF reads ``ErrorDetail.code`` where Django just sees a ``str``.
+    """
+    return ErrorDetail(str(message), code)
+
+
 def postcode_error(country: Country) -> StrOrPromise:
     """The shopper-facing message for a postcode ``country`` rejects."""
     if country.postal_code_example:
@@ -111,13 +121,18 @@ def address_errors(
     errors: dict[str, list[StrOrPromise]] = {}
 
     if not postcode_matches(country, zipcode):
-        errors["zipcode"] = [postcode_error(country)]
+        errors["zipcode"] = [
+            _coded("invalid_postcode", postcode_error(country))
+        ]
 
     if street and not any(char.isalpha() for char in street):
         errors["street"] = [
-            _(
-                "Enter the street name here; the number goes in the "
-                "street number field."
+            _coded(
+                "street_name_missing",
+                _(
+                    "Enter the street name here; the number goes in the "
+                    "street number field."
+                ),
             )
         ]
 
@@ -128,18 +143,29 @@ def address_errors(
         and postcode_matches(country, number)
     ):
         errors["street_number"] = [
-            _(
-                "This looks like a postcode. Enter the street number "
-                "here and the postcode in the postcode field."
+            _coded(
+                "street_number_is_postcode",
+                _(
+                    "This looks like a postcode. Enter the street number "
+                    "here and the postcode in the postcode field."
+                ),
             )
         ]
 
     if region is None:
         if country.regions.exists():
-            errors["region"] = [_("Select a region for the selected country.")]
+            errors["region"] = [
+                _coded(
+                    "region_required",
+                    _("Select a region for the selected country."),
+                )
+            ]
     elif region.country_id != country.alpha_2:
         errors["region"] = [
-            _("Select a region that belongs to the selected country.")
+            _coded(
+                "region_country_mismatch",
+                _("Select a region that belongs to the selected country."),
+            )
         ]
 
     return errors

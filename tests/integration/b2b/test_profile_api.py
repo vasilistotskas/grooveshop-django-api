@@ -40,6 +40,7 @@ class TestProfileEndpoint:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert response.data["reason"] == "no_business_profile"
+        assert response.data["code"] == "no_business_profile"
 
     def test_submit_creates_pending_profile_with_vies_snapshot(
         self, b2b_tenant, enable_wholesale, mock_vies

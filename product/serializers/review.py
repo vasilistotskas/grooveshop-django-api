@@ -134,7 +134,9 @@ class ProductReviewWriteSerializer(
     def validate_rate(self, value: int) -> int:
         valid_rates = [choice[0] for choice in RateEnum.choices]
         if value not in valid_rates:
-            raise serializers.ValidationError(_("Invalid rate value."))
+            raise serializers.ValidationError(
+                _("Invalid rate value."), code="invalid_rate"
+            )
         return value
 
     def create(self, validated_data):
@@ -153,7 +155,8 @@ class ProductReviewWriteSerializer(
             ).exists()
         ):
             raise serializers.ValidationError(
-                _("You have already reviewed this product.")
+                _("You have already reviewed this product."),
+                code="already_reviewed",
             )
 
         return attrs

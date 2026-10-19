@@ -109,7 +109,9 @@ class UserWriteSerializer(UserSerializer):
             return settings.LANGUAGE_CODE
         valid = {code for code, _name in settings.LANGUAGES}
         if value not in valid:
-            raise serializers.ValidationError(_("Unsupported language code."))
+            raise serializers.ValidationError(
+                _("Unsupported language code."), code="unsupported_language"
+            )
         return value
 
     def validate_username(self, username):
@@ -118,7 +120,8 @@ class UserWriteSerializer(UserSerializer):
             User.objects.filter(username=username).exists()
         ):
             raise serializers.ValidationError(
-                _("A user with this username already exists.")
+                _("A user with this username already exists."),
+                code="username_taken",
             )
         return username
 
@@ -380,7 +383,8 @@ class DeleteAccountRequestSerializer(serializers.Serializer):
     def validate_confirmation(self, value: str) -> str:
         if value != "DELETE":
             raise serializers.ValidationError(
-                _("Type DELETE exactly to confirm account deletion.")
+                _("Type DELETE exactly to confirm account deletion."),
+                code="delete_confirmation_mismatch",
             )
         return value
 

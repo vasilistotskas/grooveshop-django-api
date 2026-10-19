@@ -97,6 +97,7 @@ class TestOrderCreateErrorCodes(APITestCase):
         assert response.json()["error"]["type"] == (
             OrderCreateErrorType.CART_INVALID
         )
+        assert response.json()["code"] == OrderCreateErrorType.CART_INVALID
 
     @patch("order.services.OrderService.validate_shipping_address")
     @patch("order.services.OrderService.create_order_from_cart_offline")

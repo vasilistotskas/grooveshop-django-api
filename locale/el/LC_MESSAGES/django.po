@@ -15891,7 +15891,7 @@ msgstr ""
 "αξιολόγηση."
 
 #: .\product\views\review.py:135
-msgid "must_have_purchased"
+msgid "You must have purchased this product to review it."
 msgstr "Πρέπει να έχετε αγοράσει το προϊόν για να το αξιολογήσετε."
 
 #: .\product\views\review.py:154
@@ -23760,3 +23760,12 @@ msgstr "ΦΠΑ %(value)s%%"
 
 #~ msgid "Edge cache — Cloudflare"
 #~ msgstr "Cache στο Cloudflare"
+
+msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
+msgstr "Σταθερός κωδικός σφάλματος. Βασιστείτε σε αυτόν, ποτέ στο ``detail``, που είναι στη γλώσσα του αιτήματος."
+
+msgid "The same value as ``reason``."
+msgstr "Η ίδια τιμή με το ``reason``."
+
+msgid "The same value as ``error.type``."
+msgstr "Η ίδια τιμή με το ``error.type``."

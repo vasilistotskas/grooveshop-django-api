@@ -78,7 +78,7 @@ class ProductFavouriteWriteSerializer(
             ).exists()
         ):
             raise serializers.ValidationError(
-                _("Product is already in favorites")
+                _("Product is already in favorites"), code="already_favourited"
             )
 
         if not self.instance:
@@ -87,7 +87,10 @@ class ProductFavouriteWriteSerializer(
                 ProductFavourite.objects.filter(user=user).count()
                 >= max_favourites
             ):
-                raise serializers.ValidationError(_("Favourites limit reached"))
+                raise serializers.ValidationError(
+                    _("Favourites limit reached"),
+                    code="favourites_limit_reached",
+                )
 
         return attrs
 

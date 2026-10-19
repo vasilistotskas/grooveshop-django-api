@@ -277,7 +277,8 @@ class CartItemViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "You do not have permission to delete this cart item."
-                    )
+                    ),
+                    "code": "cart_item_forbidden",
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

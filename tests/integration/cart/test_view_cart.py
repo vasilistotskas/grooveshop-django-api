@@ -136,6 +136,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["reason"], "pay_way_unavailable")
+        self.assertEqual(response.data["code"], "pay_way_unavailable")
         # The decisive part: no intent was ever created, so there is
         # nothing for the shopper to confirm.
         provider.process_payment.assert_not_called()

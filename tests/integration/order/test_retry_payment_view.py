@@ -196,7 +196,10 @@ class TestRetryPaymentRefusals:
             response = _client(user).post(_url(order), {}, format="json")
 
         assert response.status_code == 400
-        assert response.data == {"detail": "This order has already been paid."}
+        assert response.data == {
+            "detail": "This order has already been paid.",
+            "code": "order_not_payable",
+        }
         provider.process_payment.assert_not_called()
         order.refresh_from_db()
         assert order.payment_id == "pi_paid"
@@ -220,7 +223,8 @@ class TestRetryPaymentRefusals:
 
         assert response.status_code == 400
         assert response.data == {
-            "detail": "This order's payment status does not allow a retry."
+            "detail": "This order's payment status does not allow a retry.",
+            "code": "payment_retry_not_allowed",
         }
         provider.process_payment.assert_not_called()
         order.refresh_from_db()
@@ -243,7 +247,8 @@ class TestRetryPaymentRefusals:
 
         assert response.status_code == 400
         assert response.data == {
-            "detail": "This order is no longer open for payment."
+            "detail": "This order is no longer open for payment.",
+            "code": "order_not_payable",
         }
         provider.process_payment.assert_not_called()
         order.refresh_from_db()
@@ -274,7 +279,8 @@ class TestRetryPaymentRefusals:
 
         assert response.status_code == 400
         assert response.data == {
-            "detail": "This order is no longer open for payment."
+            "detail": "This order is no longer open for payment.",
+            "code": "order_not_payable",
         }
         provider.process_payment.assert_not_called()
         order.refresh_from_db()
@@ -303,7 +309,8 @@ class TestRetryPaymentRefusals:
 
         assert response.status_code == 400
         assert response.data == {
-            "detail": "Retry is only supported for Stripe payments."
+            "detail": "Retry is only supported for Stripe payments.",
+            "code": "payment_retry_stripe_only",
         }
         provider.process_payment.assert_not_called()
         order.refresh_from_db()
@@ -318,7 +325,8 @@ class TestRetryPaymentRefusals:
 
         assert response.status_code == 400
         assert response.data == {
-            "detail": "Retry is only supported for Stripe payments."
+            "detail": "Retry is only supported for Stripe payments.",
+            "code": "payment_retry_stripe_only",
         }
 
     def test_provider_failure_returns_400_and_leaves_order_untouched(self):
@@ -333,6 +341,7 @@ class TestRetryPaymentRefusals:
         assert response.data == {
             "detail": "Failed to create payment intent.",
             "error": {"error": "card_declined"},
+            "code": "payment_intent_failed",
         }
         order.refresh_from_db()
         assert order.payment_id == "pi_old_failed"
@@ -397,7 +406,8 @@ class TestRetryPaymentConcurrentChange:
         assert response.status_code == 409, response.data
         assert response.data == {
             "detail": "This order changed while the payment was being "
-            "prepared. Reload it and try again."
+            "prepared. Reload it and try again.",
+            "code": "order_changed_during_payment",
         }
         order.refresh_from_db()
         for field, value in meanwhile.items():

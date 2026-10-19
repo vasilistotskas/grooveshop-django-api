@@ -16,6 +16,7 @@ class PaymentTransactionKind(models.TextChoices):
     CHARGEBACK = "CHARGEBACK", _("Chargeback")
     REFUND_REVERSAL = "REFUND_REVERSAL", _("Refund reversal")
     COD_COLLECTION = "COD_COLLECTION", _("Cash on delivery collection")
+    OFFLINE_COLLECTION = "OFFLINE", _("Collected off-platform")
 
 
 #: The kinds that move money against one CHARGE and so name it. A

@@ -65,6 +65,7 @@ from order.payment import (
 )
 from order.payment_binding import PaymentPurpose, binding_mismatch
 from order.payment_ledger import (
+    OFFLINE_TRANSFER_PROVIDER,
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
@@ -3510,7 +3511,12 @@ class OrderService:
             .select_related("charge")
             .select_for_update(of=("self",))
             .filter(order=order)
-            .exclude(charge__kind=PaymentTransactionKind.COD_COLLECTION)
+            .exclude(
+                charge__kind__in=(
+                    PaymentTransactionKind.COD_COLLECTION,
+                    PaymentTransactionKind.OFFLINE_COLLECTION,
+                )
+            )
             .order_by("created_at", "id")
         )
         if not pending:
@@ -4189,6 +4195,96 @@ class OrderService:
         from shipping.services import ShippingService
 
         ShippingService.dispatch_create_shipment_task(order)
+
+    @classmethod
+    @transaction.atomic
+    def confirm_offline_payment(
+        cls,
+        order: Order,
+        *,
+        amount: Money,
+        reference: str,
+        confirmed_by: str,
+        note: str = "",
+    ) -> None:
+        """Record that the money of a bank-transfer order (``PaySettlement.
+        OFFLINE_TRANSFER``) arrived, on a staff member's word.
+
+        An order's ``payment_status`` is never typed in (the admin form
+        shows it read-only, since a form save once marked orders paid with
+        no charge behind them), so this is the one door for money that is
+        settled off the platform. It is narrow on purpose: only a
+        bank-transfer order, only while its payment is PENDING, only for
+        exactly what the order costs (a short or over payment is for the
+        staff member to resolve first), and only with a reference (the
+        bank's transaction id), which is also the ledger's idempotency key
+        so one transfer cannot pay two orders. Online providers never come
+        through here: their payments are recorded by the provider's own
+        confirmed event.
+
+        Written together, under the order lock: the ledger CHARGE, the
+        payment status and the history entry saying who confirmed what
+        and when. A PENDING order then moves to PROCESSING like any paid
+        order (which fires ``order_paid``).
+        """
+        from order.models.history import OrderHistory
+
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        pay_way = locked.pay_way
+        if (
+            pay_way is None
+            or PaySettlement(pay_way.settlement)
+            != PaySettlement.OFFLINE_TRANSFER
+        ):
+            raise PaymentError(
+                _(
+                    "Only a bank-transfer order can be confirmed paid by "
+                    "hand. Online payments are recorded by the payment "
+                    "provider."
+                )
+            )
+        if locked.payment_status != PaymentStatus.PENDING:
+            raise PaymentError(_("This order is not waiting for a payment."))
+        reference = reference.strip()
+        if not reference:
+            raise PaymentError(
+                _("Give the bank's transaction reference for the transfer.")
+            )
+        if amount.amount != locked.amount_due.amount:
+            raise PaymentError(
+                _("The order costs {due}; confirm exactly that amount.").format(
+                    due=locked.amount_due
+                )
+            )
+        previous = locked.payment_status
+        _row, created = PaymentLedger.record_offline_collection(
+            locked,
+            amount=amount,
+            reference=reference,
+            description=f"Confirmed by {confirmed_by}: {note}",
+        )
+        if not created:
+            raise PaymentError(
+                _("This transfer reference is already recorded.")
+            )
+        locked.mark_as_paid(payment_method=OFFLINE_TRANSFER_PROVIDER)
+        OrderHistory.log_payment_update(
+            order=locked,
+            previous_value={"payment_status": previous},
+            new_value={
+                "payment_status": PaymentStatus.COMPLETED,
+                "provider": OFFLINE_TRANSFER_PROVIDER,
+                "reference": reference,
+                "amount": str(amount.amount),
+                "confirmed_by": confirmed_by,
+                "note": note,
+            },
+        )
+        order.payment_status = locked.payment_status
+        order.payment_method = locked.payment_method
+        if locked.status == OrderStatus.PENDING:
+            cls.update_order_status(locked, OrderStatus.PROCESSING)
+            order.status = locked.status
 
     @classmethod
     @transaction.atomic

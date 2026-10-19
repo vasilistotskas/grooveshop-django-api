@@ -52,9 +52,7 @@ from admin.filters import AcquisitionSourceFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import (
-    OrderStatus,
-)
+from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import PaymentError, RefundOutstandingError
 from order.follow_up import (
     follow_up_days,
@@ -83,6 +81,7 @@ from order.payment_ledger import (
 )
 from order.services import OrderService
 from order.taxation import breakdown_by_rate, order_vat_lines
+from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
 
 logger = logging.getLogger(__name__)
@@ -373,6 +372,42 @@ class RefundOrderForm(BaseDialogForm):
                 ),
             )
         return cleaned
+
+
+class ConfirmPaymentForm(BaseDialogForm):
+    """The "Confirm payment received" dialog of a bank-transfer order."""
+
+    amount = forms.DecimalField(
+        label=_("Amount received"),
+        max_digits=11,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        widget=UnfoldAdminDecimalFieldWidget,
+        help_text=_("Exactly what the order costs."),
+    )
+    reference = forms.CharField(
+        label=_("Bank transaction reference"),
+        max_length=100,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_(
+            "The bank's id for the transfer. One transfer cannot pay two "
+            "orders."
+        ),
+    )
+    note = forms.CharField(
+        label=_("Note"),
+        max_length=150,
+        required=False,
+        widget=UnfoldAdminTextInputWidget,
+    )
+
+    def __init__(self, request, object_id=None, *args, **kwargs):
+        super().__init__(request, object_id, *args, **kwargs)
+        order = (
+            Order.objects.filter(pk=object_id).first() if object_id else None
+        )
+        if order is not None:
+            self.fields["amount"].initial = order.amount_due.amount
 
 
 class OrderItemInline(TabularInline):
@@ -885,6 +920,7 @@ class OrderAdmin(BaseModelAdmin):
     # the shipping-voucher button top-level (it's the most-used
     # one-click op and reads cleaner with a short label).
     actions_detail = [
+        "confirm_offline_payment",
         "refund_payment",
         "download_shipping_voucher",
         {
@@ -1386,6 +1422,70 @@ class OrderAdmin(BaseModelAdmin):
             queryset,
             OrderStatus.REFUNDED,
             _("Order %(order_id)s marked as refunded"),
+        )
+
+    @action(
+        description=_("Confirm payment received"),
+        icon="payments",
+        permissions=["change", "confirm_payment"],
+        dialog=ActionDialog(
+            title=_("Confirm the bank transfer arrived"),
+            description=_(
+                "Records the transfer on the order's payment ledger and "
+                "marks the order paid. Who confirmed it, when and how much "
+                "is kept on the order. Only for a bank-transfer order that "
+                "is still waiting for its payment."
+            ),
+            form_class=ConfirmPaymentForm,
+        ),
+    )
+    def confirm_offline_payment(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        order = Order.objects.get(pk=object_id)
+        amount = Money(form.cleaned_data["amount"], order.amount_due.currency)
+        try:
+            OrderService.confirm_offline_payment(
+                order,
+                amount=amount,
+                reference=form.cleaned_data["reference"],
+                confirmed_by=request.user.email,
+                note=form.cleaned_data["note"],
+            )
+        except PaymentError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.log_change(
+                request,
+                order,
+                f"Confirmed the bank transfer {form.cleaned_data['reference']}"
+                f" of {amount}",
+            )
+            self.message_user(
+                request,
+                _("Order %(order_id)s is marked paid.")
+                % {"order_id": order.id},
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
+
+    def has_confirm_payment_permission(self, request, object_id=None):
+        """Offered only where it applies: a bank-transfer order still
+        waiting for its payment. Anything else is refused here too, so a
+        forged request for another order does nothing."""
+        return (
+            object_id is not None
+            and Order.objects.filter(
+                pk=object_id,
+                payment_status=PaymentStatus.PENDING,
+                pay_way__settlement=PaySettlement.OFFLINE_TRANSFER,
+            ).exists()
         )
 
     @action(

@@ -28,6 +28,7 @@ from admin.displays import (
     source_badge,
 )
 from admin.filters import AcquisitionSourceFilter, AnnotatedRangeFilter
+from cart.managers.cart import abandoned_cutoff
 from cart.models import Cart, CartAttribution, CartItem
 from order.managers.order import awaiting_online_payment_q
 from order.models.order import Order
@@ -40,7 +41,6 @@ CART_TYPE_VARIANT: dict[str, str] = {
 ACTIVITY_STATE_VARIANT: dict[str, str] = {
     "active": "success",
     "recent": "info",
-    "idle": "warning",
     "abandoned": "danger",
 }
 
@@ -62,8 +62,7 @@ class CartTypeFilter(DropdownFilter):
         elif self.value() == "guest":
             return queryset.filter(user__isnull=True)
         elif self.value() == "abandoned":
-            cutoff = timezone.now() - timedelta(hours=24)
-            return queryset.filter(last_activity__lt=cutoff)
+            return queryset.filter(last_activity__lt=abandoned_cutoff())
         return queryset
 
 
@@ -324,14 +323,12 @@ class CartAdmin(BaseModelAdmin):
 
     @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
     def activity_state(self, obj):
-        delta = timezone.now() - obj.last_activity
-        if delta < timedelta(hours=1):
+        # The same line the filter and the cleanup task use.
+        if obj.last_activity < abandoned_cutoff():
+            return "abandoned", _("Abandoned")
+        if timezone.now() - obj.last_activity < timedelta(hours=1):
             return "active", _("Active")
-        if delta < timedelta(hours=24):
-            return "recent", _("Recent")
-        if delta < timedelta(days=7):
-            return "idle", _("Idle")
-        return "abandoned", _("Abandoned")
+        return "recent", _("Recent")
 
     @admin.display(description=_("Items"))
     def items_summary(self, obj):

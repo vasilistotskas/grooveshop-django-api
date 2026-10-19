@@ -22,6 +22,7 @@ from unfold.widgets import (
 )
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.bulk import update_each
 from admin.displays import money
 from admin.export import ExportActionMixin
 from promotion.enum import BenefitType, TargetScope
@@ -303,7 +304,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
 
     @action(description=_("Activate selected promotions"))
     def activate_promotions(self, request, queryset):
-        updated = queryset.update(is_active=True)
+        updated = update_each(queryset, is_active=True)
         self.message_user(
             request,
             _("%(count)d promotions activated.") % {"count": updated},
@@ -312,7 +313,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
 
     @action(description=_("Deactivate selected promotions"))
     def deactivate_promotions(self, request, queryset):
-        updated = queryset.update(is_active=False)
+        updated = update_each(queryset, is_active=False)
         self.message_user(
             request,
             _("%(count)d promotions deactivated.") % {"count": updated},

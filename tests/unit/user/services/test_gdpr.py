@@ -133,3 +133,92 @@ class TestCompileUserDataCompleteness:
 
         assert data["cart"] is None
         assert data["search_history"] == []
+
+
+@pytest.mark.django_db
+class TestCompileUserDataAlertsAndContacts:
+    """Product alerts and contact messages are personal data too."""
+
+    @staticmethod
+    def _verified(user, email):
+        from allauth.account.models import EmailAddress
+
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(
+            user=user, email=email, verified=True, primary=True
+        )
+
+    def test_export_includes_the_users_product_alerts(self):
+        from product.factories.product import ProductFactory
+        from product.models.alert import ProductAlert, ProductAlertKind
+
+        user = UserAccountFactory()
+        other = UserAccountFactory()
+        product = ProductFactory(num_images=0, num_reviews=0)
+        ProductAlert.objects.create(
+            user=user, product=product, kind=ProductAlertKind.RESTOCK
+        )
+        ProductAlert.objects.create(
+            user=other, product=product, kind=ProductAlertKind.RESTOCK
+        )
+
+        alerts = compile_user_data(user)["product_alerts"]
+
+        assert [a["product_id"] for a in alerts] == [product.pk]
+        assert alerts[0]["kind"] == ProductAlertKind.RESTOCK
+
+    def test_export_includes_guest_alerts_on_a_verified_address(self):
+        from product.factories.product import ProductFactory
+        from product.models.alert import ProductAlert, ProductAlertKind
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        product = ProductFactory(num_images=0, num_reviews=0)
+        ProductAlert.objects.create(
+            email="ME@example.com",
+            product=product,
+            kind=ProductAlertKind.RESTOCK,
+        )
+        ProductAlert.objects.create(
+            email="stranger@example.com",
+            product=product,
+            kind=ProductAlertKind.RESTOCK,
+        )
+
+        alerts = compile_user_data(user)["product_alerts"]
+
+        assert [a["email"] for a in alerts] == ["ME@example.com"]
+
+    def test_export_includes_contact_messages_from_a_verified_address(self):
+        from contact.models import Contact
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        Contact.objects.create(
+            name="Me", email="Me@Example.com", message="Where is my order?"
+        )
+        Contact.objects.create(
+            name="Stranger", email="x@example.com", message="Not mine"
+        )
+
+        messages = compile_user_data(user)["contact_messages"]
+
+        assert [m["message"] for m in messages] == ["Where is my order?"]
+
+    def test_unverified_address_exports_no_contact_messages(self):
+        from allauth.account.models import EmailAddress
+
+        from contact.models import Contact
+
+        user = UserAccountFactory()
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(
+            user=user, email="me@example.com", verified=False, primary=True
+        )
+        Contact.objects.create(
+            name="Someone", email="me@example.com", message="Not proven"
+        )
+
+        data = compile_user_data(user)
+
+        assert data["contact_messages"] == []

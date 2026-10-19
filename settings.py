@@ -1904,11 +1904,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
-        "name": "LOW_STOCK_THRESHOLD",
-        "type": "int",
-        "value": 10,
-    },
-    {
         "name": "CHECKOUT_ABANDONMENT_HOURS",
         "type": "int",
         "value": 2,
@@ -2457,12 +2452,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "OLD_GUEST_CART_CLEANUP_DAYS",
         "type": "int",
         "value": 30,
-    },
-    # Notification settings
-    {
-        "name": "NOTIFICATION_EXPIRATION_DAYS",
-        "type": "int",
-        "value": 180,
     },
     # Search settings
     {

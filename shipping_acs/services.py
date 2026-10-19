@@ -2192,9 +2192,10 @@ class AcsService:
         try:
             sent = send_ops_alert(
                 kind=OpsAlertKind.UNATTRIBUTABLE_COD_PAYOUTS,
-                subject=(
-                    f"ACS COD reconcile: {total} unattributable payout row(s)"
-                ),
+                subject=gettext(
+                    "ACS COD reconcile: %(total)d unattributable payout row(s)"
+                )
+                % {"total": total},
                 message=(
                     f"{total} payout row(s) for COD_Payment_Date="
                     f"{cod_payment_date or 'unspecified'} could not be "

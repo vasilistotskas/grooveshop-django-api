@@ -4,6 +4,7 @@ from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
     RelatedDropdownFilter,
@@ -103,7 +104,7 @@ class BusinessProfileAdmin(BaseModelAdmin):
 
     fieldsets = (
         (
-            _("Company"),
+            pgettext_lazy("business profile tab", "Company"),
             {
                 "classes": ("tab",),
                 "fields": (
@@ -120,7 +121,7 @@ class BusinessProfileAdmin(BaseModelAdmin):
             },
         ),
         (
-            _("Review"),
+            pgettext_lazy("business profile tab", "Review"),
             {
                 "classes": ("tab",),
                 "fields": (

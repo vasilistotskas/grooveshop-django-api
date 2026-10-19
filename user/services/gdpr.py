@@ -321,6 +321,55 @@ def compile_user_data(user) -> dict[str, Any]:
         for s in _subject_subscriptions(user).select_related("topic")
     ]
 
+    verified_emails = _verified_emails(user)
+    by_verified_email = Q()
+    for email in verified_emails:
+        by_verified_email |= Q(email__iexact=email)
+
+    # Back-in-stock / price-drop subscriptions: the account's own, plus
+    # guest ones made with a verified address (as for subscriptions).
+    from product.models.alert import ProductAlert
+
+    alerts_filter = Q(user=user)
+    if verified_emails:
+        alerts_filter |= Q(user__isnull=True) & by_verified_email
+    product_alerts = [
+        {
+            "id": a.id,
+            "product_id": a.product_id,
+            "kind": a.kind,
+            "email": a.email,
+            "target_price": _serialize_money(a.target_price),
+            "is_active": a.is_active,
+            "notified_at": _iso(a.notified_at),
+            "created_at": _iso(a.created_at),
+        }
+        for a in ProductAlert.objects.filter(alerts_filter)
+    ]
+
+    # Contact-form messages carry no account link, only the address the
+    # sender typed; verified addresses only, so an unproven address on the
+    # account cannot pull a stranger's message into the export.
+    from contact.models import Contact
+
+    contact_messages = (
+        [
+            {
+                "id": c.id,
+                "name": c.name,
+                "email": c.email,
+                "company": c.company,
+                "phone": c.phone,
+                "subject": c.subject,
+                "message": c.message,
+                "created_at": _iso(c.created_at),
+            }
+            for c in Contact.objects.filter(by_verified_email)
+        ]
+        if verified_emails
+        else []
+    )
+
     loyalty: dict[str, Any] = {"transactions": [], "points_balance": None}
     # As above: a missing app is expected, a failed read is not. An export
     # that quietly drops a category of personal data still presents itself
@@ -397,6 +446,8 @@ def compile_user_data(user) -> dict[str, Any]:
         "liked_blog_posts": liked_posts,
         "notifications": notifications,
         "subscriptions": subscriptions,
+        "product_alerts": product_alerts,
+        "contact_messages": contact_messages,
         "loyalty": loyalty,
         "search_history": search_history,
         "cart": cart,

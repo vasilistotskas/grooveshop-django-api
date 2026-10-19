@@ -806,7 +806,6 @@ class OrderAdmin(BaseModelAdmin):
                     "zipcode",
                     "floor",
                     "location_type",
-                    "place",
                 ),
                 "classes": ("tab",),
             },

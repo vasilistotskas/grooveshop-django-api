@@ -27,6 +27,7 @@ from typing import Any
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.email_context import build_email_context
@@ -366,9 +367,10 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
     try:
         sent = send_ops_alert(
             kind=OpsAlertKind.UNREMITTED_COD,
-            subject=(
-                f"ACS COD: {len(rows)} delivered parcel(s) never remitted"
-            ),
+            subject=gettext(
+                "ACS COD: %(count)d delivered parcel(s) never remitted"
+            )
+            % {"count": len(rows)},
             message=(
                 f"{len(rows)} COD parcel(s) were delivered more than "
                 f"{older_than_days} days ago and ACS has still not "

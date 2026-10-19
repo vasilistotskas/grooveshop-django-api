@@ -8,7 +8,7 @@ from django.db import models
 from django.db.models import F, Max, Q
 from django.db.models.functions import Coalesce, Greatest
 from django.utils import timezone
-from django.utils.translation import gettext
+from django.utils.translation import gettext, pgettext_lazy
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
@@ -431,7 +431,7 @@ class BuiltInRoute(models.TextChoices):
     a navigation menu is public chrome, not a shortcut bar.
     """
 
-    HOME = "/", _("Home")
+    HOME = "/", pgettext_lazy("navigation link", "Home")
     PRODUCTS = "/products", _("Products")
     BLOG = "/blog", _("Blog")
     CONTACT = "/contact", _("Contact")

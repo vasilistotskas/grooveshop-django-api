@@ -4,7 +4,9 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import Count, Sum
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Count, F, Sum
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import path, reverse
@@ -30,6 +32,7 @@ from unfold.enums import ActionVariant
 from unfold.forms import BaseDialogForm
 from unfold.widgets import (
     UnfoldAdminDecimalFieldWidget,
+    UnfoldAdminIntegerFieldWidget,
     UnfoldAdminTextInputWidget,
 )
 
@@ -52,7 +55,11 @@ from admin.filters import AcquisitionSourceFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    RETURN_HANDLING_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.exceptions import PaymentError, RefundOutstandingError
 from order.follow_up import (
     follow_up_days,
@@ -408,6 +415,68 @@ class ConfirmPaymentForm(BaseDialogForm):
         )
         if order is not None:
             self.fields["amount"].initial = order.amount_due.amount
+
+
+class RestockReturnedForm(BaseDialogForm):
+    """The "Restock returned items" dialog of an order.
+
+    One quantity per line that still has units not put back, capped at
+    what is left (``OrderItem.refunded_quantity`` counts what was). The
+    caps only guide the staff member: ``OrderItem.refund`` checks them
+    again under the line's lock, so a stale dialog cannot restock twice.
+    """
+
+    reason = forms.CharField(
+        label=_("Reason"),
+        # Written to the stock log (255) after a fixed prefix.
+        max_length=150,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_("Recorded on the stock log with your name."),
+    )
+
+    def __init__(self, request, object_id=None, *args, **kwargs):
+        super().__init__(request, object_id, *args, **kwargs)
+        self.items = [
+            item
+            for item in OrderItem.objects.filter(order_id=object_id)
+            .select_related("product")
+            .order_by("sort_order", "pk")
+            if item.net_quantity > 0
+        ]
+        for item in self.items:
+            name = item.product.safe_translation_getter(
+                "name", any_language=True
+            ) or _("Unnamed Product")
+            self.fields[self.field_name(item)] = forms.IntegerField(
+                label=name,
+                min_value=0,
+                max_value=item.net_quantity,
+                initial=0,
+                required=False,
+                widget=UnfoldAdminIntegerFieldWidget,
+                help_text=_("Returned and still to put back: %(left)s")
+                % {"left": item.net_quantity},
+            )
+
+    @staticmethod
+    def field_name(item: OrderItem) -> str:
+        return f"quantity_{item.pk}"
+
+    def quantities(self) -> dict[int, int]:
+        """Item pk to the units staff ask to put back (zero rows left out)."""
+        return {
+            item.pk: quantity
+            for item in self.items
+            if (quantity := self.cleaned_data.get(self.field_name(item)))
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.errors and not self.quantities():
+            raise forms.ValidationError(
+                _("Enter how many units of at least one line came back.")
+            )
+        return cleaned
 
 
 class OrderItemInline(TabularInline):
@@ -925,6 +994,7 @@ class OrderAdmin(BaseModelAdmin):
     actions_detail = [
         "confirm_offline_payment",
         "refund_payment",
+        "restock_returned",
         "download_shipping_voucher",
         {
             "title": _("Invoicing & myDATA"),
@@ -1570,12 +1640,104 @@ class OrderAdmin(BaseModelAdmin):
                     % {"order_id": order.id},
                     messages.ERROR,
                 )
+            if result.paid_something and self.has_restock_permission(
+                request, object_id
+            ):
+                # A refund of goods usually has the goods coming back: offer
+                # the shelf next, never do it unasked (they may be damaged).
+                self.message_user(
+                    request,
+                    _(
+                        "Did the goods come back? Use "
+                        '"Restock returned items" to put them back in stock.'
+                    ),
+                    messages.INFO,
+                )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(
                     "admin:order_order_change", args=[object_id]
                 ),
             }
+        )
+
+    @action(
+        description=_("Restock returned items"),
+        icon="inventory_2",
+        permissions=["restock"],
+        dialog=ActionDialog(
+            title=_("Restock returned items"),
+            description=_(
+                "Puts the units that came back on the shelf and records "
+                "them on the order's lines, each in its own product (a "
+                "variant is a product). Only units not put back yet can "
+                "be entered. Pays nothing back: refund the payment "
+                "separately."
+            ),
+            form_class=RestockReturnedForm,
+        ),
+    )
+    def restock_returned(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        reason = form.cleaned_data["reason"]
+        quantities = form.quantities()
+        try:
+            with transaction.atomic():
+                # The order lock serialises this with a cancel and with a
+                # second restock; ``OrderItem.refund`` judges the status
+                # under it, so the API and this action share one rule.
+                order = Order.objects.select_for_update().get(pk=object_id)
+                for item in OrderItem.objects.filter(
+                    order=order, pk__in=quantities
+                ).order_by("pk"):
+                    item.refund(
+                        quantities[item.pk],
+                        performed_by=request.user,
+                        reason=reason,
+                    )
+                total = sum(quantities.values())
+                self.log_change(
+                    request,
+                    order,
+                    f"Restocked {total} returned unit(s): {reason}",
+                )
+        except ValidationError as exc:
+            # Atomic: nothing was put back, so the dialog can be retried.
+            self.message_user(request, " ".join(exc.messages), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                ngettext(
+                    "Order %(order_id)s: %(count)s unit put back in stock.",
+                    "Order %(order_id)s: %(count)s units put back in stock.",
+                    total,
+                )
+                % {"order_id": order.id, "count": total},
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
+
+    def has_restock_permission(self, request, object_id=None):
+        """Only where goods can come back: a delivered, completed or
+        returned order with units not put back yet, for a user who may
+        change order lines. The permission is checked here, not named in
+        ``permissions=``: Unfold's system check looks a dotted permission up
+        in the database, and checks must not touch it."""
+        return (
+            object_id is not None
+            and request.user.has_perm("order.change_orderitem")
+            and OrderItem.objects.filter(
+                order_id=object_id,
+                order__status__in=RETURN_HANDLING_STATUSES,
+                refunded_quantity__lt=F("quantity"),
+            ).exists()
         )
 
     def has_refund_permission(self, request, object_id=None):

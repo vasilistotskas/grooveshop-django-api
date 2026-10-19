@@ -3367,6 +3367,9 @@ msgstr "Development"
 msgid "Diagnostics"
 msgstr "Διαγνωστικά"
 
+msgid "Did the goods come back? Use \"Restock returned items\" to put them back in stock."
+msgstr "Επιστράφηκαν τα προϊόντα; Χρησιμοποιήστε το «Επιστροφή στο απόθεμα» για να τα επαναφέρετε στο απόθεμα."
+
 #, python-brace-format
 msgid "Did you forget something? — {site_name}"
 msgstr "Ξεχάσατε κάτι; — {site_name}"
@@ -3748,6 +3751,9 @@ msgstr "Εισαγάγετε ένα έγκυρο όνομα χρήστη. Αυτ
 #, no-python-format
 msgid "Enter a value between 0 and 100. For example, 25 for 25% discount."
 msgstr "Εισαγάγετε μια τιμή μεταξύ 0 και 100. Για παράδειγμα, 25 για έκπτωση 25%."
+
+msgid "Enter how many units of at least one line came back."
+msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μίας γραμμής επιστράφηκαν."
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
@@ -8215,6 +8221,12 @@ msgid "Order %(order_id)s was not refunded; see the order history."
 msgstr "Η παραγγελία %(order_id)s δεν επιστράφηκε· δείτε το ιστορικό της παραγγελίας."
 
 #, python-format
+msgid "Order %(order_id)s: %(count)s unit put back in stock."
+msgid_plural "Order %(order_id)s: %(count)s units put back in stock."
+msgstr[0] "Παραγγελία %(order_id)s: %(count)s τεμάχιο επανήλθε στο απόθεμα."
+msgstr[1] "Παραγγελία %(order_id)s: %(count)s τεμάχια επανήλθαν στο απόθεμα."
+
+#, python-format
 msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
 msgstr "Παραγγελία %(order_id)s: επιστράφηκαν %(refunded)s από %(requested)s· το υπόλοιπο απορρίφθηκε: %(reason)s"
 
@@ -9631,6 +9643,9 @@ msgstr "Εκκαθαρίστηκε στις"
 msgid "Puts returned units of an order line back into stock and records them on the line. It moves no money: refund the payment with the order's refund action."
 msgstr "Επιστρέφει στο απόθεμα τα επιστρεφόμενα τεμάχια μιας γραμμής παραγγελίας και τα καταγράφει στη γραμμή. Δεν μετακινεί χρήματα: επιστρέψτε την πληρωμή με την ενέργεια επιστροφής της παραγγελίας."
 
+msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
+msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (μια παραλλαγή είναι προϊόν). Μπορείτε να δηλώσετε μόνο τεμάχια που δεν έχουν ήδη επανέλθει. Δεν επιστρέφει χρήματα: επιστρέψτε την πληρωμή ξεχωριστά."
+
 msgid "Qty"
 msgstr "Ποσ."
 
@@ -9902,6 +9917,9 @@ msgstr "Καταγράφεται στη γραμμή του καθολικού"
 
 msgid "Recorded on the points ledger"
 msgstr "Καταγράφεται στο καθολικό πόντων"
+
+msgid "Recorded on the stock log with your name."
+msgstr "Καταγράφεται στο ιστορικό αποθέματος με το όνομά σας."
 
 msgid "Recorded with the refund on the order's payment ledger."
 msgstr "Καταγράφεται μαζί με την επιστροφή στο καθολικό πληρωμών της παραγγελίας."
@@ -10275,6 +10293,9 @@ msgstr "Χρόνος απόκρισης %(response)s · Ειδοποίηση %(s
 msgid "Restock"
 msgstr "Αναπλήρωση"
 
+msgid "Restock returned items"
+msgstr "Επιστροφή στο απόθεμα"
+
 msgid "Restock returned units of an order item"
 msgstr "Επαναφορά στο απόθεμα επιστρεφόμενων τεμαχίων προϊόντος παραγγελίας"
 
@@ -10389,6 +10410,10 @@ msgstr "Επιστροφή στο καλάθι:"
 
 msgid "Returned"
 msgstr "Επιστράφηκε"
+
+#, python-format
+msgid "Returned and still to put back: %(left)s"
+msgstr "Επιστράφηκαν και δεν έχουν επανέλθει στο απόθεμα: %(left)s"
 
 msgid "Returned flag"
 msgstr "Ένδειξη επιστροφής"

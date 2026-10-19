@@ -568,6 +568,7 @@ class StockManager:
         quantity: int,
         order_id: int,
         reason: str = "order_cancelled",
+        performed_by=None,
     ) -> None:
         """
         Increment stock (for cancellations/returns).
@@ -592,6 +593,8 @@ class StockManager:
             quantity: Number of units to add back to stock
             order_id: ID of the order associated with this increment
             reason: Human-readable reason for the increment (default: "order_cancelled")
+            performed_by: UserAccount who did it, when a person did (staff
+                restocking a return); None for system operations.
 
         Raises:
             ProductNotFoundError: If product doesn't exist
@@ -643,7 +646,7 @@ class StockManager:
             stock_before=stock_before,
             stock_after=product.stock,
             reason=reason,
-            performed_by=None,  # No user context for direct increments
+            performed_by=performed_by,
         )
 
     @classmethod

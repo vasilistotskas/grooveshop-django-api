@@ -37,7 +37,7 @@ from admin.displays import (
     source_badge,
 )
 from admin.filters import AcquisitionSourceFilter, AnnotatedRangeFilter
-from cart.managers.cart import abandoned_cutoff
+from cart.managers.cart import abandoned_cutoff, abandoned_hours
 from cart.models import Cart, CartAttribution, CartItem
 from order.managers.order import awaiting_online_payment_q
 from order.models.order import Order
@@ -49,7 +49,6 @@ CART_TYPE_VARIANT: dict[str, str] = {
 
 ACTIVITY_STATE_VARIANT: dict[str, str] = {
     "active": "success",
-    "recent": "info",
     "abandoned": "danger",
 }
 
@@ -78,6 +77,7 @@ class CartTypeFilter(DropdownFilter):
 class CartSourceFilter(AcquisitionSourceFilter):
     """The sources carts were started from, by name."""
 
+    title = _("Cart source")
     model = CartAttribution
 
 
@@ -128,27 +128,35 @@ class TotalItemsFilter(AnnotatedRangeFilter):
 
 
 class ActivityStatusFilter(DropdownFilter):
+    """A cart's idle time against the one line the Activity column, the
+    "Abandoned" filter and the cleanup task share
+    (``CART_ABANDONED_HOURS``): active inside it, and the carts past it
+    split by how long they have been idle."""
+
     title = _("Activity Status")
     parameter_name = "activity_status"
 
     def lookups(self, request, model_admin):
         return [
-            ("active", _("Active (Last 24h)")),
-            ("recent", _("Recent (Last 7 days)")),
-            ("old", _("Old (7+ days)")),
+            (
+                "active",
+                _("Active (last %(hours)s h)") % {"hours": abandoned_hours()},
+            ),
+            ("recent", _("Idle for up to 7 days")),
+            ("old", _("Idle for 7+ days")),
         ]
 
     def queryset(self, request, queryset):
-        now = timezone.now()
+        cutoff = abandoned_cutoff()
+        week_ago = timezone.now() - timedelta(days=7)
         if self.value() == "active":
-            return queryset.filter(last_activity__gte=now - timedelta(hours=24))
+            return queryset.filter(last_activity__gte=cutoff)
         elif self.value() == "recent":
             return queryset.filter(
-                last_activity__gte=now - timedelta(days=7),
-                last_activity__lt=now - timedelta(hours=24),
+                last_activity__lt=cutoff, last_activity__gte=week_ago
             )
         elif self.value() == "old":
-            return queryset.filter(last_activity__lt=now - timedelta(days=7))
+            return queryset.filter(last_activity__lt=min(cutoff, week_ago))
         return queryset
 
 
@@ -316,7 +324,7 @@ class CartAdmin(BaseModelAdmin):
         return "guest", _("Guest")
 
     @display(
-        description=_("Order source"),
+        description=_("Cart source"),
         label=ORDER_SOURCE_TYPE_VARIANT,
         ordering="attribution__source",
     )
@@ -344,9 +352,7 @@ class CartAdmin(BaseModelAdmin):
         # cleanup task use.
         if obj.is_abandoned:
             return "abandoned", _("Abandoned")
-        if timezone.now() - obj.last_activity < timedelta(hours=1):
-            return "active", _("Active")
-        return "recent", _("Recent")
+        return "active", _("Active")
 
     @admin.display(description=_("Items"))
     def items_summary(self, obj):

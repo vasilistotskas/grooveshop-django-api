@@ -3,6 +3,72 @@
 
 
 
+## v3.138.0 (2026-10-19)
+
+### Bug fixes
+
+* fix(devtools): staging_anonymise clears every production credential and arms staging's own (#245) ([`2dfc20d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dfc20d122afc43c0f105d0d01b4e0117d573244))
+
+* fix(devtools): staging_anonymise clears every production credential
+
+The staging refresh restored production Tenant rows with their
+encrypted credentials, and staging's field-encryption keys open them,
+so anyone reaching the staging admin, a shell or a dump held the live
+Stripe, Viva, ACS, BoxNow, myDATA, chat and ACP secrets.
+
+Clear them in the same transaction that scrubs identities, before the
+database is swapped in. The set is derived from the models: every
+EncryptedCharField, every integration-prefixed text field (merchant ids,
+public keys, analytics ids) and every *_live_mode boolean, by one UPDATE
+that never decrypts, so a token no key opens cannot stop the run. Also
+blank the OAuth app secrets and wipe the dj-stripe API key and webhook
+endpoint rows, which bootstrap_stripe rebuilds from a sandbox key.
+
+The run checks every EncryptedCharField column itself and fails if any
+holds a value, so a model that gains one cannot slip past the rules; a
+guard test fails for the same, and for a secret-looking plain field.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`2dfc20d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dfc20d122afc43c0f105d0d01b4e0117d573244))
+
+* fix(devtools): arming checks the environment and matches staging hosts exactly
+
+A substring test accepted staging.example-store.com or mystagingshop.gr, and
+arm_credentials never checked SYSTEM_ENV. Require staging, and a primary
+domain that is exactly a staging label under webside.gr or grooveshop.space.
+Correct the docs on the dj-stripe endpoint wipe.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2dfc20d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dfc20d122afc43c0f105d0d01b4e0117d573244))
+
+### Features
+
+* feat(devtools): arm_credentials writes staging's own sandbox credentials
+
+The staging arming script needs to put credentials from staging's sealed
+secret onto the Tenant rows after the anonymiser cleared production's.
+Do it here, where it is tested: accept only the credential columns the
+anonymiser derives, refuse a tenant that is not on a staging host or has
+a live-mode switch on, and report field names, never values.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`2dfc20d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dfc20d122afc43c0f105d0d01b4e0117d573244))
+
+### Testing
+
+* test(devtools): cover the class-derived credential clear, and document it
+
+An encrypted field is cleared whatever its name (the prefix list alone
+would have passed the guard for every field Tenant has today), and the
+dj-stripe key and endpoint rows are wiped. Document the credential
+clear in docs/staging-anonymise.md.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm ([`2dfc20d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dfc20d122afc43c0f105d0d01b4e0117d573244))
+
 ## v3.137.2 (2026-10-19)
 
 ### Bug fixes

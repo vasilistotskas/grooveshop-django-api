@@ -3,6 +3,26 @@
 
 
 
+## v3.141.0 (2026-10-19)
+
+### Features
+
+* feat(admin): let the platform set a store's languages (#269)
+
+Tenant.available_locales sat in no fieldset, so a store's languages
+could only change from a shell. It is now on the Branding tab of the
+tenant form: editable by platform staff, read-only for a store operator
+(it is not in TENANT_SELF_EDITABLE_FIELDS). The field's schema already
+refuses locales the storefront has no routes for, and Tenant.clean keeps
+the default locale in the set and the legal documents translated.
+
+A change purges what the storefront cached for the store: every page's
+language switcher and hreflang set, and the sitemap. It is queued after
+commit and held for STOREFRONT_TENANT_CACHE_SECONDS, because the
+storefront reads the list from its copy of the tenant-resolve payload.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9806e9d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9806e9d2d6f10876f6a1aa8ca30f3c50520352f2))
+
 ## v3.140.2 (2026-10-19)
 
 ### Bug fixes

@@ -89,6 +89,7 @@ def _build_envelope(
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("boxnow_configured_tenant")
 class TestCreateShipmentForOrder:
     def test_success_sets_ids_on_shipment_and_order(self):
         """After a successful API call, IDs are persisted on shipment and order."""
@@ -843,3 +844,139 @@ class TestCodPaidOnDelivery:
             order_paid.disconnect(dispatch_uid="test.boxnow_no_refire")
 
         assert fired == []
+
+
+# ---------------------------------------------------------------------------
+# Store fields: empty means off, never a made-up value
+# ---------------------------------------------------------------------------
+
+
+def _paid_order_with_shipment():
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING,
+        payment_status=PaymentStatus.COMPLETED,
+    )
+    BoxNowShipmentFactory(
+        order=order,
+        locker_external_id="4",
+        parcel_state=BoxNowParcelState.PENDING_CREATION,
+    )
+    return order
+
+
+@pytest.mark.django_db
+class TestEmptyStoreFieldsTurnBoxNowOff:
+    @pytest.mark.parametrize(
+        "field", ["box_now_warehouse_id", "box_now_notify_phone"]
+    )
+    def test_is_configured_needs_every_field(
+        self, boxnow_configured_tenant, field
+    ):
+        from shipping_boxnow.services import is_configured
+
+        assert is_configured()
+
+        setattr(boxnow_configured_tenant, field, "")
+
+        assert not is_configured()
+
+    @pytest.mark.parametrize(
+        "field", ["box_now_warehouse_id", "box_now_notify_phone"]
+    )
+    def test_no_parcel_is_created_with_a_field_missing(
+        self, boxnow_configured_tenant, field
+    ):
+        from shipping_boxnow.exceptions import BoxNowConfigError
+
+        order = _paid_order_with_shipment()
+        setattr(boxnow_configured_tenant, field, "")
+        client = _mock_client_create_ok()
+
+        with (
+            patch("shipping_boxnow.services.BoxNowClient", client),
+            pytest.raises(BoxNowConfigError, match=field),
+        ):
+            BoxNowService.create_shipment_for_order(order)
+
+        client.return_value.create_delivery_request.assert_not_called()
+        shipment = order.boxnow_shipment
+        shipment.refresh_from_db()
+        # No claim left behind: the store can fix the field and retry.
+        assert "mint_started_at" not in (shipment.metadata or {})
+
+    def test_the_origin_is_the_stores_own_values(
+        self, boxnow_configured_tenant
+    ):
+        boxnow_configured_tenant.box_now_warehouse_id = "WH-77"
+        boxnow_configured_tenant.box_now_notify_phone = "+306911111111"
+        order = _paid_order_with_shipment()
+        client = _mock_client_create_ok()
+
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            BoxNowService.create_shipment_for_order(order)
+
+        origin = client.return_value.create_delivery_request.call_args.args[0][
+            "origin"
+        ]
+        assert origin["locationId"] == "WH-77"
+        assert origin["contactNumber"] == "+306911111111"
+
+
+# ---------------------------------------------------------------------------
+# Reissue after a cancelled parcel
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestReissueACancelledParcel:
+    def test_a_cancelled_parcel_is_replaced_by_a_new_one(
+        self, boxnow_configured_tenant
+    ):
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.CANCELED,
+        )
+        old_request, old_parcel = (
+            shipment.delivery_request_id,
+            shipment.parcel_id,
+        )
+        client = _mock_client_create_ok()
+
+        # Without the reset the creation returns the dead parcel.
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            BoxNowService.create_shipment_for_order(order)
+        client.return_value.create_delivery_request.assert_not_called()
+
+        BoxNowService.reset_shipment_for_reissue(shipment)
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            BoxNowService.create_shipment_for_order(order)
+
+        shipment.refresh_from_db()
+        assert shipment.delivery_request_id == "42224"
+        assert shipment.parcel_id == "9219709201"
+        assert shipment.parcel_state == BoxNowParcelState.NEW
+        assert shipment.cancel_requested_at is None
+        assert shipment.metadata["previous_parcels"][0] == {
+            "delivery_request_id": old_request,
+            "parcel_id": old_parcel,
+            "cancelled_at": None,
+        }
+
+    @pytest.mark.parametrize(
+        "state", [BoxNowParcelState.NEW, BoxNowParcelState.DELIVERED]
+    )
+    def test_only_a_cancelled_parcel_can_be_reset(self, state):
+        shipment = BoxNowShipmentFactory(with_parcel=True, parcel_state=state)
+
+        with pytest.raises(BoxNowAPIError):
+            BoxNowService.reset_shipment_for_reissue(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_id
+        assert shipment.parcel_state == state

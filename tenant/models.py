@@ -1020,8 +1020,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS origin station code (up to 8 chars). "
-            "No platform fallback — empty disables ACS."
+            "ACS origin station code (up to 8 chars), used to quote "
+            "shipping. Optional: when empty it is taken from the "
+            "billing code. No platform fallback."
         ),
     )
 

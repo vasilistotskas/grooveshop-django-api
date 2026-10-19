@@ -1806,6 +1806,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "GIFT_CARD_STAFF_ISSUE_LIMIT",
+        "type": "decimal",
+        "value": 500,
+        "description": (
+            "The most a staff member can put on gift cards in one step "
+            "(issuing a card, or adding to a balance), in the store's "
+            "currency. Above it the step needs the store's owner (or a "
+            "platform superuser) and is noted on the ledger. 0 turns the "
+            "limit off."
+        ),
+    },
+    {
         "name": "ORDER_FOLLOW_UP_DAYS",
         "type": "int",
         "value": 7,

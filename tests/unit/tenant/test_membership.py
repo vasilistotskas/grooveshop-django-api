@@ -57,7 +57,7 @@ class TestGetMembership:
         m = UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
         )
         got = get_membership(user)
         assert got is not None
@@ -71,7 +71,7 @@ class TestGetMembership:
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=False,
         )
         assert get_membership(user) is None

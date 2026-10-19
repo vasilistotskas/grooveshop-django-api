@@ -28,6 +28,9 @@ Two rules shape everything here:
 
 from __future__ import annotations
 
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
+
 # Apps that belong to the PLATFORM, never to a store.
 #
 # Enumerated deliberately (see module docstring). Notes on the
@@ -96,6 +99,29 @@ STORE_SHARED_APP_LABELS: frozenset[str] = frozenset(
         "extra_settings",
     }
 )
+
+
+def selectable_roles(
+    *, may_grant_owner: bool = True
+) -> list[tuple[str, StrOrPromise]]:
+    """The roles a form offers, behind an empty choice.
+
+    A role is always a decision: with no blank option the first role
+    would be preselected by the browser, which is a default by another
+    name. ``may_grant_owner`` is False for an ADMIN, who cannot mint an
+    OWNER.
+    """
+    from tenant.models import TenantMembershipRole
+
+    return [
+        ("", _("Select value")),
+        *(
+            (value, label)
+            for value, label in TenantMembershipRole.choices
+            if may_grant_owner or value != TenantMembershipRole.OWNER
+        ),
+    ]
+
 
 # Store settings, as opposed to day-to-day operations. STAFF is
 # explicitly excluded from these: "can view the tenant's operational
@@ -178,6 +204,7 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         # Socials
         "socials_facebook",
         "socials_instagram",
+        "socials_linkedin",
         "socials_twitter",
         "socials_youtube",
         "socials_tiktok",

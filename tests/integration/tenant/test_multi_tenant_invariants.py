@@ -62,7 +62,7 @@ class TestMembershipIsolation:
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant_a,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=True,
         )
 

@@ -108,10 +108,11 @@ class ContactAttachment(
     ``contact`` is still null after ``claim_deadline`` is an abandoned
     upload and is reaped with its bytes.
 
-    Not part of ``user.services.gdpr``'s erasure path on purpose: an
-    enquiry has no user account behind it (``Contact`` has no user FK),
-    so a data-subject request against one is an admin action on that
-    row, and the retention sweep is what bounds it otherwise.
+    An enquiry has no user account behind it (``Contact`` has no user
+    FK). ``user.services.gdpr`` still finds the ones sent from an
+    address the account has verified, exports them, and erases them
+    with their files; any other data-subject request against one is an
+    admin action on that row, and the retention sweep bounds the rest.
     """
 
     class ScanStatus(models.TextChoices):

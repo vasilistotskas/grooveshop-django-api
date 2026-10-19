@@ -72,12 +72,12 @@ class TestAdminSitePermission:
         bind_tenant(tenant)
         assert admin_site.has_permission(_request_for(staff)) is False
 
-    def test_member_role_denied_on_tenant(self, tenant, bind_tenant):
+    def test_unrecognised_role_denied_on_tenant(self, tenant, bind_tenant):
         staff = UserAccountFactory(is_staff=True)
         UserTenantMembership.objects.create(
             user=staff,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role="retired",
             is_active=True,
         )
         bind_tenant(tenant)

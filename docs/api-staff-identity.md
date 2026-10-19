@@ -90,6 +90,8 @@ chooser of accounts to a store role:
   there, not to the team. The member is read from the public schema
   (`UserTenantMembership.member`).
 - **The platform console** keeps the account and store pickers.
+- **A role is always chosen**: the model has no default role, forms offer
+  an empty choice first, and the retired `MEMBER` role no longer exists.
 
 ### The last owner
 

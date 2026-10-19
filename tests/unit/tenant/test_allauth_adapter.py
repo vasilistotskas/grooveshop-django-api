@@ -87,7 +87,7 @@ class TestPreLoginHasNoMembershipGate:
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=False,
         )
         with patch(

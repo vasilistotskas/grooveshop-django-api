@@ -98,25 +98,58 @@ def _verified_emails(user) -> list[str]:
     )
 
 
+def _verified_email_match(user) -> Q | None:
+    """A filter on ``email`` for any of ``user``'s VERIFIED addresses,
+    or None when the account has proven none.
+
+    VERIFIED only: ``user.email`` alone may be an address the account has
+    never proven it owns, and exporting or deleting on it would reach a
+    stranger's data. The export and the erasure read every address-keyed
+    record through this, so they cannot drift apart.
+    """
+    match_any = Q()
+    for email in _verified_emails(user):
+        match_any |= Q(email__iexact=email)
+    return match_any or None
+
+
 def _guest_subscriptions(user):
     """Guest (newsletter form) rows made with one of ``user``'s addresses.
 
-    VERIFIED addresses only: a guest row holds its subscriber's consent
-    record (IP, user agent), and ``user.email`` alone may be an address
-    the account has never proven it owns — exporting or deleting on it
-    would reach a stranger's data. Normally these rows were already
-    attached by ``claim_guest_subscriptions`` when the address was
-    verified; this catches any that were not.
+    A guest row holds its subscriber's consent record (IP, user agent).
+    Normally these rows were already attached by
+    ``claim_guest_subscriptions`` when the address was verified; this
+    catches any that were not.
     """
     from user.models.subscription import UserSubscription
 
-    emails = _verified_emails(user)
-    if not emails:
+    match = _verified_email_match(user)
+    if match is None:
         return UserSubscription.objects.none()
-    match_any = Q()
-    for email in emails:
-        match_any |= Q(email__iexact=email)
-    return UserSubscription.objects.filter(match_any, user__isnull=True)
+    return UserSubscription.objects.filter(match, user__isnull=True)
+
+
+def _subject_product_alerts(user):
+    """Back-in-stock / price-drop subscriptions about ``user``: the
+    account's own, plus guest ones made with a verified address."""
+    from product.models.alert import ProductAlert
+
+    own = Q(user=user)
+    match = _verified_email_match(user)
+    if match is None:
+        return ProductAlert.objects.filter(own)
+    return ProductAlert.objects.filter(own | (Q(user__isnull=True) & match))
+
+
+def _subject_contact_messages(user):
+    """Contact-form messages sent from a verified address. They carry no
+    account link, only the address the sender typed."""
+    from contact.models import Contact
+
+    match = _verified_email_match(user)
+    if match is None:
+        return Contact.objects.none()
+    return Contact.objects.filter(match)
 
 
 def _subject_subscriptions(user):
@@ -321,18 +354,6 @@ def compile_user_data(user) -> dict[str, Any]:
         for s in _subject_subscriptions(user).select_related("topic")
     ]
 
-    verified_emails = _verified_emails(user)
-    by_verified_email = Q()
-    for email in verified_emails:
-        by_verified_email |= Q(email__iexact=email)
-
-    # Back-in-stock / price-drop subscriptions: the account's own, plus
-    # guest ones made with a verified address (as for subscriptions).
-    from product.models.alert import ProductAlert
-
-    alerts_filter = Q(user=user)
-    if verified_emails:
-        alerts_filter |= Q(user__isnull=True) & by_verified_email
     product_alerts = [
         {
             "id": a.id,
@@ -344,31 +365,22 @@ def compile_user_data(user) -> dict[str, Any]:
             "notified_at": _iso(a.notified_at),
             "created_at": _iso(a.created_at),
         }
-        for a in ProductAlert.objects.filter(alerts_filter)
+        for a in _subject_product_alerts(user)
     ]
 
-    # Contact-form messages carry no account link, only the address the
-    # sender typed; verified addresses only, so an unproven address on the
-    # account cannot pull a stranger's message into the export.
-    from contact.models import Contact
-
-    contact_messages = (
-        [
-            {
-                "id": c.id,
-                "name": c.name,
-                "email": c.email,
-                "company": c.company,
-                "phone": c.phone,
-                "subject": c.subject,
-                "message": c.message,
-                "created_at": _iso(c.created_at),
-            }
-            for c in Contact.objects.filter(by_verified_email)
-        ]
-        if verified_emails
-        else []
-    )
+    contact_messages = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "email": c.email,
+            "company": c.company,
+            "phone": c.phone,
+            "subject": c.subject,
+            "message": c.message,
+            "created_at": _iso(c.created_at),
+        }
+        for c in _subject_contact_messages(user)
+    ]
 
     loyalty: dict[str, Any] = {"transactions": [], "points_balance": None}
     # As above: a missing app is expected, a failed read is not. An export
@@ -558,7 +570,6 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     from meta_capi.models import MetaCapiEventLog
     from order.models.history import OrderHistory
     from order.models.order import Order
-    from product.models.alert import ProductAlert
     from promotion.models.code import PromotionCode
     from promotion.models.redemption import PromotionRedemption
     from search.models import SearchQuery
@@ -603,10 +614,17 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     ).update(ip_address=None, user_agent="")
 
     # Product alerts are single-shot opt-ins — just delete them, no
-    # historical value to preserve.
-    counts["product_alerts"] = ProductAlert.objects.filter(user=user).delete()[
-        0
-    ]
+    # historical value to preserve. The guest ones made with a verified
+    # address are the subject's too (the export includes them), and they
+    # do not cascade with the account. Read before the EmailAddress rows
+    # go below.
+    counts["product_alerts"] = _subject_product_alerts(user).delete()[0]
+
+    # Contact-form messages carry no account link, only the address the
+    # sender typed, and the export includes the ones from a verified
+    # address. Deleted through the ORM so the attachment rows cascade and
+    # ``contact.signals.delete_attachment_file`` removes their bytes.
+    counts["contact_messages"] = _subject_contact_messages(user).delete()[0]
 
     # The account's own subscriptions cascade with the user row; guest
     # newsletter rows made with one of its verified addresses do not,

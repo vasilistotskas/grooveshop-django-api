@@ -183,7 +183,7 @@ class TestOnAStoreHost:
 
     @pytest.mark.parametrize(
         "membership",
-        ["none", "customer-role", "inactive"],
+        ["none", "inactive"],
     )
     def test_staff_who_cannot_open_this_store_are_not_mailed(
         self, store, mt_tenant, membership
@@ -191,8 +191,6 @@ class TestOnAStoreHost:
         from tenant.models import TenantMembershipRole
 
         user = _account(f"mt-reset-{membership}@example.com")
-        if membership == "customer-role":
-            _member(user, mt_tenant, TenantMembershipRole.MEMBER)
         if membership == "inactive":
             row = _member(user, mt_tenant, TenantMembershipRole.STAFF)
             row.is_active = False

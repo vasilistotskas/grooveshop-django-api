@@ -1150,3 +1150,41 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
             create_pending_credits(order.id)
 
         assert not _credits(order).exists()
+
+    def test_the_credit_is_for_what_went_back_not_what_was_claimed(self):
+        from giftcard.models import (
+            GiftCardTransaction,
+            GiftCardTransactionKind,
+        )
+        from order.models.refund_attempt import (
+            RefundAttempt,
+            RefundAttemptKind,
+            RefundAttemptStatus,
+        )
+
+        order = self._gift_card_order(card="0.00", gift="100.00")
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            attempt = RefundAttempt.objects.create(
+                order=order,
+                kind=RefundAttemptKind.STORED_VALUE,
+                charge=None,
+                amount=_eur("50.00"),
+                status=RefundAttemptStatus.SETTLED,
+            )
+            redeem = GiftCardTransaction.objects.get(
+                order=order, kind=GiftCardTransactionKind.REDEEM
+            )
+            # A race returned most of the claim elsewhere: only 20 went back
+            # under this attempt.
+            GiftCardTransaction.objects.create(
+                gift_card=redeem.gift_card,
+                kind=GiftCardTransactionKind.REFUND_CREDIT,
+                amount=Decimal("20.00"),
+                order=order,
+                refund_attempt=attempt,
+            )
+            create_pending_credits(order.id)
+
+        [credit] = _credits(order)
+        assert credit.total == _eur("20.00")

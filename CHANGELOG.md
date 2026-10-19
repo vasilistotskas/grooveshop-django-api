@@ -3,6 +3,24 @@
 
 
 
+## v3.138.2 (2026-10-19)
+
+### Bug fixes
+
+* fix(orders): bound how many unpaid online orders one customer can hold (#261)
+
+An online-payment order holds its stock until it is paid or
+auto_cancel_stuck_pending_orders cancels it, and nothing limited how many
+a customer could have waiting, so checkouts started and never paid locked
+stock for the whole auto-cancel window.
+
+ORDER_MAX_UNPAID_ONLINE_ORDERS (a per-store setting, default 5, 0 turns it
+off) now refuses a new online order when the customer, the account or the
+email for a guest, already has that many waiting. Offline methods and
+paid, failed or canceled orders are not counted.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5886b8f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5886b8f88e7e54ffabb60105e2226a0b29b2503b))
+
 ## v3.138.1 (2026-10-19)
 
 ### Bug fixes

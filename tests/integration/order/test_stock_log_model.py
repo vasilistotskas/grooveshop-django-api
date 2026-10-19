@@ -288,7 +288,7 @@ class TestStockLogReasonDisplay:
 @pytest.mark.django_db
 class TestReasonCodeMigration:
     def test_known_text_becomes_a_code_and_other_text_is_kept(self):
-        migration = import_module("order.migrations.0081_stocklog_reason_code")
+        migration = import_module("order.migrations.0082_stocklog_reason_code")
         product = ProductFactory(stock=5)
         common = {
             "product": product,

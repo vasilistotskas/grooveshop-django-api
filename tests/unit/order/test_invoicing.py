@@ -17,6 +17,7 @@ from unittest.mock import patch
 from django.test import TestCase, TransactionTestCase, override_settings
 from djmoney.money import Money
 
+from core.utils.qr import qr_svg
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
@@ -24,7 +25,6 @@ from order.factories.order import OrderFactory
 from order.invoicing import (
     ReceiptNotIssuable,
     _build_context,
-    _build_qr_svg,
     _compute_vat_breakdown,
     _order_totals,
     _render_items,
@@ -668,7 +668,7 @@ class QrSvgTestCase(TestCase):
     the output tight matters because it's inlined into the PDF."""
 
     def test_returns_svg_string_containing_data(self) -> None:
-        svg = _build_qr_svg("https://example.com/orders/1")
+        svg = qr_svg("https://example.com/orders/1")
         self.assertIsInstance(svg, str)
         self.assertIn("<svg", svg)
         self.assertIn("</svg>", svg)

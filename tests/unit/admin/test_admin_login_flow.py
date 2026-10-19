@@ -29,7 +29,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
-from tests.utils.staff import store_tenant
+from tests.utils.staff import enrol_staff_mfa, store_tenant
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -48,13 +48,18 @@ def tenant_b(db):
     return store_tenant("loginflow_tenant_b")
 
 
-def _login(client, *, username, password, server_name):
+def _login(client, *, username, password, server_name, otp=""):
     # AdminSite.login() only pre-fills the "next" hidden field for GET
     # rendering; LOGIN_REDIRECT_URL points at the Nuxt storefront, so
     # the POST must carry "next" explicitly to land back on /admin/.
     return client.post(
         LOGIN_URL,
-        {"username": username, "password": password, "next": INDEX_URL},
+        {
+            "username": username,
+            "password": password,
+            "otp_code": otp,
+            "next": INDEX_URL,
+        },
         SERVER_NAME=server_name,
     )
 
@@ -145,6 +150,7 @@ class TestAdminLoginFlow:
         superuser = UserAccountFactory(
             is_staff=True, is_superuser=True, plain_password="pw12345"
         )
+        codes = enrol_staff_mfa(superuser)
         bind_tenant_and_schema(tenant_a)
 
         client = Client()
@@ -153,6 +159,7 @@ class TestAdminLoginFlow:
             username=superuser.email,
             password="pw12345",
             server_name="tenant-a.example.com",
+            otp=codes[0],
         )
         index_response = client.get(
             INDEX_URL, SERVER_NAME="tenant-a.example.com"
@@ -194,6 +201,7 @@ class TestPlatformHostFlow:
         staff = UserAccountFactory(
             is_staff=True, is_superuser=True, plain_password="pw12345"
         )
+        codes = enrol_staff_mfa(staff)
         # Mirrors what TenantMainMiddleware sets on the platform host —
         # connection.tenant is the resolved Tenant row, including for
         # the public schema (django_tenants sets request.tenant/
@@ -206,6 +214,7 @@ class TestPlatformHostFlow:
             username=staff.email,
             password="pw12345",
             server_name="platform.example.com",
+            otp=codes[0],
         )
         assert response.status_code == 302
 

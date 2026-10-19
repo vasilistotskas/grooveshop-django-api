@@ -241,3 +241,30 @@ Any of:
   price feeds, PIM sync);
 - an operator-facing client is built that is not the Django admin;
 - a third party is granted delegated write access to one store.
+
+## Second factor for platform superusers (admin login)
+
+A platform superuser reaches every store and the control plane, so the admin
+login (`admin.forms.PlatformAdminAuthenticationForm`, shared by the platform
+and the store admin) asks for a second factor after the password, **only
+when `user.is_superuser`**. Store admins and staff stay password-only.
+
+- **What:** an authenticator (TOTP) code or an unused recovery code, checked
+  with allauth's own helpers (`allauth.mfa`: code validation, replay
+  protection, recovery codes and their encryption). `admin/staff_mfa.py`
+  only decides when a code is required and carries the enrolment.
+  `allauth.mfa` is in `SHARED_APPS` as well as `TENANT_APPS`, so the
+  authenticator rows sit in the public schema next to the platform user.
+- **First login enrols.** A superuser with no authenticator gets no session:
+  the form shows a secret (link and QR code) and asks for a code from the
+  app. A correct code activates the authenticator and shows the ten recovery
+  codes once; the next login asks for a code. The code that enrolled is
+  spent.
+- **Guessing is bounded:** five wrong codes per user lock further tries for
+  fifteen minutes (cache), even a right one.
+- **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa
+  <email>` (run with cluster access) removes the authenticators and any
+  lockout; the next login enrols a new one.
+- **Not covered:** platform staff API tokens (`PlatformStaffToken`) are issued
+  after a login and are a separate surface; a token already issued keeps
+  working. WebAuthn/passkeys are not offered for the admin login yet.

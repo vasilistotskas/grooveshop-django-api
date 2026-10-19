@@ -250,9 +250,7 @@ On Windows with Docker Desktop a fresh connection to `localhost` can stall 1-30 
 
 **The dev stack bind-mounts your working tree.** `app.compose.yml` mounts `.`
 over `/home/app`, so `manage.py runserver`'s autoreloader sees your edits and
-restarts — before 2026-09-15 it watched the copy baked in by `COPY . .`, and a
-host edit did nothing until a rebuild, which is a genuinely expensive way to
-lose an afternoon. Two consequences worth knowing:
+restarts. Two consequences worth knowing:
 
 - **The virtualenv lives at `/opt/venv`, not `/home/app/.venv`**
   (`UV_PROJECT_ENVIRONMENT`), with uv's cache at `/opt/uv-cache`. Both sit

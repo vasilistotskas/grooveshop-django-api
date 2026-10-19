@@ -9,7 +9,6 @@ description: >
   "add tests for X", "write tests for the Y endpoint", "generate unit tests",
   "cover this model with tests". Also use when the user asks to test factories,
   managers, signals, serializers, or views.
-disable-model-invocation: true
 ---
 
 # Generate Tests
@@ -58,7 +57,7 @@ For detailed patterns and templates, read `references/patterns.md`.
 
 ## Critical Conventions
 
-These conventions are non-negotiable — every generated test must follow them:
+Every generated test follows these conventions:
 
 1. **Use factories**, never raw `Model.objects.create()` for complex objects (factories handle translations, unique fields, and related objects correctly)
 2. **Use `setUpTestData()`** (class method) for read-only test data; use `setUp()` only when tests modify data

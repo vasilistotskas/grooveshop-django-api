@@ -441,20 +441,19 @@ image = ImageAndSvgField(upload_to="uploads/your_app/")
 | `TimeStampFilterMixin` | `created_after/before`, `updated_after/before` | `TimeStampMixinModel` |
 | `UUIDFilterMixin` | `uuid` | `UUIDModel` |
 | `SortableFilterMixin` | `sort_order`, `sort_order_min/max` | `SortableModel` |
-| `PublishableFilterMixin` | `is_published`, `published_after/before`, `currently_published` | `PublishableModel` |
-| `SoftDeleteFilterMixin` | `is_deleted`, `include_deleted`, `deleted_after/before` | `SoftDeleteModel` |
 | `MetaDataFilterMixin` | `metadata_has_key`, `metadata_contains`, etc. | `MetaDataModel` |
 
 ### Pre-built Combinations
 
 | FilterSet | Mixins Included |
 |-----------|----------------|
-| `BaseTimeStampFilterSet` | TimeStamp |
-| `BasePublishableTimeStampFilterSet` | Publishable + TimeStamp |
-| `BaseSoftDeleteTimeStampFilterSet` | SoftDelete + TimeStamp |
-| `BaseFullFilterSet` | All mixins |
 | `CamelCaseTimeStampFilterSet` | TimeStamp + CamelCase auto-convert |
 | `CamelCasePublishableTimeStampFilterSet` | Publishable + TimeStamp + CamelCase |
+
+Publishable filtering (`is_published`, `published_after/before`,
+`currently_published`) comes from `CamelCasePublishableTimeStampFilterSet`
+(`core/filters/camel_case_filters.py`); there is no standalone publishable
+mixin and no soft-delete filter mixin.
 
 ### Standard FilterSet Template
 
@@ -687,8 +686,11 @@ def filterset_class(self):
 ### Action-Based Permissions
 
 ```python
-from rest_framework.permissions import IsAdminUser
-from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
+from core.api.permissions import (
+    IsOwnerOrAdmin,
+    IsOwnerOrAdminOrGuest,
+    StoreStaffModelPermissions,
+)
 
 
 def get_permissions(self):
@@ -699,14 +701,19 @@ def get_permissions(self):
     if self.action in owner_actions:
         self.permission_classes = [IsOwnerOrAdmin]
     elif self.action in admin_actions:
-        self.permission_classes = [IsAdminUser]
+        self.permission_classes = [StoreStaffModelPermissions]
     elif self.action in public_actions:
         self.permission_classes = []
     else:
-        self.permission_classes = [IsAdminUser]
+        self.permission_classes = [StoreStaffModelPermissions]
 
     return super().get_permissions()
 ```
+
+Store-scoped staff routes use `StoreStaffModelPermissions`; routes no store
+operator may reach use `IsPlatformSuperuser` (both in
+`core/api/permissions.py`). Never DRF's `IsAdminUser` or a
+`request.user.is_staff` check — see `docs/api-staff-identity.md`.
 
 ---
 
@@ -938,10 +945,11 @@ def get_or_create_category():
 
 ### settings.py
 
-Add to `LOCAL_APPS` list in `settings.py`:
+Add the app to `TENANT_APPS` in `settings.py` if its rows are per-store, or
+to `SHARED_APPS` if they live in the public schema:
 
 ```python
-LOCAL_APPS = [
+TENANT_APPS = [
     # ... existing apps ...
     "your_app",
 ]
@@ -1016,13 +1024,7 @@ from core.filters.core import (
     TimeStampFilterMixin,
     UUIDFilterMixin,
     SortableFilterMixin,
-    PublishableFilterMixin,
-    SoftDeleteFilterMixin,
     MetaDataFilterMixin,
-    BaseTimeStampFilterSet,
-    BasePublishableTimeStampFilterSet,
-    BaseSoftDeleteTimeStampFilterSet,
-    BaseFullFilterSet,
 )
 from core.filters.camel_case_filters import (
     CamelCaseFilterMixin,
@@ -1031,7 +1033,12 @@ from core.filters.camel_case_filters import (
 )
 
 # Permissions
-from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
+from core.api.permissions import (
+    IsOwnerOrAdmin,
+    IsOwnerOrAdminOrGuest,
+    IsPlatformSuperuser,
+    StoreStaffModelPermissions,
+)
 
 # Caching
 from core.utils.views import cache_methods
@@ -1047,7 +1054,6 @@ from devtools.factories import CustomDjangoModelFactory
 from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
 
 # Parler (translations)
 from parler.models import TranslatableModel, TranslatedFields

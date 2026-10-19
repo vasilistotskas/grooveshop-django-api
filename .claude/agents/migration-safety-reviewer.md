@@ -124,17 +124,18 @@ mid-flight, leaving a partial index.
 
 ### 5. Verify migration consistency
 
-After auditing safety, confirm the migration applies cleanly:
+After auditing safety, check the migration set against the models and the database:
 
 ```bash
 uv run python manage.py makemigrations --check --dry-run
-uv run python manage.py migrate --check
+uv run python manage.py migrate --check   # non-zero while any migration is unapplied — expected for a new migration under review
 # Against a database still at the previous release (not yet migrated):
 uv run python manage.py migration_preflight
 ```
 
-If either fails, the migration set is internally inconsistent regardless of
-whether individual operations are safe.
+`makemigrations --check` failing means a model change has no migration.
+`migrate --check` only reports unapplied migrations; it does not prove the set
+applies cleanly.
 
 ### 6. Output
 
@@ -155,13 +156,13 @@ UNSAFE
 CONDITIONAL
   order/migrations/0089_add_status_index.py:8
     AddIndex(Order, fields=["status"])
-    Order has ~5M rows in prod; CREATE INDEX may exceed PreSync 600s timeout
+    Order has ~5M rows in prod; CREATE INDEX may exceed the PreSync hook's 1800s activeDeadlineSeconds
     Fix: use AddIndexConcurrently and run as a separate manual migration
 
 SAFE
   product/migrations/0043_add_view_count.py:12
-    AddField(Product, "view_count", IntegerField(default=0))
-    New nullable-equivalent column with default; old code ignores it
+    AddField(Product, "view_count", IntegerField(db_default=0))
+    NOT NULL with db_default; old INSERTs that omit it still succeed
 
 Verdict: BLOCK — one UNSAFE op needs splitting before this can ship.
 ```
@@ -178,6 +179,6 @@ items only), or **BLOCK** (any unsafe items).
 
 ## When to Defer to the User
 
-If a migration looks unsafe but the change includes obvious indicators of
-intentional downtime (e.g. comment `# accepted downtime`, or the user said
-so explicitly), note the unsafety once and defer to the user's call.
+If the migration declares `accepted_downtime = "<reason>"` (which
+`migration_preflight` reports without blocking) or the user said so
+explicitly, note the unsafety once and defer to the user's call.

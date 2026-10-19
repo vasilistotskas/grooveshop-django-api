@@ -124,17 +124,18 @@ mid-flight, leaving a partial index.
 
 ### 5. Verify migration consistency
 
-After auditing safety, confirm the migration applies cleanly:
+After auditing safety, check the migration set against the models and the database:
 
 ```bash
 uv run python manage.py makemigrations --check --dry-run
-uv run python manage.py migrate --check
+uv run python manage.py migrate --check   # non-zero while any migration is unapplied — expected for a new migration under review
 # Against a database still at the previous release (not yet migrated):
 uv run python manage.py migration_preflight
 ```
 
-If either fails, the migration set is internally inconsistent regardless of
-whether individual operations are safe.
+`makemigrations --check` failing means a model change has no migration.
+`migrate --check` only reports unapplied migrations; it does not prove the set
+applies cleanly.
 
 ### 6. Output
 

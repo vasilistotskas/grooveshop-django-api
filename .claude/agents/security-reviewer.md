@@ -31,6 +31,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - `StockManager.reserve_stock()` / `release_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
 - `StockReservation` TTL (15 min default) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
+- Viva Wallet webhooks (`order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_refund`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
 - Order status transitions: verify they follow the expected lifecycle (no skipping states)
 
 ### 4. Celery Task Security
@@ -68,7 +69,17 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Check that group assignment (`tenant_{schema}_user_{id}`, `notification/groups.py`) cannot be spoofed across users or tenants; the socket authenticates only by a single-use `?ticket=`
 - Verify message content is not user-controlled HTML
 
-### 10. Meilisearch & Search
+### 10. Rate Limiting
+- Throttling is app-level DRF: `AnonRateThrottle`/`UserRateThrottle` as `DEFAULT_THROTTLE_CLASSES`, plus per-scope classes in `core/api/throttling.py` with rates in `DEFAULT_THROTTLE_RATES`
+- Flag a throttle keyed on `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` read directly; the ident is `trusted_client_ip(request) or self.get_ident(request)` (CLAUDE.md, "Client IP and throttle identity")
+- A new throttle uses `ResilientThrottleMixin` and sets `fail_closed` by the rule in that module's docstring (secret or existence oracle, money or stock, email to a caller-chosen address, uploads, third-party budgets deny while Redis is down)
+
+### 11. Multi-tenancy
+- Per-tenant fields are read through `tenant.membership.bound_tenant()`, never `connection.tenant` (a bare `FakeTenant` under `schema_context`)
+- Cache keys go through `tenant.cache.make_tenant_key`, which prefixes the active schema; flag a schema-independent `global:` key holding one tenant's data
+- Celery tasks carry the schema in the `_schema_name` header (`tenant.celery.TenantTask`, the base of `MonitoredTask`); a commit hook queues through `tenant.celery.dispatch_on_commit`, which pins the schema when it registers
+
+### 12. Meilisearch & Search
 - `meili_filter()`: verify it prevents indexing of unpublished/deleted content
 - Search queries: verify `IndexMixin` sanitizes indexed content (no HTML/scripts in search index)
 - API keys: verify `MEILISEARCH_MASTER_KEY` is not exposed in any response
@@ -84,6 +95,6 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 
 ## What NOT to Flag
 - `DEBUG = True` in dev settings (expected for `SYSTEM_ENV = 'dev'`)
-- Missing rate limiting on individual endpoints (handled at infrastructure level)
+- A browsing or read endpoint with no per-scope throttle (the default anon/user throttles already apply)
 - Generic Django security settings already configured in `settings.py`
 - `force_authenticate()` in test files (expected pattern)

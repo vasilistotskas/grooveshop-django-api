@@ -58,7 +58,7 @@ For detailed patterns and templates, read `references/patterns.md`.
 
 ## Critical Conventions
 
-These conventions are non-negotiable — every generated test must follow them:
+Every generated test follows these conventions:
 
 1. **Use factories**, never raw `Model.objects.create()` for complex objects (factories handle translations, unique fields, and related objects correctly)
 2. **Use `setUpTestData()`** (class method) for read-only test data; use `setUp()` only when tests modify data

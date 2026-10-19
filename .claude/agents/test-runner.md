@@ -13,32 +13,19 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 
 ## App-to-Test Mapping
 
-| Modified App | Unit Tests | Integration Tests | Command |
-|---|---|---|---|
-| `product/` | `tests/unit/product/` | `tests/integration/product/` | `uv run pytest tests/unit/product/ tests/integration/product/` |
-| `order/` | `tests/unit/order/` | `tests/integration/order/` | `uv run pytest tests/unit/order/ tests/integration/order/` |
-| `cart/` | `tests/unit/cart/` | `tests/integration/cart/` | `uv run pytest tests/unit/cart/ tests/integration/cart/` |
-| `blog/` | `tests/unit/blog/` | `tests/integration/blog/` | `uv run pytest tests/unit/blog/ tests/integration/blog/` |
-| `user/` | `tests/unit/user/` | `tests/integration/user/` | `uv run pytest tests/unit/user/ tests/integration/user/` |
-| `authentication/` | `tests/unit/authentication/` | `tests/integration/authentication/` | `uv run pytest tests/unit/authentication/ tests/integration/authentication/` |
-| `search/` | `tests/unit/search/` | `tests/integration/search/` | `uv run pytest tests/unit/search/ tests/integration/search/` |
-| `meili/` | `tests/unit/meili/` | `tests/integration/meili/` | `uv run pytest tests/unit/meili/ tests/integration/meili/` |
-| `notification/` | `tests/unit/notification/` | `tests/integration/notification/` | `uv run pytest tests/unit/notification/ tests/integration/notification/` |
-| `loyalty/` | `tests/unit/loyalty/` | `tests/integration/loyalty/` | `uv run pytest tests/unit/loyalty/ tests/integration/loyalty/` |
-| `core/` | `tests/unit/core/` | `tests/integration/core/` | `uv run pytest tests/unit/core/ tests/integration/core/` |
-| `country/` | `tests/unit/country/` | `tests/integration/country/` | `uv run pytest tests/unit/country/ tests/integration/country/` |
-| `region/` | `tests/unit/region/` | `tests/integration/region/` | `uv run pytest tests/unit/region/ tests/integration/region/` |
-| `vat/` | `tests/unit/vat/` | `tests/integration/vat/` | `uv run pytest tests/unit/vat/ tests/integration/vat/` |
-| `pay_way/` | `tests/unit/pay_way/` | `tests/integration/pay_way/` | `uv run pytest tests/unit/pay_way/ tests/integration/pay_way/` |
-| `tag/` | `tests/unit/tag/` | `tests/integration/tag/` | `uv run pytest tests/unit/tag/ tests/integration/tag/` |
-| `contact/` | `tests/unit/contact/` | `tests/integration/contact/` | `uv run pytest tests/unit/contact/ tests/integration/contact/` |
-| `devtools/` | `tests/unit/devtools/` | — | `uv run pytest tests/unit/devtools/` |
-| Cross-app changes | All tests | All tests | `uv run pytest` |
+A modified app `<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>/`
+(not every app has both): `uv run pytest tests/unit/<app>/ tests/integration/<app>/`.
+Exceptions:
+
+- `user/` social login (`user/adapter.py`, `user/signals.py`) is also covered by `tests/unit/authentication/` and `tests/integration/authentication/`
+- `core/celery.py` and `core/urls.py` are also covered by `tests/unit/app/`
+- `settings.py` is covered by `tests/unit/config/` and the `tests/unit/test_*.py` files at the root of `tests/unit/`
+- Cross-app changes: `uv run pytest`
 
 ## Process
 
 1. Identify which app directories were modified using `git diff --name-only`
-2. Map each modified app to its test directories using the table above
+2. Map each modified app to its test directories using the rule above
 3. If a test directory doesn't exist, skip it (not all apps have both unit and integration tests)
 4. Run targeted test commands (parallel execution is the default via `-n auto` in addopts)
 5. For faster feedback on a single file, add `-n0` to disable parallel: `uv run pytest tests/unit/product/test_models.py -n0`
@@ -82,9 +69,7 @@ produced `2018 errors` and `541 failed, 1457 errors`, and a targeted
 
 Before believing **any** mass-failure result, check whether another pytest
 process is running. If one is, discard the result and re-run rather than
-debugging it. The clean baseline is **5651 passed, 6 skipped, 0 failed**,
-identical under `-n auto`, `-n 4` and `-n 8` — so a run with mass failures is a
-signal to check for contention first.
+debugging it.
 
 ## Notes
 

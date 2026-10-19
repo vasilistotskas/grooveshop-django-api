@@ -38,11 +38,10 @@ Validate that Django migrations are consistent with model definitions.
    uv run python manage.py showmigrations --plan | grep -E "^\[ \]|UNMIGRATED"
    ```
 
-5. **Validate migration graph** (can all migrations apply cleanly):
+5. **List what is unapplied**:
    ```bash
-   uv run python manage.py migrate --check
+   uv run python manage.py migrate --check   # non-zero while any migration is unapplied — expected for a new migration under review
    ```
-   - If this fails, there may be circular dependencies or broken migrations
 
 6. **Deploy safety** (before applying the new migrations locally — the
    check judges what is still pending against what is applied):

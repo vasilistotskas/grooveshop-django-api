@@ -3,6 +3,71 @@
 
 
 
+## v3.140.2 (2026-10-19)
+
+### Bug fixes
+
+* fix(i18n): complete the English catalogue and regenerate the schema (#268)
+
+English is served to customers on stores that offer it, and locale/en had
+195 fuzzy entries (a fuzzy msgstr is ignored by gettext, and the guessed
+ones were wrong, e.g. "Product ID" as "Product") and about 4200 empty
+ones. Every live message now has an English msgstr: the msgid for the
+English source, "Small", "Medium" and "Large" for the three BoxNow sizes
+whose msgid is Greek. No fuzzy flag is left, the header names the language,
+and a test keeps both true. German is not served and is untouched.
+
+schema.yml is regenerated against the compiled Greek catalogue; the
+committed copy predated the admin label translations, so 54 description
+lines change and 64 are added, all text.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1f3cdbe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f3cdbea7adbad59a3738eec912e45457ecbd26c))
+
+### Documentation
+
+* docs(claude): agents and skills describe the current permissions, tests and migration rules (#265) ([`441f4c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441f4c510224194556c95628ce1f63aecbf17cac))
+
+* docs(claude): agents and skills describe the current permissions, tests and migration rules
+
+- scaffold-endpoint: register apps in TENANT_APPS or SHARED_APPS, drop filter
+  classes that do not exist, template StoreStaffModelPermissions instead of
+  IsAdminUser
+- security-reviewer: staff identity, Knox TTL and the tenant-scoped socket group
+  match core/api/permissions.py, settings.py and notification/groups.py
+test-runner: fail_under 70, the Redis-backed test cache, Argon2 in production
+- migration-safety-reviewer: db_default in the SAFE example, the 1800s PreSync
+  deadline, accepted_downtime as a migration attribute
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QoncZMFk3j8FvFNZXsWAUV ([`441f4c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441f4c510224194556c95628ce1f63aecbf17cac))
+
+* docs(claude): security reviewer covers Viva, throttles and tenancy; migrate --check described as it is
+
+- security-reviewer: Viva webhooks are authenticated by the Retrieve Transaction
+  call, throttles are DRF and key on trusted_client_ip, and a multi-tenancy
+  section (bound_tenant, make_tenant_key, TenantTask schema header)
+test-runner: one app-to-test rule with its real exceptions; no pinned test count
+- migrate --check only reports unapplied migrations
+- gen-test and CLAUDE.md drop dated or emphatic wording
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QoncZMFk3j8FvFNZXsWAUV ([`441f4c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441f4c510224194556c95628ce1f63aecbf17cac))
+
+* docs(claude): concurrent pytest runs need their own DB_NAME; gen-test and scaffold-endpoint are model-invocable
+
+test-runner: two runs are safe with different DB_NAMEs (test_<DB_NAME>_gwN,
+  TEST_NAMESPACE); the same DB_NAME collides
+- gen-test and scaffold-endpoint drop disable-model-invocation, so the
+  django-specialist can invoke them as it is told to
+- migration-check step 4 lists unapplied migrations; conflicts come from
+  makemigrations --check
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`441f4c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441f4c510224194556c95628ce1f63aecbf17cac))
+
 ## v3.140.1 (2026-10-19)
 
 ### Bug fixes

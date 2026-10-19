@@ -3,6 +3,88 @@
 
 
 
+## v3.141.2 (2026-10-19)
+
+### Bug fixes
+
+* fix(settings): drop the DEFAULT_WEIGHT_UNIT setting nothing reads (#271)
+
+A product's weight carries its own unit, so the seeded default decided
+nothing and an operator who changed it saw no effect. Remove it from the
+seed list and delete the row from existing stores (core/0012, as 0011
+did for two earlier dead settings).
+
+LOYALTY_REDEMPTION_RATIO_USD stays: the loyalty service builds its key
+from the redemption currency and the redeem API accepts USD.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`1e56272`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1e56272bf0cf10e9e17ea2cce36b8968e57977cc))
+
+* fix(cache): purge the storefront when moderation, coupon codes, promotion windows and VAT change (#275)
+
+Four admin changes left the cached storefront stale until its TTL:
+
+* approving or rejecting a review, and hiding or approving a blog comment:
+  the models were on no surface and the bulk actions used queryset.update,
+  which sends no post_save. Reviews and comments join the products and blog
+  surfaces, and the bulk paths save per row (admin.bulk.update_each,
+  ProductReviewQuerySet.moderate).
+* a coupon code: PromotionCode joins the promotions surface, and the admin's
+  bulk_create generator marks the surface stale.
+* a promotion starting or ending on its own dates: nothing is saved, so
+  refresh_window_changes marks the promotions surface stale when an edge
+  was crossed.
+* a VAT rate change: sync_product_prices writes prices with bulk_update, so
+  it marks the products surface stale when it changed anything.
+
+mark_surface_stale rides the existing batched after-commit purge.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a71a41c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a71a41cccf2d8fbe38f0afdeaff35eab94730daf))
+
+* fix(api): idempotency keys belong to the shopper, not the connection (#281) ([`ac0faef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac0faefb79ad4f1c27ecd9ca5b49be15dbe61fca))
+
+* fix(api): idempotency keys belong to the shopper, not the connection
+
+The middleware scoped an Idempotency-Key to the session user, else the
+session, else the client address. A Bearer token is resolved by DRF
+inside the view, after every process_request, so a signed-in shopper
+looked anonymous and was scoped by address, and so was every anonymous
+cart call. One shopper reaching Django from two addresses (the agent
+gateway's two pods, a phone changing networks) had a retry run twice.
+
+- The decision moves to process_view, which runs the view's own DRF
+  authenticators: the scope is the authenticated principal (knox, staff
+  and agent tokens included). A view that takes no credentials has
+  none; credentials the view would refuse leave the request unguarded,
+  since the view refuses it too.
+- An anonymous request is scoped to the cart it names (X-Cart-Token,
+  else X-Cart-Id), else its session, and to the address only last.
+- The flood budget belongs to the principal, else the client address,
+  never to a cart or session, which anyone can mint
+  (MAX_KEYS_PER_SCOPE is now MAX_KEYS_PER_CALLER).
+- The shared per-tenant cache, the in-flight 409 and the replay
+  semantics are unchanged; the replay log names the scope's kind only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTeLQc2mnu9hd6zwPD3bn5 ([`ac0faef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac0faefb79ad4f1c27ecd9ca5b49be15dbe61fca))
+
+* fix(api): the middleware's own refusals carry an error code
+
+The two answers IdempotencyMiddleware builds itself had a detail and no
+code, unlike every other error (docs/error-contract.md):
+
+- a repeat of a request still running: 409 idempotency_in_flight. A
+  client must tell it from a final refusal, which is cached under the
+  key: it keeps the key and asks again, where a new key would run the
+  request a second time once the first finished.
+- an over-long key: 400 idempotency_key_too_long.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTeLQc2mnu9hd6zwPD3bn5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ac0faef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac0faefb79ad4f1c27ecd9ca5b49be15dbe61fca))
+
 ## v3.141.1 (2026-10-19)
 
 ### Bug fixes

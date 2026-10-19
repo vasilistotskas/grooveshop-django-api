@@ -35,7 +35,7 @@ def _admin_request(post=None, user=None):
     """Minimal mock of an HttpRequest sufficient for admin action calls.
 
     ``user`` defaults to a fresh superuser: the H2 audit trail
-    (``self.log_change``/``self.log_deletion``) writes a real
+    (``self.log_change``/``self.log_deletions``) writes a real
     ``LogEntry`` keyed on ``request.user.pk``, which a bare
     ``MagicMock`` cannot satisfy (the FK write fails on a non-integer
     pk). ``post`` defaults to an empty dict — the destroy confirmation

@@ -1,0 +1,7 @@
+{% extends "admin/password_reset/base.html" %}
+
+{% load i18n %}
+
+{% block reset_body %}
+    <p class="text-sm">{% translate "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual." %}</p>
+{% endblock %}

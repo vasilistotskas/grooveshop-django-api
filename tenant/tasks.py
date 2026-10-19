@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from django.conf import settings
+
 from core import celery_app
 from core.cache.edge import EdgePurgeError
 from core.retry import (
@@ -414,3 +416,89 @@ def refresh_stats_snapshot() -> dict:
 def fanout_refresh_stats_snapshots():
     """Suspended stores are skipped and keep their last snapshot."""
     return run_for_all_tenants("tenant.tasks.refresh_stats_snapshot")
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def send_staff_password_reset_email(
+    self,
+    *,
+    email: str,
+    host: str,
+    secure: bool,
+    site_name: str,
+    urlconf: str,
+) -> dict[str, int]:
+    """Mail the admin "forgot password" link to the staff accounts on
+    ``email`` that can sign in to the admin that asked.
+
+    Queued for EVERY accepted request, found address or not, so the
+    request never learns whether the address is an account (see
+    ``admin.password_reset``). It runs in the schema of the host that
+    asked, which decides the sender and the language: the store's own
+    default locale on a store host, the project default on the platform
+    host. The link points at the host the request came in on.
+    """
+    from django.contrib.auth.tokens import default_token_generator
+    from django.core.mail import EmailMultiAlternatives
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+    from django.utils import translation
+    from django.utils.encoding import force_bytes
+    from django.utils.http import urlsafe_base64_encode
+    from django.utils.translation import gettext as _
+
+    from admin.password_reset import StaffPasswordResetForm
+    from core.utils.email_context import build_email_context
+    from tenant.credentials import tenant_from_email
+    from tenant.membership import bound_tenant
+
+    tenant = bound_tenant()
+    language = getattr(tenant, "default_locale", None) or settings.LANGUAGE_CODE
+    sent = 0
+    for user in StaffPasswordResetForm().get_users(email):
+        # Everything the recipient reads is built in the store's language,
+        # the link included: the admin's URLs carry a language prefix, and
+        # the page it opens answers in that language.
+        with translation.override(language):
+            path = reverse(
+                "admin:admin_password_reset_confirm",
+                kwargs={
+                    "uidb64": urlsafe_base64_encode(force_bytes(user.pk)),
+                    "token": default_token_generator.make_token(user),
+                },
+                current_app=site_name,
+                urlconf=urlconf,
+            )
+            context = build_email_context(
+                language=language,
+                LANGUAGE_CODE=language,
+                reset_url=f"{'https' if secure else 'http'}://{host}{path}",
+                valid_minutes=settings.PASSWORD_RESET_TIMEOUT // 60,
+            )
+            subject = _("Choose a new password for %(store)s") % {
+                "store": context["SITE_NAME"]
+            }
+            html_body = render_to_string(
+                "emails/staff/password_reset.html", context
+            )
+            text_body = render_to_string(
+                "emails/staff/password_reset.txt", context
+            )
+        message = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=tenant_from_email(),
+            to=[user.email],
+        )
+        message.attach_alternative(html_body, "text/html")
+        message.send(fail_silently=False)
+        sent += 1
+    return {"sent": sent}

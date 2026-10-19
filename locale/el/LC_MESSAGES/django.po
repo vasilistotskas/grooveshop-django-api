@@ -23769,3 +23769,61 @@ msgstr "Η ίδια τιμή με το ``reason``."
 
 msgid "The same value as ``error.type``."
 msgstr "Η ίδια τιμή με το ``error.type``."
+
+#: order/services.py order/admin.py
+msgid "Confirm payment received"
+msgstr "Επιβεβαίωση λήψης πληρωμής"
+
+#: order/services.py order/admin.py
+msgid "Confirm the bank transfer arrived"
+msgstr "Επιβεβαίωση ότι έφτασε η τραπεζική μεταφορά"
+
+#: order/services.py order/admin.py
+msgid "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
+msgstr "Καταγράφει τη μεταφορά στο καθολικό πληρωμών της παραγγελίας και την επισημαίνει ως πληρωμένη. Ποιος την επιβεβαίωσε, πότε και πόσο διατηρείται στην παραγγελία. Μόνο για παραγγελία τραπεζικής μεταφοράς που περιμένει ακόμη την πληρωμή της."
+
+#: order/services.py order/admin.py
+msgid "Amount received"
+msgstr "Ποσό που εισπράχθηκε"
+
+#: order/services.py order/admin.py
+msgid "Exactly what the order costs."
+msgstr "Ακριβώς όσο κοστίζει η παραγγελία."
+
+#: order/services.py order/admin.py
+msgid "Bank transaction reference"
+msgstr "Αριθμός συναλλαγής τράπεζας"
+
+#: order/services.py order/admin.py
+msgid "The bank's id for the transfer. One transfer cannot pay two orders."
+msgstr "Ο κωδικός της τράπεζας για τη μεταφορά. Μία μεταφορά δεν μπορεί να πληρώσει δύο παραγγελίες."
+
+#: order/services.py order/admin.py
+#, python-format
+msgid "Order %(order_id)s is marked paid."
+msgstr "Η παραγγελία %(order_id)s επισημάνθηκε ως πληρωμένη."
+
+#: order/services.py order/admin.py
+msgid "Only a bank-transfer order can be confirmed paid by hand. Online payments are recorded by the payment provider."
+msgstr "Μόνο παραγγελία τραπεζικής μεταφοράς μπορεί να επιβεβαιωθεί χειροκίνητα. Οι online πληρωμές καταγράφονται από τον πάροχο πληρωμών."
+
+#: order/services.py order/admin.py
+msgid "This order is not waiting for a payment."
+msgstr "Αυτή η παραγγελία δεν περιμένει πληρωμή."
+
+#: order/services.py order/admin.py
+msgid "Give the bank's transaction reference for the transfer."
+msgstr "Δώστε τον αριθμό συναλλαγής της τράπεζας για τη μεταφορά."
+
+#: order/services.py order/admin.py
+#, python-brace-format
+msgid "The order costs {due}; confirm exactly that amount."
+msgstr "Η παραγγελία κοστίζει {due}· επιβεβαιώστε ακριβώς αυτό το ποσό."
+
+#: order/services.py order/admin.py
+msgid "This transfer reference is already recorded."
+msgstr "Αυτός ο αριθμός μεταφοράς έχει ήδη καταγραφεί."
+
+#: order/services.py order/admin.py
+msgid "Collected off-platform"
+msgstr "Εισπράχθηκε εκτός πλατφόρμας"

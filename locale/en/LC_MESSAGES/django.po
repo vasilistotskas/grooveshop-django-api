@@ -21988,3 +21988,45 @@ msgstr "The same value as ``error.type``."
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Thank you for shopping with us!"
+
+msgid "Confirm payment received"
+msgstr "Confirm payment received"
+
+msgid "Confirm the bank transfer arrived"
+msgstr "Confirm the bank transfer arrived"
+
+msgid "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
+msgstr "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
+
+msgid "Amount received"
+msgstr "Amount received"
+
+msgid "Exactly what the order costs."
+msgstr "Exactly what the order costs."
+
+msgid "Bank transaction reference"
+msgstr "Bank transaction reference"
+
+msgid "The bank's id for the transfer. One transfer cannot pay two orders."
+msgstr "The bank's id for the transfer. One transfer cannot pay two orders."
+
+msgid "Order %(order_id)s is marked paid."
+msgstr "Order %(order_id)s is marked paid."
+
+msgid "Only a bank-transfer order can be confirmed paid by hand. Online payments are recorded by the payment provider."
+msgstr "Only a bank-transfer order can be confirmed paid by hand. Online payments are recorded by the payment provider."
+
+msgid "This order is not waiting for a payment."
+msgstr "This order is not waiting for a payment."
+
+msgid "Give the bank's transaction reference for the transfer."
+msgstr "Give the bank's transaction reference for the transfer."
+
+msgid "The order costs {due}; confirm exactly that amount."
+msgstr "The order costs {due}; confirm exactly that amount."
+
+msgid "This transfer reference is already recorded."
+msgstr "This transfer reference is already recorded."
+
+msgid "Collected off-platform"
+msgstr "Collected off-platform"

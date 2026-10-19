@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from django.contrib.auth.models import AnonymousUser
 from django.http import JsonResponse
 from django.test import RequestFactory, TestCase, override_settings
@@ -10,6 +12,7 @@ from core.middleware.idempotency import (
     IDEMPOTENCY_HEADER,
     IdempotencyMiddleware,
 )
+from tests.utils.idempotency import enter
 
 _LOCMEM = {
     "default": {
@@ -36,14 +39,20 @@ class IdempotencyInFlightTest(TestCase):
 
         # First request reserves the key and proceeds to the handler.
         first = self._request()
-        self.assertIsNone(mw.process_request(first))
+        self.assertIsNone(enter(mw, first))
 
         # A duplicate arriving BEFORE the first completes is rejected with
-        # 409 rather than executing the handler a second time.
+        # 409 rather than executing the handler a second time, under a
+        # code that tells the client to keep the key and ask again: a
+        # client that took it for a final refusal would mint a new key,
+        # and its next submit would run a second time.
         second = self._request()
-        resp = mw.process_request(second)
+        resp = enter(mw, second)
         self.assertIsNotNone(resp)
         self.assertEqual(resp.status_code, 409)
+        self.assertEqual(
+            json.loads(resp.content)["code"], "idempotency_in_flight"
+        )
 
     def test_reservation_released_on_non_cacheable_response(self):
         from django.core.cache import caches
@@ -52,10 +61,10 @@ class IdempotencyInFlightTest(TestCase):
         mw = IdempotencyMiddleware(lambda r: JsonResponse({"ok": True}))
 
         first = self._request()
-        mw.process_request(first)
+        enter(mw, first)
         # A 500 (retryable) must release the reservation, not cache it.
         mw.process_response(first, JsonResponse({"err": 1}, status=500))
 
         # A retry after the failure is allowed to proceed (not 409-blocked).
         retry = self._request()
-        self.assertIsNone(mw.process_request(retry))
+        self.assertIsNone(enter(mw, retry))

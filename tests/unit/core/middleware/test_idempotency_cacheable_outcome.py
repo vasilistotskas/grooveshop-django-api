@@ -2,7 +2,7 @@
 
 Covers ``core/middleware/idempotency.py``: ``_cacheable_outcome`` (redirect,
 oversized, non-JSON, undecodable and list bodies, preserved headers), the
-replay path in ``process_request`` and the over-long key guard.
+replay path in ``process_view`` and the over-long key guard.
 """
 
 from __future__ import annotations
@@ -26,7 +26,9 @@ from core.middleware.idempotency import (
     MAX_KEY_LENGTH,
     IdempotencyMiddleware,
     _cache_key,
+    _scope_id,
 )
+from tests.utils.idempotency import enter
 
 _LOCMEM = {
     "default": {
@@ -137,22 +139,27 @@ class IdempotencyReplayTest(TestCase):
 
     def test_non_cacheable_redirect_releases_the_reservation(self):
         first = _request()
-        assert self.mw.process_request(first) is None
+        assert enter(self.mw, first) is None
 
         self.mw.process_response(first, HttpResponseRedirect("/next/"))
 
-        assert caches[CACHE_ALIAS].get(_cache_key(first, "key-abc")) is None
-        assert self.mw.process_request(_request()) is None
+        assert (
+            caches[CACHE_ALIAS].get(
+                _cache_key(first, _scope_id(first, None), "key-abc")
+            )
+            is None
+        )
+        assert enter(self.mw, _request()) is None
 
     def test_replay_returns_cached_list_body_status_and_headers(self):
         first = _request()
-        self.mw.process_request(first)
+        enter(self.mw, first)
         original = JsonResponse([{"id": 1}], safe=False, status=201)
         original["Location"] = "/api/v1/order/1/"
         original["X-Custom"] = "not-replayed"
         self.mw.process_response(first, original)
 
-        replay = self.mw.process_request(_request())
+        replay = enter(self.mw, _request())
 
         assert replay is not None
         assert replay.status_code == 201
@@ -163,12 +170,12 @@ class IdempotencyReplayTest(TestCase):
 
     def test_replay_of_a_cached_client_error_keeps_the_error(self):
         first = _request()
-        self.mw.process_request(first)
+        enter(self.mw, first)
         self.mw.process_response(
             first, JsonResponse({"detail": "Invalid coupon."}, status=400)
         )
 
-        replay = self.mw.process_request(_request())
+        replay = enter(self.mw, _request())
 
         assert replay is not None
         assert replay.status_code == 400
@@ -176,34 +183,33 @@ class IdempotencyReplayTest(TestCase):
 
     def test_same_key_on_a_different_method_is_not_replayed(self):
         first = _request("POST")
-        self.mw.process_request(first)
+        enter(self.mw, first)
         self.mw.process_response(first, JsonResponse({"id": 1}, status=201))
 
-        assert self.mw.process_request(_request("PUT")) is None
+        assert enter(self.mw, _request("PUT")) is None
 
     def test_safe_methods_are_ignored(self):
         request = _request("GET")
 
-        assert self.mw.process_request(request) is None
+        assert enter(self.mw, request) is None
         assert not hasattr(request, "_idempotency_cache_key")
 
     def test_key_longer_than_the_limit_is_rejected_with_400(self):
-        response = self.mw.process_request(
-            _request(key="k" * (MAX_KEY_LENGTH + 1))
-        )
+        response = enter(self.mw, _request(key="k" * (MAX_KEY_LENGTH + 1)))
 
         assert response is not None
         assert response.status_code == 400
         assert json.loads(response.content) == {
             "detail": (
                 f"Idempotency-Key must be at most {MAX_KEY_LENGTH} characters."
-            )
+            ),
+            "code": "idempotency_key_too_long",
         }
 
     def test_key_at_the_limit_is_accepted(self):
         request = _request(key="k" * MAX_KEY_LENGTH)
 
-        assert self.mw.process_request(request) is None
+        assert enter(self.mw, request) is None
         assert request._idempotency_cache_key == _cache_key(
-            request, "k" * MAX_KEY_LENGTH
+            request, _scope_id(request, None), "k" * MAX_KEY_LENGTH
         )

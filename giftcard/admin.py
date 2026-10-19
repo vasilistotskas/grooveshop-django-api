@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django import forms
@@ -26,7 +27,44 @@ from admin.displays import money
 from admin.export import ExportActionMixin
 from giftcard.enum import GiftCardStatus, GiftCardTransactionKind
 from giftcard.models import GiftCard, GiftCardPurchase, GiftCardTransaction
+from giftcard.services import GiftCardService
 from tenant.celery import dispatch_on_commit
+
+logger = logging.getLogger(__name__)
+
+
+def _over_limit_message():
+    return _(
+        "This is above the limit a staff member can put on gift cards in "
+        "one step. The store's owner can do it."
+    )
+
+
+def _refuse_over_limit(request, amount) -> None:
+    logger.warning(
+        "Gift-card value above the staff limit refused",
+        extra={"user_id": request.user.pk, "amount": str(amount)},
+    )
+
+
+def _check_issue_limit(request, amount: Decimal) -> None:
+    if GiftCardService.over_staff_limit(request.user, amount):
+        _refuse_over_limit(request, amount)
+        raise forms.ValidationError(_over_limit_message())
+
+
+def _above_limit_note(amount: Decimal) -> str:
+    """A ledger note when the owner (or a superuser) put on more than the
+    staff limit: who did it is on the row (``created_by``) and in the admin
+    log."""
+    limit = GiftCardService.staff_issue_limit()
+    if limit > 0 and amount > limit:
+        return f" [above the staff limit of {limit}, authorised by the owner]"
+    return ""
+
+
+def _issue_description(amount) -> str:
+    return str(_("Issued via admin")) + _above_limit_note(Decimal(str(amount)))
 
 
 class AdjustBalanceForm(BaseDialogForm):
@@ -141,6 +179,18 @@ class GiftCardAdmin(BaseModelAdmin):
         ),
     )
 
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, change=change, **kwargs)
+        if obj is None:
+            # ``get_form`` builds a fresh form class per call, so the
+            # validator that closes over this request is this request's.
+            form.base_fields["initial_value"].validators.append(
+                lambda value: _check_issue_limit(
+                    request, Decimal(str(value.amount))
+                )
+            )
+        return form
+
     def save_model(self, request, obj, form, change):
         if change:
             super().save_model(request, obj, form, change)
@@ -159,7 +209,7 @@ class GiftCardAdmin(BaseModelAdmin):
             deliver_at=obj.deliver_at,
             expires_at=obj.expires_at,
             created_by=request.user,
-            description=str(_("Issued via admin")),
+            description=_issue_description(obj.initial_value.amount),
         )
         obj.pk = card.pk
         obj.uuid = card.uuid
@@ -217,20 +267,33 @@ class GiftCardAdmin(BaseModelAdmin):
     ) -> HttpResponse:
         card = GiftCard.objects.get(pk=object_id)
         amount = form.cleaned_data["amount"]
-        if amount < 0 and -amount > Decimal(str(card.balance.amount)):
+        if amount > 0 and GiftCardService.over_staff_limit(
+            request.user, amount
+        ):
+            _refuse_over_limit(request, amount)
+            self.message_user(request, _over_limit_message(), messages.ERROR)
+        elif amount < 0 and -amount > Decimal(str(card.balance.amount)):
             self.message_user(
                 request,
                 _("Cannot remove more than the current balance."),
                 messages.ERROR,
             )
         else:
+            note = _above_limit_note(amount) if amount > 0 else ""
             GiftCardTransaction.objects.create(
                 gift_card=card,
                 kind=GiftCardTransactionKind.ADJUST,
                 amount=amount,
                 created_by=request.user,
-                description=form.cleaned_data["reason"],
+                # The note is what records the authorisation, so it is
+                # the reason that gives way when the two do not fit.
+                description=form.cleaned_data["reason"][: 255 - len(note)]
+                + note,
             )
+            if note:
+                self.log_change(
+                    request, card, f"Added {amount} above the staff limit"
+                )
             self.message_user(request, _("Balance adjusted."), messages.SUCCESS)
         return HttpResponse(
             headers={

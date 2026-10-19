@@ -101,6 +101,41 @@ class GiftCardService:
             return None
         return timezone.now() + timedelta(days=days)
 
+    @staticmethod
+    def staff_issue_limit() -> Decimal:
+        """The most a staff member may put on gift cards in one step
+        (``GIFT_CARD_STAFF_ISSUE_LIMIT``, per store); ``0`` is no limit."""
+        return Decimal(
+            str(Setting.get("GIFT_CARD_STAFF_ISSUE_LIMIT", default=500))
+        )
+
+    @classmethod
+    def authorised_to_exceed_limit(cls, user) -> bool:
+        """Whether *user* may put more than the staff limit on gift cards:
+        a platform superuser, or the OWNER of this store. An admin or staff
+        role may not: gift-card value is spendable money."""
+        from tenant.membership import get_membership, is_platform_superuser
+        from tenant.models import TenantMembershipRole
+
+        if is_platform_superuser(user):
+            return True
+        membership = get_membership(user)
+        return (
+            membership is not None
+            and membership.role == TenantMembershipRole.OWNER
+        )
+
+    @classmethod
+    def over_staff_limit(cls, user, amount: Decimal) -> bool:
+        """True when *amount* is above the limit and *user* may not issue
+        it."""
+        limit = cls.staff_issue_limit()
+        return (
+            limit > 0
+            and amount > limit
+            and not cls.authorised_to_exceed_limit(user)
+        )
+
     @classmethod
     def issue(
         cls,

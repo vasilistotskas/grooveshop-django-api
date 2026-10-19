@@ -3,6 +3,37 @@
 
 
 
+## v3.137.2 (2026-10-19)
+
+### Bug fixes
+
+* fix(orders): credit the receipt for value returned onto gift cards or points (#260)
+
+* wip ([`ff26869`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff26869e82fd1c1ec3e87f6fbbabc00d3bfc222d))
+
+* fix(orders): credit the receipt for value returned onto gift cards or points
+
+Value that goes back onto gift cards or loyalty points after the retail
+receipt exists reverses the sale just as a provider refund does, but only
+REFUND ledger rows got a credit document (11.4), so the receipt kept
+documenting a sale that had been partly undone.
+
+create_pending_credits is now the one path for both: a settled
+STORED_VALUE refund attempt is credited for what its gift-card and points
+rows actually returned (not the amount it claimed), as a REFUND credit
+linked by a new refund_attempt (exactly one of refund / refund_attempt,
+enforced by the check constraint), VAT split and capped like any other.
+Its moment is the first row naming it, compared with the receipt row's
+creation: value returned before it was netted from the receipt and gets
+no credit. A chargeback still has none. The stored-value signal now
+triggers the reconciliation.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`ff26869`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff26869e82fd1c1ec3e87f6fbbabc00d3bfc222d))
+
 ## v3.137.1 (2026-10-19)
 
 ### Bug fixes

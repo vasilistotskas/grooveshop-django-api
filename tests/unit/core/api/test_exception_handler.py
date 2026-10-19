@@ -142,6 +142,19 @@ def test_nested_serializer_errors_keep_their_nesting():
     ]
 
 
+def test_a_validation_error_with_only_a_detail_key_still_gets_fields():
+    def raiser(request):
+        raise ValidationError({"detail": "Cannot do that."}, code="blocked")
+
+    _, body = _call(raiser)
+
+    assert body["detail"] == "Cannot do that."
+    assert body["code"] == "blocked"
+    assert body["fields"] == {
+        "detail": [{"message": "Cannot do that.", "code": "blocked"}]
+    }
+
+
 def test_a_field_named_code_is_never_overwritten():
     def raiser(request):
         raise ValidationError(

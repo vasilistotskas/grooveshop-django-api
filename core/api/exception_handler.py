@@ -90,14 +90,11 @@ def exception_handler(exc: Exception, context: dict[str, Any]):
     data = response.data
     default = getattr(exc, "default_code", INVALID_CODE)
 
-    if isinstance(data, dict) and set(data) == {"detail"}:
-        # A plain error: DRF's own ``{"detail": ...}``.
-        body: dict[str, Any] = {
-            "detail": data["detail"],
-            CODE_KEY: _code_of(data["detail"], default),
-        }
-    elif isinstance(data, dict):
-        body = dict(data)
+    if isinstance(data, dict):
+        # A plain error is DRF's own ``{"detail": ...}``: its one leaf
+        # gives the code. Any ``ValidationError`` also gets ``fields``,
+        # whatever the keys of its dict, so a client reads one rule.
+        body: dict[str, Any] = dict(data)
         if CODE_KEY not in body:
             body[CODE_KEY] = _top_level_code(data, default)
         if (

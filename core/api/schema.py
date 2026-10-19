@@ -152,6 +152,30 @@ ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
         },
         "required": ["message", "code"],
     },
+    "ApiFieldErrors": {
+        "description": (
+            "What lies under one field: its messages, or, for a nested "
+            "serializer, an object (a list serializer keys its rows by "
+            "position) or list of the same."
+        ),
+        "oneOf": [
+            {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/ApiFieldError"},
+                        {"$ref": "#/components/schemas/ApiFieldErrors"},
+                    ]
+                },
+            },
+            {
+                "type": "object",
+                "additionalProperties": {
+                    "$ref": "#/components/schemas/ApiFieldErrors"
+                },
+            },
+        ],
+    },
     "ApiError": {
         "type": "object",
         "description": (
@@ -178,8 +202,7 @@ ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
             "fields": {
                 "type": "object",
                 "additionalProperties": {
-                    "type": "array",
-                    "items": {"$ref": "#/components/schemas/ApiFieldError"},
+                    "$ref": "#/components/schemas/ApiFieldErrors"
                 },
             },
         },

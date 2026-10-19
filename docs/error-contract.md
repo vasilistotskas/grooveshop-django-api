@@ -14,7 +14,7 @@ wire, like every other body):
 | Error | Body |
 |---|---|
 | Plain (`NotFound`, `PermissionDenied`, `Throttled`, any `APIException`) | `{"detail": "...", "code": "not_found"}` |
-| Validation | the field keys as before, plus `"code"` and `"fields"` |
+| Validation (every `ValidationError` given a dict, including `{"detail": ...}`) | the keys as before, plus `"code"` and `"fields"` |
 
 `fields` repeats the field keys, each a list of `{message, code}`, nested
 where the serializer nests:

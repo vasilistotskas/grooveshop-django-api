@@ -116,6 +116,8 @@ class TestRetryPaymentSuccess:
             payment_method_id="pm_card_visa",
             purpose=PaymentPurpose.ORDER,
             subject=str(order.uuid),
+            # The retried intent is closed when the hold ends.
+            expires_at=order.payment_hold_expires_at,
         )
         assert order.payment_id == "pi_new_retry"
         assert order.payment_status == PaymentStatus.PENDING

@@ -1,5 +1,7 @@
 import logging
+import math
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, ClassVar, cast
 
@@ -7,6 +9,7 @@ import moneyed
 import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
@@ -105,6 +108,19 @@ class PaymentProvider(ABC):
         """
         return
 
+    def close_payment(self, order) -> bool:
+        """Stop accepting payment for *order*; True once none can land.
+
+        Called before an unpaid order's stock is released. A payment link
+        or session ends by itself at the expiry it was created with, so
+        the default has nothing to do. A provider whose payment object
+        has no expiry (a Stripe PaymentIntent) cancels it here. False
+        means the provider says the payment is past the point of no
+        return (processing or succeeded): the order must stay open for
+        its webhook.
+        """
+        return True
+
     @abstractmethod
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
@@ -155,6 +171,13 @@ class StripePaymentProvider(PaymentProvider):
 
     code: ClassVar[str] = "stripe"
     display_name: ClassVar[StrOrPromise] = _("Stripe")
+    #: A Checkout Session's ``expires_at`` must be 30 minutes to 24 hours
+    #: after Stripe receives the request
+    #: (https://docs.stripe.com/payments/checkout/managing-limited-inventory).
+    #: The margin keeps a 30 minute request from arriving a moment short.
+    MIN_SESSION_LIFETIME: ClassVar[timedelta] = timedelta(minutes=30)
+    MAX_SESSION_LIFETIME: ClassVar[timedelta] = timedelta(hours=24)
+    SESSION_MARGIN: ClassVar[timedelta] = timedelta(minutes=1)
     # Both: PaymentIntents for the intent-first checkout, and hosted
     # Checkout Sessions for the pay-later/retry links.
     supports_payment_intent: ClassVar[bool] = True
@@ -291,6 +314,20 @@ class StripePaymentProvider(PaymentProvider):
                 },
             }
 
+            # The session stops being payable at the instant the order
+            # stops holding its stock. Stripe will not expire one sooner
+            # than its minimum, so the expiry it applied (returned below)
+            # is what the caller records, never the one asked for.
+            requested_expiry = kwargs.get("expires_at")
+            if requested_expiry is not None:
+                now = timezone.now()
+                checkout_session_data["expires_at"] = int(
+                    max(
+                        requested_expiry,
+                        now + self.MIN_SESSION_LIFETIME + self.SESSION_MARGIN,
+                    ).timestamp()
+                )
+
             # Add shipping as a separate line for UX breakdown
             if shipping_price and shipping_price.amount > 0:
                 checkout_session_data["shipping_options"] = [
@@ -356,6 +393,9 @@ class StripePaymentProvider(PaymentProvider):
                 "amount": str(amount.amount),
                 "currency": str(amount.currency),
                 "provider": "stripe",
+                "expires_at": datetime.fromtimestamp(
+                    session.expires_at, tz=UTC
+                ),
             }
 
         except stripe.StripeError as e:
@@ -370,6 +410,31 @@ class StripePaymentProvider(PaymentProvider):
                 extra={"order_id": order_id, "error": str(e)},
             )
             return False, {"error": str(e)}
+
+    def close_payment(self, order) -> bool:
+        """Cancel the order's PaymentIntent, which has no expiry of its own.
+
+        A hosted Checkout Session ends at its ``expires_at``. An intent
+        opened by ``process_payment`` stays confirmable until canceled, so
+        it is canceled here before the stock is released. Stripe refuses
+        once the intent is processing or succeeded (or belongs to a
+        Checkout Session, which only expiry ends); the intent is then read
+        back and the order stays open unless it is already canceled.
+        """
+        payment_id = order.payment_id or ""
+        if not payment_id.startswith("pi_"):
+            return True
+        try:
+            intent = stripe.PaymentIntent.cancel(
+                payment_id,
+                cancellation_reason="abandoned",
+                api_key=self.api_key,
+            )
+        except stripe.InvalidRequestError:
+            intent = stripe.PaymentIntent.retrieve(
+                payment_id, api_key=self.api_key
+            )
+        return intent.status == "canceled"
 
     def confirm_delegated_payment(
         self, amount: Money, order_id: str, order_uuid: str, token: str
@@ -847,6 +912,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
     code: ClassVar[str] = "viva_wallet"
     display_name: ClassVar[StrOrPromise] = _("Viva Wallet")
+    #: ``paymentTimeout`` is a number of seconds, 1800 by default; 65535
+    #: means the order never expires, so it is also the largest finite
+    #: lifetime this can ask for
+    #: (https://developer.viva.com/apis-for-payments/payment-api).
+    MAX_PAYMENT_TIMEOUT: ClassVar[timedelta] = timedelta(seconds=65534)
     # Hosted redirect only. ``process_payment`` below delegates straight
     # to ``create_checkout_session`` — there is no intent to confirm, so
     # an order using Viva is created BEFORE any money moves.
@@ -1028,6 +1098,21 @@ class VivaWalletPaymentProvider(PaymentProvider):
             if customer_email:
                 payload["customer"] = {"email": customer_email}
 
+            # The payment order stops being payable at the instant the
+            # order stops holding its stock. Without it Viva applies its
+            # own 30 minute default.
+            requested_expiry = kwargs.get("expires_at")
+            if requested_expiry is not None:
+                timeout = min(
+                    timedelta(
+                        seconds=math.ceil(
+                            (requested_expiry - timezone.now()).total_seconds()
+                        )
+                    ),
+                    self.MAX_PAYMENT_TIMEOUT,
+                )
+                payload["paymentTimeout"] = int(timeout.total_seconds())
+
             response = requests.post(
                 f"{self.api_url}/checkout/v2/orders",
                 headers={
@@ -1051,7 +1136,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 },
             )
 
-            return True, {
+            payment_data = {
                 "session_id": str(order_code),
                 "checkout_url": checkout_url,
                 "status": "created",
@@ -1059,6 +1144,14 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "currency": str(amount.currency),
                 "provider": "viva_wallet",
             }
+            if "paymentTimeout" in payload:
+                # Viva starts the clock when it receives the request, so
+                # counting from the reply can only be later, never earlier
+                # than the link's real end.
+                payment_data["expires_at"] = timezone.now() + timedelta(
+                    seconds=payload["paymentTimeout"]
+                )
+            return True, payment_data
 
         except requests.HTTPError as e:
             error_body = ""

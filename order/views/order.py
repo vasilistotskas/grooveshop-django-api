@@ -50,6 +50,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from order import payment_hold
 from order.enum.cancel_error import OrderCancelErrorType
 from order.enum.create_error import OrderCreateErrorType
 from order.enum.status import OrderStatus, PaymentStatus
@@ -1669,6 +1670,8 @@ class OrderViewSet(BaseModelViewSet):
             order_uuid=str(order.uuid),
             purpose=PaymentPurpose.ORDER,
             subject=str(order.uuid),
+            # The link stops being payable when the stock hold ends.
+            expires_at=payment_hold.deadline(),
             **checkout_params,
         )
 
@@ -1696,7 +1699,10 @@ class OrderViewSet(BaseModelViewSet):
                 metadata, str(checkout_response["session_id"])
             )
             locked.metadata = metadata
-            locked.save(update_fields=["metadata"])
+            # The expiry the provider applied: the stock is held until
+            # exactly then, and not past it.
+            locked.payment_hold_expires_at = checkout_response["expires_at"]
+            locked.save(update_fields=["metadata", "payment_hold_expires_at"])
             order = locked
 
         response_serializer_class = self.get_response_serializer()

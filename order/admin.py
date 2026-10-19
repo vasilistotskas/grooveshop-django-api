@@ -729,6 +729,8 @@ class OrderAdmin(BaseModelAdmin):
         # behind it.
         "payment_status",
         "payment_id",
+        # Set by the provider's reply when a payment link is opened.
+        "payment_hold_expires_at",
         "follow_up_note",
         "created_at",
         "updated_at",
@@ -853,6 +855,7 @@ class OrderAdmin(BaseModelAdmin):
                     "payment_status",
                     "payment_method",
                     "payment_id",
+                    "payment_hold_expires_at",
                     "amount_due",
                     "discount_amount",
                     "loyalty_discount",

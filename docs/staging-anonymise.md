@@ -58,13 +58,15 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   written by `scripts/staging-arm-features.py` in the infrastructure repo, through
   `credentials.arm_credentials`: it reads the `STAGING_TENANT_CREDENTIALS` JSON
   (`{schema: {field: value}}`), accepts only the credential columns this module
-  derives, and refuses a tenant that is not on a staging host or has a live-mode
+  derives, and refuses to run unless `SYSTEM_ENV` is `staging`, and refuses a tenant whose primary
+  domain is not exactly `<staging label>.webside.gr` or `.grooveshop.space` or has a live-mode
   switch on.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
   search queries, notifications, stock reservations, admin log entries,
   Conversions API logs, Celery results, and every dj-stripe mirror row except
-  the platform's own Stripe account and endpoint configuration.
+  the platform's own Stripe account (the API key and webhook endpoint rows are
+  wiped, and `manage.py bootstrap_stripe` rebuilds them from a sandbox key).
 - **Kept real**: orders, items, payments, invoices' amounts, products, stock,
   prices, promotions, gift-card balances, loyalty points, translations.
 

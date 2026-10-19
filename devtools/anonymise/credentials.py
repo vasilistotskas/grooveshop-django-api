@@ -23,6 +23,8 @@ a secret-looking plain field is left behind.
 
 from __future__ import annotations
 
+import re
+
 from django.db import models
 
 from core.db.encrypted_fields import EncryptedCharField
@@ -73,6 +75,25 @@ def cleared_fields(model: type[models.Model]) -> dict[str, object]:
     return cleared
 
 
+#: The domains staging's hosts live under (staging-rewrite-hosts.py's
+#: REWRITES table in the infrastructure repo): ``staging.webside.gr``,
+#: ``<name>-staging.webside.gr``, ``<name>-staging.grooveshop.space``.
+STAGING_DOMAIN_SUFFIXES: tuple[str, ...] = ("webside.gr", "grooveshop.space")
+_STAGING_LABEL = re.compile(r"(?:[a-z0-9-]+-)?staging(?:-[a-z0-9-]+)?")
+
+
+def is_staging_host(host: str) -> bool:
+    """True only for a host of the form ``<staging label>.<our domain>``.
+
+    Exact, not a substring test: ``mystagingshop.gr`` and
+    ``staging.example-store.com`` are somebody's production domains.
+    """
+    label, _, parent = host.strip().lower().rstrip(".").partition(".")
+    return parent in STAGING_DOMAIN_SUFFIXES and bool(
+        _STAGING_LABEL.fullmatch(label)
+    )
+
+
 def arm_credentials(raw: str) -> dict[str, list[str]]:
     """Write staging's own sandbox credentials onto its Tenant rows.
 
@@ -85,6 +106,10 @@ def arm_credentials(raw: str) -> dict[str, list[str]]:
     a live-mode switch on, which would mean the refresh did not anonymise it.
     """
     import json
+
+    from devtools.anonymise.engine import _require_staging
+
+    _require_staging()
 
     from django_tenants.utils import (
         get_tenant_domain_model,
@@ -118,7 +143,7 @@ def arm_credentials(raw: str) -> dict[str, list[str]]:
             .values_list("domain", flat=True)
             .first()
         )
-        if not primary or "staging" not in primary:
+        if not primary or not is_staging_host(primary):
             raise ValueError(
                 f"{schema}: primary domain {primary!r} is not a staging host"
             )

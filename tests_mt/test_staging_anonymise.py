@@ -497,7 +497,7 @@ def _stage_domain(tenant) -> None:
     from tenant.models import TenantDomain
 
     TenantDomain.objects.filter(tenant=tenant, is_primary=True).update(
-        domain="mt-smoke-staging.test"
+        domain="mt-smoke-staging.grooveshop.space"
     )
 
 
@@ -576,3 +576,22 @@ def test_no_credentials_supplied_means_none_written(seeded, staging):
     from devtools.anonymise.credentials import arm_credentials
 
     assert arm_credentials("") == {}
+
+
+@pytest.mark.parametrize(
+    "domain",
+    ["staging.example-store.com", "mystagingshop.gr", "shop.webside.gr"],
+)
+def test_arming_refuses_a_production_like_host(seeded, staging, domain):
+    from devtools.anonymise.credentials import arm_credentials
+    from tenant.models import TenantDomain
+
+    tenant, _ = seeded
+    TenantDomain.objects.filter(tenant=tenant, is_primary=True).update(
+        domain=domain
+    )
+
+    with pytest.raises(ValueError, match="not a staging host"):
+        arm_credentials(
+            f'{{"{tenant.schema_name}": {{"stripe_secret_key": "x"}}}}'
+        )

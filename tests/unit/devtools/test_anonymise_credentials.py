@@ -162,3 +162,35 @@ def test_stripe_key_and_endpoint_rows_are_wiped_not_kept():
     for name in ("APIKey", "WebhookEndpoint"):
         model = apps.get_model("djstripe", name)
         assert isinstance(rules.resolve(model), rules.Delete), name
+
+
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("staging.webside.gr", True),
+        ("api-staging.webside.gr", True),
+        ("demo-staging.grooveshop.space", True),
+        ("Staging.Webside.GR.", True),
+        ("webside.gr", False),
+        ("api.webside.gr", False),
+        ("platform.grooveshop.space", False),
+        ("mystagingshop.gr", False),
+        ("staging.example-store.com", False),
+        ("staging.webside.gr.evil.com", False),
+        ("a.staging.webside.gr", False),
+        ("notstaging.webside.gr", False),
+        ("", False),
+    ],
+)
+def test_only_exact_staging_hosts_may_be_armed(host, expected):
+    assert credentials.is_staging_host(host) is expected
+
+
+@pytest.mark.parametrize("env", ["production", "dev", "ci"])
+def test_arming_refuses_outside_staging_before_touching_anything(settings, env):
+    from devtools.anonymise.engine import NotStaging
+
+    settings.SYSTEM_ENV = env
+
+    with pytest.raises(NotStaging):
+        credentials.arm_credentials('{"webside": {"stripe_secret_key": "x"}}')

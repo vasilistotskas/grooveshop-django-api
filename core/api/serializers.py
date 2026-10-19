@@ -31,7 +31,8 @@ class RequiredDefaultTranslationMixin:
     def validate_translations(self, value):
         if not value:
             raise serializers.ValidationError(
-                _("At least one translation is required.")
+                _("At least one translation is required."),
+                code="translation_required",
             )
 
         default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -42,7 +43,8 @@ class RequiredDefaultTranslationMixin:
                     "A translation for the default language (%(lang)s) "
                     "is required."
                 )
-                % {"lang": default_language}
+                % {"lang": default_language},
+                code="default_translation_required",
             )
 
         field = self.required_translation_field
@@ -52,7 +54,8 @@ class RequiredDefaultTranslationMixin:
                     "The '%(field)s' field is required for the default "
                     "language (%(lang)s)."
                 )
-                % {"field": field, "lang": default_language}
+                % {"field": field, "lang": default_language},
+                code="default_translation_field_required",
             )
 
         return value

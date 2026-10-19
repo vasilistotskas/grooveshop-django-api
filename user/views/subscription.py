@@ -207,12 +207,18 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
 
         if result.outcome == SubscribeOutcome.ALREADY_ACTIVE:
             return Response(
-                {"detail": _("Already subscribed to this topic.")},
+                {
+                    "detail": _("Already subscribed to this topic."),
+                    "code": "already_subscribed",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if result.outcome == SubscribeOutcome.ALREADY_PENDING:
             return Response(
-                {"detail": _("Subscription pending confirmation.")},
+                {
+                    "detail": _("Subscription pending confirmation."),
+                    "code": "subscription_pending",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -245,7 +251,10 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
             )
         except UserSubscription.DoesNotExist:
             return Response(
-                {"detail": _("You are not subscribed to this topic.")},
+                {
+                    "detail": _("You are not subscribed to this topic."),
+                    "code": "not_subscribed",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -351,7 +360,8 @@ class UserSubscriptionViewSet(BaseModelViewSet):
                 {
                     "detail": _("Invalid or inactive topic IDs: {}").format(
                         invalid_ids
-                    )
+                    ),
+                    "code": "topic_ids_invalid",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -424,12 +434,18 @@ class UserSubscriptionViewSet(BaseModelViewSet):
         )
         if outcome == ConfirmOutcome.EXPIRED:
             return Response(
-                {"detail": CONFIRMATION_EXPIRED_MESSAGE},
+                {
+                    "detail": CONFIRMATION_EXPIRED_MESSAGE,
+                    "code": "confirmation_expired",
+                },
                 status=status.HTTP_410_GONE,
             )
         if outcome == ConfirmOutcome.INVALID:
             return Response(
-                {"detail": _("Invalid confirmation token.")},
+                {
+                    "detail": _("Invalid confirmation token."),
+                    "code": "confirmation_token_invalid",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -533,7 +549,12 @@ class NewsletterSubscribeView(APIView):
         topic = SubscriptionTopic.objects.default_newsletter().first()
         if topic is None:
             return Response(
-                {"detail": _("This store has no newsletter to subscribe to.")},
+                {
+                    "detail": _(
+                        "This store has no newsletter to subscribe to."
+                    ),
+                    "code": "newsletter_unavailable",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -619,12 +640,18 @@ class ConfirmSubscriptionByTokenView(APIView):
         )
         if outcome == ConfirmOutcome.EXPIRED:
             return Response(
-                {"detail": CONFIRMATION_EXPIRED_MESSAGE},
+                {
+                    "detail": CONFIRMATION_EXPIRED_MESSAGE,
+                    "code": "confirmation_expired",
+                },
                 status=status.HTTP_410_GONE,
             )
         if outcome == ConfirmOutcome.INVALID or subscription is None:
             return Response(
-                {"detail": _("Invalid confirmation link.")},
+                {
+                    "detail": _("Invalid confirmation link."),
+                    "code": "confirmation_link_invalid",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
@@ -732,7 +759,12 @@ def _unsubscribe_get_response(token: str, topic_slug: str | None):
     subscriptions, error = _validate_unsubscribe_token(token)
     if error is not None:
         return Response(
-            {"error": str(error)}, status=status.HTTP_400_BAD_REQUEST
+            {
+                "error": str(error),
+                "detail": str(error),
+                "code": "unsubscribe_token_invalid",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
     count, topic_name, recipient = _apply_unsubscribe(subscriptions, topic_slug)
     if count == 0:

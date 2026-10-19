@@ -108,7 +108,8 @@ class AcsPickupListManifestView(APIView):
             )
         except AcsPickupList.DoesNotExist as exc:
             raise NotFound(
-                f"No ACS pickup list with number {pickup_list_no!r}."
+                f"No ACS pickup list with number {pickup_list_no!r}.",
+                code="pickup_list_not_found",
             ) from exc
 
         pdf_bytes = AcsService.fetch_pickup_list_pdf(pickup_list)

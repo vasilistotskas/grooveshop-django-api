@@ -110,17 +110,21 @@ class ProductCategoryWriteSerializer(
         if value and self.instance:
             if value == self.instance:
                 raise serializers.ValidationError(
-                    "Category cannot be its own parent."
+                    "Category cannot be its own parent.",
+                    code="category_own_parent",
                 )
             if value in self.instance.get_descendants():
                 raise serializers.ValidationError(
-                    "Category cannot have a descendant as parent."
+                    "Category cannot have a descendant as parent.",
+                    code="category_descendant_parent",
                 )
         return value
 
     def validate_slug(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError("Slug is required.")
+            raise serializers.ValidationError(
+                "Slug is required.", code="slug_required"
+            )
 
         queryset = ProductCategory.objects.filter(slug=value)
         if self.instance:
@@ -128,7 +132,7 @@ class ProductCategoryWriteSerializer(
 
         if queryset.exists():
             raise serializers.ValidationError(
-                "A category with this slug already exists."
+                "A category with this slug already exists.", code="slug_taken"
             )
 
         return value

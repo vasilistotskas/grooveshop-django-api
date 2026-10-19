@@ -54,17 +54,20 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             attribute_value = AttributeValue.objects.get(id=value)
         except AttributeValue.DoesNotExist:
             raise serializers.ValidationError(
-                _("Attribute value does not exist.")
+                _("Attribute value does not exist."),
+                code="attribute_value_not_found",
             )
 
         if not attribute_value.active:
             raise serializers.ValidationError(
-                _("Cannot assign inactive attribute value.")
+                _("Cannot assign inactive attribute value."),
+                code="attribute_value_inactive",
             )
 
         if not attribute_value.attribute.active:
             raise serializers.ValidationError(
-                _("Cannot assign value from inactive attribute.")
+                _("Cannot assign value from inactive attribute."),
+                code="attribute_inactive",
             )
 
         return value

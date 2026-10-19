@@ -93,7 +93,10 @@ def tenant_resolve(request: Request) -> Response:
     domain = request.query_params.get("domain", "")
     if not domain:
         return Response(
-            {"detail": "domain query parameter is required."},
+            {
+                "detail": "domain query parameter is required.",
+                "code": "domain_required",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -113,7 +116,7 @@ def tenant_resolve(request: Request) -> Response:
     )
     if tenant_domain is None:
         return Response(
-            {"detail": "Store not found."},
+            {"detail": "Store not found.", "code": "store_not_found"},
             status=status.HTTP_404_NOT_FOUND,
         )
     tenant = tenant_domain.tenant
@@ -325,7 +328,9 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         except ValueError as exc:
             # Protected, still live, or inside the suspension cooldown —
             # the gates are the lifecycle function's, not this view's.
-            raise ValidationError({"detail": str(exc)}) from exc
+            raise ValidationError(
+                {"detail": str(exc)}, code="tenant_invalid"
+            ) from exc
         return Response(
             {
                 "schemaName": result["schema_name"],
@@ -366,7 +371,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         )
         if not changed and is_protected_tenant(tenant):
             raise ValidationError(
-                {"detail": "This tenant is protected and cannot be suspended."}
+                {"detail": "This tenant is protected and cannot be suspended."},
+                code="tenant_protected",
             )
         tenant.refresh_from_db()
         return Response(
@@ -404,7 +410,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         changed = activate_tenant(tenant)
         if not changed:
             raise ValidationError(
-                {"detail": "This tenant is protected and cannot be activated."}
+                {"detail": "This tenant is protected and cannot be activated."},
+                code="tenant_protected",
             )
         tenant.refresh_from_db()
         return Response(

@@ -59,7 +59,10 @@ class UserDataExportDownloadView(APIView):
                     status=UserDataExport.Status.EXPIRED
                 )
             return Response(
-                {"detail": _("This download link has expired.")},
+                {
+                    "detail": _("This download link has expired."),
+                    "code": "download_expired",
+                },
                 status=410,
             )
 

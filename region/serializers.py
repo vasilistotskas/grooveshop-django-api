@@ -54,7 +54,8 @@ class RegionWriteSerializer(
     def validate_alpha(self, value: str) -> str:
         if value and len(value) > 10:
             raise serializers.ValidationError(
-                _("Region alpha code should be 10 characters or less.")
+                _("Region alpha code should be 10 characters or less."),
+                code="alpha_too_long",
             )
         return value.upper() if value else value
 
@@ -74,7 +75,8 @@ class RegionWriteSerializer(
                     ).format(
                         alpha=alpha,
                         country_alpha_2=country.alpha_2,
-                    )
+                    ),
+                    code="region_exists",
                 )
 
         return attrs

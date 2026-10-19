@@ -80,7 +80,7 @@ def create_websocket_ticket(request):
             request.user.pk,
         )
         return Response(
-            {"detail": "No active session."},
+            {"detail": "No active session.", "code": "session_required"},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 

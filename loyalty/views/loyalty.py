@@ -177,7 +177,10 @@ class LoyaltyViewSet(BaseModelViewSet):
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response(
-                {"detail": _("Order not found or does not belong to you.")},
+                {
+                    "detail": _("Order not found or does not belong to you."),
+                    "code": "order_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -189,7 +192,8 @@ class LoyaltyViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "Points can only be redeemed on a pending order."
-                    )
+                    ),
+                    "code": "order_not_pending",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -206,7 +210,8 @@ class LoyaltyViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "Points have already been redeemed for this order."
-                    )
+                    ),
+                    "code": "points_already_redeemed",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -224,7 +229,7 @@ class LoyaltyViewSet(BaseModelViewSet):
             )
         except ValidationError as e:
             return Response(
-                {"detail": e.message},
+                {"detail": e.message, "code": "redemption_invalid"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

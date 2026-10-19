@@ -448,7 +448,10 @@ class TestPurchaseStatus:
             response = _client().get(STATUS_URL)
 
         assert response.status_code == 400
-        assert response.json() == {"detail": "Missing uuid."}
+        assert response.json() == {
+            "detail": "Missing uuid.",
+            "code": "uuid_required",
+        }
 
     @pytest.mark.parametrize(
         "value", ["not-a-uuid", str(uuid.UUID(int=0))], ids=["bad", "unknown"]
@@ -460,7 +463,10 @@ class TestPurchaseStatus:
             response = _client().get(STATUS_URL, {"uuid": value})
 
         assert response.status_code == 404
-        assert response.json() == {"detail": "Purchase not found."}
+        assert response.json() == {
+            "detail": "Purchase not found.",
+            "code": "purchase_not_found",
+        }
 
 
 class TestMine:

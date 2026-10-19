@@ -81,7 +81,10 @@ class PlatformStaffLoginView(APIView):
         )
         if user is None:
             return Response(
-                {"detail": _("Invalid credentials.")},
+                {
+                    "detail": _("Invalid credentials."),
+                    "code": "invalid_credentials",
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -94,7 +97,10 @@ class PlatformStaffLoginView(APIView):
             )
             if not operates_something:
                 return Response(
-                    {"detail": _("No operable store for this account.")},
+                    {
+                        "detail": _("No operable store for this account."),
+                        "code": "no_operable_store",
+                    },
                     status=status.HTTP_403_FORBIDDEN,
                 )
 

@@ -135,7 +135,8 @@ class BlogAuthorWriteSerializer(
     def validate_website(self, value: str) -> str:
         if value and not (value.startswith(("http://", "https://"))):
             raise serializers.ValidationError(
-                _("Website must start with http:// or https://")
+                _("Website must start with http:// or https://"),
+                code="website_scheme_invalid",
             )
         return value
 
@@ -150,6 +151,7 @@ class BlogAuthorWriteSerializer(
             and BlogAuthor.objects.filter(user=user).exists()
         ):
             raise serializers.ValidationError(
-                {"user": _("This user already has an author profile.")}
+                {"user": _("This user already has an author profile.")},
+                code="author_profile_exists",
             )
         return attrs

@@ -69,17 +69,18 @@ raise ValidationError(
   `not_found`, `permission_denied`, `not_authenticated`; give a specific
   code when a client tells the cases apart.
 
-## Coded modules
+## What is coded
 
-`CODED_MODULES` in the guard test lists the modules where every
-`ValidationError` carries a code; a module is added when it is finished.
-Done: product reviews, favourites and alerts; cart items and cart; user
-addresses and account; blog comments; order items, orders and the order
-views.
+Every DRF `ValidationError` carries a `code=` (`test_every_drf_validation_error_has_a_code`
+scans the whole project; Django's own `ValidationError` of models and admin
+forms is staff-facing and not judged). A raise of a bare name, an error dict
+a helper built, is trusted to code its own messages (see
+`core/validators/address.py`).
 
-Follow-up (not coded yet): contact and feedback, newsletter and
-subscriptions, search query validation, loyalty, B2B profile, tenant and
-staff APIs, page-config and the other staff-only serializers.
+Not coded, on purpose: `NotFound`, `PermissionDenied`, `NotAuthenticated`
+keep their DRF code unless a client tells the cases apart, and the feature
+gate stays a bare `not_found` so a switched-off route is indistinguishable
+from a missing one.
 
 ## Responses a view builds itself
 
@@ -94,7 +95,12 @@ stable discriminator already existed, `code` now repeats it:
 - Plain `{"detail"}` responses of the cart, order, account and alert views
   carry a `code` too.
 
-Still different, listed so a client knows what not to expect: notification
-views (`{"error": "<translated text>"}`, `{"error", "success"}`), the
-settings API (`{"error": "missing_key"}`), the webhook receivers and
-platform/staff APIs, subscription and category-image views.
+Every other literal-dict error `Response` carries a `code` too
+(`test_every_error_response_a_view_builds_has_a_code`); a body that had only
+`{"error": "..."}` (notification views, product category images, the settings
+API, the editor upload) gained `detail` and `code` beside it. Exempt, because a
+provider or another protocol defines their body: the Viva and BoxNow webhook
+receivers and the allauth rate-limit response (allauth's own `errors[].code`).
+Bodies built from a variable (a serializer's errors, `error_data`) are not
+judged; the blog reorder and comment actions now raise instead, so the handler
+adds `code` and `fields`.

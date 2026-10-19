@@ -142,6 +142,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("User is not authenticated."),
                     "count": 0,
+                    "detail": _("User is not authenticated."),
+                    "code": "authentication_required",
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
@@ -169,6 +171,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("User is not authenticated."),
                     "success": False,
+                    "detail": _("User is not authenticated."),
+                    "code": "authentication_required",
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
@@ -192,6 +196,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("User is not authenticated."),
                     "success": False,
+                    "detail": _("User is not authenticated."),
+                    "code": "authentication_required",
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
@@ -214,6 +220,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("User is not authenticated."),
                     "success": False,
+                    "detail": _("User is not authenticated."),
+                    "code": "authentication_required",
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
@@ -230,6 +238,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("No notification user ids provided."),
                     "success": False,
+                    "detail": _("No notification user ids provided."),
+                    "code": "notification_user_ids_required",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -251,6 +261,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("User is not authenticated."),
                     "success": False,
+                    "detail": _("User is not authenticated."),
+                    "code": "authentication_required",
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
@@ -267,6 +279,8 @@ class NotificationUserViewSet(BaseModelViewSet):
                 {
                     "error": _("No notification user ids provided."),
                     "success": False,
+                    "detail": _("No notification user ids provided."),
+                    "code": "notification_user_ids_required",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

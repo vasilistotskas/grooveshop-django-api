@@ -79,12 +79,23 @@ def _may_upload_editor_image(user) -> bool:
 def upload_image(request):
     if not _may_upload_editor_image(request.user):
         return JsonResponse(
-            {"Error Message": "You are not authorized to upload images"},
+            {
+                "Error Message": "You are not authorized to upload images",
+                "detail": "You are not authorized to upload images",
+                "code": "upload_forbidden",
+            },
             status=403,
         )
 
     if request.method != "POST":
-        return JsonResponse({"Error Message": "Method not allowed"}, status=405)
+        return JsonResponse(
+            {
+                "Error Message": "Method not allowed",
+                "detail": "Method not allowed",
+                "code": "method_not_allowed",
+            },
+            status=405,
+        )
 
     from core.forms import ImageUploadForm
 

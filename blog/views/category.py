@@ -303,8 +303,7 @@ class BlogCategoryViewSet(BaseModelViewSet):
     @action(detail=False, methods=["POST"])
     def reorder(self, request):
         serializer = BlogCategoryReorderRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+        serializer.is_valid(raise_exception=True)
 
         categories_data = serializer.validated_data["categories"]
         updated_count = 0

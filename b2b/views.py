@@ -161,7 +161,7 @@ class B2BViewSet(BaseModelViewSet):
             ]
         except ValueError:
             return Response(
-                {"detail": _("Invalid ids parameter.")},
+                {"detail": _("Invalid ids parameter."), "code": "invalid_ids"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if len(product_ids) > MAX_PRICE_IDS:
@@ -172,7 +172,8 @@ class B2BViewSet(BaseModelViewSet):
                 {
                     "detail": _(
                         "Too many ids — request at most {max} per call."
-                    ).format(max=MAX_PRICE_IDS)
+                    ).format(max=MAX_PRICE_IDS),
+                    "code": "too_many_ids",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

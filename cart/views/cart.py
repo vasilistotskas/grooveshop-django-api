@@ -372,7 +372,10 @@ class CartViewSet(BaseModelViewSet):
         return context
 
     def create(self, request, *args, **kwargs):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(
+            {"detail": _("Method not allowed."), "code": "method_not_allowed"},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
     @staticmethod
     def _carry_b2b_pricing(source, target):
@@ -401,7 +404,7 @@ class CartViewSet(BaseModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return self._cart_not_found()
         # Re-load through for_detail() so the items are prefetched and the
         # totals are annotated: the cart_service returns a bare row whose
         # total_* properties would otherwise re-run get_items() several
@@ -416,7 +419,7 @@ class CartViewSet(BaseModelViewSet):
     def update(self, request, *args, **kwargs):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return self._cart_not_found()
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(
             cart, data=request.data, partial=kwargs.pop("partial", False)
@@ -445,7 +448,14 @@ class CartViewSet(BaseModelViewSet):
         if cart:
             cart.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(status=status.HTTP_404_NOT_FOUND)
+        return self._cart_not_found()
+
+    @staticmethod
+    def _cart_not_found() -> Response:
+        return Response(
+            {"detail": _("Cart not found"), "code": "cart_not_found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     def _cart_detail_response(self, cart, status_code=status.HTTP_200_OK):
         """Serialize the cart the same way ``retrieve`` does (optimized

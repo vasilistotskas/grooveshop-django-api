@@ -175,7 +175,10 @@ class ContactAttachmentUploadView(generics.CreateAPIView):
         declared = int(request.headers.get("content-length") or 0)
         if declared > AttachmentPolicy.MAX_BYTES_CEILING + self.ENVELOPE_SLACK:
             return Response(
-                {"detail": _("That file is too large.")},
+                {
+                    "detail": _("That file is too large."),
+                    "code": "file_too_large",
+                },
                 status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             )
         if storage_pressure(declared) is not None:
@@ -184,7 +187,8 @@ class ContactAttachmentUploadView(generics.CreateAPIView):
                     "detail": _(
                         "Files cannot be accepted right now. Please try "
                         "again in a few minutes."
-                    )
+                    ),
+                    "code": "attachments_unavailable",
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )

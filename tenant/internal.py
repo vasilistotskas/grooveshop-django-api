@@ -91,6 +91,8 @@ class InternalDomainsMiddleware:
             token = request.headers.get("X-Internal-Token", "")
             if not is_internal_caller(token):
                 # Same posture as the DRF view: existence not advertised.
-                return JsonResponse({"detail": "Not found."}, status=404)
+                return JsonResponse(
+                    {"detail": "Not found.", "code": "not_found"}, status=404
+                )
             return JsonResponse(build_domains_payload())
         return self.get_response(request)

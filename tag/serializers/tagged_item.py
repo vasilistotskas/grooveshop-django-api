@@ -53,7 +53,8 @@ class TaggedItemWriteSerializer(serializers.ModelSerializer[TaggedItem]):
 
         if not Tag.objects.filter(id=value, active=True).exists():
             raise serializers.ValidationError(
-                _("Tag with this ID does not exist or is not active.")
+                _("Tag with this ID does not exist or is not active."),
+                code="tag_not_found",
             )
         return value
 

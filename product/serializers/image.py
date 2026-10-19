@@ -183,11 +183,13 @@ class ProductImageWriteSerializer(
         from PIL import Image as PILImage
 
         if not value:
-            raise serializers.ValidationError("Image file is required.")
+            raise serializers.ValidationError(
+                "Image file is required.", code="image_required"
+            )
 
         if hasattr(value, "size") and value.size > 5 * 1024 * 1024:
             raise serializers.ValidationError(
-                "Image file size cannot exceed 5MB."
+                "Image file size cannot exceed 5MB.", code="image_too_large"
             )
 
         # Use PIL magic-byte verification instead of the browser-supplied
@@ -207,7 +209,8 @@ class ProductImageWriteSerializer(
                     if img.format not in allowed_raster_formats:
                         raise serializers.ValidationError(
                             f"Unsupported image format: {img.format}. "
-                            f"Allowed: {', '.join(sorted(allowed_raster_formats))}"
+                            f"Allowed: {', '.join(sorted(allowed_raster_formats))}",
+                            code="image_format_unsupported",
                         )
             except serializers.ValidationError:
                 raise
@@ -217,7 +220,7 @@ class ProductImageWriteSerializer(
                 ValueError,
             ) as exc:
                 raise serializers.ValidationError(
-                    "Invalid image file."
+                    "Invalid image file.", code="image_invalid"
                 ) from exc
             finally:
                 # Reset stream position so downstream readers (storage

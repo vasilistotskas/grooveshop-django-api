@@ -154,17 +154,21 @@ class BlogCategoryWriteSerializer(
         if value and self.instance:
             if value == self.instance:
                 raise serializers.ValidationError(
-                    _("Category cannot be its own parent.")
+                    _("Category cannot be its own parent."),
+                    code="category_own_parent",
                 )
             if value in self.instance.get_descendants():
                 raise serializers.ValidationError(
-                    _("Category cannot have a descendant as parent.")
+                    _("Category cannot have a descendant as parent."),
+                    code="category_descendant_parent",
                 )
         return value
 
     def validate_slug(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError(_("Slug is required."))
+            raise serializers.ValidationError(
+                _("Slug is required."), code="slug_required"
+            )
 
         queryset = BlogCategory.objects.filter(slug=value)
         if self.instance:
@@ -172,7 +176,7 @@ class BlogCategoryWriteSerializer(
 
         if queryset.exists():
             raise serializers.ValidationError(
-                _("A post with this slug already exists.")
+                _("A post with this slug already exists."), code="slug_taken"
             )
 
         return value
@@ -206,13 +210,15 @@ class BlogCategoryReorderRequestSerializer(serializers.Serializer):
     ) -> list[dict[str, int]]:
         if not value:
             raise serializers.ValidationError(
-                _("At least one category is required.")
+                _("At least one category is required."),
+                code="categories_required",
             )
 
         category_ids = [item["id"] for item in value]
         if len(category_ids) != len(set(category_ids)):
             raise serializers.ValidationError(
-                _("Duplicate category IDs are not allowed.")
+                _("Duplicate category IDs are not allowed."),
+                code="duplicate_category_ids",
             )
 
         existing_ids = set(
@@ -225,6 +231,7 @@ class BlogCategoryReorderRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 _("Categories with IDs %(missing_ids)s do not exist.")
                 % {"missing_ids": missing_ids},
+                code="categories_not_found",
             )
         return value
 

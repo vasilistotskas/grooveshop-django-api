@@ -157,11 +157,15 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
         try:
             validate_section_props(component_type, attrs.get("props"))
         except DjangoValidationError as exc:
-            raise serializers.ValidationError({"props": exc.messages}) from exc
+            raise serializers.ValidationError(
+                {"props": exc.messages}, code="invalid_props"
+            ) from exc
         try:
             validate_section_i18n(component_type, attrs.get("i18n"))
         except DjangoValidationError as exc:
-            raise serializers.ValidationError({"i18n": exc.messages}) from exc
+            raise serializers.ValidationError(
+                {"i18n": exc.messages}, code="invalid_i18n"
+            ) from exc
         return attrs
 
 
@@ -305,7 +309,9 @@ class ContentPageWriteSerializer(
 
     def validate_slug(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError(_("Slug is required."))
+            raise serializers.ValidationError(
+                _("Slug is required."), code="slug_required"
+            )
 
         queryset = ContentPage.objects.filter(slug=value)
         if self.instance:
@@ -313,7 +319,8 @@ class ContentPageWriteSerializer(
 
         if queryset.exists():
             raise serializers.ValidationError(
-                _("A content page with this slug already exists.")
+                _("A content page with this slug already exists."),
+                code="slug_taken",
             )
 
         return value

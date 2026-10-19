@@ -15,8 +15,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[4]
 
 GETTEXT = {"_", "gettext", "gettext_lazy", "ngettext", "pgettext"}
@@ -35,23 +33,6 @@ API_EXCEPTIONS = {
 #: ``must_have_purchased``: lowercase words joined by underscores. A real
 #: sentence has a space; a lone word ("Required") is not matched either.
 MSGID_LIKE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
-
-#: Modules where every ``ValidationError`` raise carries a ``code=``. The
-#: other flows are a follow-up; add a module here when it is done.
-CODED_MODULES = (
-    "product/views/review.py",
-    "product/serializers/review.py",
-    "product/serializers/favourite.py",
-    "product/serializers/alert.py",
-    "cart/serializers/item.py",
-    "cart/serializers/cart.py",
-    "user/serializers/address.py",
-    "user/serializers/account.py",
-    "blog/serializers/comment.py",
-    "order/serializers/item.py",
-    "order/serializers/order.py",
-    "order/views/order.py",
-)
 
 
 def _python_files() -> list[Path]:
@@ -97,12 +78,24 @@ def msgid_like_gettext_calls(tree: ast.AST) -> list[tuple[int, str]]:
     return found
 
 
-def uncoded_validation_raises(tree: ast.AST) -> list[int]:
-    """Lines of ``raise ValidationError(<message>)`` with no ``code=``.
+def _imports_drf_validation_error(tree: ast.AST) -> bool:
+    return any(
+        isinstance(node, ast.ImportFrom)
+        and (node.module or "").startswith("rest_framework")
+        and any(alias.name == "ValidationError" for alias in node.names)
+        for node in ast.walk(tree)
+    )
 
-    A raise of a bare name (an error dict built by a helper that codes its
-    own messages) is not judged here.
+
+def uncoded_validation_raises(tree: ast.AST) -> list[int]:
+    """Lines of DRF ``raise ValidationError(<message>)`` with no ``code=``.
+
+    Django's own ``ValidationError`` (model ``clean()``, admin forms) is not
+    judged: it is staff-facing, and DRF reads its code only through a
+    serializer. A raise of a bare name (an error dict built by a helper
+    that codes its own messages) is not judged either.
     """
+    drf_name = _imports_drf_validation_error(tree)
     lines = []
     for node in ast.walk(tree):
         if not (
@@ -112,6 +105,13 @@ def uncoded_validation_raises(tree: ast.AST) -> list[int]:
         ):
             continue
         call = node.exc
+        if isinstance(call.func, ast.Name) and not drf_name:
+            continue
+        if isinstance(call.func, ast.Attribute) and not (
+            isinstance(call.func.value, ast.Name)
+            and call.func.value.id in {"serializers", "exceptions"}
+        ):
+            continue  # forms.ValidationError and the like are Django's
         if any(keyword.arg == "code" for keyword in call.keywords):
             continue
         if len(call.args) > 1 or not call.args:
@@ -141,12 +141,17 @@ def test_no_error_code_goes_through_gettext():
     )
 
 
-@pytest.mark.parametrize("module", CODED_MODULES)
-def test_every_validation_error_of_a_coded_module_has_a_code(module):
-    tree = ast.parse((ROOT / module).read_text(encoding="utf-8"))
+def test_every_drf_validation_error_has_a_code():
+    offenders = []
+    for path in _python_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        offenders += [
+            f"{path.relative_to(ROOT)}:{line}"
+            for line in uncoded_validation_raises(tree)
+        ]
 
-    assert uncoded_validation_raises(tree) == [], (
-        f"{module}: give each ValidationError a code=..."
+    assert not offenders, "Give each ValidationError a code=...:\n" + "\n".join(
+        offenders
     )
 
 
@@ -171,9 +176,25 @@ class TestTheGuardsSeeTheirTarget:
         assert msgid_like_gettext_calls(tree) == []
 
     def test_an_uncoded_raise_is_found(self):
-        tree = _parse('raise ValidationError(_("Nope."))')
+        tree = _parse('raise serializers.ValidationError(_("Nope."))')
 
         assert uncoded_validation_raises(tree) == [1]
+
+    def test_a_django_validation_error_is_not_judged(self):
+        tree = _parse(
+            "from django.core.exceptions import ValidationError\n"
+            'raise ValidationError(_("Nope."))'
+        )
+
+        assert uncoded_validation_raises(tree) == []
+
+    def test_a_drf_name_import_is_judged(self):
+        tree = _parse(
+            "from rest_framework.exceptions import ValidationError\n"
+            'raise ValidationError(_("Nope."))'
+        )
+
+        assert uncoded_validation_raises(tree) == [2]
 
     def test_a_coded_raise_and_a_helper_dict_are_not(self):
         tree = _parse(
@@ -182,3 +203,71 @@ class TestTheGuardsSeeTheirTarget:
         )
 
         assert uncoded_validation_raises(tree) == []
+
+
+#: Responses a provider calls back or another protocol defines: not an API
+#: error a shopper's client reads.
+UNCODED_RESPONSE_MODULES = frozenset(
+    {
+        "order/views/viva_webhook.py",
+        "shipping_boxnow/views/webhook.py",
+        "core/middleware/allauth_ratelimit.py",
+    }
+)
+
+
+def uncoded_error_responses(tree: ast.AST) -> list[int]:
+    """Lines of ``Response({...}, status=4xx/5xx)`` whose dict has no ``code``.
+
+    Only a literal dict is judged: a body built elsewhere (a serializer's
+    errors, a variable) is not.
+    """
+    lines = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and _name(node.func) in {"Response", "JsonResponse"}
+            and node.args
+            and isinstance(node.args[0], ast.Dict)
+        ):
+            continue
+        status = next(
+            (k.value for k in node.keywords if k.arg == "status"), None
+        )
+        if status is None:
+            continue
+        text = ast.unparse(status)
+        if not re.search(r"HTTP_[45]\d\d|^[45]\d\d$", text):
+            continue
+        keys = {
+            k.value for k in node.args[0].keys if isinstance(k, ast.Constant)
+        }
+        if "code" not in keys:
+            lines.append(node.lineno)
+    return lines
+
+
+def test_every_error_response_a_view_builds_has_a_code():
+    offenders = []
+    for path in _python_files():
+        name = str(path.relative_to(ROOT)).replace("\\", "/")
+        if name in UNCODED_RESPONSE_MODULES:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        offenders += [
+            f"{name}:{line}" for line in uncoded_error_responses(tree)
+        ]
+
+    assert not offenders, (
+        "A 4xx/5xx Response({...}) needs a code key:\n" + "\n".join(offenders)
+    )
+
+
+def test_the_response_guard_sees_an_uncoded_body():
+    tree = _parse(
+        'Response({"detail": "x"}, status=status.HTTP_400_BAD_REQUEST)\n'
+        'Response({"detail": "x", "code": "y"}, status=404)\n'
+        'Response({"detail": "x"}, status=status.HTTP_200_OK)\n'
+    )
+
+    assert uncoded_error_responses(tree) == [1]

@@ -201,6 +201,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Already subscribed", response.data["detail"])
+        self.assertEqual(response.data["code"], "already_subscribed")
 
     def test_reactivate_unsubscribed_subscription(self):
         self.authenticate(self.user_token)

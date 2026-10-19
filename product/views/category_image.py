@@ -139,7 +139,11 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
 
         if not update_data:
             return Response(
-                {"error": "No fields to update provided."},
+                {
+                    "error": "No fields to update provided.",
+                    "detail": "No fields to update provided.",
+                    "code": "no_fields_to_update",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -162,7 +166,11 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
         category_id = request.query_params.get("category_id")
         if not category_id:
             return Response(
-                {"error": "category_id parameter is required."},
+                {
+                    "error": "category_id parameter is required.",
+                    "detail": "category_id parameter is required.",
+                    "code": "category_id_required",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -170,7 +178,11 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
             category_id = int(category_id)
         except ValueError:
             return Response(
-                {"error": "category_id must be a valid integer."},
+                {
+                    "error": "category_id must be a valid integer.",
+                    "detail": "category_id must be a valid integer.",
+                    "code": "category_id_invalid",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -187,7 +199,11 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
         image_type = request.query_params.get("image_type")
         if not image_type:
             return Response(
-                {"error": "image_type parameter is required."},
+                {
+                    "error": "image_type parameter is required.",
+                    "detail": "image_type parameter is required.",
+                    "code": "image_type_required",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

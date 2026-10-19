@@ -219,6 +219,9 @@ class UserSubscriptionSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("topic", serializer.errors)
         self.assertIn("already subscribed", str(serializer.errors["topic"]))
+        self.assertEqual(
+            serializer.errors["topic"][0].code, "already_subscribed"
+        )
 
     def test_validate_pending_subscription(self):
         UserSubscription.objects.create(

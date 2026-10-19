@@ -149,7 +149,10 @@ class AcsAddressValidationView(APIView):
         except AcsConfigError as exc:
             logger.warning("ACS address validation unavailable: %s", exc)
             return Response(
-                {"detail": "ACS address validation is not configured."},
+                {
+                    "detail": "ACS address validation is not configured.",
+                    "code": "acs_not_configured",
+                },
                 status=503,
             )
         except AcsAPIError as exc:
@@ -160,7 +163,8 @@ class AcsAddressValidationView(APIView):
             return Response(
                 {
                     "detail": exc.error_message
-                    or "ACS address validation failed."
+                    or "ACS address validation failed.",
+                    "code": "acs_address_validation_failed",
                 },
                 status=502,
             )

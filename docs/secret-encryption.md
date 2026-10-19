@@ -59,6 +59,15 @@ derived from `SECRET_KEY`, so rotating one does not touch the other.
   takes about 5 microseconds, a fully populated row about 70 microseconds.
 - `dumpdata` and the admin export the decrypted value, like any read
   through the model.
+- A store role never sees a secret the platform sets. On the store's own
+  profile, the encrypted fields that are not in
+  `TENANT_SELF_EDITABLE_FIELDS` (`chat_api_key`, `acp_bearer_token`,
+  `cloudflare_api_token`) are replaced by a read-only "set / not set"
+  column (`<name>_is_set`), because Django renders a read-only field as
+  text, decrypted. The platform operator still edits the real field. A
+  secret the merchant owns and may edit (Stripe, Viva, ACS, BoxNow,
+  myDATA, Meta) is still shown in its form to that store's Admin and
+  Owner.
 
 ## Rotating the key
 

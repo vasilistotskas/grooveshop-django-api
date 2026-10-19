@@ -98,6 +98,48 @@ class TestTenantAdminScoping:
                 f"{platform_field} is editable by a merchant"
             )
 
+    def test_a_store_role_sees_whether_a_platform_secret_is_set_not_it(
+        self, tenant, bind_tenant_and_schema
+    ):
+        user = _store_operator(tenant)
+        bind_tenant_and_schema(tenant)
+        request = _request(user)
+        listed = [
+            field
+            for _name, options in self._admin().get_fieldsets(request, tenant)
+            for field in options["fields"]
+        ]
+        readonly = set(self._admin().get_readonly_fields(request, tenant))
+        for secret in (
+            "chat_api_key",
+            "acp_bearer_token",
+            "cloudflare_api_token",
+        ):
+            assert secret not in listed
+            assert f"{secret}_is_set" in listed
+            assert f"{secret}_is_set" in readonly
+
+    def test_the_platform_operator_keeps_the_real_secret_fields(
+        self, tenant, bind_tenant_and_schema
+    ):
+        bind_tenant_and_schema(tenant)
+        request = _request(_superuser())
+        listed = [
+            field
+            for _name, options in self._admin().get_fieldsets(request, tenant)
+            for field in options["fields"]
+        ]
+        assert "chat_api_key" in listed
+        assert "chat_api_key_is_set" not in listed
+
+    def test_the_set_column_reports_state_and_not_the_value(self, tenant):
+        tenant.chat_api_key = "a-chat-key-value"
+        tenant.acp_bearer_token = ""
+
+        admin_ = self._admin()
+        assert admin_.chat_api_key_is_set(tenant) is True
+        assert admin_.acp_bearer_token_is_set(tenant) is False
+
     def test_the_active_flag_is_read_only_for_platform_operators_too(
         self, tenant, bind_tenant_and_schema
     ):
@@ -296,20 +338,28 @@ class TestMembershipAdminScoping:
     def test_cannot_grant_membership_in_another_store(
         self, tenant, other_tenant, bind_tenant_and_schema
     ):
-        """The tenant dropdown is narrowed to their own store.
+        """The store is never a field: a posted one is ignored.
 
-        Left unnarrowed, an ADMIN could save a membership row pointing
+        Left as a field, an ADMIN could save a membership row pointing
         at another merchant and walk into that store's admin.
         """
         user = _store_operator(tenant, TenantMembershipRole.ADMIN)
+        person = UserAccountFactory(email="grant.elsewhere@example.com")
         bind_tenant_and_schema(tenant)
-        db_field = UserTenantMembership._meta.get_field("tenant")
-        formfield = self._admin().formfield_for_foreignkey(
-            db_field, _request(user)
+        request = _request(user)
+
+        form_class = self._admin().get_form(request, None)
+        form = form_class(
+            {
+                "email": person.email,
+                "role": TenantMembershipRole.STAFF,
+                "tenant": other_tenant.pk,
+            }
         )
-        assert list(formfield.queryset.values_list("pk", flat=True)) == [
-            tenant.pk
-        ]
+
+        assert "tenant" not in form_class.base_fields
+        assert form.is_valid(), form.errors
+        assert form.instance.tenant == tenant
 
     def test_platform_console_keeps_every_store(
         self, tenant, other_tenant, bind_tenant_and_schema

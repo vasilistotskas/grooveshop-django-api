@@ -2,8 +2,10 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q
+from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -692,9 +694,29 @@ class TenantMembershipInlineForm(forms.ModelForm):
             self.initial["role"] = TenantMembershipRole.STAFF
 
 
+class TenantMembershipFormSet(BaseInlineFormSet):
+    """Removing a row must not strip a store of its last active owner.
+
+    A changed row is checked by ``UserTenantMembership.clean``; a deleted
+    one never reaches validation, and the model refuses it only when the
+    delete runs, which the page would answer with a 500.
+    """
+
+    def clean(self):
+        super().clean()
+        if any(
+            form.instance.is_last_active_owner for form in self.deleted_forms
+        ):
+            raise ValidationError(
+                _("A store must keep at least one active owner."),
+                code="last_owner",
+            )
+
+
 class TenantMembershipInline(TabularInline):
     model = UserTenantMembership
     form = TenantMembershipInlineForm
+    formset = TenantMembershipFormSet
     fk_name = "user"
     fields = ("tenant", "role", "is_active")
     autocomplete_fields = ("tenant",)

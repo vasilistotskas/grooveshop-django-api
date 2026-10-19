@@ -28,11 +28,15 @@ Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
 
 from __future__ import annotations
 
+from functools import wraps
+from typing import Any
+
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.actions import delete_selected
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.forms.models import ModelChoiceIterator
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -44,6 +48,7 @@ from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
 from admin.displays import format_dt, header_two_line
+from core.db.encrypted_fields import EncryptedCharField
 from tenant.admin_labels import billing_badge, label, plan_badge, status_badge
 from tenant.lifecycle import (
     SUSPEND_COOLDOWN,
@@ -52,6 +57,7 @@ from tenant.lifecycle import (
     is_protected_tenant,
     suspend_tenant,
 )
+from tenant.membership import bound_tenant
 from tenant.models import (
     SuspendedReason,
     Tenant,
@@ -102,44 +108,33 @@ def _public_schema_context():
     return schema_context(get_public_schema_name())
 
 
-class _PublicSchemaModelChoiceIterator(ModelChoiceIterator):
-    """Iterate the field's queryset inside the PUBLIC schema.
+def _platform_secret_fields() -> tuple[str, ...]:
+    """Encrypted fields the store's own operators may not change.
 
-    The generator holds the schema context open across yields; admin
-    rendering consumes every choice, so the context is exited when the
-    iterator is exhausted.
+    They belong to the platform (the chat and ACP agent credentials, the
+    Cloudflare token for a store's own zone), so a store role has no
+    business reading them either: a read-only field is still rendered,
+    and rendered decrypted.
     """
+    from tenant.role_scopes import TENANT_SELF_EDITABLE_FIELDS
 
-    def __iter__(self):
-        with _public_schema_context():
-            yield from super().__iter__()
+    return tuple(
+        field.name
+        for field in Tenant._meta.fields
+        if isinstance(field, EncryptedCharField)
+        and field.name not in TENANT_SELF_EDITABLE_FIELDS
+    )
 
 
-class PublicSchemaModelChoiceField(forms.ModelChoiceField):
-    """A ``ModelChoiceField`` pinned to the PUBLIC schema for BOTH
-    rendering and validation.
+def _secret_is_set(field_name: str):
+    """A read-only "set / not set" column standing in for a secret."""
+    verbose_name = Tenant._meta.get_field(field_name).verbose_name
 
-    ``UserTenantMembership`` lives in the SHARED ``tenant`` app and its
-    ``user`` FK targets ``public.user_useraccount``. Served on a tenant
-    host (search_path = [tenant, public]), a plain ``ModelChoiceField``
-    re-evaluates its queryset against that tenant's OWN
-    ``user_useraccount`` copy — listing that store's shoppers, and
-    (worse) binding a submitted pk to whichever PUBLIC identity happens
-    to share it: a different person than the one displayed. Every DB
-    access here is wrapped in ``schema_context(public)`` so the choices
-    and the validated object are always the platform identities the FK
-    can legitimately reference.
-    """
+    @admin.display(boolean=True, description=verbose_name)
+    def is_set(self, obj):
+        return bool(getattr(obj, field_name))
 
-    iterator = _PublicSchemaModelChoiceIterator
-
-    def to_python(self, value):
-        with _public_schema_context():
-            return super().to_python(value)
-
-    def valid_value(self, value):
-        with _public_schema_context():
-            return super().valid_value(value)
+    return is_set
 
 
 @admin.register(Tenant)
@@ -266,11 +261,39 @@ class TenantAdmin(BaseModelAdmin):
             TENANT_SELF_EDITABLE_FIELDS,
         )
 
-        return tuple(
-            field.name
-            for field in self.model._meta.fields
-            if field.name not in TENANT_SELF_EDITABLE_FIELDS
+        return (
+            *(
+                field.name
+                for field in self.model._meta.fields
+                if field.name not in TENANT_SELF_EDITABLE_FIELDS
+            ),
+            *(f"{name}_is_set" for name in _platform_secret_fields()),
         )
+
+    def get_fieldsets(self, request, obj=None):
+        """A store role sees whether a platform secret is set, never it.
+
+        The secret's own field is swapped for its "set / not set" column
+        in the fieldset, so its value is never rendered for a store role
+        (the platform operator still sees and edits the real field).
+        """
+        fieldsets = super().get_fieldsets(request, obj)
+        if self_service_tenant(request) is None:
+            return fieldsets
+        secrets = set(_platform_secret_fields())
+        return [
+            (
+                name,
+                {
+                    **options,
+                    "fields": [
+                        f"{field}_is_set" if field in secrets else field
+                        for field in options["fields"]
+                    ],
+                },
+            )
+            for name, options in fieldsets
+        ]
 
     def has_add_permission(self, request):
         """Only the platform creates stores."""
@@ -1006,6 +1029,10 @@ class TenantAdmin(BaseModelAdmin):
         )
 
 
+for _secret in _platform_secret_fields():
+    setattr(TenantAdmin, f"{_secret}_is_set", _secret_is_set(_secret))
+
+
 @admin.register(TenantDomain)
 class TenantDomainAdmin(BaseModelAdmin):
     list_display = ["domain", "tenant", "is_primary"]
@@ -1016,30 +1043,142 @@ class TenantDomainAdmin(BaseModelAdmin):
         return connection.schema_name == "public"
 
 
+class StoreTeamMemberForm(forms.ModelForm):
+    """Add a person to the store's own team, by their exact email.
+
+    Staff identities are shared across every store (they live in the
+    public schema), so a chooser of "all accounts" would show a store's
+    Admin every other store's people and the platform's operators. The
+    person has to be named instead: the address must match one existing
+    platform account exactly. Nothing is listed, searched by prefix, or
+    suggested, and the store is never a field: it is always this one.
+    """
+
+    email = forms.EmailField(
+        label=_("Email address"),
+        help_text=_(
+            "The exact email address of the person's existing platform account."
+        ),
+    )
+
+    class Meta:
+        model = UserTenantMembership
+        fields = ("role", "is_active")
+
+    def clean(self):
+        cleaned = super().clean()
+        email = cleaned.get("email")
+        store = bound_tenant()
+        if not email or store is None:
+            return cleaned
+
+        from user.models.account import UserAccount
+
+        with _public_schema_context():
+            matches = list(UserAccount.objects.filter(email__iexact=email)[:2])
+            member = matches[0] if len(matches) == 1 else None
+            already = (
+                member is not None
+                and UserTenantMembership.objects.filter(
+                    user=member, tenant=store
+                ).exists()
+            )
+        if member is None:
+            self.add_error(
+                "email",
+                ValidationError(
+                    _("No platform account uses this email address."),
+                    code="unknown_email",
+                ),
+            )
+        elif already:
+            self.add_error(
+                "email",
+                ValidationError(
+                    _("This person is already on the team."),
+                    code="already_member",
+                ),
+            )
+        else:
+            self.instance.user = member
+            self.instance.tenant = store
+        return cleaned
+
+
 @admin.register(UserTenantMembership)
 class UserTenantMembershipAdmin(BaseModelAdmin):
-    list_display = ["user", "tenant", "role", "is_active", "created_at"]
+    list_display = ["member", "tenant", "role", "is_active", "created_at"]
     list_filter = ["role", "is_active", "tenant"]
     search_fields = ["user__email", "user__username", "tenant__name"]
     autocomplete_fields = ["user", "tenant"]
     readonly_fields = ["created_at", "updated_at"]
 
-    def get_autocomplete_fields(self, request):
-        """Drop the ``user`` autocomplete on tenant hosts.
+    @admin.display(description=_("Member"))
+    def member(self, obj):
+        return obj.member
 
-        The autocomplete AJAX view runs its search in the REQUEST's
-        schema, so on a tenant host it would surface that store's
-        shoppers and let one be picked into a public-identity FK. There
-        the field is rendered as a plain select through the public-
-        pinned ``PublicSchemaModelChoiceField`` instead. ``tenant`` keeps
-        autocomplete (Tenant lives only in public); the platform host
-        (public schema) keeps ``user`` autocomplete, which resolves
-        correctly there.
-        """
-        fields = super().get_autocomplete_fields(request)
+    def get_changelist(self, request, **kwargs):
+        """A page of members is read from the public schema in one query."""
+        changelist: Any = super().get_changelist(request, **kwargs)
+
+        class MemberChangeList(changelist):
+            def get_results(self, request):
+                super().get_results(request)
+                UserTenantMembership.load_members(self.result_list)
+
+        return MemberChangeList
+
+    def get_list_display(self, request):
+        """A store's own team is all one store: no Store column."""
+        columns = super().get_list_display(request)
+        if self_service_tenant(request) is None:
+            return columns
+        return [column for column in columns if column != "tenant"]
+
+    def get_list_filter(self, request):
+        """The Store filter lists every store on the platform."""
+        filters = super().get_list_filter(request)
+        if self_service_tenant(request) is None:
+            return filters
+        return [entry for entry in filters if entry[0] != "tenant"]
+
+    def get_search_fields(self, request):
+        """Search joins the user table, which a store host resolves to
+        that store's shoppers and not to the team's staff identities."""
         if self_service_tenant(request) is not None:
-            return tuple(f for f in fields if f != "user")
-        return fields
+            return []
+        return super().get_search_fields(request)
+
+    def get_fields(self, request, obj=None):
+        """A store role adds a person by email and never picks a store."""
+        if self_service_tenant(request) is None:
+            return super().get_fields(request, obj)
+        if obj is None:
+            return ["email", "role", "is_active"]
+        return ["member", "role", "is_active"]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = super().get_readonly_fields(request, obj)
+        if self_service_tenant(request) is not None and obj is not None:
+            return (*readonly, "member")
+        return readonly
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        if self_service_tenant(request) is not None and obj is None:
+            kwargs["form"] = StoreTeamMemberForm
+        return super().get_form(request, obj, change=change, **kwargs)
+
+    def get_actions(self, request, *args, **kwargs):
+        """Bulk delete keeps the store's last owner (a message, not a 500)."""
+        actions: dict[str, Any] = super().get_actions(request, *args, **kwargs)
+        if "delete_selected" in actions:
+            _func, name, description = actions["delete_selected"]
+            actions["delete_selected"] = (
+                _delete_selected_keeping_an_owner,
+                name,
+                description,
+            )
+        return actions
 
     def has_module_permission(self, request):
         """Public always; a tenant host only for its own ADMIN/OWNER.
@@ -1076,6 +1215,8 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         if not super().has_delete_permission(request, obj):
+            return False
+        if obj is not None and obj.is_last_active_owner:
             return False
         return self._may_act_on(request, obj)
 
@@ -1114,45 +1255,19 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
                     ]
         return super().formfield_for_choice_field(db_field, request, **kwargs)
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Pin the ``user`` FK to the PUBLIC schema.
 
-        ``UserAccount`` is mirrored per-schema — an unqualified
-        ``UserAccount.objects.all()`` resolves against whatever schema
-        the connection is currently pinned to. Membership rows only
-        ever reference PUBLIC-schema users (platform identities), so the
-        candidate pks are captured eagerly inside
-        ``schema_context(public)``. That alone is NOT enough: the
-        queryset handed to the formfield is still lazy and, on a tenant
-        host, would be re-evaluated against that tenant's own user
-        table. On tenant hosts the field is therefore
-        ``PublicSchemaModelChoiceField``, which pins rendering AND
-        validation to public so a saved pk can only bind to the platform
-        identity it displayed. On the platform host (public schema) the
-        default field already resolves correctly.
-        """
-        if db_field.name == "user":
-            from user.models.account import UserAccount
+@wraps(delete_selected)
+def _delete_selected_keeping_an_owner(modeladmin, request, queryset):
+    """Django's bulk delete, answering a refusal with a message.
 
-            with _public_schema_context():
-                public_user_ids = list(
-                    UserAccount.objects.order_by(
-                        UserAccount.USERNAME_FIELD
-                    ).values_list("pk", flat=True)
-                )
-            kwargs["queryset"] = UserAccount.objects.filter(
-                pk__in=public_user_ids
-            )
-            if self_service_tenant(request) is not None:
-                kwargs["form_class"] = PublicSchemaModelChoiceField
-        elif db_field.name == "tenant":
-            # A store operator may only grant membership in THEIR store.
-            # Without this the dropdown lists every tenant, and saving
-            # one would hand them a foothold in another merchant's admin.
-            scope = self_service_tenant(request)
-            if scope is not None:
-                kwargs["queryset"] = Tenant.objects.filter(pk=scope.pk)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    ``has_delete_permission`` covers one row at a time; selecting every
+    owner of a store at once is only caught when the delete runs.
+    """
+    try:
+        return delete_selected(modeladmin, request, queryset)
+    except ValidationError as exc:
+        modeladmin.message_user(request, " ".join(exc.messages), messages.ERROR)
+        return None
 
 
 @admin.register(TenantArchive)

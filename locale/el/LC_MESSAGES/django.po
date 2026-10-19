@@ -23827,3 +23827,18 @@ msgstr "Αυτός ο αριθμός μεταφοράς έχει ήδη κατα
 #: order/services.py order/admin.py
 msgid "Collected off-platform"
 msgstr "Εισπράχθηκε εκτός πλατφόρμας"
+
+msgid "A store must keep at least one active owner."
+msgstr "Ένα κατάστημα πρέπει να έχει πάντα τουλάχιστον έναν ενεργό Ιδιοκτήτη."
+
+msgid "Email address"
+msgstr "Διεύθυνση email"
+
+msgid "The exact email address of the person's existing platform account."
+msgstr "Η ακριβής διεύθυνση email του υπάρχοντος λογαριασμού πλατφόρμας του ατόμου."
+
+msgid "No platform account uses this email address."
+msgstr "Κανένας λογαριασμός πλατφόρμας δεν χρησιμοποιεί αυτή τη διεύθυνση email."
+
+msgid "This person is already on the team."
+msgstr "Αυτό το άτομο είναι ήδη στην ομάδα."

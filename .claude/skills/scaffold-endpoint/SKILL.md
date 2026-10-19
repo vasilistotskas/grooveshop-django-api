@@ -9,7 +9,6 @@ description: >
   an existing model, or says things like "add an endpoint for X", "create CRUD
   for Y", "scaffold API for Z". Also use it when adding a new Django app that
   needs API endpoints.
-disable-model-invocation: true
 ---
 
 # Scaffold Endpoint

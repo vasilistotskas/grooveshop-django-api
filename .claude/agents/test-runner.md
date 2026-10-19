@@ -53,11 +53,14 @@ Exceptions:
 - **Skip Meilisearch tests**: they auto-skip when offline (via `requires_meilisearch` marker)
 - **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=product --cov-report=term -n0`
 
-## Never run two pytest invocations at once
+## Two concurrent pytest runs need different `DB_NAME`s
 
-Not even a small targeted run alongside a background full suite. pytest-xdist
-derives worker database names (`test_postgres_gw0..gwN`) from the DB name in
-settings, so both runs create and drop the **same** databases.
+pytest-xdist workers get their own test database, `test_<DB_NAME>_gwN`
+(pytest-django), and `tests/settings.py` scopes the test cache and
+`MEDIA_ROOT` by `TEST_NAMESPACE` (the database name plus the worker). So a
+second run beside another one is safe only with its own database name, e.g.
+`DB_NAME=postgres_b uv run pytest tests/unit/cart/ -n0`. Two runs with the same
+`DB_NAME` create and drop the **same** databases.
 
 The collision does not look like a collision. It surfaces as a flood of
 `psycopg.errors.DuplicateDatabase: database "test_postgres_gw1" already exists`
@@ -68,8 +71,8 @@ produced `2018 errors` and `541 failed, 1457 errors`, and a targeted
 56/56 under `-n0`. It reads exactly like a catastrophic regression.
 
 Before believing **any** mass-failure result, check whether another pytest
-process is running. If one is, discard the result and re-run rather than
-debugging it.
+process is running with the same `DB_NAME`. If one is, discard the result and
+re-run rather than debugging it.
 
 ## Notes
 

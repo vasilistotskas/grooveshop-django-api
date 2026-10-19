@@ -9,7 +9,6 @@ description: >
   "add tests for X", "write tests for the Y endpoint", "generate unit tests",
   "cover this model with tests". Also use when the user asks to test factories,
   managers, signals, serializers, or views.
-disable-model-invocation: true
 ---
 
 # Generate Tests

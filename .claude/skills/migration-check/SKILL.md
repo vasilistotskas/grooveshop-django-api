@@ -33,7 +33,7 @@ Validate that Django migrations are consistent with model definitions.
    uv run python manage.py makemigrations
    ```
 
-4. **Check for migration conflicts** (merge conflicts from branches):
+4. **List unapplied migrations** (conflicting leaf nodes from merged branches are reported by step 1's `makemigrations --check`):
    ```bash
    uv run python manage.py showmigrations --plan | grep -E "^\[ \]|UNMIGRATED"
    ```

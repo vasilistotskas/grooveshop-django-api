@@ -3,6 +3,42 @@
 
 
 
+## v3.140.0 (2026-10-19)
+
+### Bug fixes
+
+* fix(admin): require a second factor for platform superusers' admin login
+
+A platform superuser reaches every store and the control plane, and the
+admin login asked for a password only: the form calls the platform
+backend directly, so allauth's MFA stage never ran, and allauth.mfa was
+installed for tenant schemas only, so no authenticator could exist for a
+public-schema identity.
+
+allauth.mfa is now in SHARED_APPS too (its tables are created in public).
+After the password, the admin login form asks a superuser for an
+authenticator code or a recovery code, checked with allauth's own helpers;
+store admins and staff keep a password. A superuser with no authenticator
+gets no session until they enrol one in the same form: the secret is
+shown, a correct code activates it (and is spent), the ten recovery codes
+are shown once, and the next login asks for a code. Five wrong codes lock
+further tries for fifteen minutes. reset_staff_mfa <email> removes the
+authenticators of a superuser who lost theirs.
+
+Platform staff API tokens are issued after a login and are not covered.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c7de10b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7de10be528a822acdcf72c234412c3d74ef9af4))
+
+### Features
+
+* feat(admin): platform superusers sign in with an authenticator code (#264)
+
+* wip ([`c7de10b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7de10be528a822acdcf72c234412c3d74ef9af4))
+
 ## v3.139.0 (2026-10-19)
 
 ### Bug fixes

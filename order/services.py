@@ -3613,7 +3613,7 @@ class OrderService:
             )
             if settled.status == RefundAttemptStatus.SETTLED:
                 return _StoredReturned(
-                    attempt.pk, cls._stored_returned_by(order, settled)
+                    attempt.pk, PaymentLedger.stored_returned_by(order, settled)
                 )
 
             stored = PaymentLedger.stored_value(order)
@@ -3651,7 +3651,7 @@ class OrderService:
             previous_status = order.payment_status
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
-            returned = cls._stored_returned_by(order, settled)
+            returned = PaymentLedger.stored_returned_by(order, settled)
             order_stored_value_returned.send(
                 sender=cls,
                 order=order,
@@ -3668,37 +3668,6 @@ class OrderService:
                 points,
             )
         return _StoredReturned(attempt.pk, returned)
-
-    @staticmethod
-    def _stored_returned_by(order: Order, attempt: RefundAttempt) -> Money:
-        """What *attempt* actually put back onto gift cards and points, read
-        from the rows that name it. Not the amount it claimed: a cancel or a
-        racing refund may have returned part of it first, and the ledgers
-        only credit what is still owed."""
-        from django.db.models import Sum
-
-        from giftcard.models import GiftCardTransaction
-        from loyalty.models.transaction import PointsTransaction
-
-        currency = attempt.amount.currency
-        gift_card = GiftCardTransaction.objects.filter(
-            refund_attempt=attempt
-        ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
-        points = (
-            PointsTransaction.objects.filter(refund_attempt=attempt).aggregate(
-                total=Sum("points")
-            )["total"]
-            or 0
-        )
-        stored = PaymentLedger.stored_value(order)
-        points_value = (
-            (stored.points_value * points / stored.points_spent).quantize(
-                Decimal("0.01")
-            )
-            if points and stored.points_spent
-            else Decimal(0)
-        )
-        return Money(gift_card + points_value, currency)
 
     @classmethod
     def _decline(

@@ -1029,3 +1029,124 @@ class TestTheReceiptRowIsTheCutOff:
 
             assert generate_invoice(order, force=True).total == _eur("100.00")
         assert invoice.mydata_mark
+
+
+class TestCreditForValueReturnedOntoGiftCardsAndPoints:
+    """Value that goes back onto gift cards or points AFTER the receipt
+    exists reverses the sale as a provider refund does: one retail credit
+    (11.4) for it, through the same path. Before the receipt it was netted
+    (no credit); a chargeback never has one."""
+
+    @pytest.fixture(autouse=True)
+    def _stripe(self):
+        with FakeStripeRefunds():
+            yield
+
+    def _gift_card_order(self, *, card="60.00", gift="40.00"):
+        from giftcard.factories import GiftCardFactory
+        from giftcard.models import (
+            GiftCardTransaction,
+            GiftCardTransactionKind,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        Order.objects.filter(pk=order.pk).update(
+            gift_card_amount=_eur(gift), amount_due=_eur(card)
+        )
+        order.refresh_from_db()
+        charge = order.payment_transactions.get()
+        if Decimal(card) > 0:
+            charge.amount = _eur(card)
+            charge.save(update_fields=["amount"])
+        else:
+            # Paid entirely with the gift card: no provider payment.
+            charge.delete()
+            Order.objects.filter(pk=order.pk).update(
+                pay_way=None, payment_id=""
+            )
+            order.refresh_from_db()
+        GiftCardTransaction.objects.create(
+            gift_card=GiftCardFactory(initial_value=_eur(gift)),
+            kind=GiftCardTransactionKind.REDEEM,
+            amount=-Decimal(gift),
+            order=order,
+        )
+        return order
+
+    def test_a_gift_card_return_after_the_receipt_makes_one_credit(self):
+        order = self._gift_card_order(card="0.00", gift="100.00")
+        with mydata_enabled(), FakeAade() as aade:
+            _receipt(order)
+            OrderService.refund_order(order, amount=_eur("40.00"))
+
+        [credit] = _credits(order)
+        assert credit.total == _eur("40.00")
+        assert credit.refund is None
+        assert credit.refund_attempt is not None
+        assert [c.gross for c in aade.credits] == [Decimal("40.00")]
+
+    def test_a_mixed_refund_credits_the_whole_returned_value(self):
+        order = self._gift_card_order()
+        with mydata_enabled(), FakeAade() as aade:
+            _receipt(order)
+            OrderService.refund_order(order, amount=_eur("75.00"))
+
+        issued = list(_credits(order))
+        assert sum((c.total.amount for c in issued), Decimal(0)) == Decimal(
+            "75.00"
+        )
+        assert sorted(c.total.amount for c in issued) == [
+            Decimal("15.00"),
+            Decimal("60.00"),
+        ]
+        assert sum((c.gross for c in aade.credits), Decimal(0)) == Decimal(
+            "75.00"
+        )
+        for credit in issued:
+            assert credit.mydata_status == MyDataStatus.CONFIRMED
+
+    def test_a_return_before_the_receipt_makes_no_credit(self):
+        order = self._gift_card_order()
+        OrderService.refund_order(order, amount=_eur("75.00"))
+
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _receipt(order)
+            create_pending_credits(order.id)
+
+        assert invoice.total == _eur("25.00")
+        assert not _credits(order).exists()
+        assert aade.credits == []
+
+    def test_the_credits_never_exceed_the_receipt(self):
+        order = self._gift_card_order()
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _receipt(order)
+            OrderService.refund_order(order, amount=_eur("60.00"))
+            OrderService.refund_order(order)
+            create_pending_credits(order.id)
+
+        total = sum((c.total.amount for c in _credits(order)), Decimal(0))
+        assert total == invoice.total.amount == Decimal("100.00")
+        assert sum((c.gross for c in aade.credits), Decimal(0)) == total
+
+    def test_a_repeat_makes_no_second_credit(self):
+        order = self._gift_card_order(card="0.00", gift="100.00")
+        with mydata_enabled(), FakeAade() as aade:
+            _receipt(order)
+            OrderService.refund_order(order, amount=_eur("40.00"))
+            create_pending_credits(order.id)
+            create_pending_credits(order.id)
+
+        assert _credits(order).count() == 1
+        assert len(aade.credits) == 1
+
+    def test_a_return_made_before_the_cut_off_is_not_credited(self):
+        """Value returned before the receipt row existed was netted; its
+        attempt must not be credited by a later reconciliation."""
+        order = self._gift_card_order()
+        OrderService.refund_order(order, amount=_eur("75.00"))
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            create_pending_credits(order.id)
+
+        assert not _credits(order).exists()

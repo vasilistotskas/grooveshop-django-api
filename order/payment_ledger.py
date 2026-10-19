@@ -386,6 +386,50 @@ class PaymentLedger:
             points_value=order.loyalty_discount.amount,
         )
 
+    @staticmethod
+    def stored_returned_by(order: Order, attempt: RefundAttempt) -> Money:
+        """What *attempt* actually put back onto gift cards and points, read
+        from the rows that name it. Not the amount it claimed: a cancel or a
+        racing refund may have returned part of it first, and the ledgers
+        only credit what is still owed."""
+        from giftcard.models import GiftCardTransaction
+        from loyalty.models.transaction import PointsTransaction
+
+        gift_card = GiftCardTransaction.objects.filter(
+            refund_attempt=attempt
+        ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
+        points = PointsTransaction.objects.filter(
+            refund_attempt=attempt
+        ).aggregate(total=Coalesce(Sum("points"), 0))["total"]
+        stored = PaymentLedger.stored_value(order)
+        points_value = (
+            (stored.points_value * points / stored.points_spent).quantize(
+                Decimal("0.01")
+            )
+            if points and stored.points_spent
+            else _ZERO
+        )
+        return Money(gift_card + points_value, attempt.amount.currency)
+
+    @staticmethod
+    def stored_returned_at(attempt: RefundAttempt) -> datetime | None:
+        """When *attempt* put value back: the first row that names it (the
+        same clock ``stored_value(before=...)`` cuts by)."""
+        from giftcard.models import GiftCardTransaction
+        from loyalty.models.transaction import PointsTransaction
+
+        moments = [
+            qs.order_by("created_at")
+            .values_list("created_at", flat=True)
+            .first()
+            for qs in (
+                GiftCardTransaction.objects.filter(refund_attempt=attempt),
+                PointsTransaction.objects.filter(refund_attempt=attempt),
+            )
+        ]
+        moments = [m for m in moments if m is not None]
+        return min(moments) if moments else None
+
     @classmethod
     def stored_value_refundable(cls, order: Order) -> Decimal:
         """What can still go back onto gift cards and points: what has not

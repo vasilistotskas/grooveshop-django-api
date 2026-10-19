@@ -118,6 +118,18 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             "refund; empty for the settlement of a closed order."
         ),
     )
+    refund_attempt = models.OneToOneField(
+        "order.RefundAttempt",
+        related_name="credit_document",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        verbose_name=_("Refund attempt"),
+        help_text=_(
+            "The refund that returned value onto gift cards and points, "
+            "which this document credits; none for a provider refund."
+        ),
+    )
     credit_number = models.CharField(
         _("Credit Number"),
         max_length=32,
@@ -172,11 +184,19 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             models.CheckConstraint(
                 condition=(
                     models.Q(reason=CreditReason.REFUND)
-                    & models.Q(refund__isnull=False)
+                    & (
+                        models.Q(
+                            refund__isnull=False, refund_attempt__isnull=True
+                        )
+                        | models.Q(
+                            refund__isnull=True, refund_attempt__isnull=False
+                        )
+                    )
                 )
                 | (
                     models.Q(reason=CreditReason.SETTLEMENT)
                     & models.Q(refund__isnull=True)
+                    & models.Q(refund_attempt__isnull=True)
                 ),
                 name="credit_refund_iff_reason_refund",
             ),

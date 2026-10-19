@@ -159,14 +159,15 @@ def _has_usable_coordinates(dest: dict) -> bool:
 
 
 #: The ``Tenant.box_now_*`` fields BoxNow needs, in the order they are
-#: reported. Each one's help text says "empty disables BoxNow", and the
-#: payload sends the last two as the parcel's origin, so none has a stand-in.
+#: reported. Each one's help text says "empty disables BoxNow" and none has a
+#: stand-in. ``box_now_notify_phone`` is not here: BoxNow's integration
+#: manual (§4.4, "Request a delivery") asks for the sender's name only; the
+#: phone goes out as ``origin.contactNumber`` when the store set one.
 REQUIRED_TENANT_FIELDS = (
     ("box_now_client_id", "client_id"),
     ("box_now_client_secret", "client_secret"),
     ("box_now_partner_id", "partner_id"),
     ("box_now_warehouse_id", "warehouse_id"),
-    ("box_now_notify_phone", "notify_phone"),
 )
 
 
@@ -454,7 +455,7 @@ class BoxNowService:
             "amountToBeCollected": amount_to_collect_str,
             "notifyOnAccepted": partner_notify_email,
             "origin": {
-                "contactNumber": notify_phone,
+                **({"contactNumber": notify_phone} if notify_phone else {}),
                 "contactEmail": partner_notify_email,
                 "contactName": site_name,
                 "locationId": warehouse_id,

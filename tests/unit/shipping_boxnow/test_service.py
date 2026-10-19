@@ -866,9 +866,7 @@ def _paid_order_with_shipment():
 
 @pytest.mark.django_db
 class TestEmptyStoreFieldsTurnBoxNowOff:
-    @pytest.mark.parametrize(
-        "field", ["box_now_warehouse_id", "box_now_notify_phone"]
-    )
+    @pytest.mark.parametrize("field", ["box_now_warehouse_id"])
     def test_is_configured_needs_every_field(
         self, boxnow_configured_tenant, field
     ):
@@ -880,9 +878,7 @@ class TestEmptyStoreFieldsTurnBoxNowOff:
 
         assert not is_configured()
 
-    @pytest.mark.parametrize(
-        "field", ["box_now_warehouse_id", "box_now_notify_phone"]
-    )
+    @pytest.mark.parametrize("field", ["box_now_warehouse_id"])
     def test_no_parcel_is_created_with_a_field_missing(
         self, boxnow_configured_tenant, field
     ):
@@ -920,6 +916,26 @@ class TestEmptyStoreFieldsTurnBoxNowOff:
         ]
         assert origin["locationId"] == "WH-77"
         assert origin["contactNumber"] == "+306911111111"
+
+    def test_a_store_without_a_phone_still_ships_and_sends_none(
+        self, boxnow_configured_tenant
+    ):
+        """BoxNow's manual (§4.4) asks for the sender's name only."""
+        from shipping_boxnow.services import is_configured
+
+        boxnow_configured_tenant.box_now_notify_phone = ""
+        order = _paid_order_with_shipment()
+        client = _mock_client_create_ok()
+
+        assert is_configured()
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            BoxNowService.create_shipment_for_order(order)
+
+        origin = client.return_value.create_delivery_request.call_args.args[0][
+            "origin"
+        ]
+        assert "contactNumber" not in origin
+        assert origin["locationId"]
 
 
 # ---------------------------------------------------------------------------

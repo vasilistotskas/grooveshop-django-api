@@ -735,6 +735,9 @@ msgstr "ACS customer code"
 msgid "ACS did not issue the pickup list: %(err)s"
 msgstr "ACS did not issue the pickup list: %(err)s"
 
+msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
+msgstr "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
+
 msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 msgstr "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 
@@ -1967,6 +1970,9 @@ msgstr "Can purge caches"
 msgid "Cancel"
 msgstr "Cancel"
 
+msgid "Cancel ACS voucher"
+msgstr "Cancel ACS voucher"
+
 msgid "Cancel Requested At"
 msgstr "Cancel Requested At"
 
@@ -2001,6 +2007,9 @@ msgstr "Cancel selected orders and restore stock"
 msgid "Cancel the ACS shipment for an order"
 msgstr "Cancel the ACS shipment for an order"
 
+msgid "Cancel the ACS voucher"
+msgstr "Cancel the ACS voucher"
+
 msgid "Cancel the BoxNow shipment for an order"
 msgstr "Cancel the BoxNow shipment for an order"
 
@@ -2019,8 +2028,14 @@ msgstr "Canceled orders to refund"
 msgid "Cancelled but still paid"
 msgstr "Cancelled but still paid"
 
+msgid "Cancelled parcel reset — creating a new one."
+msgstr "Cancelled parcel reset — creating a new one."
+
 msgid "Cancelled shipment reset — minting a fresh voucher."
 msgstr "Cancelled shipment reset — minting a fresh voucher."
+
+msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
+msgstr "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
 
 msgid "Candidate"
 msgstr "Candidate"
@@ -2050,6 +2065,10 @@ msgstr "Cannot remove more than the current balance."
 #, python-format
 msgid "Cannot reset shipment for re-mint: %(err)s"
 msgstr "Cannot reset shipment for re-mint: %(err)s"
+
+#, python-format
+msgid "Cannot reset the parcel for reissue: %(err)s"
+msgstr "Cannot reset the parcel for reissue: %(err)s"
 
 #, python-brace-format
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
@@ -6656,6 +6675,22 @@ msgstr "Limit"
 msgid "Limits"
 msgstr "Limits"
 
+#, python-format
+msgid "Line %(line)d: expected 'sku;net_price', got %(text)r."
+msgstr "Line %(line)d: expected 'sku;net_price', got %(text)r."
+
+#, python-format
+msgid "Line %(line)d: invalid price %(price)r."
+msgstr "Line %(line)d: invalid price %(price)r."
+
+#, python-format
+msgid "Line %(line)d: negative price %(price)r."
+msgstr "Line %(line)d: negative price %(price)r."
+
+#, python-format
+msgid "Line %(line)d: unknown SKU %(sku)r."
+msgstr "Line %(line)d: unknown SKU %(sku)r."
+
 msgid "Line total"
 msgstr "Line total"
 
@@ -7969,6 +8004,10 @@ msgid "Order #%(order)s has not been paid yet — the voucher is issued automati
 msgstr "Order #%(order)s has not been paid yet — the voucher is issued automatically once the online payment is confirmed."
 
 #, python-format
+msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+msgstr "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+
+#, python-format
 msgid "Order #%(order_id)s has no receipt to regenerate."
 msgstr "Order #%(order_id)s has no receipt to regenerate."
 
@@ -8799,6 +8838,9 @@ msgstr "Phone Number"
 
 msgid "Phone code must be between 1 and 9999."
 msgstr "Phone code must be between 1 and 9999."
+
+msgid "Phone number for BoxNow shipment notifications, sent as the sender's contact number. Optional: left out of the request when empty. No platform fallback."
+msgstr "Phone number for BoxNow shipment notifications, sent as the sender's contact number. Optional: left out of the request when empty. No platform fallback."
 
 msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
@@ -11622,6 +11664,9 @@ msgstr "The '%(field)s' field is required for the default language (%(lang)s)."
 msgid "The 50 most recent movements"
 msgstr "The 50 most recent movements"
 
+msgid "The ACS voucher was cancelled."
+msgstr "The ACS voucher was cancelled."
+
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 
@@ -11896,6 +11941,9 @@ msgstr "The value free shipping and a free payment fee are judged on: the produc
 
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "The visitor ticked the consent box. Must be true."
+
+msgid "The voucher is already cancelled."
+msgstr "The voucher is already cancelled."
 
 msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
 msgstr "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
@@ -13316,6 +13364,9 @@ msgstr "Why Microlearning"
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
+
+msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
+msgstr "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
 
 msgid "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
 msgstr "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."

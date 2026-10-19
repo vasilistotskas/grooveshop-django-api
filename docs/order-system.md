@@ -1123,13 +1123,16 @@ accepting Cyprus orders at the Greek flat rate.
   width or height, and a BoxNow compartment is a dimensional limit, so the
   smallest size that fits cannot be computed until products carry
   dimensions.
-- **BoxNow is on only when every `Tenant.box_now_*` field is set**: client
-  id, secret, partner id, warehouse id and notify phone
+- **BoxNow is on only when its credentials and warehouse are set**: client
+  id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for
-  `is_configured` and the parcel creation). The warehouse and phone go
-  out as the parcel's origin and are never replaced by a stand-in; a store
-  that left one empty has BoxNow hidden at checkout, and a parcel for an
-  order placed before that raises `BoxNowConfigError` naming the field.
+  `is_configured` and the parcel creation). The warehouse goes out as
+  `origin.locationId` and is never replaced by a stand-in; a store that
+  left one empty has BoxNow hidden at checkout, and a parcel for an order
+  placed before that raises `BoxNowConfigError` naming the field.
+  `box_now_notify_phone` is optional (BoxNow's integration manual, §4.4
+  "Request a delivery", asks for the sender's name only): it is sent as
+  `origin.contactNumber` when set and omitted otherwise.
 - Webhook handler: `BoxNowService.apply_webhook_event` — idempotent on `webhook_message_id`.
 - The webhook view (`shipping_boxnow/views/webhook.py`) answers 400 (BoxNow does not retry) to any body it cannot read as a JSON object: bytes that are not UTF-8 (decoded strictly first, RFC 8259 §8.1 — `json.loads` on bytes would sniff UTF-16/32, while the signed-data extractor walks the raw bytes), invalid JSON, JSON nested past the decoder's stack, or valid JSON that is not an object (`[]`, `"x"`, `null`). Those used to raise inside the unauthenticated view and return 500, which BoxNow retries.
 

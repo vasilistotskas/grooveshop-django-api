@@ -18,6 +18,7 @@ from django.contrib.messages import constants as messages
 from django.test import RequestFactory
 
 from order.enum.status import OrderStatus
+from order.factories.order import OrderFactory
 from shipping_acs.admin import AcsShipmentAdmin
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError
@@ -48,9 +49,10 @@ def test_the_action_is_offered_on_the_detail_page():
 
 def test_it_cancels_the_voucher_and_not_the_order():
     shipment = AcsShipmentFactory(
-        voucher_no="9700000101", shipment_state=AcsShipmentState.NEW
+        order=OrderFactory(status=OrderStatus.PROCESSING),
+        voucher_no="9700000101",
+        shipment_state=AcsShipmentState.NEW,
     )
-    order_status = shipment.order.status
 
     with patch.object(AcsService, "cancel_voucher") as cancel:
         response, say = _call(shipment, reason="new address")
@@ -61,7 +63,7 @@ def test_it_cancels_the_voucher_and_not_the_order():
     assert "HX-Redirect" in response.headers
     assert say.call_args.args[2] == messages.SUCCESS
     shipment.order.refresh_from_db()
-    assert shipment.order.status == order_status != OrderStatus.CANCELED
+    assert shipment.order.status == OrderStatus.PROCESSING
 
 
 def test_a_voucher_on_an_issued_pickup_list_is_refused_with_the_reason():

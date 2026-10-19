@@ -751,6 +751,9 @@ msgstr "Κωδικός πελάτη ACS"
 msgid "ACS did not issue the pickup list: %(err)s"
 msgstr "Η ACS δεν εξέδωσε τη λίστα παραλαβής: %(err)s"
 
+msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
+msgstr "Κωδικός σταθμού αφετηρίας ACS (έως 8 χαρακτήρες), για τον υπολογισμό μεταφορικών. Προαιρετικό: όταν είναι κενός, προκύπτει από τον κωδικό χρέωσης. Χωρίς εναλλακτική τιμή πλατφόρμας."
+
 msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
@@ -1982,6 +1985,9 @@ msgstr "Μπορεί να εκκαθαρίζει cache"
 msgid "Cancel"
 msgstr "Ακύρωση"
 
+msgid "Cancel ACS voucher"
+msgstr "Ακύρωση voucher ACS"
+
 msgid "Cancel Requested At"
 msgstr "Ημερομηνία αιτήματος ακύρωσης"
 
@@ -2016,6 +2022,9 @@ msgstr "Ακύρωση επιλεγμένων παραγγελιών και επ
 msgid "Cancel the ACS shipment for an order"
 msgstr "Ακύρωση της αποστολής ACS για παραγγελία"
 
+msgid "Cancel the ACS voucher"
+msgstr "Ακύρωση του voucher ACS"
+
 msgid "Cancel the BoxNow shipment for an order"
 msgstr "Ακύρωση της αποστολής BoxNow για παραγγελία"
 
@@ -2034,8 +2043,14 @@ msgstr "Ακυρωμένες παραγγελίες προς επιστροφή 
 msgid "Cancelled but still paid"
 msgstr "Ακυρωμένες αλλά πληρωμένες"
 
+msgid "Cancelled parcel reset — creating a new one."
+msgstr "Το ακυρωμένο δέμα επαναφέρθηκε — δημιουργείται νέο."
+
 msgid "Cancelled shipment reset — minting a fresh voucher."
 msgstr "Η ακυρωμένη αποστολή επαναφέρθηκε — εκδίδεται νέο voucher."
+
+msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
+msgstr "Ακυρώνει μόνο το voucher στην ACS· η παραγγελία μένει ως έχει. Χρησιμοποιήστε το όταν άλλαξαν τα στοιχεία του δέματος (π.χ. νέα διεύθυνση) και μετά πατήστε «Έκδοση voucher ACS τώρα» για νέο. Η ACS αρνείται voucher που βρίσκεται ήδη σε εκδοθείσα λίστα παραλαβής."
 
 msgid "Candidate"
 msgstr "Υποψήφιο"
@@ -2065,6 +2080,10 @@ msgstr "Δεν είναι δυνατή η αφαίρεση ποσού μεγαλ
 #, python-format
 msgid "Cannot reset shipment for re-mint: %(err)s"
 msgstr "Δεν είναι δυνατή η επαναφορά της αποστολής για νέα έκδοση: %(err)s"
+
+#, python-format
+msgid "Cannot reset the parcel for reissue: %(err)s"
+msgstr "Αδυναμία επαναφοράς του δέματος για επανέκδοση: %(err)s"
 
 #, python-brace-format
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
@@ -6708,6 +6727,22 @@ msgstr "Όριο"
 msgid "Limits"
 msgstr "Όρια"
 
+#, python-format
+msgid "Line %(line)d: expected 'sku;net_price', got %(text)r."
+msgstr "Γραμμή %(line)d: αναμενόταν 'sku;καθαρή_τιμή', βρέθηκε %(text)r."
+
+#, python-format
+msgid "Line %(line)d: invalid price %(price)r."
+msgstr "Γραμμή %(line)d: μη έγκυρη τιμή %(price)r."
+
+#, python-format
+msgid "Line %(line)d: negative price %(price)r."
+msgstr "Γραμμή %(line)d: αρνητική τιμή %(price)r."
+
+#, python-format
+msgid "Line %(line)d: unknown SKU %(sku)r."
+msgstr "Γραμμή %(line)d: άγνωστο SKU %(sku)r."
+
 msgid "Line total"
 msgstr "Σύνολο γραμμής"
 
@@ -8047,6 +8082,10 @@ msgid "Order #%(order)s has not been paid yet — the voucher is issued automati
 msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακόμη — το voucher εκδίδεται αυτόματα μόλις επιβεβαιωθεί η online πληρωμή."
 
 #, python-format
+msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη — ένα νέο δέμα θα έστελνε παραγγελία που κανείς δεν θέλει."
+
+#, python-format
 msgid "Order #%(order_id)s has no receipt to regenerate."
 msgstr "Η παραγγελία #%(order_id)s δεν έχει απόδειξη για επαναδημιουργία."
 
@@ -8890,6 +8929,9 @@ msgstr "Αριθμός Τηλεφώνου"
 
 msgid "Phone code must be between 1 and 9999."
 msgstr "Ο κωδικός κλήσης πρέπει να είναι μεταξύ 1 και 9999."
+
+msgid "Phone number for BoxNow shipment notifications, sent as the sender's contact number. Optional: left out of the request when empty. No platform fallback."
+msgstr "Τηλέφωνο για τις ειδοποιήσεις αποστολής BoxNow, που στέλνεται ως τηλέφωνο επικοινωνίας του αποστολέα. Προαιρετικό: παραλείπεται από το αίτημα όταν είναι κενό. Χωρίς εναλλακτική τιμή πλατφόρμας."
 
 msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 msgstr "Αριθμός τηλεφώνου για ειδοποιήσεις αποστολών BoxNow. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το BoxNow."
@@ -11762,6 +11804,9 @@ msgstr "Το πεδίο '%(field)s' είναι υποχρεωτικό για τ�
 msgid "The 50 most recent movements"
 msgstr "Οι 50 πιο πρόσφατες κινήσεις"
 
+msgid "The ACS voucher was cancelled."
+msgstr "Το voucher ACS ακυρώθηκε."
+
 msgid "The Cloudflare fields are only for a store on its own domain in its own Cloudflare account. Leave them empty on a platform hostname."
 msgstr "Τα πεδία Cloudflare αφορούν μόνο κατάστημα με δικό του domain σε δικό του λογαριασμό Cloudflare. Αφήστε τα κενά αν χρησιμοποιείτε hostname της πλατφόρμας."
 
@@ -12046,6 +12091,9 @@ msgstr "Η αξία με την οποία κρίνονται τα δωρεάν 
 
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "Ο επισκέπτης επέλεξε το πλαίσιο συγκατάθεσης. Πρέπει να είναι true."
+
+msgid "The voucher is already cancelled."
+msgstr "Το voucher έχει ήδη ακυρωθεί."
 
 msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
 msgstr "Η ομάδα χονδρικής που τιμολόγησε αυτή την παραγγελία δεν υπάρχει πια, οπότε δεν μπορεί να τιμολογηθεί νέα γραμμή για αυτήν."
@@ -13490,6 +13538,9 @@ msgstr "Γιατί μικρομάθηση"
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Γιατί απορρίπτεται ο κωδικός, από το λεξιλόγιο εκπτώσεων του ACP (discount_code_expired, discount_code_minimum_not_met, …). Null όταν ο κωδικός είναι επιλέξιμος."
+
+msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
+msgstr "Γιατί ακυρώνεται το voucher (π.χ. διορθωμένη διεύθυνση). Αποθηκεύεται στην αποστολή."
 
 msgid "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
 msgstr "Γιατί έχει ανασταλεί αυτός ο tenant: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία ειδοποιήσεων. Κενό όταν δεν είναι σε αναστολή. Η αυτόματη επανενεργοποίηση μέσω ανανέωσης ισχύει μόνο για αναστολές 'billing'."

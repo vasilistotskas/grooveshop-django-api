@@ -267,6 +267,9 @@ msgstr ""
 msgid "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr "ACS hat für diesen Voucher bereits eine Auszahlung gemeldet; es gibt nichts auszugleichen."
 
+msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
+msgstr "ACS-Ursprungsstationscode (bis zu 8 Zeichen) zur Berechnung der Versandkosten. Optional: wenn leer, wird er aus dem Abrechnungscode abgeleitet. Kein Plattform-Fallback."
+
 msgid "ACS payouts matching no shipment"
 msgstr "ACS-Auszahlungen ohne passende Sendung"
 
@@ -789,6 +792,9 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+msgid "Cancel ACS voucher"
+msgstr "ACS-Voucher stornieren"
+
 msgid "Cancel an existing order and restore product stock"
 msgstr ""
 
@@ -798,6 +804,9 @@ msgstr ""
 msgid "Cancel selected orders and restore stock"
 msgstr ""
 
+msgid "Cancel the ACS voucher"
+msgstr "Den ACS-Voucher stornieren"
+
 msgid "Canceled"
 msgstr ""
 
@@ -806,6 +815,12 @@ msgstr "Stornierte Bestellungen zur Rückerstattung"
 
 msgid "Cancelled but still paid"
 msgstr ""
+
+msgid "Cancelled parcel reset — creating a new one."
+msgstr "Storniertes Paket zurückgesetzt — ein neues wird erstellt."
+
+msgid "Cancels only the voucher at ACS; the order stays as it is. Use it when the parcel data changed (a new address) and then press “Issue ACS voucher now” for a fresh one. ACS refuses a voucher already on an issued pickup list."
+msgstr "Storniert nur den Voucher bei ACS; die Bestellung bleibt unverändert. Verwenden Sie dies, wenn sich die Paketdaten geändert haben (z. B. neue Adresse), und drücken Sie dann „ACS-Voucher jetzt ausstellen“ für einen neuen. ACS lehnt einen Voucher ab, der bereits auf einer ausgestellten Abholliste steht."
 
 msgid "Cannot assign inactive attribute value."
 msgstr ""
@@ -829,6 +844,10 @@ msgstr ""
 
 msgid "Cannot refund more than the ordered quantity. "
 msgstr ""
+
+#, python-format
+msgid "Cannot reset the parcel for reissue: %(err)s"
+msgstr "Das Paket kann nicht für die Neuausstellung zurückgesetzt werden: %(err)s"
 
 msgid "Card not authorized for online payments"
 msgstr ""
@@ -3745,6 +3764,22 @@ msgstr ""
 msgid "Likes count"
 msgstr ""
 
+#, python-format
+msgid "Line %(line)d: expected 'sku;net_price', got %(text)r."
+msgstr "Zeile %(line)d: erwartet 'sku;netto_preis', gefunden %(text)r."
+
+#, python-format
+msgid "Line %(line)d: invalid price %(price)r."
+msgstr "Zeile %(line)d: ungültiger Preis %(price)r."
+
+#, python-format
+msgid "Line %(line)d: negative price %(price)r."
+msgstr "Zeile %(line)d: negativer Preis %(price)r."
+
+#, python-format
+msgid "Line %(line)d: unknown SKU %(sku)r."
+msgstr "Zeile %(line)d: unbekannte SKU %(sku)r."
+
 msgid "Line total"
 msgstr "Gesamt"
 
@@ -4417,6 +4452,10 @@ msgstr ""
 msgid "Order"
 msgstr "Bestellung"
 
+#, python-format
+msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+msgstr "Bestellung #%(order)s ist storniert — ein neues Paket würde eine Bestellung versenden, die niemand will."
+
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
 msgstr ""
@@ -4848,6 +4887,9 @@ msgstr ""
 
 msgid "Phone code must be between 1 and 9999."
 msgstr ""
+
+msgid "Phone number for BoxNow shipment notifications, sent as the sender's contact number. Optional: left out of the request when empty. No platform fallback."
+msgstr "Telefonnummer für BoxNow-Sendungsbenachrichtigungen, die als Kontaktnummer des Absenders gesendet wird. Optional: wird bei leerem Feld weggelassen. Kein Plattform-Fallback."
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Die Telefonnummern-Validierung für dieses Land, abgeleitet aus Djangos eigener Abhängigkeit ``phonenumbers`` — nie gespeichert. Null nur für einen reservierten Alpha-2-Code, für den ``phonenumbers`` keine Metadaten hat."
@@ -6274,6 +6316,9 @@ msgstr ""
 msgid "The %(site_name)s Team"
 msgstr ""
 
+msgid "The ACS voucher was cancelled."
+msgstr "Der ACS-Voucher wurde storniert."
+
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr ""
 
@@ -6352,6 +6397,9 @@ msgstr "Die Shopzeile in den weiteren Sprachen des Storefronts, nach Sprache geg
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Der Wert, nach dem kostenloser Versand und eine kostenlose Zahlungsgebühr beurteilt werden: die Produkte nach Aktions- und Gutscheinrabatten, ohne Versand und Gebühren. Vergleichen Sie eine Grenze „kostenlos ab“ damit, nie mit total_price."
+
+msgid "The voucher is already cancelled."
+msgstr "Der Voucher ist bereits storniert."
 
 msgid "There can only be one main address per user."
 msgstr ""
@@ -7194,6 +7242,9 @@ msgstr ""
 msgid "Who sees what"
 msgstr "Wer sieht was"
 
+msgid "Why the voucher is cancelled (for example a corrected address). Kept on the shipment."
+msgstr "Warum der Voucher storniert wird (z. B. wegen einer korrigierten Adresse). Wird an der Sendung gespeichert."
+
 msgid "Window"
 msgstr ""
 
@@ -7489,11 +7540,9 @@ msgid "💡 Shipping price currency should match item currencies to avoid total 
 msgstr ""
 
 #, fuzzy
-#~| msgid "Order Confirmation"
 #~ msgid "Subscription Confirmation"
 #~ msgstr "Bestellbestätigung"
 
 #, fuzzy, python-format
-#~| msgid "Thank you for shopping with us!"
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Vielen Dank, dass Sie bei uns eingekauft haben!"

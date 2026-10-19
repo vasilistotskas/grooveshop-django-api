@@ -10,6 +10,9 @@ receives is built by the task that sends the mail.
 
 from dataclasses import dataclass
 
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
+
 from order.enum.status import OrderStatus
 
 
@@ -17,7 +20,7 @@ from order.enum.status import OrderStatus
 class TemplateCategory:
     """Configuration for a template category."""
 
-    name: str  # Category name for display
+    name: StrOrPromise  # Category name for display
     path: str  # Subdirectory path (empty string for root level)
     context_generator: str  # Method name to generate context
 
@@ -27,8 +30,8 @@ class TemplateConfig:
     """Configuration for a single template."""
 
     name: str  # Template file name (without extension)
-    category_name: str  # Display category
-    description: str  # Template description
+    category_name: StrOrPromise  # Display category
+    description: StrOrPromise  # Template description
     subject_template: str  # Subject line template with {variables}
     is_used: bool  # Whether template is actively used
     order_statuses: list[OrderStatus] | None = (
@@ -49,19 +52,29 @@ class EmailTemplateConfig:
     """
 
     # Category configurations
+    # Headings for the directories that have no hand-written entry below.
+    DIRECTORY_HEADINGS: dict[str, StrOrPromise] = {
+        "b2b": _("B2B"),
+        "billing": _("Billing"),
+        "cart": _("Cart"),
+        "giftcard": _("Gift Cards"),
+        "product": _("Product"),
+        "shipping_acs": _("ACS Shipping"),
+    }
+
     CATEGORIES: dict[str, TemplateCategory] = {
         "order": TemplateCategory(
-            name="Order Lifecycle",
+            name=_("Order Lifecycle"),
             path="order",
             context_generator="generate_order_context",
         ),
         "subscription": TemplateCategory(
-            name="Subscription",
+            name=_("Subscription"),
             path="subscription",
             context_generator="generate_subscription_context",
         ),
         "user": TemplateCategory(
-            name="User Management",
+            name=_("User Management"),
             path="user",
             context_generator="generate_user_context",
         ),
@@ -72,64 +85,64 @@ class EmailTemplateConfig:
         # Order templates
         "order_shipped": TemplateConfig(
             name="order_shipped",
-            category_name="Order Lifecycle",
-            description="Sent when order is shipped",
+            category_name=_("Order Lifecycle"),
+            description=_("Sent when order is shipped"),
             subject_template="Your Order #{order[id]} Has Shipped",
             order_statuses=[OrderStatus.SHIPPED],
             is_used=True,
         ),
         "order_delivered": TemplateConfig(
             name="order_delivered",
-            category_name="Order Lifecycle",
-            description="Sent when order is delivered",
+            category_name=_("Order Lifecycle"),
+            description=_("Sent when order is delivered"),
             subject_template="Your Order #{order[id]} Has Been Delivered",
             order_statuses=[OrderStatus.DELIVERED],
             is_used=True,
         ),
         "order_canceled": TemplateConfig(
             name="order_canceled",
-            category_name="Order Lifecycle",
-            description="Sent when order is canceled",
+            category_name=_("Order Lifecycle"),
+            description=_("Sent when order is canceled"),
             subject_template="Your Order #{order[id]} Has Been Canceled",
             order_statuses=[OrderStatus.CANCELED],
             is_used=True,
         ),
         "order_pending_reminder": TemplateConfig(
             name="order_pending_reminder",
-            category_name="Order Lifecycle",
-            description="Reminder for pending orders after 24 hours",
+            category_name=_("Order Lifecycle"),
+            description=_("Reminder for pending orders after 24 hours"),
             subject_template="Reminder: Complete Your Order #{order[id]}",
             order_statuses=[OrderStatus.PENDING],
             is_used=True,
         ),
         "order_status_generic": TemplateConfig(
             name="order_status_generic",
-            category_name="Order Lifecycle",
-            description="Generic template for any status update",
+            category_name=_("Order Lifecycle"),
+            description=_("Generic template for any status update"),
             subject_template="Order #{order[id]} Status Update",
             order_statuses=[],
             is_used=True,
         ),
         "order_completed": TemplateConfig(
             name="order_completed",
-            category_name="Order Lifecycle",
-            description="Status update for completed orders",
+            category_name=_("Order Lifecycle"),
+            description=_("Status update for completed orders"),
             subject_template="Order #{order[id]} - Completed",
             order_statuses=[OrderStatus.COMPLETED],
             is_used=True,
         ),
         "order_refunded": TemplateConfig(
             name="order_refunded",
-            category_name="Order Lifecycle",
-            description="Status update for refunded orders",
+            category_name=_("Order Lifecycle"),
+            description=_("Status update for refunded orders"),
             subject_template="Order #{order[id]} - Refunded",
             order_statuses=[OrderStatus.REFUNDED],
             is_used=True,
         ),
         "order_returned": TemplateConfig(
             name="order_returned",
-            category_name="Order Lifecycle",
-            description="Status update for returned orders",
+            category_name=_("Order Lifecycle"),
+            description=_("Status update for returned orders"),
             subject_template="Order #{order[id]} - Returned",
             order_statuses=[OrderStatus.RETURNED],
             is_used=True,
@@ -137,16 +150,16 @@ class EmailTemplateConfig:
         # Subscription templates
         "confirmation": TemplateConfig(
             name="confirmation",
-            category_name="Subscription",
-            description="Subscription confirmation email",
+            category_name=_("Subscription"),
+            description=_("Subscription confirmation email"),
             subject_template="Subscription Confirmed",
             is_used=True,
         ),
         # User management templates
         "inactive_user_email_template": TemplateConfig(
             name="inactive_user_email_template",
-            category_name="User Management",
-            description="Inactive user notification",
+            category_name=_("User Management"),
+            description=_("Inactive user notification"),
             subject_template="We Miss You, {user[first_name]}!",
             is_used=True,
         ),

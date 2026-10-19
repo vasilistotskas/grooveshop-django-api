@@ -211,6 +211,11 @@ SHARED_APPS = [
     # usersessions table in public and every platform-admin request
     # crashes. Also in TENANT_APPS for per-schema customer sessions.
     "allauth.usersessions",
+    # The second factor of a platform superuser's admin login
+    # (``admin.staff_mfa``): the authenticator rows must exist where the
+    # user row lives, which for platform staff is the public schema. Also
+    # in TENANT_APPS for customers' own authenticators.
+    "allauth.mfa",
 ]
 
 TENANT_APPS = [

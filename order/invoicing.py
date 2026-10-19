@@ -53,6 +53,7 @@ from django.utils.translation import override as translation_override
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
+from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
 from order.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -335,28 +336,6 @@ def _verification_url(order: Order, *, language: str) -> str:
     )
 
 
-def _build_qr_svg(url: str) -> str:
-    """Inline SVG QR code for ``url``.
-
-    Uses ``SvgPathImage`` so the QR is a single ``<path>`` element —
-    WeasyPrint renders it as true vector geometry, no rasterisation
-    and no PIL dependency on the render path. Returns an ``<svg>``
-    string safe to drop into the template via ``|safe``.
-    """
-    import qrcode
-    import qrcode.image.svg
-
-    qr = qrcode.QRCode(
-        image_factory=qrcode.image.svg.SvgPathImage,
-        box_size=10,
-        border=2,
-    )
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image()
-    return img.to_string(encoding="unicode")
-
-
 def _vat_breakdown_for_render(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -453,7 +432,7 @@ def _build_context(
         "currency": invoice.currency,
         "pay_way_name": _pay_way_display(order),
         "verification_url": qr_target_url,
-        "qr_svg": _build_qr_svg(qr_target_url) if qr_target_url else "",
+        "qr_svg": qr_svg(qr_target_url) if qr_target_url else "",
         # Surfaced on the PDF when present so auditors / customers can
         # see the legal registration number next to the invoice number.
         "mydata_mark": invoice.mydata_mark,
@@ -742,7 +721,7 @@ def render_credit_pdf(credit: RetailCredit) -> RetailCredit:
         "currency": credit.currency,
         "pay_way_name": _pay_way_display(order),
         "verification_url": qr_target_url,
-        "qr_svg": _build_qr_svg(qr_target_url),
+        "qr_svg": qr_svg(qr_target_url),
         "mydata_mark": credit.mydata_mark,
     }
     with translation_override(language):

@@ -415,7 +415,7 @@ def _verify_viva_terminal_transaction(
     to flip financial state: a spoofed 1798 could mark an order or a
     gift-card purchase FAILED. Mirroring the 1796 path, we confirm with
     Viva that the transaction genuinely reached the expected terminal
-    state. A reversal (1797) is verified by :func:`_verify_viva_refund`
+    state. A reversal (1797) is verified by :func:`_verify_viva_reversal`
     instead: its transaction is a refund of its own, not the payment
     reaching a terminal status.
 
@@ -480,17 +480,6 @@ def _verify_viva_terminal_transaction(
         return None
 
     return verified_status
-
-
-def _verify_viva_refund(subject, transaction_id, order_codes) -> Decimal | None:
-    """Verify a reversal (1797) that is a refund and return how much it
-    refunded; ``None`` for anything else, a refund claim included."""
-    from order.payment import VIVA_REFUND_TRANSACTION_TYPE_IDS
-
-    verified = _verify_viva_reversal(
-        subject, transaction_id, order_codes, VIVA_REFUND_TRANSACTION_TYPE_IDS
-    )
-    return None if verified is None else verified[0]
 
 
 def _verify_viva_reversal(
@@ -1638,7 +1627,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
     means the goods are returned is a business call the admin owns.
 
     The event's ``TransactionId`` is the refund and ``ParentId`` the
-    payment it reverses (:func:`_verify_viva_refund`). The ledger holds
+    payment it reverses (:func:`_verify_viva_reversal`). The ledger holds
     every payment of the order (it can be paid twice, under two of its
     checkout codes), so the refund is attached to the payment ``ParentId``
     names. REFUNDED releases the gift-card redemption and the loyalty

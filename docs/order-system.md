@@ -741,7 +741,7 @@ REFUNDED, which Viva never reports, so every real 1797 was skipped — and
 recorded as processed, so Viva never retried. Nothing is read from the
 unauthenticated body except `ParentId`:
 
-1. `_verify_viva_refund` retrieves the refund transaction (an error raises
+1. `_verify_viva_reversal` retrieves the refund transaction (an error raises
    → 500 → Viva retries, and the multi-tenant candidate loop moves on) and
    requires one of the order's issued order codes on it, `F`, a refund or
    void type and a negative amount; the refunded amount is `-amount`. The

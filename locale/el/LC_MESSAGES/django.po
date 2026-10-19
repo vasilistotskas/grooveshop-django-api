@@ -5234,16 +5234,12 @@ msgid "Updated At"
 msgstr "Ενημερώθηκε στις"
 
 #: .\core\models.py:286
-#, fuzzy
-#| msgid "Starts At"
 msgid "Started At"
-msgstr "Έναρξη"
+msgstr "Ξεκίνησε στις"
 
 #: .\core\models.py:287
-#, fuzzy
-#| msgid "Ended"
 msgid "Ended At"
-msgstr "Έληξε"
+msgstr "Έληξε στις"
 
 #: .\core\models.py:347 .\search\models.py:48
 msgid "UUID"
@@ -8547,7 +8543,7 @@ msgstr "Αναγνωριστικό συναλλαγής παρόχου"
 
 #: .\giftcard\models.py:91
 msgid "Dispute ID"
-msgstr ""
+msgstr "Αναγνωριστικό αμφισβήτησης"
 
 #: .\giftcard\models.py:100
 msgid "Unrecovered Amount"
@@ -8652,14 +8648,13 @@ msgstr ""
 " αφαιρεί (εξαργύρωση/λήξη)"
 
 #: .\giftcard\models.py:317 .\loyalty\models\transaction.py:47
-#, fuzzy
-#| msgid "Refund Attempt"
 msgid "Refund attempt"
 msgstr "Απόπειρα επιστροφής"
 
 #: .\giftcard\models.py:318
 msgid "The refund that returned this credit, when it was one."
 msgstr ""
+"Η επιστροφή που έδωσε πίσω αυτή την πίστωση, όταν πρόκειται για τέτοια."
 
 #: .\giftcard\models.py:326
 msgid "Admin who made a manual adjustment"
@@ -8683,21 +8678,17 @@ msgid "%(kind)s %(amount)s on gift card %(card)s"
 msgstr "%(kind)s %(amount)s στη δωροκάρτα %(card)s"
 
 #: .\giftcard\models.py:384
-#, fuzzy
-#| msgid "Gift Card Purchase"
 msgid "Gift Card Pause"
-msgstr "Αγορά δωροκάρτας"
+msgstr "Παύση δωροκαρτών"
 
 #: .\giftcard\models.py:385
-#, fuzzy
-#| msgid "Gift Card Purchases"
 msgid "Gift Card Pauses"
-msgstr "Αγορές δωροκαρτών"
+msgstr "Παύσεις δωροκαρτών"
 
 #: .\giftcard\models.py:389
 #, python-format
 msgid "Gift cards off from %(start)s"
-msgstr ""
+msgstr "Δωροκάρτες ανενεργές από %(start)s"
 
 #: .\giftcard\serializers.py:14
 msgid "Gift card code (case-insensitive)"
@@ -8882,21 +8873,17 @@ msgid "Filter by transaction type (EARN, REDEEM, EXPIRE, ADJUST, BONUS)"
 msgstr "Φίλτρο ανά τύπο συναλλαγής (EARN, REDEEM, EXPIRE, ADJUST, BONUS)"
 
 #: .\loyalty\models\pause.py:13
-#, fuzzy
-#| msgid "Loyalty Points"
 msgid "Loyalty Pause"
-msgstr "Πόντοι πιστότητας"
+msgstr "Παύση πιστότητας"
 
 #: .\loyalty\models\pause.py:14
-#, fuzzy
-#| msgid "Loyalty Tiers"
 msgid "Loyalty Pauses"
-msgstr "Επίπεδα Πιστότητας"
+msgstr "Παύσεις πιστότητας"
 
 #: .\loyalty\models\pause.py:18
 #, python-format
 msgid "Loyalty off from %(start)s"
-msgstr ""
+msgstr "Πιστότητα ανενεργή από %(start)s"
 
 #: .\loyalty\models\tier.py:23
 msgid "Required Level"
@@ -8951,6 +8938,8 @@ msgid ""
 "The refund that gave back points the customer had spent, when this row is "
 "one."
 msgstr ""
+"Η επιστροφή που έδωσε πίσω πόντους που είχε ξοδέψει ο πελάτης, όταν η γραμμή "
+"είναι τέτοια."
 
 #: .\loyalty\models\transaction.py:59
 msgid "Admin user who created this adjustment"
@@ -9841,6 +9830,9 @@ msgid ""
 "provider, then %(stored)s back onto the gift cards and loyalty points the "
 "order paid with. Enter the value of what the customer returned."
 msgstr ""
+"Μπορούν να επιστραφούν έως %(refundable)s: %(provider)s μέσω του παρόχου "
+"πληρωμών και μετά %(stored)s πίσω στις δωροκάρτες και τους πόντους πιστότητας"
+" που πλήρωσαν την παραγγελία. Εισάγετε την αξία όσων επέστρεψε ο πελάτης."
 
 #: .\order\admin.py:335
 #, python-format
@@ -10970,6 +10962,8 @@ msgid ""
 "Order #%(order_id)s was refunded in full before its receipt was issued, so "
 "there is no sale to document."
 msgstr ""
+"Η παραγγελία #%(order_id)s επιστράφηκε πλήρως πριν εκδοθεί η απόδειξή της, "
+"άρα δεν υπάρχει πώληση προς τεκμηρίωση."
 
 #: .\order\invoicing.py:620
 #, python-format
@@ -11896,29 +11890,27 @@ msgid "Declined"
 msgstr "Απορρίφθηκε"
 
 #: .\order\models\refund_attempt.py:29
-#, fuzzy
-#| msgid "Payment provider name"
 msgid "Payment provider"
-msgstr "Όνομα παρόχου πληρωμών"
+msgstr "Πάροχος πληρωμών"
 
 #: .\order\models\refund_attempt.py:30
-#, fuzzy
-#| msgid "Gift card {amount}"
 msgid "Gift cards and points"
-msgstr "Δωροκάρτα {amount}"
+msgstr "Δωροκάρτες και πόντοι"
 
 #: .\order\models\refund_attempt.py:83
 msgid ""
 "A share paid back through a payment provider, or the value of what the order "
 "paid with gift cards and points."
 msgstr ""
+"Μερίδιο που επιστρέφεται μέσω παρόχου πληρωμών ή η αξία όσων πλήρωσε η "
+"παραγγελία με δωροκάρτες και πόντους."
 
 #: .\order\models\refund_attempt.py:95
-#, fuzzy
-#| msgid "The payment this share is refunded against."
 msgid ""
 "The payment this share is refunded against; none for gift cards and points."
-msgstr "Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο."
+msgstr ""
+"Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο· καμία για δωροκάρτες "
+"και πόντους."
 
 #: .\order\models\refund_attempt.py:104
 msgid "Idempotency key"
@@ -13194,6 +13186,9 @@ msgid ""
 "The order's UUID. Required when the order belongs to a guest (no account); "
 "ignored for signed-in owners and store staff."
 msgstr ""
+"Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει σε επισκέπτη "
+"(χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες και προσωπικό του "
+"καταστήματος."
 
 #: .\order\views\order.py:156
 msgid "Retrieve an order by UUID"
@@ -17822,13 +17817,7 @@ msgstr ""
 "είναι και το ``delivery_days_min``."
 
 #: .\shipping\serializers\option.py:130
-#, fuzzy, python-brace-format
-#| msgid ""
-#| "Absolute URL for the operator-uploaded brand logo, resolved per (provider, "
-#| "kind) so the home-delivery row and the pickup-point row of the same carrier "
-#| "can show different images. Null when no logo is uploaded — the storefront "
-#| "then falls back to its bundled default. ``settings.MEDIA_URL`` is absolute in"
-#| " every environment so this is always a full URL when present."
+#, python-brace-format
 msgid ""
 "Relative media path (``media/{schema}/uploads/shipping/…``) of the operator-"
 "uploaded brand logo, resolved per (provider, kind) so the home-delivery row "
@@ -17836,12 +17825,13 @@ msgid ""
 "storefront renders it through media-stream at the size it shows. Null when no"
 " logo is uploaded — the storefront then falls back to its bundled default."
 msgstr ""
-"Απόλυτο URL για το λογότυπο μάρκας που ανέβασε ο χειριστής, υπολογισμένο ανά "
-"(πάροχο, τύπο) ώστε η γραμμή κατ' οίκον παράδοσης και η γραμμή σημείου "
-"παραλαβής του ίδιου μεταφορέα να μπορούν να εμφανίζουν διαφορετικές εικόνες. "
-"Null όταν δεν έχει μεταφορτωθεί λογότυπο — το κατάστημα τότε επιστρέφει στην "
-"ενσωματωμένη προεπιλογή του. Το ``settings.MEDIA_URL`` είναι απόλυτο σε κάθε "
-"περιβάλλον, οπότε αυτό είναι πάντα πλήρες URL όταν υπάρχει."
+"Σχετική διαδρομή πολυμέσων (``media/{schema}/uploads/shipping/…``) του "
+"λογότυπου μάρκας που ανέβασε ο χειριστής, υπολογισμένη ανά (πάροχο, τύπο) "
+"ώστε η γραμμή κατ' οίκον παράδοσης και η γραμμή σημείου παραλαβής του ίδιου "
+"μεταφορέα να μπορούν να εμφανίζουν διαφορετικές εικόνες· το storefront την "
+"εμφανίζει μέσω του media-stream στο μέγεθος που χρειάζεται. Null όταν δεν "
+"έχει μεταφορτωθεί λογότυπο — το storefront τότε επιστρέφει στην ενσωματωμένη "
+"προεπιλογή του."
 
 #: .\shipping\serializers\option.py:143
 msgid ""
@@ -21586,42 +21576,28 @@ msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr "Ο/Η %(user)s έλαβε προσαρμογή %(points)d πόντων επιβράβευσης."
 
 #: .\user\admin.py:657
-#, fuzzy
-#| msgid "Platform storefront"
 msgid "Platform superusers"
-msgstr "Storefront πλατφόρμας"
+msgstr "Υπερχρήστες πλατφόρμας"
 
 #: .\user\admin.py:658
-#, fuzzy
-#| msgid "Stores"
 msgid "Store staff"
-msgstr "Καταστήματα"
+msgstr "Προσωπικό καταστήματος"
 
 #: .\user\admin.py:659
-#, fuzzy
-#| msgid "Format"
 msgid "Dormant"
-msgstr "Μορφή"
+msgstr "Αδρανές"
 
 #: .\user\admin.py:702
-#, fuzzy
-#| msgid "Store Profile"
 msgid "Store role"
-msgstr "Προφίλ καταστήματος"
+msgstr "Ρόλος καταστήματος"
 
 #: .\user\admin.py:703
-#, fuzzy
-#| msgid "Store Profile"
 msgid "Store roles"
-msgstr "Προφίλ καταστήματος"
+msgstr "Ρόλοι καταστήματος"
 
 #: .\user\admin.py:736
-#, fuzzy
-#| msgid "Search by email, username, name, phone, city, address, or bio."
 msgid "Search by email, username or name."
-msgstr ""
-"Αναζήτηση με email, όνομα χρήστη, όνομα, τηλέφωνο, πόλη, διεύθυνση ή "
-"βιογραφικό."
+msgstr "Αναζήτηση με email, όνομα χρήστη ή όνομα."
 
 #: .\user\admin.py:800
 msgid "inactive"

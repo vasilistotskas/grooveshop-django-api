@@ -37,6 +37,13 @@ def admin_request():
     return request
 
 
+def _annotated(cart_admin, cart):
+    """The row as the changelist hands it to the column."""
+    request = RequestFactory().get("/admin/cart/cart/")
+    request.user = Mock(is_superuser=True, is_staff=True)
+    return cart_admin.get_queryset(request).get(pk=cart.pk)
+
+
 @pytest.fixture
 def cart_admin():
     return CartAdmin(Cart, AdminSite())
@@ -187,7 +194,7 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "active"
         assert label == "Active"
@@ -198,7 +205,7 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "recent"
         assert label == "Recent"
@@ -212,7 +219,7 @@ class TestCartAdmin:
         )
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "abandoned"
         assert label == "Abandoned"
@@ -227,7 +234,7 @@ class TestCartAdmin:
         )
         cart.refresh_from_db()
 
-        value, _label = cart_admin.activity_state(cart)
+        value, _label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "recent"
         assert self._filtered_abandoned(cart_admin) == []
@@ -245,7 +252,7 @@ class TestCartAdmin:
         )
         cart.refresh_from_db()
 
-        value, _label = cart_admin.activity_state(cart)
+        value, _label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "abandoned"
         assert self._filtered_abandoned(cart_admin) == [cart.pk]
@@ -270,7 +277,7 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=old_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "abandoned"
         assert label == "Abandoned"

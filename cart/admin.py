@@ -2,7 +2,16 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import transaction
-from django.db.models import CharField, F, OuterRef, Subquery, Sum
+from django.db.models import (
+    BooleanField,
+    CharField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+)
 from django.db.models.fields.json import KT
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
@@ -278,7 +287,15 @@ class CartAdmin(BaseModelAdmin):
             # ``list_select_related`` only to a queryset with no
             # ``select_related`` of its own.
             .select_related("user", "attribution")
-            .annotate(awaiting_order_id=awaiting_payment_order_id())
+            .annotate(
+                awaiting_order_id=awaiting_payment_order_id(),
+                # The cutoff is read once per changelist query, not once
+                # per row, so every row is judged against the same line.
+                is_abandoned=ExpressionWrapper(
+                    Q(last_activity__lt=abandoned_cutoff()),
+                    output_field=BooleanField(),
+                ),
+            )
             .prefetch_related("items__product__vat")
         )
 
@@ -323,8 +340,9 @@ class CartAdmin(BaseModelAdmin):
 
     @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
     def activity_state(self, obj):
-        # The same line the filter and the cleanup task use.
-        if obj.last_activity < abandoned_cutoff():
+        # Annotated by ``get_queryset`` with the line the filter and the
+        # cleanup task use.
+        if obj.is_abandoned:
             return "abandoned", _("Abandoned")
         if timezone.now() - obj.last_activity < timedelta(hours=1):
             return "active", _("Active")

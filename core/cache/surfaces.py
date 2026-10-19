@@ -11,6 +11,9 @@ NUXT_ROUTE_PREFIX = "cache:nitro:routes:"
 #: Every page the storefront has cached for a store, and its settings read.
 STORE_PAGES_SURFACE = "store_pages"
 
+#: The sitemap, RSS, llms.txt and OG image caches.
+SITEMAP_SEO_SURFACE = "sitemap_seo"
+
 
 def _nuxt(*names: str) -> tuple[str, ...]:
     """Build Nuxt Nitro handler patterns from EXACT handler names.
@@ -630,7 +633,7 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
-            code="sitemap_seo",
+            code=SITEMAP_SEO_SURFACE,
             label=_("Sitemap & SEO"),
             description=_(
                 "XML sitemap, RSS, llms.txt and the OG image cache."

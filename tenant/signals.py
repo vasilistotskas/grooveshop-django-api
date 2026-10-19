@@ -31,6 +31,16 @@ on_switch_change(
     plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
 )
 
+# The language switcher, hreflang set and sitemap of every page follow
+# ``available_locales``. The storefront reads it from its copy of the
+# resolve payload, so the purge waits until that copy has expired.
+on_switch_change(
+    setting_gates=(),
+    plan_flags=("available_locales",),
+    task="core.tasks.purge_store_locales_task",
+    plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
+)
+
 
 @receiver(check_request_enabled, dispatch_uid="tenant.allow_tenant_origin")
 def allow_tenant_origin(sender, request, **kwargs) -> bool:

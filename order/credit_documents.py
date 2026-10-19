@@ -14,9 +14,10 @@ document:
   receipt also covered a gift card) gets ONE settlement document for what
   the receipt still holds and no credit has covered.
 
-A refund recorded before the receipt existed has no document: there was
-nothing to credit, and a cancellation before shipment never produced a
-receipt.
+A refund recorded before the receipt existed has no document: the receipt
+is issued net of it (``order.invoicing.refunded_before_receipt``), so there
+is nothing to credit; a chargeback never has one (the sale was not reversed
+by the merchant).
 
 :func:`create_pending_credits` is the single reconciliation: it looks at
 the ledger and the documents under the order lock and creates whatever is

@@ -198,16 +198,20 @@ class PaymentLedger:
         )
 
     @staticmethod
-    def refunded(order: Order) -> Decimal:
+    def refunded(order: Order, *, before: datetime | None = None) -> Decimal:
         """What was paid back out of *order*'s payments, by a provider or
-        by the merchant, less refunds a provider reported failed."""
-        return PaymentTransaction.objects.filter(
+        by the merchant, less refunds a provider reported failed. With
+        *before*, only the rows recorded before that moment."""
+        rows = PaymentTransaction.objects.filter(
             order=order,
             kind__in=(
                 PaymentTransactionKind.REFUND,
                 PaymentTransactionKind.REFUND_REVERSAL,
             ),
-        ).aggregate(total=_taken_out())["total"]
+        )
+        if before is not None:
+            rows = rows.filter(created_at__lt=before)
+        return rows.aggregate(total=_taken_out())["total"]
 
     @staticmethod
     def charged_back(order: Order) -> Decimal:
@@ -331,22 +335,27 @@ class PaymentLedger:
         return sum((b.refundable for b in cls.balances(order)), _ZERO)
 
     @staticmethod
-    def stored_value(order: Order) -> StoredValue:
+    def stored_value(
+        order: Order, *, before: datetime | None = None
+    ) -> StoredValue:
         """What *order* paid with gift cards and points, and what has gone
-        back (:class:`StoredValue`)."""
+        back (:class:`StoredValue`). With *before*, what had gone back by
+        that moment."""
         from giftcard.enum import GiftCardTransactionKind
         from giftcard.models import GiftCardTransaction
         from loyalty.enum import TransactionType
         from loyalty.models.transaction import PointsTransaction
 
+        cut = {} if before is None else {"created_at__lt": before}
+
         def gift_card(kind) -> Decimal:
             return GiftCardTransaction.objects.filter(
-                order=order, kind=kind
+                order=order, kind=kind, **cut
             ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
 
         def points(**filters) -> int:
             return PointsTransaction.objects.filter(
-                reference_order=order, **filters
+                reference_order=order, **filters, **cut
             ).aggregate(total=Coalesce(Sum("points"), 0))["total"]
 
         # An order that paid with neither has nothing to read: the common

@@ -12322,8 +12322,8 @@ paths:
   /api/v1/loyalty/tiers:
     get:
       operationId: listLoyaltyTiers
-      description: Λίστα όλων των tier πιστότητας
-      summary: Λίστα όλων των tier πιστότητας
+      description: Λίστα όλων των βαθμίδων πιστότητας
+      summary: Λίστα όλων των βαθμίδων πιστότητας
       parameters:
       - in: query
         name: languageCode
@@ -15877,8 +15877,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       requestBody:
@@ -15959,8 +15960,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       requestBody:
@@ -16035,8 +16037,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       requestBody:
@@ -16109,8 +16112,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       requestBody:
@@ -16195,8 +16199,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       security:
@@ -16261,8 +16266,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       security:
@@ -16325,8 +16331,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       security:
@@ -16447,8 +16454,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       requestBody:
@@ -16649,8 +16657,9 @@ paths:
         schema:
           type: string
           format: uuid
-        description: The order's UUID. Required when the order belongs to a guest
-          (no account); ignored for signed-in owners and store staff.
+        description: Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει
+          σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες
+          και προσωπικό του καταστήματος.
       tags:
       - Orders
       security:
@@ -22598,12 +22607,12 @@ paths:
         description: |-
           * `MAIN` - Κύρια εικόνα
           * `BANNER` - Banner
-          * `ICON` - Εικονίδιο
-          * `THUMBNAIL` - Μικρογραφία
+          * `ICON` - Εικόνα εικονιδίου
+          * `THUMBNAIL` - Εικόνα μικρογραφίας
           * `GALLERY` - Εικόνα συλλογής
           * `BACKGROUND` - Εικόνα φόντου
-          * `HERO` - Κεντρική εικόνα
-          * `FEATURE` - Κεντρική Εικόνα
+          * `HERO` - Εικόνα εξωφύλλου
+          * `FEATURE` - Χαρακτηριστική εικόνα
           * `PROMOTIONAL` - Προωθητική εικόνα
           * `SEASONAL` - Εποχιακή εικόνα
       - in: query
@@ -23136,12 +23145,12 @@ paths:
         description: |-
           * `MAIN` - Κύρια εικόνα
           * `BANNER` - Banner
-          * `ICON` - Εικονίδιο
-          * `THUMBNAIL` - Μικρογραφία
+          * `ICON` - Εικόνα εικονιδίου
+          * `THUMBNAIL` - Εικόνα μικρογραφίας
           * `GALLERY` - Εικόνα συλλογής
           * `BACKGROUND` - Εικόνα φόντου
-          * `HERO` - Κεντρική εικόνα
-          * `FEATURE` - Κεντρική Εικόνα
+          * `HERO` - Εικόνα εξωφύλλου
+          * `FEATURE` - Χαρακτηριστική εικόνα
           * `PROMOTIONAL` - Προωθητική εικόνα
           * `SEASONAL` - Εποχιακή εικόνα
       - in: query
@@ -23255,12 +23264,12 @@ paths:
         description: |-
           * `MAIN` - Κύρια εικόνα
           * `BANNER` - Banner
-          * `ICON` - Εικονίδιο
-          * `THUMBNAIL` - Μικρογραφία
+          * `ICON` - Εικόνα εικονιδίου
+          * `THUMBNAIL` - Εικόνα μικρογραφίας
           * `GALLERY` - Εικόνα συλλογής
           * `BACKGROUND` - Εικόνα φόντου
-          * `HERO` - Κεντρική εικόνα
-          * `FEATURE` - Κεντρική Εικόνα
+          * `HERO` - Εικόνα εξωφύλλου
+          * `FEATURE` - Χαρακτηριστική εικόνα
           * `PROMOTIONAL` - Προωθητική εικόνα
           * `SEASONAL` - Εποχιακή εικόνα
       - in: query
@@ -31157,7 +31166,7 @@ paths:
 
           * `ACTIVE` - Ενεργή
           * `PENDING` - Εκκρεμεί Επιβεβαίωση
-          * `UNSUBSCRIBED` - Διαγραφή
+          * `UNSUBSCRIBED` - Απεγγραφή
           * `BOUNCED` - Επιστράφηκε
       - in: query
         name: subscribedAfter
@@ -34553,7 +34562,7 @@ components:
             type: integer
         featured:
           type: boolean
-          title: Προβεβλημένο
+          title: Προτεινόμενο
         viewCount:
           type: integer
           readOnly: true
@@ -34700,7 +34709,7 @@ components:
           readOnly: true
         featured:
           type: boolean
-          title: Προβεβλημένο
+          title: Προτεινόμενο
         viewCount:
           type: integer
           readOnly: true
@@ -34931,7 +34940,7 @@ components:
           type: integer
         featured:
           type: boolean
-          title: Προβεβλημένο
+          title: Προτεινόμενο
         isPublished:
           type: boolean
           title: Δημοσιευμένο
@@ -37212,7 +37221,7 @@ components:
         * `hero_carousel` - Κεντρικό καρουζέλ
         * `products_slider` - Slider προϊόντων
         * `products_grid` - Πλέγμα προϊόντων
-        * `featured_products` - Προβεβλημένα Προϊόντα
+        * `featured_products` - Προτεινόμενα Προϊόντα
         * `product_categories` - Κατηγορίες προϊόντος
         * `blog_categories` - Λωρίδα κατηγοριών Blog
         * `blog_posts_carousel` - Καρουζέλ άρθρων Blog
@@ -38859,12 +38868,12 @@ components:
       description: |-
         * `MAIN` - Κύρια εικόνα
         * `BANNER` - Banner
-        * `ICON` - Εικονίδιο
-        * `THUMBNAIL` - Μικρογραφία
+        * `ICON` - Εικόνα εικονιδίου
+        * `THUMBNAIL` - Εικόνα μικρογραφίας
         * `GALLERY` - Εικόνα συλλογής
         * `BACKGROUND` - Εικόνα φόντου
-        * `HERO` - Κεντρική εικόνα
-        * `FEATURE` - Κεντρική Εικόνα
+        * `HERO` - Εικόνα εξωφύλλου
+        * `FEATURE` - Χαρακτηριστική εικόνα
         * `PROMOTIONAL` - Προωθητική εικόνα
         * `SEASONAL` - Εποχιακή εικόνα
     InvoiceDownloadResponse:
@@ -38874,7 +38883,7 @@ components:
         invoiceNumber:
           type: string
           readOnly: true
-          title: Αριθμός τιμολογίου
+          title: Αριθμός απόδειξης
           description: Διαδοχικό αναγνωριστικό στη μορφή ``INV-{YEAR}-{NNNNNN}``.
             Δεν επιτρέπονται κενά βάσει της ελληνικής φορολογικής νομοθεσίας.
         issueDate:
@@ -39253,7 +39262,7 @@ components:
             * `payment_failed` - Η πληρωμή απέτυχε
             * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
             * `restock_favourite` - Διαθέσιμο ξανά (αγαπημένο προϊόν)
-            * `loyalty_tier_up` - Αναβάθμιση επιπέδου επιβράβευσης
+            * `loyalty_tier_up` - Αναβάθμιση βαθμίδας πιστότητας
             * `comment_liked` - Επισήμανση σχολίου blog
             * `BOXNOW_PARCEL_AT_LOCKER` - Το δέμα BoxNow έφτασε στο locker
             * `BOXNOW_PARCEL_DELIVERED` - Το δέμα BoxNow παραδόθηκε
@@ -39310,7 +39319,7 @@ components:
         * `SHIPPING` - Μεταφορικά
         * `CART` - Καλάθι
         * `PRODUCT` - Προϊόν
-        * `ACCOUNT` - Λογαριασμός Ανενεργός
+        * `ACCOUNT` - Λογαριασμός
         * `SECURITY` - Ασφάλεια
         * `PROMOTION` - Προσφορά
         * `SYSTEM` - Σύστημα
@@ -39389,7 +39398,7 @@ components:
         * `payment_failed` - Η πληρωμή απέτυχε
         * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
         * `restock_favourite` - Διαθέσιμο ξανά (αγαπημένο προϊόν)
-        * `loyalty_tier_up` - Αναβάθμιση επιπέδου επιβράβευσης
+        * `loyalty_tier_up` - Αναβάθμιση βαθμίδας πιστότητας
         * `comment_liked` - Επισήμανση σχολίου blog
         * `BOXNOW_PARCEL_AT_LOCKER` - Το δέμα BoxNow έφτασε στο locker
         * `BOXNOW_PARCEL_DELIVERED` - Το δέμα BoxNow παραδόθηκε
@@ -43130,7 +43139,7 @@ components:
           type: integer
         featured:
           type: boolean
-          title: Προβεβλημένο
+          title: Προτεινόμενο
         isPublished:
           type: boolean
           title: Δημοσιευμένο
@@ -48196,12 +48205,13 @@ components:
         logoPath:
           type: string
           nullable: true
-          description: Relative media path (``media/{schema}/uploads/shipping/…``)
-            of the operator-uploaded brand logo, resolved per (provider, kind) so
-            the home-delivery row and the pickup-point row of the same carrier can
-            show different images; the storefront renders it through media-stream
-            at the size it shows. Null when no logo is uploaded — the storefront then
-            falls back to its bundled default.
+          description: Σχετική διαδρομή πολυμέσων (``media/{schema}/uploads/shipping/…``)
+            του λογότυπου μάρκας που ανέβασε ο χειριστής, υπολογισμένη ανά (πάροχο,
+            τύπο) ώστε η γραμμή κατ' οίκον παράδοσης και η γραμμή σημείου παραλαβής
+            του ίδιου μεταφορέα να μπορούν να εμφανίζουν διαφορετικές εικόνες· το
+            storefront την εμφανίζει μέσω του media-stream στο μέγεθος που χρειάζεται.
+            Null όταν δεν έχει μεταφορτωθεί λογότυπο — το storefront τότε επιστρέφει
+            στην ενσωματωμένη προεπιλογή του.
         metadata:
           type: object
           additionalProperties: {}
@@ -48486,7 +48496,7 @@ components:
       description: |-
         * `ACTIVE` - Ενεργή
         * `PENDING` - Εκκρεμεί Επιβεβαίωση
-        * `UNSUBSCRIBED` - Διαγραφή
+        * `UNSUBSCRIBED` - Απεγγραφή
         * `BOUNCED` - Επιστράφηκε
     SubscriptionTopic:
       type: object
@@ -49373,7 +49383,7 @@ components:
       - BONUS
       type: string
       description: |-
-        * `EARN` - Κερδίστε
+        * `EARN` - Κέρδος
         * `REDEEM` - Εξαργύρωση
         * `EXPIRE` - Λήξη
         * `ADJUST` - Προσαρμογή

@@ -748,7 +748,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     )
     @transaction.atomic
     def approve_comments(self, request, queryset):
-        updated = queryset.update(approved=True)
+        updated = update_each(queryset, approved=True)
         self.message_user(
             request,
             _("%(count)d comments were successfully approved.")
@@ -762,7 +762,7 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
     )
     @transaction.atomic
     def unapprove_comments(self, request, queryset):
-        updated = queryset.update(approved=False)
+        updated = update_each(queryset, approved=False)
         self.message_user(
             request,
             _("%(count)d comments were successfully unapproved.")

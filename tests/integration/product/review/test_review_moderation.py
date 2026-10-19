@@ -316,7 +316,8 @@ class TestThePublishDateFollowsTheStatus:
             pk__in=[fresh.pk, old.pk]
         ).moderate(ReviewStatus.TRUE)
 
-        assert updated == 2
+        # Only the row that changed is counted (and saved).
+        assert updated == 1
         assert _stored(fresh).published_at is not None
         assert _stored(fresh).is_published is True
         assert _stored(old).published_at == fixed

@@ -85,3 +85,54 @@ def test_the_catalogue_is_in_canonical_form(catalogue):
     Fix it with ``uv run python manage.py makemessages -l el -l en -l de``,
     which writes this form (``core/utils/po_catalogue.py``)."""
     assert catalogue.read_text(encoding="utf-8") == canonical_text(catalogue)
+
+
+SOURCE_EXTENSIONS = {".py", ".html", ".txt"}
+
+
+def _copy_translatable_source(destination: Path) -> None:
+    """What ``makemessages`` would scan from the project root, minus every
+    ``locale`` directory, so the catalogue under test is the copy's own.
+
+    It cannot run in place: it finds the real ``locale`` directory while
+    walking the tree and writes there, whatever ``LOCALE_PATHS`` says."""
+    root = Path(settings.BASE_DIR)
+    for directory, subdirectories, filenames in root.walk():
+        subdirectories[:] = [
+            name
+            for name in subdirectories
+            if not name.startswith(".") and name != "locale"
+        ]
+        target = destination / directory.relative_to(root)
+        for name in filenames:
+            if Path(name).suffix in SOURCE_EXTENSIONS:
+                target.mkdir(parents=True, exist_ok=True)
+                shutil.copy(directory / name, target / name)
+
+
+def test_the_project_catalogue_covers_the_source(tmp_path, monkeypatch):
+    """A message added to the code must reach the Greek catalogue.
+
+    ``test_every_greek_message_is_translated`` only sees entries already
+    in the file, so a new ``_()`` that was never extracted passed it and
+    reached the Greek admin in English. Extract the source into a copy
+    of the catalogue, as ``makemessages -l el`` would; ``msgmerge`` then
+    leaves every new message empty and every changed one fuzzy.
+
+    One way only, as for Unfold: an older xgettext may miss strings, so
+    this can under-report but never reports a string that is not there."""
+    _copy_translatable_source(tmp_path)
+    copy = tmp_path / "locale" / MESSAGES
+    copy.parent.mkdir(parents=True)
+    shutil.copy(CATALOGUES["project"], copy)
+
+    monkeypatch.chdir(tmp_path)
+    with override_settings(LOCALE_PATHS=[str(tmp_path / "locale")]):
+        call_command("makemessages", locale=["el"], verbosity=0)
+
+    missing = [
+        entry.msgid[:80]
+        for entry in _live_entries(copy)
+        if entry.msgid and (not entry.translated() or "fuzzy" in entry.flags)
+    ]
+    assert missing == []

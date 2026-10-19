@@ -3,6 +3,38 @@
 
 
 
+## v3.141.1 (2026-10-19)
+
+### Bug fixes
+
+* fix(orders): let an owner confirm a bank transfer was received (#270)
+
+* wip ([`476c02d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/476c02d130f9a2e0465476ed6aff6d53f854de90))
+
+* fix(orders): let an owner confirm a bank transfer was received
+
+payment_status and payment_id became read-only in the order admin (#251),
+which closed the way a store owner confirmed a bank transfer: edit the
+payment status in the form. Nothing replaced it, so a bank-transfer order
+could not be marked paid at all.
+
+A "Confirm payment received" action now records money settled off the
+platform. It is offered only for a bank-transfer order still waiting for
+its payment, for exactly what the order costs and with the bank's
+reference (the ledger key, so one transfer cannot pay two orders). Under
+the order lock it writes an OFFLINE ledger row, marks the order paid,
+adds a history entry with who confirmed it, when and how much, adds an
+admin log entry and moves a pending order to processing. Online
+providers, courier cash and carrier-terminal orders are refused, so the
+protection #251 added still holds. The row has no provider to refund it
+through, like courier cash: a refund of it is paid back by hand.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`476c02d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/476c02d130f9a2e0465476ed6aff6d53f854de90))
+
 ## v3.141.0 (2026-10-19)
 
 ### Documentation

@@ -80,7 +80,8 @@ def test_offline_dispatches_nothing():
 
 
 def test_the_admin_action_reindexes_what_it_deactivated():
-    """Through the action, not just the helper."""
+    """Through the action: it saves each row, so the post_save receiver
+    queues the reindex (no explicit helper call is needed)."""
     from django.contrib.admin.sites import AdminSite
     from django.test import RequestFactory
 
@@ -99,7 +100,7 @@ def test_the_admin_action_reindexes_what_it_deactivated():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        patch("meili.tasks.index_document_task.delay") as dispatch,
+        patch("product.signals.dispatch_on_commit") as dispatch,
         patch.object(ProductAdmin, "message_user"),
     ):
         admin_instance.make_inactive(

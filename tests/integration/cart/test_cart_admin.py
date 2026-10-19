@@ -37,6 +37,13 @@ def admin_request():
     return request
 
 
+def _annotated(cart_admin, cart):
+    """The row as the changelist hands it to the column."""
+    request = RequestFactory().get("/admin/cart/cart/")
+    request.user = Mock(is_superuser=True, is_staff=True)
+    return cart_admin.get_queryset(request).get(pk=cart.pk)
+
+
 @pytest.fixture
 def cart_admin():
     return CartAdmin(Cart, AdminSite())
@@ -187,7 +194,7 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "active"
         assert label == "Active"
@@ -198,21 +205,71 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "recent"
         assert label == "Recent"
 
-    def test_activity_state_idle(self, cart_admin):
-        idle_time = timezone.now() - timedelta(days=3)
+    def test_activity_state_abandoned_past_the_store_setting(self, cart_admin):
+        """The column and the "Abandoned Carts" filter share one line:
+        ``CART_ABANDONED_HOURS``."""
         cart = CartFactory()
-        Cart.objects.filter(id=cart.id).update(last_activity=idle_time)
+        Cart.objects.filter(id=cart.id).update(
+            last_activity=timezone.now() - timedelta(hours=30)
+        )
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
-        assert value == "idle"
-        assert label == "Idle"
+        assert value == "abandoned"
+        assert label == "Abandoned"
+        assert self._filtered_abandoned(cart_admin) == [cart.pk]
+
+    def test_a_cart_inside_the_window_is_not_abandoned_in_either(
+        self, cart_admin
+    ):
+        cart = CartFactory()
+        Cart.objects.filter(id=cart.id).update(
+            last_activity=timezone.now() - timedelta(hours=20)
+        )
+        cart.refresh_from_db()
+
+        value, _label = cart_admin.activity_state(_annotated(cart_admin, cart))
+
+        assert value == "recent"
+        assert self._filtered_abandoned(cart_admin) == []
+
+    def test_the_setting_moves_both_together(self, cart_admin):
+        from extra_settings.models import Setting
+
+        Setting.objects.update_or_create(
+            name="CART_ABANDONED_HOURS",
+            defaults={"value_type": "int", "value_int": 6},
+        )
+        cart = CartFactory()
+        Cart.objects.filter(id=cart.id).update(
+            last_activity=timezone.now() - timedelta(hours=8)
+        )
+        cart.refresh_from_db()
+
+        value, _label = cart_admin.activity_state(_annotated(cart_admin, cart))
+
+        assert value == "abandoned"
+        assert self._filtered_abandoned(cart_admin) == [cart.pk]
+
+    @staticmethod
+    def _filtered_abandoned(cart_admin):
+        from cart.admin import CartTypeFilter
+
+        request = RequestFactory().get("/admin/cart/cart/")
+        flt = CartTypeFilter(
+            request, {"cart_type": ["abandoned"]}, Cart, cart_admin
+        )
+        return list(
+            flt.queryset(request, Cart.objects.all()).values_list(
+                "pk", flat=True
+            )
+        )
 
     def test_activity_state_abandoned(self, cart_admin):
         old_time = timezone.now() - timedelta(days=10)
@@ -220,7 +277,7 @@ class TestCartAdmin:
         Cart.objects.filter(id=cart.id).update(last_activity=old_time)
         cart.refresh_from_db()
 
-        value, label = cart_admin.activity_state(cart)
+        value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
         assert value == "abandoned"
         assert label == "Abandoned"

@@ -2,7 +2,16 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import transaction
-from django.db.models import CharField, F, OuterRef, Subquery, Sum
+from django.db.models import (
+    BooleanField,
+    CharField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+)
 from django.db.models.fields.json import KT
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
@@ -28,6 +37,7 @@ from admin.displays import (
     source_badge,
 )
 from admin.filters import AcquisitionSourceFilter, AnnotatedRangeFilter
+from cart.managers.cart import abandoned_cutoff
 from cart.models import Cart, CartAttribution, CartItem
 from order.managers.order import awaiting_online_payment_q
 from order.models.order import Order
@@ -40,7 +50,6 @@ CART_TYPE_VARIANT: dict[str, str] = {
 ACTIVITY_STATE_VARIANT: dict[str, str] = {
     "active": "success",
     "recent": "info",
-    "idle": "warning",
     "abandoned": "danger",
 }
 
@@ -62,8 +71,7 @@ class CartTypeFilter(DropdownFilter):
         elif self.value() == "guest":
             return queryset.filter(user__isnull=True)
         elif self.value() == "abandoned":
-            cutoff = timezone.now() - timedelta(hours=24)
-            return queryset.filter(last_activity__lt=cutoff)
+            return queryset.filter(last_activity__lt=abandoned_cutoff())
         return queryset
 
 
@@ -279,7 +287,15 @@ class CartAdmin(BaseModelAdmin):
             # ``list_select_related`` only to a queryset with no
             # ``select_related`` of its own.
             .select_related("user", "attribution")
-            .annotate(awaiting_order_id=awaiting_payment_order_id())
+            .annotate(
+                awaiting_order_id=awaiting_payment_order_id(),
+                # The cutoff is read once per changelist query, not once
+                # per row, so every row is judged against the same line.
+                is_abandoned=ExpressionWrapper(
+                    Q(last_activity__lt=abandoned_cutoff()),
+                    output_field=BooleanField(),
+                ),
+            )
             .prefetch_related("items__product__vat")
         )
 
@@ -324,14 +340,13 @@ class CartAdmin(BaseModelAdmin):
 
     @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
     def activity_state(self, obj):
-        delta = timezone.now() - obj.last_activity
-        if delta < timedelta(hours=1):
+        # Annotated by ``get_queryset`` with the line the filter and the
+        # cleanup task use.
+        if obj.is_abandoned:
+            return "abandoned", _("Abandoned")
+        if timezone.now() - obj.last_activity < timedelta(hours=1):
             return "active", _("Active")
-        if delta < timedelta(hours=24):
-            return "recent", _("Recent")
-        if delta < timedelta(days=7):
-            return "idle", _("Idle")
-        return "abandoned", _("Abandoned")
+        return "recent", _("Recent")
 
     @admin.display(description=_("Items"))
     def items_summary(self, obj):

@@ -31,6 +31,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.bulk import update_each
 from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
     REVIEW_STATUS_VARIANT,
@@ -62,7 +63,6 @@ from product.models.product_attribute import ProductAttribute
 from product.models.relation import ProductRelation
 from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
-from product.signals import reindex_products_by_pk
 from tag.admin import TaggedItemInline
 from user.models.account import UserAccount
 
@@ -435,7 +435,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
     )
     def activate_attributes(self, request, queryset):
         """Bulk action to activate selected attributes."""
-        updated = queryset.update(active=True)
+        updated = update_each(queryset, active=True)
         self.message_user(
             request,
             ngettext(
@@ -454,7 +454,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
     )
     def deactivate_attributes(self, request, queryset):
         """Bulk action to deactivate selected attributes."""
-        updated = queryset.update(active=False)
+        updated = update_each(queryset, active=False)
         self.message_user(
             request,
             ngettext(
@@ -579,7 +579,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
     )
     def activate_values(self, request, queryset):
         """Bulk action to activate selected attribute values."""
-        updated = queryset.update(active=True)
+        updated = update_each(queryset, active=True)
         self.message_user(
             request,
             ngettext(
@@ -598,7 +598,7 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
     )
     def deactivate_values(self, request, queryset):
         """Bulk action to deactivate selected attribute values."""
-        updated = queryset.update(active=False)
+        updated = update_each(queryset, active=False)
         self.message_user(
             request,
             ngettext(
@@ -1261,14 +1261,10 @@ class ProductAdmin(
         icon="check_circle",
     )
     def make_active(self, request, queryset):
-        # Collect BEFORE the update: after it, a filtered queryset would
-        # no longer match the rows it just changed.
-        changed_ids = list(queryset.values_list("pk", flat=True))
-        updated = queryset.update(active=True)
-        # `update()` emits no post_save, so the Meilisearch documents
-        # would keep their old `active` value and the products stay
-        # searchable (or invisible) until the nightly sync.
-        reindex_products_by_pk(changed_ids)
+        # Through `save`, so the post_save receivers run: the Meilisearch
+        # documents keep their `active` value and the storefront cache
+        # surfaces are marked stale.
+        updated = update_each(queryset, active=True)
         self.message_user(
             request,
             ngettext(
@@ -1286,14 +1282,10 @@ class ProductAdmin(
         icon="cancel",
     )
     def make_inactive(self, request, queryset):
-        # Collect BEFORE the update: after it, a filtered queryset would
-        # no longer match the rows it just changed.
-        changed_ids = list(queryset.values_list("pk", flat=True))
-        updated = queryset.update(active=False)
-        # `update()` emits no post_save, so the Meilisearch documents
-        # would keep their old `active` value and the products stay
-        # searchable (or invisible) until the nightly sync.
-        reindex_products_by_pk(changed_ids)
+        # Through `save`, so the post_save receivers run: the Meilisearch
+        # documents keep their `active` value and the storefront cache
+        # surfaces are marked stale.
+        updated = update_each(queryset, active=False)
         self.message_user(
             request,
             ngettext(

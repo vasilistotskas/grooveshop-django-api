@@ -159,7 +159,7 @@ class GiftCardAdmin(BaseModelAdmin):
             deliver_at=obj.deliver_at,
             expires_at=obj.expires_at,
             created_by=request.user,
-            description="Issued via admin",
+            description=str(_("Issued via admin")),
         )
         obj.pk = card.pk
         obj.uuid = card.uuid

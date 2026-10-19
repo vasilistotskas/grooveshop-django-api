@@ -42,6 +42,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils.text import capfirst
 from django.utils.translation import gettext as _
+from django.utils.translation import pgettext
 from unfold.dataclasses import SearchResult
 from unfold.settings import get_config
 
@@ -156,7 +157,7 @@ def page_results(
         link = _link(entry)
         result = SearchResult(
             title=str(entry["title"]),
-            description=where or _("Home"),
+            description=where or pgettext("navigation link", "Home"),
             link=link,
             icon=entry.get("icon"),
         )

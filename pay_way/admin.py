@@ -10,6 +10,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
+from admin.bulk import update_each
 from admin.displays import header_two_line
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay, PayWayShippingExclusion
@@ -216,7 +217,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
             return f"{obj.effective_cost} {obj.cost.currency}"
         return "0"
 
-    @admin.display(description=_("Order"))
+    @admin.display(description=_("Sort Order"))
     def sort_order_display(self, obj):
         if obj.sort_order is not None:
             return f"#{obj.sort_order}"
@@ -228,7 +229,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         icon="check_circle",
     )
     def activate_payment_methods(self, request, queryset):
-        updated = self._set_active(queryset, active=True)
+        updated = update_each(queryset, active=True)
         self.message_user(
             request,
             _("%(count)d payment methods were successfully activated.")
@@ -241,27 +242,9 @@ class PayWayAdmin(BaseTranslatableAdmin):
         icon="cancel",
     )
     def deactivate_payment_methods(self, request, queryset):
-        updated = self._set_active(queryset, active=False)
+        updated = update_each(queryset, active=False)
         self.message_user(
             request,
             _("%(count)d payment methods were successfully deactivated.")
             % {"count": updated},
         )
-
-    @staticmethod
-    def _set_active(queryset, *, active: bool) -> int:
-        """Switch each pay way through ``save`` so its signals fire.
-
-        ``queryset.update`` sends no ``post_save``, so a bulk toggle
-        skipped the tenant resolve-cache generation bump
-        (``tenant.signals``) and the gateway kept advertising the old
-        payment instruments for up to the cache TTL. A store has a
-        handful of pay ways, so one save each costs nothing. Rows already
-        in the target state are left alone and not counted.
-        """
-        changed = 0
-        for pay_way in queryset.filter(active=not active):
-            pay_way.active = active
-            pay_way.save(update_fields=["active"])
-            changed += 1
-        return changed

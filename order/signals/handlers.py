@@ -6,6 +6,7 @@ from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.utils.translation import gettext
 from django_tenants.utils import schema_context
 from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
@@ -1504,10 +1505,15 @@ def handle_stripe_dispute_created(sender, **kwargs):
 
         OrderHistory.log_note(
             order=order,
-            note=(
-                f"Stripe dispute created: dispute_id={dispute_id}, "
-                f"charge_id={charge_id}, reason={reason}"
-            ),
+            note=gettext(
+                "Stripe dispute created: dispute_id=%(dispute_id)s, "
+                "charge_id=%(charge_id)s, reason=%(reason)s"
+            )
+            % {
+                "dispute_id": dispute_id,
+                "charge_id": charge_id,
+                "reason": reason,
+            },
         )
 
         logger.warning(
@@ -1659,10 +1665,11 @@ def handle_stripe_dispute_closed(sender, **kwargs):
         elif not lost:
             OrderHistory.log_note(
                 order=order,
-                note=(
-                    f"Stripe dispute closed: dispute_id={dispute_id}, "
-                    f"status={dispute_status}"
-                ),
+                note=gettext(
+                    "Stripe dispute closed: dispute_id=%(dispute_id)s, "
+                    "status=%(status)s"
+                )
+                % {"dispute_id": dispute_id, "status": dispute_status},
             )
 
         logger.warning(

@@ -17,6 +17,7 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.bulk import update_each
 from admin.displays import format_dt
 from tag.models.tag import Tag
 from tag.models.tagged_item import TaggedItem
@@ -178,7 +179,7 @@ class TagAdmin(BaseTranslatableAdmin):
         icon="check_circle",
     )
     def activate_tags(self, request, queryset):
-        updated = queryset.update(active=True)
+        updated = update_each(queryset, active=True)
         self.message_user(
             request,
             ngettext(
@@ -196,7 +197,7 @@ class TagAdmin(BaseTranslatableAdmin):
         icon="cancel",
     )
     def deactivate_tags(self, request, queryset):
-        updated = queryset.update(active=False)
+        updated = update_each(queryset, active=False)
         self.message_user(
             request,
             ngettext(

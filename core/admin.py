@@ -3,6 +3,7 @@ import logging
 from django.contrib import admin
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from django_celery_beat.admin import (
     ClockedScheduleAdmin as BaseClockedScheduleAdmin,
 )
@@ -162,11 +163,14 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
 # Ordered prefix → category map for the ~80 flat extra_settings rows.
 # First match wins, so put the more specific prefixes before generic
 # ones (MYDATA_GIFT_CARD_* is a myDATA knob, not a gift-card one).
+# Names go through ``gettext_noop`` so makemessages extracts them: they
+# stay plain English keys (the filter value) and are translated where
+# displayed (``_(category)``).
 # The "Other" bucket catches anything unmapped — extend this map when
 # a new settings family lands.
 SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     (
-        "Storefront UI",
+        gettext_noop("Storefront UI"),
         (
             "MOBILE_BOTTOM_NAV_",
             "STICKY_ADD_TO_CART_",
@@ -181,11 +185,11 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "PRODUCT_ALERTS_",
         ),
     ),
-    ("Invoicing & myDATA", ("INVOICE_", "MYDATA_", "B2B_")),
-    ("Promotions & Gift Cards", ("PROMOTIONS_", "GIFT_CARD")),
-    ("Loyalty", ("LOYALTY_",)),
+    (gettext_noop("Invoicing & myDATA"), ("INVOICE_", "MYDATA_", "B2B_")),
+    (gettext_noop("Promotions & Gift Cards"), ("PROMOTIONS_", "GIFT_CARD")),
+    (gettext_noop("Loyalty"), ("LOYALTY_",)),
     (
-        "Shipping",
+        gettext_noop("Shipping"),
         (
             "ACS_",
             "BOXNOW_",
@@ -195,32 +199,30 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
-        "Orders & Checkout",
+        gettext_noop("Orders & Checkout"),
         (
             "ORDER_",
             "PENDING_ORDER_",
             "STOCK_",
             "CART_",
             "CHECKOUT_",
-            "LOW_STOCK_",
             "ABANDONED_CART_",
             "OLD_GUEST_CART_",
         ),
     ),
     (
-        "Emails & Engagement",
+        gettext_noop("Emails & Engagement"),
         (
             "REENGAGEMENT_",
             "INACTIVE_USER_",
-            "NOTIFICATION_",
             "SUBSCRIPTION_",
             "CONTACT_",
         ),
     ),
-    ("Operational Alerts", ("OPS_ALERT_",)),
-    ("Agent Commerce", ("AGENT_", "PRODUCT_FEEDS_")),
-    ("Analytics", ("META_CAPI_",)),
-    ("Search", ("SEARCH_",)),
+    (gettext_noop("Operational Alerts"), ("OPS_ALERT_",)),
+    (gettext_noop("Agent Commerce"), ("AGENT_", "PRODUCT_FEEDS_")),
+    (gettext_noop("Analytics"), ("META_CAPI_",)),
+    (gettext_noop("Search"), ("SEARCH_",)),
 ]
 
 

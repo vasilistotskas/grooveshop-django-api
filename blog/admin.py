@@ -20,6 +20,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseTranslatableAdmin
+from admin.bulk import update_each
 from admin.displays import change_link, header_two_line
 from admin.export import ExportActionMixin
 from admin.filters import AnnotatedRangeFilter, LikesCountFilter
@@ -187,6 +188,12 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         # Always annotated by ``get_queryset``; a ``getattr`` default
         # would run its COUNT on every row even so.
         return obj.posts_count_ann
+
+    @admin.display(description=_("Total likes received"))
+    def total_likes_received(self, obj):
+        # The model property, labelled here: a property has no
+        # ``short_description``, so the column would show its raw name.
+        return obj.total_likes_received
 
     @admin.display(description=_("Website"))
     def website_link(self, obj):
@@ -550,7 +557,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     )
     @transaction.atomic
     def mark_as_featured(self, request, queryset):
-        updated = queryset.update(featured=True)
+        updated = update_each(queryset, featured=True)
         self.message_user(
             request,
             _("%(count)d posts were successfully marked as featured.")
@@ -564,7 +571,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     )
     @transaction.atomic
     def unmark_as_featured(self, request, queryset):
-        updated = queryset.update(featured=False)
+        updated = update_each(queryset, featured=False)
         self.message_user(
             request,
             _("%(count)d posts were successfully unmarked as featured.")
@@ -578,8 +585,8 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     )
     @transaction.atomic
     def publish_posts(self, request, queryset):
-        updated = queryset.update(
-            is_published=True, published_at=timezone.now()
+        updated = update_each(
+            queryset, is_published=True, published_at=timezone.now()
         )
         self.message_user(
             request,
@@ -594,7 +601,7 @@ class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     )
     @transaction.atomic
     def unpublish_posts(self, request, queryset):
-        updated = queryset.update(is_published=False)
+        updated = update_each(queryset, is_published=False)
         self.message_user(
             request,
             _("%(count)d posts were successfully unpublished.")

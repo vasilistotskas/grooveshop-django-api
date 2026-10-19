@@ -14,6 +14,7 @@ from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import Q
 from django.http import JsonResponse
+from django.utils.translation import gettext
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_tenants.utils import (
@@ -2151,10 +2152,11 @@ def _note_viva_dispute_opened(order, dispute_id: str, raw_status: str):
         return VivaWebhookEvent.OUTCOME_SKIPPED
     OrderHistory.log_note(
         order=order,
-        note=(
-            f"Viva Wallet dispute opened: sale transaction={dispute_id}, "
-            f"status={raw_status}"
-        ),
+        note=gettext(
+            "Viva Wallet dispute opened: sale transaction=%(dispute_id)s, "
+            "status=%(status)s"
+        )
+        % {"dispute_id": dispute_id, "status": raw_status},
     )
     dispatch_on_commit(
         send_dispute_notification_email,
@@ -2176,6 +2178,7 @@ def _note_viva_dispute_won(order, dispute_id: str):
     order.save(update_fields=["metadata"])
     OrderHistory.log_note(
         order=order,
-        note=f"Viva Wallet dispute won: sale transaction={dispute_id}",
+        note=gettext("Viva Wallet dispute won: sale transaction=%(dispute_id)s")
+        % {"dispute_id": dispute_id},
     )
     return None

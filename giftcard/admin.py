@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Prefetch, Sum
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
@@ -40,6 +41,13 @@ def _over_limit_message():
     )
 
 
+def _over_daily_limit_message():
+    return _(
+        "This takes you above the limit a staff member can put on gift "
+        "cards in a day. The store's owner can do it."
+    )
+
+
 def _refuse_over_limit(request, amount) -> None:
     logger.warning(
         "Gift-card value above the staff limit refused",
@@ -48,23 +56,40 @@ def _refuse_over_limit(request, amount) -> None:
 
 
 def _check_issue_limit(request, amount: Decimal) -> None:
+    """Refuse *amount* above the per-step or the daily limit. The daily
+    total is read under the staff member's lock, which the surrounding
+    transaction (the admin's changeform, or the adjustment) holds until the
+    row is written."""
     if GiftCardService.over_staff_limit(request.user, amount):
         _refuse_over_limit(request, amount)
         raise forms.ValidationError(_over_limit_message())
+    if GiftCardService.over_daily_limit(request.user, amount):
+        _refuse_over_limit(request, amount)
+        raise forms.ValidationError(_over_daily_limit_message())
 
 
-def _above_limit_note(amount: Decimal) -> str:
+def _above_limit_note(user, amount: Decimal) -> str:
     """A ledger note when the owner (or a superuser) put on more than the
-    staff limit: who did it is on the row (``created_by``) and in the admin
-    log."""
+    staff limit, per step or for the day: who did it is on the row
+    (``created_by``) and in the admin log. Read under the lock
+    :func:`_check_issue_limit` took, before the row is written."""
+    note = ""
     limit = GiftCardService.staff_issue_limit()
     if limit > 0 and amount > limit:
-        return f" [above the staff limit of {limit}, authorised by the owner]"
-    return ""
+        note += f" [above the staff limit of {limit}, authorised by the owner]"
+    daily = GiftCardService.staff_daily_limit()
+    if GiftCardService.exceeds_daily_limit(user, amount):
+        note += (
+            f" [above the staff daily limit of {daily}, authorised by "
+            "the owner]"
+        )
+    return note
 
 
-def _issue_description(amount) -> str:
-    return str(_("Issued via admin")) + _above_limit_note(Decimal(str(amount)))
+def _issue_description(user, amount) -> str:
+    return str(_("Issued via admin")) + _above_limit_note(
+        user, Decimal(str(amount))
+    )
 
 
 class AdjustBalanceForm(BaseDialogForm):
@@ -209,7 +234,9 @@ class GiftCardAdmin(BaseModelAdmin):
             deliver_at=obj.deliver_at,
             expires_at=obj.expires_at,
             created_by=request.user,
-            description=_issue_description(obj.initial_value.amount),
+            description=_issue_description(
+                request.user, obj.initial_value.amount
+            ),
         )
         obj.pk = card.pk
         obj.uuid = card.uuid
@@ -267,34 +294,53 @@ class GiftCardAdmin(BaseModelAdmin):
     ) -> HttpResponse:
         card = GiftCard.objects.get(pk=object_id)
         amount = form.cleaned_data["amount"]
-        if amount > 0 and GiftCardService.over_staff_limit(
-            request.user, amount
-        ):
-            _refuse_over_limit(request, amount)
-            self.message_user(request, _over_limit_message(), messages.ERROR)
-        elif amount < 0 and -amount > Decimal(str(card.balance.amount)):
-            self.message_user(
-                request,
-                _("Cannot remove more than the current balance."),
-                messages.ERROR,
-            )
-        else:
-            note = _above_limit_note(amount) if amount > 0 else ""
-            GiftCardTransaction.objects.create(
-                gift_card=card,
-                kind=GiftCardTransactionKind.ADJUST,
-                amount=amount,
-                created_by=request.user,
-                # The note is what records the authorisation, so it is
-                # the reason that gives way when the two do not fit.
-                description=form.cleaned_data["reason"][: 255 - len(note)]
-                + note,
-            )
-            if note:
-                self.log_change(
-                    request, card, f"Added {amount} above the staff limit"
+        # One transaction from the daily total read to the row written,
+        # under the staff member's lock, so two adjustments cannot both
+        # pass on the same total.
+        with transaction.atomic():
+            if amount > 0 and GiftCardService.over_staff_limit(
+                request.user, amount
+            ):
+                _refuse_over_limit(request, amount)
+                self.message_user(
+                    request, _over_limit_message(), messages.ERROR
                 )
-            self.message_user(request, _("Balance adjusted."), messages.SUCCESS)
+            elif amount > 0 and GiftCardService.over_daily_limit(
+                request.user, amount
+            ):
+                _refuse_over_limit(request, amount)
+                self.message_user(
+                    request, _over_daily_limit_message(), messages.ERROR
+                )
+            elif amount < 0 and -amount > Decimal(str(card.balance.amount)):
+                self.message_user(
+                    request,
+                    _("Cannot remove more than the current balance."),
+                    messages.ERROR,
+                )
+            else:
+                note = (
+                    _above_limit_note(request.user, amount)
+                    if amount > 0
+                    else ""
+                )
+                GiftCardTransaction.objects.create(
+                    gift_card=card,
+                    kind=GiftCardTransactionKind.ADJUST,
+                    amount=amount,
+                    created_by=request.user,
+                    # The note is what records the authorisation, so it is
+                    # the reason that gives way when the two do not fit.
+                    description=form.cleaned_data["reason"][: 255 - len(note)]
+                    + note,
+                )
+                if note:
+                    self.log_change(
+                        request, card, f"Added {amount} above the staff limit"
+                    )
+                self.message_user(
+                    request, _("Balance adjusted."), messages.SUCCESS
+                )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(

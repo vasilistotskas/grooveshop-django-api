@@ -11,13 +11,15 @@ from __future__ import annotations
 
 import logging
 import secrets
+import zlib
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db.models import DurationField, F
+from django.db import connection
+from django.db.models import DurationField, F, Sum
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -108,6 +110,70 @@ class GiftCardService:
         return Decimal(
             str(Setting.get("GIFT_CARD_STAFF_ISSUE_LIMIT", default=500))
         )
+
+    @staticmethod
+    def staff_daily_limit() -> Decimal:
+        """The most one staff member may put on gift cards in any rolling
+        24 hours (``GIFT_CARD_STAFF_DAILY_LIMIT``, per store); ``0`` is no
+        limit."""
+        return Decimal(
+            str(Setting.get("GIFT_CARD_STAFF_DAILY_LIMIT", default=1000))
+        )
+
+    @staticmethod
+    def lock_staff_issuing(user) -> None:
+        """Serialise one staff member's gift-card issuing until the
+        surrounding transaction ends.
+
+        The daily total is read and the row that adds to it is written in
+        one transaction, so two requests could each read the same total
+        and both pass. A transaction-scoped advisory lock (released at
+        COMMIT, never leaked to a pooled connection) makes the second wait
+        and read the first's row. The key carries the schema because
+        advisory locks are per database and every tenant shares one; the
+        user is a platform identity with no tenant row to lock.
+        """
+        scope = f"{connection.schema_name}:giftcard_issue:{user.pk}"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(%s)",
+                [zlib.crc32(scope.encode())],
+            )
+
+    @classmethod
+    def issued_by_in_last_day(cls, user) -> Decimal:
+        """What *user* put on gift cards in the last 24 hours: the cards
+        they issued and the balance they added, across the admin add form
+        and the balance adjustment. Removals do not offset it."""
+        total = GiftCardTransaction.objects.filter(
+            created_by=user,
+            kind__in=(
+                GiftCardTransactionKind.ISSUE,
+                GiftCardTransactionKind.ADJUST,
+            ),
+            amount__gt=0,
+            created_at__gte=timezone.now() - timedelta(hours=24),
+        ).aggregate(total=Sum("amount"))["total"]
+        return total or Decimal(0)
+
+    @classmethod
+    def exceeds_daily_limit(cls, user, amount: Decimal) -> bool:
+        """True when adding *amount* takes *user* past the daily limit.
+
+        Call it with :meth:`lock_staff_issuing` held, in the transaction
+        that writes the row, or the total it reads can be stale."""
+        limit = cls.staff_daily_limit()
+        return limit > 0 and cls.issued_by_in_last_day(user) + amount > limit
+
+    @classmethod
+    def over_daily_limit(cls, user, amount: Decimal) -> bool:
+        """True when *amount* is above the daily limit and *user* may not
+        issue it. Takes the per-user lock; call inside the transaction
+        that writes the row."""
+        cls.lock_staff_issuing(user)
+        return cls.exceeds_daily_limit(
+            user, amount
+        ) and not cls.authorised_to_exceed_limit(user)
 
     @classmethod
     def authorised_to_exceed_limit(cls, user) -> bool:

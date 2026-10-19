@@ -5,6 +5,17 @@
 
 ## v3.141.0 (2026-10-19)
 
+### Documentation
+
+* docs: keep the reset_staff_mfa command on one line (#273)
+
+The code span was split so that its second line began with `<email>`.
+CommonMark joins the two lines, but the docs site renders this page with
+VitePress, which reads a line-leading unknown tag as a Vue component, and
+the site build failed with "Element is missing end tag".
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3f58919`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f58919c237fad4b1c2310168e4ea353b79e56f0))
+
 ### Features
 
 * feat(admin): let the platform set a store's languages (#269)

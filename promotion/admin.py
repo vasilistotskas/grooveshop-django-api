@@ -25,6 +25,7 @@ from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.bulk import update_each
 from admin.displays import money
 from admin.export import ExportActionMixin
+from core.cache.invalidation import mark_surface_stale
 from promotion.enum import BenefitType, TargetScope
 from promotion.models import (
     Promotion,
@@ -79,6 +80,9 @@ def _create_codes(
         created += PromotionCode.objects.filter(
             promotion=promotion, code__in=fresh
         ).count()
+    # ``bulk_create`` sends no signal, and the offers listing prints one
+    # of the promotion's codes.
+    mark_surface_stale("promotions")
     return created
 
 

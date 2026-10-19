@@ -16,9 +16,14 @@ Design notes
 ------------
 
 * **Opt-in per surface** via ``CacheSurface.invalidated_by``: a surface
-  names the merchant-edited models it renders. User-generated rows
-  (reviews, comments, favourites) stay out — they change constantly and
-  are social proof, which the TTL already bounds.
+  names the merchant-edited models it renders. User-generated rows that
+  change constantly (favourites, likes) stay out — social proof, which
+  the TTL already bounds. Reviews and comments are in: nothing shows
+  until a moderator approves them, and hiding one has to take effect.
+
+* **Writes without a signal** (``bulk_create``, ``bulk_update``, a
+  promotion window passing) call ``mark_surface_stale`` and join the
+  same batched purge.
 
 * **Batched across transactions, off the request.** ``CacheService.purge``
   SCANs Redis and POSTs to the Nuxt purge endpoint, and a catalogue import
@@ -173,6 +178,21 @@ def _mark_stale(code: str) -> None:
     # it — over-purging is safe, under-purging is the bug.
     schema_name = getattr(connection, "schema_name", "-")
     transaction.on_commit(lambda: _flush(schema_name))
+
+
+def mark_surface_stale(code: str) -> None:
+    """Queue a purge of surface ``code`` for a change no signal reports.
+
+    For the writes ``post_save`` never sees: a ``bulk_create``, a
+    ``bulk_update``, or a change of time (a promotion window opening).
+    Rides the same batched, after-commit purge as a model write, and is
+    skipped when caching is disabled, like the receivers.
+    """
+    from django.conf import settings
+
+    if getattr(settings, "DISABLE_CACHE", False):
+        return
+    _mark_stale(code)
 
 
 def _make_receiver(code: str, ignored_update_fields: frozenset[str]):

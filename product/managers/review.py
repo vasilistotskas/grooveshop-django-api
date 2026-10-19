@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from django.db import models
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q
-from django.db.models.functions import Coalesce, Now
 from django.utils import timezone
 
 from core.managers import (
@@ -132,22 +131,17 @@ class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
         return self.filter(status=ReviewStatus.TRUE)
 
     def moderate(self, status: str) -> int:
-        """Set ``status`` on every row and keep the publish date in step.
+        """Set ``status`` on every row through ``save``.
 
-        The bulk twin of ``ProductReview.sync_publication`` (one UPDATE,
-        no ``save``): approving stamps ``published_at`` on rows that have
-        none and publishes them; any other status unpublishes and clears
-        the date. Returns the number of rows updated.
+        ``save`` keeps ``is_published`` / ``published_at`` in step (see
+        ``ProductReview.sync_publication``) and sends the signals that
+        purge the storefront's cached reviews; one UPDATE would do
+        neither, so an approved review stayed hidden until the cache
+        TTL. Returns the number of rows changed.
         """
-        approved = status == ReviewStatus.TRUE
-        return self.update(
-            status=status,
-            is_published=approved,
-            published_at=(
-                Coalesce("published_at", Now()) if approved else None
-            ),
-            updated_at=Now(),
-        )
+        from admin.bulk import update_each
+
+        return update_each(self, status=status)
 
     def approved(self):
         return self.filter(status=ReviewStatus.TRUE)

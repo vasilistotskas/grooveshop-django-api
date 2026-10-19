@@ -404,6 +404,11 @@ class TestPageSurfacesAreWired:
             ("page_config", "page_config.PageSection"),
             ("page_config", "page_config.NavigationLinkTranslation"),
             ("promotions", "promotion.PromotionTranslation"),
+            ("promotions", "promotion.PromotionCode"),
+            ("products", "product.ProductReview"),
+            ("products", "product.ProductReviewTranslation"),
+            ("blog", "blog.BlogComment"),
+            ("blog", "blog.BlogCommentTranslation"),
         ],
     )
     def test_declares(self, code, label):
@@ -418,10 +423,8 @@ class TestPageSurfacesAreWired:
             label for s in iter_surfaces() for label in s.invalidated_by
         }
         for label in (
-            "product.ProductReview",
             "product.ProductFavourite",
             "product.ProductAlert",
-            "blog.BlogComment",
             "promotion.PromotionRedemption",
         ):
             assert label not in declared

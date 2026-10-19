@@ -90,6 +90,17 @@ store's `PROMOTIONS_ENABLED`, the plan's `promotions_enabled`) runs the same
 sweep for that store at once (`promotion/signals.py`). A promotion's start is recorded when the queue or sweep notices it
 (seconds to five minutes), not at its `starts_at`.
 
+Those price columns move through `bulk_update`, which sends no `post_save`,
+so `sync_product_prices` queues the `products` cache-surface purge itself
+(`core.cache.invalidation.mark_surface_stale`) when it changed anything: a VAT
+edit, a promotion window and the nightly sweep reach the storefront without
+waiting for the cache TTL. A promotion window passing
+(`promotion.offer_sync.refresh_window_changes`) and the admin's coupon-code
+generator do the same for the `promotions` surface. Reviews, blog comments and
+promotion codes are on their surfaces' `invalidated_by`, and the bulk
+moderation actions save row by row, so approving, rejecting or hiding one
+shows at once.
+
 Spells are legal records. `clean_old_history` only touches simple-history
 tables, and nothing deletes a spell.
 

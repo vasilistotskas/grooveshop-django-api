@@ -32,6 +32,7 @@ from django.db.models import Min, Q
 from django.utils import timezone
 from djmoney.money import Money
 
+from core.cache.invalidation import mark_surface_stale
 from product.models.price_spell import ProductPriceSpell
 from product.models.product import PRICING_DERIVED_FIELDS, Product
 from product.pricing.constants import (
@@ -304,4 +305,10 @@ def sync_product_prices(
                 [plan.product for plan in stale], list(PRICING_DERIVED_FIELDS)
             )
             changed.update(plan.product.pk for plan in touched)
+    if changed:
+        # ``bulk_update`` sends no ``post_save``, and a VAT edit, a
+        # promotion window or the nightly sweep reach the price columns
+        # only here; without this the storefront served the old prices
+        # until the cache expired.
+        mark_surface_stale("products")
     return changed

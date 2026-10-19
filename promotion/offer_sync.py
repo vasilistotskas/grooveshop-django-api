@@ -35,6 +35,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django_tenants.utils import schema_context
 
+from core.cache.invalidation import mark_surface_stale
 from promotion.models import Promotion
 from promotion.offers import scope_product_ids
 
@@ -156,12 +157,20 @@ def refresh_window_changes(now: datetime | None = None) -> set[int]:
         if cursor_raw
         else now - WINDOW_FALLBACK
     )
-    crossed = Promotion.objects.filter(is_active=True).filter(
-        Q(starts_at__gt=cursor, starts_at__lte=now)
-        | Q(ends_at__gt=cursor, ends_at__lte=now)
+    crossed = list(
+        Promotion.objects.filter(is_active=True)
+        .filter(
+            Q(starts_at__gt=cursor, starts_at__lte=now)
+            | Q(ends_at__gt=cursor, ends_at__lte=now)
+        )
+        .values_list("pk", flat=True)
     )
-    product_ids = scope_product_ids(crossed.values_list("pk", flat=True))
+    product_ids = scope_product_ids(crossed)
     refresh_products(product_ids)
+    if crossed:
+        # No save means no signal, so the cached offers listing would
+        # keep advertising a promotion that ended, or hide one that began.
+        mark_surface_stale("promotions")
     # No expiry: losing the cursor only widens the next window.
     cache.set(_WINDOW_CURSOR_KEY, now.isoformat(), timeout=None)
     return product_ids

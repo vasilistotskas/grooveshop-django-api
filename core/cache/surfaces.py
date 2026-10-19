@@ -295,6 +295,11 @@ def register_default_surfaces() -> None:
                 "product.Brand",
                 "product.ProductVariantGroup",
                 "product.ProductVariantGroupTranslation",
+                # Moderation shows or hides a review on the product page;
+                # a rate edit moves the average. A customer's new review
+                # is pending, so it costs one batched purge, no more.
+                "product.ProductReview",
+                "product.ProductReviewTranslation",
             ),
             # Each order's stock decrement; the product pages show stock,
             # but checkout re-validates it and the page TTL bounds it.
@@ -372,6 +377,9 @@ def register_default_surfaces() -> None:
                 "blog.BlogAuthorTranslation",
                 "blog.BlogTag",
                 "blog.BlogTagTranslation",
+                # Approving or hiding a comment is a moderator edit.
+                "blog.BlogComment",
+                "blog.BlogCommentTranslation",
             ),
             icon="article",
             group="content",
@@ -533,6 +541,8 @@ def register_default_surfaces() -> None:
             invalidated_by=(
                 "promotion.Promotion",
                 "promotion.PromotionTranslation",
+                # The listing prints one of the promotion's codes.
+                "promotion.PromotionCode",
             ),
             icon="local_offer",
             group="commerce",

@@ -66,7 +66,13 @@ from order.models import (
     RetailCredit,
 )
 from order.models.invoice import MyDataStatus
+from order.models.refund_attempt import (
+    RefundAttempt,
+    RefundAttemptKind,
+    RefundAttemptStatus,
+)
 from order.models.retail_credit import CreditReason
+from order.payment_ledger import PaymentLedger
 from order.taxation import split_gross
 
 logger = logging.getLogger(__name__)
@@ -156,7 +162,8 @@ def _create_credit(
     *,
     amount: Decimal,
     reason: CreditReason,
-    refund: PaymentTransaction | None,
+    refund: PaymentTransaction | None = None,
+    refund_attempt: RefundAttempt | None = None,
 ) -> RetailCredit:
     prior = [
         credit.vat_breakdown
@@ -174,6 +181,7 @@ def _create_credit(
         invoice=invoice,
         reason=reason,
         refund=refund,
+        refund_attempt=refund_attempt,
         credit_number=CreditCounter.allocate(issue_date.year),
         issue_date=issue_date,
         subtotal=Money(net, currency),
@@ -231,6 +239,33 @@ def create_pending_credits(order_id: int) -> list[int]:
                     amount=Decimal(refund.amount.amount),
                     reason=CreditReason.REFUND,
                     refund=refund,
+                )
+            )
+
+        # Value returned onto gift cards and points is a refund like any
+        # other: the same credit, the same rule, one path. Its moment is
+        # when its rows were written, the clock the receipt's cut-off uses.
+        for attempt in RefundAttempt.objects.filter(
+            order=order,
+            kind=RefundAttemptKind.STORED_VALUE,
+            status=RefundAttemptStatus.SETTLED,
+            credit_document__isnull=True,
+        ).order_by("id"):
+            returned_at = PaymentLedger.stored_returned_at(attempt)
+            returned = PaymentLedger.stored_returned_by(order, attempt)
+            if (
+                returned_at is None
+                or returned_at < invoice.created_at
+                or returned.amount <= 0
+            ):
+                continue
+            created.extend(
+                _guarded(
+                    order,
+                    invoice,
+                    amount=Decimal(returned.amount),
+                    reason=CreditReason.REFUND,
+                    refund_attempt=attempt,
                 )
             )
 

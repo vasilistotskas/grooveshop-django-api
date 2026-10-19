@@ -776,8 +776,9 @@ def handle_order_stored_value_returned(
                 f"Reason: {kwargs.get('reason') or 'Not specified'}"
             ),
         )
-        if order.payment_status == PaymentStatus.REFUNDED:
-            _dispatch_credit_documents(order)
+        # The receipt (if one exists) is credited for this value like for a
+        # provider refund; before it exists the receipt was netted instead.
+        _dispatch_credit_documents(order)
     except Exception:
         logger.exception("Error handling order_stored_value_returned signal")
 

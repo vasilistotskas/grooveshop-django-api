@@ -3,6 +3,35 @@
 
 
 
+## v3.141.3 (2026-10-19)
+
+### Bug fixes
+
+* fix(admin): store admins see only their own store's people and no secrets (#283)
+
+A store's team page listed every platform account and every store, and
+the store profile rendered platform-set secrets as read-only text.
+
+- Add a person to the team by the exact email of an existing account;
+  the store is never a field. The list drops the Store column, filter
+  and search on a store host, and names members from the public schema.
+- Replace the platform-set encrypted fields with a set / not set column
+  for store roles.
+- Refuse to remove, demote, deactivate or move a store's last active
+  owner on every path: save, delete, form, bulk delete and update.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5937c93`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5937c93f1be9a42dcf4590c2e72d26c9b306edbb))
+
+### Testing
+
+* test(tenant): name log_deletions in the lifecycle helper docstring (#282)
+
+TenantAdmin's destroy action calls ModelAdmin.log_deletions (Django 6
+removed the singular log_deletion), so the _admin_request docstring now
+names the method the audit trail actually uses.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`98d2adc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/98d2adc33ccdbc42a3cbce24a3665ddee59be0e8))
+
 ## v3.141.2 (2026-10-19)
 
 ### Bug fixes

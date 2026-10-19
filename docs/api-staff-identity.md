@@ -262,8 +262,8 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   spent.
 - **Guessing is bounded:** five wrong codes per user lock further tries for
   fifteen minutes (cache), even a right one.
-- **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa
-  <email>` (run with cluster access) removes the authenticators and any
+- **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa <email>`
+  (run with cluster access) removes the authenticators and any
   lockout; the next login enrols a new one.
 - **Not covered:** platform staff API tokens (`PlatformStaffToken`) are issued
   after a login and are a separate surface; a token already issued keeps

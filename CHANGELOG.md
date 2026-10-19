@@ -3,6 +3,39 @@
 
 
 
+## v3.138.1 (2026-10-19)
+
+### Bug fixes
+
+* fix(admin): correct Greek admin labels and make bulk actions refresh the storefront (#259) ([`67040c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67040c1dbe94ab856b208b464ca883e95041fa0e))
+
+* fix(admin): correct Greek admin labels and make bulk actions refresh the storefront
+
+Greek: fix wrong or missing msgstrs found in a docs review (Account,
+Organization, Home via pgettext, Unsubscribed, tiers as "Βαθμίδες",
+dispute wording, Moderation, Featured, Follow up, B2B tabs via
+pgettext, ...), mark the settings categories, dispute history notes,
+ACS COD alert subjects and a few labels for translation.
+
+Behaviour: bulk activate/publish/feature actions on products, blog
+posts, promotions and tags now save each row (admin.bulk.update_each)
+so cache invalidation, reindexing and price refresh run like a single
+save. The cart admin's abandoned column and filter share
+CART_ABANDONED_HOURS. Drop the unread LOW_STOCK_THRESHOLD and
+NOTIFICATION_EXPIRATION_DAYS settings. Hide the legacy order "place"
+field from the admin form. The GDPR export now includes product alerts
+and contact messages.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`67040c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67040c1dbe94ab856b208b464ca883e95041fa0e))
+
+* fix(admin): judge cart abandonment once per changelist query and translate the new catalogue entries
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`67040c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67040c1dbe94ab856b208b464ca883e95041fa0e))
+
 ## v3.138.0 (2026-10-19)
 
 ### Bug fixes

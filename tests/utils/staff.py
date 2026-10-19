@@ -70,6 +70,17 @@ def stamp_platform_identity(user):
     return user
 
 
+def enrol_staff_mfa(user) -> list[str]:
+    """Give a platform superuser an authenticator, as the first login
+    does, and return their recovery codes: a superuser's admin login asks
+    for a code (``admin.staff_mfa``)."""
+    from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+    from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+
+    TOTP.activate(user, generate_totp_secret())
+    return RecoveryCodes.activate(user).generate_codes()
+
+
 def store_staff(
     tenant: Tenant,
     role: str = TenantMembershipRole.STAFF,

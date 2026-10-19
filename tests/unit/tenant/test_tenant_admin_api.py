@@ -54,7 +54,8 @@ def test_destroying_a_live_tenant_is_refused(
         reverse("tenant-admin-detail", args=[tenant.pk])
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "suspended first" in response.data["detail"]
+    assert response.data["code"] == "tenant_destroy_not_suspended"
+    assert "Refusing" not in response.data["detail"]
     no_destroy_side_effects.assert_not_called()
 
 
@@ -70,6 +71,7 @@ def test_destroying_inside_the_cooldown_is_refused(
         reverse("tenant-admin-detail", args=[tenant.pk])
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "tenant_destroy_cooldown"
     no_destroy_side_effects.assert_not_called()
 
 
@@ -86,7 +88,8 @@ def test_destroying_a_protected_tenant_is_refused(
         reverse("tenant-admin-detail", args=[tenant.pk])
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "protected" in response.data["detail"]
+    assert response.data["code"] == "tenant_destroy_protected"
+    assert "api_protected" not in response.data["detail"]
     no_destroy_side_effects.assert_not_called()
 
 

@@ -3,6 +3,49 @@
 
 
 
+## v3.137.1 (2026-10-19)
+
+### Bug fixes
+
+* fix(orders): issue the retail receipt net of refunds made before it (#258) ([`f55d6b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f55d6b3d37788b522ea41e4caa84c1845931ce19))
+
+* fix(orders): issue the retail receipt net of refunds made before it
+
+A retail receipt (myDATA 11.1) documents the sale for the consideration
+actually paid, and a credit document (11.4) only corrects a receipt that
+exists. Money refunded before the receipt was issued still left the
+receipt at the full total, and no credit covered it, so revenue at AADE
+was overstated by the refund.
+
+The receipt is now issued at the total less what was returned before it
+(ledger refunds net of failed ones, plus value returned onto gift cards
+and points), split over the VAT rates exactly as a credit splits it. The
+myDATA payload follows the frozen breakdown when the order's own lines no
+longer add up to the receipt. A refund before the receipt never produces
+a credit document and one after it does; everything refunded before
+issuance means no receipt. A chargeback neither reduces the receipt nor
+earns a credit document: the merchant did not reverse the sale.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+* wip2 ([`f55d6b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f55d6b3d37788b522ea41e4caa84c1845931ce19))
+
+* fix(orders): make the receipt row the one cut-off for refunds netted and credited
+
+A retry of a receipt whose render failed, or a forced regeneration of an
+unregistered one, recomputed the receipt with every refund so far, so a
+refund made after the row was subtracted from the receipt AND credited.
+A row that exists now keeps the figures it was issued with; the
+full-refund guard applies to every receipt without a MARK, on the force
+path too, counting for an existing row only what was returned before it
+was created.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f55d6b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f55d6b3d37788b522ea41e4caa84c1845931ce19))
+
 ## v3.137.0 (2026-10-18)
 
 ### Bug fixes

@@ -1831,6 +1831,21 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES",
+        "type": "int",
+        "value": 60,
+        "validator": "order.payment_hold.validate_max_hold_minutes_setting",
+        "description": (
+            "The longest an online-payment order may hold its stock in "
+            "total, counted from when it was placed. Opening a new "
+            "payment link (a retry) can move the hold later, never past "
+            "this. Once it has passed the order can no longer be paid "
+            "and the shopper places a new one from their cart. At least "
+            "the hold above, and at least 31 for Stripe to open a "
+            "payment page."
+        ),
+    },
+    {
         "name": "ORDER_ONLINE_PAYMENT_GRACE_MINUTES",
         "type": "int",
         "value": 5,

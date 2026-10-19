@@ -2224,7 +2224,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             provider = provider_class()
         except ImproperlyConfigured:
             return True
-        closed = provider.close_payment(order)
+        closed = provider.close_payment(order.payment_id or "")
         if not closed:
             logger.warning(
                 "Auto-cancel skipped order %s: its payment is already "

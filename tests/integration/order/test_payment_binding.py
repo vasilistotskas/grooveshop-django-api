@@ -314,6 +314,7 @@ class TestTheReverseAndTheOtherIntentKinds:
         with patch("order.payment.stripe.checkout.Session.create") as create:
             create.return_value.id = "cs_1"
             create.return_value.url = "https://checkout.example/cs_1"
+            create.return_value.expires_at = 1_800_000_000
             ok, _data = StripePaymentProvider().create_checkout_session(
                 Money("10.00", settings.DEFAULT_CURRENCY),
                 "7",

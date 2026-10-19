@@ -27,6 +27,7 @@ from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
 from pay_way.enum.settlement import PaySettlement
 
 HOLD_SETTING = "ORDER_ONLINE_PAYMENT_HOLD_MINUTES"
+MAX_HOLD_SETTING = "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES"
 GRACE_SETTING = "ORDER_ONLINE_PAYMENT_GRACE_MINUTES"
 ALERT_SETTING = "ORDER_UNPAID_ONLINE_ALERT_THRESHOLD"
 
@@ -34,6 +35,21 @@ ALERT_SETTING = "ORDER_UNPAID_ONLINE_ALERT_THRESHOLD"
 #: ``GrooveShopUnpaidOnlineOrdersSpike`` alert in grooveshop-infrastructure
 #: matches it exactly.
 SPIKE_MESSAGE = "orders:unpaid_online_spike"
+
+
+def _fits_providers(minutes: object) -> bool:
+    try:
+        window = timedelta(minutes=int(str(minutes)))
+    except ValueError:
+        return False
+    return (
+        StripePaymentProvider.MIN_SESSION_LIFETIME
+        <= window
+        <= min(
+            StripePaymentProvider.MAX_SESSION_LIFETIME,
+            VivaWalletPaymentProvider.MAX_PAYMENT_TIMEOUT,
+        )
+    )
 
 
 def validate_hold_minutes_setting(value: object) -> bool:
@@ -44,17 +60,18 @@ def validate_hold_minutes_setting(value: object) -> bool:
     would give one provider an expiry it refuses or silently clamps, and
     the stock would outlive (or be released before) the payment link.
     """
-    try:
-        minutes = int(str(value))
-    except ValueError:
-        return False
+    return _fits_providers(value)
+
+
+def validate_max_hold_minutes_setting(value: object) -> bool:
+    """Validator for ``ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES``.
+
+    The total a new payment link may stretch an order's hold to. It must
+    fit the providers like the hold itself and be no shorter than it.
+    """
     return (
-        StripePaymentProvider.MIN_SESSION_LIFETIME
-        <= timedelta(minutes=minutes)
-        <= min(
-            StripePaymentProvider.MAX_SESSION_LIFETIME,
-            VivaWalletPaymentProvider.MAX_PAYMENT_TIMEOUT,
-        )
+        _fits_providers(value)
+        and timedelta(minutes=int(str(value))) >= hold_window()
     )
 
 
@@ -66,9 +83,32 @@ def grace_window() -> timedelta:
     return timedelta(minutes=int(Setting.get(GRACE_SETTING)))
 
 
-def deadline(now: datetime | None = None) -> datetime:
-    """When a payment opened *now* should stop being payable."""
-    return (now or timezone.now()) + hold_window()
+def max_hold_window() -> timedelta:
+    return timedelta(minutes=int(Setting.get(MAX_HOLD_SETTING)))
+
+
+def hold_limit(order: Order) -> datetime:
+    """The latest instant any payment link may keep *order* payable.
+
+    Counted from the order's creation, so opening new links (a retry, a
+    second checkout session) can never stretch the hold past it.
+    """
+    return order.created_at + max_hold_window()
+
+
+def deadline(order: Order, now: datetime | None = None) -> datetime:
+    """When a payment opened *now* for *order* should stop being payable."""
+    now = now or timezone.now()
+    return min(now + hold_window(), hold_limit(order))
+
+
+def window_closed(
+    order: Order,
+    minimum: timedelta = timedelta(0),
+    now: datetime | None = None,
+) -> bool:
+    """True when no payment link of at least *minimum* fits before the limit."""
+    return hold_limit(order) - (now or timezone.now()) <= minimum
 
 
 def unpaid_online_orders() -> QuerySet[Order]:

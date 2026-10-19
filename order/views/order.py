@@ -705,10 +705,32 @@ class OrderViewSet(BaseModelViewSet):
             detail = _("This order has already been paid.")
         elif order.status != OrderStatus.PENDING:
             detail = _("This order is no longer open for payment.")
+        elif payment_hold.window_closed(order):
+            return self._payment_window_expired()
         else:
             return None
         return Response(
             {"detail": detail, "code": "order_not_payable"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @staticmethod
+    def _payment_window_expired() -> Response:
+        """400 for an order whose total payment window has run out.
+
+        A new payment link never extends the stock hold past
+        ``ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES`` from the order's
+        creation. The cart is kept while an order awaits its payment and a
+        cancel leaves it alone, so the shopper starts again from it.
+        """
+        return Response(
+            {
+                "detail": _(
+                    "The time to pay for this order has run out. Place a "
+                    "new order from your cart."
+                ),
+                "code": "payment_window_expired",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -1652,6 +1674,11 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
+        # A hosted link the provider cannot open for what is left of the
+        # window is refused, never stretched past it.
+        if payment_hold.window_closed(order, provider.min_hosted_session):
+            return self._payment_window_expired()
+
         # Charge what the customer actually owes — line items + extras
         # minus any loyalty redemption. Reading order.total_price here
         # billed the UNDISCOUNTED figure while the shopper's points had
@@ -1671,7 +1698,7 @@ class OrderViewSet(BaseModelViewSet):
             purpose=PaymentPurpose.ORDER,
             subject=str(order.uuid),
             # The link stops being payable when the stock hold ends.
-            expires_at=payment_hold.deadline(),
+            expires_at=payment_hold.deadline(order),
             **checkout_params,
         )
 

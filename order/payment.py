@@ -50,6 +50,10 @@ class PaymentProvider(ABC):
     #: pay way is keyed ``CREDIT_CARD``.
     display_name: ClassVar[StrOrPromise]
 
+    #: The shortest hosted session this PSP will open. A link that must
+    #: end sooner than this cannot be created, so the caller refuses.
+    min_hosted_session: ClassVar[timedelta] = timedelta(0)
+
     #: Intent-first: an intent is minted before the order exists and the
     #: shopper confirms it client-side. The order-creation path can then
     #: demand a ``payment_intent_id``.
@@ -108,16 +112,16 @@ class PaymentProvider(ABC):
         """
         return
 
-    def close_payment(self, order) -> bool:
-        """Stop accepting payment for *order*; True once none can land.
+    def close_payment(self, payment_id: str) -> bool:
+        """Stop accepting payment on *payment_id*; True once none can land.
 
-        Called before an unpaid order's stock is released. A payment link
-        or session ends by itself at the expiry it was created with, so
-        the default has nothing to do. A provider whose payment object
-        has no expiry (a Stripe PaymentIntent) cancels it here. False
-        means the provider says the payment is past the point of no
-        return (processing or succeeded): the order must stay open for
-        its webhook.
+        Called before an unpaid order's stock is released, and before a
+        retry replaces the payment. A payment link or session ends by
+        itself at the expiry it was created with, so the default has
+        nothing to do. A provider whose payment object has no expiry (a
+        Stripe PaymentIntent) cancels it here. False means the provider
+        says the payment is past the point of no return (processing or
+        succeeded): the order must stay open for its webhook.
         """
         return True
 
@@ -178,6 +182,9 @@ class StripePaymentProvider(PaymentProvider):
     MIN_SESSION_LIFETIME: ClassVar[timedelta] = timedelta(minutes=30)
     MAX_SESSION_LIFETIME: ClassVar[timedelta] = timedelta(hours=24)
     SESSION_MARGIN: ClassVar[timedelta] = timedelta(minutes=1)
+    min_hosted_session: ClassVar[timedelta] = (
+        MIN_SESSION_LIFETIME + SESSION_MARGIN
+    )
     # Both: PaymentIntents for the intent-first checkout, and hosted
     # Checkout Sessions for the pay-later/retry links.
     supports_payment_intent: ClassVar[bool] = True
@@ -411,8 +418,8 @@ class StripePaymentProvider(PaymentProvider):
             )
             return False, {"error": str(e)}
 
-    def close_payment(self, order) -> bool:
-        """Cancel the order's PaymentIntent, which has no expiry of its own.
+    def close_payment(self, payment_id: str) -> bool:
+        """Cancel a PaymentIntent, which has no expiry of its own.
 
         A hosted Checkout Session ends at its ``expires_at``. An intent
         opened by ``process_payment`` stays confirmable until canceled, so
@@ -421,7 +428,6 @@ class StripePaymentProvider(PaymentProvider):
         Checkout Session, which only expiry ends); the intent is then read
         back and the order stays open unless it is already canceled.
         """
-        payment_id = order.payment_id or ""
         if not payment_id.startswith("pi_"):
             return True
         try:

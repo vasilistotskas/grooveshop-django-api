@@ -59,7 +59,13 @@ _AMOUNT = DecimalField(max_digits=11, decimal_places=2)
 _RECEIPT_KINDS = (
     PaymentTransactionKind.CHARGE,
     PaymentTransactionKind.COD_COLLECTION,
+    PaymentTransactionKind.OFFLINE_COLLECTION,
 )
+
+#: The provider code of money a staff member confirmed arrived by bank
+#: transfer (``OrderService.confirm_offline_payment``). Not a registered
+#: payment provider, so nothing can mistake it for one.
+OFFLINE_TRANSFER_PROVIDER = "bank_transfer"
 
 #: Who moved the money of a refund the merchant made themselves, outside any
 #: payment provider (a bank transfer, cash handed over). Not a registered
@@ -155,9 +161,13 @@ class ChargebackOutcome(NamedTuple):
 
 
 def is_cash_collection(row: PaymentTransaction) -> bool:
-    """Money a courier collected in cash: there is no provider to refund it
+    """Money no payment provider moved (cash a courier collected, a bank
+    transfer a staff member confirmed): there is no provider to refund it
     through, so the merchant pays it back themselves."""
-    return row.kind == PaymentTransactionKind.COD_COLLECTION
+    return row.kind in (
+        PaymentTransactionKind.COD_COLLECTION,
+        PaymentTransactionKind.OFFLINE_COLLECTION,
+    )
 
 
 def _total(rows: QuerySet[PaymentTransaction]) -> Decimal:
@@ -585,6 +595,21 @@ class PaymentLedger:
                 provider=provider,
                 reference=reference,
             )
+
+    @classmethod
+    def record_offline_collection(
+        cls, order: Order, *, amount: Money, reference: str, description: str
+    ) -> tuple[PaymentTransaction, bool]:
+        """Record that *amount* arrived off the platform (a bank transfer)
+        under the bank's *reference*."""
+        return cls._record(
+            order,
+            kind=PaymentTransactionKind.OFFLINE_COLLECTION,
+            amount=amount,
+            provider=OFFLINE_TRANSFER_PROVIDER,
+            reference=reference,
+            description=description[:255],
+        )
 
     @classmethod
     def record_refund(

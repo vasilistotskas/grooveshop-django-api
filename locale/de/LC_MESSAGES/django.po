@@ -10565,3 +10565,65 @@ msgstr ""
 
 msgid "The same value as ``error.type``."
 msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Confirm payment received"
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Confirm the bank transfer arrived"
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Amount received"
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Exactly what the order costs."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Bank transaction reference"
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "The bank's id for the transfer. One transfer cannot pay two orders."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Note"
+msgstr ""
+
+#: order/services.py order/admin.py
+#, python-format
+msgid "Order %(order_id)s is marked paid."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Only a bank-transfer order can be confirmed paid by hand. Online payments are recorded by the payment provider."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "This order is not waiting for a payment."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Give the bank's transaction reference for the transfer."
+msgstr ""
+
+#: order/services.py order/admin.py
+#, python-brace-format
+msgid "The order costs {due}; confirm exactly that amount."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "This transfer reference is already recorded."
+msgstr ""
+
+#: order/services.py order/admin.py
+msgid "Collected off-platform"
+msgstr ""

@@ -1741,11 +1741,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 24,
     },
     {
-        "name": "DEFAULT_WEIGHT_UNIT",
-        "type": "string",
-        "value": "kg",
-    },
-    {
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
         "value": 30,

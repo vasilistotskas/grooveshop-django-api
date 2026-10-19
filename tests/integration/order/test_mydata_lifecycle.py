@@ -745,3 +745,182 @@ class TestInvoiceOrdersInTheAdmin:
             order, invoice, platform_issues=True
         )
         assert card["value"] == invoice.invoice_number
+
+
+class TestReceiptNetOfRefundsMadeBeforeIt:
+    """A retail receipt documents the sale for the consideration actually
+    paid. Money returned BEFORE it is issued reduces it, and no credit
+    document follows for that money; a credit (11.4) only corrects a
+    receipt that exists. Money returned after it gets a credit as ever."""
+
+    @pytest.fixture(autouse=True)
+    def _stripe(self):
+        # One Stripe for the test, so each refund gets its own id.
+        with FakeStripeRefunds():
+            yield
+
+    def _refund(self, order, amount=None):
+        OrderService.refund_order(
+            order, amount=_eur(amount) if amount else None
+        )
+
+    def test_the_receipt_is_for_the_total_less_the_refund(self):
+        order = _order(lines=(("24", "100.00"),))
+        self._refund(order, "30.00")
+
+        with mydata_enabled(), FakeAade() as aade:
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("70.00")
+        invoice = Invoice.objects.get(order=order)
+        assert invoice.total == _eur("70.00")
+        # The full 100.00 is 80.65 + 19.35; the 30.00 returned is 24.19 +
+        # 5.81 (the credit rule), so what is left is 56.46 + 13.54.
+        [row] = invoice.vat_breakdown
+        assert Decimal(row["rate"]) == 24
+        assert (row["subtotal"], row["vat"], row["gross"]) == (
+            "56.46",
+            "13.54",
+            "70.00",
+        )
+        assert aade.credits == []
+        assert not _credits(order).exists()
+
+    def test_it_is_split_over_the_rates_as_a_credit_would_be(self):
+        order = _order(lines=(("24", "124.00"), ("13", "113.00")))
+        self._refund(order, "59.25")
+
+        with mydata_enabled(), FakeAade() as aade:
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        invoice = Invoice.objects.get(order=order)
+        rows = {Decimal(r["rate"]): r for r in invoice.vat_breakdown}
+        # 59.25 of 237.00: proportional to what each rate holds (25%).
+        assert Decimal(rows[Decimal(24)]["gross"]) == Decimal("93.00")
+        assert Decimal(rows[Decimal(13)]["gross"]) == Decimal("84.75")
+        assert invoice.total == _eur("177.75")
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("177.75")
+        for row in invoice.vat_breakdown:
+            assert Decimal(row["subtotal"]) + Decimal(row["vat"]) == Decimal(
+                row["gross"]
+            )
+
+    def test_a_refund_after_the_receipt_gets_a_credit(self):
+        order = _order(lines=(("24", "100.00"),))
+        self._refund(order, "30.00")
+
+        with mydata_enabled(), FakeAade() as aade:
+            invoice = _receipt(order)
+            assert invoice.total == _eur("70.00")
+            self._refund(order, "20.00")
+
+        [credit] = _credits(order)
+        assert credit.total == _eur("20.00")
+        assert [c.gross for c in aade.credits] == [Decimal("20.00")]
+
+    def test_a_refund_before_never_produces_a_credit(self):
+        order = _order(lines=(("24", "100.00"),))
+        self._refund(order, "30.00")
+        self._refund(order, "10.00")
+
+        with mydata_enabled(), FakeAade() as aade:
+            _receipt(order)
+            create_pending_credits(order.id)
+
+        assert not _credits(order).exists()
+        assert aade.credits == []
+
+    def test_the_value_returned_onto_a_gift_card_counts_too(self):
+        from giftcard.factories import GiftCardFactory
+        from giftcard.models import (
+            GiftCardTransaction,
+            GiftCardTransactionKind,
+        )
+
+        order = _order(lines=(("24", "100.00"),), paid_online=True)
+        Order.objects.filter(pk=order.pk).update(
+            gift_card_amount=_eur("40.00"), amount_due=_eur("60.00")
+        )
+        order.refresh_from_db()
+        PaymentTransaction = order.payment_transactions.get()
+        PaymentTransaction.amount = _eur("60.00")
+        PaymentTransaction.save(update_fields=["amount"])
+        card = GiftCardFactory(initial_value=_eur("40.00"))
+        GiftCardTransaction.objects.create(
+            gift_card=card,
+            kind=GiftCardTransactionKind.REDEEM,
+            amount=Decimal("-40.00"),
+            order=order,
+        )
+        # 60 card + 40 gift card; a EUR 100 return gives both back.
+        self._refund(order, "70.00")
+
+        from order.invoicing import refunded_before_receipt
+
+        assert refunded_before_receipt(order) == Decimal("70.00")
+        with mydata_enabled(), FakeAade() as aade:
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("30.00")
+
+    def test_a_chargeback_before_the_receipt_does_not_reduce_it(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get()
+        PaymentTransactionFactory(
+            order=order,
+            charge=charge,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            amount=_eur("30.00"),
+            provider_reference="dp_before",
+        )
+
+        with mydata_enabled(), FakeAade() as aade:
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("100.00")
+        assert aade.credits == []
+
+    def test_a_refund_that_failed_does_not_reduce_it(self):
+        from order.payment_ledger import PaymentLedger
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get()
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("30.00"), reference="re_1"
+        )
+        PaymentLedger.record_refund_reversal(
+            order, charge=charge, amount=_eur("30.00"), reference="re_1"
+        )
+
+        with mydata_enabled(), FakeAade() as aade:
+            OrderService.update_order_status(order, OrderStatus.SHIPPED)
+
+        [receipt] = aade.receipts
+        assert receipt.gross == Decimal("100.00")
+
+    def test_everything_refunded_before_it_means_no_receipt(self):
+        from order.invoicing import ReceiptNotIssuable
+
+        order = _order(lines=(("24", "100.00"),))
+        self._refund(order)
+        _mark_shipped(order)
+
+        with mydata_enabled(), FakeAade() as aade:
+            with pytest.raises(ReceiptNotIssuable, match="refunded in full"):
+                generate_invoice(order)
+            generate_order_invoice(order.id)
+
+        assert not Invoice.objects.filter(order=order).exists()
+        assert aade.sent == []
+
+    def test_a_receipt_that_exists_is_unaffected_by_a_later_full_refund(self):
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            invoice = _receipt(order)
+            self._refund(order)
+
+            assert generate_invoice(order).pk == invoice.pk
+        assert Invoice.objects.get(order=order).total == _eur("100.00")

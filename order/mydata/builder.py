@@ -295,9 +295,24 @@ def _receipt_lines(invoice: Any) -> list[_Line]:
     travel with. Order-level discounts are already allocated across the
     goods; gift-card amounts are payment and never reduce a taxable
     value."""
-    return [
+    lines = [
         _Line(rate=line.rate, net=line.net, vat=line.vat)
         for line in order_vat_lines(invoice.order)
+    ]
+    if sum((line.gross for line in lines), Decimal(0)) == Decimal(
+        invoice.total.amount
+    ):
+        return lines
+    # A receipt issued net of money refunded before it (``order.invoicing``)
+    # is documented by the breakdown frozen on its row, one line per rate:
+    # the order's own lines would add up to the sale it no longer is.
+    return [
+        _Line(
+            rate=Decimal(row["rate"]),
+            net=Decimal(row["subtotal"]),
+            vat=Decimal(row["vat"]),
+        )
+        for row in invoice.vat_breakdown
     ]
 
 

@@ -182,7 +182,75 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     the lines first — VAT is owed on what the customer actually paid.
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
-    return breakdown_by_rate(order_vat_lines(order))
+    rows = breakdown_by_rate(order_vat_lines(order))
+    refunded = refunded_before_receipt(order)
+    if refunded <= 0:
+        return rows
+    return _net_of(rows, min(refunded, _gross(rows)))
+
+
+def refunded_before_receipt(order: Order) -> Decimal:
+    """What was paid back for *order* before its receipt exists: provider
+    and cash refunds on the payment ledger, net of those a provider
+    reported failed, plus the value returned onto gift cards and points.
+
+    A retail receipt documents the sale for the consideration actually
+    paid, so money returned before it is issued reduces what it says, and
+    no credit document follows for it (``order.credit_documents`` credits
+    only what was refunded after the receipt row existed). A chargeback is
+    not counted: the card network took the money back, the merchant did not
+    reverse the sale, and the receipt stands.
+    """
+    from order.payment_ledger import PaymentLedger
+
+    return PaymentLedger.refunded(order) + (
+        PaymentLedger.stored_value(order).returned
+    )
+
+
+def _gross(rows: list[dict[str, Any]]) -> Decimal:
+    return sum((Decimal(r["gross"]) for r in rows), Decimal(0))
+
+
+def _net_of(
+    rows: list[dict[str, Any]], amount: Decimal
+) -> list[dict[str, Any]]:
+    """*rows* less *amount* (gross), split over the rates exactly as a credit
+    document splits it (``credit_documents.credit_breakdown``): in proportion
+    to what each rate still holds, to the cent, the net of each rate derived
+    cumulatively so the figures add up. Rates left with nothing drop out."""
+    from order.credit_documents import credit_breakdown
+
+    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount)}
+    out = []
+    for row in rows:
+        cut = taken.get(row["rate"])
+        if cut is None:
+            out.append(row)
+            continue
+        gross = Decimal(row["gross"]) - Decimal(cut["gross"])
+        if gross <= 0:
+            continue
+        out.append(
+            {
+                "rate": row["rate"],
+                "subtotal": str(
+                    Decimal(row["subtotal"]) - Decimal(cut["subtotal"])
+                ),
+                "vat": str(Decimal(row["vat"]) - Decimal(cut["vat"])),
+                "gross": str(gross),
+            }
+        )
+    return out
+
+
+def fully_refunded_before_receipt(order: Order) -> bool:
+    """True when what was paid back already covers the whole sale, so there
+    is no consideration left to document and no receipt is issued."""
+    refunded = refunded_before_receipt(order)
+    return refunded > 0 and refunded >= _gross(
+        breakdown_by_rate(order_vat_lines(order))
+    )
 
 
 def _order_totals(
@@ -530,6 +598,14 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
                     "doc": order.get_document_type_display(),
                     "status": order.get_status_display(),
                 }
+            )
+        if existing is None and fully_refunded_before_receipt(order):
+            raise ReceiptNotIssuable(
+                _(
+                    "Order #%(order_id)s was refunded in full before its "
+                    "receipt was issued, so there is no sale to document."
+                )
+                % {"order_id": order.id}
             )
         if not load_mydata_config().is_ready():
             raise ReceiptNotIssuable(

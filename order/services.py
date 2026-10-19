@@ -13,6 +13,7 @@ from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
+from extra_settings.models import Setting
 
 from order.attribution import (
     AttributionInput,
@@ -1515,6 +1516,47 @@ class OrderService:
                 _("Failed to create order: {error}").format(error=str(e))
             ) from e
 
+    @staticmethod
+    def _enforce_unpaid_order_limit(*, pay_way, user, email: str) -> None:
+        """Refuse a new online-payment order when the customer already has
+        ``ORDER_MAX_UNPAID_ONLINE_ORDERS`` waiting for their payment.
+
+        Such an order holds its stock until it is paid or auto-canceled
+        (``auto_cancel_stuck_pending_orders``), so without a bound anyone
+        can lock stock by starting checkouts they never pay. The customer
+        is the account, or the email for a guest. Per store: the setting
+        is a tenant ``Setting``. Offline methods are not counted (they are
+        expected to sit PENDING until the carrier remits). ``0`` turns it
+        off. Counted under the cart lock, so two carts of one customer
+        racing can overshoot by the number in flight, not without bound.
+        """
+        if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
+            return
+        limit = int(Setting.get("ORDER_MAX_UNPAID_ONLINE_ORDERS", default=5))
+        if limit <= 0:
+            return
+        waiting = Order.objects.filter(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            pay_way__settlement=PaySettlement.ONLINE,
+        )
+        if user is not None and user.is_authenticated:
+            waiting = waiting.filter(user=user)
+        elif email:
+            waiting = waiting.filter(user__isnull=True, email__iexact=email)
+        else:
+            return
+        if waiting.count() >= limit:
+            raise InvalidOrderDataError(
+                str(
+                    _(
+                        "You already have {count} orders waiting for their "
+                        "payment. Pay for or cancel one before placing "
+                        "another."
+                    ).format(count=limit)
+                )
+            )
+
     @classmethod
     @transaction.atomic
     def create_order_from_cart_offline(
@@ -1594,6 +1636,14 @@ class OrderService:
 
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
+
+            # Step 2.3: An online order holds its stock until it is paid
+            # or auto-canceled; bound how many one customer can hold.
+            cls._enforce_unpaid_order_limit(
+                pay_way=pay_way,
+                user=user,
+                email=shipping_address.get("email") or "",
+            )
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).

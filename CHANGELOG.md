@@ -3,6 +3,52 @@
 
 
 
+## v3.139.0 (2026-10-19)
+
+### Bug fixes
+
+* fix(api): give every dict ValidationError fields and type nested ones
+
+A ValidationError given only a detail key was treated as a plain error and
+got code without fields, though the docs recommend that shape. Every
+ValidationError with a dict body now gets fields.
+
+ApiValidationError.fields now points at a recursive ApiFieldErrors
+component, so nested serializer errors validate against the published
+schema.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b6db3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6db3c6f20ff3e4786e807741ae73c82f6b55c7d))
+
+### Features
+
+* feat(api): every error carries a stable code and per-field details (#262) ([`b6db3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6db3c6f20ff3e4786e807741ae73c82f6b55c7d))
+
+* feat(api): every error carries a stable code and per-field details
+
+One EXCEPTION_HANDLER keeps today's error body and adds code, plus fields
+({field: [{message, code}]}) for validation errors, built from DRF's
+ErrorDetail codes. Non-API exceptions still reach Django unchanged, so no
+exception text can leave through it.
+
+The review refusal used its code as the gettext msgid, so the wire carried
+the translation and the storefront, comparing text, failed in Greek. It is
+now a translated sentence with code="must_have_purchased", and a guard test
+fails on any snake_case string passed through gettext inside an API
+exception. Every ValidationError of the review, favourite, alert, cart,
+address, account, comment and order modules has a code; the order, cart,
+account and alert responses a view builds itself carry code too (equal to
+reason or error.type where those already existed). The address rules code
+their messages through ErrorDetail.
+
+schema.yml gains only optional code properties and the ApiError,
+ApiValidationError and ApiFieldError components.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b6db3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6db3c6f20ff3e4786e807741ae73c82f6b55c7d))
+
 ## v3.138.2 (2026-10-19)
 
 ### Bug fixes

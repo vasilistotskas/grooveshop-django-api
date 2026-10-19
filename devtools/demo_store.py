@@ -160,9 +160,6 @@ DEMO_SETTINGS: dict[str, Any] = {
     # A homepage section for this already exists in the layout; with the
     # flag off the slot renders an empty grid cell.
     "RECENTLY_VIEWED_ENABLED": True,
-    # 0 disables the pending-order reminder sequence outright, which
-    # also makes the three interval settings below it unreachable.
-    "PENDING_ORDER_REMINDER_MAX_COUNT": 3,
     # The B2B×promotions and B2B×loyalty interactions are the subtlest
     # pricing paths in the system and are untestable while these are
     # off (the coupon input is deliberately HIDDEN on a wholesale cart

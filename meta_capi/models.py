@@ -10,7 +10,9 @@ class MetaCapiEventStatus(models.TextChoices):
     PENDING = "pending", _("Pending")
     SENT = "sent", _("Sent")
     FAILED = "failed", _("Failed")
-    SKIPPED = "skipped", _("Skipped")
+    # No "skipped": a dispatch that does not apply (CAPI off, ad consent
+    # declined) writes no row. One per declining shopper would dominate
+    # this table, and the INFO log line says why.
 
 
 class MetaCapiEventLog(TimeStampMixinModel):

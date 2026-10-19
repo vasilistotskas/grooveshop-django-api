@@ -12,6 +12,7 @@ chargebacks together cover everything received.
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -472,13 +473,18 @@ def _dispute_mail(mailoutbox):
 
 
 class TestStaffEmail:
+    @pytest.fixture(autouse=True)
+    def _english_store(self, bind_tenant):
+        """Staff mail speaks the store's language; this store's is English."""
+        bind_tenant(SimpleNamespace(default_locale="en", schema_name="public"))
+
     def _send(self, order, provider="stripe", **kwargs):
         from order.tasks import send_dispute_notification_email
 
         with patch(
             "order.tasks.tenant_contact_email", return_value="staff@example.com"
         ):
-            return send_dispute_notification_email(
+            return send_dispute_notification_email.run(
                 order.id, DISPUTE, provider, **kwargs
             )
 

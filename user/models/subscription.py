@@ -327,6 +327,16 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
         self.confirmed_ip = None
         self.unsubscribed_at = None
 
+    def mark_bounced(self):
+        """The address cannot receive mail: stop writing to it.
+
+        Only a PENDING row has anything to lose (its confirmation never
+        arrived); a new request for the address starts over with a fresh
+        link (``user.services.subscription``).
+        """
+        self.status = self.SubscriptionStatus.BOUNCED
+        self.save(update_fields=["status", "updated_at"])
+
     def unsubscribe(self):
         self.status = self.SubscriptionStatus.UNSUBSCRIBED
         self.unsubscribed_at = timezone.now()

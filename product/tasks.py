@@ -8,7 +8,6 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.text import Truncator
-from django.utils.translation import get_language as translation_get_language
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override as translation_override
 
@@ -20,7 +19,7 @@ from core.retry import (
 )
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
+from core.utils.i18n import store_language
 from core.utils.tenant_urls import get_tenant_frontend_url, storefront_path
 from tenant.credentials import (
     tenant_contact_email,
@@ -299,20 +298,20 @@ def check_low_stock_products() -> dict:
         for p in products_to_alert
     ]
 
-    # Merchant-facing, rendered under no override: the active language.
-    context = build_email_context(
-        language=translation_get_language(), products=rows
-    )
-    subject = _("[{site}] Low stock alert — {n} product(s)").format(
-        site=tenant_site_name(), n=len(rows)
-    )
+    # Merchant-facing: the store's own language, not the worker's.
+    language = store_language()
     try:
-        text_content = render_to_string(
-            "emails/product/low_stock_alert.txt", context
-        )
-        html_content = render_to_string(
-            "emails/product/low_stock_alert.html", context
-        )
+        with translation_override(language):
+            context = build_email_context(language=language, products=rows)
+            subject = _("[{site}] Low stock alert — {n} product(s)").format(
+                site=tenant_site_name(), n=len(rows)
+            )
+            text_content = render_to_string(
+                "emails/product/low_stock_alert.txt", context
+            )
+            html_content = render_to_string(
+                "emails/product/low_stock_alert.html", context
+            )
         msg = EmailMultiAlternatives(
             subject,
             text_content,
@@ -454,7 +453,7 @@ def send_product_alert_restock(product_id: int) -> dict:
         # templates rendered inside the helper — to the recipient's
         # language (anonymous alerts fall back to LANGUAGE_CODE).
         user = alert.user if alert.user_id else None
-        language = get_user_language(user)
+        language = alert.email_language
         with translation_override(language):
             product_name = (
                 product.safe_translation_getter("name", any_language=True)
@@ -536,7 +535,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
 
         # Same per-recipient localization rationale as the restock task.
         user = alert.user if alert.user_id else None
-        language = get_user_language(user)
+        language = alert.email_language
         with translation_override(language):
             product_name = (
                 product.safe_translation_getter("name", any_language=True)
@@ -648,7 +647,6 @@ def send_review_pending_alert(review_id: int) -> dict:
     from product.enum.review import ReviewStatus
     from product.models.review import ProductReview
     from shipping.alerts import OpsAlertKind, send_ops_alert
-    from tenant.membership import bound_tenant
 
     review = (
         ProductReview.objects.with_translations()
@@ -660,8 +658,7 @@ def send_review_pending_alert(review_id: int) -> dict:
     if review is None:
         return {"status": "skipped", "reason": "not_waiting"}
 
-    tenant = bound_tenant()
-    language = getattr(tenant, "default_locale", "") or settings.LANGUAGE_CODE
+    language = store_language()
     with translation_override(language):
         product_name = review.product.safe_translation_getter(
             "name", any_language=True

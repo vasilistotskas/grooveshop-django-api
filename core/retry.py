@@ -152,6 +152,17 @@ def is_permanent_http_failure(exc: BaseException) -> bool:
     return 400 <= status < 500 and status not in _RETRYABLE_CLIENT_STATUSES
 
 
+def is_recipient_refused(exc: BaseException) -> bool:
+    """Whether the mail server permanently refused every recipient.
+
+    The synchronous bounce: the address cannot receive mail, so neither
+    a retry nor a later send to it will do any good.
+    """
+    return isinstance(
+        exc, smtplib.SMTPRecipientsRefused
+    ) and is_permanent_smtp_failure(exc)
+
+
 def is_permanent_failure(exc: BaseException) -> bool:
     """Whether ``exc`` carries a verdict that a retry cannot change."""
     return is_permanent_smtp_failure(exc) or is_permanent_http_failure(exc)

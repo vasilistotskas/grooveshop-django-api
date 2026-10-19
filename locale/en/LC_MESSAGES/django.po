@@ -7463,6 +7463,10 @@ msgstr "New Arrivals (Last 30 days)"
 msgid "New B2B application awaiting review"
 msgstr "New B2B application awaiting review"
 
+#, python-brace-format
+msgid "New B2B application — {company}"
+msgstr "New B2B application — {company}"
+
 msgid "New Status"
 msgstr "New Status"
 
@@ -7477,6 +7481,10 @@ msgstr "New customers"
 
 msgid "New messages"
 msgstr "New messages"
+
+#, python-brace-format
+msgid "New order — #{order_id}"
+msgstr "New order — #{order_id}"
 
 msgid "New product"
 msgstr "New product"
@@ -11805,6 +11813,9 @@ msgstr "The gross unit price a consumer paid: price plus VAT, minus the product 
 
 msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 msgstr "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
+
+msgid "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
+msgstr "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
 
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"

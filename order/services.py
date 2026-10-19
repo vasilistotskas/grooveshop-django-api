@@ -9,12 +9,12 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
-from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 from extra_settings.models import Setting
 
+from core.utils.i18n import active_language_code
 from order.attribution import (
     AttributionInput,
     ClassifiedAttribution,
@@ -4006,19 +4006,15 @@ class OrderService:
         of what locale the request was in, so a German shopper would
         get Greek emails for the rest of their order's lifecycle.
 
-        Pulled from ``django.utils.translation.get_language`` — the
-        request language ``core.middleware.locale.RequestLanguageMiddleware``
-        activates from the storefront's ``X-Language`` — so views don't
-        need to thread a ``request`` argument through. Validated against ``settings.LANGUAGES`` so a stray
-        unknown code never lands in the DB.
+        Pulled from the request language
+        ``core.middleware.locale.RequestLanguageMiddleware`` activates
+        from the storefront's ``X-Language`` (``active_language_code``),
+        so views don't need to thread a ``request`` argument through. A
+        stray unknown code never lands in the DB.
         """
         if order_data.get("language_code"):
             return
-        candidate = (get_language() or "").split("-")[0].strip().lower()
-        valid = {code for code, _name in settings.LANGUAGES}
-        order_data["language_code"] = (
-            candidate if candidate in valid else settings.LANGUAGE_CODE
-        )
+        order_data["language_code"] = active_language_code()
 
     # Allow-list for keys we accept on ``order.metadata['meta']``. The
     # storefront proxy can only forward what's here; everything else

@@ -12,7 +12,7 @@ from core import celery_app
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
+from core.utils.i18n import get_user_language, store_language
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -127,19 +127,22 @@ def send_admin_new_business_profile_email(self, profile_id: int) -> dict:
         )
         return {"status": "skipped", "reason": "no_contact_email"}
 
-    # Merchant-facing, rendered under no override: the active language.
-    context = build_email_context(
-        language=translation.get_language(), profile=profile
-    )
-    text_content = render_to_string(
-        "emails/b2b/admin_new_business_profile.txt", context
-    )
-    html_content = render_to_string(
-        "emails/b2b/admin_new_business_profile.html", context
-    )
+    # Merchant-facing: the store's own language, not the worker's.
+    language = store_language()
+    with translation.override(language):
+        context = build_email_context(language=language, profile=profile)
+        subject = _("New B2B application — {company}").format(
+            company=profile.company_name
+        )
+        text_content = render_to_string(
+            "emails/b2b/admin_new_business_profile.txt", context
+        )
+        html_content = render_to_string(
+            "emails/b2b/admin_new_business_profile.html", context
+        )
 
     msg = EmailMultiAlternatives(
-        f"New B2B application — {profile.company_name}",
+        subject,
         text_content,
         tenant_from_email(),
         [staff_email],

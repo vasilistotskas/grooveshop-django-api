@@ -1036,7 +1036,6 @@ SCHEDULE_PRESETS = {
     "daily_4am": crontab(hour="4", minute="0"),
     "daily_5am": crontab(hour="5", minute="0"),
     "daily_6am": crontab(hour="6", minute="0"),
-    "daily_7am": crontab(hour="7", minute="0"),
     "daily_noon": crontab(hour="12", minute="0"),
     # Weekly schedules
     "weekly_sunday_5am": crontab(hour="5", minute="0", day_of_week="0"),
@@ -1299,16 +1298,10 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
-        # All five scheduled domain tasks below run via tenant fanout
+        # The scheduled domain tasks below run via tenant fanout
         # wrappers — the beat scheduler dispatches once against public,
         # the fanout helper then re-dispatches the underlying task into
         # every active tenant schema with the right _schema_name header.
-        "check-pending-orders": {
-            "task": "tenant.tasks.fanout_check_pending_orders",
-            "schedule": SCHEDULE_PRESETS["daily_7am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
-        },
         "process-loyalty-points-expiration": {
             "task": "tenant.tasks.fanout_process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
@@ -2164,7 +2157,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": (
             "Product favourites/wishlist: the hearts across the "
             "storefront, the account favourites page, the API, and the "
-            "favourites-driven price-drop / back-in-stock emails."
+            "favourites-driven price-drop / back-in-stock notifications "
+            "in the customer's account (no emails: those are the product "
+            "alerts)."
         ),
     },
     {
@@ -2525,27 +2520,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "LOYALTY_TIER_MULTIPLIER_ENABLED",
         "type": "bool",
         "value": False,
-    },
-    # Order reminder settings
-    {
-        "name": "PENDING_ORDER_REMINDER_MAX_COUNT",
-        "type": "int",
-        "value": 3,
-    },
-    {
-        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_1",
-        "type": "int",
-        "value": 1,
-    },
-    {
-        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_2",
-        "type": "int",
-        "value": 3,
-    },
-    {
-        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_3",
-        "type": "int",
-        "value": 7,
     },
     # Re-engagement email settings
     {

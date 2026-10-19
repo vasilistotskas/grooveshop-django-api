@@ -119,11 +119,6 @@ def fanout_send_gift_card_expiry_reminders():
 
 
 @celery_app.task(base=TenantTask)
-def fanout_check_pending_orders():
-    return run_for_all_tenants("order.tasks.check_pending_orders")
-
-
-@celery_app.task(base=TenantTask)
 def fanout_auto_cancel_stuck_pending_orders():
     return run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
 

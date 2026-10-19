@@ -263,7 +263,6 @@ class EmailTemplatePreviewService:
     def _get_status_from_template_name(self, template_name: str) -> str:
         """Extract order status from template name."""
         status_map = {
-            "order_pending_reminder": "PENDING",
             "order_shipped": "SHIPPED",
             "order_delivered": "DELIVERED",
             "order_completed": "COMPLETED",

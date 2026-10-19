@@ -667,30 +667,32 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         for s in shipments
     ]
 
-    from django.utils.translation import get_language
     from django.utils.translation import gettext as _
+    from django.utils.translation import override
 
-    # Merchant-facing, rendered under no override: the active language.
-    context = build_email_context(
-        language=get_language(),
-        shipments=rows,
-        threshold_days=threshold_days,
-    )
+    from core.utils.i18n import store_language
 
-    subject = _("Stale ACS shipment alert — {n} shipment(s)").format(
-        n=len(rows)
-    )
+    # Merchant-facing: the store's own language, not the worker's.
+    language = store_language()
     try:
-        sent = send_ops_alert(
-            kind=OpsAlertKind.STALE_SHIPMENTS,
-            subject=subject,
-            message=render_to_string(
-                "emails/shipping_acs/stale_shipments_alert.txt", context
-            ),
-            html_message=render_to_string(
-                "emails/shipping_acs/stale_shipments_alert.html", context
-            ),
-        )
+        with override(language):
+            context = build_email_context(
+                language=language,
+                shipments=rows,
+                threshold_days=threshold_days,
+            )
+            sent = send_ops_alert(
+                kind=OpsAlertKind.STALE_SHIPMENTS,
+                subject=_("Stale ACS shipment alert — {n} shipment(s)").format(
+                    n=len(rows)
+                ),
+                message=render_to_string(
+                    "emails/shipping_acs/stale_shipments_alert.txt", context
+                ),
+                html_message=render_to_string(
+                    "emails/shipping_acs/stale_shipments_alert.html", context
+                ),
+            )
     except Exception as exc:
         logger.exception(
             "check_stale_acs_shipments: failed to send alert email",

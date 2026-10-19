@@ -1,7 +1,7 @@
 """Tests for the tenant fanout pattern.
 
 ``tenant.celery.run_for_all_tenants(task_name, **kwargs)`` is the
-primitive every scheduled cross-tenant job calls (fanout_check_pending_orders,
+primitive every scheduled cross-tenant job calls (fanout_auto_cancel_stuck_pending_orders,
 fanout_sync_meilisearch_indexes, etc.). It iterates active tenants,
 excludes the public schema, and dispatches the underlying task with a
 ``_schema_name`` header so ``TenantTask.__call__`` can switch into the
@@ -25,7 +25,7 @@ class TestRunForAllTenants:
         store_tenant("fanout_active_b")
 
         with patch("core.celery_app.send_task") as send:
-            run_for_all_tenants("order.tasks.check_pending_orders")
+            run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
 
         # At least these two tenants (backfill 0004 also seeds webside)
         schemas = {
@@ -43,7 +43,7 @@ class TestRunForAllTenants:
         inactive.save(update_fields=["is_active"])
 
         with patch("core.celery_app.send_task") as send:
-            run_for_all_tenants("order.tasks.check_pending_orders")
+            run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
 
         schemas = {
             call.kwargs["headers"]["_schema_name"]
@@ -57,7 +57,7 @@ class TestRunForAllTenants:
         store_tenant("fanout_tenant_x")
 
         with patch("core.celery_app.send_task") as send:
-            run_for_all_tenants("order.tasks.check_pending_orders")
+            run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
 
         schemas = {
             call.kwargs["headers"]["_schema_name"]
@@ -83,15 +83,6 @@ class TestRunForAllTenants:
 
 class TestFanoutTaskWrappers:
     """The ``tenant.tasks.fanout_*`` wrappers delegate to run_for_all_tenants."""
-
-    @pytest.mark.django_db
-    def test_fanout_check_pending_orders(self):
-        from tenant import tasks as tenant_tasks
-
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            tenant_tasks.fanout_check_pending_orders()
-
-        run.assert_called_once_with("order.tasks.check_pending_orders")
 
     @pytest.mark.django_db
     def test_fanout_auto_cancel_stuck_pending_orders(self):
@@ -294,7 +285,9 @@ class TestFanoutReturnIsSerializable:
 
         with patch("core.celery_app.send_task") as send:
             send.return_value.id = "00000000-0000-0000-0000-000000000001"
-            result = run_for_all_tenants("order.tasks.check_pending_orders")
+            result = run_for_all_tenants(
+                "order.tasks.auto_cancel_stuck_pending_orders"
+            )
 
         # Plain json first — the readable assertion.
         json.dumps(result)
@@ -326,7 +319,7 @@ class TestFanoutHonoursIgnoreResult:
         from core import celery_app
 
         store_tenant("fanout_ignore")
-        task_name = "order.tasks.check_pending_orders"
+        task_name = "order.tasks.auto_cancel_stuck_pending_orders"
         expected = celery_app.tasks[task_name].ignore_result
 
         with patch("core.celery_app.send_task") as send:
@@ -347,7 +340,7 @@ class TestFanoutHonoursIgnoreResult:
         from core import celery_app
 
         store_tenant("fanout_opt_out")
-        task_name = "order.tasks.check_pending_orders"
+        task_name = "order.tasks.auto_cancel_stuck_pending_orders"
         task = celery_app.tasks[task_name]
         original = task.ignore_result
         task.ignore_result = False

@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.db.models import Prefetch
 from django.utils.cache import patch_vary_headers
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
@@ -27,6 +28,7 @@ from tenant.legal_identity import (
 )
 from tenant.lifecycle import (
     activate_tenant,
+    destroy_refusal,
     destroy_tenant,
     is_protected_tenant,
     suspend_tenant,
@@ -327,9 +329,13 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
             )
         except ValueError as exc:
             # Protected, still live, or inside the suspension cooldown —
-            # the gates are the lifecycle function's, not this view's.
+            # the gates are the lifecycle function's, not this view's. The
+            # client gets the gate as a stable code, never the exception.
+            logger.warning("Tenant destroy refused: %s", exc)
+            refusal = destroy_refusal(tenant) or "invalid"
             raise ValidationError(
-                {"detail": str(exc)}, code="tenant_invalid"
+                {"detail": _("This tenant cannot be destroyed right now.")},
+                code=f"tenant_destroy_{refusal}",
             ) from exc
         return Response(
             {

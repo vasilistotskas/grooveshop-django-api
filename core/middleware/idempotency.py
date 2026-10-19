@@ -207,6 +207,19 @@ def _claim_budget(request: HttpRequest, owner: str) -> bool:
     return True
 
 
+def _in_flight() -> JsonResponse:
+    """A repeat of a request that is still running. Its code tells a
+    client to keep the key and ask again, unlike a refusal, which is
+    cached under the key and final (docs/error-contract.md)."""
+    return JsonResponse(
+        {
+            "detail": "A duplicate request is already in progress.",
+            "code": "idempotency_in_flight",
+        },
+        status=409,
+    )
+
+
 class IdempotencyMiddleware(MiddlewareMixin):
     def process_view(
         self,
@@ -228,7 +241,8 @@ class IdempotencyMiddleware(MiddlewareMixin):
                     "detail": (
                         "Idempotency-Key must be at most "
                         f"{MAX_KEY_LENGTH} characters."
-                    )
+                    ),
+                    "code": "idempotency_key_too_long",
                 },
                 status=400,
             )
@@ -245,10 +259,7 @@ class IdempotencyMiddleware(MiddlewareMixin):
             # A duplicate with the same key is still executing — tell the
             # client to back off rather than run the handler a second time
             # (G0103).
-            return JsonResponse(
-                {"detail": "A duplicate request is already in progress."},
-                status=409,
-            )
+            return _in_flight()
 
         if cached is None:
             # First seen — atomically reserve the key so a concurrent
@@ -269,10 +280,7 @@ class IdempotencyMiddleware(MiddlewareMixin):
                 key, _IN_FLIGHT_MARKER, _IN_FLIGHT_TTL_SECONDS
             )
             if not reserved:
-                return JsonResponse(
-                    {"detail": "A duplicate request is already in progress."},
-                    status=409,
-                )
+                return _in_flight()
             request._idempotency_cache_key = key  # type: ignore[attr-defined]
             return None
 

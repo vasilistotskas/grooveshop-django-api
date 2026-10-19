@@ -202,7 +202,8 @@ class IdempotencyReplayTest(TestCase):
         assert json.loads(response.content) == {
             "detail": (
                 f"Idempotency-Key must be at most {MAX_KEY_LENGTH} characters."
-            )
+            ),
+            "code": "idempotency_key_too_long",
         }
 
     def test_key_at_the_limit_is_accepted(self):

@@ -52,8 +52,13 @@ class EmailTemplateConfig:
     """
 
     # Category configurations
-    # Headings for the directories that have no hand-written entry below.
+    # The admin heading of every template directory under
+    # ``core/templates/emails``. A directory missing here is a bug, caught by
+    # ``test_every_template_directory_has_a_heading``.
     DIRECTORY_HEADINGS: dict[str, StrOrPromise] = {
+        "order": _("Order Lifecycle"),
+        "subscription": _("Subscription"),
+        "user": _("User Management"),
         "b2b": _("B2B"),
         "billing": _("Billing"),
         "cart": _("Cart"),
@@ -64,17 +69,17 @@ class EmailTemplateConfig:
 
     CATEGORIES: dict[str, TemplateCategory] = {
         "order": TemplateCategory(
-            name=_("Order Lifecycle"),
+            name=DIRECTORY_HEADINGS["order"],
             path="order",
             context_generator="generate_order_context",
         ),
         "subscription": TemplateCategory(
-            name=_("Subscription"),
+            name=DIRECTORY_HEADINGS["subscription"],
             path="subscription",
             context_generator="generate_subscription_context",
         ),
         "user": TemplateCategory(
-            name=_("User Management"),
+            name=DIRECTORY_HEADINGS["user"],
             path="user",
             context_generator="generate_user_context",
         ),

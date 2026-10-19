@@ -1,6 +1,10 @@
+from importlib import import_module
+
 import pytest
+from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 
+from order.enum.stock_log_reason import StockLogReason
 from order.models import StockLog
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
@@ -258,3 +262,51 @@ class TestStockLogModel:
         assert stock_log.quantity_delta == quantity_delta
         assert stock_log.stock_before == stock_before
         assert stock_log.stock_after == stock_after
+
+
+@pytest.mark.django_db
+class TestStockLogReasonDisplay:
+    def test_code_is_translated_when_shown(self):
+        log = StockLog.objects.create(
+            product=ProductFactory(stock=5),
+            operation_type=StockLog.OPERATION_INCREMENT,
+            quantity_delta=1,
+            stock_before=5,
+            stock_after=6,
+            reason_code=StockLogReason.MANUAL_ADJUSTMENT,
+        )
+
+        assert log.reason_display == StockLogReason.MANUAL_ADJUSTMENT.label
+        assert log.reason_display == "Manual stock adjustment via admin panel"
+
+    def test_free_text_is_shown_when_there_is_no_code(self):
+        log = StockLog(reason="Order created")
+
+        assert log.reason_display == "Order created"
+
+
+@pytest.mark.django_db
+class TestReasonCodeMigration:
+    def test_known_text_becomes_a_code_and_other_text_is_kept(self):
+        migration = import_module("order.migrations.0081_stocklog_reason_code")
+        product = ProductFactory(stock=5)
+        common = {
+            "product": product,
+            "operation_type": StockLog.OPERATION_INCREMENT,
+            "quantity_delta": 1,
+            "stock_before": 5,
+            "stock_after": 6,
+        }
+        manual = StockLog.objects.create(
+            reason="Manual stock adjustment via admin panel", **common
+        )
+        other = StockLog.objects.create(reason="Order created", **common)
+
+        migration.codes_for_known_texts(django_apps, None)
+        manual.refresh_from_db()
+        other.refresh_from_db()
+
+        assert manual.reason_code == StockLogReason.MANUAL_ADJUSTMENT
+        assert manual.reason == ""
+        assert other.reason_code == ""
+        assert other.reason == "Order created"

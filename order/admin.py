@@ -2537,7 +2537,7 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "stock_before",
         "stock_after",
         "order",
-        "reason",
+        "reason_display",
         "performed_by",
         "created_at",
     )

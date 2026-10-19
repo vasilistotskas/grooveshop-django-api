@@ -163,20 +163,10 @@ class EmailTemplateRegistry:
             )
             return
 
-        # ONE display name per directory. Config-backed templates carry
-        # a category_name ("Order Lifecycle"); everything else in the
-        # same folder must land under the same heading rather than a
-        # second, titleised one ("Order").
-        display_category = next(
-            (
-                cfg.name
-                for cfg in EmailTemplateConfig.CATEGORIES.values()
-                if cfg.path == category_path
-            ),
-            EmailTemplateConfig.DIRECTORY_HEADINGS.get(
-                category_path, category_path.replace("_", " ").title()
-            ),
-        )
+        # ONE heading per directory, so a config-backed template and its
+        # siblings land together. No fallback: a directory without a
+        # heading raises, and a test lists every directory on disk.
+        display_category = EmailTemplateConfig.DIRECTORY_HEADINGS[category_path]
 
         for html_file in html_files:
             try:

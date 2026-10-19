@@ -6,8 +6,8 @@ is changed manually (e.g., via admin panel).
 """
 
 import pytest
-from django.utils.translation import gettext
 
+from order.enum.stock_log_reason import StockLogReason
 from order.models.stock_log import StockLog
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
@@ -36,7 +36,7 @@ class TestStockChangeSignals:
         assert log.quantity_delta == 5
         assert log.stock_before == 10
         assert log.stock_after == 15
-        assert log.reason == gettext("Manual stock adjustment via admin panel")
+        assert log.reason_code == StockLogReason.MANUAL_ADJUSTMENT
         assert log.performed_by == user
         assert log.order is None
 
@@ -59,7 +59,7 @@ class TestStockChangeSignals:
         assert log.quantity_delta == -5
         assert log.stock_before == 20
         assert log.stock_after == 15
-        assert log.reason == gettext("Manual stock adjustment via admin panel")
+        assert log.reason_code == StockLogReason.MANUAL_ADJUSTMENT
         assert log.performed_by == user
 
     def test_no_log_when_stock_unchanged(self):

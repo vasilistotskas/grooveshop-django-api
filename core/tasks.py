@@ -204,6 +204,35 @@ def purge_store_pages_task():
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,
+    autoretry_for=(StorePagesPurgeFailed,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_store_locales_task():
+    """Purge what the storefront cached for the current store's languages.
+
+    Queued by ``tenant.signals`` when ``Tenant.available_locales`` really
+    changes; runs in that store's schema (``TenantTask``). Every page
+    shows the language switcher and its hreflang set, and the sitemap
+    lists each language's URLs, so both surfaces go. Retried like
+    ``purge_store_pages_task``: one change queues one purge.
+    """
+    from core.cache import nuxt as nuxt_client
+    from core.cache.service import CacheService
+    from core.cache.surfaces import SITEMAP_SEO_SURFACE, STORE_PAGES_SURFACE
+
+    report = CacheService.purge(
+        [STORE_PAGES_SURFACE, SITEMAP_SEO_SURFACE], include_related=False
+    )
+    failed = [s.code for s in report.failed_surfaces]
+    if failed and nuxt_client.is_configured():
+        raise StorePagesPurgeFailed(failed)
+    return {"status": "success", "nuxt": report.nuxt_headline}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
     autoretry_for=(EdgePurgeError,),
     # Cloudflare's Free plan refills five purges a minute; back off past it.
     retry_backoff=15,

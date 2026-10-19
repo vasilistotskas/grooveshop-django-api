@@ -118,3 +118,23 @@ the storefront chrome and pages. The agent gateway calls those routes
 feature, so gating them at the API would turn a store's agent checkout and
 catalogue feeds into 404s before the gateway knows to stop offering them.
 They join the table after the gateway reads the feature, gateway first.
+
+## Store languages
+
+`Tenant.available_locales` is the list of languages a store's storefront
+serves; empty means the default locale only. Platform staff set it on the
+tenant form's Branding tab (`TenantAdmin.fieldsets`); a store operator sees
+it read-only, because it is not in `TENANT_SELF_EDITABLE_FIELDS`. The field
+accepts only `STOREFRONT_LOCALES` (the storefront's routes, narrower than
+`settings.LANGUAGES`: `de` is a content language with no `/de` routes) and
+must contain `default_locale`. Adding a language also needs that language's
+legal documents to exist (`Tenant._validate_legal_documents_for_new_locales`).
+
+A change purges what the storefront cached for the store: the language
+switcher and hreflang set of every page, and the sitemap
+(`purge_store_locales_task`: the `store_pages` and `sitemap_seo` surfaces).
+It is queued once the change commits and held for
+`STOREFRONT_TENANT_CACHE_SECONDS`, because the storefront reads the list from
+its copy of the tenant-resolve payload and a purge before that copy expires
+would re-cache pages rendered from the old list. A save that leaves the list
+unchanged queues nothing.

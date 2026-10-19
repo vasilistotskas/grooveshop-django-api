@@ -471,6 +471,7 @@ class TenantAdmin(BaseModelAdmin):
                     "store_description",
                     "store_description_i18n",
                     "default_locale",
+                    "available_locales",
                     "default_currency",
                     "logo_light_url",
                     "logo_dark_url",

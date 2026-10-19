@@ -3,13 +3,14 @@
 Three surfaces, three postures:
 
 * ``RecommendationSlot`` is the one merchants EDIT — chain, weights,
-  limits per surface. Validation lives on the model's ``clean()`` so a
-  bad chain is a field error, not a 500.
-* ``RecommendationCandidate`` is read-only: it is Celery's output, and
+  limits per surface, and whether the weights learn. Validation lives
+  on the model's ``clean()`` so a bad chain is a field error, not a 500.
+* ``RecommendationCandidate`` is read-only: it is Celery's output for
+  the precomputed strategies (``attributes``, ``co_purchase``), and
   editing a row by hand would be overwritten by the next rebuild. It is
   here so "why did it show that" can be answered without a shell.
 * ``RecommendationEvent`` is read-only for the same reason; it is the
-  raw feedback the nightly aggregation reads.
+  raw feedback the nightly weight learning reads.
 
 ``BaseModelAdmin`` keeps all three off the platform console: these are
 tenant-app models and the base withholds them on the public schema.
@@ -53,9 +54,7 @@ STRATEGY_VARIANT: dict[str, str] = {
     StrategyCode.VARIANT_GROUP: "primary",
     StrategyCode.CATEGORY: "primary",
     StrategyCode.ATTRIBUTES: "info",
-    StrategyCode.SEMANTIC: "info",
     StrategyCode.CO_PURCHASE: "warning",
-    StrategyCode.CO_VIEW: "warning",
     StrategyCode.POPULAR: "danger",
 }
 
@@ -77,13 +76,14 @@ class RecommendationSlotAdmin(BaseModelAdmin):
     list_display = (
         "surface_label",
         "enabled",
+        "learn_weights",
         "chain_summary",
         "limit",
         "min_fill",
         "price_band_ratio",
         "updated_at",
     )
-    list_filter = ["enabled", "surface"]
+    list_filter = ["enabled", "learn_weights", "surface"]
     search_fields = ("surface",)
     readonly_fields = ("created_at", "updated_at")
     fieldsets = (
@@ -91,12 +91,14 @@ class RecommendationSlotAdmin(BaseModelAdmin):
         (
             _("Strategy chain"),
             {
-                "fields": ("strategy_chain", "weights"),
+                "fields": ("strategy_chain", "weights", "learn_weights"),
                 "description": _(
                     "Ordered list of strategy codes; a strategy the plan "
                     "does not allow, or that has nothing to say for this "
-                    "store, is skipped. Weights are optional and default "
-                    "to 1.0."
+                    "store yet, is skipped. Weights are optional and "
+                    'default to 1.0. With "Learn weights" on they are '
+                    "recalculated every night from what shoppers bought "
+                    "after seeing each strategy's suggestions here."
                 ),
             },
         ),
@@ -127,9 +129,9 @@ class RecommendationSlotAdmin(BaseModelAdmin):
         dialog=ActionDialog(
             title=_("Reset every slot to the preset?"),
             description=_(
-                "Replaces the chain, weights, limits and price band "
-                "of every surface with the defaults for this store's "
-                "vertical. Your edits are lost."
+                "Replaces the chain, weights, weight learning, limits "
+                "and price band of every surface with the defaults for "
+                "this store's vertical. Your edits are lost."
             ),
         ),
     )
@@ -158,9 +160,9 @@ class RecommendationSlotAdmin(BaseModelAdmin):
         dialog=ActionDialog(
             title=_("Reset this slot to the preset?"),
             description=_(
-                "Replaces this surface's chain, weights, limits and "
-                "price band with the defaults for this store's "
-                "vertical. Your edits are lost."
+                "Replaces this surface's chain, weights, weight "
+                "learning, limits and price band with the defaults for "
+                "this store's vertical. Your edits are lost."
             ),
         ),
     )

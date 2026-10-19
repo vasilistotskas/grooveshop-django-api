@@ -8,10 +8,10 @@ The one idea that is not borrowed from the carriers is
 ``is_available``: a strategy is asked whether it can answer WELL for
 this tenant before it is asked to answer at all. Co-purchase declines
 below a support threshold, ``attributes`` declines when the tenant has
-populated none of the signals it reads, ``semantic`` declines when the
-index has no embedder. **A strategy that cannot answer well returns
-nothing rather than noise** — that is what makes the engine safe for a
-store with zero orders, which is every store on its first day.
+populated none of the signals it reads. **A strategy that cannot answer
+well returns nothing rather than noise** — that is what makes the engine
+safe for a store with zero orders, which is every store on its first
+day.
 """
 
 from __future__ import annotations
@@ -79,7 +79,6 @@ class TenantContext:
     has_attributes: bool
     order_count: int
     multi_item_order_count: int
-    semantic_available: bool
 
 
 class RecommendationStrategy(ABC):
@@ -108,6 +107,11 @@ class RecommendationStrategy(ABC):
     # every order), where the offline table is what keeps the request
     # path constant-cost at any catalogue size.
     precompute: bool = False
+    # Whether this strategy can answer a seedless surface
+    # (``SEEDLESS_SURFACES`` — the empty cart) through ``store_wide``.
+    # The slot's ``clean()`` refuses any other strategy on such a
+    # surface, because it would have nothing to say there.
+    seedless: bool = False
 
     def is_available(self, ctx: TenantContext) -> bool:
         return plan_allows(ctx.plan, self.min_plan)
@@ -139,6 +143,17 @@ class RecommendationStrategy(ABC):
         return {
             seed_id: self.candidates(seed_id, limit) for seed_id in seed_ids
         }
+
+    def store_wide(self, limit: int) -> list[Candidate]:
+        """Up to ``limit`` candidates that need no seed, best first.
+
+        What a seedless surface (``SEEDLESS_SURFACES`` — the empty cart)
+        is answered from: the shopper has nothing in front of them to be
+        similar to, so only a strategy whose answer is about the store
+        as a whole can say anything. Implemented by the strategies that
+        set ``seedless``; the engine asks no other.
+        """
+        raise NotImplementedError(f"{self.code} has no store-wide answer")
 
 
 # Module-level registry. Populated by @register_strategy when

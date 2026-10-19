@@ -113,6 +113,19 @@ class TestRecommendations:
         assert response.data["items"] == []
         assert not RecommendationEvent.objects.exists()
 
+    def test_the_empty_cart_is_answered_without_a_seed(self, client):
+        shown = {_product().id for _ in range(3)}
+
+        response = client.get(self.url, {"surface": Surface.EMPTY_CART})
+
+        assert response.status_code == status.HTTP_200_OK
+        items = response.data["items"]
+        assert shown <= {item["product"]["id"] for item in items}
+        assert {item["reason"]["strategy"] for item in items} == {
+            StrategyCode.POPULAR
+        }
+        uuid.UUID(str(response.data["impression_id"]))
+
     def test_exclusions_are_honoured(self, client, curated_seed):
         seed, curated = curated_seed
         response = client.get(

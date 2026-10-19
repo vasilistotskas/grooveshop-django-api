@@ -1,21 +1,39 @@
-"""Each Free-tier strategy: what it answers, what it declines, and the
-one property the engine's constant cost rests on — a fixed number of
-queries whatever the seed count.
+"""Each strategy: what it answers, what it declines, and the one
+property the engine's constant cost rests on — a query count that does
+not grow with the seed count.
 """
 
 from __future__ import annotations
 
-import pytest
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
+from datetime import timedelta
 
+import pytest
+from django.conf import settings
+from django.db import connection
+from django.db.models.signals import post_save
+from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
+from factory.django import mute_signals
+
+from order.enum.status import OrderStatus
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
+from order.models.order import Order
 from product.enum.relation import RelationType
+from product.factories.attribute import AttributeFactory
+from product.factories.attribute_value import AttributeValueFactory
+from product.factories.brand import BrandFactory
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
 from product.factories.variant_group import ProductVariantGroupFactory
-from product.models import ProductRelation
+from product.models import ProductAttribute, ProductRelation
 from recommendation.enum import StrategyCode
 from recommendation.strategies import get_strategy
+from recommendation.strategies.base import TenantContext
+from tag.factories.tag import TagFactory
+from tag.factories.tagged_item import TaggedProductFactory
+from tenant.models import TenantPlan
 
 pytestmark = pytest.mark.django_db
 
@@ -219,4 +237,185 @@ class TestPopular:
             out = strategy.candidates_for([s.id for s in seeds], 4)
 
         assert len(one) == len(three) == 1
+        assert set(out) == {s.id for s in seeds}
+
+
+def _context(plan, **facts):
+    values = {
+        "product_count": 10,
+        "has_brands": False,
+        "has_tags": False,
+        "has_attributes": False,
+        "order_count": 0,
+        "multi_item_order_count": 0,
+    }
+    values.update(facts)
+    return TenantContext(plan=plan, **values)
+
+
+def _value(active=True):
+    return AttributeValueFactory(
+        attribute=AttributeFactory(active=True), active=active
+    )
+
+
+def _with_values(product, *values):
+    for value in values:
+        ProductAttribute.objects.create(product=product, attribute_value=value)
+    return product
+
+
+class TestAttributes:
+    def test_more_shared_features_rank_first_by_jaccard(self):
+        red, cotton = _value(), _value()
+        brand = BrandFactory()
+        seed = _with_values(_product(brand=brand), red, cotton)
+        twin = _with_values(_product(brand=brand), red, cotton)
+        cousin = _with_values(_product(), red)
+        _with_values(_product(), _value())
+
+        out = get_strategy(StrategyCode.ATTRIBUTES).candidates(seed.id, 4)
+
+        assert _ids(out) == [twin.id, cousin.id]
+        # 3 shared of 3 | 1 shared of seed 3 + cousin 1 - 1
+        assert [c.score for c in out] == [1.0, round(1 / 3, 4)]
+
+    def test_tags_count_as_features(self):
+        tag = TagFactory(active=True)
+        seed, tagged = _product(), _product()
+        TaggedProductFactory(content_object=seed, tag=tag)
+        TaggedProductFactory(content_object=tagged, tag=tag)
+
+        out = get_strategy(StrategyCode.ATTRIBUTES).candidates(seed.id, 4)
+
+        assert _ids(out) == [tagged.id]
+
+    def test_inactive_features_and_unsellable_products_are_ignored(self):
+        hidden_value = _value(active=False)
+        hidden_tag = TagFactory(active=False)
+        shared = _value()
+        seed = _with_values(_product(), hidden_value, shared)
+        same_hidden = _with_values(_product(), hidden_value)
+        TaggedProductFactory(content_object=seed, tag=hidden_tag)
+        TaggedProductFactory(content_object=same_hidden, tag=hidden_tag)
+        _with_values(_product(active=False), shared)
+
+        strategy = get_strategy(StrategyCode.ATTRIBUTES)
+        assert strategy.candidates(seed.id, 4) == []
+
+    @override_settings(RECOMMENDATION_ATTRIBUTES_MAX_FEATURE_PRODUCTS=2)
+    def test_a_feature_on_too_many_products_finds_no_candidates(self):
+        """The brand is on three active products — over the cap — so
+        it finds nobody; it still counts in each product's set size."""
+        brand = BrandFactory()
+        rare = _value()
+        seed = _with_values(_product(brand=brand), rare)
+        partner = _with_values(_product(brand=brand), rare)
+        _product(brand=brand)
+
+        out = get_strategy(StrategyCode.ATTRIBUTES).candidates(seed.id, 4)
+
+        assert _ids(out) == [partner.id]
+        # Overlap counted on the rare value only: 1 / (2 + 2 - 1).
+        assert out[0].score == round(1 / 3, 4)
+
+    def test_declines_below_its_plan_or_without_any_signal(self):
+        strategy = get_strategy(StrategyCode.ATTRIBUTES)
+
+        assert not strategy.is_available(
+            _context(TenantPlan.TRIAL, has_attributes=True)
+        )
+        assert not strategy.is_available(_context(TenantPlan.BASIC))
+        for signal in ("has_attributes", "has_tags", "has_brands"):
+            assert strategy.is_available(
+                _context(TenantPlan.BASIC, **{signal: True})
+            )
+
+    def test_query_count_does_not_grow_with_the_seeds(self):
+        value = _value()
+        seeds = [_with_values(_product(), value) for _ in range(3)]
+        _with_values(_product(), value)
+        strategy = get_strategy(StrategyCode.ATTRIBUTES)
+
+        with CaptureQueriesContext(connection) as one:
+            strategy.candidates_for([seeds[0].id], 4)
+        with CaptureQueriesContext(connection) as three:
+            out = strategy.candidates_for([s.id for s in seeds], 4)
+
+        assert len(one) == len(three)
+        assert set(out) == {s.id for s in seeds}
+
+
+def _bought_together(*products, status=OrderStatus.COMPLETED):
+    with mute_signals(post_save):
+        order = OrderFactory(num_order_items=0, status=status)
+        for product in products:
+            OrderItemFactory(order=order, product=product)
+    return order
+
+
+class TestCoPurchase:
+    @pytest.fixture(autouse=True)
+    def _support_of_two(self, settings):
+        settings.RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT = 2
+
+    def test_scored_by_the_share_of_the_seeds_orders(self):
+        seed, partner, sometimes, once = (_product() for _ in range(4))
+        for _ in range(2):
+            _bought_together(seed, partner, sometimes)
+        _bought_together(seed, partner, once)
+        _bought_together(seed, partner)
+        _bought_together(seed)
+
+        out = get_strategy(StrategyCode.CO_PURCHASE).candidates(seed.id, 4)
+
+        # 4 and 2 of the seed's 5 orders; ``once`` is under the support.
+        assert _ids(out) == [partner.id, sometimes.id]
+        assert [c.score for c in out] == [0.8, 0.4]
+
+    def test_canceled_old_and_unsellable_purchases_do_not_count(self):
+        seed, partner, retired = _product(), _product(), _product()
+        for _ in range(2):
+            _bought_together(seed, partner, status=OrderStatus.CANCELED)
+        old = [_bought_together(seed, partner) for _ in range(2)]
+        window = settings.RECOMMENDATION_CO_PURCHASE_WINDOW_DAYS
+        Order.objects.filter(pk__in=[o.pk for o in old]).update(
+            created_at=timezone.now() - timedelta(days=window + 1)
+        )
+        for _ in range(2):
+            _bought_together(seed, retired)
+        retired.active = False
+        retired.save()
+
+        strategy = get_strategy(StrategyCode.CO_PURCHASE)
+        assert strategy.candidates(seed.id, 4) == []
+
+    @override_settings(RECOMMENDATION_CO_PURCHASE_MIN_ORDERS=50)
+    def test_declines_below_its_plan_or_its_multi_item_orders(self):
+        strategy = get_strategy(StrategyCode.CO_PURCHASE)
+
+        assert not strategy.is_available(
+            _context(TenantPlan.BASIC, multi_item_order_count=500)
+        )
+        assert not strategy.is_available(
+            _context(TenantPlan.PRO, multi_item_order_count=49)
+        )
+        assert strategy.is_available(
+            _context(TenantPlan.PRO, multi_item_order_count=50)
+        )
+
+    def test_two_queries_for_any_number_of_seeds(self):
+        seeds = [_product() for _ in range(3)]
+        partner = _product()
+        for seed in seeds:
+            for _ in range(2):
+                _bought_together(seed, partner)
+        strategy = get_strategy(StrategyCode.CO_PURCHASE)
+
+        with CaptureQueriesContext(connection) as one:
+            strategy.candidates_for([seeds[0].id], 4)
+        with CaptureQueriesContext(connection) as three:
+            out = strategy.candidates_for([s.id for s in seeds], 4)
+
+        assert len(one) == len(three) == 2
         assert set(out) == {s.id for s in seeds}

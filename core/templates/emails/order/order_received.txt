@@ -34,8 +34,7 @@
 {% endif %}{% if order.loyalty_discount.amount > 0 %}{% trans "Loyalty discount" %}: -{{ order.loyalty_discount }}
 {% endif %}{% if order.gift_card_amount.amount > 0 %}{% trans "Gift card" %}: -{{ order.gift_card_amount }}
 {% endif %}{% trans "Total" %}: {{ order.calculate_order_total_amount }}
-
-{% if expects_payment_confirmation %}{% trans "You will receive a second email as soon as we confirm your payment." %}
+{% include "emails/order/_suggestions.txt" %}{% if expects_payment_confirmation %}{% trans "You will receive a second email as soon as we confirm your payment." %}
 {% endif %}{% trans "We will email you as your order progresses." %}
 
 {{ SITE_NAME }}

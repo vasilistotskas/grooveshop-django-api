@@ -20,19 +20,25 @@ class Surface(models.TextChoices):
     ORDER_EMAIL = "order_email", _("Order email")
 
 
+# Surfaces answered without a seed product: the shopper has nothing in
+# front of them to be "like", so only store-wide strategies can answer
+# (``RecommendationStrategy.store_wide``). Every other surface requires
+# at least one seed.
+SEEDLESS_SURFACES = frozenset({Surface.EMPTY_CART})
+
+
 class StrategyCode(models.TextChoices):
     """The registry keys. Adding a strategy means adding a member here
-    AND a ``@register_strategy`` class — the enum is what a slot's
-    ``strategy_chain`` is validated against, so an unregistered code can
-    never be configured."""
+    AND a ``@register_strategy`` class in the same change — the enum is
+    what a slot's ``strategy_chain`` is validated against, and a test
+    pins that every member is registered, so the admin can never offer
+    a strategy that does nothing."""
 
     CURATED = "curated", _("Merchant curated")
     VARIANT_GROUP = "variant_group", _("Same variant group")
     CATEGORY = "category", _("Same category")
     ATTRIBUTES = "attributes", _("Shared attributes, tags and brand")
-    SEMANTIC = "semantic", _("Semantic similarity")
     CO_PURCHASE = "co_purchase", _("Bought together")
-    CO_VIEW = "co_view", _("Viewed together")
     POPULAR = "popular", _("Popular")
 
 

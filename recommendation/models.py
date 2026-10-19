@@ -11,7 +11,13 @@ from django_stubs_ext.db.models import TypedModelMeta
 from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel
 from product.enum.relation import RelationType
-from recommendation.enum import AttachMatch, EventKind, StrategyCode, Surface
+from recommendation.enum import (
+    SEEDLESS_SURFACES,
+    AttachMatch,
+    EventKind,
+    StrategyCode,
+    Surface,
+)
 
 
 class RecommendationSlot(TimeStampMixinModel):
@@ -20,6 +26,8 @@ class RecommendationSlot(TimeStampMixinModel):
 
     One row per ``Surface`` per tenant, seeded from a vertical preset
     at provisioning (``recommendation/presets.py``) and edited in admin.
+    With ``learn_weights`` on, ``weights`` is rewritten nightly by
+    ``recommendation.learning`` from the surface's attach rates.
     ``strategy_chain`` and ``weights`` are JSON validated against
     ``recommendation/json_schemas.py`` rather than a widget-heavy
     relation table, because a chain is edited a handful of times per
@@ -58,7 +66,19 @@ class RecommendationSlot(TimeStampMixinModel):
         validators=[JSONSchemaValidator("recommendation.json_schemas.weights")],
         help_text=_(
             "Strategy code → weight in 0..1. Missing codes default to "
-            "1.0. Updated nightly from attach rate on plans that learn."
+            '1.0. With "Learn weights" on, replaced nightly from each '
+            "strategy's attach rate on this surface."
+        ),
+    )
+    learn_weights = models.BooleanField(
+        _("Learn weights"),
+        default=True,
+        db_default=True,
+        help_text=_(
+            "Every night, re-weight the strategies by how often the "
+            "products each one suggested here were then bought. A "
+            "strategy needs enough recent impressions before its weight "
+            "moves. Turn off to keep weights you set by hand."
         ),
     )
     limit = models.PositiveSmallIntegerField(_("Limit"), default=4)
@@ -93,11 +113,35 @@ class RecommendationSlot(TimeStampMixinModel):
 
     def clean(self) -> None:
         """The rules the field schemas cannot express: every weighted
-        code is in the chain, and ``min_fill`` fits in ``limit``.
-        Weights are stored as floats."""
+        code is in the chain, ``min_fill`` fits in ``limit``, and a
+        seedless surface chains only strategies that can answer without
+        a seed. Weights are stored as floats."""
         from django.core.exceptions import ValidationError
 
+        from recommendation.strategies import get_strategy
+
         errors: dict[str, list[str]] = {}
+        if self.surface in SEEDLESS_SURFACES and isinstance(
+            self.strategy_chain, list
+        ):
+            # Unknown codes are the field validator's error, not this one.
+            unable = [
+                str(get_strategy(code).label)
+                for code in self.strategy_chain
+                if code in StrategyCode.values
+                and not get_strategy(code).seedless
+            ]
+            if unable:
+                errors["strategy_chain"] = [
+                    str(
+                        _(
+                            "This surface has no product to start from, so "
+                            "these strategies have nothing to suggest "
+                            "here: %(names)s"
+                        )
+                        % {"names": ", ".join(unable)}
+                    )
+                ]
         if isinstance(self.weights, dict) and isinstance(
             self.strategy_chain, list
         ):
@@ -129,10 +173,10 @@ class RecommendationCandidate(models.Model):
     (product, strategy), written by Celery, read by the request path.
 
     This table is the seam that keeps the read path constant-cost at
-    any catalogue size. Rebuilt per product on save via
-    ``dispatch_on_commit`` and in full nightly for behavioural
-    strategies; ``computed_at`` lets the engine spot a stale row and
-    fall back to a live compute for that seed.
+    any catalogue size. Rows exist only for the strategies with
+    ``precompute`` set (``attributes``, ``co_purchase``): rebuilt per
+    product on save via ``dispatch_on_commit`` and for the whole
+    catalogue nightly (``tasks.recompute_all_candidates``).
     """
 
     product = models.ForeignKey(

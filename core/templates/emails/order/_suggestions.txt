@@ -1,0 +1,4 @@
+{% load i18n %}{% if suggested_products %}
+{% trans "YOU MIGHT ALSO LIKE" %}
+{% for product in suggested_products %}{{ product.name|safe }}: {{ product.url|safe }}
+{% endfor %}{% endif %}

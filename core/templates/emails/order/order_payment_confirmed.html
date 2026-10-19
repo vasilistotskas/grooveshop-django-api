@@ -83,6 +83,8 @@
     <p class="text-bold"><strong>{% trans "Total Paid" %}:</strong> {{ order.amount_due }}</p>
 </div>
 
+{% include "emails/order/_suggestions.html" %}
+
 <p class="mt-3">{% trans "We will notify you again once your order ships." %}</p>
 <p>{% trans "Thank you for shopping with us!" %}</p>
 {% endblock %}

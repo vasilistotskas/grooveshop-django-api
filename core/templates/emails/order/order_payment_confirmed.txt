@@ -29,8 +29,7 @@
 {% endif %}{% if order.loyalty_discount.amount > 0 %}{% trans "Loyalty discount" %}: -{{ order.loyalty_discount }}
 {% endif %}{% if order.gift_card_amount.amount > 0 %}{% trans "Gift card" %}: -{{ order.gift_card_amount }}
 {% endif %}{% trans "Total Paid" %}: {{ order.amount_due }}
-
-{% trans "We will notify you again once your order ships." %}
+{% include "emails/order/_suggestions.txt" %}{% trans "We will notify you again once your order ships." %}
 
 {{ SITE_NAME }}
 {{ INFO_EMAIL }}

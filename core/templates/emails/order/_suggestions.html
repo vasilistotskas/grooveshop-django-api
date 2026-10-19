@@ -1,0 +1,12 @@
+{% load i18n %}{% if suggested_products %}
+<h3>{% trans "You might also like" %}</h3>
+<table class="email-table">
+    <tbody>
+        {% for product in suggested_products %}
+        <tr>
+            <td><a href="{{ product.url }}">{{ product.name }}</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}

@@ -8,10 +8,11 @@ yet; the slot admin's "Reset to preset" re-applies it on demand. Seeding
 never overwrites a row a merchant has edited — ``get_or_create`` only;
 only the explicit reset does.
 
-Every preset lists the Free-tier strategies first and the plan-gated
-ones after: the engine skips a strategy the plan does not allow, so a
-preset can name ``semantic`` for every vertical and it simply starts
-contributing the day the store upgrades. Order is priority, not tier.
+A preset names plan-gated strategies (``attributes``, ``co_purchase``)
+alongside the Free ones: the engine skips a strategy the plan does not
+allow, or one the store's data cannot support yet, so it simply starts
+contributing the day the store upgrades or earns the support. Order is
+priority, not tier.
 
 ``min_fill`` differs by surface on purpose. A product-page strip with
 one item looks broken, so it wants two; a cart cross-sell of one
@@ -43,6 +44,7 @@ PRESET_FIELDS = (
     "limit",
     "min_fill",
     "price_band_ratio",
+    "learn_weights",
     "enabled",
 )
 
@@ -61,6 +63,7 @@ def _slot(
         "limit": limit,
         "min_fill": min_fill,
         "price_band_ratio": price_band_ratio,
+        "learn_weights": True,
         "enabled": True,
     }
 
@@ -94,7 +97,6 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
             S.CURATED,
             S.VARIANT_GROUP,
             S.ATTRIBUTES,
-            S.SEMANTIC,
             S.CATEGORY,
             S.POPULAR,
         ],
@@ -102,7 +104,6 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
         out_of_stock=[
             S.CURATED,
             S.VARIANT_GROUP,
-            S.SEMANTIC,
             S.ATTRIBUTES,
             S.CATEGORY,
             S.POPULAR,
@@ -117,20 +118,18 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
             S.VARIANT_GROUP,
             S.CURATED,
             S.ATTRIBUTES,
-            S.SEMANTIC,
             S.CATEGORY,
             S.POPULAR,
         ],
-        cart=[S.CURATED, S.CO_PURCHASE, S.SEMANTIC, S.ATTRIBUTES, S.POPULAR],
+        cart=[S.CURATED, S.CO_PURCHASE, S.ATTRIBUTES, S.POPULAR],
         out_of_stock=[
             S.VARIANT_GROUP,
             S.CURATED,
-            S.SEMANTIC,
             S.ATTRIBUTES,
             S.CATEGORY,
             S.POPULAR,
         ],
-        order_email=[S.CURATED, S.CO_PURCHASE, S.SEMANTIC],
+        order_email=[S.CURATED, S.CO_PURCHASE],
         cart_band="4.00",
     ),
     # Plants & garden: complements (pot, soil, feed) matter more than
@@ -140,14 +139,12 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
             S.CURATED,
             S.CO_PURCHASE,
             S.ATTRIBUTES,
-            S.SEMANTIC,
             S.CATEGORY,
             S.POPULAR,
         ],
         cart=[S.CURATED, S.CO_PURCHASE, S.ATTRIBUTES, S.POPULAR],
         out_of_stock=[
             S.CURATED,
-            S.SEMANTIC,
             S.ATTRIBUTES,
             S.CATEGORY,
             S.POPULAR,
@@ -160,7 +157,6 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     StoreVertical.ELECTRONICS: _preset(
         pdp=[
             S.CURATED,
-            S.SEMANTIC,
             S.ATTRIBUTES,
             S.VARIANT_GROUP,
             S.CATEGORY,
@@ -169,7 +165,6 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
         cart=[S.CURATED, S.CO_PURCHASE, S.ATTRIBUTES, S.POPULAR],
         out_of_stock=[
             S.CURATED,
-            S.SEMANTIC,
             S.ATTRIBUTES,
             S.VARIANT_GROUP,
             S.CATEGORY,
@@ -180,9 +175,9 @@ PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     # Food & drink: pairs-with is curated; repeat purchase dominates,
     # and baskets are bigger, so the cart strip is wider.
     StoreVertical.FOOD: _preset(
-        pdp=[S.CURATED, S.CO_PURCHASE, S.CATEGORY, S.SEMANTIC, S.POPULAR],
+        pdp=[S.CURATED, S.CO_PURCHASE, S.CATEGORY, S.POPULAR],
         cart=[S.CURATED, S.CO_PURCHASE, S.CATEGORY, S.POPULAR],
-        out_of_stock=[S.CURATED, S.CATEGORY, S.SEMANTIC, S.POPULAR],
+        out_of_stock=[S.CURATED, S.CATEGORY, S.POPULAR],
         order_email=[S.CURATED, S.CO_PURCHASE],
         cart_band="6.00",
         cart_limit=6,

@@ -27,7 +27,6 @@ def _context(plan: str) -> TenantContext:
         has_attributes=False,
         order_count=0,
         multi_item_order_count=0,
-        semantic_available=False,
     )
 
 
@@ -40,14 +39,29 @@ def registry_snapshot():
 
 
 class TestRegistry:
-    def test_step_one_strategies_are_registered_at_boot(self):
-        codes = {s.code for s in iter_strategies()}
-        assert {
-            StrategyCode.CURATED,
-            StrategyCode.VARIANT_GROUP,
-            StrategyCode.CATEGORY,
-            StrategyCode.POPULAR,
-        } <= codes
+    def test_every_strategy_code_is_registered_at_boot(self):
+        """The admin offers every ``StrategyCode`` in a slot's chain; a
+        code with no strategy behind it would be a promise the engine
+        silently skips."""
+        assert {str(s.code) for s in iter_strategies()} == set(
+            StrategyCode.values
+        )
+
+    def test_only_seedless_strategies_answer_without_a_seed(self):
+        """``seedless`` is what the slot's ``clean()`` trusts for the
+        empty cart, so it must match the strategies that really
+        implement ``store_wide``."""
+        for strategy in iter_strategies():
+            implements = (
+                type(strategy).store_wide
+                is not RecommendationStrategy.store_wide
+            )
+            assert strategy.seedless is implements, strategy.code
+        assert get_strategy(StrategyCode.POPULAR).seedless is True
+
+    def test_a_strategy_without_a_store_wide_answer_refuses_to_give_one(self):
+        with pytest.raises(NotImplementedError):
+            get_strategy(StrategyCode.CURATED).store_wide(4)
 
     def test_unknown_code_raises_and_names_the_known_ones(self):
         with pytest.raises(KeyError, match="curated"):
@@ -64,13 +78,13 @@ class TestRegistry:
     def test_re_registering_a_code_swaps_the_instance(self, registry_snapshot):
         @register_strategy
         class Stub(RecommendationStrategy):
-            code = StrategyCode.CO_VIEW
+            code = StrategyCode.CO_PURCHASE
             label = "stub"
 
             def candidates(self, product_id, limit):
                 return [Candidate(product_id=1, score=1.0)]
 
-        assert isinstance(get_strategy(StrategyCode.CO_VIEW), Stub)
+        assert isinstance(get_strategy(StrategyCode.CO_PURCHASE), Stub)
 
 
 class TestPlanGate:

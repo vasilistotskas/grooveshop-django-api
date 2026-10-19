@@ -12,16 +12,21 @@ decision per strategy instead of a scatter of ad-hoc lookups.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, fields
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count
 
 from recommendation.strategies.base import TenantContext
 from tenant.models import TenantPlan
 
-_CACHE_KEY = "recs:tenant_context"
+# The field names are part of the key: the value is rebuilt as
+# ``TenantContext(**cached)``, so a release that adds or drops a field
+# must never read a dict the previous release cached — it would raise
+# on every recommendation request until the TTL ran out.
+_CACHE_KEY = "recs:tenant_context:" + ",".join(
+    f.name for f in fields(TenantContext)
+)
 _CACHE_TTL = 300
 
 
@@ -52,16 +57,6 @@ def current_vertical() -> str:
     return str(tenant.vertical) if tenant is not None else StoreVertical.GENERAL
 
 
-def _semantic_available() -> bool:
-    # Wired in Step 3 together with the embedder: until an index carries
-    # one, the ``semantic`` strategy has nothing to query. Kept as a
-    # context fact rather than a strategy-local check so the admin can
-    # show WHY a configured strategy is being skipped.
-    if settings.MEILISEARCH.get("OFFLINE"):
-        return False
-    return bool(getattr(settings, "RECOMMENDATION_EMBEDDER", None))
-
-
 def build_tenant_context() -> TenantContext:
     """Uncached build. Prefer ``tenant_context()``."""
     from order.models.order import Order
@@ -87,7 +82,6 @@ def build_tenant_context() -> TenantContext:
         multi_item_order_count=(
             Order.objects.annotate(n=Count("items")).filter(n__gte=2).count()
         ),
-        semantic_available=_semantic_available(),
     )
 
 
@@ -102,3 +96,22 @@ def tenant_context() -> TenantContext:
 
 def invalidate_tenant_context() -> None:
     cache.delete(_CACHE_KEY)
+
+
+def recommendations_active() -> bool:
+    """Whether the active store shows suggestions at all.
+
+    The same two tiers the read endpoint enforces with
+    ``IsRecommendationsEnabled`` and ``IsRecommendationsRuntimeEnabled``
+    — the plan flag on the ``Tenant`` row and the merchant's
+    ``PRODUCT_SUGGESTIONS_ENABLED`` setting — for the paths that have no
+    request to run a permission on: the order email and the nightly
+    jobs.
+    """
+    from extra_settings.models import Setting
+
+    from tenant.membership import tenant_plan_allows
+
+    if not tenant_plan_allows("recommendations_enabled"):
+        return False
+    return bool(Setting.get("PRODUCT_SUGGESTIONS_ENABLED", default=False))

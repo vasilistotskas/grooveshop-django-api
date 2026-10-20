@@ -3,6 +3,53 @@
 
 
 
+## v3.143.0 (2026-10-20)
+
+### Bug fixes
+
+* fix(admin): a restock reason fits the stock log, and the error detail stays a string
+
+The API accepted a 255-character reason, which the stock log column then
+overflowed once the fixed prefix was added; it is capped at 150 like the
+admin dialog (one constant). The restock 400 carries detail as a single
+string, like every other error of the endpoint.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f8533a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8533a075651ebde9e2a91fd0958577522af373d))
+
+### Chores
+
+* chore(schema): the restock reason is capped at 150 characters
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f8533a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8533a075651ebde9e2a91fd0958577522af373d))
+
+### Features
+
+* feat(admin): restock returned items from the order page (#276) ([`f8533a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8533a075651ebde9e2a91fd0958577522af373d))
+
+* feat(admin): restock returned items from the order page
+
+Returned units could only be put back on the shelf through
+POST order-items/<id>/restock; the admin had no way to do it. The order
+page now has a "Restock returned items" dialog: one quantity per line
+that still has units not put back, and a reason. It calls the same
+OrderItem.refund the endpoint does, for all lines in one transaction.
+
+The guards move into that shared method so both paths hold them:
+the order is locked first and its status judged under the lock
+(delivered, completed or returned), then the line, so a unit is never put
+back twice or beyond what was sold, and a cancel cannot slip in between.
+The stock log row now names who did it and why (the endpoint passed
+neither); the endpoint also reports the actual refusal instead of a
+generic validation error. Nothing here touches payments; after a refund
+the admin only points staff at the new action.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTeLQc2mnu9hd6zwPD3bn5 ([`f8533a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8533a075651ebde9e2a91fd0958577522af373d))
+
 ## v3.142.3 (2026-10-20)
 
 ### Bug fixes

@@ -17,6 +17,8 @@ from django.conf import settings
 from django.core.management import call_command
 from django.test import override_settings
 
+from core.utils.po_catalogue import canonical_text
+
 MESSAGES = Path("el") / "LC_MESSAGES" / "django.po"
 CATALOGUES = {
     "project": Path(settings.BASE_DIR) / "locale" / MESSAGES,
@@ -69,3 +71,17 @@ def test_the_unfold_catalogue_covers_the_installed_unfold(tmp_path):
         return {(entry.msgctxt, entry.msgid) for entry in _live_entries(path)}
 
     assert messages(copy) - messages(CATALOGUES["unfold"]) == set()
+
+
+@pytest.mark.parametrize(
+    "catalogue",
+    sorted((Path(settings.BASE_DIR) / "locale").glob("*/LC_MESSAGES/*.po")),
+    ids=lambda path: path.parent.parent.name,
+)
+def test_the_catalogue_is_in_canonical_form(catalogue):
+    """Sorted, with no source locations: two PRs that add different messages
+    then touch different lines and merge cleanly.
+
+    Fix it with ``uv run python manage.py makemessages -l el -l en -l de``,
+    which writes this form (``core/utils/po_catalogue.py``)."""
+    assert catalogue.read_text(encoding="utf-8") == canonical_text(catalogue)

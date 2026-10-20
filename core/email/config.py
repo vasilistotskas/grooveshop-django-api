@@ -59,6 +59,7 @@ class EmailTemplateConfig:
         "order": _("Order Lifecycle"),
         "subscription": _("Subscription"),
         "user": _("User Management"),
+        "staff": _("Staff"),
         "b2b": _("B2B"),
         "billing": _("Billing"),
         "cart": _("Cart"),

@@ -12,6 +12,9 @@
     return;
   }
 
+  const CONFIRMATION_MS = 2000;
+  const timers = new WeakMap();
+
   const textOf = (id) => {
     const source = document.getElementById(id);
     if (!source) {
@@ -23,15 +26,37 @@
       : source.textContent.trim();
   };
 
+  // Shows `message` on the button for a moment. The original label is read
+  // once, so a second click while the message shows cannot make the message
+  // the label for good.
   const confirmed = (button, message) => {
     const label = button.querySelector(".js-staff-label");
-    const original = label.textContent;
+    label.dataset.original ??= label.textContent;
+    window.clearTimeout(timers.get(button));
     label.textContent = message;
     status.textContent = message;
-    window.setTimeout(() => {
-      label.textContent = original;
-      status.textContent = "";
-    }, 2000);
+    timers.set(
+      button,
+      window.setTimeout(() => {
+        label.textContent = label.dataset.original;
+        status.textContent = "";
+      }, CONFIRMATION_MS),
+    );
+  };
+
+  // The codes are shown once: when the clipboard is refused (no secure
+  // context, or the browser said no), select them so they can be copied by
+  // hand, and say so.
+  const selectForManualCopy = (id) => {
+    const source = document.getElementById(id);
+    if (!source) {
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(source);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
 
   const download = (text, filename) => {
@@ -49,12 +74,17 @@
       return;
     }
     const text = textOf(button.value);
-    if (button.classList.contains("js-staff-copy")) {
-      await navigator.clipboard.writeText(text);
-      confirmed(button, i18n.dataset.copied);
-    } else {
+    if (button.classList.contains("js-staff-download")) {
       download(text, i18n.dataset.filename);
       confirmed(button, i18n.dataset.saved);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      confirmed(button, i18n.dataset.copied);
+    } catch {
+      selectForManualCopy(button.value);
+      status.textContent = i18n.dataset.copyFailed;
     }
   });
 })();

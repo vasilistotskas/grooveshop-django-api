@@ -422,16 +422,19 @@ class TestThePendingSignIn:
         assert response.context["form"].step is Step.PASSWORD
         assert staff_mfa.PENDING_SESSION_KEY not in client.session
 
-    def test_each_step_restarts_the_clock(self, settings):
+    def test_each_step_restarts_the_clock(self, monkeypatch):
         user = _superuser()
         client = Client()
+        monkeypatch.setattr(staff_mfa.time, "time", lambda: 1_000_000.0)
         secret = _password(client, user).context["form"].enrolment.secret
         before = client.session[staff_mfa.PENDING_SESSION_KEY]["issued_at"]
 
+        # A minute later, well inside the window: the step must restart it.
+        monkeypatch.setattr(staff_mfa.time, "time", lambda: 1_000_060.0)
         _answer(client, "enrol", _code(secret))
 
         after = client.session[staff_mfa.PENDING_SESSION_KEY]["issued_at"]
-        assert after >= before
+        assert (before, after) == (1_000_000.0, 1_000_060.0)
         assert (
             client.session[staff_mfa.PENDING_SESSION_KEY]["step"] == "recovery"
         )
@@ -607,7 +610,8 @@ class TestTheLoginPage:
         assert "js-staff-copy" in body
         assert "js-staff-download" in body
         assert 'id="recovery-codes"' in body
-        assert 'value="recovery"' in body
+        # Both buttons read the codes list by its id.
+        assert body.count('value="recovery-codes"') == 2
 
 
 class TestReset:

@@ -2818,6 +2818,9 @@ msgstr "Copy all"
 msgid "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 msgstr "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 
+msgid "Copying failed: the text is selected, copy it with Ctrl+C."
+msgstr "Copying failed: the text is selected, copy it with Ctrl+C."
+
 msgid "Correct the details and send them again"
 msgstr "Correct the details and send them again"
 

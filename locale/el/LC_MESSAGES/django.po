@@ -2840,6 +2840,9 @@ msgstr "Αντιγραφή όλων"
 msgid "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 msgstr "Αντιγραφή κάθε είδους από προηγούμενη παραγγελία πίσω στο ενεργό καλάθι του συνδεδεμένου χρήστη. Τα είδη των οποίων τα προϊόντα είναι ανενεργά ή εξαντλημένα επιστρέφονται στο skipped_items· οι ποσότητες περιορίζονται στο τρέχον απόθεμα."
 
+msgid "Copying failed: the text is selected, copy it with Ctrl+C."
+msgstr "Η αντιγραφή απέτυχε: το κείμενο είναι επιλεγμένο, αντιγράψτε το με Ctrl+C."
+
 msgid "Correct the details and send them again"
 msgstr "Διορθώστε τα στοιχεία και στείλτε τα ξανά"
 

@@ -70,9 +70,9 @@ def test_stamp_without_membership_is_not_staff(tenant, bind):
     assert is_store_staff(user) is False
 
 
-def test_member_role_is_not_staff(tenant, bind):
+def test_unrecognised_role_is_not_staff(tenant, bind):
     bind(tenant)
-    user = store_staff(tenant, role=TenantMembershipRole.MEMBER)
+    user = store_staff(tenant, role="retired")
     assert is_store_staff(user) is False
 
 

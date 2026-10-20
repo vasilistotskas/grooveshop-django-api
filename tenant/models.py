@@ -1653,21 +1653,19 @@ class TenantMembershipRole(models.TextChoices):
     The global ``User.is_staff`` / ``is_superuser`` flags keep their
     platform-wide meaning (platform operators who manage Tenant rows in
     the public-schema admin). These per-tenant roles govern what a user
-    can do *inside* a tenant they belong to:
+    can do *inside* a tenant they belong to. Customers hold none: they
+    are scoped to a store by living in that store's schema, not by a
+    membership row (see tenant/membership.py).
 
-    - MEMBER  — RESERVED, no longer issued. Customers are scoped to a
-                store by living in that store's schema, not by a
-                membership row; the rows this role once carried were
-                removed in migration 0015. See tenant/membership.py.
     - STAFF   — can view the tenant's operational admin (orders,
                 products) but cannot change tenant settings or invite
                 other staff.
     - ADMIN   — full admin within the tenant (settings, team).
     - OWNER   — same as ADMIN plus cannot be demoted/removed by other
-                admins; the tenant must always have at least one owner.
+                admins; the tenant must always have at least one owner
+                (``UserTenantMembership`` refuses to remove the last).
     """
 
-    MEMBER = "member", _("Member")
     STAFF = "staff", _("Staff")
     ADMIN = "admin", _("Admin")
     OWNER = "owner", _("Owner")
@@ -1754,7 +1752,7 @@ class UserTenantMembership(TimeStampMixinModel):
 
     ``UserAccount`` lives in SHARED_APPS — there is one platform-wide
     identity per email. Membership in a tenant is an explicit row here,
-    so the same person can have a ``webside`` membership as MEMBER and
+    so the same person can have a ``webside`` membership as STAFF and
     a ``tenant-b`` membership as ADMIN without duplicating the user
     record. Any API or admin path that is tenant-scoped MUST verify an
     active membership for the requesting user + the current
@@ -1779,7 +1777,6 @@ class UserTenantMembership(TimeStampMixinModel):
         _("Role"),
         max_length=20,
         choices=TenantMembershipRole.choices,
-        default=TenantMembershipRole.MEMBER,
     )
     is_active = models.BooleanField(_("Active"), default=True)
 

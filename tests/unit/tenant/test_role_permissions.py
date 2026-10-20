@@ -203,9 +203,9 @@ class TestGrantsNothing:
         bind_tenant(tenant)
         assert TenantRolePermissionBackend().get_all_permissions(user) == set()
 
-    def test_for_the_retired_member_role(self, tenant, bind_tenant):
+    def test_for_an_unrecognised_role(self, tenant, bind_tenant):
         user = _staff_identity()
-        _member(user, tenant, TenantMembershipRole.MEMBER)
+        _member(user, tenant, "retired")
         bind_tenant(tenant)
         assert TenantRolePermissionBackend().get_all_permissions(user) == set()
 

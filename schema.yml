@@ -28769,7 +28769,6 @@ paths:
                     role:
                       type: string
                       enum:
-                      - member
                       - staff
                       - admin
                       - owner

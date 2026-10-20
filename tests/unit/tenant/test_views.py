@@ -216,7 +216,7 @@ class TestMyMemberships:
             user=user, tenant=tenant_a, role=TenantMembershipRole.OWNER
         )
         UserTenantMembership.objects.create(
-            user=user, tenant=tenant_b, role=TenantMembershipRole.MEMBER
+            user=user, tenant=tenant_b, role=TenantMembershipRole.STAFF
         )
         # Other user has their own membership in tenant_a; must not
         # appear in alice's response.
@@ -233,7 +233,7 @@ class TestMyMemberships:
         assert schemas == {"memb_a", "memb_b"}
         role_by_schema = {m["schemaName"]: m["role"] for m in payload}
         assert role_by_schema["memb_a"] == "owner"
-        assert role_by_schema["memb_b"] == "member"
+        assert role_by_schema["memb_b"] == "staff"
 
     @pytest.mark.django_db
     def test_omits_inactive_memberships(self, auth_client, db):
@@ -249,7 +249,7 @@ class TestMyMemberships:
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=False,
         )
         auth_client.force_authenticate(user=user)
@@ -275,7 +275,7 @@ class TestMyMemberships:
         UserTenantMembership.objects.create(
             user=user,
             tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=True,
         )
         auth_client.force_authenticate(user=user)

@@ -1,10 +1,9 @@
 """The platform account admin's store-role inline.
 
-A store role is a staff grant. The model's default, MEMBER, is reserved
-and no longer issued: a role added without changing the select was
-active yet granted no access to the store's admin. The inline offers the
-roles still issued and starts a new one at STAFF. Removing a row refuses
-to strip a store of its last owner.
+A store role is a staff grant, and the role is always a choice: the
+inline offers the roles in issue with no preselection, so a role cannot
+be added by leaving a select alone, and the retired MEMBER role is not
+among them. Removing a row refuses to strip a store of its last owner.
 """
 
 from __future__ import annotations
@@ -16,27 +15,11 @@ from django.utils.translation import gettext
 
 from tenant.models import TenantMembershipRole, UserTenantMembership
 from tests.utils.staff import store_tenant
-from user.admin import TenantMembershipInline, TenantMembershipInlineForm
+from user.admin import TenantMembershipInline
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount
 
 pytestmark = pytest.mark.django_db
-
-
-def test_offers_only_the_roles_still_issued():
-    choices = TenantMembershipInlineForm().fields["role"].choices
-
-    assert [value for value, _label in choices] == [
-        TenantMembershipRole.STAFF,
-        TenantMembershipRole.ADMIN,
-        TenantMembershipRole.OWNER,
-    ]
-
-
-def test_a_new_role_starts_as_staff():
-    assert TenantMembershipInlineForm()["role"].value() == (
-        TenantMembershipRole.STAFF
-    )
 
 
 def _formset_class():
@@ -44,6 +27,20 @@ def _formset_class():
     request.user = UserAccountFactory(is_staff=True, is_superuser=True)
     inline = TenantMembershipInline(UserAccount, admin_site)
     return inline.get_formset(request)
+
+
+def test_offers_the_roles_in_issue_and_preselects_none():
+    form = _formset_class()().empty_form
+    role = form.fields["role"]
+
+    assert [value for value, _label in role.choices] == [
+        "",
+        TenantMembershipRole.STAFF,
+        TenantMembershipRole.ADMIN,
+        TenantMembershipRole.OWNER,
+    ]
+    assert role.required
+    assert form["role"].value() in (None, "")
 
 
 def _post(member, *, delete):

@@ -51,7 +51,8 @@ from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 from tenant.deletion import PublicSchemaDeletionMixin
 from tenant.membership import is_platform_superuser
-from tenant.models import TenantMembershipRole, UserTenantMembership
+from tenant.models import UserTenantMembership
+from tenant.role_scopes import selectable_roles
 from user.forms import UserAccountCreationForm
 from user.models import UserAccount
 from user.models.address import UserAddress
@@ -672,28 +673,6 @@ class PlatformIdentityKindFilter(DropdownFilter):
         return queryset
 
 
-class TenantMembershipInlineForm(forms.ModelForm):
-    """A store role is a staff grant: the reserved MEMBER, no longer
-    issued (``TenantMembershipRole``) and the model's default, is neither
-    offered nor preselected. Left on it, a role added here was active yet
-    granted no access to the store's admin."""
-
-    class Meta:
-        model = UserTenantMembership
-        fields = ("tenant", "role", "is_active")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        role = self.fields["role"]
-        role.choices = [
-            choice
-            for choice in role.choices
-            if choice[0] != TenantMembershipRole.MEMBER
-        ]
-        if self.instance._state.adding:
-            self.initial["role"] = TenantMembershipRole.STAFF
-
-
 class TenantMembershipFormSet(BaseInlineFormSet):
     """Removing a row must not strip a store of its last active owner.
 
@@ -715,7 +694,6 @@ class TenantMembershipFormSet(BaseInlineFormSet):
 
 class TenantMembershipInline(TabularInline):
     model = UserTenantMembership
-    form = TenantMembershipInlineForm
     formset = TenantMembershipFormSet
     fk_name = "user"
     fields = ("tenant", "role", "is_active")
@@ -723,6 +701,12 @@ class TenantMembershipInline(TabularInline):
     extra = 0
     verbose_name = _("Store role")
     verbose_name_plural = _("Store roles")
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        """A role is a decision: nothing is preselected."""
+        if db_field.name == "role":
+            kwargs["choices"] = selectable_roles()
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
 
 class PlatformUserAdmin(PublicSchemaDeletionMixin, UserAdmin):

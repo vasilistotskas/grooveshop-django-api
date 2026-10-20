@@ -189,7 +189,7 @@ def internal_domains(request: Request) -> Response:
                     "primaryDomain": {"type": "string"},
                     "role": {
                         "type": "string",
-                        "enum": ["member", "staff", "admin", "owner"],
+                        "enum": ["staff", "admin", "owner"],
                     },
                 },
             },

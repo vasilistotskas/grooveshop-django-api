@@ -45,19 +45,35 @@ def user(db):
 @pytest.mark.django_db
 def test_membership_str_contains_user_tenant_and_role(tenant, user):
     membership = UserTenantMembership.objects.create(
-        user=user, tenant=tenant, role=TenantMembershipRole.MEMBER
+        user=user, tenant=tenant, role=TenantMembershipRole.STAFF
     )
     label = str(membership)
     assert "alice" in label or "alice@example.com" in label
     assert "Unit Test Tenant" in label
-    assert "member" in label
+    assert "staff" in label
 
 
 @pytest.mark.django_db
-def test_membership_default_role_is_member(tenant, user):
-    membership = UserTenantMembership.objects.create(user=user, tenant=tenant)
-    assert membership.role == TenantMembershipRole.MEMBER
+def test_membership_role_must_be_chosen(tenant, user):
+    """No default role: the one that used to be the default granted
+    nothing, so a row made without choosing was active and useless."""
+    membership = UserTenantMembership(user=user, tenant=tenant)
+    assert membership.role == ""
+    with pytest.raises(ValidationError) as caught:
+        membership.full_clean()
+    assert "role" in caught.value.error_dict
+
+
+@pytest.mark.django_db
+def test_membership_is_active_by_default(tenant, user):
+    membership = UserTenantMembership.objects.create(
+        user=user, tenant=tenant, role=TenantMembershipRole.STAFF
+    )
     assert membership.is_active is True
+
+
+def test_the_retired_member_role_is_not_a_choice():
+    assert "member" not in TenantMembershipRole.values
 
 
 @pytest.mark.django_db
@@ -68,23 +84,16 @@ def test_can_manage_tenant_true_for_admin_and_owner(tenant, user):
     owner = UserTenantMembership(
         user=user, tenant=tenant, role=TenantMembershipRole.OWNER
     )
-    member = UserTenantMembership(
-        user=user, tenant=tenant, role=TenantMembershipRole.MEMBER
-    )
     staff = UserTenantMembership(
         user=user, tenant=tenant, role=TenantMembershipRole.STAFF
     )
     assert admin.can_manage_tenant is True
     assert owner.can_manage_tenant is True
     assert staff.can_manage_tenant is False
-    assert member.can_manage_tenant is False
 
 
 @pytest.mark.django_db
 def test_is_tenant_staff_true_for_staff_admin_owner(tenant, user):
-    member = UserTenantMembership(
-        user=user, tenant=tenant, role=TenantMembershipRole.MEMBER
-    )
     staff = UserTenantMembership(
         user=user, tenant=tenant, role=TenantMembershipRole.STAFF
     )
@@ -94,7 +103,6 @@ def test_is_tenant_staff_true_for_staff_admin_owner(tenant, user):
     owner = UserTenantMembership(
         user=user, tenant=tenant, role=TenantMembershipRole.OWNER
     )
-    assert member.is_tenant_staff is False
     assert staff.is_tenant_staff is True
     assert admin.is_tenant_staff is True
     assert owner.is_tenant_staff is True
@@ -102,7 +110,9 @@ def test_is_tenant_staff_true_for_staff_admin_owner(tenant, user):
 
 @pytest.mark.django_db
 def test_unique_user_tenant_constraint(tenant, user):
-    UserTenantMembership.objects.create(user=user, tenant=tenant)
+    UserTenantMembership.objects.create(
+        user=user, tenant=tenant, role=TenantMembershipRole.STAFF
+    )
     with pytest.raises(IntegrityError):
         UserTenantMembership.objects.create(
             user=user, tenant=tenant, role=TenantMembershipRole.ADMIN
@@ -114,7 +124,7 @@ def test_same_user_can_belong_to_two_tenants(user):
     tenant_a = store_tenant("unit_two_a")
     tenant_b = store_tenant("unit_two_b")
     m_a = UserTenantMembership.objects.create(
-        user=user, tenant=tenant_a, role=TenantMembershipRole.MEMBER
+        user=user, tenant=tenant_a, role=TenantMembershipRole.STAFF
     )
     m_b = UserTenantMembership.objects.create(
         user=user, tenant=tenant_b, role=TenantMembershipRole.ADMIN

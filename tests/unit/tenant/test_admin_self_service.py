@@ -98,6 +98,22 @@ class TestTenantAdminScoping:
                 f"{platform_field} is editable by a merchant"
             )
 
+    def test_every_social_link_is_theirs_to_edit(
+        self, tenant, bind_tenant_and_schema
+    ):
+        """The Branding tab lists them all; one read-only link is a field
+        a merchant sees and cannot change."""
+        user = _store_operator(tenant)
+        bind_tenant_and_schema(tenant)
+        readonly = set(self._admin().get_readonly_fields(_request(user)))
+        socials = {
+            field.name
+            for field in Tenant._meta.fields
+            if field.name.startswith("socials_")
+        }
+        assert "socials_linkedin" in socials
+        assert socials.isdisjoint(readonly)
+
     def test_a_store_role_sees_whether_a_platform_secret_is_set_not_it(
         self, tenant, bind_tenant_and_schema
     ):

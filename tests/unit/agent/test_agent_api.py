@@ -70,7 +70,7 @@ class AgentAPITestCase(APITestCase):
         UserTenantMembership.objects.create(
             user=cls.user,
             tenant=cls.tenant,
-            role=TenantMembershipRole.MEMBER,
+            role=TenantMembershipRole.STAFF,
             is_active=True,
         )
 

@@ -66,6 +66,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tenant.role_scopes import selectable_roles
 
 
 class TenantDomainInline(TabularInline):
@@ -1236,9 +1237,10 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
         )
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
-        """An ADMIN cannot mint an OWNER — only an OWNER can."""
+        """The role is chosen, and an ADMIN cannot mint an OWNER."""
         if db_field.name == "role":
             scope = self_service_tenant(request)
+            is_owner = False
             if scope is not None:
                 from tenant.membership import get_membership
 
@@ -1247,12 +1249,9 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
                     membership is not None
                     and membership.role == TenantMembershipRole.OWNER
                 )
-                if not is_owner:
-                    kwargs["choices"] = [
-                        (value, label)
-                        for value, label in db_field.choices
-                        if value != TenantMembershipRole.OWNER
-                    ]
+            kwargs["choices"] = selectable_roles(
+                may_grant_owner=scope is None or is_owner
+            )
         return super().formfield_for_choice_field(db_field, request, **kwargs)
 
 

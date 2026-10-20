@@ -116,6 +116,21 @@ class TestStoreTeamMemberForm:
             gettext("This person is already on the team.")
         ]
 
+    def test_a_role_must_be_chosen(self, tenant):
+        UserAccountFactory(email="norole@example.com")
+
+        form = _form({"email": "norole@example.com", "role": ""}, tenant)
+
+        assert "role" in form.errors
+
+    def test_the_retired_member_role_is_not_accepted(self, tenant):
+        UserAccountFactory(email="retired@example.com")
+
+        form = _form({"email": "retired@example.com", "role": "member"}, tenant)
+
+        assert "role" in form.errors
+        assert "member" not in [v for v, _ in form.fields["role"].choices]
+
     def test_the_form_has_no_account_or_store_chooser(self):
         assert set(StoreTeamMemberForm.base_fields) == {
             "email",

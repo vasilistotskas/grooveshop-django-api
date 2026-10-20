@@ -220,6 +220,21 @@ def test_the_team_list_names_the_platform_account_not_a_shopper(
             UserAccount.objects.filter(pk=store_admin.pk).delete()
 
 
+def test_the_role_choice_starts_empty_and_has_no_retired_role(client_):
+    from html import unescape
+
+    response = client_.get(_add_url())
+
+    body = unescape(response.content.decode())
+    select = body[body.index('name="role"') :]
+    select = select[: select.index("</select>")]
+    options = [
+        part.split(">")[0] for part in select.split('<option value="')[1:]
+    ]
+    assert options[0].startswith('"')  # the empty choice comes first
+    assert '"member"' not in options
+
+
 def _last_owner_message() -> str:
     """The refusal, in the language the store's admin is served in."""
     from django.utils import translation

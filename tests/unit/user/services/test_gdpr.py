@@ -8,6 +8,7 @@ voucher/parcel request payload (name, address, phone) outside the order row.
 from __future__ import annotations
 
 import pytest
+from django.utils import timezone
 
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_boxnow.factories import BoxNowShipmentFactory
@@ -222,3 +223,122 @@ class TestCompileUserDataAlertsAndContacts:
         data = compile_user_data(user)
 
         assert data["contact_messages"] == []
+
+
+@pytest.mark.django_db
+class TestErasureMatchesTheExport:
+    """What the export hands the subject, the erasure removes.
+
+    Product alerts and contact messages made with a verified address carry
+    no account link, so deleting the account never reaches them on its
+    own; the export finds them by that address and so must the erasure.
+    """
+
+    @staticmethod
+    def _verified(user, email, *, verified=True):
+        from allauth.account.models import EmailAddress
+
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(
+            user=user, email=email, verified=verified, primary=True
+        )
+
+    @staticmethod
+    def _alert(**kwargs):
+        from product.factories.product import ProductFactory
+        from product.models.alert import ProductAlert, ProductAlertKind
+
+        return ProductAlert.objects.create(
+            product=ProductFactory(num_images=0, num_reviews=0),
+            kind=ProductAlertKind.RESTOCK,
+            **kwargs,
+        )
+
+    def test_guest_alerts_on_a_verified_address_are_erased(self):
+        from product.models.alert import ProductAlert
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        own = self._alert(user=user)
+        guest = self._alert(email="ME@example.com")
+        stranger = self._alert(email="stranger@example.com")
+
+        counts = anonymise_and_delete_user(user)
+
+        assert counts["product_alerts"] == 2
+        assert not ProductAlert.objects.filter(
+            pk__in=[own.pk, guest.pk]
+        ).exists()
+        assert ProductAlert.objects.filter(pk=stranger.pk).exists()
+
+    def test_contact_messages_from_a_verified_address_are_erased(self):
+        from contact.models import Contact
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        mine = Contact.objects.create(
+            name="Me", email="Me@Example.com", message="Where is my order?"
+        )
+        stranger = Contact.objects.create(
+            name="Stranger", email="x@example.com", message="Not mine"
+        )
+
+        counts = anonymise_and_delete_user(user)
+
+        assert counts["contact_messages"] == 1
+        assert not Contact.objects.filter(pk=mine.pk).exists()
+        assert Contact.objects.filter(pk=stranger.pk).exists()
+
+    def test_their_attachments_go_with_the_message(self):
+        from contact.models import Contact, ContactAttachment
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        contact = Contact.objects.create(
+            name="Me", email="me@example.com", message="See the photo"
+        )
+        attachment = ContactAttachment.objects.create(
+            contact=contact,
+            file="x/photo.png",
+            original_name="photo.png",
+            content_type="image/png",
+            size=1,
+            checksum="a" * 64,
+            claim_deadline=timezone.now(),
+        )
+
+        anonymise_and_delete_user(user)
+
+        assert not ContactAttachment.objects.filter(pk=attachment.pk).exists()
+
+    def test_an_unverified_address_erases_nothing_of_a_stranger(self):
+        from contact.models import Contact
+        from product.models.alert import ProductAlert
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com", verified=False)
+        alert = self._alert(email="me@example.com")
+        contact = Contact.objects.create(
+            name="Someone", email="me@example.com", message="Not proven"
+        )
+
+        counts = anonymise_and_delete_user(user)
+
+        assert counts["contact_messages"] == 0
+        assert ProductAlert.objects.filter(pk=alert.pk).exists()
+        assert Contact.objects.filter(pk=contact.pk).exists()
+
+    def test_the_export_and_the_erasure_find_the_same_rows(self):
+        from contact.models import Contact
+
+        user = UserAccountFactory()
+        self._verified(user, "me@example.com")
+        self._alert(user=user)
+        self._alert(email="me@example.com")
+        Contact.objects.create(name="Me", email="me@example.com", message="x")
+        exported = compile_user_data(user)
+
+        counts = anonymise_and_delete_user(user)
+
+        assert counts["product_alerts"] == len(exported["product_alerts"])
+        assert counts["contact_messages"] == len(exported["contact_messages"])

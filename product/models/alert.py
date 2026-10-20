@@ -19,6 +19,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
 from core.models import TimeStampMixinModel, UUIDModel
+from core.utils.i18n import get_user_language, store_language
 
 
 class ProductAlertKind(models.TextChoices):
@@ -59,6 +60,17 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
         help_text=_(
             "For price_drop alerts: trigger when the product's price "
             "falls to or below this value. Ignored for restock alerts."
+        ),
+    )
+    language_code = models.CharField(
+        _("Language"),
+        max_length=10,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The language the visitor subscribed in, which their alert "
+            "email is written in. Empty means the store's language."
         ),
     )
     is_active = models.BooleanField(_("Is active"), default=True)
@@ -103,6 +115,17 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
             "recipient": recipient,
             "product": self.product_id,
         }
+
+    @property
+    def email_language(self) -> str:
+        """The language this alert's email is written in.
+
+        A member's own preference; a guest's is the language they
+        subscribed in, else the store's.
+        """
+        if self.user_id:
+            return get_user_language(self.user)
+        return self.language_code or store_language()
 
     def clean(self) -> None:
         super().clean()

@@ -413,17 +413,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             "not move it."
         ),
     )
-    reminder_count = models.PositiveSmallIntegerField(
-        _("Reminder Count"),
-        default=0,
-        help_text=_("Number of pending-order reminder emails sent."),
-    )
-    last_reminder_sent_at = models.DateTimeField(
-        _("Last Reminder Sent At"),
-        null=True,
-        blank=True,
-        help_text=_("Timestamp of the most recent reminder email."),
-    )
     language_code = models.CharField(
         _("Language"),
         max_length=10,

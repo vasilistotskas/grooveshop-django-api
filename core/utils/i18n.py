@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.utils.translation import get_language
 
 
 def available_language_codes() -> frozenset[str]:
@@ -31,35 +32,63 @@ def available_language_codes() -> frozenset[str]:
     return frozenset(entry["code"] for entry in per_site)
 
 
+def store_language() -> str:
+    """The language of the store this code runs for.
+
+    ``Tenant.default_locale`` of the bound store, else the platform's
+    ``LANGUAGE_CODE`` (no store is bound in the public schema). What a
+    message uses when its reader stated no language of their own: a
+    guest, an account that recorded none, and the store's own staff.
+    """
+    from tenant.membership import bound_tenant
+
+    return (
+        getattr(bound_tenant(), "default_locale", "") or settings.LANGUAGE_CODE
+    )
+
+
 def get_user_language(user) -> str:
     if user is None:
-        return settings.LANGUAGE_CODE
-    return getattr(user, "language_code", None) or settings.LANGUAGE_CODE
+        return store_language()
+    return getattr(user, "language_code", None) or store_language()
 
 
 def get_order_language(order) -> str:
     if order is None:
-        return settings.LANGUAGE_CODE
+        return store_language()
     return getattr(order, "language_code", None) or get_user_language(
         getattr(order, "user", None)
     )
 
 
-def resolve_request_language(request) -> str:
+def active_language_code() -> str:
+    """The language the current request was made in.
+
+    The code ``RequestLanguageMiddleware`` activated from the storefront's
+    ``X-Language``, when this deployment serves it; the store's language
+    otherwise. For rows that remember the language they were created in
+    so a later email speaks it (``Order``, ``ProductAlert``).
+    """
+    candidate = (get_language() or "").split("-")[0].strip().lower()
+    valid = {code for code, _name in settings.LANGUAGES}
+    return candidate if candidate in valid else store_language()
+
+
+def stated_request_language(request) -> str:
+    """The language the caller asked for, or ``""`` when they asked for none
+    this deployment serves (``X-Language``, then ``X-Locale``, then
+    ``Accept-Language``)."""
     if request is None:
-        return settings.LANGUAGE_CODE
+        return ""
 
     header = (
         request.headers.get("X-Language")
         or request.headers.get("X-Locale")
         or request.META.get("HTTP_ACCEPT_LANGUAGE", "")
     )
-    if not header:
-        return settings.LANGUAGE_CODE
-
     candidate = header.split(",")[0].split("-")[0].strip().lower()
-    return (
-        candidate
-        if candidate in available_language_codes()
-        else settings.LANGUAGE_CODE
-    )
+    return candidate if candidate in available_language_codes() else ""
+
+
+def resolve_request_language(request) -> str:
+    return stated_request_language(request) or settings.LANGUAGE_CODE

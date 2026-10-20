@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.utils.i18n import stated_request_language
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -135,6 +136,10 @@ class ProductAlertViewSet(BaseModelViewSet):
                 )
             validated["email"] = email
             validated["user"] = None
+        # The language the visitor is reading the storefront in, so the
+        # alert email they asked for comes back in it. Unstated: the
+        # email uses the store's.
+        validated["language_code"] = stated_request_language(request)
 
         try:
             alert = ProductAlert.objects.create(**validated)

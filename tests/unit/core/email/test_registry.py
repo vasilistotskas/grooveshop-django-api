@@ -57,9 +57,9 @@ class TestEmailTemplateRegistry:
 
     def test_get_by_status(self, registry):
         """Test getting templates by order status."""
-        templates = registry.get_by_status(OrderStatus.PENDING)
+        templates = registry.get_by_status(OrderStatus.CANCELED)
         assert isinstance(templates, list)
-        # Should have at least one template for pending status
+        # Should have at least one template for canceled status
         assert len(templates) > 0
 
     def test_template_has_required_fields(self, registry):
@@ -93,10 +93,8 @@ class TestEmailTemplateRegistry:
     def test_status_template_mapping(self, registry):
         """Test that status-to-template mapping is correct."""
         # Test a few known mappings
-        pending_templates = registry.get_by_status(OrderStatus.PENDING)
-        assert any(
-            t.name == "order_pending_reminder" for t in pending_templates
-        )
+        canceled_templates = registry.get_by_status(OrderStatus.CANCELED)
+        assert any(t.name == "order_canceled" for t in canceled_templates)
 
         shipped_templates = registry.get_by_status(OrderStatus.SHIPPED)
         assert any(t.name == "order_shipped" for t in shipped_templates)

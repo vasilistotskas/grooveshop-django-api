@@ -8,7 +8,6 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
-from django.db.models import F
 from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
@@ -25,7 +24,11 @@ from core.retry import (
 )
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
-from core.utils.i18n import get_order_language, get_user_language
+from core.utils.i18n import (
+    get_order_language,
+    get_user_language,
+    store_language,
+)
 from core.utils.tenant_urls import get_tenant_frontend_url
 from order import payment_hold
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -457,53 +460,57 @@ def send_dispute_notification_email(
 
         provider_name = payment_provider_label(provider_code) or provider_code
 
-        # Staff-facing, rendered under no override: the active language.
-        context = build_email_context(
-            language=translation.get_language(),
-            order=order,
-            dispute_id=dispute_id,
-            reason=reason,
-            chargeback=chargeback,
-            lost=lost,
-            provider_name=provider_name,
-        )
+        # Staff-facing: the store's own language, not the worker's.
+        language = store_language()
+        with translation.override(language):
+            context = build_email_context(
+                language=language,
+                order=order,
+                dispute_id=dispute_id,
+                reason=reason,
+                chargeback=chargeback,
+                lost=lost,
+                provider_name=provider_name,
+            )
 
-        subject = (
-            _("[%(site)s] %(provider)s dispute lost — Order #%(order)s")
-            if lost
-            else _("[%(site)s] %(provider)s dispute opened — Order #%(order)s")
-        ) % {
-            "site": tenant_site_name(),
-            "provider": provider_name,
-            "order": order_id,
-        }
+            subject = (
+                _("[%(site)s] %(provider)s dispute lost — Order #%(order)s")
+                if lost
+                else _(
+                    "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
+                )
+            ) % {
+                "site": tenant_site_name(),
+                "provider": provider_name,
+                "order": order_id,
+            }
 
-        try:
-            text_content = render_to_string(
-                "emails/order/dispute_notification.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/dispute_notification.html", context
-            )
-        except TemplateDoesNotExist:
-            # ONLY a missing template. Both dispute templates exist, so
-            # catching every exception here could only mask a real render
-            # bug behind an inline plain-text body nobody would notice.
-            text_content = (
-                f"A {provider_name} dispute has been opened for Order #{order_id}.\n"
-                f"Dispute ID: {dispute_id}\n"
-                f"Reason: {reason}\n\n"
-                f"Please review this dispute in the {provider_name} dashboard and take action."
-            )
-            html_content = (
-                f"<p>A {provider_name} dispute has been opened for "
-                f"<strong>Order #{order_id}</strong>.</p>"
-                f"<ul>"
-                f"<li>Dispute ID: {dispute_id}</li>"
-                f"<li>Reason: {reason}</li>"
-                f"</ul>"
-                f"<p>Please review this dispute in the {provider_name} dashboard.</p>"
-            )
+            try:
+                text_content = render_to_string(
+                    "emails/order/dispute_notification.txt", context
+                )
+                html_content = render_to_string(
+                    "emails/order/dispute_notification.html", context
+                )
+            except TemplateDoesNotExist:
+                # ONLY a missing template. Both dispute templates exist, so
+                # catching every exception here could only mask a real render
+                # bug behind an inline plain-text body nobody would notice.
+                text_content = (
+                    f"A {provider_name} dispute has been opened for Order #{order_id}.\n"
+                    f"Dispute ID: {dispute_id}\n"
+                    f"Reason: {reason}\n\n"
+                    f"Please review this dispute in the {provider_name} dashboard and take action."
+                )
+                html_content = (
+                    f"<p>A {provider_name} dispute has been opened for "
+                    f"<strong>Order #{order_id}</strong>.</p>"
+                    f"<ul>"
+                    f"<li>Dispute ID: {dispute_id}</li>"
+                    f"<li>Reason: {reason}</li>"
+                    f"</ul>"
+                    f"<p>Please review this dispute in the {provider_name} dashboard.</p>"
+                )
 
         staff_email = tenant_contact_email()
         if not staff_email:
@@ -573,24 +580,26 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             )
             return False
 
-        # Merchant-facing, rendered under no override: the active language.
-        context = build_email_context(
-            language=translation.get_language(),
-            order=order,
-            items=order.items.all(),
-            pay_way=order.pay_way,
-            INFO_EMAIL=staff_email,
-        )
-
-        text_content = render_to_string(
-            "emails/order/admin_new_order.txt", context
-        )
-        html_content = render_to_string(
-            "emails/order/admin_new_order.html", context
-        )
+        # Merchant-facing: the store's own language, not the worker's.
+        language = store_language()
+        with translation.override(language):
+            context = build_email_context(
+                language=language,
+                order=order,
+                items=order.items.all(),
+                pay_way=order.pay_way,
+                INFO_EMAIL=staff_email,
+            )
+            subject = _("New order — #{order_id}").format(order_id=order_id)
+            text_content = render_to_string(
+                "emails/order/admin_new_order.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/admin_new_order.html", context
+            )
 
         msg = EmailMultiAlternatives(
-            f"New order — #{order_id}",
+            subject,
             text_content,
             tenant_from_email(),
             [staff_email],
@@ -1919,120 +1928,6 @@ def cancel_mydata_credit(self, credit_id: int) -> bool:
     if credit is None:
         return False
     return _cancel_registered_document(self, credit.order, credit)
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    autoretry_for=MAIL_TRANSIENT_ERRORS,
-    max_retries=3,
-    retry_backoff=True,
-    retry_jitter=True,
-)
-def check_pending_orders() -> int:
-    now = timezone.now()
-    one_day_ago = now - timedelta(days=1)
-    max_reminders = Setting.get("PENDING_ORDER_REMINDER_MAX_COUNT", default=3)
-    reminder_intervals = [
-        Setting.get(
-            f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
-            default=d,
-        )
-        for i, d in [(1, 1), (2, 3), (3, 7)]
-    ]
-    # Online payments only: a PENDING online order means the customer
-    # abandoned checkout and can still come back and pay. Offline
-    # orders (COD) sit PENDING only when voucher creation failed — an
-    # ops problem the shipping alerts surface; mailing the customer
-    # "complete your order" for those is wrong-audience (prod orders
-    # 31/36/38/39 received exactly that in April 2026 while stuck on
-    # a failed ACS mint).
-    # Annotated and eager-loaded: the reminder template prints
-    # ``order.total_price``, and Order.total_price_items falls back to an
-    # aggregate query whenever the items_total annotation is absent —
-    # once per order, plus a user dereference for the language. On a
-    # daily sweep over a few hundred stale orders that is thousands of
-    # queries, each swallowed by the per-order try/except.
-    pending_orders = (
-        Order.objects.filter(
-            status=OrderStatus.PENDING,
-            created_at__lt=one_day_ago,
-            reminder_count__lt=max_reminders,
-            # Only chase orders the shopper was meant to pay online.
-            # A collect-on-delivery order is not "unpaid", it is
-            # awaiting the carrier — reminding those would nag people
-            # who owe us nothing yet.
-            pay_way__settlement=PaySettlement.ONLINE,
-        )
-        .select_related("user", "pay_way")
-        .with_total_amounts()
-    )
-
-    count = 0
-    for order in pending_orders:
-        if order.last_reminder_sent_at:
-            interval_index = min(
-                order.reminder_count,
-                len(reminder_intervals) - 1,
-            )
-            cooldown = timedelta(days=reminder_intervals[interval_index])
-            if now - order.last_reminder_sent_at < cooldown:
-                continue
-
-        # Per-order isolation: one undeliverable address must not
-        # starve every later order's reminder (the old whole-loop
-        # try/except also swallowed setup errors, defeating the
-        # task-level autoretry).
-        try:
-            language = get_order_language(order)
-            context = build_email_context(language=language, order=order)
-
-            with translation.override(language):
-                subject = _("Reminder: Complete Your Order #{order_id}").format(
-                    order_id=order.id
-                )
-                text_content = render_to_string(
-                    "emails/order/order_pending_reminder.txt", context
-                )
-                html_content = render_to_string(
-                    "emails/order/order_pending_reminder.html", context
-                )
-
-            msg = EmailMultiAlternatives(
-                subject,
-                text_content,
-                tenant_from_email(),
-                [order.email],
-                reply_to=tenant_reply_to(),
-            )
-            msg.attach_alternative(html_content, "text/html")
-
-            msg.send()
-
-            Order.objects.filter(pk=order.pk).update(
-                reminder_count=F("reminder_count") + 1,
-                last_reminder_sent_at=now,
-            )
-
-            logger.info(
-                f"Pending order reminder sent for order #{order.id} "
-                f"(reminder {order.reminder_count + 1}/{max_reminders})",
-                extra={"order_id": order.id, "email": order.email},
-            )
-
-            OrderHistory.log_note(
-                order=order,
-                note=f"Pending order reminder email sent to {order.email} "
-                f"({order.reminder_count + 1}/{max_reminders})",
-            )
-
-            count += 1
-        except Exception:
-            logger.exception(
-                "Pending-order reminder failed for order %s",
-                order.id,
-            )
-
-    return count
 
 
 @celery_app.task(

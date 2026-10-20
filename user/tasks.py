@@ -9,6 +9,7 @@ from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
+    is_recipient_refused,
 )
 from core.tasks import MonitoredTask
 
@@ -82,6 +83,17 @@ def send_subscription_confirmation_email_task(
     try:
         return send_subscription_confirmation(subscription)
     except Exception as exc:
+        if is_recipient_refused(exc):
+            # Not a failure to retry: the mail server says nobody can
+            # read this address.
+            logger.warning(
+                "Confirmation for subscription %s refused by the mail "
+                "server: %s",
+                subscription_id,
+                exc,
+            )
+            subscription.mark_bounced()
+            return False
         logger.error(
             "Error sending subscription confirmation for %s: %s",
             subscription_id,

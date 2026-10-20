@@ -4161,6 +4161,10 @@ msgstr ""
 msgid "New Arrivals (Last 30 days)"
 msgstr ""
 
+#, python-brace-format
+msgid "New B2B application — {company}"
+msgstr "Neue B2B-Anfrage — {company}"
+
 #, fuzzy
 #| msgid "Status"
 msgid "New Status"
@@ -4174,6 +4178,10 @@ msgstr ""
 
 msgid "New and improved user interface"
 msgstr ""
+
+#, python-brace-format
+msgid "New order — #{order_id}"
+msgstr "Neue Bestellung — #{order_id}"
 
 msgid "New sort order value"
 msgstr ""
@@ -6369,6 +6377,9 @@ msgstr[1] ""
 
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr ""
+
+msgid "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
+msgstr "Die Sprache, in der sich der Besucher angemeldet hat und in der seine Benachrichtigungs-E-Mail verfasst wird. Leer bedeutet die Sprache des Shops."
 
 msgid "The ledger refund this attempt produced."
 msgstr ""

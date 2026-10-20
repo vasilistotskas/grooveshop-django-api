@@ -32,11 +32,11 @@ class VivaWebhookEvent(TimeStampMixinModel):
 
     OUTCOME_PROCESSED = "processed"
     OUTCOME_SKIPPED = "skipped"
-    OUTCOME_FAILED = "failed"
+    # No "failed": a handler that raises rolls the row back so Viva's retry
+    # gets a fresh attempt, and a stored row permanently dedups the event.
     OUTCOME_CHOICES = (
         (OUTCOME_PROCESSED, _("Processed")),
         (OUTCOME_SKIPPED, _("Skipped")),
-        (OUTCOME_FAILED, _("Failed")),
     )
 
     transaction_id = models.CharField(

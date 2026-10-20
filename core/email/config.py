@@ -94,14 +94,6 @@ class EmailTemplateConfig:
             order_statuses=[OrderStatus.CANCELED],
             is_used=True,
         ),
-        "order_pending_reminder": TemplateConfig(
-            name="order_pending_reminder",
-            category_name="Order Lifecycle",
-            description="Reminder for pending orders after 24 hours",
-            subject_template="Reminder: Complete Your Order #{order[id]}",
-            order_statuses=[OrderStatus.PENDING],
-            is_used=True,
-        ),
         "order_status_generic": TemplateConfig(
             name="order_status_generic",
             category_name="Order Lifecycle",

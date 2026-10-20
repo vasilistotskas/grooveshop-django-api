@@ -7535,6 +7535,10 @@ msgstr "Νέες παραλαβές (τελευταίες 30 ημέρες)"
 msgid "New B2B application awaiting review"
 msgstr "Νέα αίτηση B2B προς έλεγχο"
 
+#, python-brace-format
+msgid "New B2B application — {company}"
+msgstr "Νέα αίτηση B2B — {company}"
+
 msgid "New Status"
 msgstr "Νέα Κατάσταση"
 
@@ -7549,6 +7553,10 @@ msgstr "Νέοι πελάτες"
 
 msgid "New messages"
 msgstr "Νέα μηνύματα"
+
+#, python-brace-format
+msgid "New order — #{order_id}"
+msgstr "Νέα παραγγελία — #{order_id}"
 
 msgid "New product"
 msgstr "Νέο προϊόν"
@@ -11945,6 +11953,9 @@ msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρω�
 
 msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 msgstr "Το ``document.referrer`` της σελίδας προσγείωσης. Κρατείται μόνο ο ιστότοπος, και καθόλου όταν είναι ένα από τα domain του ίδιου του καταστήματος."
+
+msgid "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
+msgstr "Η γλώσσα στην οποία έκανε εγγραφή ο επισκέπτης, και στην οποία γράφεται το email ειδοποίησής του. Κενό σημαίνει η γλώσσα του καταστήματος."
 
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "Ο νόμος απαιτεί να εμφανίζονται στο ηλεκτρονικό σας κατάστημα τα στοιχεία της επιχείρησης. Συμπληρώστε όσα λείπουν:"

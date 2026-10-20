@@ -1254,11 +1254,27 @@ premature "shipped"); now it sends only the confirmation.
 ### 6.2 Locale handling
 
 - `Order.language_code` captured at create time
-  (`OrderService._seed_language_code` reads
-  `django.utils.translation.get_language()` — the request language
+  (`OrderService._seed_language_code` stores
+  `core.utils.i18n.active_language_code()` — the request language
   `core/middleware/locale.py: RequestLanguageMiddleware` activates from
   the storefront's `X-Language`), so an order's emails and invoice come
   in the language the customer shopped in.
+- Whoever stated no language gets **the store's**, never the platform's:
+  `core.utils.i18n.store_language()` is `Tenant.default_locale` of the
+  bound store (`LANGUAGE_CODE` only with no store bound).
+  `get_user_language` / `get_order_language` fall back to it, and a guest
+  product alert remembers the language it was made in
+  (`ProductAlert.language_code`).
+- Merchant-facing mail (`send_admin_new_order_email`, the dispute,
+  low-stock, stale-ACS and B2B-application alerts, the review alert)
+  renders, subject included, under `translation.override(store_language())`:
+  the worker's active language says nothing about the store.
+- There is no pending-order reminder email. An unpaid online order is
+  cancelled by `auto_cancel_stuck_pending_orders` (every 15 minutes), so a
+  "complete your order" mail a day later reached an order that was already
+  gone; `check_pending_orders`, its template and `PENDING_ORDER_REMINDER_*`
+  were removed (`Order.reminder_count` / `last_reminder_sent_at` leave the
+  model in `order` 0084 and the columns are dropped one release later).
 - A refused create answers 400 with a stable `error.type`
   (`order/enum/create_error.py: OrderCreateErrorType`); `detail` and
   `cart` are display text in the request's language, never a contract.

@@ -2115,11 +2115,14 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     errors = 0
 
     def _payment_closed(order):
-        # Outside the row lock: this is a provider round trip. No
-        # registered provider, or one that cannot be built (credentials
-        # removed), cannot confirm a payment either, so the order is
-        # cancelled as before.
-        if order.pay_way is None:  # SET_NULL when the pay way is deleted
+        # Outside the row lock: this is a provider round trip. An order
+        # with no pay way (SET_NULL when it is deleted) or a pay way with
+        # no registered provider has no online payment to close. A
+        # provider that cannot be built (credentials removed) cannot close
+        # the payment either, but the payment may still land (a Viva
+        # payment order stays payable until it expires), so it waits for
+        # the stored hold like any payment that could not be closed.
+        if order.pay_way is None:
             return True
         provider_class = get_payment_provider_class(order.pay_way.provider_code)
         if provider_class is None:
@@ -2127,12 +2130,13 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         try:
             provider = provider_class()
         except ImproperlyConfigured:
-            return True
-        closed = provider.close_payment(order)
+            closed = payment_hold.hold_ended(order)
+        else:
+            closed = provider.close_payment(order)
         if not closed:
             logger.warning(
-                "Auto-cancel skipped order %s: its payment is already "
-                "being processed by the provider",
+                "Auto-cancel skipped order %s: its payment may still land "
+                "(the provider is processing it, or its hold is running)",
                 order.id,
             )
         return closed

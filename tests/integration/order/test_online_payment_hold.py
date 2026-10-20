@@ -660,6 +660,29 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
 
+    def test_an_unconfigured_provider_waits_for_the_hold_too(self):
+        """Removed credentials cannot close the payment, and a Viva code
+        stays payable until it expires: the same wait, not a cancel."""
+        order = self._failed("viva_wallet", payment_id="")
+        _age(order, hold_expires=timezone.now() + timedelta(minutes=10))
+
+        result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 0
+        assert result["skipped_open"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    def test_an_unconfigured_provider_cancels_once_the_hold_ended(self):
+        order = self._failed("viva_wallet", payment_id="")
+        _age(order, hold_expires=timezone.now() - timedelta(minutes=6))
+
+        result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+
 
 class TestARetryClosesThePaymentItReplaces:
     """A PaymentIntent has no expiry, so the one a retry replaces would

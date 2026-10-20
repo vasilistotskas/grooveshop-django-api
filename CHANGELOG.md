@@ -3,6 +3,29 @@
 
 
 
+## v3.143.8 (2026-10-20)
+
+### Bug fixes
+
+* fix(admin): style the password reset inputs (#299)
+
+The staff password reset forms build on Django's PasswordResetForm and
+SetPasswordForm, whose bare inputs Unfold's CSS draws without a border:
+the email field on /admin/password_reset/ and both new-password fields
+could not be seen. They now use Unfold's email and password widgets, and
+a test checks every input on the signed-out admin pages.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7fa27de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7fa27deada710bd811f269e40c4e8707f86515a5))
+
+* fix(i18n): repeat the German notification cleanup after the rollout (#298)
+
+The release before German was removed saved a notification translation
+for every configured language, so a notification sent while it was still
+serving could write a de row after notification 0019 had run. 0020
+repeats that deletion once only the release without German serves.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b03b41f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b03b41fe4654219338d4a0676283b3995d46429c))
+
 ## v3.143.7 (2026-10-20)
 
 ### Bug fixes

@@ -99,8 +99,8 @@ def theme_metadata() -> dict[str, Any]:
 
 def available_locales() -> dict[str, Any]:
     """Locales the storefront has routes for (``STOREFRONT_LOCALES``,
-    narrower than ``settings.LANGUAGES``: Django carries ``de`` content,
-    the storefront has no ``/de``). Empty = single-language on
+    kept apart from ``settings.LANGUAGES``, which names the content
+    languages). Empty = single-language on
     ``default_locale``; that it contains ``default_locale`` otherwise
     is a cross-field rule (``Tenant.clean``)."""
     return {

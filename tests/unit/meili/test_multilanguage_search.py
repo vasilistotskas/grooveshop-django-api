@@ -112,11 +112,11 @@ class TestMultilanguageSearch:
         MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
-        queryset.locales("en", "el", "de")
+        queryset.locales("en", "el")
         queryset.search("test")
 
         call_args = self.mock_index.search.call_args[0][1]
-        assert call_args["locales"] == ["en", "el", "de"]
+        assert call_args["locales"] == ["en", "el"]
 
     @patch("meili.querysets.client")
     def test_search_without_language_filter(self, mock_client):
@@ -128,9 +128,8 @@ class TestMultilanguageSearch:
             "hits": [
                 {"id": 1, "language_code": "en"},
                 {"id": 2, "language_code": "el"},
-                {"id": 3, "language_code": "de"},
             ],
-            "estimatedTotalHits": 3,
+            "estimatedTotalHits": 2,
         }
         self.mock_index.search.return_value = mock_search_results
 
@@ -138,17 +137,15 @@ class TestMultilanguageSearch:
         mock_obj1.pk = 1
         mock_obj2 = MagicMock()
         mock_obj2.pk = 2
-        mock_obj3 = MagicMock()
-        mock_obj3.pk = 3
 
         mock_queryset = MagicMock()
-        mock_queryset.order_by.return_value = [mock_obj1, mock_obj2, mock_obj3]
+        mock_queryset.order_by.return_value = [mock_obj1, mock_obj2]
         MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         results = queryset.search("test")
 
-        assert len(results["results"]) == 3
+        assert len(results["results"]) == 2
 
     @patch("meili.querysets.client")
     def test_combined_language_filter_and_locale(self, mock_client):
@@ -239,8 +236,8 @@ class TestMultilanguageSearch:
         assert call_args[0] == "Δοκιμαστικό"
 
     @patch("meili.querysets.client")
-    def test_search_german_characters(self, mock_client):
-        """Test search with German characters (umlauts)."""
+    def test_search_accented_characters(self, mock_client):
+        """Test search with accented Greek characters."""
         mock_client.get_index.return_value = self.mock_index
         mock_client.get_search_index.return_value = self.mock_index
 
@@ -248,8 +245,8 @@ class TestMultilanguageSearch:
             "hits": [
                 {
                     "id": 1,
-                    "title": "Über uns",
-                    "language_code": "de",
+                    "title": "Όμορφη ημέρα",
+                    "language_code": "el",
                 }
             ],
             "estimatedTotalHits": 1,
@@ -264,12 +261,12 @@ class TestMultilanguageSearch:
         MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
-        queryset.filter(language_code="de").locales("de")
-        queryset.search("Über")
+        queryset.filter(language_code="el").locales("el")
+        queryset.search("Όμορφη")
 
         self.mock_index.search.assert_called_once()
         call_args = self.mock_index.search.call_args[0]
-        assert call_args[0] == "Über"
+        assert call_args[0] == "Όμορφη"
 
     @patch("meili.querysets.client")
     def test_empty_query_with_language_filter(self, mock_client):

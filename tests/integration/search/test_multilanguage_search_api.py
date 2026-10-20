@@ -93,7 +93,6 @@ class TestProductSearch:
             {
                 "en": f"{marker} phone",
                 "el": f"{marker} τηλέφωνο",
-                "de": f"{marker} Telefon",
             }
         )
         live_index.add(*product.translations.all())
@@ -270,15 +269,14 @@ class TestBlogPostSearch:
             {
                 "en": f"{marker} guide",
                 "el": f"{marker} οδηγός",
-                "de": f"{marker} Anleitung",
             }
         )
         live_index.add(*post.translations.all())
 
-        german = search(self.url, query=marker, language_code="de")
+        greek = search(self.url, query=marker, language_code="el")
         every_locale = search(self.url, query=marker)
 
-        assert ids(german) == [translation(post, "de").id]
+        assert ids(greek) == [translation(post, "el").id]
         assert sorted(ids(every_locale)) == sorted(
             post.translations.values_list("id", flat=True)
         )

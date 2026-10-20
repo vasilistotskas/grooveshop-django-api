@@ -1,7 +1,7 @@
 """English is served to customers on stores that offer it, so its catalogue
 must be complete: every live message has an English msgstr and none is
 fuzzy (gettext ignores a fuzzy entry, and a guessed one is worse than the
-msgid it replaced). German is not served to any store and is not judged."""
+msgid it replaced)."""
 
 from __future__ import annotations
 

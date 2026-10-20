@@ -78,9 +78,9 @@ def get_tenant_base_url() -> str:
 #
 # - ``STOREFRONT_LOCALES`` is ``SUPPORTED_LOCALES`` in its
 #   ``i18n/locales.ts``: the locales it generates routes for at build time.
-#   Deliberately narrower than ``settings.LANGUAGES`` — Django carries
-#   ``de`` content, the storefront has no ``/de`` routes, so a ``/de`` link
-#   would 404.
+#   Kept apart from ``settings.LANGUAGES`` (the content languages): a
+#   content language the storefront has no routes for would get links that
+#   404.
 # - ``STOREFRONT_DEFAULT_LOCALE`` is ``DEFAULT_LOCALE`` in the same file:
 #   the UNPREFIXED locale. @nuxtjs/i18n runs ``prefix_except_default``, so
 #   that locale's pages carry no prefix and every other locale's pages

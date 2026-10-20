@@ -48,8 +48,8 @@ class TestValidation:
         tenant.clean()
 
     def test_rejects_a_locale_the_storefront_has_no_routes_for(self):
-        # ``de`` is a Django content language, not a storefront one.
-        tenant = _tenant(store_description_i18n={"de": "Handyzubehoer"})
+        # ``fr`` is not a locale the storefront builds.
+        tenant = _tenant(store_description_i18n={"fr": "Accessoires"})
         with pytest.raises(ValidationError) as exc_info:
             tenant.clean_fields()
         assert "store_description_i18n" in exc_info.value.message_dict

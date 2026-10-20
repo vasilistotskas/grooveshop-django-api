@@ -34,7 +34,7 @@ class PayWayKeyTests(TestCase):
         )
 
     def test_the_key_is_the_same_in_every_language(self):
-        for language in ("el", "en", "de"):
+        for language in ("el", "en"):
             with translation.override(language):
                 self.cod.set_current_language(language)
                 self.assertEqual(

@@ -59,7 +59,7 @@ class SearchQuery(models.Model):
         null=True,
         blank=True,
         default="",
-        help_text="Language code for the search (e.g., 'en', 'el', 'de')",
+        help_text="Language code for the search (e.g., 'en', 'el')",
         verbose_name=_("Language Code"),
     )
     content_type = models.CharField(

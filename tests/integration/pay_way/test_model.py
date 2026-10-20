@@ -88,7 +88,7 @@ class PayWayModelTestCase(TestCase):
         )
 
     def test_key_does_not_depend_on_the_language(self):
-        for language in ("el", "en", "de"):
+        for language in ("el", "en"):
             self.bank_transfer.set_current_language(language)
             self.assertEqual(self.bank_transfer.key, PayWayEnum.BANK_TRANSFER)
 

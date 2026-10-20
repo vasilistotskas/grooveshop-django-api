@@ -240,13 +240,7 @@ class TestStorefrontLocalePrefix:
     def test_code_the_storefront_does_not_support_gets_no_prefix(
         self, bind_tenant
     ):
-        # ``de`` is a valid Django/parler language and a valid
-        # available_locales entry, but the storefront has no /de routes.
-        bind_tenant(_locale_tenant(available_locales=["el", "en", "de"]))
-        assert (
-            get_tenant_frontend_url("/cart", language="de")
-            == "https://webside.gr/cart"
-        )
+        bind_tenant(_locale_tenant(available_locales=["el", "en"]))
         assert (
             get_tenant_frontend_url("/cart", language="fr")
             == "https://webside.gr/cart"

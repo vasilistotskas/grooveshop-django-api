@@ -121,7 +121,7 @@ class TestSearchAnalyticsMiddleware:
         """Test that federated search queries are tracked."""
         request = request_factory.get(
             "/api/v1/search/federated",
-            {"query": "test query", "language_code": "de"},
+            {"query": "test query", "language_code": "el"},
         )
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session-789")
@@ -133,7 +133,7 @@ class TestSearchAnalyticsMiddleware:
 
         search_query = SearchQuery.objects.latest("timestamp")
         assert search_query.query == "test query"
-        assert search_query.language_code == "de"
+        assert search_query.language_code == "el"
         assert search_query.content_type == "federated"
 
     def test_tracks_authenticated_user(

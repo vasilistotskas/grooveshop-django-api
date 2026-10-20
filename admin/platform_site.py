@@ -33,6 +33,7 @@ from unfold.sites import UnfoldAdminSite
 
 from admin.forms import PlatformAdminAuthenticationForm
 from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
+from admin.password_reset import StaffPasswordResetMixin
 from admin.search import CommandSearchMixin
 
 # Apps whose models belong on the control plane. Anything outside this
@@ -92,6 +93,7 @@ PLATFORM_ADMIN_CLASSES: dict[str, str] = {
 
 
 class PlatformAdminSite(
+    StaffPasswordResetMixin,
     CommandSearchMixin,
     AdminFooterMixin,
     AdminSiteLoginNextMixin,

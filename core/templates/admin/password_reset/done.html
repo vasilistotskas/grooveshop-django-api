@@ -1,0 +1,7 @@
+{% extends "admin/password_reset/base.html" %}
+
+{% load i18n %}
+
+{% block reset_body %}
+    <p class="text-sm">{% translate "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon." %}</p>
+{% endblock %}

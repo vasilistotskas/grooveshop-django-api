@@ -23842,3 +23842,61 @@ msgstr "Κανένας λογαριασμός πλατφόρμας δεν χρη
 
 msgid "This person is already on the team."
 msgstr "Αυτό το άτομο είναι ήδη στην ομάδα."
+
+#: .\admin\password_reset.py
+msgid "Check your email"
+msgstr "Ελέγξτε το email σας"
+
+#: .\admin\password_reset.py
+msgid "Choose a new password"
+msgstr "Επιλέξτε νέο κωδικό πρόσβασης"
+
+#: .\admin\password_reset.py
+msgid "Too many requests. Try again in a while."
+msgstr "Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο."
+
+#: .\core\templates\admin\password_reset
+msgid "Back to log in"
+msgstr "Πίσω στη σύνδεση"
+
+#: .\core\templates\admin\password_reset
+msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
+msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
+
+#: .\core\templates\admin\password_reset
+msgid "Send the link"
+msgstr "Αποστολή συνδέσμου"
+
+#: .\core\templates\admin\password_reset
+msgid "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon."
+msgstr "Αν η διεύθυνση ανήκει σε λογαριασμό προσωπικού που μπορεί να συνδεθεί εδώ, σας στέλνουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης. Λειτουργεί μία φορά και λήγει σύντομα."
+
+#: .\core\templates\admin\password_reset
+msgid "Change my password"
+msgstr "Αλλαγή του κωδικού μου"
+
+#: .\core\templates\admin\password_reset
+msgid "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."
+msgstr "Αυτός ο σύνδεσμος δεν ισχύει πια: χρησιμοποιήθηκε ήδη, έληξε ή δεν αφορά λογαριασμό που μπορεί να συνδεθεί εδώ. Ζητήστε νέο."
+
+#: .\core\templates\admin\password_reset
+msgid "Ask for a new link"
+msgstr "Ζητήστε νέο σύνδεσμο"
+
+#: .\core\templates\admin\password_reset
+msgid "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
+msgstr "Ο κωδικός πρόσβασής σας άλλαξε. Συνδεθείτε με τον νέο κωδικό· αν ο λογαριασμός σας χρησιμοποιεί εφαρμογή ελέγχου ταυτότητας, θα σας ζητηθεί κωδικός όπως πάντα."
+
+#: .\tenant\tasks.py
+#, python-format
+msgid "Choose a new password for %(store)s"
+msgstr "Νέος κωδικός πρόσβασης για %(store)s"
+
+#: .\core\templates\emails\staff
+#, python-format
+msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
+msgstr "Κάποιος ζήτησε επαναφορά του κωδικού πρόσβασης του λογαριασμού προσωπικού σας. Ανοίξτε τον παρακάτω σύνδεσμο για να επιλέξετε νέο. Λειτουργεί μία φορά και λήγει σε %(valid_minutes)s λεπτά."
+
+#: .\core\templates\emails\staff
+msgid "If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app."
+msgstr "Αν δεν ήσασταν εσείς, αγνοήστε αυτό το email: ο κωδικός σας παραμένει ως έχει. Η επαναφορά κωδικού δεν αλλάζει την εφαρμογή ελέγχου ταυτότητάς σας."

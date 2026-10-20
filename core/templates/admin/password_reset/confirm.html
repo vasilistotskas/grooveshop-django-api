@@ -1,0 +1,29 @@
+{% extends "admin/password_reset/base.html" %}
+
+{% load i18n unfold %}
+
+{% block reset_body %}
+    {% if validlink %}
+        <form method="post">
+            {% csrf_token %}
+
+            {% include "unfold/helpers/field.html" with field=form.new_password1 %}
+
+            {% include "unfold/helpers/field.html" with field=form.new_password2 %}
+
+            <div class="mt-6">
+                {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
+                    {% translate 'Change my password' %}
+                {% endcomponent %}
+            </div>
+        </form>
+    {% else %}
+        <p class="text-sm">{% translate "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one." %}</p>
+
+        <div class="mt-6">
+            {% component "unfold/components/button.html" with href=password_reset_url variant="primary" class="w-full" %}
+                {% translate 'Ask for a new link' %}
+            {% endcomponent %}
+        </div>
+    {% endif %}
+{% endblock %}

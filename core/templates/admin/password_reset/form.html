@@ -1,0 +1,19 @@
+{% extends "admin/password_reset/base.html" %}
+
+{% load i18n unfold %}
+
+{% block reset_body %}
+    <p class="mb-6 text-sm">{% translate "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password." %}</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% include "unfold/helpers/field.html" with field=form.email %}
+
+        <div class="mt-6">
+            {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
+                {% translate 'Send the link' %}
+            {% endcomponent %}
+        </div>
+    </form>
+{% endblock %}

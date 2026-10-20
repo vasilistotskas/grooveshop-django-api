@@ -18,6 +18,7 @@ from admin.forms import (
     PlatformPasswordChangeForm,
 )
 from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
+from admin.password_reset import StaffPasswordResetMixin
 from admin.search import CommandSearchMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
@@ -68,6 +69,7 @@ def _purge_log_table(logs) -> dict:
 
 
 class MyAdminSite(
+    StaffPasswordResetMixin,
     CommandSearchMixin,
     AdminFooterMixin,
     AdminSiteLoginNextMixin,

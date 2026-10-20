@@ -22045,3 +22045,61 @@ msgstr "This transfer reference is already recorded."
 
 msgid "Collected off-platform"
 msgstr "Collected off-platform"
+
+#: .\admin\password_reset.py
+msgid "Check your email"
+msgstr "Check your email"
+
+#: .\admin\password_reset.py
+msgid "Choose a new password"
+msgstr "Choose a new password"
+
+#: .\admin\password_reset.py
+msgid "Too many requests. Try again in a while."
+msgstr "Too many requests. Try again in a while."
+
+#: .\core\templates\admin\password_reset
+msgid "Back to log in"
+msgstr "Back to log in"
+
+#: .\core\templates\admin\password_reset
+msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
+msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
+
+#: .\core\templates\admin\password_reset
+msgid "Send the link"
+msgstr "Send the link"
+
+#: .\core\templates\admin\password_reset
+msgid "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon."
+msgstr "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon."
+
+#: .\core\templates\admin\password_reset
+msgid "Change my password"
+msgstr "Change my password"
+
+#: .\core\templates\admin\password_reset
+msgid "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."
+msgstr "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."
+
+#: .\core\templates\admin\password_reset
+msgid "Ask for a new link"
+msgstr "Ask for a new link"
+
+#: .\core\templates\admin\password_reset
+msgid "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
+msgstr "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
+
+#: .\tenant\tasks.py
+#, python-format
+msgid "Choose a new password for %(store)s"
+msgstr "Choose a new password for %(store)s"
+
+#: .\core\templates\emails\staff
+#, python-format
+msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
+msgstr "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
+
+#: .\core\templates\emails\staff
+msgid "If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app."
+msgstr "If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app."

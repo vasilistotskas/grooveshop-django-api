@@ -300,3 +300,50 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
 - **Not covered:** platform staff API tokens (`PlatformStaffToken`) are issued
   after a login and are a separate surface; a token already issued keeps
   working. WebAuthn/passkeys are not offered for the admin login yet.
+
+## Forgotten password (admin login)
+
+The admin login offers **"Forgotten your password or username?"** on the
+platform and on every store host (`admin/password_reset.py`, mounted by
+`StaffPasswordResetMixin` on both admin sites). It is **Django's own**
+`PasswordResetView` / `PasswordResetConfirmView`, not allauth's reset flow.
+allauth's reset belongs to the shopper's account (a tenant-schema
+`EmailAddress`, the storefront's login, headless URLs); the admin login never
+reads an allauth session, and a staff member's password is a Django password
+on their public-schema row (`PlatformStaffBackend`), so allauth's flow would
+look in the wrong place. allauth's own docs say its rate limits do not
+protect the Django admin login either.
+
+- **Public schema.** The form's lookup and the save of the new password run in
+  `public`; a store host binds the store's schema, whose `UserAccount` rows are
+  shoppers.
+- **Who may ask.** `can_reset_here`: an active staff account with a usable
+  password that could sign in on THIS host: a superuser, or on a store host an
+  active staff-capable membership in that store. The platform host serves
+  superusers alone. The confirm view re-checks it, so a link outlives neither a
+  deactivation nor a removed role.
+- **No enumeration.** Every accepted request answers the same redirect and
+  page. The request does not look the address up: it queues
+  `tenant.tasks.send_staff_password_reset_email` once, and the task finds the
+  accounts, so a match is not slower either. Budgets
+  (`settings.STAFF_PASSWORD_RESET`): per client address (`client_ip_or_peer`;
+  past it the answer is 429, which says nothing about any address) and per
+  target address (past it the request is dropped silently, same answer). Both
+  fail closed when the cache cannot count, because the form makes us mail an
+  address the caller chose.
+- **Token.** Django's `PasswordResetTokenGenerator`: bound to the password
+  hash and `last_login`, so a link works once and dies when the password
+  changes; it expires after `PASSWORD_RESET_TIMEOUT` (an hour by default).
+  Django swaps the token for a session marker on the first visit, so it does
+  not leak in a `Referer`.
+- **Mail.** Rendered in the task from the store's `default_locale` (the
+  project default on the platform host), sent from `tenant_from_email()` (the
+  store's verified sender, else the platform envelope under the store's name).
+  The link points at the host the request came in on, which the tenant
+  middleware already matched to one of the store's own domains.
+- **MFA is not bypassed.** The reset sets a password and nothing else:
+  `post_reset_login` stays off, so nobody is signed in, and the authenticators
+  are untouched, so a platform superuser still meets the code (or the
+  enrolment) step of the login form next time. A mailbox alone never yields a
+  session. The reset also ends the account's staff API tokens
+  (`PlatformStaffToken`), which the old password could have minted.

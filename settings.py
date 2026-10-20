@@ -460,6 +460,20 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# How long the admin "forgot password" link (``admin.password_reset``) works.
+# Django's token generator reads it; allauth's reset flow has its own.
+PASSWORD_RESET_TIMEOUT = int(getenv("PASSWORD_RESET_TIMEOUT", "3600"))
+# Budgets of the admin "forgot password" form: requests per client address
+# and per target address inside ``WINDOW_SECONDS``. Past the first it answers
+# 429; past the second it answers as if the mail had been sent.
+STAFF_PASSWORD_RESET = {
+    "PER_IP": int(getenv("STAFF_PASSWORD_RESET_PER_IP", "5")),
+    "PER_EMAIL": int(getenv("STAFF_PASSWORD_RESET_PER_EMAIL", "3")),
+    "WINDOW_SECONDS": int(
+        getenv("STAFF_PASSWORD_RESET_WINDOW_SECONDS", "3600")
+    ),
+}
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",

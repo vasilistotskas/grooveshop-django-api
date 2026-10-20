@@ -72,10 +72,9 @@ class ShippingParcelTooLargeError(ShippingError):
     its biggest one.
     """
 
-    def __init__(self, *, provider_code: str, detail: str) -> None:
-        self.provider_code = provider_code
+    def __init__(self, *, detail: str) -> None:
         super().__init__(
-            f"The cart does not fit {provider_code!r} parcels: {detail}"
+            f"The cart does not fit the carrier's parcels: {detail}"
         )
 
 

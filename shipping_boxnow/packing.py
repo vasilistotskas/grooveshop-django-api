@@ -110,7 +110,6 @@ def derive_compartment(
 
     largest = COMPARTMENT_LIMITS_CM[max(BoxNowCompartmentSize)]
     raise ShippingParcelTooLargeError(
-        provider_code="boxnow",
         detail=(
             f"stacked height {stack_height:g} cm and footprint "
             f"{widest_footprint[0]:g} x {widest_footprint[1]:g} cm exceed "

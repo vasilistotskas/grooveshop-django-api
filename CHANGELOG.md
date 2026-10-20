@@ -3,6 +3,19 @@
 
 
 
+## v3.143.5 (2026-10-20)
+
+### Bug fixes
+
+* fix(deps): bump Django dependencies (pillow 13, unfold 0.110, allauth 65.20, mptt 0.19, aiohttp 3.14.5, ...) (#295)
+
+Bumps the Django dependencies (pillow 13, unfold 0.110, allauth 65.20,
+mptt 0.19 and others) and adapts the code: allauth's renamed
+reauthentication helper, the stricter DRF and celery stubs, and the
+tenant switch dispatch types.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`1d0da2b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d0da2ba66784ae6d32d8d959372b234dec54f80))
+
 ## v3.143.4 (2026-10-20)
 
 ### Bug fixes

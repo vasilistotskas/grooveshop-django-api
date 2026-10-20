@@ -6032,6 +6032,9 @@ msgstr "Βαρύ"
 msgid "Heavy Discount (>20%)"
 msgstr "Μεγάλη Έκπτωση (>20%)"
 
+msgid "Height"
+msgstr "Ύψος"
+
 #, python-format
 msgid "Hello %(first_name)s,"
 msgstr "Γεια σας %(first_name)s,"
@@ -6817,6 +6820,9 @@ msgstr "Καθολικό"
 msgctxt "legal details alert"
 msgid "Legal form (e.g. sole trader, IKE, AE)"
 msgstr "Νομική μορφή (π.χ. ατομική, ΙΚΕ, ΑΕ)"
+
+msgid "Length"
+msgstr "Μήκος"
 
 msgid "Let AI-agent platforms choose an online payment method, placing the order and handing the buyer the payment page. When off, agents can only complete with methods they can settle themselves (e.g. cash on delivery) and card buyers are handed off to the storefront checkout."
 msgstr "Επιτρέπει στις πλατφόρμες AI πρακτόρων να επιλέγουν μέθοδο online πληρωμής, καταχωρώντας την παραγγελία και παραδίδοντας στον αγοραστή τη σελίδα πληρωμής. Όταν είναι απενεργοποιημένο, οι πράκτορες μπορούν να ολοκληρώσουν μόνο με μεθόδους που μπορούν να εξοφλήσουν οι ίδιοι (π.χ. αντικαταβολή) και οι αγοραστές με κάρτα παραπέμπονται στην ολοκλήρωση αγοράς του storefront."
@@ -12132,6 +12138,9 @@ msgstr "Το καλάθι δεν καλύπτει ακόμη την ελάχισ
 msgid "The cart is too heavy for the selected shipping method."
 msgstr "Το καλάθι είναι πολύ βαρύ για την επιλεγμένη μέθοδο αποστολής."
 
+msgid "The cart is too large for the selected shipping method."
+msgstr "Το καλάθι είναι πολύ μεγάλο για την επιλεγμένη μέθοδο αποστολής."
+
 msgid "The cart token is invalid or has expired."
 msgstr "Το διακριτικό καλαθιού δεν είναι έγκυρο ή έχει λήξει."
 
@@ -13896,6 +13905,9 @@ msgstr "Γιατί ακυρώνεται το voucher (π.χ. διορθωμέν�
 
 msgid "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
 msgstr "Γιατί έχει ανασταλεί αυτός ο tenant: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία ειδοποιήσεων. Κενό όταν δεν είναι σε αναστολή. Η αυτόματη επανενεργοποίηση μέσω ανανέωσης ισχύει μόνο για αναστολές 'billing'."
+
+msgid "Width"
+msgstr "Πλάτος"
 
 msgid "Window"
 msgstr "Παράθυρο"

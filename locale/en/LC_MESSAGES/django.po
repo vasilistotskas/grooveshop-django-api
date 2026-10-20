@@ -5979,6 +5979,9 @@ msgstr "Heavy"
 msgid "Heavy Discount (>20%)"
 msgstr "Heavy Discount (>20%)"
 
+msgid "Height"
+msgstr "Height"
+
 #, python-format
 msgid "Hello %(first_name)s,"
 msgstr "Hello %(first_name)s,"
@@ -6747,6 +6750,9 @@ msgstr "Ledger"
 msgctxt "legal details alert"
 msgid "Legal form (e.g. sole trader, IKE, AE)"
 msgstr "Legal form (e.g. sole trader, IKE, AE)"
+
+msgid "Length"
+msgstr "Length"
 
 msgid "Let AI-agent platforms choose an online payment method, placing the order and handing the buyer the payment page. When off, agents can only complete with methods they can settle themselves (e.g. cash on delivery) and card buyers are handed off to the storefront checkout."
 msgstr "Let AI-agent platforms choose an online payment method, placing the order and handing the buyer the payment page. When off, agents can only complete with methods they can settle themselves (e.g. cash on delivery) and card buyers are handed off to the storefront checkout."
@@ -11929,6 +11935,9 @@ msgstr "The cart does not meet the promotion's minimum yet"
 msgid "The cart is too heavy for the selected shipping method."
 msgstr "The cart is too heavy for the selected shipping method."
 
+msgid "The cart is too large for the selected shipping method."
+msgstr "The cart is too large for the selected shipping method."
+
 msgid "The cart token is invalid or has expired."
 msgstr "The cart token is invalid or has expired."
 
@@ -13644,6 +13653,9 @@ msgstr "Why the voucher is cancelled (for example a corrected address). Kept on 
 
 msgid "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
 msgstr "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
+
+msgid "Width"
+msgstr "Width"
 
 msgid "Window"
 msgstr "Window"

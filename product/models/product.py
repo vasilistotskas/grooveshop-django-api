@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
-from measurement.measures import Weight
+from measurement.measures import Distance, Weight
 from mptt.fields import TreeForeignKey
 from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
@@ -34,7 +34,7 @@ from core.models import (
     TimeStampMixinModel,
     UUIDModel,
 )
-from core.units import WeightUnits
+from core.units import DistanceUnits, WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
 from core.weight import zero_weight
 from meili.models import IndexMixin
@@ -232,6 +232,31 @@ class Product(
         measurement=Weight,
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,
+    )
+    # Parcel size, one field per axis. Nullable on purpose: a product
+    # with no dimensions is valid, and ``shipping_boxnow.packing`` falls
+    # back to the checkout's compartment size for an order that holds
+    # one. Stored in metres (the library's standard unit), shown in cm.
+    length = MeasurementField(
+        _("Length"),
+        measurement=Distance,
+        unit_choices=DistanceUnits.CHOICES,
+        null=True,
+        blank=True,
+    )
+    width = MeasurementField(
+        _("Width"),
+        measurement=Distance,
+        unit_choices=DistanceUnits.CHOICES,
+        null=True,
+        blank=True,
+    )
+    height = MeasurementField(
+        _("Height"),
+        measurement=Distance,
+        unit_choices=DistanceUnits.CHOICES,
+        null=True,
+        blank=True,
     )
     changed_by_id = models.BigIntegerField(
         _("Changed By"),

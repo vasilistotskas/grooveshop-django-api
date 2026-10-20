@@ -10,7 +10,7 @@ price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -691,8 +691,14 @@ class ShippingService:
         kind: str | None,
         country_code: str | None,
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
     ) -> ShippingRate:
-        """:meth:`active_rate`, plus the weight-cap check.
+        """:meth:`active_rate`, plus the weight-cap and parcel-size checks.
+
+        ``items`` are the cart's ``(product, quantity)`` pairs; the
+        carrier adapter decides whether they fit its parcels
+        (``ShippingCarrierInterface.assert_parcel_fits``). ``None``
+        skips that check.
 
         Used directly (not through :meth:`quote`) by callers that need
         to gate on availability without needing a priced amount — e.g.
@@ -710,6 +716,10 @@ class ShippingService:
             raise ShippingWeightExceededError(
                 weight_grams=weight_grams,
                 max_weight_grams=rate.max_weight_grams,
+            )
+        if items is not None:
+            get_provider(rate.provider.code).assert_parcel_fits(
+                kind=ShippingKind(rate.kind), items=items
             )
         return rate
 
@@ -758,9 +768,10 @@ class ShippingService:
         country_code: str | None,
         region_id: str | None = None,
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
         order_value: Money,
     ) -> Money:
-        """Gate on availability + weight cap, then price the shipment.
+        """Gate on availability, weight cap and parcel size, then price.
 
         The single entry point ``OrderService.shipping_cost`` and the
         create-payment-intent view use — replaces the old
@@ -776,6 +787,7 @@ class ShippingService:
             kind=kind,
             country_code=country_code,
             weight_grams=weight_grams,
+            items=items,
         )
         price = cls._priced(
             rate,

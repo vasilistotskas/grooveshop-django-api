@@ -1116,13 +1116,40 @@ accepting Cyprus orders at the Greek flat rate.
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
   new request with `P410` (duplicate) raises the usual creation alert.
-- **Known limit: the compartment size is not derived.** `BoxNowShipment.
-  compartment_size` is what the checkout sends
-  (`boxnow_compartment_size`, the storefront defaults to 1 = Small) and a
-  customer never chooses it. A product carries a weight but no length,
-  width or height, and a BoxNow compartment is a dimensional limit, so the
-  smallest size that fits cannot be computed until products carry
-  dimensions.
+- **The compartment size is derived from the products' dimensions**
+  (`shipping_boxnow/packing.py`). `Product.length` / `width` / `height`
+  are nullable `Distance` fields (stored in metres, edited in cm, mm, m or
+  inch next to the weight in the product admin; not in the API, nothing
+  outside the server reads them). Limits are `COMPARTMENT_LIMITS_CM`
+  (`shipping_boxnow/enum/compartment_size.py`), BOX NOW's published sizes
+  (https://boxnow.gr/en/faq): Small H8, Medium H17, Large H36, all W45 x
+  L60 cm. The FAQ also lists a Mini (H8 x W24 x L60); the partner API's
+  `compartmentSize` has no value for it, so it is booked as Small. The
+  20 kg weight limit stays on `ShippingRate.max_weight_grams`. The rule is
+  conservative, never undersizing: each unit lies on its smallest side
+  (height = smallest dimension), its other two sides must fit W45 x L60,
+  and units are stacked (no side-by-side packing), so the parcel's height
+  is the sum of the units' heights; the answer is the smallest size whose
+  height holds the stack. Dimensions compare at millimetre precision
+  (metres are floats). `create_shipment_row` stores the result on
+  `BoxNowShipment.compartment_size`, which goes out as
+  `items[].compartmentSize`.
+  **Products without dimensions keep the previous behaviour:** the size
+  the checkout sent (`boxnow_compartment_size`, the storefront sends 1 =
+  Small, a customer never chooses it). A cart with some measured and some
+  unmeasured items takes the larger of the derived size and that value;
+  with every item measured the derived size wins. Gift items from a
+  promotion are not measured.
+- **A cart that fits no compartment is refused at checkout**, next to the
+  weight cap: `ShippingService.assert_available(items=...)` asks the
+  adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by
+  default) and a `ShippingParcelTooLargeError` becomes the 400
+  `invalid_order_data` ("The cart is too large for the selected shipping
+  method.") on `shippingProviderCode`, from order creation and from the
+  create-payment-intent endpoint. `/shipping/options` does not know the
+  cart's items, so it still lists BoxNow for such a cart; flagging it
+  there (like `exceeds_max_weight`) needs a response field and a
+  storefront change, not built yet.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

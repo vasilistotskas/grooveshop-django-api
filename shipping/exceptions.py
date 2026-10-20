@@ -62,6 +62,23 @@ class ShippingWeightExceededError(ShippingError):
         )
 
 
+class ShippingParcelTooLargeError(ShippingError):
+    """The cart's items do not fit the carrier's largest parcel.
+
+    Raised through :meth:`shipping.interfaces.ShippingCarrierInterface.
+    assert_parcel_fits` by :meth:`shipping.services.ShippingService.
+    assert_available`, next to the weight cap: a locker carrier with
+    fixed compartments cannot take an order whose items, packed, exceed
+    its biggest one.
+    """
+
+    def __init__(self, *, provider_code: str, detail: str) -> None:
+        self.provider_code = provider_code
+        super().__init__(
+            f"The cart does not fit {provider_code!r} parcels: {detail}"
+        )
+
+
 class ShipmentAwaitingPaymentError(ShippingError):
     """A courier shipment was requested for an order that still owes payment.
 

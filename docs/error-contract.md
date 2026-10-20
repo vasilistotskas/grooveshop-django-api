@@ -104,3 +104,38 @@ receivers and the allauth rate-limit response (allauth's own `errors[].code`).
 Bodies built from a variable (a serializer's errors, `error_data`) are not
 judged; the blog reorder and comment actions now raise instead, so the handler
 adds `code` and `fields`.
+
+## Which codes are returned (monitoring)
+
+Every request writes one access line (`core/middleware/access_log.py`), and
+an error response's line names its `code`. It is read from the response,
+not in the handler, because the handler sees only raised errors and the
+order, cart and payment views build most of theirs themselves; the access
+line sees both, once each. In production it is one JSON object (the
+`JsonFormatter` in `core/logging.py`), which VictoriaLogs stores under
+`log.*`:
+
+```json
+{"level": "INFO", "logger": "core.middleware.access_log",
+ "schema": "webside", "correlation_id": "…",
+ "message": "POST api/v1/order/<int:pk>/create_payment_intent 400 812.4ms payment_intent_failed",
+ "method": "POST", "route": "api/v1/order/<int:pk>/create_payment_intent",
+ "status": 400, "duration_ms": 812.4, "code": "payment_intent_failed"}
+```
+
+- `route` is the URL pattern, never the path; `schema` is the store. No
+  message text, body, query string or header is logged, so no user input
+  or personal data reaches the line.
+- `level` is `WARNING` for a 5xx and `INFO` otherwise. `django.request`
+  still logs every 5xx at `ERROR` (with the traceback when an exception
+  caused it); the access line never repeats the traceback.
+- `code` is present only on a 4xx/5xx DRF response whose body has a string
+  `code`. A Django error page (an unhandled exception's 500, an unknown
+  host's 404) and a body whose `code` key is a field (a coupon code) have
+  none.
+- The log alerts in grooveshop-infrastructure
+  (`manifests/app-constructs/victoria-metrics/logs-alerting/vmrule-grooveshop-logs.yaml`)
+  count `log.code` per route, so **renaming a code silently drops it from
+  its alert**: change the rule in the same change set. Query by hand with
+  `_time:1h kubernetes.pod_namespace:="grooveshop" log.code:*
+  | stats by (log.code, log.route, log.status) count()`.

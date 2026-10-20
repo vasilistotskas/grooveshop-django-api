@@ -17,10 +17,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 from django.conf import settings
+from django.db import connection
 from django.http import HttpResponse
 from django.test import RequestFactory, override_settings
+from rest_framework.response import Response
 
-from core.logging import CorrelationIdFilter, JsonFormatter
+from core.logging import (
+    CorrelationIdFilter,
+    JsonFormatter,
+    TenantContextFilter,
+)
 from core.middleware.access_log import UNMATCHED_ROUTE, AccessLogMiddleware
 from core.middleware.correlation_id import CORRELATION_ID_HEADER
 from tenant.internal import INTERNAL_DOMAINS_PATH
@@ -37,6 +43,7 @@ def access_lines(caplog):
     caplog handler would not see ``correlation_id`` at all.
     """
     caplog.handler.addFilter(CorrelationIdFilter())
+    caplog.handler.addFilter(TenantContextFilter())
     caplog.set_level(logging.INFO, logger=ACCESS_LOGGER)
 
     def lines() -> list[logging.LogRecord]:
@@ -68,8 +75,10 @@ class TestOneLinePerRequest:
         assert isinstance(payload["duration_ms"], int | float)
         assert payload["duration_ms"] >= 0
         assert payload["correlation_id"] == "cid-42"
+        assert payload["code"] == response.json()["code"] == "not_found"
         assert payload["message"] == (
             f"GET {PRODUCT_DETAIL_ROUTE} 404 {payload['duration_ms']:.1f}ms"
+            " not_found"
         )
 
     def test_the_line_and_the_response_header_share_one_id(
@@ -160,6 +169,103 @@ class TestOneLinePerRequest:
         payload = _as_json(record)
         assert payload["status"] == response.status_code == 404
         assert payload["correlation_id"] == "cid-async"
+
+
+def _respond_with(response):
+    """Run one request through the middleware alone, answering ``response``."""
+    middleware = AccessLogMiddleware(Mock(return_value=response))
+    return middleware(RequestFactory().post("/anything"))
+
+
+class TestErrorCode:
+    """The ``code`` of an error response, so a spike of one code can be
+    counted per route (``GrooveShopApiErrorCodeSpike`` and friends in
+    grooveshop-infrastructure read ``log.code``)."""
+
+    def test_a_response_a_view_builds_is_logged_with_its_code(
+        self, access_lines
+    ):
+        """Most checkout and payment errors are built by the view, never
+        raised, so the exception handler alone would miss them."""
+        _respond_with(
+            Response(
+                {"detail": "Stripe said no.", "code": "payment_intent_failed"},
+                status=400,
+            )
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert record.levelno == logging.INFO
+        assert payload["status"] == 400
+        assert payload["code"] == "payment_intent_failed"
+        assert "Stripe said no." not in json.dumps(payload)
+
+    def test_a_5xx_is_a_warning_with_its_code(self, access_lines):
+        _respond_with(
+            Response(
+                {"detail": "Courier down.", "code": "courier_unreachable"},
+                status=503,
+            )
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert record.levelno == logging.WARNING
+        assert payload["level"] == "WARNING"
+        assert payload["code"] == "courier_unreachable"
+        assert "exception" not in payload
+
+    def test_an_unhandled_500_is_a_warning_without_a_code(self, access_lines):
+        """Django's own 500 page carries no code of ours, and
+        ``django.request`` already logs its traceback at ERROR."""
+        _respond_with(HttpResponse("boom", status=500))
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert record.levelno == logging.WARNING
+        assert "code" not in payload
+        assert "exception" not in payload
+
+    def test_a_field_named_code_is_not_taken_for_the_error_code(
+        self, access_lines
+    ):
+        """A validation error on a coupon's ``code`` field keeps the key
+        for the field (a list), so there is no top-level code."""
+        _respond_with(
+            Response({"code": ["This coupon has expired."]}, status=400)
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert "code" not in payload
+        assert "expired" not in json.dumps(payload)
+
+    def test_a_success_body_with_a_code_field_is_not_an_error_code(
+        self, access_lines
+    ):
+        _respond_with(Response({"code": "SUMMER10"}, status=200))
+
+        (record,) = access_lines()
+        assert record.levelno == logging.INFO
+        assert "code" not in _as_json(record)
+
+    @pytest.mark.django_db
+    def test_a_raised_validation_error_is_logged_with_its_code(
+        self, client, access_lines
+    ):
+        """Through the real stack: the exception handler adds the code to
+        the body, and the line repeats it with the tenant schema."""
+        response = client.post(
+            "/api/v1/order", data={}, content_type="application/json"
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert payload["status"] == response.status_code == 400
+        assert payload["code"] == response.json()["code"]
+        assert payload["route"] == "api/v1/order"
+        assert payload["schema"] == connection.tenant.schema_name
 
 
 class TestMeasurement:

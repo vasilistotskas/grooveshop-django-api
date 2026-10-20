@@ -4,6 +4,13 @@ from shipping_acs.models import AcsPickupList
 
 
 class AcsPickupListSerializer(serializers.ModelSerializer[AcsPickupList]):
+    issued_by = serializers.IntegerField(
+        source="issued_by_id",
+        read_only=True,
+        allow_null=True,
+        label=AcsPickupList._meta.get_field("issued_by_id").verbose_name,
+        help_text=AcsPickupList._meta.get_field("issued_by_id").help_text,
+    )
     issued_by_username = serializers.SerializerMethodField()
 
     class Meta:

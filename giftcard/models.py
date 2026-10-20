@@ -28,6 +28,7 @@ from giftcard.enum import (
     GiftCardStatus,
     GiftCardTransactionKind,
 )
+from tenant.staff_actors import StaffActor
 
 
 class GiftCardPurchase(TimeStampMixinModel, UUIDModel):
@@ -317,15 +318,15 @@ class GiftCardTransaction(TimeStampMixinModel):
         verbose_name=_("Refund attempt"),
         help_text=_("The refund that returned this credit, when it was one."),
     )
-    created_by = models.ForeignKey(
-        "user.UserAccount",
-        related_name="gift_card_adjustments_made",
+    created_by_id = models.BigIntegerField(
+        _("Created By"),
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
-        help_text=_("Admin who made a manual adjustment"),
-        verbose_name=_("Created By"),
+        help_text=_(
+            "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+        ),
     )
+    created_by = StaffActor()
     description = models.CharField(
         _("Description"), max_length=255, blank=True, default=""
     )

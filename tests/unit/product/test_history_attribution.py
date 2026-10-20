@@ -1,18 +1,12 @@
-"""Cross-schema audit attribution must not be a database constraint.
+"""Cross-schema audit attribution is a plain staff id, not a relation.
 
-``HistoryRequestMiddleware`` attributes writes to ``request.user`` — on
-a tenant host that is a PLATFORM-PUBLIC identity — while
-``product_historicalproduct.history_user`` and ``product.changed_by``
-live in the TENANT schema, where the user table is the tenant copy. A
-real FK there only ever held because the cutover copied users
-id-preserving: a post-cutover staff identity (public-only, no tenant
-row) saving a product raised an FK violation at INSERT.
-
-The ACS/BoxNow shipment histories already declare
-``user_db_constraint=False`` for exactly this reason; Product was the
-one historied model that had been missed. These tests pin the fix by
-doing what the bug forbade: attributing to a user id that exists in no
-user table at all.
+``HistoryRequestMiddleware`` attributes writes to ``request.user`` - on a
+tenant host a PLATFORM-PUBLIC identity - while the history row and
+``product.changed_by`` live in the TENANT schema, where the user table
+holds the store's shoppers. A relation there either violates (no such
+row) or names a shopper who shares the id, so the columns hold the id and
+``tenant.staff_actors`` resolves it in public. The store-schema half of
+this is ``tests_mt/test_staff_actor_resolution.py``.
 """
 
 from __future__ import annotations
@@ -21,57 +15,58 @@ import pytest
 
 from product.factories.product import ProductFactory
 from product.models.product import Product
-from user.models import UserAccount
+from tests.utils.staff import stamp_platform_identity
+from user.factories import UserAccountFactory
 
 # An id far beyond anything the test databases allocate.
 GHOST_PK = 987_654_321
 
 
 @pytest.mark.django_db
-class TestCrossSchemaAttribution:
-    def test_changed_by_may_reference_a_missing_user(self):
-        """Previously an IntegrityError at COMMIT."""
+class TestStaffAttribution:
+    def test_changed_by_may_name_a_missing_account(self):
         product = ProductFactory()
-        product.changed_by = UserAccount(pk=GHOST_PK)
-        product.save(update_fields=["changed_by"])
+        product.changed_by_id = GHOST_PK
+        product.save(update_fields=["changed_by_id"])
 
         product.refresh_from_db()
         assert product.changed_by_id == GHOST_PK
+        assert product.changed_by.pk == GHOST_PK
+        assert str(product.changed_by) == ""
 
-    def test_history_user_may_reference_a_missing_user(self):
-        """The historical INSERT is where the constraint actually fired."""
+    def test_history_user_may_name_a_missing_account(self):
         product = ProductFactory()
-        product._history_user = UserAccount(pk=GHOST_PK)
+        product.changed_by_id = GHOST_PK
         product.stock = product.stock + 1
-        product.save(update_fields=["stock"])
+        product.save(update_fields=["changed_by_id", "stock"])
 
         row = product.history.first()
         assert row.history_user_id == GHOST_PK
 
-    def test_attribution_stays_readable_through_the_orm(self):
-        """db_constraint=False keeps the relation usable — a resolvable
-        id still resolves; only enforcement is gone."""
+    def test_an_assigned_staff_member_resolves(self):
         product = ProductFactory()
-        actor = UserAccount.objects.create_user(
-            email="attribution-actor@example.com",
-            username="attributionactor",
-            password="x",
-        )
+        actor = stamp_platform_identity(UserAccountFactory())
         product.changed_by = actor
-        product.save(update_fields=["changed_by"])
+        product.save(update_fields=["changed_by_id"])
 
         product.refresh_from_db()
         assert product.changed_by == actor
 
-    def test_the_model_declares_the_orm_only_relations(self):
-        """Regression guard at the declaration level.
+    def test_a_shopper_is_never_recorded_as_staff(self):
+        """Only the staff backend stamps an identity; anyone else (a
+        shopper acting through the API) leaves the column empty rather
+        than naming an unrelated staff member."""
+        product = ProductFactory()
+        product.changed_by = UserAccountFactory()
+        product.save(update_fields=["changed_by_id"])
 
-        A future field rewrite that drops these flags reintroduces the
-        FK at the next migration — fail here, not in production.
-        """
-        changed_by = Product._meta.get_field("changed_by")
-        assert changed_by.db_constraint is False
+        product.refresh_from_db()
+        assert product.changed_by_id is None
+        assert product.changed_by is None
 
+    def test_the_columns_are_ids_not_relations(self):
+        """A relation to the store's user table is what named the wrong
+        person: it must not come back."""
+        assert not Product._meta.get_field("changed_by_id").is_relation
         history_model = Product.history.model
-        history_user = history_model._meta.get_field("history_user")
-        assert history_user.db_constraint is False
+        assert not history_model._meta.get_field("history_user_id").is_relation

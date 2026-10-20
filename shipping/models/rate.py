@@ -10,6 +10,7 @@ from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel
 from shipping.enum import ShippingKind
+from tenant.staff_actors import history_user_getter, history_user_setter
 
 
 class ShippingRate(TimeStampMixinModel):
@@ -129,7 +130,11 @@ class ShippingRate(TimeStampMixinModel):
     # Audit trail for price changes — a merchant support ticket about
     # "why did shipping to Cyprus jump" is answered from this table
     # rather than a support engineer guessing from memory.
-    history = HistoricalRecords(user_db_constraint=False)
+    history = HistoricalRecords(
+        history_user_id_field=models.BigIntegerField(null=True),
+        history_user_getter=history_user_getter,
+        history_user_setter=history_user_setter,
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Shipping Rate")

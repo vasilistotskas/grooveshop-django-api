@@ -38,6 +38,7 @@ from shipping_acs.tasks import (
     _unremitted_cod_rows,
     alert_unremitted_cod_payouts,
 )
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -53,7 +54,9 @@ def _acs_configured():
 
 @pytest.fixture
 def staff_user():
-    return UserAccountFactory(is_staff=True, is_superuser=True)
+    return stamp_platform_identity(
+        UserAccountFactory(is_staff=True, is_superuser=True)
+    )
 
 
 def _shipment(

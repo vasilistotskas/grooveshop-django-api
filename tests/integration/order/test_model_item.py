@@ -177,16 +177,18 @@ class TestOrderItemRefund:
         ).exists()
 
     def test_the_stock_log_names_who_and_why(self, order_item, product):
+        from tests.utils.staff import stamp_platform_identity
         from user.factories import UserAccountFactory
 
-        staff = UserAccountFactory(is_staff=True)
+        staff = stamp_platform_identity(UserAccountFactory(is_staff=True))
 
         order_item.refund(1, performed_by=staff, reason="Box came back")
 
         log = StockLog.objects.get(
             product=product, operation_type=StockLog.OPERATION_INCREMENT
         )
-        assert log.performed_by == staff
+        assert log.performed_by_staff_id == staff.pk
+        assert log.performed_by is None
         assert "Box came back" in log.reason
 
     @pytest.mark.parametrize("quantity", [-1, 0, 6])

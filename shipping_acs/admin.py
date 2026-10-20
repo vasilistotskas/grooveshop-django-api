@@ -786,6 +786,7 @@ class AcsStationAdmin(BaseModelAdmin):
 
 @admin.register(AcsPickupList)
 class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
+    staff_actor_fields = ("issued_by",)
     list_display = (
         "pickup_list_no",
         "issued_at",
@@ -804,6 +805,8 @@ class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "created_at",
         "updated_at",
     )
+    # Shown read-only as ``issued_by``.
+    exclude = ("issued_by_id",)
 
 
 @admin.register(AcsCodPayout)
@@ -859,6 +862,8 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "created_at",
         "updated_at",
     )
+    # Shown read-only as ``reconciled_by``.
+    exclude = ("reconciled_by_id",)
     # Reconciles every payout, not a row: a list action, not a row one.
     actions_list = ["run_reconciliation"]
     actions_row = ["mark_reconciled"]

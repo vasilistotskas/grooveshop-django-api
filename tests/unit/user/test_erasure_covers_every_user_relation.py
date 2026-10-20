@@ -35,25 +35,6 @@ User = get_user_model()
 # is the whole of the personal data on it.
 _NOT_SUBJECT_DATA = {
     "core.CachePurgeLog.actor": "staff FK — records who purged a cache",
-    "product.Product.changed_by": "staff FK — the row is product data",
-    "loyalty.PointsTransaction.created_by": "staff FK — operator who granted",
-    "giftcard.GiftCardTransaction.created_by": (
-        "staff FK — the operator who adjusted a card's balance; the "
-        "cardholder is GiftCard.issued_to, which is handled"
-    ),
-    "b2b.BusinessProfile.reviewed_by": "staff FK — reviewer of a company",
-    "shipping_acs.AcsPickupList.issued_by": (
-        "staff FK — the operator who closed a pickup list; recipient "
-        "details live on the shipment, scrubbed via the order"
-    ),
-    "shipping_acs.AcsCodPayout.reconciled_by": (
-        "staff FK — the operator who reconciled an ACS payout no shipment "
-        "explains; the row is the store's accounting record"
-    ),
-    "shipping_acs.AcsShipment.cod_received_outside_acs_by": (
-        "staff FK — the operator who recorded a COD settlement; the "
-        "shipment is scrubbed via the order"
-    ),
     "order.OrderItemHistory.user": (
         "carries only previous_value/new_value for an item change; no "
         "request metadata and no copy of the subject's details"

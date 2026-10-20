@@ -349,3 +349,48 @@ protect the Django admin login either.
   enrolment) step of the login form next time. A mailbox alone never yields a
   session. The reset also ends the account's staff API tokens
   (`PlatformStaffToken`), which the old password could have minted.
+
+## Staff members named on store rows
+
+A staff member is a **public-schema** account; the rows they act on (a
+product, a shipment, a stock movement, a gift-card adjustment) live in the
+**store's schema**, whose own `user_useraccount` holds the store's
+*shoppers*. A foreign key from such a row to `UserAccount` therefore points
+the staff id at the wrong table. PostgreSQL cannot express the cross-schema
+constraint, so it either rejected a staff member the store has no copy of
+(`ForeignKeyViolation`), or, once a shopper held that id, silently accepted
+it and **showed the shopper as the actor**. Reproduced in
+`tests_mt/test_staff_actor_resolution.py`.
+
+So these columns are plain ids with no relation (`tenant/staff_actors.py`):
+
+- `x_id` is a nullable `BigIntegerField`; `x` is a `StaffActor` property that
+  resolves the id in `public`: the account, `None` when empty, or an
+  `UnknownActor` (renders empty, keeps the pk) for a deleted account.
+- There is no join to get wrong. `select_related("x")` is gone by
+  construction; a page of rows resolves in one public query with
+  `prefetch_related("x")` (`BaseModelAdmin.staff_actor_fields` does it for
+  changelists and datasets).
+- Only an identity stamped by the staff backend is stored (`staff_id`). A
+  shopper acting through the API leaves the column empty rather than naming
+  an unrelated staff member.
+- simple_history models use `history_user_id_field` with
+  `history_user_getter` / `history_user_setter` (documented simple_history
+  options), so `history_user` resolves the same way.
+- `StockLog` had both writers in one column, so it is split:
+  `performed_by` is the shopper behind a reservation (a real relation to the
+  store's users), `performed_by_staff_id` is the staff member. `StockLog.actor`
+  is whichever is set. The migration moves the rows the admin stock-edit signal
+  wrote (the only staff writer then) across.
+
+Columns covered: `Product.changed_by` and every history `history_user`
+(`Product`, `ShippingRate`, `AcsShipment`, `BoxNowShipment`),
+`AcsShipment.cod_received_outside_acs_by`, `AcsPickupList.issued_by`,
+`AcsCodPayout.reconciled_by`, `BusinessProfile.reviewed_by`,
+`GiftCardTransaction.created_by`, `PointsTransaction.created_by`,
+`StockLog.performed_by_staff_id`. The migrations change Django's state only
+(the columns keep their name, type and data, so the release still serving is
+unaffected); the last three real foreign keys are dropped in store schemas
+(`tenant.migration_helpers.drop_actor_fk`), as `django_admin_log.user_id` was
+(`admin.log_actors`). A new column that records a staff member uses
+`StaffActor`, never a foreign key to `UserAccount`.

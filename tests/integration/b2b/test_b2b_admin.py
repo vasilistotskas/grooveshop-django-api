@@ -26,6 +26,7 @@ from b2b.enum import BusinessProfileStatus
 from b2b.factories import BusinessProfileFactory, CustomerGroupFactory
 from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
 from product.factories import ProductFactory
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -33,7 +34,9 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def staff_user(db):
-    return UserAccountFactory(is_staff=True, is_superuser=True)
+    return stamp_platform_identity(
+        UserAccountFactory(is_staff=True, is_superuser=True)
+    )
 
 
 def _post(staff_user, data):

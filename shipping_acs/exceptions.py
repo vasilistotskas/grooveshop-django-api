@@ -9,8 +9,8 @@ ACS error semantics (per PDF):
 * HTTP 200 + ``ACSExecution_HasError = true``   → business error;
   message in ``ACSExecutionErrorMessage``.
 * HTTP 403 / 406                                → auth-layer rejection;
-  transient in practice (~2% of prod tracking polls, self-heals on
-  retry — verified 2026-07-11), so Celery retries it. A *persistent*
+  ACS answers 406 to overlapping calls from one account (bounded by
+  ``shipping_acs.concurrency``), so Celery retries it. A *persistent*
   403/406 means a wrong AcsApiKey or a de-listed calling IP.
 * HTTP 5xx                                      → transient; Celery retries.
 * Other 4xx                                     → permanent; surface to admin.
@@ -63,7 +63,10 @@ class AcsAPIError(AcsError):
 
 
 class AcsRetryableError(AcsAPIError, CarrierUnavailableError):
-    """Raised on HTTP 5xx and connection errors — Celery autoretries."""
+    """Raised on HTTP 5xx, connection errors and a full request cap.
+
+    Celery autoretries.
+    """
 
 
 class AcsUnprintedVouchersError(AcsAPIError):
@@ -83,9 +86,9 @@ class AcsAuthError(AcsRetryableError):
     """Raised on HTTP 403 / 406 — auth-layer rejection.
 
     Subclasses :class:`AcsRetryableError` because production ACS
-    returns sporadic 406s that succeed on the next attempt (observed
-    on ~2% of tracking polls; same key/IP succeeded for sibling
-    vouchers in the same second). An auth-rejected request was never
+    returns 406s that succeed on the next attempt once fewer calls are
+    in flight (same key/IP succeeded for sibling vouchers in the same
+    second). An auth-rejected request was never
     processed by ACS, so retrying is safe even for non-idempotent
     aliases like ``ACS_Create_Voucher``. When the key/IP is genuinely
     wrong, Celery's capped retries exhaust and the task fails loudly

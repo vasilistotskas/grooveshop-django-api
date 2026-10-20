@@ -1414,10 +1414,11 @@ def get_celery_beat_schedule():
             "options": {"queue": "celery", "expires": 300},
         },
         # Poll ACS_Trackingsummary every 15 min for non-terminal
-        # shipments. Sub-tasks fan out internally with a 0.2s
-        # countdown stagger so we stay well within ACS's 10 req/sec
-        # cap. Distributed mutex inside the task body prevents two
-        # workers from each running the full fan-out concurrently.
+        # shipments. Sub-tasks fan out internally spaced by
+        # ACS_POLL_DISPATCH_SPACING_SECONDS; the calls in flight are
+        # capped by shipping_acs.concurrency. Distributed mutex inside
+        # the task body prevents two workers from each running the full
+        # fan-out concurrently.
         "poll-acs-tracking": {
             # Beat fires in the public schema. Without the fanout wrapper
             # the worker would query `AcsShipment` in public — where no
@@ -4391,6 +4392,22 @@ ACS_API_BASE_URL = getenv(
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+# Requests in flight per ACS account across every pod
+# (``shipping_acs/concurrency.py``). ACS answers 406 to overlapping calls;
+# it publishes no figure, so tune this against the 406 rate in the logs.
+ACS_MAX_CONCURRENT_REQUESTS = int(getenv("ACS_MAX_CONCURRENT_REQUESTS", "3"))
+# How long a call waits for a free slot before it is retried through Celery.
+ACS_SLOT_WAIT_SECONDS = int(getenv("ACS_SLOT_WAIT_SECONDS", "10"))
+# Lease on a slot, so a worker killed mid-request cannot hold it for good.
+# Well above ``ACS_HTTP_TIMEOUT``.
+ACS_SLOT_TTL_SECONDS = int(getenv("ACS_SLOT_TTL_SECONDS", "60"))
+# Gap between the start times of the per-shipment tracking polls a batch
+# dispatches. Each poll makes two calls of about a second, so with the cap
+# above this is the rate the slots can serve without the polls queueing for
+# a slot and retrying.
+ACS_POLL_DISPATCH_SPACING_SECONDS = float(
+    getenv("ACS_POLL_DISPATCH_SPACING_SECONDS", "1.0")
+)
 # Days without a tracking event before a non-terminal shipment is
 # reported by check_stale_acs_shipments to the store's operators
 # (platform ADMINS only as a fallback).

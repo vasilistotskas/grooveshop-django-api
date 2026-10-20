@@ -25,6 +25,7 @@ from datetime import timedelta
 from typing import Any
 
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
@@ -471,19 +472,18 @@ _POLL_BATCH_LOCK_TTL = 13 * 60  # 13 minutes
 def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
     """Dispatch per-shipment poll tasks for non-terminal shipments.
 
-    Rate-limit aware: ACS caps at 10 req/sec, so we dispatch sub-tasks
-    with staggered ``countdown`` of 0.2s so the natural fan-out hits at
-    roughly 5 req/sec — well within the cap with margin for the
-    ``tracking_summary`` + ``tracking_details`` two-call pair per
-    shipment.
+    The number of calls in flight is bounded where they are made, by the
+    per-account slots in ``shipping_acs.concurrency``, not here. The
+    dispatch spacing (``ACS_POLL_DISPATCH_SPACING_SECONDS``) only paces
+    the fan-out to what those slots can serve, so the polls do not all
+    queue for a slot at once and exhaust their wait.
 
     Concurrency-safe via a Redis-backed ``cache.add`` mutex: with
     ``celery-beat`` enqueuing into a shared RabbitMQ queue and the
     HPA running multiple worker pods, two consumers could otherwise
     each dequeue this beat task and each dispatch the full 200-task
-    fan-out — doubling the API rate to 20 req/sec and breaching the
-    ACS 10 req/sec cap. The mutex makes the batch single-flight
-    cluster-wide.
+    fan-out, doubling the load on the slots. The mutex makes the batch
+    single-flight cluster-wide.
     """
     if _skip_if_acs_unconfigured("poll_acs_tracking_batch"):
         return {"dispatched": 0, "skipped": True}
@@ -498,7 +498,7 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
     if not cache.add(_POLL_BATCH_LOCK_KEY, 1, _POLL_BATCH_LOCK_TTL):
         logger.info(
             "poll_acs_tracking_batch: another worker holds the lock — "
-            "skipping this tick to stay under the ACS 10 req/sec cap."
+            "skipping this tick."
         )
         return {"dispatched": 0, "skipped": True}
 
@@ -521,10 +521,11 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
             .values_list("id", flat=True)[:max_per_run]
         )
 
+        spacing = settings.ACS_POLL_DISPATCH_SPACING_SECONDS
         for index, shipment_id in enumerate(candidates):
             poll_acs_tracking_one.apply_async(
                 args=[shipment_id],
-                countdown=index * 0.2,
+                countdown=index * spacing,
             )
         return {"dispatched": len(candidates)}
     finally:
@@ -542,9 +543,13 @@ def models_or_null(cutoff):
     bind=True,
     base=TenantTask,
     autoretry_for=(AcsRetryableError, ConnectionError),
-    retry_backoff=True,
+    # A fixed 10 s factor (10, 20, 40, 80, 160 s) and no jitter: Celery's
+    # jitter draws between zero and the backoff, so the first retry of a
+    # rejected poll could re-enter the same congestion at once. The slots
+    # in ``shipping_acs.concurrency`` spread the retries that follow.
+    retry_backoff=10,
     retry_backoff_max=600,
-    retry_jitter=True,
+    retry_jitter=False,
     max_retries=5,
 )
 def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:

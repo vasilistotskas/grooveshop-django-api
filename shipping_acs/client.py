@@ -22,6 +22,7 @@ from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from shipping_acs.concurrency import acs_request_slot
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
@@ -150,16 +151,19 @@ class AcsClient:
         }
 
         try:
-            response = self._session.post(
-                self.api_base_url,
-                json=body,
-                headers={
-                    "AcsApiKey": self.api_key,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                timeout=self.timeout,
-            )
+            # Every ACS call, whatever the alias, takes a slot: ACS
+            # rejects overlapping calls from one account with a 406.
+            with acs_request_slot(account=self.company_id, alias=alias):
+                response = self._session.post(
+                    self.api_base_url,
+                    json=body,
+                    headers={
+                        "AcsApiKey": self.api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    timeout=self.timeout,
+                )
         except requests.ConnectionError as exc:
             raise AcsRetryableError(
                 alias=alias,
@@ -176,18 +180,19 @@ class AcsClient:
                 error_message=f"ACS timeout after {self.timeout}s: {exc}",
             ) from exc
 
-        # Auth failures bypass the JSON envelope. Production ACS also
-        # returns sporadic transient 403/406s (~2% of tracking polls,
-        # self-healing on retry), so AcsAuthError is retryable — see
-        # its docstring. Only a *persistent* rejection indicates a bad
-        # key or a de-listed IP.
+        # Auth failures bypass the JSON envelope. ACS answers 406 to
+        # overlapping calls from one account, which ``acs_request_slot``
+        # now bounds; a rejection that still gets through was never
+        # processed, so AcsAuthError is retryable — see its docstring.
+        # Only a *persistent* rejection indicates a bad key or a
+        # de-listed IP.
         if response.status_code in (403, 406):
             raise AcsAuthError(
                 alias=alias,
                 error_message=(
                     "ACS rejected the request at the auth layer "
-                    "(usually a transient rejection that succeeds on "
-                    "retry; persistent failures mean an invalid "
+                    "(usually too many calls in flight at once, which "
+                    "succeeds on retry; persistent failures mean an invalid "
                     "AcsApiKey or a calling IP missing from the "
                     "allow-list)."
                 ),

@@ -7,7 +7,8 @@ the serving ACS station code.
 
 Public — anyone can submit an address for validation; the endpoint
 never echoes credentials or sensitive data back, and the underlying
-ACS API is rate-limited at 10 req/sec server-side.  We still cache
+ACS call takes a request slot like every other (``shipping_acs.concurrency``).
+We still cache
 validations in Redis for 1 hour per identical input to absorb the
 typical typing-storm pattern (street → zip → typo → fix).
 """

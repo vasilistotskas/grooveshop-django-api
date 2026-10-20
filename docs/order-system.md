@@ -1019,10 +1019,27 @@ accepting Cyprus orders at the Greek flat rate.
   the order paid through `_mark_cod_order_paid_if_pending` (silent, a
   no-op if already paid). `_unremitted_cod_rows` then skips the parcel. No
   `AcsCodPayout` is ever created for it.
-- HTTP 403/406 (`AcsAuthError`) is **retryable**: prod ACS returns
-  sporadic transient 406s (~2% of tracking polls, self-healing —
-  verified 2026-07-11); only a persistent rejection means a bad
-  key/IP.
+- HTTP 403/406 (`AcsAuthError`) is **retryable**; only a persistent
+  rejection means a bad key/IP. ACS answers 406 to overlapping calls
+  from one account: 2026-10-20 prod saw 22% of tracking calls rejected
+  (2% in July), every one inside the `poll_acs_tracking_batch` fan-out,
+  where each poll makes two calls of 0.6 to 4 s so six to eight were in
+  flight across the worker pods. Staggering task *start* times does not
+  bound that, so `AcsClient._call` (every alias) takes one of
+  `ACS_MAX_CONCURRENT_REQUESTS` (default 3) Redis slots per ACS
+  `Company_ID` and store (`shipping_acs/concurrency.py`: `cache.add`
+  slot keys with a `ACS_SLOT_TTL_SECONDS` lease so a killed worker frees
+  its slot, released in `finally`). A call finding every slot taken waits
+  up to `ACS_SLOT_WAIT_SECONDS`, then raises `AcsRetryableError` for
+  Celery to retry; with Redis down the cap is skipped, not the call.
+  ACS publishes no concurrency or rate figure (the old "10 req/sec" had
+  no source we could find), so 3 is a starting point to tune against the
+  406 rate. The batch spaces its dispatches by
+  `ACS_POLL_DISPATCH_SPACING_SECONDS` (default 1 s, about what three
+  slots serve) so polls do not all queue for a slot, and
+  `poll_acs_tracking_one` retries at 10, 20, 40, 80, 160 s with no jitter
+  (Celery's jitter draws from zero, which re-entered the congestion at
+  once).
 - A refused or uncollected COD parcel: ACS records `attempted` (order →
   SHIPPED), texts the customer and holds the parcel about ten days, then
   reports `returned_flag=1` → shipment RETURNED → order RETURNED, and the

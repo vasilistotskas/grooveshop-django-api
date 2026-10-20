@@ -234,6 +234,23 @@ class PaymentLedger:
         )
 
     @staticmethod
+    def chargebacks_returned(
+        order: Order, *, before: datetime | None = None
+    ) -> Decimal:
+        """What lost disputes took back on *order* where staff decided the
+        goods came back (``ChargebackDecision``): the part of a chargeback
+        that reverses the sale, as a refund does. With *before*, only the
+        decisions made before that moment."""
+        rows = PaymentTransaction.objects.filter(
+            order=order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            decision__goods_returned=True,
+        )
+        if before is not None:
+            rows = rows.filter(decision__decided_at__lt=before)
+        return _total(rows)
+
+    @staticmethod
     def dispute_open(order: Order, metadata: dict | None) -> bool:
         """Whether a cardholder dispute against *order*'s payment is open,
         from the ``disputed`` / ``dispute_id`` / ``dispute_status`` flags

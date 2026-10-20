@@ -29,9 +29,10 @@ pytestmark = pytest.mark.django_db
 # once its row is read - in production every declared setting has a row
 # and these reads are cache hits. Measured 2026-10-17 (39 warm, 69 cold: the
 # follow-up counter reads ORDER_FOLLOW_UP_DAYS and four more counts add a
-# query each); re-measure before raising.
+# query each; 70 cold on 2026-10-19: the lost-dispute counter is one more
+# count); re-measure before raising.
 WARM_BUDGET = 39
-COLD_BUDGET = 69
+COLD_BUDGET = 70
 
 
 @pytest.fixture

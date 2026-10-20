@@ -453,6 +453,11 @@ def attention_counts() -> dict[str, int]:
         "canceled_still_paid": model("order.Order")
         .objects.refund_owed()
         .count(),
+        # A lost dispute is money gone; whether its goods came back decides
+        # if the receipt is credited, and only staff know.
+        "chargebacks_to_settle": model("order.Order")
+        .objects.awaiting_chargeback_decision()
+        .count(),
         "low_stock": model("product.Product")
         .objects.filter(active=True, stock__gt=0, stock__lt=LOW_STOCK_BELOW)
         .count(),

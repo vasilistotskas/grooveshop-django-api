@@ -4,7 +4,9 @@
 retail credit document is issued". The platform's retail receipt is the
 order's :class:`~order.models.invoice.Invoice` (11.1); every refund of an
 order whose receipt is registered with AADE gets a ``RetailCredit`` linked
-to that receipt's MARK, crediting exactly the amount refunded.
+to that receipt's MARK, crediting exactly the amount refunded. So does a
+chargeback that staff decided brought the goods back
+(:class:`~order.models.chargeback_decision.ChargebackDecision`).
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ class CreditReason(models.TextChoices):
 
     REFUND = "REFUND", _("Refund")
     SETTLEMENT = "SETTLEMENT", _("Order closed without a sale")
+    CHARGEBACK = "CHARGEBACK", _("Goods returned after a chargeback")
 
 
 def _credit_upload_to(instance: RetailCredit, filename: str) -> str:
@@ -130,6 +133,18 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             "which this document credits; none for a provider refund."
         ),
     )
+    chargeback = models.OneToOneField(
+        "order.PaymentTransaction",
+        related_name="chargeback_credit",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        verbose_name=_("Chargeback"),
+        help_text=_(
+            "The ledger chargeback whose goods came back, which this "
+            "document credits; none for a refund or a settlement."
+        ),
+    )
     credit_number = models.CharField(
         _("Credit Number"),
         max_length=32,
@@ -184,6 +199,7 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
             models.CheckConstraint(
                 condition=(
                     models.Q(reason=CreditReason.REFUND)
+                    & models.Q(chargeback__isnull=True)
                     & (
                         models.Q(
                             refund__isnull=False, refund_attempt__isnull=True
@@ -197,8 +213,15 @@ class RetailCredit(TimeStampMixinModel, UUIDModel, MyDataRegistration):
                     models.Q(reason=CreditReason.SETTLEMENT)
                     & models.Q(refund__isnull=True)
                     & models.Q(refund_attempt__isnull=True)
+                    & models.Q(chargeback__isnull=True)
+                )
+                | (
+                    models.Q(reason=CreditReason.CHARGEBACK)
+                    & models.Q(refund__isnull=True)
+                    & models.Q(refund_attempt__isnull=True)
+                    & models.Q(chargeback__isnull=False)
                 ),
-                name="credit_refund_iff_reason_refund",
+                name="credit_source_matches_reason",
             ),
         ]
 

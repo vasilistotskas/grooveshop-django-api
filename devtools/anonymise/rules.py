@@ -545,6 +545,12 @@ NOT_PERSONAL: dict[str, str] = {
         "tenant.TenantDomain",
         "core.CachePurgeLog",
     ),
+    **_exempt(
+        "a staff decision about a lost dispute: a yes/no, a timestamp and "
+        "the platform staff member's id, nothing about the customer; "
+        "staging keeps operator identities",
+        "order.ChargebackDecision",
+    ),
 }
 
 #: Individual fields that look personal (an e-mail or phone column, an IP,

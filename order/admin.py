@@ -33,6 +33,7 @@ from unfold.forms import BaseDialogForm
 from unfold.widgets import (
     UnfoldAdminDecimalFieldWidget,
     UnfoldAdminIntegerFieldWidget,
+    UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
 )
 
@@ -54,7 +55,12 @@ from admin.displays import (
 from admin.filters import AcquisitionSourceFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
+from order.chargebacks import (
+    ChargebackDecisionError,
+    decide_chargebacks,
+)
 from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     RETURN_HANDLING_STATUSES,
     OrderStatus,
@@ -221,6 +227,23 @@ class RefundOwedFilter(DropdownFilter):
     def queryset(self, request, queryset):
         if self.value() == "yes":
             return queryset.refund_owed()
+        return queryset
+
+
+class ChargebackDecisionFilter(DropdownFilter):
+    """Orders that lost a dispute and still wait for staff to say whether
+    the goods came back (``OrderQuerySet.awaiting_chargeback_decision``,
+    the rule behind the dashboard counter)."""
+
+    title = _("Chargeback")
+    parameter_name = "chargeback"
+
+    def lookups(self, request, model_admin):
+        return [("undecided", _("Goods not yet settled"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "undecided":
+            return queryset.awaiting_chargeback_decision()
         return queryset
 
 
@@ -478,6 +501,35 @@ class RestockReturnedForm(BaseDialogForm):
         return cleaned
 
 
+class ChargebackDecisionForm(BaseDialogForm):
+    """The "Settle chargeback" dialog of an order: what became of the goods
+    of a lost dispute. The decision applies to every chargeback of the
+    order (``order.chargebacks.decide_chargebacks``)."""
+
+    OUTCOME_RETURNED = "returned"
+    OUTCOME_KEPT = "kept"
+
+    outcome = forms.ChoiceField(
+        label=_("What became of the goods?"),
+        choices=[
+            ("", "---------"),
+            (OUTCOME_RETURNED, _("The product was returned or not delivered")),
+            (OUTCOME_KEPT, _("The customer kept the product")),
+        ],
+        widget=UnfoldAdminSelectWidget,
+        help_text=_(
+            "Returned or not delivered: the sale is reversed, and the "
+            "receipt is credited (or issued net of the chargeback if it "
+            "does not exist yet). Kept: the sale stands and nothing is "
+            "credited."
+        ),
+    )
+
+    @property
+    def goods_returned(self) -> bool:
+        return self.cleaned_data["outcome"] == self.OUTCOME_RETURNED
+
+
 class OrderItemInline(TabularInline):
     model = OrderItem
     extra = 0
@@ -598,9 +650,13 @@ class PaymentTransactionInline(TabularInline):
         "provider",
         "provider_reference",
         "description",
+        "decision_display",
     )
     readonly_fields = fields
     ordering = ("created_at", "id")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("decision")
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -608,6 +664,25 @@ class PaymentTransactionInline(TabularInline):
     @admin.display(description=_("Amount"))
     def amount_display(self, obj):
         return money(obj.amount.amount)
+
+    @admin.display(description=_("Goods"))
+    def decision_display(self, obj):
+        """What staff decided about a lost dispute's goods, or that they
+        have not yet."""
+        if obj.kind != PaymentTransactionKind.CHARGEBACK:
+            return ""
+        decision = getattr(obj, "decision", None)
+        if decision is None:
+            return _("Awaiting a decision")
+        outcome = (
+            _("Returned or not delivered")
+            if decision.goods_returned
+            else _("Customer kept them")
+        )
+        when = formats.date_format(
+            timezone.localtime(decision.decided_at), "SHORT_DATETIME_FORMAT"
+        )
+        return f"{outcome}, {when}"
 
 
 def _invoice_download_url(invoice: Invoice) -> str | None:
@@ -740,6 +815,7 @@ class OrderAdmin(BaseModelAdmin):
         "document_type",
         WholesaleOrderFilter,
         RefundOwedFilter,
+        ChargebackDecisionFilter,
         FollowUpFilter,
         RecentOrdersFilter,
         ("attribution__source_type", ChoicesDropdownFilter),
@@ -994,6 +1070,7 @@ class OrderAdmin(BaseModelAdmin):
         "confirm_offline_payment",
         "refund_payment",
         "restock_returned",
+        "decide_chargeback",
         "download_shipping_voucher",
         {
             "title": _("Invoicing & myDATA"),
@@ -1739,6 +1816,16 @@ class OrderAdmin(BaseModelAdmin):
             ).exists()
         )
 
+    def has_decide_chargeback_permission(self, request, object_id=None):
+        """Offered where a lost dispute exists, whatever has been decided
+        so far: the service refuses a change that has gone too far."""
+        return (
+            object_id is not None
+            and PaymentTransaction.objects.filter(
+                order_id=object_id, kind=PaymentTransactionKind.CHARGEBACK
+            ).exists()
+        )
+
     def has_refund_permission(self, request, object_id=None):
         """Money moves from here, so only where money can still be refunded
         (``PaymentLedger.refund_open``), whatever the order's status: a return, a
@@ -1750,6 +1837,57 @@ class OrderAdmin(BaseModelAdmin):
             else None
         )
         return order is not None and PaymentLedger.refund_open(order)
+
+    @action(
+        description=_("Settle chargeback (goods)"),
+        icon="gavel",
+        permissions=["change", "decide_chargeback"],
+        dialog=ActionDialog(
+            title=_("Settle chargeback"),
+            description=_(
+                "A lost dispute took money back; say whether the goods "
+                "came back. Returned or not delivered credits the receipt "
+                "(retail credit document), as a refund does. The customer "
+                "keeping the goods leaves the sale as it is."
+            ),
+            form_class=ChargebackDecisionForm,
+        ),
+    )
+    def decide_chargeback(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        order = Order.objects.get(pk=object_id)
+        try:
+            changed = decide_chargebacks(
+                order.pk, goods_returned=form.goods_returned, user=request.user
+            )
+        except ChargebackDecisionError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            if changed:
+                self.log_change(
+                    request,
+                    order,
+                    "Chargeback goods returned"
+                    if form.goods_returned
+                    else "Chargeback goods kept by the customer",
+                )
+            self.message_user(
+                request,
+                _("Order %(order_id)s: the chargeback is settled.")
+                % {"order_id": order.id}
+                if changed
+                else _("Order %(order_id)s: nothing to change.")
+                % {"order_id": order.id},
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
 
     def has_retail_documents_permission(self, request, object_id=None):
         """The "Invoicing & myDATA" actions exist only for a store whose

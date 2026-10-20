@@ -16,8 +16,12 @@ document:
 
 A refund recorded before the receipt existed has no document: the receipt
 is issued net of it (``order.invoicing.refunded_before_receipt``), so there
-is nothing to credit; a chargeback never has one (the sale was not reversed
-by the merchant).
+is nothing to credit. A chargeback has one only when staff decided the goods
+came back (``ChargebackDecision``): the card network taking money back does
+not reverse the sale by itself, but a sale whose goods returned is reversed
+in fact. It is credited for what the chargeback took, capped at what the
+receipt still holds, and on the same cut-off as a refund (a decision made
+before the receipt row existed nets the receipt instead).
 
 :func:`create_pending_credits` is the single reconciliation: it looks at
 the ledger and the documents under the order lock and creates whatever is
@@ -74,6 +78,7 @@ from order.models.refund_attempt import (
 from order.models.retail_credit import CreditReason
 from order.payment_ledger import PaymentLedger
 from order.taxation import split_gross
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +169,7 @@ def _create_credit(
     reason: CreditReason,
     refund: PaymentTransaction | None = None,
     refund_attempt: RefundAttempt | None = None,
+    chargeback: PaymentTransaction | None = None,
 ) -> RetailCredit:
     prior = [
         credit.vat_breakdown
@@ -182,6 +188,7 @@ def _create_credit(
         reason=reason,
         refund=refund,
         refund_attempt=refund_attempt,
+        chargeback=chargeback,
         credit_number=CreditCounter.allocate(issue_date.year),
         issue_date=issue_date,
         subtotal=Money(net, currency),
@@ -202,6 +209,35 @@ def _credited_total(invoice: Invoice) -> Decimal:
         ),
         _ZERO,
     )
+
+
+def _capped_to_receipt(invoice: Invoice, amount: Decimal) -> Decimal:
+    """*amount*, or what the receipt still holds when that is less.
+
+    Nothing left at all returns *amount* unchanged, so the guard refuses it
+    and tells staff (:func:`_guarded`) rather than saying nothing."""
+    left = Decimal(invoice.total.amount) - _credited_total(invoice)
+    if left <= 0 or amount <= left:
+        return amount
+    logger.warning(
+        "Credit of %s capped at the %s the receipt of order %s still holds",
+        amount,
+        left,
+        invoice.order_id,
+    )
+    return left
+
+
+def request_credit_documents(order_id: int) -> None:
+    """Issue the order's retail credit documents, when the platform issues
+    its retail documents by itself (``MYDATA_AUTO_SUBMIT``). Idempotent on
+    the receiving side: nothing is owed until the order's receipt is
+    registered, and each refund or chargeback is credited once."""
+    from order.mydata.config import load_config
+    from order.tasks import issue_pending_credits
+
+    if load_config().issues_automatically():
+        dispatch_on_commit(issue_pending_credits, [order_id])
 
 
 def create_pending_credits(order_id: int) -> list[int]:
@@ -266,6 +302,28 @@ def create_pending_credits(order_id: int) -> list[int]:
                     amount=Decimal(returned.amount),
                     reason=CreditReason.REFUND,
                     refund_attempt=attempt,
+                )
+            )
+
+        # A lost dispute whose goods came back reverses the sale like a
+        # refund: the same credit, the same cap, one path. Its moment is
+        # the staff decision, the clock the receipt's cut-off uses.
+        for chargeback in PaymentTransaction.objects.filter(
+            order=order,
+            kind=PaymentTransactionKind.CHARGEBACK,
+            decision__goods_returned=True,
+            decision__decided_at__gte=invoice.created_at,
+            chargeback_credit__isnull=True,
+        ).order_by("decision__decided_at", "id"):
+            created.extend(
+                _guarded(
+                    order,
+                    invoice,
+                    amount=_capped_to_receipt(
+                        invoice, Decimal(chargeback.amount.amount)
+                    ),
+                    reason=CreditReason.CHARGEBACK,
+                    chargeback=chargeback,
                 )
             )
 

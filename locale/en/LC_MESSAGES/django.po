@@ -345,6 +345,9 @@ msgid_plural "%(num)d years"
 msgstr[0] "%(num)d year"
 msgstr[1] "%(num)d years"
 
+msgid "%(outcome)s (chargeback %(chargeback)s)"
+msgstr "%(outcome)s (chargeback %(chargeback)s)"
+
 #, python-format
 msgid "%(pay_way)s blocked on %(provider)s/%(kind)s"
 msgstr "%(pay_way)s blocked on %(provider)s/%(kind)s"
@@ -546,6 +549,9 @@ msgstr "A dispute is open on this payment and the payment provider does not acce
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
+
+msgid "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
+msgstr "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
 
 #, python-format
 msgid "A lot has happened since your last visit, and we'd love to have you back to explore all the exciting updates and features we've been working on at %(site_name)s."
@@ -1368,6 +1374,9 @@ msgstr "Avatar path or empty string"
 
 msgid "Average order"
 msgstr "Average order"
+
+msgid "Awaiting a decision"
+msgstr "Awaiting a decision"
 
 msgid "Awaiting payment"
 msgstr "Awaiting payment"
@@ -2308,6 +2317,18 @@ msgstr "Chargeback %(amount)s"
 msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
 msgstr "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
 
+msgid "Chargeback %(amount)s: goods returned, the sale is reversed (decided by %(who)s)."
+msgstr "Chargeback %(amount)s: goods returned, the sale is reversed (decided by %(who)s)."
+
+msgid "Chargeback %(amount)s: the customer kept the goods, the sale stands (decided by %(who)s)."
+msgstr "Chargeback %(amount)s: the customer kept the goods, the sale stands (decided by %(who)s)."
+
+msgid "Chargeback Decision"
+msgstr "Chargeback Decision"
+
+msgid "Chargeback Decisions"
+msgstr "Chargeback Decisions"
+
 #, python-format
 msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
 msgstr "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
@@ -3062,6 +3083,12 @@ msgstr "Customer full name"
 msgid "Customer group"
 msgstr "Customer group"
 
+msgid "Customer kept the goods"
+msgstr "Customer kept the goods"
+
+msgid "Customer kept them"
+msgstr "Customer kept them"
+
 msgid "Customer last name"
 msgstr "Customer last name"
 
@@ -3167,6 +3194,12 @@ msgstr "Dear %(first_name)s %(last_name)s,"
 #, python-format
 msgid "Dear %(name)s,"
 msgstr "Dear %(name)s,"
+
+msgid "Decided at"
+msgstr "Decided at"
+
+msgid "Decided by"
+msgstr "Decided by"
 
 msgid "Declined"
 msgstr "Declined"
@@ -5735,6 +5768,18 @@ msgstr "Good news — the business account for %(company)s has been approved."
 msgid "Good news! Your order #%(order_id)s has been shipped and is on its way to you."
 msgstr "Good news! Your order #%(order_id)s has been shipped and is on its way to you."
 
+msgid "Goods"
+msgstr "Goods"
+
+msgid "Goods not yet settled"
+msgstr "Goods not yet settled"
+
+msgid "Goods returned"
+msgstr "Goods returned"
+
+msgid "Goods returned after a chargeback"
+msgstr "Goods returned after a chargeback"
+
 msgid "Google Ads Add-Payment-Info Label"
 msgstr "Google Ads Add-Payment-Info Label"
 
@@ -6903,6 +6948,9 @@ msgstr "Looking forward to seeing you again!"
 msgid "Lost"
 msgstr "Lost"
 
+msgid "Lost disputes to settle"
+msgstr "Lost disputes to settle"
+
 msgid "Loved (High Likes)"
 msgstr "Loved (High Likes)"
 
@@ -7947,6 +7995,9 @@ msgstr "Open full stock history chart"
 msgid "Open the myDATA settings"
 msgstr "Open the myDATA settings"
 
+msgid "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
+msgstr "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
+
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 
@@ -8029,6 +8080,12 @@ msgstr "Order #%(order)s has not been paid yet — the voucher is issued automat
 #, python-format
 msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
 msgstr "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+
+msgid "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
+msgstr "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
+
+msgid "Order #%(order_id)s has no chargeback to decide."
+msgstr "Order #%(order_id)s has no chargeback to decide."
 
 #, python-format
 msgid "Order #%(order_id)s has no receipt to regenerate."
@@ -8151,6 +8208,12 @@ msgstr[1] "Order %(order_id)s: %(count)s units put back in stock."
 #, python-format
 msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
 msgstr "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
+
+msgid "Order %(order_id)s: nothing to change."
+msgstr "Order %(order_id)s: nothing to change."
+
+msgid "Order %(order_id)s: the chargeback is settled."
+msgstr "Order %(order_id)s: the chargeback is settled."
 
 #, python-format
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
@@ -10316,6 +10379,12 @@ msgstr "Returned and still to put back: %(left)s"
 msgid "Returned flag"
 msgstr "Returned flag"
 
+msgid "Returned or not delivered"
+msgstr "Returned or not delivered"
+
+msgid "Returned or not delivered: the sale is reversed, and the receipt is credited (or issued net of the chargeback if it does not exist yet). Kept: the sale stands and nothing is credited."
+msgstr "Returned or not delivered: the sale is reversed, and the receipt is credited (or issued net of the chargeback if it does not exist yet). Kept: the sale stands and nothing is credited."
+
 msgid "Returned units"
 msgstr "Returned units"
 
@@ -10477,6 +10546,9 @@ msgstr "Say how the cash was paid back (a bank transfer id, for example): part o
 
 msgid "Say how the cash was paid back: this refund returns money collected on delivery."
 msgstr "Say how the cash was paid back: this refund returns money collected on delivery."
+
+msgid "Say whether the goods came back, so the receipt is credited"
+msgstr "Say whether the goods came back, so the receipt is credited"
 
 msgid "Scan"
 msgstr "Scan"
@@ -10793,6 +10865,12 @@ msgstr "Setting values keyed by setting name."
 
 msgid "Settings"
 msgstr "Settings"
+
+msgid "Settle chargeback"
+msgstr "Settle chargeback"
+
+msgid "Settle chargeback (goods)"
+msgstr "Settle chargeback (goods)"
 
 msgid "Settled"
 msgstr "Settled"
@@ -11273,6 +11351,9 @@ msgstr "Storefront path, e.g. /account/orders/42. No host and no language prefix
 
 msgid "Stores"
 msgstr "Stores"
+
+msgid "Stores a PLATFORM-schema user id; not FK-enforced."
+msgstr "Stores a PLATFORM-schema user id; not FK-enforced."
 
 msgid "Story Timeline"
 msgstr "Story Timeline"
@@ -11787,6 +11868,9 @@ msgstr "The coupon code to apply."
 msgid "The customer is not eligible for this promotion"
 msgstr "The customer is not eligible for this promotion"
 
+msgid "The customer kept the product"
+msgstr "The customer kept the product"
+
 msgid "The destination this option was priced for."
 msgstr "The destination this option was priced for."
 
@@ -11845,6 +11929,9 @@ msgstr "The language the visitor subscribed in, which their alert email is writt
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
+msgid "The ledger chargeback whose goods came back, which this document credits; none for a refund or a settlement."
+msgstr "The ledger chargeback whose goods came back, which this document credits; none for a refund or a settlement."
+
 msgid "The ledger refund this attempt produced."
 msgstr "The ledger refund this attempt produced."
 
@@ -11900,6 +11987,9 @@ msgstr "The previous payment is still in progress."
 
 msgid "The product the shopper is looking at."
 msgstr "The product the shopper is looking at."
+
+msgid "The product was returned or not delivered"
+msgstr "The product was returned or not delivered"
 
 msgid "The promotion has ended"
 msgstr "The promotion has ended"
@@ -13257,6 +13347,9 @@ msgstr "What This Means"
 msgid "What You'll Receive"
 msgstr "What You'll Receive"
 
+msgid "What became of the goods?"
+msgstr "What became of the goods?"
+
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 
@@ -13304,6 +13397,9 @@ msgstr "When the current confirmation link was issued. The link expires a week l
 
 msgid "When the customer was told the parcel is out for delivery. ACS's shipment_status is a snapshot of the parcel's current leg, not a monotonic sequence: a parcel loaded on a vehicle (4), returned to the depot at end of shift (3) and loaded again next morning (4) re-enters OUT_FOR_DELIVERY, and the notification fired on every edge. Set once, under the same lock as the state change."
 msgstr "When the customer was told the parcel is out for delivery. ACS's shipment_status is a snapshot of the parcel's current leg, not a monotonic sequence: a parcel loaded on a vehicle (4), returned to the depot at end of shift (3) and loaded again next morning (4) re-enters OUT_FOR_DELIVERY, and the notification fired on every edge. Set once, under the same lock as the state change."
+
+msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
+msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
 msgid "When the download link stops working."
 msgstr "When the download link stops working."
@@ -13502,6 +13598,9 @@ msgstr "Yes"
 
 msgid "Yes, permanently destroy"
 msgstr "Yes, permanently destroy"
+
+msgid "Yes: the goods came back or were never delivered, so the sale is reversed and the receipt is credited. No: the customer kept the goods and the sale stands."
+msgstr "Yes: the goods came back or were never delivered, so the sale is reversed and the receipt is credited. No: the customer kept the goods and the sale stands."
 
 msgid "You already have an active alert of this kind for this product."
 msgstr "You already have an active alert of this kind for this product."

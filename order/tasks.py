@@ -8,7 +8,6 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
-from django.db.models import Q
 from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
@@ -2047,11 +2046,10 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     Two buckets:
     - Orders with FAILED payment older than
-      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30), once the
-      payment link's hold has also ended: a failed attempt leaves a Viva
-      payment order payable until its expiry and a Stripe PaymentIntent
-      open for another card, which the provider is asked to close first,
-      like the next bucket.
+      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30). A failed
+      attempt leaves a Viva payment order payable until its expiry and a
+      Stripe PaymentIntent open for another card, so the provider is asked
+      to close the payment first, like the next bucket.
     - Orders with PENDING payment whose hold has ended: the payment link
       or session stopped being payable (``Order.payment_hold_expires_at``,
       ORDER_ONLINE_PAYMENT_HOLD_MINUTES) plus
@@ -2076,18 +2074,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     now = timezone.now()
     failed_cutoff = now - timedelta(minutes=failed_minutes)
 
-    failed_qs = (
-        Order.objects.filter(
-            status=OrderStatus.PENDING,
-            payment_status=PaymentStatus.FAILED,
-            updated_at__lt=failed_cutoff,
-        )
-        .filter(
-            Q(payment_hold_expires_at__isnull=True)
-            | Q(payment_hold_expires_at__lt=now - payment_hold.grace_window())
-        )
-        .select_related("pay_way")
-    )
+    failed_qs = Order.objects.filter(
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.FAILED,
+        updated_at__lt=failed_cutoff,
+    ).select_related("pay_way")
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
     # pays, sometimes for days (measured ACS lag ~4 days), so cancelling
@@ -2137,7 +2128,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             provider = provider_class()
         except ImproperlyConfigured:
             return True
-        closed = provider.close_payment(order.payment_id or "")
+        closed = provider.close_payment(order)
         if not closed:
             logger.warning(
                 "Auto-cancel skipped order %s: its payment is already "

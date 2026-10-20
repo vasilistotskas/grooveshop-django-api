@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import math
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import moneyed
 import stripe
@@ -17,6 +19,9 @@ from djstripe.models import PaymentIntent, Refund
 
 from order.enum.status import PaymentStatus
 from order.payment_binding import PaymentPurpose, binding_metadata
+
+if TYPE_CHECKING:
+    from order.models.order import Order
 
 logger = logging.getLogger(__name__)
 
@@ -112,16 +117,18 @@ class PaymentProvider(ABC):
         """
         return
 
-    def close_payment(self, payment_id: str) -> bool:
-        """Stop accepting payment on *payment_id*; True once none can land.
+    def close_payment(self, order: Order) -> bool:
+        """Stop accepting payment on *order*; True once none can land.
 
         Called before an unpaid order's stock is released, and before a
         retry replaces the payment. A payment link or session ends by
         itself at the expiry it was created with, so the default has
         nothing to do. A provider whose payment object has no expiry (a
-        Stripe PaymentIntent) cancels it here. False means the provider
-        says the payment is past the point of no return (processing or
-        succeeded): the order must stay open for its webhook.
+        Stripe PaymentIntent) or can be ended early (a Viva payment
+        order) closes it here, reading what it needs from the order.
+        False means the payment may still land (the provider says it is
+        past the point of no return, or would not cancel it): the order
+        must stay open for its webhook.
         """
         return True
 
@@ -418,16 +425,19 @@ class StripePaymentProvider(PaymentProvider):
             )
             return False, {"error": str(e)}
 
-    def close_payment(self, payment_id: str) -> bool:
-        """Cancel a PaymentIntent, which has no expiry of its own.
+    def close_payment(self, order: Order) -> bool:
+        """Cancel the order's PaymentIntent, which has no expiry of its own.
 
-        A hosted Checkout Session ends at its ``expires_at``. An intent
-        opened by ``process_payment`` stays confirmable until canceled, so
-        it is canceled here before the stock is released. Stripe refuses
-        once the intent is processing or succeeded (or belongs to a
-        Checkout Session, which only expiry ends); the intent is then read
-        back and the order stays open unless it is already canceled.
+        A hosted Checkout Session ends at its ``expires_at`` and records no
+        ``payment_id`` on the order, so it has nothing to cancel here. An
+        intent opened by ``process_payment`` stays confirmable until
+        canceled, so it is canceled here before the stock is released.
+        Stripe refuses once the intent is processing or succeeded (or
+        belongs to a Checkout Session, which can only be expired); the
+        intent is then read back and the order stays open unless it is
+        already canceled.
         """
+        payment_id = order.payment_id or ""
         if not payment_id.startswith("pi_"):
             return True
         try:
@@ -995,6 +1005,55 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.token_cache_key = (
             f"viva_wallet_access_token_{'live' if self.live_mode else 'demo'}"
         )
+
+    def close_payment(self, order: Order) -> bool:
+        """Cancel every payment order code issued for *order*.
+
+        A Viva payment order stays payable after a failed transaction until
+        its expiry (``paymentTimeout``), and the shopper may retry on it.
+        Once the stored hold has ended no code can land, so nothing is
+        asked. Before that, each code is cancelled with Cancel Payment
+        Order (``DELETE /api/orders/{orderCode}``, Basic auth with the
+        tenant's merchant id and API key,
+        https://developer.viva.com/apis-for-payments/payment-api/); a code
+        Viva will not cancel (the documentation lists 401 and 404, and says
+        nothing of a paid or expired code) leaves the order open for its
+        webhook.
+        """
+        import requests
+
+        from order import payment_hold
+        from order.views.viva_webhook import order_viva_codes
+
+        if payment_hold.hold_ended(order):
+            return True
+        for code in sorted(order_viva_codes(order)):
+            response = requests.delete(
+                f"{self.transactions_url}/api/orders/{code}",
+                headers={"Authorization": self._get_basic_auth_header()},
+                timeout=30,
+            )
+            if 400 <= response.status_code < 500:
+                logger.warning(
+                    "Viva Wallet would not cancel payment order %s: HTTP %s",
+                    code,
+                    response.status_code,
+                    extra={"order_id": order.pk},
+                )
+                return False
+            response.raise_for_status()
+            data = response.json()
+            if data.get("Success") is not True or data.get("ErrorCode") != 0:
+                logger.warning(
+                    "Viva Wallet would not cancel payment order %s: "
+                    "ErrorCode=%s ErrorText=%s",
+                    code,
+                    data.get("ErrorCode"),
+                    data.get("ErrorText"),
+                    extra={"order_id": order.pk},
+                )
+                return False
+        return True
 
     def _get_access_token(self) -> str:
         from base64 import b64encode

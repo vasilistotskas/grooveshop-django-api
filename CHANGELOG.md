@@ -3,6 +3,37 @@
 
 
 
+## v3.143.1 (2026-10-20)
+
+### Bug fixes
+
+* fix(admin): create the staff authenticator table in the public schema (#292) ([`852f71c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/852f71c57ecbe5e2c73540d28a0bf4c230184658))
+
+* fix(admin): create the staff authenticator table in the public schema
+
+The public schema recorded the mfa migrations from before
+multi-tenancy, but the cutover cleanup had dropped mfa_authenticator.
+Adding allauth.mfa to SHARED_APPS for the platform staff second factor
+therefore created nothing, and every superuser admin login on the
+platform host failed with "relation mfa_authenticator does not exist".
+
+A tenant migration now builds the table from the migrated model state
+wherever it is missing and leaves every existing one alone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0192SSCCvTJArvERrpbzzCkb ([`852f71c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/852f71c57ecbe5e2c73540d28a0bf4c230184658))
+
+* fix(deps): upgrade aiohttp to 3.14.5
+
+3.14.3 is affected by CVE-2026-111064 and GHSA-2g87-pp6c-29x5 (both
+high), which the security scan now refuses. yarl moves with it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`852f71c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/852f71c57ecbe5e2c73540d28a0bf4c230184658))
+
 ## v3.143.0 (2026-10-20)
 
 ### Bug fixes

@@ -2818,7 +2818,7 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "operation_type",
         "stock_change",
         "order",
-        "performed_by",
+        "actor",
         "created_at",
     )
     list_filter = (
@@ -2840,11 +2840,14 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "stock_after",
         "order",
         "reason",
-        "performed_by",
+        "actor",
         "created_at",
     )
+    # ``actor`` shows whichever of the two is set; neither is ever edited.
+    exclude = ("performed_by", "performed_by_staff_id")
     date_hierarchy = "created_at"
     list_select_related = ("product", "order", "performed_by")
+    staff_actor_fields = ("performed_by_staff",)
 
     @display(description=_("Stock Change"), ordering="stock_after")
     def stock_change(self, obj):

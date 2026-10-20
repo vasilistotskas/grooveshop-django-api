@@ -6,6 +6,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from b2b.enum import BusinessProfileStatus, ViesStatus
 from b2b.validators import validate_greek_vat
 from core.models import TimeStampMixinModel, UUIDModel
+from tenant.staff_actors import StaffActor
 
 
 class BusinessProfile(TimeStampMixinModel, UUIDModel):
@@ -87,14 +88,15 @@ class BusinessProfile(TimeStampMixinModel, UUIDModel):
     )
 
     # Review workflow.
-    reviewed_by = models.ForeignKey(
-        "user.UserAccount",
-        related_name="business_profiles_reviewed",
+    reviewed_by_id = models.BigIntegerField(
+        _("Reviewed by"),
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
-        verbose_name=_("Reviewed by"),
+        help_text=_(
+            "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+        ),
     )
+    reviewed_by = StaffActor()
     reviewed_at = models.DateTimeField(_("Reviewed at"), null=True, blank=True)
     rejection_reason = models.TextField(
         _("Rejection reason"), blank=True, default=""

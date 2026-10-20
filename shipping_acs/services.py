@@ -2300,7 +2300,7 @@ class AcsService:
             locked.save(
                 update_fields=[
                     "cod_received_outside_acs_at",
-                    "cod_received_outside_acs_by",
+                    "cod_received_outside_acs_by_id",
                     "cod_received_outside_acs_note",
                 ]
             )
@@ -2358,7 +2358,7 @@ class AcsService:
             locked.save(
                 update_fields=[
                     "reconciled_at",
-                    "reconciled_by",
+                    "reconciled_by_id",
                     "reconciliation_note",
                     "updated_at",
                 ]

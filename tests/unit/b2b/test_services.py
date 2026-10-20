@@ -16,6 +16,7 @@ from django.contrib.auth.models import AnonymousUser
 from b2b.enum import BusinessProfileStatus
 from b2b.factories import BusinessProfileFactory, CustomerGroupFactory
 from b2b.services import B2BService
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -117,7 +118,7 @@ class TestProfileWorkflow:
     ):
         profile = BusinessProfileFactory()
         group = CustomerGroupFactory()
-        reviewer = UserAccountFactory(is_staff=True)
+        reviewer = stamp_platform_identity(UserAccountFactory(is_staff=True))
 
         with (
             patch(
@@ -130,7 +131,7 @@ class TestProfileWorkflow:
         profile.refresh_from_db()
         assert profile.status == BusinessProfileStatus.APPROVED
         assert profile.customer_group == group
-        assert profile.reviewed_by == reviewer
+        assert profile.reviewed_by_id == reviewer.pk
         assert profile.reviewed_at is not None
         mock_task.assert_called_once()
 

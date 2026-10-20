@@ -34,6 +34,7 @@ from order.models.payment_transaction import PaymentTransaction
 from order.models.stock_log import StockLog
 from product.factories.product import ProductFactory
 from product.models.variant_group import ProductVariantGroup
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -41,7 +42,9 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 @pytest.fixture
 def staff_user():
-    return UserAccountFactory(is_staff=True, is_superuser=True)
+    return stamp_platform_identity(
+        UserAccountFactory(is_staff=True, is_superuser=True)
+    )
 
 
 @pytest.fixture
@@ -143,7 +146,7 @@ class TestRestocking:
         [row] = StockLog.objects.filter(
             order_id=order.pk, operation_type=StockLog.OPERATION_INCREMENT
         )
-        assert row.performed_by_id == staff_user.pk
+        assert row.performed_by_staff_id == staff_user.pk
         assert row.product_id == product.pk
         assert row.quantity_delta == 3
         assert (row.stock_before, row.stock_after) == (10, 13)

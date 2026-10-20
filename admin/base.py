@@ -166,6 +166,16 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
                     cls._DEFAULT_ACTION_PERMISSIONS
                 )
 
+    # ``StaffActor`` attributes (``tenant.staff_actors``) the changelist and
+    # datasets show: resolved for the whole page in one public query.
+    staff_actor_fields: tuple[str, ...] = ()
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if self.staff_actor_fields:
+            queryset = queryset.prefetch_related(*self.staff_actor_fields)
+        return queryset
+
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True

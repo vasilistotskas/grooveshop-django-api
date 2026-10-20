@@ -763,7 +763,9 @@ class RestockActionTests(TestURLFixerMixin, APITestCase):
             order_id=self.order.id,
             operation_type=StockLog.OPERATION_INCREMENT,
         )
-        self.assertEqual(log.performed_by, self.staff)
+        # Staff are platform identities: named by id, never as a store user.
+        self.assertEqual(log.performed_by_staff_id, self.staff.pk)
+        self.assertIsNone(log.performed_by_id)
         self.assertIn("Product defective", log.reason)
 
     def test_restock_reason_longer_than_the_stock_log_allows_is_refused(self):

@@ -8,6 +8,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from order.managers.stock import StockLogManager
+from tenant.staff_actors import StaffActor
 
 
 class StockLog(TimeStampMixinModel):
@@ -95,22 +96,27 @@ class StockLog(TimeStampMixinModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        # ORM-only, like Product.changed_by. This field has MIXED
-        # writers: customer flows pass same-schema users
-        # (reservation.reserved_by), but manual admin stock changes copy
-        # ``history_user`` (product/signals.py) — a PLATFORM-PUBLIC
-        # identity, since PlatformStaffBackend is the only way into a
-        # tenant's admin. A real FK points that public id at the
-        # TENANT's user table: ForeignKeyViolation when the id has no
-        # tenant row, silent misattribution when it collides with a
-        # shopper's. StockReservation.reserved_by keeps its constraint —
-        # its writers are customers only.
+        # The SHOPPER behind a reservation (``reservation.reserved_by``),
+        # in this store's user table. A staff member is never stored
+        # here: their id is a PLATFORM-PUBLIC pk, and read as a shopper
+        # it names whoever shares it (``performed_by_staff_id``). The
+        # constraint stays off only because rows written before that
+        # split may still hold a staff id.
         db_constraint=False,
-        help_text=_(
-            "User who performed the operation (null for system operations)"
-        ),
+        help_text=_("Shopper whose reservation this was (null otherwise)"),
         verbose_name=_("Performed By"),
     )
+    performed_by_staff_id = models.BigIntegerField(
+        _("Performed By (staff)"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Id of the platform staff member who made the change (public "
+            "schema, not a store user). Read it through "
+            "``performed_by_staff``."
+        ),
+    )
+    performed_by_staff = StaffActor()
 
     # Manager
     objects: StockLogManager = StockLogManager()
@@ -149,6 +155,12 @@ class StockLog(TimeStampMixinModel):
             "before": self.stock_before,
             "after": self.stock_after,
         }
+
+    @property
+    def actor(self):
+        """Who made the change: the staff member, else the shopper whose
+        reservation it was, else nobody (a system operation)."""
+        return self.performed_by_staff or self.performed_by
 
     @property
     def is_increase(self) -> bool:

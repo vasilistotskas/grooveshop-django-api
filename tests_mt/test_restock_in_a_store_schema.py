@@ -2,11 +2,11 @@
 
 The staff member who puts units back is a PUBLIC-schema identity, while
 the order, its lines, the product and the stock log live in the store's
-schema. Postgres has no cross-schema foreign key, so the stock log's
-``performed_by`` carries no constraint (``db_constraint=False``): a real
-one would point the public pk at the store's own user table and fail, or
-worse, name a shopper. The main suite runs every table in one schema and
-cannot see either.
+schema. Postgres has no cross-schema foreign key, so the stock log names
+staff by id in ``performed_by_staff_id`` (``tenant.staff_actors``) and
+keeps ``performed_by`` for shoppers only: a foreign key would point the
+public pk at the store's own user table and name a shopper. The main
+suite runs every table in one schema and cannot see either.
 """
 
 from __future__ import annotations
@@ -23,15 +23,19 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def staff():
+    from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
     from user.models import UserAccount
 
     with schema_context(get_public_schema_name()):
-        return UserAccount.objects.create_user(
+        user = UserAccount.objects.create_user(
             email="mt-restock-staff@example.com",
             username="mtrestockstaff",
             password=None,
             is_staff=True,
         )
+    # What ``PlatformStaffBackend`` stamps on every staff login.
+    setattr(user, PLATFORM_IDENTITY_ATTR, True)
+    return user
 
 
 @pytest.fixture
@@ -69,7 +73,8 @@ def test_the_public_staff_member_is_recorded_on_the_stores_stock_log(
             order_id=delivered_line.order_id,
             operation_type=StockLog.OPERATION_INCREMENT,
         )
-        assert log.performed_by_id == staff.pk
+        assert log.performed_by_staff_id == staff.pk
+        assert log.performed_by_id is None
         assert "Came back" in log.reason
         delivered_line.product.refresh_from_db()
         assert delivered_line.product.stock == 12

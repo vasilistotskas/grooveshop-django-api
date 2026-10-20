@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -14,6 +13,11 @@ from shipping.querysets import ShipmentQuerySet
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 from shipping_acs.enum.shipment_state import AcsShipmentState
+from tenant.staff_actors import (
+    StaffActor,
+    history_user_getter,
+    history_user_setter,
+)
 
 # States after which the order is no longer in flight — the polling
 # task skips these to avoid burning ACS rate limits on settled rows.
@@ -264,23 +268,15 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "are untouched."
         ),
     )
-    cod_received_outside_acs_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+    cod_received_outside_acs_by_id = models.BigIntegerField(
+        _("COD received outside ACS by"),
         null=True,
         blank=True,
-        related_name="acs_cod_settlements_recorded",
-        verbose_name=_("COD received outside ACS by"),
-        # ORM-only for the same reason as AcsPickupList.issued_by: the
-        # operator is a PLATFORM-PUBLIC identity and this row lives in
-        # the tenant schema, where a real FK would either violate or
-        # silently match an unrelated shopper with the same pk.
-        db_constraint=False,
         help_text=_(
-            "Operator who recorded the settlement. Stores a "
-            "PLATFORM-schema user id; not FK-enforced."
+            "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
         ),
     )
+    cod_received_outside_acs_by = StaffActor()
     cod_received_outside_acs_note = models.TextField(
         _("COD received outside ACS note"),
         blank=True,
@@ -314,19 +310,11 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "updated_at",
             "stale_alert_sent",
         ],
-        # history_user is written from ``request.user`` during admin
-        # actions, and on a tenant host EVERY admin user is a
-        # PLATFORM-PUBLIC identity by construction
-        # (PlatformStaffBackend). This table lives in the tenant schema,
-        # so a real FK would point that public id at the TENANT's user
-        # table: either a ForeignKeyViolation when no such id exists
-        # there, or — worse — a silent match attributing the action to
-        # an unrelated shopper who happens to share the pk.
-        #
-        # The relation stays usable through the ORM; it just is not
-        # enforced by PostgreSQL, which cannot express a cross-schema
-        # FK anyway. Same reasoning as UserAccount.loyalty_tier.
-        user_db_constraint=False,
+        # A staff id, not a relation to the store's shoppers: see
+        # ``tenant.staff_actors``.
+        history_user_id_field=models.BigIntegerField(null=True),
+        history_user_getter=history_user_getter,
+        history_user_setter=history_user_setter,
     )
 
     objects = ShipmentQuerySet.as_manager()

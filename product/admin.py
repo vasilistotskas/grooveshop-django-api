@@ -743,6 +743,7 @@ class StockLogDatasetAdmin(RelatedDatasetAdmin):
         "created_at",
     )
     ordering = ("-created_at",)
+    staff_actor_fields = ("performed_by_staff",)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("performed_by")
@@ -768,8 +769,9 @@ class StockLogDatasetAdmin(RelatedDatasetAdmin):
 
     @admin.display(description=_("By"))
     def performed_by_display(self, obj):
-        if obj.performed_by:
-            return obj.performed_by.email or obj.performed_by.username
+        actor = obj.actor
+        if actor:
+            return getattr(actor, "email", "") or getattr(actor, "username", "")
         return _("System")
 
 
@@ -889,7 +891,7 @@ class ProductAdmin(
         # Stamped from the saving admin (``Product._history_user``).
         "changed_by",
     )
-    list_select_related = ["category", "vat", "brand", "changed_by"]
+    list_select_related = ["category", "vat", "brand"]
     autocomplete_fields = ["category", "vat", "variant_group", "brand"]
     search_help_text = _(
         "Search by ID, SKU, name, description, or category name."
@@ -1090,7 +1092,7 @@ class ProductAdmin(
         )
 
         return (
-            qs.select_related("category", "vat", "changed_by", "variant_group")
+            qs.select_related("category", "vat", "variant_group")
             .prefetch_related(
                 main_images,
                 active_reservations,
@@ -1559,6 +1561,7 @@ class ProductAdmin(
         logs = (
             StockLog.objects.filter(product_id=product.pk)
             .select_related("performed_by")
+            .prefetch_related("performed_by_staff")
             .order_by("-created_at")[:50]
         )
         rows = [
@@ -1578,7 +1581,7 @@ class ProductAdmin(
                 )
                 if log.order_id
                 else "—",
-                log.performed_by or _("System"),
+                log.actor or _("System"),
             ]
             for log in logs
         ]

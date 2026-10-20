@@ -296,7 +296,7 @@ class B2BService:
     _REVIEW_FIELDS = (
         "status",
         "customer_group",
-        "reviewed_by",
+        "reviewed_by_id",
         "reviewed_at",
         "rejection_reason",
         "updated_at",

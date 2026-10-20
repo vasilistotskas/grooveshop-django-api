@@ -45,6 +45,12 @@ from search.transliteration import (
     greeklish_variants,
 )
 from tag.models.tagged_item import TaggedModel
+from tenant.staff_actors import (
+    StaffActor,
+    StaffRef,
+    history_user_getter,
+    history_user_setter,
+)
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
 DISCOUNT_PERCENT_MAX = Decimal("100.0")
@@ -226,31 +232,21 @@ class Product(
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,
     )
-    changed_by = models.ForeignKey(
-        "user.UserAccount",
-        on_delete=models.SET_NULL,
-        related_name="changed_products",
+    changed_by_id = models.BigIntegerField(
+        _("Changed By"),
         null=True,
         blank=True,
-        # ORM-only, like UserAccount.loyalty_tier. ``changed_by`` is
-        # written from ``request.user`` in the admin, and on a tenant
-        # host EVERY admin user is a PLATFORM-PUBLIC identity by
-        # construction (PlatformStaffBackend). This table lives in the
-        # tenant schema, so a real FK would point that public id at the
-        # TENANT's user table: a ForeignKeyViolation when no such id
-        # exists there, or — worse — a silent match attributing the
-        # change to an unrelated shopper who happens to share the pk.
-        # It worked until now only because the cutover copied users
-        # id-preserving. PostgreSQL cannot express a cross-schema FK
-        # anyway. Same fix the shipping shipment histories carry.
-        db_constraint=False,
-        verbose_name=_("Changed By"),
+        help_text=_(
+            "Staff member who last changed the product from the admin. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+        ),
     )
+    changed_by = StaffActor()
     history = HistoricalRecords(
-        # Same cross-schema reasoning as ``changed_by`` above — the
-        # ACS/BoxNow shipment histories already declare this; Product
-        # was the one historied model that had been missed.
-        user_db_constraint=False,
+        # A staff id, not a relation to the store's shoppers: see
+        # ``tenant.staff_actors``.
+        history_user_id_field=models.BigIntegerField(null=True),
+        history_user_getter=history_user_getter,
+        history_user_setter=history_user_setter,
         # Derived from price, markdown, VAT and promotions by
         # ``product.pricing.service``; the legal record of prices is
         # ``ProductPriceSpell``, not this table.
@@ -398,7 +394,9 @@ class Product(
 
     @property
     def _history_user(self):
-        return self.changed_by
+        return (
+            None if self.changed_by_id is None else StaffRef(self.changed_by_id)
+        )
 
     @_history_user.setter
     def _history_user(self, value):

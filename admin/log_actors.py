@@ -44,39 +44,7 @@ from django.contrib.admin.models import LogEntry
 from django.contrib.auth import get_user_model
 from django_tenants.utils import get_public_schema_name, schema_context
 
-
-class UnknownActor:
-    """Stand-in for an actor that no longer exists in the public schema.
-
-    Caching ``None`` would NOT do: ``ForwardManyToOneDescriptor`` treats
-    a cached ``None`` alongside a non-null ``user_id`` as a cache miss
-    and falls back to a database lookup — against the TENANT's user
-    table, which is precisely the misattribution this module exists to
-    prevent. A non-``None`` sentinel is what actually stops that query.
-
-    Deliberately not a ``UserAccount`` instance: it must be impossible
-    to mistake for a real account, and fabricating an identity for an
-    actor we cannot identify would be worse than admitting we cannot.
-    It renders as empty in ``object_history.html`` while keeping the pk
-    available for anyone debugging the row.
-    """
-
-    __slots__ = ("pk",)
-
-    def __init__(self, pk: object) -> None:
-        self.pk = pk
-
-    def get_username(self) -> str:
-        return ""
-
-    def get_full_name(self) -> str:
-        return ""
-
-    def __str__(self) -> str:
-        return ""
-
-    def __repr__(self) -> str:
-        return f"<UnknownActor pk={self.pk!r}>"
+from tenant.staff_actors import UnknownActor
 
 
 def bind_public_actors(entries: Iterable[LogEntry]) -> list[LogEntry]:

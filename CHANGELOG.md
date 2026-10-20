@@ -3,6 +3,35 @@
 
 
 
+## v3.143.4 (2026-10-20)
+
+### Bug fixes
+
+* fix(i18n): polish the Greek admin texts (#294) ([`421f9f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/421f9f2656c094e42f7ee7214d79877459eb6382))
+
+* fix(i18n): polish the Greek admin texts
+
+One Greek term per concept across the admin, the remaining English admin
+texts translated, stock-log reasons stored as codes shown in the active
+language, and a guard test that fails when a source message never
+reached the Greek catalogue.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`421f9f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/421f9f2656c094e42f7ee7214d79877459eb6382))
+
+* fix(i18n): keep the stock reason text during the rollout
+
+The release still serving while 0088 runs reads StockLog.reason, so the
+migration only adds the code and keeps the text, and the stock-edit
+signal writes both until a release that no longer reads the text is the
+only one serving. A template directory without a heading is reported and
+skipped instead of aborting the scan of every later directory.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`421f9f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/421f9f2656c094e42f7ee7214d79877459eb6382))
+
 ## v3.143.3 (2026-10-20)
 
 ### Bug fixes

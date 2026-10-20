@@ -6823,11 +6823,11 @@ msgstr ""
 msgid "Order Items"
 msgstr "Προϊόντα Παραγγελίας"
 
-#: .\core\templates\emails\order\_suggestions.html:2
+#: .\core\templates\emails\base\_suggestions.html:2
 msgid "You might also like"
 msgstr "Μπορεί να σας ενδιαφέρουν"
 
-#: .\core\templates\emails\order\_suggestions.txt:2
+#: .\core\templates\emails\base\_suggestions.txt:2
 msgid "YOU MIGHT ALSO LIKE"
 msgstr "ΜΠΟΡΕΙ ΝΑ ΣΑΣ ΕΝΔΙΑΦΕΡΟΥΝ"
 

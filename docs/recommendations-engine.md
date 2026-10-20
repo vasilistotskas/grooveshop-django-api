@@ -221,7 +221,7 @@ say nothing.
 
 `order_email` (`recommendation/order_email.py`) is answered by the same
 `suggest()` when `send_order_confirmation_email` renders, seeded with the
-order's products, and rendered by `emails/order/_suggestions.html` /
+order's products, and rendered by `emails/base/_suggestions.html` /
 `.txt` as names linked to their product pages — no prices, because the
 email has no viewer to apply a B2B customer group to. The sent strip is
 recorded as an `impression` with the order's customer and cart, so a

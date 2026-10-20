@@ -2,7 +2,7 @@
 
 Seeded with the order's own products, so the strip is "goes with what
 you just bought", and excluding them. Rendered by the confirmation
-templates through ``emails/order/_suggestions.html`` / ``.txt``.
+templates through ``emails/base/_suggestions.html`` / ``.txt``.
 
 No prices: the email is rendered without a request, so the viewer's
 pricing context (a B2B customer group) cannot be applied, and a retail

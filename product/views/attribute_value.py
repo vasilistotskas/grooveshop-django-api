@@ -42,7 +42,7 @@ class AttributeValueViewSet(BaseModelViewSet):
 
     Attribute values are specific values for an attribute type (e.g., "Small", "Medium", "Large"
     for the "Size" attribute). Each value belongs to exactly one attribute and supports
-    multi-language translations (Greek, English, German).
+    multi-language translations (Greek, English).
     """
 
     queryset = AttributeValue.objects.all()

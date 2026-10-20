@@ -1,7 +1,6 @@
 """The admin is Greek-first: every message in the Greek catalogues is
 translated and none is fuzzy (gettext ignores a fuzzy entry, so the
-admin shows the English msgid). English is the source language; German
-is out of scope for the admin.
+admin shows the English msgid). English is the source language.
 
 Two catalogues: the project's own, and the one for django-unfold's
 strings (``manage.py makemessages_unfold``), which Unfold does not ship."""
@@ -82,7 +81,7 @@ def test_the_catalogue_is_in_canonical_form(catalogue):
     """Sorted, with no source locations: two PRs that add different messages
     then touch different lines and merge cleanly.
 
-    Fix it with ``uv run python manage.py makemessages -l el -l en -l de``,
+    Fix it with ``uv run python manage.py makemessages -l el -l en``,
     which writes this form (``core/utils/po_catalogue.py``)."""
     assert catalogue.read_text(encoding="utf-8") == canonical_text(catalogue)
 

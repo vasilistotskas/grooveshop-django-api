@@ -182,7 +182,7 @@ class TestProductTranslationMeilisearchAttributes:
 
         ProductAttributeFactory(product=product, attribute_value=value)
 
-        translation = product.translations.get(language_code="de")
+        translation = product.translations.get(language_code="en")
 
         fields = ProductTranslation.get_additional_meili_fields()
         data_func = fields["attribute_data"]
@@ -191,10 +191,10 @@ class TestProductTranslationMeilisearchAttributes:
 
         data = attribute_data[0]
         expected_name = attribute.safe_translation_getter(
-            "name", language_code="de", any_language=True
+            "name", language_code="en", any_language=True
         )
         expected_value = value.safe_translation_getter(
-            "value", language_code="de", any_language=True
+            "value", language_code="en", any_language=True
         )
 
         assert data["attribute_name"] == expected_name

@@ -291,7 +291,7 @@ def _relaxed_query(query: str) -> str | None:
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
-                "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
+                "Language code to filter results (e.g., 'en', 'el'). If not provided, searches all languages."
             ),
             required=False,
         ),
@@ -415,7 +415,7 @@ def blog_post_meili_search(request):
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
-                "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
+                "Language code to filter results (e.g., 'en', 'el'). If not provided, searches all languages."
             ),
             required=False,
         ),
@@ -725,7 +725,7 @@ def product_meili_search(request):
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
-                "Language code to filter results (e.g., 'en', 'el', 'de'). "
+                "Language code to filter results (e.g., 'en', 'el'). "
                 "If not provided, searches all languages."
             ),
             required=False,

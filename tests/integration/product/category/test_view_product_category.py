@@ -281,9 +281,9 @@ class ProductCategoryViewSetTestCase(APITestCase):
                     "name": "Complex Category EN",
                     "description": "Complex Category Description EN",
                 },
-                "de": {
-                    "name": "Complex Category DE",
-                    "description": "Complex Category Description DE",
+                "el": {
+                    "name": "Complex Category EL",
+                    "description": "Complex Category Description EL",
                 },
             },
         }
@@ -298,8 +298,8 @@ class ProductCategoryViewSetTestCase(APITestCase):
         category.set_current_language("en")
         self.assertEqual(category.name, "Complex Category EN")
 
-        category.set_current_language("de")
-        self.assertEqual(category.name, "Complex Category DE")
+        category.set_current_language("el")
+        self.assertEqual(category.name, "Complex Category EL")
 
     def test_hierarchy_data_in_responses(self):
         url = self.get_product_category_detail_url(self.category.id)

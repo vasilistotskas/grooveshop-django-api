@@ -421,9 +421,9 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
                         "title": "Complex Thumbnail EN",
                         "alt_text": "Complex thumbnail alt text EN",
                     },
-                    "de": {
-                        "title": "Complex Thumbnail DE",
-                        "alt_text": "Complex thumbnail alt text DE",
+                    "el": {
+                        "title": "Complex Thumbnail EL",
+                        "alt_text": "Complex thumbnail alt text EL",
                     },
                 }
             ),
@@ -442,11 +442,11 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             image.set_current_language("en")
             self.assertEqual(image.title, "Complex Thumbnail EN")
 
-        if "de" in [
+        if "el" in [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]:
-            image.set_current_language("de")
-            self.assertEqual(image.title, "Complex Thumbnail DE")
+            image.set_current_language("el")
+            self.assertEqual(image.title, "Complex Thumbnail EL")
 
     def test_queryset_optimization(self):
         url = self.get_product_category_image_list_url()

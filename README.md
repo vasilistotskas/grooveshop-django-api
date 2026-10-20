@@ -8,7 +8,7 @@ notifications via Django Channels; each store is a django-tenants schema resolve
 the request host. Uses Knox + Django Allauth for authentication (token API + social/MFA),
 Celery with RabbitMQ broker for background tasks, PostgreSQL 18 for data storage, Redis
 for caching and Channels layer, and Meilisearch for federated search. Features include
-multi-language support (Greek, English, German), Viva Wallet and Stripe payments,
+multi-language support (Greek, English), Viva Wallet and Stripe payments,
 comprehensive test coverage, and a Django Unfold admin panel.
 
 ## Project Structure
@@ -45,7 +45,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 ## Features
 
 - **Authentication and User Management**: Knox token auth for API, Django Allauth for account management with social providers (Google, Facebook, GitHub, Discord), MFA/WebAuthn/Passkeys support
-- **Multi-Language Support**: django-parler translations for Greek (default), English, and German
+- **Multi-Language Support**: django-parler translations for Greek (default) and English
 - **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking
 - **Payments**: Viva Wallet (primary) and Stripe via dj-stripe, plus offline
   methods such as cash on delivery. Credentials are per-tenant

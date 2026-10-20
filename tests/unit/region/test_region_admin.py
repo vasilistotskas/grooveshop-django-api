@@ -43,7 +43,7 @@ class TestRegionStatusFilter(TestCase):
         )
         # Set name in ALL configured Parler languages so the "no_name" filter
         # (which LEFT JOINs on translations) won't match missing translations
-        for lang_code in ("en", "el", "de"):
+        for lang_code in ("en", "el"):
             self.region_with_name.set_current_language(lang_code)
             self.region_with_name.name = "California"
             self.region_with_name.save()

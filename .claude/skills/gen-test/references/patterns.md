@@ -59,12 +59,12 @@ class TestYourModelFactory(TestCase):
         """Test that translations are created for all languages."""
         instance = YourModelFactory()
 
-        # Project uses el, en, de
-        self.assertEqual(instance.translations.count(), 3)
+        # Project uses el, en
+        self.assertEqual(instance.translations.count(), 2)
         language_codes = set(
             instance.translations.values_list("language_code", flat=True)
         )
-        self.assertEqual(language_codes, {"el", "en", "de"})
+        self.assertEqual(language_codes, {"el", "en"})
 
     def test_factory_batch_create(self):
         instances = YourModelFactory.create_batch(5)

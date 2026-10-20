@@ -65,7 +65,6 @@ class TestFederatedSearchProperties:
         [
             ("laptop", "en"),
             ("υπολογιστής", "el"),
-            ("handy", "de"),
             ("test query", None),
             ("gaming", "en"),
         ],
@@ -157,7 +156,7 @@ class TestFederatedSearchProperties:
         assert results[0]["federation"]["indexUid"] == "ProductTranslation"
         assert "_federation" not in results[0]
 
-    @pytest.mark.parametrize("language_code", ["en", "el", "de"])
+    @pytest.mark.parametrize("language_code", ["en", "el"])
     def test_language_filtering_across_indexes(
         self, mock_models, mock_meili_client, language_code
     ):

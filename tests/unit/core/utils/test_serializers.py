@@ -95,7 +95,7 @@ def mock_request():
 class TestTranslatedFieldExtended(TestCase):
     def test_to_internal_value_with_valid_data(self):
         # ``el`` and ``en``, not the ``fr`` this used to send: the
-        # deployment serves el/en/de, so ``fr`` was only ever accepted
+        # deployment serves el/en, so ``fr`` was only ever accepted
         # because the keys went unchecked.
         data = {
             "en": {"field1": "value1", "field2": 123},

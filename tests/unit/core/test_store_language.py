@@ -53,7 +53,7 @@ class TestWhoStatedNoLanguage:
     def test_an_account_keeps_its_own(self, store):
         store("en")
 
-        assert get_user_language(SimpleNamespace(language_code="de")) == "de"
+        assert get_user_language(SimpleNamespace(language_code="el")) == "el"
 
     def test_an_order_without_a_language_gets_the_stores(self, store):
         store("en")
@@ -68,8 +68,8 @@ class TestActiveLanguageCode:
     def test_is_the_request_language_when_served(self, store):
         store("el")
 
-        with translation.override("de"):
-            assert active_language_code() == "de"
+        with translation.override("en"):
+            assert active_language_code() == "en"
 
     def test_a_regional_variant_is_clamped_to_its_language(self, store):
         store("el")

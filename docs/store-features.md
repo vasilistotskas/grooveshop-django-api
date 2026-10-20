@@ -125,8 +125,8 @@ They join the table after the gateway reads the feature, gateway first.
 serves; empty means the default locale only. Platform staff set it on the
 tenant form's Branding tab (`TenantAdmin.fieldsets`); a store operator sees
 it read-only, because it is not in `TENANT_SELF_EDITABLE_FIELDS`. The field
-accepts only `STOREFRONT_LOCALES` (the storefront's routes, narrower than
-`settings.LANGUAGES`: `de` is a content language with no `/de` routes) and
+accepts only `STOREFRONT_LOCALES` (the storefront's routes, kept apart from
+`settings.LANGUAGES`, which names the content languages) and
 must contain `default_locale`. Adding a language also needs that language's
 legal documents to exist (`Tenant._validate_legal_documents_for_new_locales`).
 

@@ -110,13 +110,13 @@ class TestPlatformForm:
     def test_the_form_refuses_a_locale_the_build_does_not_support(
         self, model_admin, tenant
     ):
-        # ``de`` is a content language, not a storefront one.
+        # ``fr`` is not a locale the storefront builds.
         request = _request(_superuser())
         form_class = model_admin.get_form(
             request, tenant, fields=["available_locales", "default_locale"]
         )
         form = form_class(
-            {"available_locales": '["el", "de"]', "default_locale": "el"},
+            {"available_locales": '["el", "fr"]', "default_locale": "el"},
             instance=tenant,
         )
         assert not form.is_valid()

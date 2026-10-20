@@ -149,15 +149,14 @@ class TestWritesInvalidate:
 
 @real_commits
 class TestCoalescing:
-    def test_one_edit_across_three_languages_purges_once(self, purge):
-        """Master plus three translation rows is ONE logical edit.
-        Purging per row would SCAN Redis and POST to Nuxt four times."""
+    def test_one_edit_across_two_languages_purges_once(self, purge):
+        """Master plus two translation rows is ONE logical edit.
+        Purging per row would SCAN Redis and POST to Nuxt three times."""
         with transaction.atomic():
             pay_way = PayWay.objects.create(provider_code="test_provider")
             for code, text in (
                 ("el", "Ελληνικά"),
                 ("en", "English"),
-                ("de", "Deutsch"),
             ):
                 pay_way.set_current_language(code)
                 pay_way.description = text

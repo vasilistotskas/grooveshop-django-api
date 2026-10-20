@@ -102,7 +102,7 @@ class CreateUserNotificationTestCase(TestCase):
     def test_skips_unsupported_languages_silently(self) -> None:
         """Languages outside PARLER_LANGUAGES must drop without raising.
 
-        Lets callers ship an ``en``/``el``/``de`` dict even when the
+        Lets callers ship an ``en``/``el``/``fr`` dict even when the
         environment is configured for a subset — the alternative
         (raising) would make tests brittle against settings drift.
         """
@@ -167,7 +167,7 @@ class CreateUserNotificationTestCase(TestCase):
 
     @override_settings(
         PARLER_LANGUAGES={
-            1: ({"code": "en"}, {"code": "el"}, {"code": "de"}),
+            1: ({"code": "en"}, {"code": "el"}, {"code": "fr"}),
         }
     )
     def test_all_supplied_languages_persisted(self) -> None:
@@ -176,7 +176,7 @@ class CreateUserNotificationTestCase(TestCase):
             translations={
                 "en": {"title": "English", "message": "Hello"},
                 "el": {"title": "Ελληνικά", "message": "Γειά"},
-                "de": {"title": "Deutsch", "message": "Hallo"},
+                "fr": {"title": "Français", "message": "Bonjour"},
             },
         )
         languages = sorted(
@@ -184,4 +184,4 @@ class CreateUserNotificationTestCase(TestCase):
                 "language_code", flat=True
             )
         )
-        self.assertEqual(languages, ["de", "el", "en"])
+        self.assertEqual(languages, ["el", "en", "fr"])

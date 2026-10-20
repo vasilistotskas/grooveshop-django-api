@@ -204,6 +204,16 @@ def fanout_reevaluate_price_episodes():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_recompute_recommendation_candidates():
+    return run_for_all_tenants("recommendation.tasks.recompute_all_candidates")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_learn_recommendation_weights():
+    return run_for_all_tenants("recommendation.tasks.learn_slot_weights")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_update_click_scores():
     return run_for_all_tenants("search.tasks.update_click_scores")
 

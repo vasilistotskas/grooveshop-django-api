@@ -87,7 +87,7 @@ settings.
 | `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `promotion/views.py`, cart coupon actions |
 | `gift_cards` | `gift_cards_enabled` | `GIFT_CARDS_ENABLED` | `giftcard/views.py` |
 | `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `b2b/views.py` |
-| `product_suggestions` | `recommendations_enabled` | `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py` |
+| `product_suggestions` | `recommendations_enabled` | `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
 | `product_alerts` | | `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |

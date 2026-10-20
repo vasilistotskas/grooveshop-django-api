@@ -3,18 +3,13 @@
 ``recompute_candidates_for_product`` runs per product after a save
 (dispatched through ``tenant.celery.dispatch_on_commit`` so the tenant
 schema travels with the message). ``recompute_all_candidates`` is the
-full pass, meant to be reached through ``tenant.tasks.fanout_*`` because
-beat runs in the public schema and this must run once per tenant.
+nightly full pass and ``learn_slot_weights`` the nightly weight update;
+both are reached through ``tenant.tasks.fanout_*`` because beat runs in
+the public schema and they must run once per tenant.
 
-NOT CURRENTLY IN USE, and that is deliberate. Both tasks only write rows
-for strategies whose ``precompute`` is True, and no shipped strategy sets
-it — ``curated``, ``variant_group``, ``category`` and ``popular`` are all
-cheap enough to answer live. So these tasks write nothing today, and
-``recompute_all_candidates`` is intentionally absent from
-``CELERY_BEAT_SCHEDULE``: scheduling a nightly pass that produces no rows
-would be pure cost. Schedule it in the same change that ships the first
-``precompute = True`` strategy — not before, and do not delete this as
-dead code in the meantime.
+The candidate tasks write rows for the strategies whose ``precompute``
+is True — ``attributes`` and ``co_purchase`` — and nothing for the live
+ones, which the engine answers per request.
 """
 
 from __future__ import annotations
@@ -37,9 +32,12 @@ _FULL_PASS_BATCH = 200
     retry_backoff=True,
 )
 def recompute_candidates_for_product(product_id: int) -> dict[str, int]:
-    from recommendation.candidates import compute_candidates_for_product
+    from recommendation.candidates import compute_candidates
+    from recommendation.context import recommendations_active
 
-    rows = compute_candidates_for_product(product_id)
+    if not recommendations_active():
+        return {"product_id": product_id, "rows": 0}
+    rows = compute_candidates([product_id])
     return {"product_id": product_id, "rows": rows}
 
 
@@ -52,13 +50,20 @@ def recompute_candidates_for_product(product_id: int) -> dict[str, int]:
 def recompute_all_candidates() -> dict[str, int]:
     """Rebuild every active product's candidates in this schema.
 
-    Iterates ids in batches rather than instances, and rebuilds one
-    product per call to ``compute_candidates_for_product`` so a single
-    bad row cannot abort the pass — it is logged and the pass goes on.
+    Batches of ``_FULL_PASS_BATCH`` seeds, each answered by every
+    precomputed strategy in a fixed number of queries; a batch that
+    fails is logged and the pass goes on. A store with suggestions off
+    computes nothing: no strip will read the rows.
     """
     from product.models import Product
-    from recommendation.candidates import compute_candidates_for_product
-    from recommendation.context import invalidate_tenant_context
+    from recommendation.candidates import compute_candidates
+    from recommendation.context import (
+        invalidate_tenant_context,
+        recommendations_active,
+    )
+
+    if not recommendations_active():
+        return {"products": 0, "rows": 0, "failed": 0}
 
     # The nightly pass is the moment the cached tenant facts (order
     # counts, has_tags, ...) should be re-read: a strategy that was
@@ -71,15 +76,16 @@ def recompute_all_candidates() -> dict[str, int]:
     rows = 0
     failed = 0
     for start in range(0, len(ids), _FULL_PASS_BATCH):
-        for product_id in ids[start : start + _FULL_PASS_BATCH]:
-            try:
-                rows += compute_candidates_for_product(product_id)
-            except Exception:
-                failed += 1
-                logger.exception(
-                    "Candidate rebuild failed product=%s; continuing",
-                    product_id,
-                )
+        batch = ids[start : start + _FULL_PASS_BATCH]
+        try:
+            rows += compute_candidates(batch)
+        except Exception:
+            failed += len(batch)
+            logger.exception(
+                "Candidate rebuild failed products=%s..%s; continuing",
+                batch[0],
+                batch[-1],
+            )
     logger.info(
         "Recommendation full pass products=%s rows=%s failed=%s",
         len(ids),
@@ -95,6 +101,26 @@ def recompute_all_candidates() -> dict[str, int]:
 
     CacheService.purge(["recommendations"])
     return {"products": len(ids), "rows": rows, "failed": failed}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_ERRORS,
+    retry_backoff=True,
+)
+def learn_slot_weights() -> dict[str, int]:
+    """Re-weight each learning slot's strategies from attach rate.
+
+    See ``recommendation.learning``. A store with suggestions off shows
+    no strips, so it has no new evidence to learn from.
+    """
+    from recommendation.context import recommendations_active
+    from recommendation.learning import learn_weights
+
+    if not recommendations_active():
+        return {"slots": 0}
+    return {"slots": learn_weights()}
 
 
 @celery_app.task(

@@ -6823,6 +6823,14 @@ msgstr ""
 msgid "Order Items"
 msgstr "Προϊόντα Παραγγελίας"
 
+#: .\core\templates\emails\base\_suggestions.html:2
+msgid "You might also like"
+msgstr "Μπορεί να σας ενδιαφέρουν"
+
+#: .\core\templates\emails\base\_suggestions.txt:2
+msgid "YOU MIGHT ALSO LIKE"
+msgstr "ΜΠΟΡΕΙ ΝΑ ΣΑΣ ΕΝΔΙΑΦΕΡΟΥΝ"
+
 #: .\core\templates\emails\order\order_payment_confirmed.html:55
 #: .\core\templates\emails\order\order_received.html:62
 #: .\core\templates\emails\order\order_status_generic.html:98
@@ -16509,12 +16517,15 @@ msgstr "Αλυσίδα στρατηγικών"
 #: .\recommendation\admin.py:96
 msgid ""
 "Ordered list of strategy codes; a strategy the plan does not allow, or that "
-"has nothing to say for this store, is skipped. Weights are optional and "
-"default to 1.0."
+"has nothing to say for this store yet, is skipped. Weights are optional and "
+"default to 1.0. With \"Learn weights\" on they are recalculated every night "
+"from what shoppers bought after seeing each strategy's suggestions here."
 msgstr ""
 "Ταξινομημένη λίστα κωδικών στρατηγικών· μια στρατηγική που δεν επιτρέπει το "
-"πλάνο ή που δεν έχει τίποτα να προτείνει για αυτό το κατάστημα παραλείπεται. "
-"Τα βάρη είναι προαιρετικά και η προεπιλεγμένη τιμή τους είναι 1.0."
+"πλάνο ή που δεν έχει ακόμη τίποτα να προτείνει για αυτό το κατάστημα "
+"παραλείπεται. Τα βάρη είναι προαιρετικά και η προεπιλεγμένη τιμή τους είναι "
+"1.0. Με ενεργή την «Εκμάθηση βαρών» υπολογίζονται ξανά κάθε βράδυ από όσα "
+"αγόρασαν οι πελάτες αφού είδαν εδώ τις προτάσεις κάθε στρατηγικής."
 
 #: .\recommendation\admin.py:104
 msgid "Limits"
@@ -16538,14 +16549,14 @@ msgstr ""
 msgid "Reset every slot to the preset?"
 msgstr "Επαναφορά κάθε θέσης στις προκαθορισμένες ρυθμίσεις;"
 
-#: .\recommendation\admin.py:130
+#: .\recommendation\admin.py:132
 msgid ""
-"Replaces the chain, weights, limits and price band of every surface with the "
-"defaults for this store's vertical. Your edits are lost."
+"Replaces the chain, weights, weight learning, limits and price band of every "
+"surface with the defaults for this store's vertical. Your edits are lost."
 msgstr ""
-"Αντικαθιστά την αλυσίδα, τα βάρη, τα όρια και το εύρος τιμών κάθε επιφάνειας "
-"με τις προεπιλογές για τον κλάδο αυτού του καταστήματος. Οι αλλαγές σας θα "
-"χαθούν."
+"Αντικαθιστά την αλυσίδα, τα βάρη, την εκμάθηση βαρών, τα όρια και το εύρος "
+"τιμών κάθε επιφάνειας με τις προεπιλογές για τον κλάδο αυτού του "
+"καταστήματος. Οι αλλαγές σας θα χαθούν."
 
 #: .\recommendation\admin.py:143
 #, python-format
@@ -16562,14 +16573,14 @@ msgstr "Επαναφορά στις προκαθορισμένες ρυθμίσ�
 msgid "Reset this slot to the preset?"
 msgstr "Επαναφορά αυτής της θέσης στις προκαθορισμένες ρυθμίσεις;"
 
-#: .\recommendation\admin.py:161
+#: .\recommendation\admin.py:163
 msgid ""
-"Replaces this surface's chain, weights, limits and price band with the "
-"defaults for this store's vertical. Your edits are lost."
+"Replaces this surface's chain, weights, weight learning, limits and price "
+"band with the defaults for this store's vertical. Your edits are lost."
 msgstr ""
-"Αντικαθιστά την αλυσίδα, τα βάρη, τα όρια και το εύρος τιμών αυτής της "
-"επιφάνειας με τις προεπιλογές για τον κλάδο αυτού του καταστήματος. Οι "
-"αλλαγές σας θα χαθούν."
+"Αντικαθιστά την αλυσίδα, τα βάρη, την εκμάθηση βαρών, τα όρια και το εύρος "
+"τιμών αυτής της επιφάνειας με τις προεπιλογές για τον κλάδο αυτού του "
+"καταστήματος. Οι αλλαγές σας θα χαθούν."
 
 #: .\recommendation\admin.py:175
 #, python-format
@@ -16606,17 +16617,9 @@ msgstr "Ίδια κατηγορία"
 msgid "Shared attributes, tags and brand"
 msgstr "Κοινά χαρακτηριστικά, ετικέτες και μάρκα"
 
-#: .\recommendation\enum.py:33
-msgid "Semantic similarity"
-msgstr "Σημασιολογική ομοιότητα"
-
 #: .\recommendation\enum.py:34
 msgid "Bought together"
 msgstr "Αγοράζονται μαζί"
-
-#: .\recommendation\enum.py:35
-msgid "Viewed together"
-msgstr "Προβάλλονται μαζί"
 
 #: .\recommendation\enum.py:36
 msgid "Popular"
@@ -16663,14 +16666,30 @@ msgstr ""
 msgid "Weights"
 msgstr "Βάρη"
 
-#: .\recommendation\models.py:60
+#: .\recommendation\models.py:66
 msgid ""
-"Strategy code → weight in 0..1. Missing codes default to 1.0. Updated nightly"
-" from attach rate on plans that learn."
+"Strategy code → weight in 0..1. Missing codes default to 1.0. With \"Learn "
+"weights\" on, replaced nightly from each strategy's attach rate on this "
+"surface."
 msgstr ""
 "Κωδικός στρατηγικής → βάρος στο διάστημα 0..1. Οι κωδικοί που λείπουν έχουν "
-"προεπιλεγμένη τιμή 1.0. Ενημερώνεται κάθε βράδυ από το ποσοστό προσθήκης στα "
-"πλάνα με εκμάθηση."
+"προεπιλεγμένη τιμή 1.0. Με ενεργή την «Εκμάθηση βαρών» αντικαθίστανται κάθε "
+"βράδυ από το ποσοστό αγορών κάθε στρατηγικής σε αυτή την επιφάνεια."
+
+#: .\recommendation\models.py:74
+msgid "Learn weights"
+msgstr "Εκμάθηση βαρών"
+
+#: .\recommendation\models.py:78
+msgid ""
+"Every night, re-weight the strategies by how often the products each one "
+"suggested here were then bought. A strategy needs enough recent impressions "
+"before its weight moves. Turn off to keep weights you set by hand."
+msgstr ""
+"Κάθε βράδυ τα βάρη των στρατηγικών υπολογίζονται ξανά από το πόσο συχνά "
+"αγοράστηκαν τα προϊόντα που πρότεινε εδώ η καθεμία. Μια στρατηγική "
+"χρειάζεται αρκετές πρόσφατες προβολές πριν αλλάξει το βάρος της. "
+"Απενεργοποιήστε την για να κρατήσετε βάρη που ορίσατε μόνοι σας."
 
 #: .\recommendation\models.py:64
 msgid "Limit"
@@ -16714,6 +16733,15 @@ msgstr "Θέσεις συστάσεων"
 #, python-format
 msgid "Weighted strategies not in the chain: %(codes)s"
 msgstr "Στρατηγικές με βάρος που δεν βρίσκονται στην αλυσίδα: %(codes)s"
+
+#: .\recommendation\models.py:133
+#, python-format
+msgid ""
+"This surface has no product to start from, so these strategies have nothing "
+"to suggest here: %(names)s"
+msgstr ""
+"Αυτή η επιφάνεια δεν έχει προϊόν από το οποίο να ξεκινήσει, οπότε αυτές οι "
+"στρατηγικές δεν έχουν τίποτα να προτείνουν εδώ: %(names)s"
 
 #: .\recommendation\models.py:121
 msgid "Minimum fill cannot exceed the limit."

@@ -14,9 +14,16 @@ from product.factories.product import ProductFactory
 from recommendation.context import (
     build_tenant_context,
     invalidate_tenant_context,
+    recommendations_active,
     tenant_context,
 )
 from tag.factories.tagged_item import TaggedProductFactory
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
+from tests.utils.store_settings import switch_store_settings
 
 pytestmark = pytest.mark.django_db
 
@@ -61,3 +68,37 @@ def test_context_is_cached_until_invalidated():
     with CaptureQueriesContext(connection) as rebuilt:
         tenant_context()
     assert len(rebuilt) > 0
+
+
+class TestRecommendationsActive:
+    """The gate for the paths with no request to run a permission on —
+    the order email and the nightly jobs: the same plan flag and store
+    switch the read endpoint enforces."""
+
+    @pytest.fixture
+    def store(self, request):
+        tenant = store_tenant(
+            f"recs_active_{request.param}",
+            recommendations_enabled=request.param == "plan_on",
+        )
+        previous = bind_store_tenant(tenant)
+        yield tenant
+        unbind_store_tenant(previous)
+
+    @pytest.mark.parametrize("store", ["plan_on"], indirect=True)
+    def test_on_when_the_plan_and_the_store_both_say_so(self, store):
+        switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=True)
+        assert recommendations_active() is True
+
+    @pytest.mark.parametrize("store", ["plan_on"], indirect=True)
+    def test_off_when_the_store_switched_suggestions_off(self, store):
+        switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=False)
+        assert recommendations_active() is False
+
+    @pytest.mark.parametrize("store", ["plan_off"], indirect=True)
+    def test_off_when_the_plan_does_not_include_them(self, store):
+        switch_store_settings(PRODUCT_SUGGESTIONS_ENABLED=True)
+        assert recommendations_active() is False
+
+    def test_the_store_switch_ships_off(self):
+        assert recommendations_active() is False

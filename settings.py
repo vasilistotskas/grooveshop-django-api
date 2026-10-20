@@ -1149,6 +1149,25 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "recompute-recommendation-candidates": {
+            # Fanout: RecommendationCandidate is per-tenant; beat fires
+            # in public. Rebuilds the precomputed strategies' rows
+            # (attributes, co_purchase) for the whole catalogue — a
+            # product save rebuilds only its own.
+            "task": "tenant.tasks.fanout_recompute_recommendation_candidates",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "learn-recommendation-weights": {
+            # Fanout: RecommendationSlot/Event are per-tenant; beat
+            # fires in public. Re-weights each learning slot from the
+            # attach rates of the trailing window.
+            "task": "tenant.tasks.fanout_learn_recommendation_weights",
+            "schedule": SCHEDULE_PRESETS["daily_5am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "reindex-offer-window-changes": {
             # Fanout: Promotion/Product are per-tenant; beat fires in
             # public. A promotion window opening or closing saves
@@ -4397,6 +4416,36 @@ RECOMMENDATION_ATTACH_CART_WINDOW_HOURS = int(
 )
 RECOMMENDATION_ATTACH_USER_WINDOW_DAYS = int(
     getenv("RECOMMENDATION_ATTACH_USER_WINDOW_DAYS", "7")
+)
+# ``attributes``: a feature (attribute value, tag, brand) carried by more
+# active products than this is not used to find candidates — it bounds
+# the work on a large catalogue and says little about similarity there.
+RECOMMENDATION_ATTRIBUTES_MAX_FEATURE_PRODUCTS = int(
+    getenv("RECOMMENDATION_ATTRIBUTES_MAX_FEATURE_PRODUCTS", "500")
+)
+# ``co_purchase``: orders from this many days back count; the strategy
+# declines until the store has this many orders with two or more lines;
+# a pair bought together in fewer orders than the support is noise.
+RECOMMENDATION_CO_PURCHASE_WINDOW_DAYS = int(
+    getenv("RECOMMENDATION_CO_PURCHASE_WINDOW_DAYS", "180")
+)
+RECOMMENDATION_CO_PURCHASE_MIN_ORDERS = int(
+    getenv("RECOMMENDATION_CO_PURCHASE_MIN_ORDERS", "50")
+)
+RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT = int(
+    getenv("RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT", "5")
+)
+# Nightly weight learning (``recommendation/learning.py``): the trailing
+# window of events read, the impressions a strategy needs on a surface
+# before its weight moves, and the lowest weight learning may set.
+RECOMMENDATION_LEARNING_WINDOW_DAYS = int(
+    getenv("RECOMMENDATION_LEARNING_WINDOW_DAYS", "30")
+)
+RECOMMENDATION_LEARNING_MIN_IMPRESSIONS = int(
+    getenv("RECOMMENDATION_LEARNING_MIN_IMPRESSIONS", "200")
+)
+RECOMMENDATION_LEARNING_WEIGHT_FLOOR = float(
+    getenv("RECOMMENDATION_LEARNING_WEIGHT_FLOOR", "0.05")
 )
 
 # ---------- Meta Conversions API ----------

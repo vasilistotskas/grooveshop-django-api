@@ -1,9 +1,10 @@
 """The online ranker: merge, guard, weight, diversify, cut.
 
-Strategies are stubbed under the codes Step 1 leaves unregistered
-(``co_purchase``, ``co_view``) so each test controls exactly what the
-engine is handed; the real ``curated`` and ``popular`` strategies are
-used where the test is about how the engine treats THEM.
+Strategies are stubbed over the real ``co_purchase`` and
+``attributes`` registrations (the ``stub`` fixture restores the
+registry) so each test controls exactly what the engine is handed; the
+real ``curated`` and ``popular`` strategies are used where the test is
+about how the engine treats THEM.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from product.enum.relation import RelationType
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
 from product.models import ProductRelation
+from recommendation.candidates import compute_candidates
 from recommendation.engine import Suggestion, SuggestionContext, suggest
 from recommendation.enum import StrategyCode, Surface
 from recommendation.models import RecommendationCandidate, RecommendationSlot
@@ -60,7 +62,6 @@ def _context(plan: str) -> TenantContext:
         has_attributes=False,
         order_count=0,
         multi_item_order_count=0,
-        semantic_available=False,
     )
 
 
@@ -170,8 +171,8 @@ class TestRanking:
     def test_slot_weights_scale_strategy_scores(self, stub):
         seed, a, b = _product(), _product(), _product()
         stub(StrategyCode.CO_PURCHASE, {seed.id: [Candidate(a.id, 0.9)]})
-        stub(StrategyCode.CO_VIEW, {seed.id: [Candidate(b.id, 0.5)]})
-        slot = _slot(chain=[StrategyCode.CO_PURCHASE, StrategyCode.CO_VIEW])
+        stub(StrategyCode.ATTRIBUTES, {seed.id: [Candidate(b.id, 0.5)]})
+        slot = _slot(chain=[StrategyCode.CO_PURCHASE, StrategyCode.ATTRIBUTES])
 
         assert _ids(_suggest([seed.id])) == [a.id, b.id]
 
@@ -201,12 +202,12 @@ class TestRanking:
         seed, curated, agreed = _product(), _product(), _product()
         ProductRelation.objects.create(from_product=seed, to_product=curated)
         stub(StrategyCode.CO_PURCHASE, {seed.id: [Candidate(agreed.id, 1.0)]})
-        stub(StrategyCode.CO_VIEW, {seed.id: [Candidate(agreed.id, 1.0)]})
+        stub(StrategyCode.ATTRIBUTES, {seed.id: [Candidate(agreed.id, 1.0)]})
         _slot(
             chain=[
                 StrategyCode.CURATED,
                 StrategyCode.CO_PURCHASE,
-                StrategyCode.CO_VIEW,
+                StrategyCode.ATTRIBUTES,
                 StrategyCode.POPULAR,
             ]
         )
@@ -268,8 +269,9 @@ class TestSlotResolution:
         assert _suggest([seed.id]) == []
 
     def test_missing_slot_falls_back_to_the_preset(self):
-        """No row, a chain naming strategies that are not registered
-        yet — the preset still answers with what IS registered."""
+        """No row, a chain naming strategies this store cannot use yet
+        (no attributes, no orders) — the preset still answers with the
+        ones that can."""
         seed = _product()
         curated = _product()
         ProductRelation.objects.create(from_product=seed, to_product=curated)
@@ -281,7 +283,8 @@ class TestSlotResolution:
         assert _ids(out)[0] == curated.id
         assert out[0].strategy == StrategyCode.CURATED
 
-    def test_no_seeds_no_answer(self):
+    def test_a_product_surface_without_a_seed_has_no_answer(self):
+        _product()
         assert _suggest([]) == []
 
     def test_explicit_limit_overrides_the_slot(self, stub):
@@ -319,19 +322,67 @@ class TestAvailability:
 
 
 class TestPrecomputed:
-    def test_table_is_the_source_and_is_cold_filled_on_first_read(self, stub):
+    def test_the_table_is_the_only_source_and_a_request_never_fills_it(
+        self, stub
+    ):
+        """A seed without rows is answered without them. "No rows" is
+        far more often "nothing bought with it" than "not computed yet",
+        so computing on a miss would run the expensive path on every
+        view of such a product."""
         seed, first, second = _product(), _product(), _product()
         answers = {seed.id: [Candidate(first.id, 0.9)]}
         stub(StrategyCode.CO_PURCHASE, answers, precompute=True)
         _slot(chain=[StrategyCode.CO_PURCHASE])
+
+        assert _suggest([seed.id]) == []
         assert not RecommendationCandidate.objects.exists()
 
+        compute_candidates([seed.id])
         assert _ids(_suggest([seed.id])) == [first.id]
-        row = RecommendationCandidate.objects.get(product=seed)
-        assert row.candidate_id == first.id
-        assert row.strategy == StrategyCode.CO_PURCHASE
 
         # The strategy now says something else; the table still holds
         # the computed answer until the next rebuild.
         answers[seed.id] = [Candidate(second.id, 0.9)]
         assert _ids(_suggest([seed.id])) == [first.id]
+
+
+class TestSeedless:
+    def test_the_empty_cart_is_answered_without_a_seed(self):
+        """The empty cart has no product to start from; the store's
+        best sellers are its answer, and with no seed to crowd out the
+        filler cap does not apply."""
+        shown = [_product() for _ in range(4)]
+        _slot(
+            surface=Surface.EMPTY_CART,
+            chain=[StrategyCode.POPULAR],
+            limit=6,
+            min_fill=3,
+        )
+
+        out = _suggest([], surface=Surface.EMPTY_CART)
+
+        assert sorted(_ids(out)) == sorted(p.id for p in shown)
+        assert {s.strategy for s in out} == {StrategyCode.POPULAR}
+
+    def test_the_empty_cart_preset_answers_without_a_slot_row(self):
+        for _ in range(3):
+            _product()
+        assert not RecommendationSlot.objects.exists()
+
+        assert len(_suggest([], surface=Surface.EMPTY_CART)) == 3
+
+    def test_a_strategy_with_no_store_wide_answer_is_never_asked(self, stub):
+        """``clean()`` refuses such a chain; a row written around it
+        must still not reach ``store_wide``, which would raise."""
+        for _ in range(3):
+            _product()
+        stub(StrategyCode.CO_PURCHASE, {})
+        _slot(
+            surface=Surface.EMPTY_CART,
+            chain=[StrategyCode.CO_PURCHASE, StrategyCode.POPULAR],
+            min_fill=1,
+        )
+
+        out = _suggest([], surface=Surface.EMPTY_CART)
+
+        assert {s.strategy for s in out} == {StrategyCode.POPULAR}

@@ -61,13 +61,19 @@ class CartRecommendationQueryBudgetTest(TestURLFixerMixin, APITestCase):
             self._sellable(category=self.category)
 
     def test_cart_detail_cost_does_not_grow_with_recommendations(self):
+        from django.core.cache import cache
+
         url = reverse("cart-detail")
+        # As below: both measured blocks rebuild the engine's cached
+        # per-tenant context, so only the per-product cost can differ.
         self._add_recommendable(1)
         with CaptureQueriesContext(connection) as few:
+            cache.clear()
             self.client.get(url)
 
         self._add_recommendable(3)
         with CaptureQueriesContext(connection) as many:
+            cache.clear()
             self.client.get(url)
 
         assert len(many) == len(few), (

@@ -71,7 +71,7 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_link = storefront_path(f"/products/{product.id}/{product.slug}")
+    product_link = storefront_path(product.storefront_path)
     product_name = (
         product.safe_translation_getter("name", any_language=True)
         or f"Product {product.slug or product.id}"
@@ -167,7 +167,7 @@ def send_price_drop_notifications(
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_link = storefront_path(f"/products/{product.id}/{product.slug}")
+    product_link = storefront_path(product.storefront_path)
     instance_name = (
         product.safe_translation_getter("name", any_language=True)
         or f"Product {product.slug or product.id}"
@@ -434,7 +434,7 @@ def send_product_alert_restock(product_id: int) -> dict:
     except Product.DoesNotExist:
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_path = f"/products/{product.id}/{product.slug}"
+    product_path = product.storefront_path
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
@@ -515,7 +515,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         return {"status": "skipped", "reason": "product_not_found"}
 
     new_price_dec = Decimal(str(new_price))
-    product_path = f"/products/{product.id}/{product.slug}"
+    product_path = product.storefront_path
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,

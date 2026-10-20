@@ -48472,9 +48472,7 @@ components:
       - variant_group
       - category
       - attributes
-      - semantic
       - co_purchase
-      - co_view
       - popular
       type: string
       description: |-
@@ -48482,9 +48480,7 @@ components:
         * `variant_group` - Ίδια ομάδα παραλλαγών
         * `category` - Ίδια κατηγορία
         * `attributes` - Κοινά χαρακτηριστικά, ετικέτες και μάρκα
-        * `semantic` - Σημασιολογική ομοιότητα
         * `co_purchase` - Αγοράζονται μαζί
-        * `co_view` - Προβάλλονται μαζί
         * `popular` - Δημοφιλή
     SubscriptionStatus:
       enum:

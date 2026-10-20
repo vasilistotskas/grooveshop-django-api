@@ -7,6 +7,10 @@ gets, blends scores with the slot's per-strategy weights, diversifies,
 and cuts to the slot's limit. Below ``min_fill`` it returns nothing,
 because one lonely suggestion looks broken.
 
+A seedless surface (``SEEDLESS_SURFACES`` — the empty cart) has no
+product to be similar to; it is answered from the strategies that have a
+store-wide answer (``RecommendationStrategy.seedless``).
+
 It returns product IDs plus a ``reason`` per item, never serialized
 products: hydration happens in the view with ``Product.objects
 .for_list()`` so pricing context (B2B customer group) and locale are
@@ -20,27 +24,24 @@ read for precomputed ones is a single ``IN`` query.
 
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import NamedTuple
 
-from recommendation.candidates import compute_candidates_for_product
 from recommendation.context import current_vertical, tenant_context
-from recommendation.enum import StrategyCode, Surface
+from recommendation.enum import SEEDLESS_SURFACES, StrategyCode, Surface
 from recommendation.models import RecommendationCandidate, RecommendationSlot
 from recommendation.presets import slot_defaults
 from recommendation.strategies import RecommendationStrategy, get_strategy
-
-logger = logging.getLogger(__name__)
 
 # A product nominated for more than one seed (two cart lines both
 # point at it) is the thing that turns "more of the same" into
 # "complete the order". Added per extra seed hit.
 BASKET_BONUS = 0.25
 
-# ``popular`` is filler. It may never crowd out a real signal.
+# ``popular`` is filler beside a seed. It may never crowd out a real
+# signal. Without a seed it is the signal, and the cap does not apply.
 FILLER_CAP = 1
 
 
@@ -101,20 +102,16 @@ def _slot(surface: str) -> RecommendationSlot:
 def _available_chain(
     slot: RecommendationSlot,
 ) -> list[RecommendationStrategy]:
+    # Every ``StrategyCode`` is registered (pinned by a test) and the
+    # chain is validated against that enum, so ``get_strategy`` cannot
+    # miss here; a strategy that cannot answer for this store declines
+    # through ``is_available`` instead.
     ctx = tenant_context()
-    chain: list[RecommendationStrategy] = []
-    for code in slot.strategy_chain:
-        try:
-            strategy = get_strategy(code)
-        except KeyError:
-            # A preset may name a strategy from a later step (semantic,
-            # co_purchase) that this build does not register yet. That
-            # is expected until it ships, so debug rather than warning.
-            logger.debug("Strategy %r not registered; skipping", code)
-            continue
-        if strategy.is_available(ctx):
-            chain.append(strategy)
-    return chain
+    return [
+        strategy
+        for strategy in map(get_strategy, slot.strategy_chain)
+        if strategy.is_available(ctx)
+    ]
 
 
 def _stored_rows(
@@ -164,20 +161,38 @@ def _collect(
                 for candidate in candidates
             )
 
-    # Precomputed strategies: one table read; a seed with no rows at
-    # all has never been computed (first request after creation, or
-    # before the nightly pass) — compute it now, bounded by K per
-    # strategy, and read it back.
+    # Precomputed strategies: one table read. A seed with no rows is
+    # answered without them — it has none for these strategies, or its
+    # rows are still on the way from its own ``post_save``; computing
+    # them here would put the expensive path on the request after all
+    # (see ``recommendation/candidates.py``).
     stored = [s.code for s in chain if s.precompute]
     if stored:
-        found = _stored_rows(seed_ids, stored)
-        for seed_id in seed_ids:
-            if seed_id not in found:
-                compute_candidates_for_product(seed_id)
-                found.update(_stored_rows((seed_id,), stored))
-        for seed_rows in found.values():
+        for seed_rows in _stored_rows(seed_ids, stored).values():
             rows.extend(seed_rows)
     return rows
+
+
+# The seed id the store-wide rows are filed under: no real product id
+# is 0, and nothing downstream reads it as a product.
+_NO_SEED = 0
+
+
+def _collect_store_wide(
+    chain: list[RecommendationStrategy], limit: int
+) -> list[_Row]:
+    return [
+        _Row(
+            _NO_SEED,
+            candidate.product_id,
+            strategy.code,
+            float(candidate.score),
+            candidate.relation_type,
+        )
+        for strategy in chain
+        if strategy.seedless
+        for candidate in strategy.store_wide(limit)
+    ]
 
 
 def _final_price(price: Decimal, discount_percent: Decimal) -> Decimal:
@@ -185,7 +200,8 @@ def _final_price(price: Decimal, discount_percent: Decimal) -> Decimal:
 
 
 def suggest(ctx: SuggestionContext) -> list[Suggestion]:
-    if not ctx.seed_ids:
+    seedless = ctx.surface in SEEDLESS_SURFACES
+    if not ctx.seed_ids and not seedless:
         return []
 
     slot = _slot(ctx.surface)
@@ -199,7 +215,10 @@ def suggest(ctx: SuggestionContext) -> list[Suggestion]:
 
     # Ask each strategy for more than the slot shows, so the guard and
     # the diversity caps have something to drop.
-    rows = _collect(ctx.seed_ids, chain, per_strategy_limit=limit * 3)
+    if ctx.seed_ids:
+        rows = _collect(ctx.seed_ids, chain, per_strategy_limit=limit * 3)
+    else:
+        rows = _collect_store_wide(chain, limit * 3)
     weights = {s.code: float(slot.weights.get(s.code, 1.0)) for s in chain}
     excluded = set(ctx.seed_ids) | set(ctx.exclude_ids)
 
@@ -265,7 +284,11 @@ def suggest(ctx: SuggestionContext) -> list[Suggestion]:
     chosen: list[Suggestion] = []
     for pid in ranked:
         entry = merged[pid]
-        if entry.strategy == StrategyCode.POPULAR and filler_used >= FILLER_CAP:
+        if (
+            ctx.seed_ids
+            and entry.strategy == StrategyCode.POPULAR
+            and filler_used >= FILLER_CAP
+        ):
             continue
         category_id = facts[pid]["category_id"]
         if (

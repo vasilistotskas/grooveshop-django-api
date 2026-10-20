@@ -7,7 +7,11 @@ never line numbers** — the line anchors this file used to carry had all
 drifted by 40+ lines within weeks, pointing at unrelated code. The engine
 has enough "this is deliberate" pieces that drift here is expensive.
 
-Last refresh: 2026-09-11 (design record; research figures verified against Meilisearch v1.53 docs, HF TEI docs, arXiv 2607.21274 and the live cluster on this date). See git log for changes since.
+Last refresh: 2026-10-19 — `attributes` and `co_purchase` built and
+precomputed, `semantic` and `co_view` retired, the empty cart and the
+order email served, weights learned nightly. §6 is the 2026-09-11 design
+record for a semantic strategy that does not exist; its research figures
+were verified on that date. See git log for changes since.
 
 ## 1. Overview
 
@@ -52,11 +56,44 @@ Free tier on its own.
 Mirrors the adapter registry in `shipping/interfaces.py`: an ABC, a `@register_strategy`
 class decorator, a module-level `_REGISTRY` populated in
 `AppConfig.ready()`. Every strategy answers `is_available(tenant_ctx)`
-**before** it is asked to suggest — co-purchase declines below a
-support threshold, `brand` declines when the tenant has no brands,
-`semantic` declines when the index has no embedder or
-`MEILISEARCH["OFFLINE"]` is set. **A strategy that cannot answer well
-returns nothing rather than noise.** That is the cold-start answer.
+**before** it is asked to suggest — `co_purchase` declines until the
+store has enough multi-item orders, `attributes` declines when the
+tenant has populated no attribute, tag or brand. **A strategy that
+cannot answer well returns nothing rather than noise.** That is the
+cold-start answer.
+
+Every `StrategyCode` member has a registered strategy, and
+`tests/unit/recommendation/test_registry.py` fails for one that does
+not: the slot admin offers every member, so a code with nothing behind
+it would be a promise the engine silently skips. Two codes the original
+design listed were therefore **removed** (migration
+`recommendation/0006` strips them from every slot) rather than left
+unbuilt:
+
+- `semantic` (embedding similarity) has no embedder to query: no index
+  has one configured, and `meili/` has no `embedders` settings path. It
+  is a **follow-up, not impossible**: Meilisearch's own `huggingFace`
+  embedder source runs in-process with no API key, so no new service is
+  needed (the TEI sidecar of §6 is the alternative). What that takes:
+  the settings path of §6.2; a Meilisearch memory limit above the
+  model's (prod runs at 1024Mi and staging at 768Mi, while `bge-m3`, the
+  in-process model §6.1 found acceptable for Greek, is about 2 GB of
+  weights; the small model that fits scores 0.325 on Greek, rejected in
+  §6.1); and the product-name measurement §6.1 requires before any store
+  gets it.
+- `co_view` (viewed together) needs a per-visitor record of product
+  views, and nothing keeps one. `Product.view_count` is a bare counter
+  (`ProductViewSet.update_view_count`, an `F() + 1`). The session-keyed
+  records — `RecommendationEvent` clicks and `search.SearchClick` under a
+  `SearchQuery.session_key` — cover only the views reached from a strip
+  or from search. Meta's `ViewContent` is declared but never sent from
+  the server. The storefront's evlog request lines are ops logs,
+  sampled to 10% of info events in production, with no visitor id for
+  an anonymous shopper. Adding it means recording (visitor, product) on
+  the product page's existing view-count call first.
+
+Adding either back is the §9.1 playbook: the enum member, the strategy
+and its data source in one change.
 
 ### 2.3 Two-stage retrieval: candidates offline, ranking online
 
@@ -67,44 +104,54 @@ which answers the whole seed set in a fixed number of queries whatever
 the basket size (measured: per-seed calls took cart detail from 30 to
 42 queries as lines were added). Live is what keeps a product created a
 minute ago beside its category siblings immediately rather than after
-the nightly pass. Expensive ones — a Meilisearch vector query, a
-co-occurrence aggregation over every order — set `precompute = True`
-and are written ahead of time per (product, strategy) into
-`RecommendationCandidate` (top-K, K=50) by Celery; the request path
-reads their rows in one `IN` query and cold-computes a seed that has
-none. That is why the read path costs the same at 7 SKUs or 100k — its
-query count is bounded by the number of strategies in the chain, never
-by seeds or candidates — and why the executor behind a strategy can
-move ORM → Meilisearch → precomputed table without the contract
-changing. The candidate table is the seam.
+the nightly pass. Expensive ones — `attributes` (a set intersection over
+the catalogue) and `co_purchase` (a co-occurrence aggregation over every
+order) — set `precompute = True` and are written ahead of time per
+(product, strategy) into `RecommendationCandidate` (top-K, K=50) by
+Celery; the request path reads their rows in one `IN` query. That is
+why the read path costs the same at 7 SKUs or 100k — its query count is
+bounded by the number of strategies in the chain, never by seeds or
+candidates — and why the executor behind a strategy can move ORM →
+Meilisearch → precomputed table without the contract changing. The
+candidate table is the seam, and the admin's **Recommendation
+candidates** list is that table.
 
-> **Status today: nothing is precomputed.** All four shipped strategies
-> (`curated`, `variant_group`, `category`, `popular`) leave `precompute` at
-> its `False` default, so `RecommendationCandidate` is neither written nor
-> read on any live request, and `recompute_all_candidates` — while it exists
-> and works — is **not** in `CELERY_BEAT_SCHEDULE`; there is no nightly pass.
-> The table, the task and the `precompute` branch in `engine.py` are the
-> extension point for the first expensive strategy (vector similarity,
-> order co-occurrence), kept deliberately rather than left behind by one.
-> Anything below describing the offline pass describes that seam, not work
-> the platform currently performs — and scheduling the task is part of
-> shipping such a strategy.
+**A request never computes candidates.** A seed with no rows is
+answered without them: `compute_candidates` writes nothing for a product
+nobody bought anything with, so "no rows" is far more often "nothing to
+say" than "not computed yet", and computing on a miss would put the
+expensive path on every view of every such product. A product's own
+save rebuilds its rows within seconds (`recommendation/signals.py`),
+and the nightly pass rebuilds the rest:
+
+| Writer | When | What |
+|---|---|---|
+| `tasks.recompute_candidates_for_product` | `post_save` of the `Product`, or a `ProductRelation` from it | that product's rows |
+| `tasks.recompute_all_candidates` (beat `recompute-recommendation-candidates`, 04:00, fanned out per store) | nightly | every active product, `_FULL_PASS_BATCH` seeds per `compute_candidates` call |
+
+Both write nothing on a store whose suggestions are off
+(`context.recommendations_active` — the plan flag and the store's switch,
+the same two tiers the endpoints enforce), so a store that turns
+suggestions on gets its precomputed rows from the next nightly pass, or
+per product as each one is saved. A rebuild replaces every row of its
+seeds, so a strategy that stopped being available stops being served.
 
 ## 3. Pipeline
 
 ```
-OFFLINE (Celery)                          ONLINE (request)
+OFFLINE (Celery)                          ONLINE (request, or the order email)
 Product / relation save                   GET /api/v1/recommendations
   └─ dispatch_on_commit ──┐                 └─ slot config for surface
-Nightly fanout           │                  └─ candidates: live strategies (batched) + table for precomputed
-  └─ behavioural pass ───┤                  └─ guard · weight · diversify · cut N
-                         ▼                  └─ hydrate via ProductSerializer(for_list())
-              RecommendationCandidate        └─ items + reason per item, impressionId
-              (per schema, top-K)                     │
-                         ▲                            ▼
-     Meilisearch /similar (embedder) ─┘     RecommendationEvent (impression · click · attach)
+Nightly fanout (04:00)    │                 └─ candidates: live strategies (batched) + table for precomputed
+  └─ full pass ───────────┤                    (no seed — empty cart: the seedless strategies' store_wide)
+                          ▼                 └─ guard · weight · diversify · cut N
+              RecommendationCandidate        └─ hydrate via ProductSerializer(for_list())
+              (per schema, top-K:            └─ items + reason per item, impressionId
+               attributes, co_purchase)               │
+                                                      ▼
+                                            RecommendationEvent (impression · click · attach)
                                                       │
-                                            nightly aggregate → RecommendationSlot.weights
+                          nightly fanout (05:00) learning.learn_weights → RecommendationSlot.weights
 ```
 
 Dispatch is **always** `tenant.celery.dispatch_on_commit(task, kwargs={...})`,
@@ -119,23 +166,27 @@ are otherwise garbage-collected and the signal silently stops firing
 
 ## 4. Strategies
 
-**Four of the eight are built.** `curated`, `variant_group`, `category` and
-`popular` exist in `recommendation/strategies/` and are the entire live
-engine. `attributes`, `semantic`, `co_purchase` and `co_view` are design, not
-code — there is no module for them, which is also why no strategy sets
-`precompute = True`: the precomputed ones are precisely the unbuilt ones. The
-Standard and Pro tiers therefore have nothing behind them yet.
+Six strategies, every one registered (`recommendation/strategies/`).
+The tier is the strategy's `min_plan`; a strategy below the store's plan
+is skipped, so a preset can name it and it starts contributing the day
+the store upgrades.
 
-| Code | Signal | Executor by scale | Declines when | Tier | Status |
-|---|---|---|---|---|---|
-| `curated` | `ProductRelation` rows | ORM at any size | never — merchant intent always wins | Free | **shipped** |
-| `variant_group` | `Product.variant_group` | ORM | product has no group | Free | **shipped** |
-| `category` | same category (0.8), then sibling categories (0.6), then the parent's whole MPTT subtree (0.5); within a tier by `click_score`, `view_count` | ORM — exactly three queries whatever the seed count | product has no category | Free | **shipped** |
-| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | ORM — one store-wide query | never — last-resort filler, **capped at 1 slot** by the ranker | Free | **shipped** |
-| `attributes` | shared `attribute_values` ∪ tags ∪ brand (Jaccard) | ORM < 2k · Meilisearch above | tenant populates none of the three | Standard | design only |
-| `semantic` | embedding similarity (§6) | Meilisearch `/similar` | no embedder on the index, or `OFFLINE` | Standard | design only |
-| `co_purchase` | `OrderItem` pairs, 180-day window | SQL aggregation → table | pair count < 5 or < 50 multi-item orders | Pro | design only |
-| `co_view` | same-session views/clicks from `RecommendationEvent` | SQL aggregation → table | fewer than N sessions with ≥ 2 views | Pro | design only |
+| Code | Signal | Executor | Declines when | Lowest plan |
+|---|---|---|---|---|
+| `curated` | `ProductRelation` rows | live ORM, one query | never — merchant intent always wins | Trial |
+| `variant_group` | `Product.variant_group` | live ORM | product has no group | Trial |
+| `category` | same category (0.8), then sibling categories (0.6), then the parent's whole MPTT subtree (0.5); within a tier by `click_score`, `view_count` | live ORM — exactly three queries whatever the seed count | product has no category | Trial |
+| `popular` | `click_score`, `view_count`, `likes_count`, `discount_percent` | live ORM — one store-wide query | never — last-resort filler, **capped at 1 slot** beside a seed; the whole answer for the empty cart (`seedless`) | Trial |
+| `attributes` | shared active attribute values ∪ active tags ∪ brand, scored by Jaccard over each product's full set | precomputed; a fixed number of queries per batch of seeds | the store has populated none of the three | Basic |
+| `co_purchase` | confidence `P(candidate \| seed)` over non-canceled orders of the last `RECOMMENDATION_CO_PURCHASE_WINDOW_DAYS` (180); a pair in fewer than `RECOMMENDATION_CO_PURCHASE_MIN_SUPPORT` (5) orders is dropped | precomputed; two queries per batch of seeds | fewer than `RECOMMENDATION_CO_PURCHASE_MIN_ORDERS` (50) orders with two or more lines | Pro |
+
+`attributes` does not LOOK UP candidates through a feature carried by more
+than `RECOMMENDATION_ATTRIBUTES_MAX_FEATURE_PRODUCTS` (500) active products
+— a brand or colour on half a large catalogue would make every product a
+candidate of every other and says little about similarity there — but
+such a feature still counts in each product's set size, so the score
+stays the true Jaccard. Below the cap (every feature of a small store)
+all features are used.
 
 Chain order, weights, `limit`, `min_fill` and `price_band_ratio` are
 **data per tenant per surface** — a `RecommendationSlot` row — seeded
@@ -149,6 +200,34 @@ section. One lonely suggestion looks broken on a product page; the
 cart and out-of-stock presets ship with `min_fill = 1` because one
 complementary item there is a real "add this one thing", and a
 three-product store would otherwise never show a cart suggestion.
+
+Every `Surface` is served where its slot promises:
+
+| Surface | Seeds | Where it renders |
+|---|---|---|
+| `pdp` | the product | storefront product page |
+| `out_of_stock` | the product | storefront product page, when the product is sold out |
+| `cart` | every basket line | the cart payload's `recommendations` field, rendered by the cart page |
+| `empty_cart` | **none** | storefront cart page, when the cart is empty |
+| `order_email` | the order's products | the order confirmation email (`order_received` / `order_payment_confirmed`) |
+
+`empty_cart` is the one **seedless** surface (`enum.SEEDLESS_SURFACES`):
+there is no product to be similar to, so it is answered from the
+strategies that have a store-wide answer — those with `seedless = True`,
+today only `popular` — through `RecommendationStrategy.store_wide`, and
+`FILLER_CAP` does not apply there. `RecommendationSlot.clean()` refuses any
+other strategy in a seedless slot's chain, because it would save and then
+say nothing.
+
+`order_email` (`recommendation/order_email.py`) is answered by the same
+`suggest()` when `send_order_confirmation_email` renders, seeded with the
+order's products, and rendered by `emails/base/_suggestions.html` /
+`.txt` as names linked to their product pages — no prices, because the
+email has no viewer to apply a B2B customer group to. The sent strip is
+recorded as an `impression` with the order's customer and cart, so a
+later order can attach to it and the weight learning measures the
+surface like the others. A failure building it is logged and the
+confirmation goes out without it; a store with suggestions off gets none.
 
 ## 5. Online ranking and guardrails
 
@@ -171,19 +250,40 @@ cart), merge candidates from each enabled strategy, then:
    strategies agreeing on one product out-sum a curated 1.0 — measured
    on staging on the first read: `variant_group + category + popular`
    came to 2.2 against the merchant's 1.5.
-3. **Diversify.** `popular` fills at most one slot (`engine.FILLER_CAP`)
-   — a strip of four "popular" items under a specific product says
-   nothing about it — and no single category may fill more than
-   `limit − 1` slots on any surface except the product page, which IS
-   the category.
+3. **Diversify.** Beside a seed, `popular` fills at most one slot
+   (`engine.FILLER_CAP`) — a strip of four "popular" items under a
+   specific product says nothing about it — and no single category may
+   fill more than `limit − 1` slots on any surface except the product
+   page, which IS the category.
 4. **Cut** to `limit`; return `[]` under `min_fill`.
 
-Weights start from the preset. **Design, not built:** no task updates
-them yet — they stay the preset's (or the merchant's admin edit). The
-intended update is nightly, from attach rate per strategy per tenant (exponentially weighted, floored at 0.05 so no
-strategy is starved of impressions). Deliberately a bandit-shaped loop
-and not a model: explainable, runs in SQL, and its output is a row a
-merchant can read.
+**Weights are learned nightly** (`recommendation/learning.py`, task
+`learn_slot_weights`, beat `learn-recommendation-weights` at 05:00, fanned
+out per store) for every enabled slot with **`learn_weights`** on — the
+default, and part of the preset, so "Reset to preset" turns it back on.
+Per surface and strategy over the trailing
+`RECOMMENDATION_LEARNING_WINDOW_DAYS` (30), the attach rate is `attach`
+rows ÷ `impression` rows (one impression row per product shown, one
+attach row per suggested product that reached an order — both carry the
+surface and strategy that showed it):
+
+- a strategy with fewer than `RECOMMENDATION_LEARNING_MIN_IMPRESSIONS`
+  (200) impressions keeps its weight — too few showings to tell good
+  from lucky;
+- the best measured rate weighs 1.0 and every other measured strategy
+  `its rate ÷ the best`, never below `RECOMMENDATION_LEARNING_WEIGHT_FLOOR`
+  (0.05): a strategy weighted to zero is never shown again, so it could
+  never earn its way back;
+- no measured strategy attached anything → no evidence of a difference,
+  nothing changes.
+
+A merchant who wants to set weights by hand turns `learn_weights` off on
+that slot. Clicks are recorded but not learned from: attach is the
+commercial signal. Deliberately a bandit-shaped loop and not a model:
+explainable, runs in SQL, and its output is a row a merchant can read.
+Since `curated` is a tier above the blended score, its weight orders it
+only against other curated candidates. A changed slot is saved through
+the ORM, so the `recommendations` cache surface purges the cached strips.
 
 **Attach attribution** (`recommendation/events.py:record_attach_events`,
 dispatched from `order_created` by `recommendation/signals.py`): an order
@@ -220,6 +320,11 @@ The storefront renders it as a translated label keyed by the enum
 answer "why did it show that".
 
 ## 6. Semantic similarity — Greek is the requirement
+
+> **Not built.** `semantic` is not a `StrategyCode`: it was removed on
+> 2026-10-19 (§2.2) because no embedding model runs on the platform.
+> This section is the 2026-09-11 design record for adding it, with the
+> research it rests on; nothing here describes running code.
 
 ### 6.1 What the measurements say
 
@@ -299,9 +404,9 @@ every deploy. Enable `vectorStore` with the existing
 | Model | Fields | Notes |
 |---|---|---|
 | `product.ProductRelation` | `from_product · to_product · relation_type · sort_order` | unique (from, to, type); `from != to`; `SortableModel` scoped per `from_product` |
-| `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `json_schemas.py` (the `page_config` idiom) |
+| `recommendation.RecommendationSlot` | `surface · strategy_chain[] · weights{} · learn_weights · limit · min_fill · price_band_ratio · enabled` | one row per surface; `strategy_chain` is `JSONField(default=list)` validated in `json_schemas.py` (the `page_config` idiom); `learn_weights` hands `weights` to the nightly learning (§5) |
 | `recommendation.RecommendationCandidate` | `product · candidate · strategy · score · relation_type · computed_at` | unique (product, candidate, strategy); indexed (product, strategy, -score) |
-| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · created_at` | `impression | click` from the storefront; `attach` derived from `order_created` (unique per order · product · impression); `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
+| `recommendation.RecommendationEvent` | `surface · strategy · seed · product · position · kind · impression_id · session_key · cart_uuid · user · order · matched_by · created_at` | `impression | click` from the storefront, `impression` also from the sent order email; `attach` derived from `order_created` (unique per order · product · impression); `cart_uuid` is the journey identity, the cart row is a per-customer singleton |
 | `cart.CartItem.recommendation_impression_id` → `order.OrderItem.recommendation_impression_id` | nullable UUID on the line | the impression carried from add-to-cart (`CartItemCreateSerializer` / `CartItemUpdateSerializer`, latest add wins) and copied at checkout by both `OrderService` cart→order paths; read by `record_attach_events` as the first identity |
 
 Gating is two-tier like everything else: `Tenant.recommendations_enabled`
@@ -311,6 +416,9 @@ per-schema `PRODUCT_SUGGESTIONS_ENABLED` extra-setting
 (`EXTRA_SETTINGS_DEFAULTS`, listed in `PUBLIC_SETTING_KEYS`,
 `core/api/views.py`), which `IsRecommendationsRuntimeEnabled` enforces on
 both endpoints as well, so the server answers 404 whichever half is off.
+The paths with no request — the order email, the candidate rebuilds and
+the weight learning — read the same two tiers through
+`recommendation.context.recommendations_active()`.
 
 ## 8. Caching — the 2026-09-10 lesson
 
@@ -330,7 +438,10 @@ the end instead.
 The one thing the engine caches itself is the per-tenant
 `TenantContext` (`recommendation/context.py`: plan, product count,
 whether brands/tags/attributes exist, order counts) under
-`recs:tenant_context` for 300 s — the facts `is_available` consults.
+`recs:tenant_context:<field names>` for 300 s — the facts `is_available`
+consults. The field names are part of the key because the value is
+rebuilt as `TenantContext(**cached)`: a release that adds or drops a
+field must never read what the previous release cached.
 Its build is a fixed number of queries: it joins `django_content_type`
 rather than calling `ContentType.objects.get_for_model`, because
 django-tenants clears that cache on every schema switch and the lookup
@@ -347,8 +458,11 @@ strip for every surface. The product page and the out-of-stock slot
 fetch through `server/api/products/[id]/recommendations.get.ts`, a
 Nitro-cached tenant proxy (`name: 'productRecommendations'`, 5-minute
 SWR, keyed by seed · surface · limit · locale — the `recommendations`
-cache surface purges it); the cart renders the basket-seeded list its
-own payload already carries. **The read endpoint writes no event.**
+cache surface purges it); the empty cart, which has no seed, fetches
+through `server/api/recommendations.get.ts`, cached under the same
+handler name so the same purge reaches it; the cart renders the
+basket-seeded list its own payload already carries. **The read endpoint
+writes no event.**
 `impressionId` is a correlation id; the strip posts the impression
 from its own `onMounted`, which under `hydrate-on-visible` fires when
 it scrolls into view — "shown", not "served" — and echoes the id on
@@ -368,27 +482,34 @@ in client-side by `useB2BPricing`, never cached.
 1. `recommendation/strategies/<code>.py`: subclass
    `RecommendationStrategy`, set `code`, `label`, `min_plan` and
    `precompute`; implement `is_available` (decline honestly — call
-   `super()` first) and `candidates`. A live strategy (`precompute =
-   False`) MUST also override `candidates_for` to answer the whole seed
-   set in a bounded number of queries; the default loops per seed and
-   is only acceptable when the per-seed cost is zero queries.
-2. Add the code to `StrategyCode` (`recommendation/enum.py`) and to the
-   presets that should use it.
+   `super()` first) and `candidates`. Override `candidates_for` to
+   answer the whole seed set in a bounded number of queries — required
+   for a live strategy, and what `compute_candidates` batches a
+   precomputed one through. A strategy that can answer the empty cart
+   sets `seedless = True` and implements `store_wide`.
+2. Add the code to `StrategyCode` (`recommendation/enum.py`) **in the
+   same change** — `test_registry.py` fails for a member with no
+   strategy — and to the presets that should use it.
 3. Import the module in `recommendation/strategies/__init__.py` —
    `RecommendationConfig.ready()` imports that package, which is what
    runs `@register_strategy`.
 4. Tests in `tests/unit/recommendation/test_strategies.py` — one test
    per decline condition, one per happy path, and the query count for
    one seed versus three (it must be equal); the engine's own guard,
-   ranking and diversity rules are covered in `test_engine.py` with a
-   stub registered under a spare code.
+   ranking and diversity rules are covered in `test_engine.py` with
+   stubs registered over real codes (the `stub` fixture restores the
+   registry).
 
 ### 9.2 Adding a surface
 
-Add to `Surface`, add a preset entry, add the storefront placement in
-`app/components/Product/Suggestions.vue` (a `title.<surface>` i18n key)
-and the page that hosts it. Cart-like surfaces (per-session seeds) must
-bypass Nitro caching.
+Add to `Surface`, add a preset entry, and the place it renders: the
+storefront's `Product/Suggestions.vue` in BOTH trees (the default and
+`variants/webside/`, with a `title.<surface>` i18n key) and the page that
+hosts it, or — for a surface outside the storefront, like the order
+email — the code that calls `suggest()` for it. A surface with no seed
+joins `SEEDLESS_SURFACES`. Cart-like surfaces (per-session seeds) must
+bypass Nitro caching. Add the surface to the table in §4: every slot the
+admin offers must render somewhere.
 
 ### 9.3 Adding a vertical preset
 
@@ -415,17 +536,21 @@ change plus the PreSync settings apply; pin `revision` either way.
 
 ## 10. Plan ladder
 
-| Capability | Free | Standard | Pro |
+What the code enforces is the strategy tier — each strategy's
+`min_plan`, a `TenantPlan` ranked Trial < Basic < Pro < Enterprise
+(`strategies/base.py:plan_allows`; an unknown plan ranks as Trial).
+Surfaces and weight learning are **not** plan-gated: every store with
+recommendations on gets every surface, and every slot learns while its
+`learn_weights` is on.
+
+| Capability | Trial | Basic | Pro · Enterprise |
 |---|---|---|---|
 | Curated relations (typed) · variant group · category · popular filler | ✓ | ✓ | ✓ |
-| Surfaces | product page | + cart · out-of-stock · empty cart | + order email · thank-you |
 | Attribute / tag / brand similarity | — | ✓ | ✓ |
-| Semantic similarity (embeddings) | — | ✓ | ✓ |
-| Co-purchase · co-view | — | — | ✓ (once support thresholds are met) |
-| Basket-aware completion | — | — | ✓ |
-| Weights learned from attach | — | preset only | ✓ nightly |
-| Analytics per strategy | — | summary | full, per surface |
-| Slot editor · A/B of two chains | — | ✓ | ✓ + A/B |
+| Co-purchase | — | — | ✓ (once its support threshold is met) |
+
+Not built, and not offered: semantic similarity and co-view (§2.2), a
+thank-you surface, per-strategy analytics and A/B of two chains.
 
 Events are collected on every tier — one insert — and only the
 reporting is gated. That is what lets the platform learn vertical

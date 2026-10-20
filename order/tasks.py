@@ -39,6 +39,7 @@ from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
+from recommendation.order_email import order_email_strip, record_impression
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -257,10 +258,27 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 pay_way and not settled and not pay_way.is_collected_on_delivery
             )
 
+            # Suggestions are an extra in this email, never a reason to
+            # lose it: a failure building them is logged and the
+            # confirmation goes out without the strip.
+            try:
+                suggestion_strip = order_email_strip(order, language=language)
+            except Exception:
+                logger.exception(
+                    "Order #%s confirmation: suggestions failed, sending "
+                    "without them",
+                    order.id,
+                    extra={"order_id": order.id},
+                )
+                suggestion_strip = None
+
             context = build_email_context(
                 language=language,
                 order=order,
                 items=order.items.all(),
+                suggested_products=(
+                    suggestion_strip.items if suggestion_strip else []
+                ),
                 pay_way=pay_way,
                 payment_instructions=payment_instructions,
                 payment_instructions_text=payment_instructions_text,
@@ -293,6 +311,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         # cache.delete). From this point on every future call to this task
         # will short-circuit on the DB flag.
         _mark_confirmation_sent(order_id)
+
+        if suggestion_strip is not None:
+            record_impression(order, suggestion_strip)
 
         # The rendered subject goes into the log AND the order history:
         # it is the one thing the customer quotes back ("I got an email

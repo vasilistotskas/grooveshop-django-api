@@ -544,6 +544,12 @@ class Product(
         return Money(_quantize_cents(total.amount), price_currency)
 
     @property
+    def storefront_path(self) -> str:
+        """The product page's path on the storefront, without a locale
+        prefix — ``core.utils.tenant_urls`` adds the host and prefix."""
+        return f"/products/{self.id}/{self.slug}"
+
+    @property
     def main_image_path(self) -> str:
         # Use prefetched main images if available (from for_list() queryset)
         # to avoid an N+1 query per product

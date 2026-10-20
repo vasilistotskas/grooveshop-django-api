@@ -468,7 +468,19 @@ def _persist_invoice_row(
     a row lock, so anything slow inside this block (notably the PDF
     render) would hold both the lock and an idle transaction open —
     see ``generate_invoice`` for why that matters.
+
+    The order row is locked FIRST, the lock every refund path holds while
+    it writes its ledger row (``PaymentLedger`` documents it). The receipt
+    nets what the ledger holds when it is built and every later refund is
+    credited by comparing its ``created_at`` with the row's, so the read
+    and the row's creation must be one step: a refund inserted but not yet
+    committed when the ledger is read is invisible to the netting, yet it
+    predates the row, and no credit would ever cover it.
     """
+    Order.objects.select_for_update().get(pk=order.pk)
+    # Re-judged under the lock: a refund that committed since the caller's
+    # check may have returned the whole sale.
+    _refuse_if_fully_refunded(order, existing)
     if existing is not None:
         # Preserve the original number + issue date so a regeneration
         # doesn't consume a fresh counter slot and leave the previous

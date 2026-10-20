@@ -164,9 +164,23 @@ class EmailTemplateRegistry:
             return
 
         # ONE heading per directory, so a config-backed template and its
-        # siblings land together. No fallback: a directory without a
-        # heading raises, and a test lists every directory on disk.
-        display_category = EmailTemplateConfig.DIRECTORY_HEADINGS[category_path]
+        # siblings land together. No fallback heading: a directory without
+        # one is reported and left out, never filed under a guess, and the
+        # other directories still load (``_discover_templates`` wraps the
+        # whole scan, so raising here would drop every later directory).
+        # ``test_every_template_directory_has_a_heading`` keeps the map
+        # complete.
+        display_category = EmailTemplateConfig.DIRECTORY_HEADINGS.get(
+            category_path
+        )
+        if display_category is None:
+            logger.error(
+                "Email template directory %s has no heading in "
+                "EmailTemplateConfig.DIRECTORY_HEADINGS; its templates are "
+                "not listed",
+                category_path,
+            )
+            return
 
         for html_file in html_files:
             try:

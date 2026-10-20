@@ -307,6 +307,7 @@ class TestReasonCodeMigration:
         other.refresh_from_db()
 
         assert manual.reason_code == StockLogReason.MANUAL_ADJUSTMENT
-        assert manual.reason == ""
+        # Kept for the release still serving during the rollout.
+        assert manual.reason == "Manual stock adjustment via admin panel"
         assert other.reason_code == ""
         assert other.reason == "Order created"

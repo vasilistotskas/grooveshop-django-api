@@ -7,15 +7,17 @@ MANUAL_CODE = 'manual_adjustment'
 
 
 def codes_for_known_texts(apps, schema_editor):
+    # Adds the code and keeps the text: the release still serving during the
+    # rollout reads ``reason`` and would otherwise show an empty reason.
     apps.get_model('order', 'StockLog').objects.filter(
         reason=MANUAL_TEXT
-    ).update(reason_code=MANUAL_CODE, reason='')
+    ).update(reason_code=MANUAL_CODE)
 
 
 def texts_for_codes(apps, schema_editor):
     apps.get_model('order', 'StockLog').objects.filter(
         reason_code=MANUAL_CODE
-    ).update(reason=MANUAL_TEXT, reason_code='')
+    ).update(reason_code='')
 
 
 class Migration(migrations.Migration):

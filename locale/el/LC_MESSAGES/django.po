@@ -2524,6 +2524,9 @@ msgstr "Κωδικός"
 msgid "Code Pattern"
 msgstr "Μοτίβο κωδικού"
 
+msgid "Code from your authenticator app"
+msgstr "Κωδικός από την εφαρμογή ταυτοποίησης"
+
 msgid "Code used to identify the payment provider in the system (e.g., 'stripe', 'paypal')"
 msgstr "Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')"
 

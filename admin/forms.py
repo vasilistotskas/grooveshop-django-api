@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from django import forms
-from django.contrib.admin.forms import AdminAuthenticationForm
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name, schema_context
-from unfold.forms import AdminOwnPasswordChangeForm
+from unfold.forms import AdminOwnPasswordChangeForm, AuthenticationForm
 from unfold.widgets import (
     UnfoldAdminCheckboxSelectMultipleWidget,
     UnfoldAdminTextInputWidget,
@@ -21,7 +20,7 @@ from tenant.auth_backends import (
 )
 
 
-class PlatformAdminAuthenticationForm(AdminAuthenticationForm):
+class PlatformAdminAuthenticationForm(AuthenticationForm):
     """Admin login form — authenticates ONLY against ``PlatformStaffBackend``.
 
     Bypasses Django's global ``django.contrib.auth.authenticate()``

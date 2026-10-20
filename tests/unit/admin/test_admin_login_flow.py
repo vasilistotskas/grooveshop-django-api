@@ -345,3 +345,22 @@ class TestAdminPasswordChange:
 
         staff.refresh_from_db()
         assert staff.check_password("a-brand-new-passw0rd!")
+
+
+def test_the_login_inputs_carry_unfolds_input_styling():
+    """The form must build on ``unfold.forms.AuthenticationForm``: Django's
+    own leaves the username and password inputs unstyled, and Unfold's CSS
+    then draws them with no border at all (seen on production)."""
+    from django.contrib.sessions.backends.cache import SessionStore
+    from django.test import RequestFactory
+    from unfold.widgets import BASE_INPUT_CLASSES
+
+    from admin.forms import PlatformAdminAuthenticationForm
+
+    request = RequestFactory().get("/admin/login/")
+    request.session = SessionStore()
+    form = PlatformAdminAuthenticationForm(request=request)
+
+    for name in ("username", "password"):
+        classes = form.fields[name].widget.attrs["class"].split()
+        assert set(BASE_INPUT_CLASSES) <= set(classes), name

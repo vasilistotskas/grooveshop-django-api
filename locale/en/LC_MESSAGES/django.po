@@ -2505,6 +2505,9 @@ msgstr "Code"
 msgid "Code Pattern"
 msgstr "Code Pattern"
 
+msgid "Code from your authenticator app"
+msgstr ""
+
 msgid "Code used to identify the payment provider in the system (e.g., 'stripe', 'paypal')"
 msgstr "Code used to identify the payment provider in the system (e.g., 'stripe', 'paypal')"
 

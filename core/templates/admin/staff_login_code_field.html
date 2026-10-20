@@ -1,6 +1,7 @@
 {# The code input of the second-factor steps. Unfold's field.html keeps a label on one line, which a long Greek label pushes past a narrow screen. #}
+{% load i18n %}
 <div class="{% if form.otp_code.errors %}errors {% endif %}form-field flex flex-col group mb-4">
-    <label for="{{ form.otp_code.id_for_label }}" class="block font-semibold mb-2 text-important">{{ form.otp_code.label }}</label>
+    <label for="{{ form.otp_code.id_for_label }}" class="block font-semibold mb-2 text-important">{% if form.step == "enrol" %}{% translate "Code from your authenticator app" %}{% else %}{{ form.otp_code.label }}{% endif %}</label>
 
     {{ form.otp_code }}
 

@@ -25,6 +25,7 @@ from shipping_acs.exceptions import AcsPayoutReconciliationError
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsCodPayout
 from shipping_acs.services import AcsService
+from tests.utils.staff import stamp_platform_identity
 from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -38,7 +39,9 @@ def _acs_configured():
 
 @pytest.fixture
 def staff_user():
-    return UserAccountFactory(is_staff=True, is_superuser=True)
+    return stamp_platform_identity(
+        UserAccountFactory(is_staff=True, is_superuser=True)
+    )
 
 
 @pytest.fixture

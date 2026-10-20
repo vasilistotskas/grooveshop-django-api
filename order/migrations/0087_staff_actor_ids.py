@@ -23,22 +23,24 @@ class Migration(migrations.Migration):
             name='performed_by',
             field=models.ForeignKey(blank=True, db_constraint=False, help_text='Shopper whose reservation this was (null otherwise)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='stock_operations', to=settings.AUTH_USER_MODEL, verbose_name='Performed By'),
         ),
-        # Rows the admin's stock-edit signal wrote carry a PLATFORM staff id in
-        # ``performed_by``, which reads as the store's shopper with that id.
-        # That signal is the only staff writer before this split, and its
-        # reason is fixed, so those rows (and only those) move over.
+        # Before this split, every row a staff member caused carries their
+        # PLATFORM id in ``performed_by``, which reads as the store's shopper
+        # with that id: the admin's stock-edit signal, a restock or refund
+        # (``increment_stock``) and an adjustment. A shopper is named only on
+        # their own reservation: reserving, releasing it, and converting it
+        # to a sale. Everything else moves over.
         migrations.RunSQL(
             sql=(
                 "UPDATE order_stocklog SET performed_by_staff_id = "
                 "performed_by_id, performed_by_id = NULL WHERE "
-                "performed_by_id IS NOT NULL AND reason = "
-                "'Manual stock adjustment via admin panel'"
+                "performed_by_id IS NOT NULL AND (operation_type = "
+                "'INCREMENT' OR (operation_type = 'DECREMENT' AND reason "
+                "NOT LIKE 'Reservation % converted to sale for order %'))"
             ),
             reverse_sql=(
                 "UPDATE order_stocklog SET performed_by_id = "
                 "performed_by_staff_id, performed_by_staff_id = NULL WHERE "
-                "performed_by_staff_id IS NOT NULL AND reason = "
-                "'Manual stock adjustment via admin panel'"
+                "performed_by_staff_id IS NOT NULL"
             ),
         ),
     ]

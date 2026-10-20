@@ -8100,7 +8100,7 @@ msgid "Operator identity recorded for accountability (art. 5(2))."
 msgstr "Ταυτότητα του χειριστή που καταγράφεται για λόγους λογοδοσίας (άρθ. 5(2))."
 
 msgid "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
-msgstr "Χειριστής που συμφιλίωσε την πληρωμή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+msgstr "Χειριστής που συμφώνησε την απόδοση. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
 msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."

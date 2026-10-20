@@ -165,11 +165,17 @@ class StaffActor(property):
     # Django's prefetch protocol (``prefetch_one_level``). The "queryset" is
     # the already-resolved list: Django only iterates it.
     def get_prefetch_querysets(self, instances, querysets=None):
-        users = resolve_staff(
-            getattr(obj, f"{self.name}_id") for obj in instances
-        )
+        ids = {
+            pk
+            for obj in instances
+            if (pk := getattr(obj, f"{self.name}_id")) is not None
+        }
+        users = resolve_staff(ids)
+        # A deleted account still gets a stand-in, or each of its rows would
+        # read as a cache miss and look the id up again on its own.
+        actors = [users.get(pk) or UnknownActor(pk) for pk in ids]
         return (
-            list(users.values()),
+            actors,
             lambda user: user.pk,
             lambda obj: getattr(obj, f"{self.name}_id"),
             True,

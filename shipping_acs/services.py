@@ -43,6 +43,7 @@ from shipping_acs.models import (
     AcsTrackingEvent,
 )
 from tenant.credentials import tenant_site_name
+from tenant.staff_actors import staff_id
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -2294,7 +2295,7 @@ class AcsService:
                 )
 
             locked.cod_received_outside_acs_at = timezone.now()
-            locked.cod_received_outside_acs_by_id = user.pk
+            locked.cod_received_outside_acs_by_id = staff_id(user)
             locked.cod_received_outside_acs_note = note
             locked._change_reason = "COD received outside ACS"
             locked.save(
@@ -2353,7 +2354,7 @@ class AcsService:
                     gettext("This payout is already reconciled.")
                 )
             locked.reconciled_at = timezone.now()
-            locked.reconciled_by_id = user.pk
+            locked.reconciled_by_id = staff_id(user)
             locked.reconciliation_note = note
             locked.save(
                 update_fields=[

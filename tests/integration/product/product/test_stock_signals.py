@@ -38,6 +38,8 @@ class TestStockChangeSignals:
         assert log.stock_before == 10
         assert log.stock_after == 15
         assert log.reason_code == StockLogReason.MANUAL_ADJUSTMENT
+        # The code says it; the sentence is not stored beside it.
+        assert log.reason == ""
         assert log.performed_by_staff_id == user.pk
         assert log.performed_by is None
         assert log.order is None

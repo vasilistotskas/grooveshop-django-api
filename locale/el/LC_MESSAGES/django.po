@@ -12289,6 +12289,9 @@ msgstr "Το κατάστημα εκδίδει τις αποδείξεις το�
 msgid "This surface has no product to start from, so these strategies have nothing to suggest here: %(names)s"
 msgstr "Αυτή η επιφάνεια δεν έχει προϊόν από το οποίο να ξεκινήσει, οπότε αυτές οι στρατηγικές δεν έχουν τίποτα να προτείνουν εδώ: %(names)s"
 
+msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
+msgstr "Αυτό ξεπερνά το όριο που μπορεί να βάλει ένα μέλος του προσωπικού σε δωροκάρτες μέσα σε μια ημέρα. Μπορεί να το κάνει ο ιδιοκτήτης του καταστήματος."
+
 msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 msgstr "Αυτό το κατάστημα είναι αναλώσιμο δείγμα επίδειξης, όχι πραγματικός έμπορος. Επιτρέπει στο manage.py seed_demo_store να αντικαθιστά τον κατάλογο, τις διατάξεις και την πλοήγησή του χωρίς --force. Μην το ενεργοποιείτε ποτέ σε κατάστημα που δέχεται πραγματικές παραγγελίες."
 

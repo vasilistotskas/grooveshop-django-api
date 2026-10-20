@@ -6499,6 +6499,9 @@ msgstr ""
 msgid "This store has no credentials for the payment provider, so the payment cannot be refunded here."
 msgstr ""
 
+msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
+msgstr ""
+
 msgid "This topic is not available for subscription."
 msgstr ""
 

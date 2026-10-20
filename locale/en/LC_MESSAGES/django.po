@@ -12133,6 +12133,9 @@ msgstr "This store issues its receipts outside the platform, so no receipt is cr
 msgid "This surface has no product to start from, so these strategies have nothing to suggest here: %(names)s"
 msgstr "This surface has no product to start from, so these strategies have nothing to suggest here: %(names)s"
 
+msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
+msgstr "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
+
 msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 msgstr "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 

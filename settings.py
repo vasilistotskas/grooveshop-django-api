@@ -1846,6 +1846,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "GIFT_CARD_STAFF_DAILY_LIMIT",
+        "type": "decimal",
+        "value": 1000,
+        "description": (
+            "The most one staff member can put on gift cards in any "
+            "rolling 24 hours (issuing cards and adding to balances "
+            "together), in the store's currency. Above it the step needs "
+            "the store's owner (or a platform superuser) and is noted on "
+            "the ledger. 0 turns the limit off."
+        ),
+    },
+    {
         "name": "ORDER_FOLLOW_UP_DAYS",
         "type": "int",
         "value": 7,

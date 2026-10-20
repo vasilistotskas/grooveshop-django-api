@@ -177,7 +177,7 @@ class BaseModelViewSetTestCase(TestCase):
             serializer_class=ProductSerializer,
         )
 
-    @patch.object(BaseModelViewSet, "metadata_class")
+    @patch("core.api.views.Metadata")
     def test_api_schema_action(self, mock_metadata_class):
         mock_meta_instance = Mock()
         mock_meta_data = {"test": "data"}

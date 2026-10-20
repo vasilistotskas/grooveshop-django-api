@@ -3,10 +3,12 @@ import math
 from rest_framework import pagination
 from rest_framework.response import Response
 
+MAX_PAGE_SIZE = 100
+
 
 class CursorPaginator(pagination.CursorPagination):
     page_size = 20
-    max_page_size: int = 100
+    max_page_size = MAX_PAGE_SIZE
     page_size_query_param = "page_size"
     cursor_query_param = "cursor"
     total_items = 0
@@ -21,7 +23,7 @@ class CursorPaginator(pagination.CursorPagination):
         ) or request.query_params.get("page_size")
         if page_size_param:
             try:
-                self.page_size = min(int(page_size_param), self.max_page_size)
+                self.page_size = min(int(page_size_param), MAX_PAGE_SIZE)
             except ValueError, TypeError:
                 pass
 

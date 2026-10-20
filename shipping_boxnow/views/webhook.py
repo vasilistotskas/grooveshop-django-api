@@ -103,7 +103,7 @@ class BoxNowWebhookView(APIView):
     """
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []
+    authentication_classes = []
     serializer_class = BoxNowWebhookEnvelopeSerializer
 
     @extend_schema(

@@ -149,10 +149,10 @@ class CategoryManager(TreeTranslatableManager):
     Manager for ProductCategory model with optimized queryset methods.
     """
 
-    queryset_class: type[CategoryQuerySet] = CategoryQuerySet
+    queryset_class = CategoryQuerySet
 
     def get_queryset(self) -> CategoryQuerySet:
-        return self.queryset_class(self.model, using=self._db)
+        return CategoryQuerySet(self.model, using=self._db)
 
     def for_list(self) -> CategoryQuerySet:
         """Return optimized queryset for list views."""

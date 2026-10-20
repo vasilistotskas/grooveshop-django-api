@@ -13,6 +13,12 @@ if TYPE_CHECKING:
     from typing import Self
 
 
+def abandoned_hours() -> int:
+    """How long a cart may sit idle before it counts as abandoned
+    (``CART_ABANDONED_HOURS``, per store)."""
+    return Setting.get("CART_ABANDONED_HOURS", default=24)
+
+
 def abandoned_cutoff():
     """The single line between an active cart and an abandoned one.
 
@@ -23,8 +29,7 @@ def abandoned_cutoff():
     30 days for "abandoned", which left a cart idle for five days
     matching NEITHER.
     """
-    hours = Setting.get("CART_ABANDONED_HOURS", default=24)
-    return timezone.now() - timedelta(hours=hours)
+    return timezone.now() - timedelta(hours=abandoned_hours())
 
 
 class CartQuerySet(OptimizedQuerySet):

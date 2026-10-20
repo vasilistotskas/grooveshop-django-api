@@ -199,16 +199,20 @@ class TestCartAdmin:
         assert value == "active"
         assert label == "Active"
 
-    def test_activity_state_recent(self, cart_admin):
-        recent_time = timezone.now() - timedelta(hours=2)
+    def test_a_cart_idle_for_hours_is_still_active(self, cart_admin):
+        """Active is not abandoned: the column used to call a cart
+        "Recent" after an hour while the filter still called it active for
+        24."""
         cart = CartFactory()
-        Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
+        Cart.objects.filter(id=cart.id).update(
+            last_activity=timezone.now() - timedelta(hours=2)
+        )
         cart.refresh_from_db()
 
         value, label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
-        assert value == "recent"
-        assert label == "Recent"
+        assert value == "active"
+        assert label == "Active"
 
     def test_activity_state_abandoned_past_the_store_setting(self, cart_admin):
         """The column and the "Abandoned Carts" filter share one line:
@@ -236,7 +240,7 @@ class TestCartAdmin:
 
         value, _label = cart_admin.activity_state(_annotated(cart_admin, cart))
 
-        assert value == "recent"
+        assert value == "active"
         assert self._filtered_abandoned(cart_admin) == []
 
     def test_the_setting_moves_both_together(self, cart_admin):
@@ -256,6 +260,76 @@ class TestCartAdmin:
 
         assert value == "abandoned"
         assert self._filtered_abandoned(cart_admin) == [cart.pk]
+
+    @staticmethod
+    def _active_filter(cart_admin, value):
+        request = RequestFactory().get("/admin/cart/cart/")
+        flt = ActivityStatusFilter(
+            request, {"activity_status": [value]}, Cart, cart_admin
+        )
+        return set(
+            flt.queryset(request, Cart.objects.all()).values_list(
+                "pk", flat=True
+            )
+        )
+
+    def test_the_column_and_the_filter_share_one_line(self, cart_admin):
+        """What the Activity column calls active is exactly what the
+        "Active" filter lists, for any ``CART_ABANDONED_HOURS``."""
+        from extra_settings.models import Setting
+
+        Setting.objects.update_or_create(
+            name="CART_ABANDONED_HOURS",
+            defaults={"value_type": "int", "value_int": 6},
+        )
+        carts = {}
+        for name, idle in {
+            "fresh": timedelta(minutes=10),
+            "inside": timedelta(hours=5),
+            "past": timedelta(hours=8),
+            "week": timedelta(days=3),
+            "old": timedelta(days=10),
+        }.items():
+            cart = CartFactory(user=UserAccountFactory(num_addresses=0))
+            Cart.objects.filter(id=cart.id).update(
+                last_activity=timezone.now() - idle
+            )
+            carts[name] = cart.pk
+
+        for name, pk in carts.items():
+            cart = Cart.objects.get(pk=pk)
+            value, _label = cart_admin.activity_state(
+                _annotated(cart_admin, cart)
+            )
+            in_filter = pk in self._active_filter(cart_admin, "active")
+            assert (value == "active") is in_filter, name
+
+        assert self._active_filter(cart_admin, "active") == {
+            carts["fresh"],
+            carts["inside"],
+        }
+        assert self._active_filter(cart_admin, "recent") == {
+            carts["past"],
+            carts["week"],
+        }
+        assert self._active_filter(cart_admin, "old") == {carts["old"]}
+
+    def test_the_filter_names_the_window_it_uses(self, cart_admin):
+        from extra_settings.models import Setting
+
+        Setting.objects.update_or_create(
+            name="CART_ABANDONED_HOURS",
+            defaults={"value_type": "int", "value_int": 6},
+        )
+        request = RequestFactory().get("/admin/cart/cart/")
+
+        lookups = dict(
+            ActivityStatusFilter(request, {}, Cart, cart_admin).lookups(
+                request, cart_admin
+            )
+        )
+
+        assert lookups["active"] == "Active (last 6 h)"
 
     @staticmethod
     def _filtered_abandoned(cart_admin):

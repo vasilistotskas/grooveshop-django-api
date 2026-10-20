@@ -92,6 +92,22 @@ class TestSourceColumn:
         assert _admin().cart_source(_listed(_cart())) is None
 
 
+class TestCaptions:
+    """A cart's source is the cart's, not an order's: the column header and
+    the filter both said "Order source"."""
+
+    def test_the_column_is_captioned_cart_source(self):
+        column = _admin().cart_source
+        with translation.override("en"):
+            assert str(column.short_description) == "Cart source"
+
+    def test_the_filter_is_captioned_cart_source(self):
+        request = RequestFactory().get("/")
+        flt = CartSourceFilter(request, {}, Cart, _admin())
+        with translation.override("en"):
+            assert str(flt.title) == "Cart source"
+
+
 class TestSourceFilter:
     def _filter(self, value=None):
         params = {"order_source": [value]} if value else {}

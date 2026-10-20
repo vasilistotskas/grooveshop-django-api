@@ -324,6 +324,9 @@ msgstr ""
 msgid "Active (Last 24h)"
 msgstr ""
 
+msgid "Active (last %(hours)s h)"
+msgstr ""
+
 msgid "Active Carts"
 msgstr ""
 
@@ -3447,6 +3450,12 @@ msgid "Icon Image"
 msgstr ""
 
 msgid "Idempotency key"
+msgstr ""
+
+msgid "Idle for 7+ days"
+msgstr ""
+
+msgid "Idle for up to 7 days"
 msgstr ""
 
 msgid "If the button doesn't work, copy and paste this link into your browser:"

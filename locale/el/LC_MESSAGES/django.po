@@ -928,6 +928,9 @@ msgstr "Ενεργό (τελευταίες 24h)"
 msgid "Active (Pending / In transit)"
 msgstr "Ενεργά (Εκκρεμή / Σε μεταφορά)"
 
+msgid "Active (last %(hours)s h)"
+msgstr "Ενεργά (τελευταίες %(hours)s ώρες)"
+
 msgid "Active Regular Users"
 msgstr "Ενεργοί απλοί χρήστες"
 
@@ -6127,6 +6130,12 @@ msgstr "Αναγνωριστικό της σελίδας (π.χ. \"home\", \"pro
 
 msgid "Identity"
 msgstr "Ταυτότητα"
+
+msgid "Idle for 7+ days"
+msgstr "Αδρανή για 7+ ημέρες"
+
+msgid "Idle for up to 7 days"
+msgstr "Αδρανή έως 7 ημέρες"
 
 msgid "If it was you, you can sign up for an account using the link below."
 msgstr "Αν ήσασταν εσείς, μπορείτε να δημιουργήσετε λογαριασμό χρησιμοποιώντας τον παρακάτω σύνδεσμο."

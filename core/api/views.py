@@ -441,7 +441,7 @@ class BaseModelViewSet(
     TranslationsModelViewSet,
     PaginationModelViewSet,
 ):
-    metadata_class: type[Metadata] = Metadata
+    metadata_class = Metadata
 
     def create(self, request, *args, **kwargs):
         with transaction.atomic():
@@ -512,7 +512,7 @@ class BaseModelViewSet(
 
     @action(detail=False, methods=["GET"])
     def api_schema(self, request, *args, **kwargs):
-        meta = self.metadata_class()
+        meta = Metadata()
         data = meta.determine_metadata(request, self)
         return Response(data)
 

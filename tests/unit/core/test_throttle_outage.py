@@ -209,8 +209,8 @@ class TestRedisDown:
         )
 
         class _View(APIView):
-            authentication_classes: list = []
-            permission_classes: list = []
+            authentication_classes = []
+            permission_classes = []
             throttle_classes = [throttling.GiftCardCheckThrottle]
 
             def get(self, request):

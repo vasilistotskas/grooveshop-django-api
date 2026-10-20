@@ -528,7 +528,7 @@ class UserAccountViewSet(BaseModelViewSet):
         from this check.
         """
         from allauth.account.internal.flows.reauthentication import (
-            did_recently_authenticate,
+            did_recently_reauthenticate,
         )
 
         from user.signals import (
@@ -550,7 +550,7 @@ class UserAccountViewSet(BaseModelViewSet):
 
         # Require recent reauthentication for the account owner.
         # Staff acting on behalf of another user are exempt.
-        if request.user == user and not did_recently_authenticate(request):
+        if request.user == user and not did_recently_reauthenticate(request):
             return Response(
                 {
                     "detail": _("Re-authentication required."),

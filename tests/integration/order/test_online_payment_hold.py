@@ -90,8 +90,8 @@ def _provider_with_stripe_key():
     )
 
 
-def _provider_with_viva_credentials():
-    return patch(
+def _viva_provider():
+    with patch(
         "tenant.credentials.viva_wallet_credentials",
         return_value={
             "merchant_id": "m",
@@ -101,11 +101,7 @@ def _provider_with_viva_credentials():
             "source_code": "Default",
             "live_mode": False,
         },
-    )
-
-
-def _viva_provider():
-    with _provider_with_viva_credentials():
+    ):
         return VivaWalletPaymentProvider()
 
 
@@ -634,30 +630,82 @@ class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
 
         assert result["canceled_failed"] == 1
 
-    def test_a_payment_order_still_payable_keeps_the_order_open(self):
-        """Viva keeps a payment order payable after a failed transaction
-        until its own expiry, which nothing closes earlier: the order
-        waits for the stored hold like a pending one."""
-        order = self._failed("viva_wallet", payment_id="")
-        _age(order, hold_expires=timezone.now() + timedelta(minutes=10))
-
-        with _provider_with_viva_credentials():
+    def _viva(self, *, hold_ends_in, response):
+        order = self._failed(
+            "viva_wallet",
+            payment_id="",
+            metadata={"viva_order_codes": ["1234567890123456"]},
+        )
+        _age(order, hold_expires=timezone.now() + hold_ends_in)
+        with (
+            patch(
+                "tenant.credentials.viva_wallet_credentials",
+                return_value={
+                    "merchant_id": "m",
+                    "api_key": "k",
+                    "client_id": "c",
+                    "client_secret": "s",
+                    "source_code": "Default",
+                    "live_mode": False,
+                },
+            ),
+            patch("requests.delete", return_value=response) as delete,
+        ):
             result = auto_cancel_stuck_pending_orders()
+        order.refresh_from_db()
+        return order, result, delete
+
+    @staticmethod
+    def _viva_reply(status=200, **body):
+        reply = Mock(status_code=status)
+        reply.json.return_value = body
+        reply.raise_for_status.return_value = None
+        return reply
+
+    def test_a_payment_order_still_payable_is_canceled_at_viva(self):
+        order, result, delete = self._viva(
+            hold_ends_in=timedelta(minutes=10),
+            response=self._viva_reply(Success=True, ErrorCode=0),
+        )
+
+        assert delete.call_args.args == (
+            "https://demo.vivapayments.com/api/orders/1234567890123456",
+        )
+        assert delete.call_args.kwargs["headers"]["Authorization"].startswith(
+            "Basic "
+        )
+        assert result["canceled_failed"] == 1
+        assert order.status == OrderStatus.CANCELED
+
+    def test_a_payment_order_viva_will_not_cancel_keeps_the_order_open(self):
+        order, result, _ = self._viva(
+            hold_ends_in=timedelta(minutes=10),
+            response=self._viva_reply(
+                Success=False, ErrorCode=403, ErrorText="refused"
+            ),
+        )
 
         assert result["canceled_failed"] == 0
         assert result["skipped_open"] == 1
-        order.refresh_from_db()
         assert order.status == OrderStatus.PENDING
 
-    def test_a_payment_order_that_expired_cancels_the_order(self):
-        order = self._failed("viva_wallet", payment_id="")
-        _age(order, hold_expires=timezone.now() - timedelta(minutes=6))
+    def test_a_payment_order_viva_does_not_know_keeps_the_order_open(self):
+        order, result, _ = self._viva(
+            hold_ends_in=timedelta(minutes=10),
+            response=self._viva_reply(status=404),
+        )
 
-        with _provider_with_viva_credentials():
-            result = auto_cancel_stuck_pending_orders()
+        assert result["skipped_open"] == 1
+        assert order.status == OrderStatus.PENDING
 
+    def test_a_payment_order_that_expired_is_not_asked_about(self):
+        order, result, delete = self._viva(
+            hold_ends_in=-timedelta(minutes=6),
+            response=self._viva_reply(Success=False, ErrorCode=1),
+        )
+
+        delete.assert_not_called()
         assert result["canceled_failed"] == 1
-        order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
 
 

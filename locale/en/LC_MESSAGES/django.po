@@ -1351,6 +1351,12 @@ msgstr "Authentication is required to reorder a past order."
 msgid "Authentication is required to view your orders"
 msgstr "Authentication is required to view your orders"
 
+msgid "Authenticator or recovery code"
+msgstr "Authenticator or recovery code"
+
+msgid "Authenticator set up."
+msgstr "Authenticator set up."
+
 msgid "Author"
 msgstr "Author"
 
@@ -2095,6 +2101,9 @@ msgstr "Cannot reset the parcel for reissue: %(err)s"
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
 msgstr "Cannot restock more than the available quantity. Available: {available_quantity}"
 
+msgid "Cannot scan it? Type this secret into the app instead:"
+msgstr "Cannot scan it? Type this secret into the app instead:"
+
 msgid "Capabilities"
 msgstr "Capabilities"
 
@@ -2793,6 +2802,15 @@ msgstr "Conversion label for starting the checkout."
 
 msgid "Conversion label for the shopper submitting payment details at checkout. Sent with the cart value and currency."
 msgstr "Conversion label for the shopper submitting payment details at checkout. Sent with the cart value and currency."
+
+msgid "Copied"
+msgstr "Copied"
+
+msgid "Copy"
+msgstr "Copy"
+
+msgid "Copy all"
+msgstr "Copy all"
 
 msgid "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 msgstr "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
@@ -3535,6 +3553,9 @@ msgstr "Don't want to receive these reminders?"
 msgid "Download"
 msgstr "Download"
 
+msgid "Download .txt"
+msgstr "Download .txt"
+
 msgid "Download BoxNow voucher (PDF)"
 msgstr "Download BoxNow voucher (PDF)"
 
@@ -3598,6 +3619,9 @@ msgstr "Duplicate category IDs are not allowed."
 
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
+
+msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
+msgstr "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 
 msgid "Each store's commercial terms, and how the platform records and enforces them."
 msgstr "Each store's commercial terms, and how the platform records and enforces them."
@@ -3767,6 +3791,9 @@ msgstr "Enter how many units of at least one line came back."
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
+
+msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
+msgstr "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
@@ -6064,6 +6091,9 @@ msgstr "Human-readable reason for the stock change"
 
 msgid "Hurry — popular items may sell out quickly!"
 msgstr "Hurry — popular items may sell out quickly!"
+
+msgid "I have saved them, continue"
+msgstr "I have saved them, continue"
 
 msgid "ID of the selected PayWay (must be online Stripe)."
 msgstr "ID of the selected PayWay (must be online Stripe)."
@@ -8634,6 +8664,12 @@ msgstr "Partner shop (2)"
 msgid "Partner shop (3)"
 msgstr "Partner shop (3)"
 
+msgid "Password accepted. Confirm it is you with a code."
+msgstr "Password accepted. Confirm it is you with a code."
+
+msgid "Password accepted. Platform accounts need an authenticator app, set up once."
+msgstr "Password accepted. Platform accounts need an authenticator app, set up once."
+
 msgid "Password changed"
 msgstr "Password changed"
 
@@ -9641,6 +9677,9 @@ msgstr "Puts returned units of an order line back into stock and records them on
 msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
 msgstr "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
 
+msgid "QR code for the authenticator app"
+msgstr "QR code for the authenticator app"
+
 msgid "Qty"
 msgstr "Qty"
 
@@ -10562,6 +10601,12 @@ msgstr "Sample data"
 msgid "Sanitised request body (PII fields are hashed by the facebook_business SDK before serialisation). Stored for replay during incident debugging."
 msgstr "Sanitised request body (PII fields are hashed by the facebook_business SDK before serialisation). Stored for replay during incident debugging."
 
+msgid "Save your recovery codes"
+msgstr "Save your recovery codes"
+
+msgid "Saved"
+msgstr "Saved"
+
 msgid "Savings"
 msgstr "Savings"
 
@@ -10585,6 +10630,9 @@ msgstr "Scan failed"
 
 msgid "Scan status"
 msgstr "Scan status"
+
+msgid "Scan this code with an authenticator app, then enter the code the app shows."
+msgstr "Scan this code with an authenticator app, then enter the code the app shows."
 
 msgid "Scan to verify"
 msgstr "Scan to verify"
@@ -10867,6 +10915,9 @@ msgstr "Set the VAT percentage rate (0.0% - 100.0%)"
 
 msgid "Set this address as the user's main address."
 msgstr "Set this address as the user's main address."
+
+msgid "Set up your authenticator app"
+msgstr "Set up your authenticator app"
 
 #, python-format
 msgid "Setting '%(key)s' not found"
@@ -11264,6 +11315,10 @@ msgstr "Status ID"
 
 msgid "Status Updated At"
 msgstr "Status Updated At"
+
+#, python-format
+msgid "Step %(current)s of %(total)s"
+msgstr "Step %(current)s of %(total)s"
 
 msgid "Stock"
 msgstr "Stock"
@@ -11810,6 +11865,9 @@ msgstr ""
 #, python-format
 msgid "Thanks,<br>The %(site_name)s team"
 msgstr "Thanks,<br>The %(site_name)s team"
+
+msgid "That code is not correct."
+msgstr "That code is not correct."
 
 msgid "That file is too large."
 msgstr "That file is too large."
@@ -12456,6 +12514,9 @@ msgstr "Too many ids — request at most {max} per call."
 msgid "Too many requests. Try again in a while."
 msgstr "Too many requests. Try again in a while."
 
+msgid "Too many wrong codes. Try again in a few minutes."
+msgstr "Too many wrong codes. Try again in a few minutes."
+
 msgid "Top searches"
 msgstr "Top searches"
 
@@ -12603,6 +12664,9 @@ msgstr "Twitter/X profile URL. Must use https://. Empty → link hidden in store
 
 msgid "Two"
 msgstr "Two"
+
+msgid "Two-step verification"
+msgstr "Two-step verification"
 
 msgid "Type"
 msgstr "Type"
@@ -12881,6 +12945,9 @@ msgstr "Usage Status"
 msgid "Usage limit per code"
 msgstr "Usage limit per code"
 
+msgid "Use another account"
+msgstr "Use another account"
+
 #, python-format
 msgid "Use only regular-expression syntax the storefront reads the same way: “%(construct)s” is not supported."
 msgstr "Use only regular-expression syntax the storefront reads the same way: “%(construct)s” is not supported."
@@ -13139,6 +13206,12 @@ msgstr "Vendor Cards"
 
 msgid "Verified purchase"
 msgstr "Verified purchase"
+
+msgid "Verify and continue"
+msgstr "Verify and continue"
+
+msgid "Verify and log in"
+msgstr "Verify and log in"
 
 msgid "Version"
 msgstr "Version"
@@ -13919,6 +13992,9 @@ msgstr "Your sign-in code"
 
 msgid "Your sign-in code is listed below. Please enter it in your open browser window."
 msgstr "Your sign-in code is listed below. Please enter it in your open browser window."
+
+msgid "Your sign-in has expired. Log in again."
+msgstr "Your sign-in has expired. Log in again."
 
 msgid "Your stock reservation is no longer valid. Please try again."
 msgstr "Your stock reservation is no longer valid. Please try again."

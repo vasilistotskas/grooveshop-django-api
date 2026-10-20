@@ -1367,11 +1367,11 @@ msgstr "Απαιτείται ταυτοποίηση για την επανάλη
 msgid "Authentication is required to view your orders"
 msgstr "Απαιτείται ταυτοποίηση για να δείτε τις παραγγελίες σας"
 
-msgid "Authenticator code"
-msgstr "Κωδικός εφαρμογής ταυτοποίησης"
+msgid "Authenticator or recovery code"
+msgstr "Κωδικός εφαρμογής ταυτοποίησης ή κωδικός ανάκτησης"
 
-msgid "Authenticator set up. Save the recovery codes below, then log in again with a code."
-msgstr "Η εφαρμογή ταυτοποίησης ρυθμίστηκε. Αποθηκεύστε τους κωδικούς ανάκτησης παρακάτω και συνδεθείτε ξανά με έναν κωδικό."
+msgid "Authenticator set up."
+msgstr "Η εφαρμογή ταυτοποίησης ρυθμίστηκε."
 
 msgid "Author"
 msgstr "Συντάκτης"
@@ -2119,6 +2119,9 @@ msgstr "Αδυναμία επαναφοράς του δέματος για επ�
 msgid "Cannot restock more than the available quantity. Available: {available_quantity}"
 msgstr "Δεν μπορούν να επανέλθουν στο απόθεμα περισσότερα από τα διαθέσιμα τεμάχια. Διαθέσιμα: {available_quantity}"
 
+msgid "Cannot scan it? Type this secret into the app instead:"
+msgstr "Δεν μπορείτε να τον σαρώσετε; Πληκτρολογήστε αυτό το μυστικό στην εφαρμογή:"
+
 msgid "Capabilities"
 msgstr "Δυνατότητες"
 
@@ -2821,6 +2824,15 @@ msgstr "Ετικέτα μετατροπής για την έναρξη της ο
 
 msgid "Conversion label for the shopper submitting payment details at checkout. Sent with the cart value and currency."
 msgstr "Ετικέτα μετατροπής για την υποβολή των στοιχείων πληρωμής από τον πελάτη στην ολοκλήρωση αγοράς. Στέλνεται με την αξία του καλαθιού και το νόμισμα."
+
+msgid "Copied"
+msgstr "Αντιγράφηκε"
+
+msgid "Copy"
+msgstr "Αντιγραφή"
+
+msgid "Copy all"
+msgstr "Αντιγραφή όλων"
 
 msgid "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 msgstr "Αντιγραφή κάθε είδους από προηγούμενη παραγγελία πίσω στο ενεργό καλάθι του συνδεδεμένου χρήστη. Τα είδη των οποίων τα προϊόντα είναι ανενεργά ή εξαντλημένα επιστρέφονται στο skipped_items· οι ποσότητες περιορίζονται στο τρέχον απόθεμα."
@@ -3570,6 +3582,9 @@ msgstr "Αδρανές"
 msgid "Download"
 msgstr "Λήψη"
 
+msgid "Download .txt"
+msgstr "Λήψη .txt"
+
 msgid "Download BoxNow voucher (PDF)"
 msgstr "Λήψη BoxNow voucher (PDF)"
 
@@ -3633,6 +3648,9 @@ msgstr "Δεν επιτρέπονται διπλότυπα ID κατηγοριώ
 
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη τιμή με ΦΠΑ των 30 ημερών πριν από την έναρξη της τρέχουσας μείωσης, σταθερή από την έναρξή της. Κενή όταν δεν επιτρέπεται να ανακοινωθεί μείωση."
+
+msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
+msgstr "Κάθε κωδικός ισχύει μία φορά και δεν θα εμφανιστεί ξανά. Φυλάξτε τους σε ασφαλές μέρος: σας επιτρέπουν να συνδεθείτε αν χάσετε το κινητό σας."
 
 msgid "Each store's commercial terms, and how the platform records and enforces them."
 msgstr "Οι εμπορικοί όροι κάθε καταστήματος και πώς η πλατφόρμα τους καταχωρεί και τους επιβάλλει."
@@ -3812,8 +3830,8 @@ msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μ
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
 
-msgid "Enter the code from your authenticator app."
-msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης."
+msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
+msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης. Αν δεν έχετε πια το κινητό σας, χρησιμοποιήστε έναν από τους κωδικούς ανάκτησης."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
@@ -6139,6 +6157,9 @@ msgstr "Αιτία της αλλαγής αποθέματος σε κείμεν�
 
 msgid "Hurry — popular items may sell out quickly!"
 msgstr "Βιαστείτε — τα δημοφιλή προϊόντα εξαντλούνται γρήγορα!"
+
+msgid "I have saved them, continue"
+msgstr "Τους αποθήκευσα, συνέχεια"
 
 msgid "ID of the selected PayWay (must be online Stripe)."
 msgstr "ID της επιλεγμένης μεθόδου πληρωμής (πρέπει να είναι online Stripe)."
@@ -8761,6 +8782,12 @@ msgstr "Συνεργαζόμενο κατάστημα (2)"
 msgid "Partner shop (3)"
 msgstr "Συνεργαζόμενο κατάστημα (3)"
 
+msgid "Password accepted. Confirm it is you with a code."
+msgstr "Ο κωδικός πρόσβασης έγινε δεκτός. Επιβεβαιώστε ότι είστε εσείς με έναν κωδικό."
+
+msgid "Password accepted. Platform accounts need an authenticator app, set up once."
+msgstr "Ο κωδικός πρόσβασης έγινε δεκτός. Οι λογαριασμοί πλατφόρμας χρειάζονται εφαρμογή ταυτοποίησης, που ρυθμίζεται μία φορά."
+
 msgid "Password changed"
 msgstr "Ο κωδικός πρόσβασης άλλαξε"
 
@@ -9780,6 +9807,9 @@ msgstr "Επιστρέφει στο απόθεμα τα επιστρεφόμεν
 msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
 msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (μια παραλλαγή είναι προϊόν). Μπορείτε να δηλώσετε μόνο τεμάχια που δεν έχουν ήδη επανέλθει. Δεν επιστρέφει χρήματα: επιστρέψτε την πληρωμή ξεχωριστά."
 
+msgid "QR code for the authenticator app"
+msgstr "Κωδικός QR για την εφαρμογή ταυτοποίησης"
+
 msgid "Qty"
 msgstr "Ποσ."
 
@@ -10069,9 +10099,6 @@ msgstr "Καταχώρηση πληρωμής"
 
 msgid "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
 msgstr "Καταγράφει τη μεταφορά στο καθολικό πληρωμών της παραγγελίας και την επισημαίνει ως πληρωμένη. Ποιος την επιβεβαίωσε, πότε και πόσο διατηρείται στην παραγγελία. Μόνο για παραγγελία τραπεζικής μεταφοράς που περιμένει ακόμη την πληρωμή της."
-
-msgid "Recovery codes (shown once, each works once):"
-msgstr "Κωδικοί ανάκτησης (εμφανίζονται μία φορά, ο καθένας ισχύει μία φορά):"
 
 msgid "Reddit URL"
 msgstr "URL Reddit"
@@ -10728,6 +10755,12 @@ msgstr "Δείγμα δεδομένων"
 msgid "Sanitised request body (PII fields are hashed by the facebook_business SDK before serialisation). Stored for replay during incident debugging."
 msgstr "Καθαρισμένο σώμα αιτήματος (τα πεδία PII γίνονται hash από το SDK facebook_business πριν τη σειριοποίηση). Αποθηκεύεται για επανάληψη (replay) κατά τον εντοπισμό σφαλμάτων σε περιστατικά."
 
+msgid "Save your recovery codes"
+msgstr "Αποθηκεύστε τους κωδικούς ανάκτησης"
+
+msgid "Saved"
+msgstr "Αποθηκεύτηκε"
+
 msgid "Savings"
 msgstr "Εξοικονόμηση"
 
@@ -10752,8 +10785,8 @@ msgstr "Η σάρωση απέτυχε"
 msgid "Scan status"
 msgstr "Κατάσταση σάρωσης"
 
-msgid "Scan this code with an authenticator app, or type the secret in:"
-msgstr "Σαρώστε αυτόν τον κωδικό με μια εφαρμογή ταυτοποίησης ή πληκτρολογήστε το μυστικό κλειδί:"
+msgid "Scan this code with an authenticator app, then enter the code the app shows."
+msgstr "Σαρώστε αυτόν τον κωδικό με μια εφαρμογή ταυτοποίησης και έπειτα εισαγάγετε τον κωδικό που εμφανίζει η εφαρμογή."
 
 msgid "Scan to verify"
 msgstr "Σάρωση για επαλήθευση"
@@ -11052,8 +11085,8 @@ msgstr "Ορίστε το ποσοστό ΦΠΑ (0.0% - 100.0%)"
 msgid "Set this address as the user's main address."
 msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας διεύθυνσης του χρήστη."
 
-msgid "Set up your authenticator app with the secret below, then enter the code it shows."
-msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης με το μυστικό κλειδί παρακάτω και μετά εισαγάγετε τον κωδικό που εμφανίζει."
+msgid "Set up your authenticator app"
+msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
 
 #, python-format
 msgid "Setting '%(key)s' not found"
@@ -11466,6 +11499,10 @@ msgstr "Ενημέρωση κατάστασης για παραγγελίες μ
 
 msgid "Status update for returned orders"
 msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή προϊόντων"
+
+#, python-format
+msgid "Step %(current)s of %(total)s"
+msgstr "Βήμα %(current)s από %(total)s"
 
 msgid "Stock"
 msgstr "Απόθεμα"
@@ -12856,6 +12893,9 @@ msgstr "URL προφίλ Twitter/X. Πρέπει να χρησιμοποιεί h
 msgid "Two"
 msgstr "Δύο"
 
+msgid "Two-step verification"
+msgstr "Επαλήθευση σε δύο βήματα"
+
 msgid "Type"
 msgstr "Τύπος"
 
@@ -13137,6 +13177,9 @@ msgstr "Κατάσταση χρήσης"
 msgid "Usage limit per code"
 msgstr "Όριο χρήσης ανά κωδικό"
 
+msgid "Use another account"
+msgstr "Χρήση άλλου λογαριασμού"
+
 msgid "Use once this payout has been accounted for although no shipment of the store explains it. It stops counting as needing attention on the dashboard. The payout itself is kept unchanged."
 msgstr "Χρησιμοποιήστε το όταν η απόδοση έχει λογιστικοποιηθεί παρόλο που καμία αποστολή του καταστήματος δεν την εξηγεί. Παύει να μετράει ως εκκρεμότητα στον πίνακα ελέγχου. Η ίδια η απόδοση μένει αναλλοίωτη."
 
@@ -13401,6 +13444,12 @@ msgstr "Κάρτες προμηθευτών"
 
 msgid "Verified purchase"
 msgstr "Επαληθευμένη αγορά"
+
+msgid "Verify and continue"
+msgstr "Επαλήθευση και συνέχεια"
+
+msgid "Verify and log in"
+msgstr "Επαλήθευση και σύνδεση"
 
 msgid "Version"
 msgstr "Έκδοση"
@@ -14201,6 +14250,9 @@ msgstr "Ο κωδικός σύνδεσής σας"
 
 msgid "Your sign-in code is listed below. Please enter it in your open browser window."
 msgstr "Ο κωδικός σύνδεσής σας εμφανίζεται παρακάτω. Εισαγάγετέ τον στο ανοιχτό παράθυρο του προγράμματος περιήγησης."
+
+msgid "Your sign-in has expired. Log in again."
+msgstr "Η σύνδεσή σας έληξε. Συνδεθείτε ξανά."
 
 msgid "Your stock reservation is no longer valid. Please try again."
 msgstr "Η δέσμευση αποθέματος δεν ισχύει πλέον. Δοκίμασε ξανά."

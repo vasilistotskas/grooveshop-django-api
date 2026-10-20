@@ -294,7 +294,7 @@ class TestMfaIsNotBypassed:
 
         form = _login_form(user)
         assert not form.is_valid()
-        assert form.mfa_stage == "code"
+        assert form.step == "code"
         assert form.get_user() is None
 
     def test_the_reset_leaves_the_authenticators_alone(self):
@@ -324,4 +324,4 @@ class TestMfaIsNotBypassed:
 
         form = _login_form(user)
         assert not form.is_valid()
-        assert form.mfa_stage == "enrol"
+        assert form.step == "enrol"

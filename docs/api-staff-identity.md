@@ -289,11 +289,24 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   only decides when a code is required and carries the enrolment.
   `allauth.mfa` is in `SHARED_APPS` as well as `TENANT_APPS`, so the
   authenticator rows sit in the public schema next to the platform user.
-- **First login enrols.** A superuser with no authenticator gets no session:
-  the form shows a secret (link and QR code) and asks for a code from the
-  app. A correct code activates the authenticator and shows the ten recovery
-  codes once; the next login asks for a code. The code that enrolled is
-  spent.
+- **A step-by-step sign-in held in the session.** The password is posted
+  once; for a superuser the form then stores a pending sign-in in the
+  session (`staff_mfa.PENDING_SESSION_KEY`: user id, step, when the step
+  began) and shows the next step, never re-posting the password. Steps:
+  `password` -> `code` (enrolled), or `password` -> `enrol` -> `recovery`
+  (not enrolled yet). A step change is not an error: only a wrong
+  password or code, a lockout or an expired sign-in is. The pending
+  sign-in ends on success, on "use another account", when it expires
+  (`STAFF_MFA_PENDING_SIGN_IN_SECONDS`, default ten minutes, restarted by
+  each step), and whenever another password is submitted, so it cannot be
+  replayed or inherited by a different user.
+- **First login enrols.** A superuser with no authenticator is shown a
+  secret (QR code and text) and asks for a code from the app. A correct
+  code activates the authenticator and shows the ten recovery codes once
+  (copy and download buttons); confirming them completes the same
+  sign-in, with no second login. The code that enrolled is spent. The
+  recovery codes sit in the pending sign-in until confirmed, so a reload
+  does not lose them.
 - **Guessing is bounded:** five wrong codes per user lock further tries for
   fifteen minutes (cache), even a right one.
 - **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa <email>`

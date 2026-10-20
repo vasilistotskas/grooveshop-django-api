@@ -1,8 +1,9 @@
 """A second factor for platform superusers' admin login.
 
-Only superusers are asked; store admins and staff keep a password. A
-superuser without an authenticator gets no session until they enrol one in
-the login form itself, and sees the recovery codes once. Code validation,
+Only superusers are asked; store admins and staff keep a password. The
+sign-in is a few steps held in the session: the password, then a code
+(already enrolled) or the enrolment followed by the recovery codes, shown
+once, whose confirmation completes the same sign-in. Code validation,
 replay protection and recovery codes are allauth's (``allauth.mfa``).
 """
 
@@ -19,6 +20,7 @@ from allauth.mfa.totp.internal.auth import (
     format_hotp_value,
     hotp_value,
 )
+from django.contrib.auth import SESSION_KEY
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, RequestFactory
@@ -26,11 +28,13 @@ from django.urls import reverse
 
 from admin import staff_mfa
 from admin.forms import PlatformAdminAuthenticationForm
+from admin.staff_mfa import Step
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 PASSWORD = "S3cure-passw0rd!"
+ERRORNOTE = "Please correct the error"
 
 
 def _user(**kwargs):
@@ -63,109 +67,201 @@ def _window(offset: int):
         yield
 
 
-def _form(user, otp="", session=None, password=PASSWORD):
-    request = RequestFactory().post("/admin/login/")
-    request.session = session if session is not None else {}
-    form = PlatformAdminAuthenticationForm(
-        request,
-        data={
-            "username": user.email,
-            "password": password,
-            "otp_code": otp,
-        },
+def _post(client, **data):
+    return client.post(reverse("admin:login"), data)
+
+
+def _password(client, user, password=PASSWORD):
+    return _post(
+        client, step="password", username=user.email, password=password
     )
-    form.is_valid()
-    return form, request.session
+
+
+def _answer(client, step, code=""):
+    return _post(client, step=step, otp_code=code)
+
+
+def _reload(client):
+    """Open the login page again (it redirects to add ``next``)."""
+    return client.get(reverse("admin:login"), follow=True)
+
+
+def _signed_in(client) -> bool:
+    return SESSION_KEY in client.session
 
 
 def _enrol(user):
-    """Walk the enrolment: returns the secret and the recovery codes."""
-    form, session = _form(user)
-    secret = form.enrolment.secret
-    done, _ = _form(user, otp=_code(secret), session=session)
-    return secret, done.recovery_codes
+    """Walk the enrolment in a client of its own: returns the secret and
+    the recovery codes, with *user* now enrolled."""
+    client = Client()
+    secret = _password(client, user).context["form"].enrolment.secret
+    codes = (
+        _answer(client, "enrol", _code(secret)).context["form"].recovery_codes
+    )
+    return secret, list(codes)
 
 
 class TestWhoIsAsked:
     def test_a_store_admin_logs_in_with_a_password(self):
         user = _user(is_superuser=False)
+        client = Client()
 
-        form, _ = _form(user)
+        response = _password(client, user)
 
-        assert form.is_valid()
-        assert form.get_user() == user
-        assert form.mfa_stage is None
+        assert response.status_code == 302
+        assert client.session[SESSION_KEY] == str(user.pk)
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
 
     def test_a_wrong_password_is_refused_before_any_code_is_asked(self):
         user = _superuser()
+        client = Client()
 
-        form, session = _form(user, password="nope")
+        response = _password(client, user, password="nope")
 
-        assert not form.is_valid()
-        assert form.mfa_stage is None
-        assert staff_mfa.ENROLMENT_SESSION_KEY not in session
+        form = response.context["form"]
+        assert response.status_code == 200
+        assert form.step is Step.PASSWORD
+        assert form.errors
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+        assert not _signed_in(client)
+
+    def test_a_superuser_who_is_not_staff_gets_no_step_at_all(self):
+        user = _user(is_staff=False, is_superuser=True)
+        client = Client()
+
+        response = _password(client, user)
+
+        assert response.context["form"].step is Step.PASSWORD
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
 
 
-class TestFirstLoginEnrols:
-    def test_a_superuser_with_no_authenticator_gets_no_session(self):
+class TestPasswordThenEnrol:
+    def test_the_password_moves_on_without_an_error_or_a_session(self):
         user = _superuser()
+        client = Client()
 
-        form, session = _form(user)
+        response = _password(client, user)
 
-        assert not form.is_valid()
-        assert form.mfa_stage == "enrol"
-        assert form.get_user() is None
-        assert "Set up your authenticator" in str(form.errors)
-        assert form.enrolment.secret
-        assert form.enrolment_qr.startswith("<svg")
-        assert session[staff_mfa.ENROLMENT_SESSION_KEY]["user_id"] == user.pk
+        form = response.context["form"]
+        body = response.content.decode()
+        assert response.status_code == 200
+        assert form.step is Step.ENROL
+        assert not form.errors
+        assert ERRORNOTE not in body
+        assert "Password accepted" in body
+        assert "Step 2 of 3" in body
+        assert form.enrolment.secret in body
+        assert "<svg" in body
+        assert 'name="username"' not in body
+        assert 'name="restart"' in body
+        assert not _signed_in(client)
+        pending = client.session[staff_mfa.PENDING_SESSION_KEY]
+        assert pending["user_id"] == user.pk
+        assert pending["step"] == "enrol"
 
-    def test_the_same_secret_is_kept_across_submits(self):
+    def test_the_same_secret_is_kept_across_submits_and_reloads(self):
         user = _superuser()
-        first, session = _form(user)
+        client = Client()
+        first = _password(client, user).context["form"].enrolment.secret
 
-        second, _ = _form(user, otp="000000", session=session)
+        wrong = _answer(client, "enrol", "000000")
+        reloaded = _reload(client)
 
-        assert second.enrolment.secret == first.enrolment.secret
+        assert wrong.context["form"].enrolment.secret == first
+        assert reloaded.context["form"].enrolment.secret == first
 
-    def test_a_wrong_code_enrols_nothing(self):
+    def test_a_wrong_code_enrols_nothing_and_stays_on_the_step(self):
         user = _superuser()
-        _, session = _form(user)
+        client = Client()
+        _password(client, user)
 
-        form, _ = _form(user, otp="000000", session=session)
+        response = _answer(client, "enrol", "000000")
 
-        assert not form.is_valid()
-        assert "not correct" in str(form.errors)
+        form = response.context["form"]
+        assert form.step is Step.ENROL
+        assert "That code is not correct." in str(form.errors)
         assert not Authenticator.objects.filter(user_id=user.pk).exists()
+        assert not _signed_in(client)
 
-    def test_the_right_code_enrols_and_shows_recovery_codes_once(self):
+    def test_an_empty_code_is_a_field_error_with_the_note(self):
         user = _superuser()
-        form, session = _form(user)
-        secret = form.enrolment.secret
+        client = Client()
+        _password(client, user)
 
-        done, _ = _form(user, otp=_code(secret), session=session)
+        response = _answer(client, "enrol", "")
 
-        assert not done.is_valid()
-        assert done.get_user() is None
-        assert done.mfa_stage == "recovery"
-        assert len(done.recovery_codes) == 10
+        assert response.context["form"].step is Step.ENROL
+        assert ERRORNOTE in response.content.decode()
+
+    def test_the_right_code_shows_the_recovery_codes_once(self):
+        user = _superuser()
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
+
+        response = _answer(client, "enrol", _code(secret))
+
+        form = response.context["form"]
+        body = response.content.decode()
+        assert form.step is Step.RECOVERY
+        assert not form.errors
+        assert ERRORNOTE not in body
+        assert "Step 3 of 3" in body
+        assert len(form.recovery_codes) == 10
+        for recovery_code in form.recovery_codes:
+            assert recovery_code in body
+        assert "Authenticator set up." in body
+        assert 'name="restart"' not in body
         assert Authenticator.objects.filter(
             user_id=user.pk, type=Authenticator.Type.TOTP
         ).exists()
-        assert staff_mfa.ENROLMENT_SESSION_KEY not in session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+        assert not _signed_in(client)
+
+    def test_the_recovery_codes_survive_a_reload_until_confirmed(self):
+        user = _superuser()
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
+        shown = (
+            _answer(client, "enrol", _code(secret))
+            .context["form"]
+            .recovery_codes
+        )
+
+        reloaded = _reload(client)
+
+        assert reloaded.context["form"].recovery_codes == shown
+
+    def test_confirming_the_recovery_codes_completes_the_login(self):
+        user = _superuser()
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
+        _answer(client, "enrol", _code(secret))
+
+        response = _answer(client, "recovery")
+
+        assert response.status_code == 302
+        assert client.session[SESSION_KEY] == str(user.pk)
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+        assert client.get(reverse("admin:index")).status_code == 200
 
     def test_a_secret_made_for_another_user_is_not_used(self):
         first, other = _superuser(), _superuser()
-        form, session = _form(first)
-        secret = form.enrolment.secret
+        client = Client()
+        secret = _password(client, first).context["form"].enrolment.secret
+        # The session carries the other user's sign-in, but first's secret.
+        session = client.session
+        session[staff_mfa.PENDING_SESSION_KEY]["user_id"] = other.pk
+        session.save()
 
-        done, _ = _form(other, otp=_code(secret), session=session)
+        response = _answer(client, "enrol", _code(secret))
 
-        assert not done.is_valid()
+        assert response.context["form"].errors
         assert not Authenticator.objects.filter(user_id=other.pk).exists()
 
 
-class TestLoginWithACode:
+class TestPasswordThenCode:
     def _enrolled(self):
         user = _superuser()
         secret, codes = _enrol(user)
@@ -173,130 +269,345 @@ class TestLoginWithACode:
 
     def test_the_password_alone_is_not_enough(self):
         user, _, _ = self._enrolled()
+        client = Client()
 
-        form, _ = _form(user)
+        response = _password(client, user)
 
-        assert not form.is_valid()
-        assert form.mfa_stage == "code"
-        assert form.get_user() is None
+        form = response.context["form"]
+        body = response.content.decode()
+        assert form.step is Step.CODE
+        assert not form.errors
+        assert ERRORNOTE not in body
+        assert "Step 2 of 2" in body
+        assert 'name="otp_code"' in body
+        assert 'autocomplete="one-time-code"' in body
+        assert 'name="password"' not in body
+        assert not _signed_in(client)
 
     def test_a_correct_code_logs_in(self):
         user, secret, _ = self._enrolled()
+        client = Client()
+        _password(client, user)
 
         with _window(1):
-            form, _ = _form(user, otp=_code(secret, offset=1))
+            response = _answer(client, "code", _code(secret, offset=1))
 
-        assert form.is_valid()
-        assert form.get_user() == user
+        assert response.status_code == 302
+        assert client.session[SESSION_KEY] == str(user.pk)
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
 
     def test_the_code_that_enrolled_cannot_log_in(self):
         user = _superuser()
-        form, session = _form(user)
-        secret = form.enrolment.secret
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
         code = _code(secret)
-        _form(user, otp=code, session=session)
+        _answer(client, "enrol", code)
+        other = Client()
+        _password(other, user)
 
-        again, _ = _form(user, otp=code)
+        response = _answer(other, "code", code)
 
-        assert not again.is_valid()
+        assert response.context["form"].errors
+        assert not _signed_in(other)
 
-    def test_a_wrong_code_is_refused(self):
+    def test_a_wrong_code_is_refused_and_the_step_stays(self):
         user, _, _ = self._enrolled()
+        client = Client()
+        _password(client, user)
 
-        form, _ = _form(user, otp="123456")
+        response = _answer(client, "code", "123456")
 
-        assert not form.is_valid()
-        assert form.get_user() is None
-        assert "not correct" in str(form.errors)
+        form = response.context["form"]
+        assert form.step is Step.CODE
+        assert "That code is not correct." in str(form.errors)
+        assert not _signed_in(client)
+        assert client.session[staff_mfa.PENDING_SESSION_KEY]["user_id"] == (
+            user.pk
+        )
 
     def test_a_code_cannot_be_used_twice(self):
         user, secret, _ = self._enrolled()
         with _window(-1):
             code = _code(secret, offset=-1)
-            first, _ = _form(user, otp=code)
-            second, _ = _form(user, otp=code)
+            first, second = Client(), Client()
+            _password(first, user)
+            _password(second, user)
+            first_response = _answer(first, "code", code)
+            second_response = _answer(second, "code", code)
 
-        assert first.is_valid()
-        assert not second.is_valid()
+        assert first_response.status_code == 302
+        assert second_response.status_code == 200
+        assert not _signed_in(second)
 
     def test_a_recovery_code_works_once(self):
         user, _, codes = self._enrolled()
+        first, second = Client(), Client()
+        _password(first, user)
+        _password(second, user)
 
-        first, _ = _form(user, otp=codes[0])
-        second, _ = _form(user, otp=codes[0])
+        first_response = _answer(first, "code", codes[0])
+        second_response = _answer(second, "code", codes[0])
 
-        assert first.is_valid()
-        assert not second.is_valid()
+        assert first_response.status_code == 302
+        assert second_response.status_code == 200
+        assert not _signed_in(second)
 
     def test_five_wrong_codes_lock_further_tries_even_a_right_one(self):
         user, secret, _ = self._enrolled()
+        client = Client()
+        _password(client, user)
         for _ in range(staff_mfa.MAX_FAILURES):
-            _form(user, otp="000000")
+            _answer(client, "code", "000000")
 
         with _window(1):
-            form, _ = _form(user, otp=_code(secret, offset=1))
+            response = _answer(client, "code", _code(secret, offset=1))
 
-        assert not form.is_valid()
-        assert "Too many wrong codes" in str(form.errors)
+        assert "Too many wrong codes" in str(response.context["form"].errors)
+        assert not _signed_in(client)
 
     def test_a_success_clears_the_failures(self):
         user, secret, _ = self._enrolled()
+        client = Client()
+        _password(client, user)
         for _ in range(staff_mfa.MAX_FAILURES - 1):
-            _form(user, otp="000000")
+            _answer(client, "code", "000000")
+
         with _window(1):
-            _form(user, otp=_code(secret, offset=1))
+            _answer(client, "code", _code(secret, offset=1))
 
         assert not staff_mfa.is_locked(user)
 
+    def test_the_username_posted_with_a_code_is_ignored(self):
+        user, secret, _ = self._enrolled()
+        other = _user(is_superuser=False)
+        client = Client()
+        _password(client, user)
 
-class TestTheLoginPage:
-    def _post(self, client, user, otp=""):
-        return client.post(
-            reverse("admin:login"),
-            {"username": user.email, "password": PASSWORD, "otp_code": otp},
-        )
+        with _window(1):
+            _post(
+                client,
+                step="code",
+                username=other.email,
+                password=PASSWORD,
+                otp_code=_code(secret, offset=1),
+            )
 
-    def test_first_login_shows_the_secret_and_gives_no_session(self):
+        assert client.session[SESSION_KEY] == str(user.pk)
+
+
+class TestThePendingSignIn:
+    def test_it_expires(self, settings):
         user = _superuser()
         client = Client()
+        _password(client, user)
+        settings.STAFF_MFA_PENDING_SIGN_IN_SECONDS = 0
 
-        response = self._post(client, user)
+        response = _answer(client, "enrol", "000000")
+
+        form = response.context["form"]
+        assert form.step is Step.PASSWORD
+        assert "Your sign-in has expired." in str(form.errors)
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+        assert 'name="password"' in response.content.decode()
+
+    def test_an_expired_one_is_not_shown_on_a_reload(self, settings):
+        user = _superuser()
+        client = Client()
+        _password(client, user)
+        settings.STAFF_MFA_PENDING_SIGN_IN_SECONDS = 0
+
+        response = _reload(client)
+
+        assert response.context["form"].step is Step.PASSWORD
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+
+    def test_each_step_restarts_the_clock(self, settings):
+        user = _superuser()
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
+        before = client.session[staff_mfa.PENDING_SESSION_KEY]["issued_at"]
+
+        _answer(client, "enrol", _code(secret))
+
+        after = client.session[staff_mfa.PENDING_SESSION_KEY]["issued_at"]
+        assert after >= before
+        assert (
+            client.session[staff_mfa.PENDING_SESSION_KEY]["step"] == "recovery"
+        )
+
+    def test_the_recovery_step_cannot_be_posted_without_one(self):
+        client = Client()
+
+        response = _answer(client, "recovery")
 
         assert response.status_code == 200
-        assert response.context["form"].mfa_stage == "enrol"
-        assert response.context["form"].enrolment.secret in (
-            response.content.decode()
+        assert "Your sign-in has expired." in str(
+            response.context["form"].errors
         )
-        assert "<svg" in response.content.decode()
-        assert "_auth_user_id" not in client.session
+        assert not _signed_in(client)
 
-    def test_recovery_codes_are_shown_after_enrolling(self):
+    def test_a_finished_sign_in_cannot_be_replayed(self):
         user = _superuser()
         client = Client()
-        secret = self._post(client, user).context["form"].enrolment.secret
+        secret = _password(client, user).context["form"].enrolment.secret
+        _answer(client, "enrol", _code(secret))
+        _answer(client, "recovery")
+        client.logout()
 
-        response = self._post(client, user, _code(secret))
+        response = _answer(client, "recovery")
+
+        assert response.status_code == 200
+        assert not _signed_in(client)
+
+    def test_start_over_clears_it(self):
+        user = _superuser()
+        client = Client()
+        _password(client, user)
+
+        response = _post(client, step="enrol", restart="1")
+
+        form = response.context["form"]
+        assert response.status_code == 200
+        assert form.step is Step.PASSWORD
+        assert not form.errors
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+        assert 'name="username"' in response.content.decode()
+
+    def test_start_over_works_after_it_expired(self, settings):
+        user = _superuser()
+        client = Client()
+        _password(client, user)
+        settings.STAFF_MFA_PENDING_SIGN_IN_SECONDS = 0
+
+        response = _post(client, step="code", restart="1")
+
+        assert not response.context["form"].errors
+
+    def test_another_user_signing_in_replaces_it(self):
+        first, second = _superuser(), _superuser()
+        client = Client()
+        _password(client, first)
+
+        _password(client, second)
+
+        pending = client.session[staff_mfa.PENDING_SESSION_KEY]
+        assert pending["user_id"] == second.pk
+
+    def test_a_store_admin_signing_in_ends_it(self):
+        superuser, store_admin = _superuser(), _user(is_superuser=False)
+        client = Client()
+        _password(client, superuser)
+
+        response = _password(client, store_admin)
+
+        assert response.status_code == 302
+        assert client.session[SESSION_KEY] == str(store_admin.pk)
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+        assert staff_mfa.ENROLMENT_SESSION_KEY not in client.session
+
+    def test_a_wrong_password_for_someone_else_ends_it_too(self):
+        first, second = _superuser(), _superuser()
+        client = Client()
+        _password(client, first)
+
+        _password(client, second, password="nope")
+
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+
+    def test_a_post_for_another_step_changes_nothing(self):
+        user = _superuser()
+        client = Client()
+        _password(client, user)
+
+        response = _answer(client, "code", "123456")
+
+        form = response.context["form"]
+        assert form.step is Step.ENROL
+        assert not form.errors
+        assert not staff_mfa.is_locked(user)
+
+    def test_an_account_switched_off_midway_stops_there(self):
+        user = _superuser()
+        client = Client()
+        _password(client, user)
+        user.is_active = False
+        user.save()
+
+        response = _answer(client, "enrol", "000000")
+
+        assert "Your sign-in has expired." in str(
+            response.context["form"].errors
+        )
+        assert staff_mfa.PENDING_SESSION_KEY not in client.session
+
+    def test_a_form_in_a_plain_session_dict_works_too(self):
+        user = _superuser()
+        request = RequestFactory().post("/admin/login/")
+        request.session = {}
+
+        form = PlatformAdminAuthenticationForm(
+            request,
+            data={
+                "step": "password",
+                "username": user.email,
+                "password": PASSWORD,
+            },
+        )
+
+        assert not form.is_valid()
+        assert form.get_user() is None
+        assert form.step is Step.ENROL
+        assert request.session[staff_mfa.PENDING_SESSION_KEY]["user_id"] == (
+            user.pk
+        )
+
+
+class TestTheLoginPage:
+    def test_a_first_visit_asks_for_the_password_only(self):
+        response = Client().get(reverse("admin:login"), follow=True)
 
         body = response.content.decode()
-        assert "Recovery codes" in body
-        for code in response.context["form"].recovery_codes:
-            assert code in body
-        assert "_auth_user_id" not in client.session
-
-    def test_the_code_field_is_asked_for_once_enrolled(self):
-        user = _superuser()
-        _enrol(user)
-
-        response = self._post(Client(), user)
-
-        assert 'name="otp_code"' in response.content.decode()
+        assert response.context["form"].step is Step.PASSWORD
+        assert 'name="username"' in body
+        assert 'name="otp_code"' not in body
+        assert "Step " not in body
 
     def test_a_store_admin_is_not_shown_a_code_field(self):
         user = _user(is_superuser=False)
+        client = Client()
 
-        response = self._post(Client(), user)
+        response = _password(client, user)
 
-        assert 'name="otp_code"' not in response.content.decode()
+        assert response.status_code == 302
+
+    def test_the_note_is_for_field_errors_only(self):
+        response = _post(Client(), step="password", username="", password="")
+
+        body = response.content.decode()
+        assert ERRORNOTE in body
+
+    def test_a_wrong_password_shows_the_error_without_the_note(self):
+        user = _superuser()
+
+        response = _password(Client(), user, password="nope")
+
+        body = response.content.decode()
+        assert 'role="alert"' in body
+        assert ERRORNOTE not in body
+
+    def test_the_recovery_step_offers_copy_and_download(self):
+        user = _superuser()
+        client = Client()
+        secret = _password(client, user).context["form"].enrolment.secret
+
+        body = _answer(client, "enrol", _code(secret)).content.decode()
+
+        assert "js-staff-copy" in body
+        assert "js-staff-download" in body
+        assert 'id="recovery-codes"' in body
+        assert 'value="recovery"' in body
 
 
 class TestReset:
@@ -309,14 +620,16 @@ class TestReset:
 
         assert not Authenticator.objects.filter(user_id=user.pk).exists()
         assert "next admin login sets up a new one" in out.getvalue()
-        form, _ = _form(user)
-        assert form.mfa_stage == "enrol"
+        client = Client()
+        assert _password(client, user).context["form"].step is Step.ENROL
 
     def test_it_clears_a_lockout(self):
         user = _superuser()
         _enrol(user)
+        client = Client()
+        _password(client, user)
         for _ in range(staff_mfa.MAX_FAILURES):
-            _form(user, otp="000000")
+            _answer(client, "code", "000000")
         assert staff_mfa.is_locked(user)
 
         call_command("reset_staff_mfa", user.email, stdout=StringIO())

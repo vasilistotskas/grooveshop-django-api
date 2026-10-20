@@ -2930,6 +2930,12 @@ MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = DEBUG
 MFA_PASSKEY_SIGNUP_ENABLED = True
+# How long a half-finished admin sign-in (password proven, second factor
+# not yet) stays valid in the session (``admin.staff_mfa``). Each step of
+# the sign-in restarts the clock.
+STAFF_MFA_PENDING_SIGN_IN_SECONDS = int(
+    getenv("STAFF_MFA_PENDING_SIGN_IN_SECONDS", "600")
+)
 
 PARLER_DEFAULT_LANGUAGE_CODE = "el"
 _PARLER_LANG_TUPLE = (

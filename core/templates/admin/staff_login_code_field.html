@@ -1,0 +1,8 @@
+{# The code input of the second-factor steps. Unfold's field.html keeps a label on one line, which a long Greek label pushes past a narrow screen. #}
+<div class="{% if form.otp_code.errors %}errors {% endif %}form-field flex flex-col group mb-4">
+    <label for="{{ form.otp_code.id_for_label }}" class="block font-semibold mb-2 text-important">{{ form.otp_code.label }}</label>
+
+    {{ form.otp_code }}
+
+    {% include "unfold/helpers/form_errors.html" with errors=form.otp_code.errors %}
+</div>

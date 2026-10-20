@@ -3,6 +3,19 @@
 
 
 
+## v3.143.2 (2026-10-20)
+
+### Bug fixes
+
+* fix(orders): credit the receipt when a charged-back sale's goods came back (#279)
+
+A lost dispute whose goods came back now reverses the sale: the staff
+member records the outcome on the order (Settle chargeback), and the
+receipt is credited, or issued net of the chargeback when it does not
+exist yet. Kept goods leave the sale standing.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`10936b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10936b352f9f968942c4c6eedbadc4847d7b8666))
+
 ## v3.143.1 (2026-10-20)
 
 ### Bug fixes

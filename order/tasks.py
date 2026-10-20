@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
+from django.db.models import Q
 from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
@@ -2046,15 +2047,23 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     Two buckets:
     - Orders with FAILED payment older than
-      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30)
+      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30), once the
+      payment link's hold has also ended: a failed attempt leaves a Viva
+      payment order payable until its expiry and a Stripe PaymentIntent
+      open for another card, which the provider is asked to close first,
+      like the next bucket.
     - Orders with PENDING payment whose hold has ended: the payment link
       or session stopped being payable (``Order.payment_hold_expires_at``,
       ORDER_ONLINE_PAYMENT_HOLD_MINUTES) plus
       ORDER_ONLINE_PAYMENT_GRACE_MINUTES for a confirmation still on its
       way. The stock is released only when the payment can no longer
       succeed, so a late payment cannot book money for goods nobody
-      reserved. Before cancelling, the provider is asked to close a
-      payment that has no expiry of its own (a Stripe PaymentIntent).
+      reserved.
+
+    Before cancelling either bucket, the provider is asked to close a
+    payment that has no expiry of its own (a Stripe PaymentIntent). One the
+    provider says is past the point of no return (processing, succeeded)
+    leaves the order open: its webhook settles it.
 
     Delegates to OrderService.cancel_order which restores stock via
     StockManager.increment_stock and releases any outstanding
@@ -2067,10 +2076,17 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     now = timezone.now()
     failed_cutoff = now - timedelta(minutes=failed_minutes)
 
-    failed_qs = Order.objects.filter(
-        status=OrderStatus.PENDING,
-        payment_status=PaymentStatus.FAILED,
-        updated_at__lt=failed_cutoff,
+    failed_qs = (
+        Order.objects.filter(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.FAILED,
+            updated_at__lt=failed_cutoff,
+        )
+        .filter(
+            Q(payment_hold_expires_at__isnull=True)
+            | Q(payment_hold_expires_at__lt=now - payment_hold.grace_window())
+        )
+        .select_related("pay_way")
     )
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
@@ -2112,6 +2128,8 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         # registered provider, or one that cannot be built (credentials
         # removed), cannot confirm a payment either, so the order is
         # cancelled as before.
+        if order.pay_way is None:  # SET_NULL when the pay way is deleted
+            return True
         provider_class = get_payment_provider_class(order.pay_way.provider_code)
         if provider_class is None:
             return True
@@ -2150,6 +2168,12 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     for order in failed_qs.iterator():
         try:
+            # A failed attempt leaves a Stripe PaymentIntent open for
+            # another card: it is closed like a stale one, or the shopper
+            # could still pay an order whose stock was released.
+            if not _payment_closed(order):
+                skipped_open += 1
+                continue
             if _cancel_with_lock(
                 order,
                 "Auto-canceled: payment failed and not retried",

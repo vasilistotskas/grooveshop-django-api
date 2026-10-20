@@ -528,6 +528,115 @@ class TestAPaymentIntentIsClosedBeforeTheStockIsReleased:
         cancel.assert_not_called()
 
 
+class TestAFailedPaymentIsClosedBeforeTheOrderIsCanceled:
+    """A failed attempt is not the end of the payment: the shopper may try
+    another card on the same PaymentIntent or payment order."""
+
+    @staticmethod
+    def _failed(provider, **kwargs):
+        order = _unpaid(
+            provider=provider, payment_status=PaymentStatus.FAILED, **kwargs
+        )
+        Order.objects.filter(pk=order.pk).update(
+            updated_at=timezone.now() - timedelta(minutes=31)
+        )
+        return order
+
+    def test_the_intent_is_canceled_then_the_order(self):
+        order = self._failed("stripe", payment_id="pi_declined")
+        with (
+            _provider_with_stripe_key(),
+            patch(
+                "order.payment.stripe.PaymentIntent.cancel",
+                return_value=Mock(status="canceled"),
+            ) as cancel,
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert cancel.call_args.args == ("pi_declined",)
+        assert result["canceled_failed"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+
+    def test_an_intent_stripe_already_canceled_still_cancels_the_order(self):
+        order = self._failed("stripe", payment_id="pi_gone")
+        with (
+            _provider_with_stripe_key(),
+            patch(
+                "order.payment.stripe.PaymentIntent.cancel",
+                side_effect=stripe.InvalidRequestError("canceled", "id"),
+            ),
+            patch(
+                "order.payment.stripe.PaymentIntent.retrieve",
+                return_value=Mock(status="canceled"),
+            ),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+
+    def test_an_intent_that_succeeded_meanwhile_keeps_the_order_open(self):
+        """The shopper's retry went through before the sweep: the order is
+        left for ``payment_intent.succeeded`` to settle, not canceled."""
+        order = self._failed("stripe", payment_id="pi_paid_late")
+        with (
+            _provider_with_stripe_key(),
+            patch(
+                "order.payment.stripe.PaymentIntent.cancel",
+                side_effect=stripe.InvalidRequestError("succeeded", "id"),
+            ),
+            patch(
+                "order.payment.stripe.PaymentIntent.retrieve",
+                return_value=Mock(status="succeeded"),
+            ),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 0
+        assert result["skipped_open"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    def test_a_provider_outage_leaves_the_order_for_the_next_sweep(self):
+        order = self._failed("stripe", payment_id="pi_declined")
+        with (
+            _provider_with_stripe_key(),
+            patch(
+                "order.payment.stripe.PaymentIntent.cancel",
+                side_effect=stripe.APIConnectionError("down"),
+            ),
+        ):
+            result = auto_cancel_stuck_pending_orders()
+
+        assert result["errors"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    def test_a_payment_order_still_payable_keeps_the_order_open(self):
+        """Viva keeps a payment order payable after a failed transaction
+        until its own expiry; the order waits for it like a pending one."""
+        order = self._failed("viva_wallet", payment_id="")
+        _age(order, hold_expires=timezone.now() + timedelta(minutes=10))
+
+        result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 0
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PENDING
+
+    def test_a_payment_order_that_expired_cancels_the_order(self):
+        order = self._failed("viva_wallet", payment_id="")
+        _age(order, hold_expires=timezone.now() - timedelta(minutes=6))
+
+        result = auto_cancel_stuck_pending_orders()
+
+        assert result["canceled_failed"] == 1
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+
+
 class TestARetryClosesThePaymentItReplaces:
     """A PaymentIntent has no expiry, so the one a retry replaces would
     stay confirmable from an old tab after the new one was swept."""

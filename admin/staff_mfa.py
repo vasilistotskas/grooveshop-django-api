@@ -14,10 +14,12 @@ them on. Platform identities live in the public schema, so the
 authenticator rows are read and written there (``allauth.mfa`` is in
 ``SHARED_APPS`` too).
 
-First login: a superuser with no authenticator is not given a session. The
-form shows a secret (as a link and a QR code) and asks for a code from the
-app; a correct code activates the authenticator, shows the recovery codes
-ONCE, and the next login asks for a code like any other.
+The sign-in is a few steps held in the SESSION (``PendingSignIn``), never by
+posting the password again: the password step, then for a superuser the
+``code`` step (enrolled) or the ``enrol`` step followed by the ``recovery``
+step (not enrolled yet). A correct enrolment code activates the
+authenticator and shows the recovery codes ONCE; confirming them completes
+the same sign-in, because both factors were proven in this session.
 
 Not covered: platform staff API tokens (``PlatformStaffToken``) are issued
 after a login and are a separate surface.
@@ -26,7 +28,9 @@ after a login and are a separate surface.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
+from enum import StrEnum
 
 from allauth.mfa.adapter import get_adapter
 from allauth.mfa.models import Authenticator
@@ -36,6 +40,7 @@ from allauth.mfa.totp.internal.auth import (
     generate_totp_secret,
     validate_totp_code,
 )
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django_tenants.utils import get_public_schema_name, schema_context
@@ -46,11 +51,31 @@ logger = logging.getLogger(__name__)
 #: user it is for.
 ENROLMENT_SESSION_KEY = "staff_mfa.enrolment"
 
+#: The session key holding the sign-in in progress: who proved their
+#: password, which step is next, and when that step began.
+PENDING_SESSION_KEY = "staff_mfa.pending"
+
 #: Wrong codes allowed per user before further attempts are refused, and how
 #: long the refusal lasts. The password is already known at this point, so
 #: the code is the only thing left to guess.
 MAX_FAILURES = 5
 LOCKOUT_SECONDS = 15 * 60
+
+
+class Step(StrEnum):
+    """The steps of the admin sign-in, in the order a user meets them."""
+
+    PASSWORD = "password"
+    CODE = "code"
+    ENROL = "enrol"
+    RECOVERY = "recovery"
+
+
+@dataclass(frozen=True)
+class PendingSignIn:
+    user_id: int
+    step: Step
+    recovery_codes: tuple[str, ...] = ()
 
 
 def requires_mfa(user) -> bool:
@@ -156,3 +181,55 @@ def reset(user) -> int:
         deleted, _ = Authenticator.objects.filter(user_id=user.pk).delete()
     clear_failures(user)
     return deleted
+
+
+def begin_pending(request, user) -> PendingSignIn:
+    """Start the second-factor steps for *user*, who has proved their
+    password. Whatever sign-in was pending before (another user's, or an
+    earlier attempt) is gone."""
+    clear_pending(request)
+    return _store_pending(
+        request, user.pk, Step.CODE if is_enrolled(user) else Step.ENROL
+    )
+
+
+def advance_pending(
+    request, pending: PendingSignIn, step: Step, recovery_codes=()
+) -> PendingSignIn:
+    """Move the sign-in to *step* and restart its time limit."""
+    return _store_pending(request, pending.user_id, step, recovery_codes)
+
+
+def _store_pending(request, user_id, step, recovery_codes=()):
+    request.session[PENDING_SESSION_KEY] = {
+        "user_id": user_id,
+        "step": str(step),
+        "issued_at": time.time(),
+        "recovery_codes": list(recovery_codes),
+    }
+    return PendingSignIn(user_id, step, tuple(recovery_codes))
+
+
+def get_pending(request) -> PendingSignIn | None:
+    """The sign-in in progress, or ``None`` when there is none or its time
+    (``STAFF_MFA_PENDING_SIGN_IN_SECONDS``) ran out, in which case it is
+    removed."""
+    state = request.session.get(PENDING_SESSION_KEY)
+    if not state:
+        return None
+    age = time.time() - state["issued_at"]
+    if not 0 <= age <= settings.STAFF_MFA_PENDING_SIGN_IN_SECONDS:
+        clear_pending(request)
+        return None
+    return PendingSignIn(
+        user_id=state["user_id"],
+        step=Step(state["step"]),
+        recovery_codes=tuple(state["recovery_codes"]),
+    )
+
+
+def clear_pending(request) -> None:
+    """End the sign-in in progress, and the enrolment secret that went
+    with it: nothing of it can be replayed afterwards."""
+    request.session.pop(PENDING_SESSION_KEY, None)
+    request.session.pop(ENROLMENT_SESSION_KEY, None)

@@ -52,14 +52,22 @@ def _login(client, *, username, password, server_name, otp=""):
     # AdminSite.login() only pre-fills the "next" hidden field for GET
     # rendering; LOGIN_REDIRECT_URL points at the Nuxt storefront, so
     # the POST must carry "next" explicitly to land back on /admin/.
-    return client.post(
+    response = client.post(
         LOGIN_URL,
         {
+            "step": "password",
             "username": username,
             "password": password,
-            "otp_code": otp,
             "next": INDEX_URL,
         },
+        SERVER_NAME=server_name,
+    )
+    if not otp:
+        return response
+    # A superuser answers the second factor in a post of its own.
+    return client.post(
+        LOGIN_URL,
+        {"step": "code", "otp_code": otp, "next": INDEX_URL},
         SERVER_NAME=server_name,
     )
 
@@ -165,6 +173,48 @@ class TestAdminLoginFlow:
             INDEX_URL, SERVER_NAME="tenant-a.example.com"
         )
         assert index_response.status_code == 200
+
+    def test_superuser_gets_the_code_step_not_an_error_on_a_store_host(
+        self, tenant_a, bind_tenant_and_schema
+    ):
+        superuser = UserAccountFactory(
+            is_staff=True, is_superuser=True, plain_password="pw12345"
+        )
+        codes = enrol_staff_mfa(superuser)
+        bind_tenant_and_schema(tenant_a)
+        client = Client()
+
+        first = _login(
+            client,
+            username=superuser.email,
+            password="pw12345",
+            server_name="tenant-a.example.com",
+        )
+
+        form = first.context["form"]
+        assert first.status_code == 200
+        assert form.step == "code"
+        assert not form.errors
+        assert (
+            client.get(
+                INDEX_URL, SERVER_NAME="tenant-a.example.com"
+            ).status_code
+            == 302
+        )
+
+        second = client.post(
+            LOGIN_URL,
+            {"step": "code", "otp_code": codes[0], "next": INDEX_URL},
+            SERVER_NAME="tenant-a.example.com",
+        )
+
+        assert second.status_code == 302
+        assert (
+            client.get(
+                INDEX_URL, SERVER_NAME="tenant-a.example.com"
+            ).status_code
+            == 200
+        )
 
     def test_force_login_non_platform_backend_denied_even_for_staff_superuser(
         self, tenant_a, bind_tenant_and_schema
@@ -295,3 +345,22 @@ class TestAdminPasswordChange:
 
         staff.refresh_from_db()
         assert staff.check_password("a-brand-new-passw0rd!")
+
+
+def test_the_login_inputs_carry_unfolds_input_styling():
+    """The form must build on ``unfold.forms.AuthenticationForm``: Django's
+    own leaves the username and password inputs unstyled, and Unfold's CSS
+    then draws them with no border at all (seen on production)."""
+    from django.contrib.sessions.backends.cache import SessionStore
+    from django.test import RequestFactory
+    from unfold.widgets import BASE_INPUT_CLASSES
+
+    from admin.forms import PlatformAdminAuthenticationForm
+
+    request = RequestFactory().get("/admin/login/")
+    request.session = SessionStore()
+    form = PlatformAdminAuthenticationForm(request=request)
+
+    for name in ("username", "password"):
+        classes = form.fields[name].widget.attrs["class"].split()
+        assert set(BASE_INPUT_CLASSES) <= set(classes), name

@@ -7,76 +7,189 @@
     {{ form.media }}
 {% endblock %}
 
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% static 'admin/js/staff_login.js' %}" defer></script>
+{% endblock %}
+
 {% block title %}
     {{ title }} | {{ site_title }}
 {% endblock %}
 
 {% block content %}
+    {# Room for the absolutely positioned header above, on a page taller than the screen. #}
+    <div class="py-14">
     {% include "unfold/helpers/unauthenticated_title.html" with title=site_title|default:_('Django site admin') subtitle=_('Welcome back to') %}
 
     {% include "unfold/helpers/messages.html" %}
 
-    {% if form.errors or form.non_field_errors %}
-        <div class="flex flex-col gap-4 mb-8 *:mb-0">
-            {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+    {# Real failures only: a step change is not an error (admin.forms). #}
+    <div role="alert">
+        {% if form.errors or form.non_field_errors %}
+            <div class="flex flex-col gap-4 mb-8 *:mb-0">
+                {% if form.has_field_errors %}
+                    {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+                {% endif %}
 
-            {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+                {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
 
-            {% if user.is_authenticated %}
-                {% blocktranslate trimmed asvar message %}
-                    You are authenticated as {{ username }}, but are not authorized to
-                    access this page. Would you like to login to a different account?
-                {% endblocktranslate %}
+                {% if user.is_authenticated %}
+                    {% blocktranslate trimmed asvar message %}
+                        You are authenticated as {{ username }}, but are not authorized to
+                        access this page. Would you like to login to a different account?
+                    {% endblocktranslate %}
 
-                {% include "unfold/helpers/messages/error.html" with error=message %}
-            {% endif %}
-        </div>
-    {% endif %}
+                    {% include "unfold/helpers/messages/error.html" with error=message %}
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
 
     {% block login_before %}{% endblock %}
 
     <form action="{{ app_path }}" method="post" id="login-form">
         {% csrf_token %}
+        <input type="hidden" name="step" value="{{ form.step }}">
 
-        {% include "unfold/helpers/field.html" with field=form.username %}
+        {% if form.step == "password" %}
+            {% include "unfold/helpers/field.html" with field=form.username %}
 
-        {% include "unfold/helpers/field.html" with field=form.password %}
+            {% include "unfold/helpers/field.html" with field=form.password %}
 
-        {# Platform superusers only: the second factor (admin.staff_mfa). #}
-        {% if form.mfa_stage == "enrol" %}
-            <div class="mt-6 mb-4 text-sm">
-                <p class="mb-3">{% translate "Scan this code with an authenticator app, or type the secret in:" %}</p>
-                <div class="w-48 h-48 mb-3 bg-white p-2 rounded">{{ form.enrolment_qr|safe }}</div>
-                <p class="font-mono break-all select-all">{{ form.enrolment.secret }}</p>
-            </div>
-        {% endif %}
-
-        {% if form.mfa_stage == "recovery" %}
-            <div class="mt-6 mb-4 text-sm">
-                <p class="mb-3 font-semibold">{% translate "Recovery codes (shown once, each works once):" %}</p>
-                <ul class="font-mono grid grid-cols-2 gap-1 select-all">
-                    {% for recovery_code in form.recovery_codes %}<li>{{ recovery_code }}</li>{% endfor %}
-                </ul>
-            </div>
-        {% elif form.mfa_stage %}
-            {% include "unfold/helpers/field.html" with field=form.otp_code %}
-        {% endif %}
-
-        <div class="flex flex-col gap-3 mt-6">
-            {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
-                {% translate 'Log in' %} <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">arrow_forward</span>
-            {% endcomponent %}
-
-            {% url 'admin_password_reset' as password_reset_url %}
-            {% url 'admin:admin_password_reset' as unfold_password_reset_url %}
-
-            {% if password_reset_url or unfold_password_reset_url %}
-                {% component "unfold/components/button.html" with href=password_reset_url|default:unfold_password_reset_url variant="secondary" class="password-reset-link w-full" %}
-                    {% translate 'Forgotten your password or username?' %}
+            <div class="flex flex-col gap-3 mt-6">
+                {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
+                    {% translate 'Log in' %} <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">arrow_forward</span>
                 {% endcomponent %}
+
+                {% url 'admin_password_reset' as password_reset_url %}
+                {% url 'admin:admin_password_reset' as unfold_password_reset_url %}
+
+                {% if password_reset_url or unfold_password_reset_url %}
+                    {% component "unfold/components/button.html" with href=password_reset_url|default:unfold_password_reset_url variant="secondary" class="password-reset-link w-full whitespace-normal! text-center" %}
+                        {% translate 'Forgotten your password or username?' %}
+                    {% endcomponent %}
+                {% endif %}
+            </div>
+        {% else %}
+            {# The second factor, for a platform superuser (admin.staff_mfa). #}
+            <div class="mb-6">
+                <p class="font-medium mb-2 text-base-500 text-xs uppercase tracking-wide dark:text-base-400">
+                    {% blocktranslate with current=form.step_number total=form.step_total %}Step {{ current }} of {{ total }}{% endblocktranslate %}
+                </p>
+
+                <ol class="flex gap-1.5" aria-hidden="true">
+                    {% for number in form.step_numbers %}
+                        <li class="flex-1 h-1 rounded-default {% if number <= form.step_number %}bg-primary-600 dark:bg-primary-500{% else %}bg-base-200 dark:bg-base-700{% endif %}"></li>
+                    {% endfor %}
+                </ol>
+
+                <h2 class="font-semibold mt-5 text-font-important-light text-lg dark:text-font-important-dark">
+                    {% if form.step == "code" %}
+                        {% translate "Two-step verification" %}
+                    {% elif form.step == "enrol" %}
+                        {% translate "Set up your authenticator app" %}
+                    {% else %}
+                        {% translate "Save your recovery codes" %}
+                    {% endif %}
+                </h2>
+
+                {% if form.account and form.step != "recovery" %}
+                    <p class="break-all mt-1 text-base-500 text-sm dark:text-base-400">{{ form.account }}</p>
+                {% endif %}
+            </div>
+
+            {% if not form.errors %}
+                {% if form.step == "code" %}
+                    {% translate "Password accepted. Confirm it is you with a code." as notice %}
+                    {% include "unfold/helpers/messages/info.html" with message=notice %}
+                {% elif form.step == "enrol" %}
+                    {% translate "Password accepted. Platform accounts need an authenticator app, set up once." as notice %}
+                    {% include "unfold/helpers/messages/info.html" with message=notice %}
+                {% else %}
+                    {% translate "Authenticator set up." as notice %}
+                    {% include "unfold/helpers/messages/success.html" with message=notice %}
+                {% endif %}
             {% endif %}
-        </div>
+
+            {% if form.step == "code" %}
+                <p class="mb-5 text-base-600 text-sm dark:text-base-300">
+                    {% translate "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead." %}
+                </p>
+
+                {% include "admin/staff_login_code_field.html" %}
+            {% elif form.step == "enrol" %}
+                <p class="mb-5 text-base-600 text-sm dark:text-base-300">
+                    {% translate "Scan this code with an authenticator app, then enter the code the app shows." %}
+                </p>
+
+                <div class="flex flex-col gap-4 items-center mb-6">
+                    <div class="[&>svg]:h-full [&>svg]:w-full bg-white border border-base-200 h-48 p-2 rounded-default w-48 dark:border-base-700" role="img" aria-label="{% translate 'QR code for the authenticator app' %}">
+                        {{ form.enrolment_qr|safe }}
+                    </div>
+
+                    <div class="w-full">
+                        <p class="mb-1 text-base-500 text-xs dark:text-base-400">
+                            {% translate "Cannot scan it? Type this secret into the app instead:" %}
+                        </p>
+
+                        <div class="flex gap-2 items-center">
+                            <code id="mfa-secret" class="bg-base-100 break-all flex-1 font-mono px-3 py-2 rounded-default select-all text-sm dark:bg-base-800">{{ form.enrolment.secret }}</code>
+
+                            {% component "unfold/components/button.html" with type="button" value="mfa-secret" icon="content_copy" variant="default" class="js-staff-copy shrink-0" %}
+                                <span class="js-staff-label">{% translate "Copy" %}</span>
+                            {% endcomponent %}
+                        </div>
+                    </div>
+                </div>
+
+                {% include "admin/staff_login_code_field.html" %}
+            {% else %}
+                <p class="mb-5 text-base-600 text-sm dark:text-base-300">
+                    {% translate "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone." %}
+                </p>
+
+                <ul id="recovery-codes" class="gap-2 grid grid-cols-2 mb-4">
+                    {% for recovery_code in form.recovery_codes %}
+                        <li class="bg-base-100 font-mono py-2 rounded-default select-all text-center tracking-wider dark:bg-base-800">{{ recovery_code }}</li>
+                    {% endfor %}
+                </ul>
+
+                <div class="flex flex-wrap gap-2 mb-6">
+                    {% component "unfold/components/button.html" with type="button" value="recovery-codes" icon="content_copy" variant="default" class="js-staff-copy flex-1" %}
+                        <span class="js-staff-label">{% translate "Copy all" %}</span>
+                    {% endcomponent %}
+
+                    {% component "unfold/components/button.html" with type="button" value="recovery-codes" icon="download" variant="default" class="js-staff-download flex-1" %}
+                        <span class="js-staff-label">{% translate "Download .txt" %}</span>
+                    {% endcomponent %}
+                </div>
+            {% endif %}
+
+            <div class="flex flex-col gap-3 mt-6">
+                {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
+                    {% if form.step == "code" %}
+                        {% translate "Verify and log in" %}
+                    {% elif form.step == "enrol" %}
+                        {% translate "Verify and continue" %}
+                    {% else %}
+                        {% translate "I have saved them, continue" %}
+                    {% endif %}
+                    <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">arrow_forward</span>
+                {% endcomponent %}
+
+                {# After the recovery codes the authenticator exists and the codes are gone from the page: starting over would lose them. #}
+                {% if form.step != "recovery" %}
+                    {% component "unfold/components/button.html" with submit=1 name="restart" value="1" variant="ghost" extra_attrs="formnovalidate" class="w-full" %}
+                        {% translate "Use another account" %}
+                    {% endcomponent %}
+                {% endif %}
+            </div>
+
+            <p id="staff-login-status" class="sr-only" role="status" aria-live="polite"></p>
+            <span id="staff-login-i18n" hidden data-copied="{% translate 'Copied' %}" data-saved="{% translate 'Saved' %}" data-copy-failed="{% translate 'Copying failed: the text is selected, copy it with Ctrl+C.' %}" data-filename="recovery-codes.txt"></span>
+        {% endif %}
     </form>
 
     {% block login_after %}{% endblock %}
+    </div>
 {% endblock %}

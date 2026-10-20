@@ -6,9 +6,11 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from djmoney.money import Money
 
+from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
+from order.models.order import Order
 from order.models.stock_log import StockLog
 from product.factories.product import ProductFactory
 
@@ -146,6 +148,47 @@ class TestOrderItemConstraints:
 
 
 class TestOrderItemRefund:
+    @pytest.fixture(autouse=True)
+    def delivered(self, order):
+        # Units come back on a delivered order; the status is a guard of
+        # ``refund`` itself, tested below.
+        Order.objects.filter(pk=order.pk).update(status=OrderStatus.DELIVERED)
+
+    @pytest.mark.parametrize(
+        "status",
+        [OrderStatus.PENDING, OrderStatus.SHIPPED, OrderStatus.CANCELED],
+    )
+    def test_refused_outside_return_handling_statuses(
+        self, order, order_item, product, status
+    ):
+        Order.objects.filter(pk=order.pk).update(status=status)
+        product.refresh_from_db()
+        stock_before = product.stock
+
+        with pytest.raises(ValidationError):
+            order_item.refund(2)
+
+        order_item.refresh_from_db()
+        product.refresh_from_db()
+        assert order_item.refunded_quantity == 0
+        assert product.stock == stock_before
+        assert not StockLog.objects.filter(
+            product=product, order_id=order.pk
+        ).exists()
+
+    def test_the_stock_log_names_who_and_why(self, order_item, product):
+        from user.factories import UserAccountFactory
+
+        staff = UserAccountFactory(is_staff=True)
+
+        order_item.refund(1, performed_by=staff, reason="Box came back")
+
+        log = StockLog.objects.get(
+            product=product, operation_type=StockLog.OPERATION_INCREMENT
+        )
+        assert log.performed_by == staff
+        assert "Box came back" in log.reason
+
     @pytest.mark.parametrize("quantity", [-1, 0, 6])
     def test_invalid_quantity_changes_nothing(self, order_item, quantity):
         with pytest.raises(ValidationError):

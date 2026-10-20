@@ -41111,7 +41111,7 @@ components:
         reason:
           type: string
           description: Προαιρετικός λόγος επιστροφής
-          maxLength: 255
+          maxLength: 150
     OrderItemRestockResponse:
       type: object
       properties:

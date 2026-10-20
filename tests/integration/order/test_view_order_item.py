@@ -18,6 +18,7 @@ from order.enum.status import (
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.models.stock_log import StockLog
 from order.serializers.item import (
     OrderItemDetailSerializer,
     OrderItemSerializer,
@@ -744,6 +745,70 @@ class RestockActionTests(TestURLFixerMixin, APITestCase):
         )
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 21)
+
+    def test_restock_action_records_who_and_why_on_the_stock_log(self):
+        self.client.force_authenticate(user=self.staff)
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_restock_url(self.order_item.id),
+            {"quantity": 1, "reason": "Product defective"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        log = StockLog.objects.get(
+            product=self.product,
+            order_id=self.order.id,
+            operation_type=StockLog.OPERATION_INCREMENT,
+        )
+        self.assertEqual(log.performed_by, self.staff)
+        self.assertIn("Product defective", log.reason)
+
+    def test_restock_reason_longer_than_the_stock_log_allows_is_refused(self):
+        self.client.force_authenticate(user=self.staff)
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_restock_url(self.order_item.id),
+            {"quantity": 1, "reason": "x" * 151},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 20)
+
+    def test_restock_error_detail_is_a_string(self):
+        self.client.force_authenticate(user=self.staff)
+        self.order.status = OrderStatus.PROCESSING.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_restock_url(self.order_item.id),
+            {"quantity": 1},
+            format="json",
+        )
+
+        self.assertIsInstance(response.data["detail"], str)
+
+    def test_restock_action_refused_before_delivery_says_why(self):
+        self.client.force_authenticate(user=self.staff)
+        self.order.status = OrderStatus.PROCESSING.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_restock_url(self.order_item.id),
+            {"quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivered", str(response.data))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 20)
 
     def test_restock_action_moves_no_money(self):
         """The answer says nothing about a refunded amount and nothing is

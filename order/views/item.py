@@ -24,7 +24,6 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from order.enum.status import RETURN_HANDLING_STATUSES
 from order.filters import OrderItemFilter
 from order.models.item import OrderItem
 from order.serializers.item import (
@@ -206,16 +205,6 @@ class OrderItemViewSet(BaseModelViewSet):
 
         order_item = self.get_object()
 
-        if order_item.order.status not in RETURN_HANDLING_STATUSES:
-            raise DRFValidationError(
-                {
-                    "detail": _(
-                        "Units can only be restocked on a delivered, "
-                        "completed or returned order."
-                    )
-                }
-            )
-
         if order_item.is_refunded:
             raise DRFValidationError(
                 {"detail": _("All units of this item were already restocked.")}
@@ -236,7 +225,9 @@ class OrderItemViewSet(BaseModelViewSet):
             # left "Restock reason: ..." on an item whose restock then
             # failed validation, so the notes claimed a restock that never
             # happened.
-            order_item.refund(quantity)
+            order_item.refund(
+                quantity, performed_by=request.user, reason=reason
+            )
 
             if reason:
                 notes = order_item.notes or ""
@@ -262,13 +253,7 @@ class OrderItemViewSet(BaseModelViewSet):
                     "user_id": request.user.id,
                 },
             )
-            raise DRFValidationError(
-                {
-                    "detail": _(
-                        "A validation error occurred while restocking the item. Please check your input and try again."
-                    )
-                }
-            ) from e
+            raise DRFValidationError({"detail": " ".join(e.messages)}) from e
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(

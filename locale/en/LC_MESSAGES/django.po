@@ -3347,6 +3347,9 @@ msgstr "Development"
 msgid "Diagnostics"
 msgstr "Diagnostics"
 
+msgid "Did the goods come back? Use \"Restock returned items\" to put them back in stock."
+msgstr "Did the goods come back? Use \"Restock returned items\" to put them back in stock."
+
 #, python-brace-format
 msgid "Did you forget something? — {site_name}"
 msgstr "Did you forget something? — {site_name}"
@@ -3716,6 +3719,9 @@ msgstr "Enter a valid username. This value may contain only letters, numbers, an
 #, no-python-format
 msgid "Enter a value between 0 and 100. For example, 25 for 25% discount."
 msgstr "Enter a value between 0 and 100. For example, 25 for 25% discount."
+
+msgid "Enter how many units of at least one line came back."
+msgstr "Enter how many units of at least one line came back."
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
@@ -8137,6 +8143,12 @@ msgid "Order %(order_id)s was not refunded; see the order history."
 msgstr "Order %(order_id)s was not refunded; see the order history."
 
 #, python-format
+msgid "Order %(order_id)s: %(count)s unit put back in stock."
+msgid_plural "Order %(order_id)s: %(count)s units put back in stock."
+msgstr[0] "Order %(order_id)s: %(count)s unit put back in stock."
+msgstr[1] "Order %(order_id)s: %(count)s units put back in stock."
+
+#, python-format
 msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
 msgstr "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
 
@@ -9542,6 +9554,9 @@ msgstr "Purged At"
 msgid "Puts returned units of an order line back into stock and records them on the line. It moves no money: refund the payment with the order's refund action."
 msgstr "Puts returned units of an order line back into stock and records them on the line. It moves no money: refund the payment with the order's refund action."
 
+msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
+msgstr "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
+
 msgid "Qty"
 msgstr "Qty"
 
@@ -9805,6 +9820,9 @@ msgstr "Recorded on the ledger row"
 
 msgid "Recorded on the points ledger"
 msgstr "Recorded on the points ledger"
+
+msgid "Recorded on the stock log with your name."
+msgstr "Recorded on the stock log with your name."
 
 msgid "Recorded with the refund on the order's payment ledger."
 msgstr "Recorded with the refund on the order's payment ledger."
@@ -10173,6 +10191,9 @@ msgstr "Response time %(response)s · Notification %(status)s · %(priority)s / 
 msgid "Restock"
 msgstr "Restock"
 
+msgid "Restock returned items"
+msgstr "Restock returned items"
+
 msgid "Restock returned units of an order item"
 msgstr "Restock returned units of an order item"
 
@@ -10287,6 +10308,10 @@ msgstr "Return to your cart:"
 
 msgid "Returned"
 msgstr "Returned"
+
+#, python-format
+msgid "Returned and still to put back: %(left)s"
+msgstr "Returned and still to put back: %(left)s"
 
 msgid "Returned flag"
 msgstr "Returned flag"

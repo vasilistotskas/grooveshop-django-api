@@ -2,7 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from rest_framework import serializers
 
-from order.models.item import OrderItem
+from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
 from product.serializers.product import ProductSerializer
 
 
@@ -148,7 +148,7 @@ class OrderItemRestockSerializer(serializers.Serializer):
     reason = serializers.CharField(
         required=False,
         allow_blank=True,
-        max_length=255,
+        max_length=RESTOCK_REASON_MAX_LENGTH,
         help_text=_("Optional reason for the return"),
     )
 

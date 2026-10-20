@@ -11,8 +11,13 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from order.enum.status import RETURN_HANDLING_STATUSES
 from order.managers.item import OrderItemManager
 from vat.models import validate_mydata_vat_rate
+
+# The restock reason is written to ``StockLog.reason`` (255) after a prefix of
+# about 45 characters, so it is capped well under that wherever it is typed.
+RESTOCK_REASON_MAX_LENGTH = 150
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
@@ -179,18 +184,38 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             self.vat_rate = self.product.vat_percent
         super().save(*args, **kwargs)
 
-    def refund(self, quantity=None):
+    def refund(self, quantity=None, *, performed_by=None, reason=""):
         """Put ``quantity`` returned units back in stock and record them as
         refunded on this line. Moves NO money: what the customer is paid
         back is the order's refund (``OrderService.refund_order``), because
         a line's snapshot price is not what was paid for it. Returns the
         value of the units, for the caller's display.
+
+        ``performed_by`` and ``reason`` go onto the stock log row: who put
+        the units back, and why.
         """
         from django.db import transaction
 
         from order.stock import StockManager
 
         with transaction.atomic():
+            # The order first, then the line: the admin action restocks
+            # several lines under the order lock, so every path takes the
+            # two in that order. The status is judged under the lock, so a
+            # cancel or a status change cannot slip between check and write.
+            order = (
+                type(self.order)
+                .objects.select_for_update()
+                .get(pk=self.order_id)
+            )
+            if order.status not in RETURN_HANDLING_STATUSES:
+                raise ValidationError(
+                    _(
+                        "Units can only be restocked on a delivered, "
+                        "completed or returned order."
+                    )
+                )
+
             # Lock this item so concurrent refunds serialize on
             # refunded_quantity — otherwise both read a stale value, both pass
             # the over-refund guard, and stock is restocked twice.
@@ -240,7 +265,14 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
                     product_id=item.product_id,
                     quantity=refund_qty,
                     order_id=item.order_id,
-                    reason=f"Refund of {refund_qty} unit(s) for order item {item.pk}",
+                    reason=(
+                        f"Refund of {refund_qty} unit(s) for order item "
+                        f"{item.pk}: {reason}"
+                        if reason
+                        else f"Refund of {refund_qty} unit(s) for order item "
+                        f"{item.pk}"
+                    ),
+                    performed_by=performed_by,
                 )
 
             item.refunded_quantity += refund_qty

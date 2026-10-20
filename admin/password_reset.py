@@ -51,6 +51,10 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name, schema_context
+from unfold.widgets import (
+    UnfoldAdminEmailInputWidget,
+    UnfoldAdminPasswordWidget,
+)
 
 from core.client_ip import client_ip_or_peer
 from tenant.celery import dispatch_on_commit
@@ -107,6 +111,14 @@ class StaffPasswordResetForm(PasswordResetForm):
     this form for the users.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Unfold's widget: Django's bare input has no border under Unfold's
+        # CSS, which made the field invisible.
+        self.fields["email"].widget = UnfoldAdminEmailInputWidget(
+            attrs={"autocomplete": "email", "autofocus": True}
+        )
+
     def get_users(self, email):
         with schema_context(get_public_schema_name()):
             users = list(super().get_users(email))
@@ -116,6 +128,14 @@ class StaffPasswordResetForm(PasswordResetForm):
 class StaffSetPasswordForm(SetPasswordForm):
     """Saves the new password to the public row, and ends the old one's API
     tokens."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Unfold's widgets, for the same reason as the reset form's email.
+        for name in ("new_password1", "new_password2"):
+            self.fields[name].widget = UnfoldAdminPasswordWidget(
+                attrs={"autocomplete": "new-password"}
+            )
 
     def save(self, commit=True):
         from tenant.models import PlatformStaffToken

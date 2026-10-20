@@ -3,6 +3,42 @@
 
 
 
+## v3.142.2 (2026-10-20)
+
+### Bug fixes
+
+* fix(email): speak the store's language and drop the statuses and reminders nothing sets (#272)
+
+Store language. The new-order email to the merchant had a hardcoded
+English subject and a body in "the active language", which in a worker is
+the platform's. It, the B2B-application, dispute, low-stock and stale-ACS
+alerts now render, subject included, under the bound store's
+Tenant.default_locale (core.utils.i18n.store_language, which the review
+alert already did by hand). get_user_language / get_order_language fall
+back to it instead of the platform language, so a guest or an account with
+no language gets the store's. A product alert remembers the language the
+visitor subscribed in (ProductAlert.language_code, from X-Language) and
+its email uses it, else the store's.
+
+Statuses nothing set. UserSubscription BOUNCED is now set when the mail
+server permanently refuses every recipient of the confirmation email
+(the one bounce this platform sees), and the task no longer retries it.
+VivaWebhookEvent "failed" and Meta CAPI "skipped" are removed: a handler
+that raises rolls its row back so Viva's retry works, and a dispatch that
+does not apply writes no row.
+
+FAVOURITES_ENABLED no longer promises emails; existing stores' row is
+updated in product/0055.
+
+Pending-order reminders are removed: the 15-minute auto-cancel sweep
+cancels an unpaid online order at the same 24 hours the reminder waited
+for, so the daily 07:00 reminder met an order only in the quarter hour
+before its cancellation. check_pending_orders, its template, beat entry,
+four PENDING_ORDER_REMINDER_* settings and Order.reminder_count /
+last_reminder_sent_at (state only; the columns drop next release) go.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c651be0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c651be02c3e693334914e989c4b2638f24f903ee))
+
 ## v3.142.1 (2026-10-20)
 
 ### Bug fixes

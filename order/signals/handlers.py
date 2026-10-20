@@ -12,6 +12,7 @@ from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
+from order.credit_documents import request_credit_documents
 from order.disputes import announce_chargeback
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
@@ -51,7 +52,6 @@ from order.signals import (
 from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
-    issue_pending_credits,
     push_order_event_to_gateway,
     send_admin_new_order_email,
     send_dispute_notification_email,
@@ -191,21 +191,12 @@ def handle_order_post_save(
         payment_status_changed
         and instance.payment_status == PaymentStatus.CANCELED
     ):
-        _dispatch_credit_documents(instance)
+        request_credit_documents(instance.id)
 
     if settings.AGENT_GATEWAY_INTERNAL_URL and (
         status_changed or payment_status_changed or tracking_dispatched
     ):
         dispatch_on_commit(push_order_event_to_gateway, [instance.id])
-
-
-def _dispatch_credit_documents(order: Order) -> None:
-    """Issue the order's retail credit documents, when the platform issues
-    its retail documents by itself (``MYDATA_AUTO_SUBMIT``). Idempotent on
-    the receiving side: nothing is owed until the order's receipt is
-    registered, and each refund is credited once."""
-    if load_mydata_config().issues_automatically():
-        dispatch_on_commit(issue_pending_credits, [order.id])
 
 
 def _cart_for_order(order: Order):
@@ -743,7 +734,7 @@ def handle_order_refunded(
         # The refund's retail credit document (ΕΛΠ art. 12(4)), linked to
         # the receipt's MARK. Every refund path signals here once per
         # ledger row, which is what makes it one document per refund.
-        _dispatch_credit_documents(order)
+        request_credit_documents(order.id)
 
         logger.info("Order %s refunded", order.id)
 
@@ -779,7 +770,7 @@ def handle_order_stored_value_returned(
         )
         # The receipt (if one exists) is credited for this value like for a
         # provider refund; before it exists the receipt was netted instead.
-        _dispatch_credit_documents(order)
+        request_credit_documents(order.id)
     except Exception:
         logger.exception("Error handling order_stored_value_returned signal")
 

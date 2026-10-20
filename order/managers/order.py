@@ -17,6 +17,7 @@ from djmoney.models.fields import MoneyField
 
 from core.managers import OptimizedManager, OptimizedQuerySet
 from core.mixins import SoftDeleteQuerySetMixin
+from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -71,6 +72,15 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
                 PaymentStatus.PARTIALLY_REFUNDED,
             ),
         )
+
+    def awaiting_chargeback_decision(self) -> Self:
+        """Orders with a lost dispute whose goods staff have not yet said
+        came back or stayed (``ChargebackDecision``): the worklist the
+        dashboard counts, and the filter behind it."""
+        return self.filter(
+            payment_transactions__kind=PaymentTransactionKind.CHARGEBACK,
+            payment_transactions__decision__isnull=True,
+        ).distinct()
 
     def needing_follow_up(self, now=None) -> Self:
         """Orders the shopper has waited on for ``ORDER_FOLLOW_UP_DAYS``

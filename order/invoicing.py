@@ -196,7 +196,8 @@ def refunded_before_receipt(
 ) -> Decimal:
     """What was paid back for *order* before its receipt exists: provider
     and cash refunds on the payment ledger, net of those a provider
-    reported failed, plus the value returned onto gift cards and points.
+    reported failed, the value returned onto gift cards and points, and
+    the chargebacks staff decided came with the goods back.
 
     The cut-off is the receipt row's creation: a NEW receipt nets
     everything returned so far (``before=None``); a row that exists is
@@ -207,14 +208,18 @@ def refunded_before_receipt(
     A retail receipt documents the sale for the consideration actually
     paid, so money returned before it is issued reduces what it says, and
     no credit document follows for it (``order.credit_documents`` credits
-    only what was refunded after the receipt row existed). A chargeback is
-    not counted: the card network took the money back, the merchant did not
-    reverse the sale, and the receipt stands.
+    only what was refunded after the receipt row existed). A chargeback
+    counts only once staff decided the goods came back
+    (``ChargebackDecision``), by the moment of that decision; otherwise the
+    card network took the money back, the merchant did not reverse the
+    sale, and the receipt stands.
     """
     from order.payment_ledger import PaymentLedger
 
-    return PaymentLedger.refunded(order, before=before) + (
-        PaymentLedger.stored_value(order, before=before).returned
+    return (
+        PaymentLedger.refunded(order, before=before)
+        + PaymentLedger.stored_value(order, before=before).returned
+        + PaymentLedger.chargebacks_returned(order, before=before)
     )
 
 

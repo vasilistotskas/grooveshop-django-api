@@ -339,6 +339,18 @@ class StoreAttention(DashboardWidget):
             ),
             (
                 True,
+                "chargebacks_to_settle",
+                "gavel",
+                "danger",
+                _("Lost disputes to settle"),
+                _(
+                    "Say whether the goods came back, so the receipt is credited"
+                ),
+                "order.Order",
+                urlencode({"chargeback": "undecided"}),
+            ),
+            (
+                True,
                 "unremitted_cod",
                 "payments",
                 "danger",

@@ -3,6 +3,153 @@
 
 
 
+## v3.142.0 (2026-10-20)
+
+### Bug fixes
+
+* fix(recommendations): every admin strategy, slot and weight now works (#278) ([`920558c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/920558c5279826fee179514fde5d4f83bcd6626c))
+
+* fix(recommendations): every admin strategy, slot and weight now works
+
+Strategies. StrategyCode listed eight codes and four were registered, so
+a chain naming attributes, semantic, co_purchase or co_view was skipped
+on every request. attributes (Jaccard over active attribute values,
+active tags and brand; Basic) and co_purchase (confidence over the
+non-canceled orders of a 180-day window, with minimum support and a
+multi-item-order threshold; Pro) are built, both precomputed. semantic
+has no embedder to query: no index has one, and the in-process
+Meilisearch embedder that could back it needs a settings path, more
+memory than Meilisearch is given and a Greek measurement first, so it
+is a follow-up. co_view needs a per-visitor record of product views
+that nothing keeps. Both leave the enum, migration 0006 strips them
+from every slot, and a test now fails for any StrategyCode member
+without a registered strategy.
+
+Slots. The engine returned nothing for a request without a seed, so the
+empty_cart slot could never show anything; seedless surfaces are now
+answered from the strategies with a store-wide answer (popular), the
+filler cap does not apply there, and the slot refuses any other
+strategy. Nothing rendered the order_email slot: the order confirmation
+now lists suggestions seeded with the order's products, linked to their
+pages, records the sent strip as an impression, and is sent without the
+strip if building it fails.
+
+Candidates. No strategy was precomputed and the nightly pass was not
+scheduled, so the admin's candidate list was always empty. The two new
+strategies are rebuilt on product save and nightly (fanned out per
+store, 04:00). A request no longer computes a seed without rows: "no
+rows" mostly means nothing to suggest, and computing on a miss would
+put the expensive path on every view of such a product.
+
+Weights. The help text said weights were updated nightly from attach
+rate; nothing updated them. learn_slot_weights (05:00, per store)
+re-weights each enabled slot from its impression and attach rows of the
+last 30 days: the best attach rate weighs 1.0, the others in proportion
+with a 0.05 floor, a strategy under 200 impressions keeps its weight. A
+new per-slot "Learn weights" switch, on by default and in the presets,
+keeps weights a merchant sets by hand.
+
+Candidate rebuilds, learning and the email strip all skip a store whose
+plan or switch has suggestions off. schema.yml: StrategyEnum loses
+semantic and co_view, which the API never returned.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTeLQc2mnu9hd6zwPD3bn5 ([`920558c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/920558c5279826fee179514fde5d4f83bcd6626c))
+
+* fix(recommendations): keep the order email strip with the shared email base
+
+The suggestions fragment is included by the order emails, not sent on
+its own, so it lives beside email_base.html in emails/base/, the one
+folder the theme test exempts from extending the base.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`920558c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/920558c5279826fee179514fde5d4f83bcd6626c))
+
+* fix(api): stable error codes for the remaining endpoints (#274) ([`870c24f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870c24feca1b3f66b8b98685faeab2a0d8b3466c))
+
+* fix(api): stable error codes for the remaining endpoints
+
+Every DRF ValidationError now carries a code=, and every literal-dict
+4xx/5xx Response a view builds carries a code (plus detail where the body
+only had error), so clients branch on a stable identifier instead of
+translated text. Bodies only gain keys; none is removed or loosened. The
+order create and blog reorder/comment views re-raise instead of
+hand-building the body, so the exception handler adds code and fields.
+
+The static guard now scans the whole project instead of a CODED_MODULES
+list, and a second guard covers literal-dict error responses. Provider
+webhook receivers and the allauth rate-limit response are exempt because
+another protocol defines their body.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`870c24f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870c24feca1b3f66b8b98685faeab2a0d8b3466c))
+
+* fix(tenant): never put exception text in the destroy refusal body
+
+The platform destroy API returned str(exc) of the lifecycle ValueError as
+the response detail. It now logs the exception and answers with a fixed
+message and a stable per-gate code (tenant_destroy_protected,
+tenant_destroy_not_suspended, tenant_destroy_cooldown).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`870c24f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870c24feca1b3f66b8b98685faeab2a0d8b3466c))
+
+* fix(cache): tell the storefront which purges change the tenant config
+
+The storefront's purge endpoint moves a store's cache epoch and drops its
+tenant config, which must happen only when the purge follows a change to
+what /tenant/resolve serves, not on every auto-invalidation purge
+(products, blog, recommendations).
+
+CacheSurface gains invalidates_tenant_config, set on settings and
+store_pages, the two surfaces whose data feeds TenantConfig.features and
+the resolve payload. request_purge sends tenantConfig: true only for such
+a surface.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DKyCtCCkFTgcH6VAVK3AJm
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`870c24f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870c24feca1b3f66b8b98685faeab2a0d8b3466c))
+
+### Features
+
+* feat(admin): staff can reset a forgotten admin password (#277)
+
+The admin login had no way back for a staff member who forgot their
+password. Both admin sites (the platform and every store) now mount
+Django's password reset views, which fit because a staff password is a
+Django password on the public-schema row that PlatformStaffBackend
+checks; allauth's reset belongs to the shopper's account and never
+reaches the admin login.
+
+The lookup and the save run in the public schema; only an active staff
+account that could sign in on that host is mailed (a superuser, or a
+staff role in that store; the platform host admits superusers alone).
+The request never looks the address up, it queues one task per accepted
+request, so the answer and its timing are the same for any address.
+Requests are budgeted per client address (429) and per target address
+(silently dropped), and both fail closed when the cache cannot count.
+
+The mail is rendered in the store's default language, sent as the
+store, with a one-time, expiring link on the host that asked. The reset
+sets a password and nothing else: nobody is signed in, authenticators
+are untouched, so a platform superuser still meets the code step, and
+the account's staff API tokens end.
+
+
+Claude-Session: https://claude.ai/code/session_01UTeLQc2mnu9hd6zwPD3bn5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b77cd14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b77cd143008b36187accd0cdd544d1d3b4f67fbb))
+
+### Testing
+
+* test(order): assert the invalid-order 400 carries its code
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`870c24f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870c24feca1b3f66b8b98685faeab2a0d8b3466c))
+
 ## v3.141.3 (2026-10-19)
 
 ### Bug fixes

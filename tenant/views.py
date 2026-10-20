@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.db import connection
 from django.db.models import Prefetch
 from django.utils.cache import patch_vary_headers
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
@@ -27,6 +28,7 @@ from tenant.legal_identity import (
 )
 from tenant.lifecycle import (
     activate_tenant,
+    destroy_refusal,
     destroy_tenant,
     is_protected_tenant,
     suspend_tenant,
@@ -93,7 +95,10 @@ def tenant_resolve(request: Request) -> Response:
     domain = request.query_params.get("domain", "")
     if not domain:
         return Response(
-            {"detail": "domain query parameter is required."},
+            {
+                "detail": "domain query parameter is required.",
+                "code": "domain_required",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -113,7 +118,7 @@ def tenant_resolve(request: Request) -> Response:
     )
     if tenant_domain is None:
         return Response(
-            {"detail": "Store not found."},
+            {"detail": "Store not found.", "code": "store_not_found"},
             status=status.HTTP_404_NOT_FOUND,
         )
     tenant = tenant_domain.tenant
@@ -324,8 +329,14 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
             )
         except ValueError as exc:
             # Protected, still live, or inside the suspension cooldown —
-            # the gates are the lifecycle function's, not this view's.
-            raise ValidationError({"detail": str(exc)}) from exc
+            # the gates are the lifecycle function's, not this view's. The
+            # client gets the gate as a stable code, never the exception.
+            logger.warning("Tenant destroy refused: %s", exc)
+            refusal = destroy_refusal(tenant) or "invalid"
+            raise ValidationError(
+                {"detail": _("This tenant cannot be destroyed right now.")},
+                code=f"tenant_destroy_{refusal}",
+            ) from exc
         return Response(
             {
                 "schemaName": result["schema_name"],
@@ -366,7 +377,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         )
         if not changed and is_protected_tenant(tenant):
             raise ValidationError(
-                {"detail": "This tenant is protected and cannot be suspended."}
+                {"detail": "This tenant is protected and cannot be suspended."},
+                code="tenant_protected",
             )
         tenant.refresh_from_db()
         return Response(
@@ -404,7 +416,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         changed = activate_tenant(tenant)
         if not changed:
             raise ValidationError(
-                {"detail": "This tenant is protected and cannot be activated."}
+                {"detail": "This tenant is protected and cannot be activated."},
+                code="tenant_protected",
             )
         tenant.refresh_from_db()
         return Response(

@@ -59,11 +59,14 @@ class AttributeValueSerializer(
     def validate_attribute(self, value):
         """Validate that the attribute exists and is active."""
         if not value:
-            raise serializers.ValidationError(_("Attribute is required."))
+            raise serializers.ValidationError(
+                _("Attribute is required."), code="attribute_required"
+            )
 
         if not value.active:
             raise serializers.ValidationError(
-                _("Cannot assign value to inactive attribute.")
+                _("Cannot assign value to inactive attribute."),
+                code="attribute_inactive",
             )
 
         return value

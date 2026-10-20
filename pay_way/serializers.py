@@ -71,13 +71,16 @@ class PayWayWriteSerializer(
 
     def validate_cost(self, value: Money) -> Money:
         if value and value.amount < 0:
-            raise serializers.ValidationError(_("Cost cannot be negative."))
+            raise serializers.ValidationError(
+                _("Cost cannot be negative."), code="cost_negative"
+            )
         return value
 
     def validate_free_threshold(self, value: Money) -> Money:
         if value and value.amount < 0:
             raise serializers.ValidationError(
-                _("Free order amount threshold cannot be negative.")
+                _("Free order amount threshold cannot be negative."),
+                code="threshold_negative",
             )
         return value
 
@@ -92,7 +95,8 @@ class PayWayWriteSerializer(
             or getattr(self.instance, "provider_code", "")
         ):
             raise serializers.ValidationError(
-                _("Online payment methods must have a provider code.")
+                _("Online payment methods must have a provider code."),
+                code="provider_code_required",
             )
 
         return attrs

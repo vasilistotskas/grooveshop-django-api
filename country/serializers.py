@@ -128,28 +128,32 @@ class CountryWriteSerializer(
     def validate_alpha_2(self, value: str) -> str:
         if len(value) != 2:
             raise serializers.ValidationError(
-                _("Alpha-2 code must be exactly 2 characters.")
+                _("Alpha-2 code must be exactly 2 characters."),
+                code="alpha2_length",
             )
         return value.upper()
 
     def validate_alpha_3(self, value: str) -> str:
         if len(value) != 3:
             raise serializers.ValidationError(
-                _("Alpha-3 code must be exactly 3 characters.")
+                _("Alpha-3 code must be exactly 3 characters."),
+                code="alpha3_length",
             )
         return value.upper()
 
     def validate_phone_code(self, value: int) -> int:
         if value is not None and (value <= 0 or value > 9999):
             raise serializers.ValidationError(
-                _("Phone code must be between 1 and 9999.")
+                _("Phone code must be between 1 and 9999."),
+                code="phone_code_out_of_range",
             )
         return value
 
     def validate_iso_cc(self, value: int) -> int:
         if value is not None and (value <= 0 or value > 999):
             raise serializers.ValidationError(
-                _("ISO country code must be between 1 and 999.")
+                _("ISO country code must be between 1 and 999."),
+                code="iso_code_out_of_range",
             )
         return value
 

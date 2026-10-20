@@ -71,7 +71,8 @@ class AcsLabelView(APIView):
             )
         except AcsShipment.DoesNotExist as exc:
             raise NotFound(
-                f"No ACS shipment found with voucher {voucher_no!r}."
+                f"No ACS shipment found with voucher {voucher_no!r}.",
+                code="shipment_not_found",
             ) from exc
 
         self.check_object_permissions(request, shipment.order)
@@ -120,7 +121,8 @@ class AcsCancelView(APIView):
             )
         except AcsShipment.DoesNotExist as exc:
             raise NotFound(
-                f"No ACS shipment found with voucher {voucher_no!r}."
+                f"No ACS shipment found with voucher {voucher_no!r}.",
+                code="shipment_not_found",
             ) from exc
 
         reason: str = request.data.get("reason", "")
@@ -138,7 +140,8 @@ class AcsCancelView(APIView):
             return Response(
                 {
                     "detail": exc.error_message
-                    or "ACS rejected the cancellation."
+                    or "ACS rejected the cancellation.",
+                    "code": "acs_cancellation_rejected",
                 },
                 status=400,
             )
@@ -172,7 +175,8 @@ class AcsTrackingView(APIView):
             )
         except AcsShipment.DoesNotExist as exc:
             raise NotFound(
-                f"No ACS shipment found with voucher {voucher_no!r}."
+                f"No ACS shipment found with voucher {voucher_no!r}.",
+                code="shipment_not_found",
             ) from exc
 
         self.check_object_permissions(request, shipment.order)

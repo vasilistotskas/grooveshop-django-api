@@ -28,11 +28,13 @@ def _int_list(raw: str, *, field: str) -> list[int]:
         values = [int(part) for part in raw.split(",") if part.strip()]
     except ValueError as exc:
         raise serializers.ValidationError(
-            {field: _("Must be a comma-separated list of product ids.")}
+            {field: _("Must be a comma-separated list of product ids.")},
+            code="product_ids_invalid",
         ) from exc
     if any(value < 1 for value in values):
         raise serializers.ValidationError(
-            {field: _("Product ids must be positive.")}
+            {field: _("Product ids must be positive.")},
+            code="product_ids_not_positive",
         )
     return values
 
@@ -76,7 +78,8 @@ class RecommendationQuerySerializer(serializers.Serializer):
         seed_ids = list(dict.fromkeys(seed_ids))[:_MAX_SEEDS]
         if not seed_ids and attrs["surface"] != Surface.EMPTY_CART:
             raise serializers.ValidationError(
-                {"seed": _("A seed product is required for this surface.")}
+                {"seed": _("A seed product is required for this surface.")},
+                code="seed_required",
             )
         attrs["seed_ids"] = seed_ids
         attrs["exclude_ids"] = _int_list(
@@ -127,10 +130,13 @@ class RecommendationEventRequestSerializer(serializers.Serializer):
 
     def validate_items(self, value):
         if not value:
-            raise serializers.ValidationError(_("At least one item."))
+            raise serializers.ValidationError(
+                _("At least one item."), code="items_required"
+            )
         if len(value) > _MAX_SEEDS:
             raise serializers.ValidationError(
-                _("At most %(n)s items per event.") % {"n": _MAX_SEEDS}
+                _("At most %(n)s items per event.") % {"n": _MAX_SEEDS},
+                code="too_many_items",
             )
         return value
 

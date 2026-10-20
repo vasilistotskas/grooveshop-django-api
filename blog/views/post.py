@@ -276,7 +276,12 @@ class BlogPostViewSet(BaseModelViewSet):
     def update_likes(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(
-                {"detail": _("Authentication credentials were not provided.")},
+                {
+                    "detail": _(
+                        "Authentication credentials were not provided."
+                    ),
+                    "code": "authentication_required",
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -335,10 +340,7 @@ class BlogPostViewSet(BaseModelViewSet):
         # - a 500 on what was an AllowAny action.
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(
-                request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+        request_serializer.is_valid(raise_exception=True)
 
         user = request.user
         post_ids = request_serializer.validated_data["post_ids"]
@@ -375,7 +377,10 @@ class BlogPostViewSet(BaseModelViewSet):
             queryset = comment_filterset.qs
         else:
             return Response(
-                {"filter_errors": comment_filterset.errors},
+                {
+                    "filter_errors": comment_filterset.errors,
+                    "code": "invalid_filter",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -330,7 +330,7 @@ class GiftCardViewSet(BaseModelViewSet):
         purchase_uuid = (request.query_params.get("uuid") or "").strip()
         if not purchase_uuid:
             return Response(
-                {"detail": _("Missing uuid.")},
+                {"detail": _("Missing uuid."), "code": "uuid_required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         from django.core.exceptions import (
@@ -345,7 +345,10 @@ class GiftCardViewSet(BaseModelViewSet):
             ValueError,
         ):
             return Response(
-                {"detail": _("Purchase not found.")},
+                {
+                    "detail": _("Purchase not found."),
+                    "code": "purchase_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 

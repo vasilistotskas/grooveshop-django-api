@@ -917,6 +917,7 @@ class OrderViewSet(BaseModelViewSet):
                 "error": {
                     "type": OrderCreateErrorType.INVALID_ORDER_DATA,
                 },
+                "code": OrderCreateErrorType.INVALID_ORDER_DATA,
             }
             if e.field_errors:
                 error_response["field_errors"] = e.field_errors
@@ -1024,15 +1025,8 @@ class OrderViewSet(BaseModelViewSet):
 
         except ValidationError as e:
             logger.warning("Validation error: %s", e)
-            error_detail = (
-                e.detail
-                if hasattr(e, "detail")
-                else {"detail": _("Validation error")}
-            )
-            return Response(
-                error_detail,
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            # Re-raised so the API handler adds code and fields.
+            raise
 
         except PermissionDenied:
             return Response(

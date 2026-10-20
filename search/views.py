@@ -105,7 +105,9 @@ def _parse_int(value: str | None, default: int, name: str) -> int:
     try:
         return max(0, int(value))
     except ValueError, TypeError:
-        raise ValidationError({name: _("Must be a valid integer.")})
+        raise ValidationError(
+            {name: _("Must be a valid integer.")}, code="invalid_integer"
+        )
 
 
 def _parse_optional_int(value: str | None, name: str) -> int | None:
@@ -115,7 +117,9 @@ def _parse_optional_int(value: str | None, name: str) -> int | None:
     try:
         return int(value)
     except ValueError, TypeError:
-        raise ValidationError({name: _("Must be a valid integer.")})
+        raise ValidationError(
+            {name: _("Must be a valid integer.")}, code="invalid_integer"
+        )
 
 
 def _parse_optional_float(value: str | None, name: str) -> float | None:
@@ -125,7 +129,9 @@ def _parse_optional_float(value: str | None, name: str) -> float | None:
     try:
         return float(value)
     except ValueError, TypeError:
-        raise ValidationError({name: _("Must be a valid number.")})
+        raise ValidationError(
+            {name: _("Must be a valid number.")}, code="invalid_number"
+        )
 
 
 def _parse_int_csv(value: str | None, name: str) -> list[int]:
@@ -136,7 +142,8 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         return [int(v.strip()) for v in value.split(",") if v.strip()]
     except ValueError, TypeError:
         raise ValidationError(
-            {name: _("Must be a comma-separated list of integers.")}
+            {name: _("Must be a comma-separated list of integers.")},
+            code="invalid_integer_list",
         )
 
 
@@ -158,7 +165,9 @@ def _parse_bool_flag(value: str | None, name: str) -> bool:
         return True
     if lowered in _FALSE_VALUES:
         return False
-    raise ValidationError({name: _("Must be true or false.")})
+    raise ValidationError(
+        {name: _("Must be true or false.")}, code="invalid_boolean"
+    )
 
 
 def _category_subtree_ids(category_ids: list[int]) -> list[int]:
@@ -224,7 +233,10 @@ def _record_engine_time(request, milliseconds) -> None:
 
 def _validate_language_code(language_code: str | None) -> str | None:
     if language_code and language_code not in _VALID_LANGUAGE_CODES:
-        raise ValidationError({"language_code": _("Invalid language code.")})
+        raise ValidationError(
+            {"language_code": _("Invalid language code.")},
+            code="invalid_language",
+        )
     return language_code
 
 
@@ -312,7 +324,9 @@ def _relaxed_query(query: str) -> str | None:
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
     if not query:
-        raise ValidationError({"error": _("A search query is required.")})
+        raise ValidationError(
+            {"error": _("A search query is required.")}, code="query_required"
+        )
 
     limit = min(
         _parse_int(request.query_params.get("limit"), 10, "limit"),
@@ -758,7 +772,9 @@ def federated_search(request):
     # Parse and validate query parameters
     query = request.query_params.get("query")
     if not query:
-        raise ValidationError({"error": _("A search query is required.")})
+        raise ValidationError(
+            {"error": _("A search query is required.")}, code="query_required"
+        )
 
     limit = min(
         _parse_int(request.query_params.get("limit"), 20, "limit"),
@@ -873,7 +889,8 @@ def federated_search(request):
     except Exception as e:
         logger.error(f"Federated search failed: {e!s}")
         raise ValidationError(
-            {"error": _("Search failed. Please try again later.")}
+            {"error": _("Search failed. Please try again later.")},
+            code="search_failed",
         )
 
     # Extract hits and metadata
@@ -1014,7 +1031,7 @@ def _analytics_day(value: str | None, invalid: StrOrPromise) -> date | None:
     try:
         return date.fromisoformat(value)
     except ValueError:
-        raise ValidationError({"error": invalid}) from None
+        raise ValidationError({"error": invalid}, code="invalid_date") from None
 
 
 def _start_of_local_day(day: date) -> datetime:
@@ -1113,7 +1130,8 @@ def search_analytics(request):
     )
     if start_date and end_date and start_date > end_date:
         raise ValidationError(
-            {"error": _("start_date must not be after end_date.")}
+            {"error": _("start_date must not be after end_date.")},
+            code="date_range_invalid",
         )
     if start_date:
         queries_qs = queries_qs.filter(
@@ -1132,7 +1150,8 @@ def search_analytics(request):
                     "error": _(
                         "Invalid content_type. Must be 'product', 'blog_post', or 'federated'"
                     )
-                }
+                },
+                code="invalid_content_type",
             )
         queries_qs = queries_qs.filter(content_type=content_type_filter)
 
@@ -1320,7 +1339,10 @@ def search_trending(request):
         and _VALID_LANGUAGE_CODES
         and language_code not in _VALID_LANGUAGE_CODES
     ):
-        raise ValidationError({"language_code": _("Unsupported language.")})
+        raise ValidationError(
+            {"language_code": _("Unsupported language.")},
+            code="unsupported_language",
+        )
 
     cache_key = f"search:trending:{content_type}:{language_code}:{limit}"
 

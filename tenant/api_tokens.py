@@ -93,7 +93,9 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
                 try:
                     digest = hash_token(token)
                 except (TypeError, binascii.Error) as exc:
-                    raise exceptions.AuthenticationFailed(msg) from exc
+                    raise exceptions.AuthenticationFailed(
+                        msg, code="invalid_token"
+                    ) from exc
                 if not compare_digest(digest, auth_token.digest):
                     continue
 
@@ -105,7 +107,7 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
                 authenticated = (user, auth_token)
                 break
         if authenticated is None:
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(msg, code="invalid_token")
         # Deliberately OUTSIDE the public-schema context: the question is
         # about the tenant the REQUEST is on, and inside that block
         # ``connection`` reports public.
@@ -141,7 +143,8 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
             return
         if not is_store_staff(user):
             raise exceptions.AuthenticationFailed(
-                _("This staff token grants no access to this store.")
+                _("This staff token grants no access to this store."),
+                code="staff_token_no_access",
             )
 
     def validate_user(self, auth_token):
@@ -150,6 +153,6 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
         # an outstanding token must stop working the moment it does.
         if not user.is_staff:
             raise exceptions.AuthenticationFailed(
-                _("User is no longer platform staff.")
+                _("User is no longer platform staff."), code="staff_revoked"
             )
         return user, auth_token

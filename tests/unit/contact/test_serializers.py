@@ -356,6 +356,7 @@ class TestContactWriteSerializer(TestCase):
 
         assert "name" in serializer.errors
         assert "at least 2 characters" in str(serializer.errors["name"][0])
+        assert serializer.errors["name"][0].code == "name_too_short"
 
     def test_empty_data_validation(self):
         serializer = ContactWriteSerializer(data={})

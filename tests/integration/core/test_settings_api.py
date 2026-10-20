@@ -149,6 +149,8 @@ class TestGetSettingByKeyPublicAccess:
         url = reverse("api-settings-get")
         response = client.get(url)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["code"] == "missing_key"
+        assert response.data["error"] == "missing_key"
 
     def test_acs_smartpoint_enabled_is_whitelisted(self):
         client = _anon_client()

@@ -82,20 +82,24 @@ class ContactAttachmentSerializer(
             # Belt and braces: the view is gated too. A serializer
             # reachable from anywhere else must not become the hole.
             raise serializers.ValidationError(
-                _("Attachments are not accepted.")
+                _("Attachments are not accepted."), code="attachments_disabled"
             )
         if not upload.size:
-            raise serializers.ValidationError(_("The file is empty."))
+            raise serializers.ValidationError(
+                _("The file is empty."), code="file_empty"
+            )
         if upload.size > policy.max_bytes:
             raise serializers.ValidationError(
                 _("The file is larger than the %(mb)s MB limit.")
-                % {"mb": policy.max_megabytes}
+                % {"mb": policy.max_megabytes},
+                code="file_too_large",
             )
         sniffed = sniff_content_type(upload)
         if not policy.accepts(sniffed):
             raise serializers.ValidationError(
                 _("That file type is not accepted. Allowed: %(types)s.")
-                % {"types": ", ".join(policy.allowed_types)}
+                % {"types": ", ".join(policy.allowed_types)},
+                code="file_type_not_allowed",
             )
         self._sniffed_type = sniffed or ""
         return upload
@@ -154,7 +158,8 @@ def _digest(upload, *, ceiling: int) -> tuple[str, int]:
                 {
                     "file": _("The file is larger than the %(mb)s MB limit.")
                     % {"mb": ceiling // (1024 * 1024)}
-                }
+                },
+                code="file_too_large",
             )
         digest.update(chunk)
     upload.seek(0)
@@ -217,14 +222,17 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
         policy = AttachmentPolicy()
         if not policy.enabled:
             raise serializers.ValidationError(
-                _("Attachments are not accepted.")
+                _("Attachments are not accepted."), code="attachments_disabled"
             )
         if len(value) > policy.max_count:
             raise serializers.ValidationError(
-                _("At most %(count)s files.") % {"count": policy.max_count}
+                _("At most %(count)s files.") % {"count": policy.max_count},
+                code="too_many_attachments",
             )
         if len(set(value)) != len(value):
-            raise serializers.ValidationError(_("Duplicate attachment."))
+            raise serializers.ValidationError(
+                _("Duplicate attachment."), code="duplicate_attachment"
+            )
 
         # The queryset is tenant-scoped by the schema the connection is
         # bound to — there is no cross-tenant read to guard against
@@ -241,7 +249,8 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
                 _(
                     "One of the files is no longer available. Please "
                     "re-attach it."
-                )
+                ),
+                code="attachment_unavailable",
             )
         self._attachments = rows
         return value
@@ -261,7 +270,9 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
                 error_messages.append(f"{field}: {error}")
 
             if error_messages:
-                raise serializers.ValidationError(", ".join(error_messages))
+                raise serializers.ValidationError(
+                    ", ".join(error_messages), code="message_rejected"
+                )
 
         attrs["message"] = sanitize_message(message)
 
@@ -290,14 +301,16 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
                                 "One of the files is no longer available. "
                                 "Please re-attach it."
                             )
-                        }
+                        },
+                        code="attachment_unavailable",
                     )
         return contact
 
     def validate_name(self, value: str) -> str:
         if len(value.strip()) < 2:
             raise serializers.ValidationError(
-                _("Name must be at least 2 characters long.")
+                _("Name must be at least 2 characters long."),
+                code="name_too_short",
             )
         return value.strip()
 
@@ -315,7 +328,8 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
         cleaned = sanitize_message(value)
         if cleaned and not _PHONE_RE.fullmatch(cleaned):
             raise serializers.ValidationError(
-                _("Enter a phone number, using digits and + ( ) - only.")
+                _("Enter a phone number, using digits and + ( ) - only."),
+                code="phone_invalid",
             )
         return cleaned
 
@@ -325,11 +339,13 @@ class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
     def validate_message(self, value: str) -> str:
         if len(value.strip()) < 10:
             raise serializers.ValidationError(
-                _("Message must be at least 10 characters long.")
+                _("Message must be at least 10 characters long."),
+                code="message_too_short",
             )
         if len(value) > 5000:
             raise serializers.ValidationError(
-                _("Message is too long. Maximum 5000 characters allowed.")
+                _("Message is too long. Maximum 5000 characters allowed."),
+                code="message_too_long",
             )
         return value.strip()
 
@@ -372,7 +388,9 @@ class FeedbackWriteSerializer(serializers.ModelSerializer[Feedback]):
                 error_messages.append(f"{field}: {error}")
 
             if error_messages:
-                raise serializers.ValidationError(", ".join(error_messages))
+                raise serializers.ValidationError(
+                    ", ".join(error_messages), code="feedback_rejected"
+                )
 
         attrs["message"] = sanitize_message(message)
         attrs["name"] = name.strip()
@@ -382,6 +400,6 @@ class FeedbackWriteSerializer(serializers.ModelSerializer[Feedback]):
     def validate_rating(self, value: int) -> int:
         if not 1 <= value <= 5:
             raise serializers.ValidationError(
-                _("Rating must be between 1 and 5.")
+                _("Rating must be between 1 and 5."), code="rating_out_of_range"
             )
         return value

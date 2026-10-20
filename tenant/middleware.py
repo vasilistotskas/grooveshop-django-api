@@ -136,7 +136,8 @@ class SuspendedTenantMiddleware:
                     "detail": _(
                         "This store is temporarily unavailable. Please "
                         "contact the store owner."
-                    )
+                    ),
+                    "code": "store_unavailable",
                 },
                 status=503,
             )

@@ -170,7 +170,9 @@ class BlogPostWriteSerializer(
 
     def validate_slug(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError(_("Slug is required."))
+            raise serializers.ValidationError(
+                _("Slug is required."), code="slug_required"
+            )
 
         queryset = BlogPost.objects.filter(slug=value)
         if self.instance:
@@ -178,7 +180,7 @@ class BlogPostWriteSerializer(
 
         if queryset.exists():
             raise serializers.ValidationError(
-                _("A post with this slug already exists.")
+                _("A post with this slug already exists."), code="slug_taken"
             )
 
         return value
@@ -186,12 +188,12 @@ class BlogPostWriteSerializer(
     def validate_tags(self, value: list) -> list:
         if not value:
             raise serializers.ValidationError(
-                _("At least one tag is required.")
+                _("At least one tag is required."), code="tags_required"
             )
 
         if len(value) > 10:
             raise serializers.ValidationError(
-                _("Maximum 10 tags allowed per post.")
+                _("Maximum 10 tags allowed per post."), code="too_many_tags"
             )
 
         return value

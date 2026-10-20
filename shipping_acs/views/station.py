@@ -219,7 +219,10 @@ class AcsStationViewSet(
 
         if not postal:
             return Response(
-                {"detail": "postalCode query parameter is required."},
+                {
+                    "detail": "postalCode query parameter is required.",
+                    "code": "postal_code_required",
+                },
                 status=400,
             )
 

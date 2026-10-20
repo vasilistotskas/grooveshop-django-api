@@ -58,7 +58,11 @@ def notifications_by_ids(request):
 
     if not notification_ids:
         return Response(
-            {"error": _("No notification ids provided.")},
+            {
+                "error": _("No notification ids provided."),
+                "detail": _("No notification ids provided."),
+                "code": "notification_ids_required",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -85,7 +89,11 @@ def notifications_by_ids(request):
 
     if not notifications.exists():
         return Response(
-            {"error": _("No notifications found for the provided ids.")},
+            {
+                "error": _("No notifications found for the provided ids."),
+                "detail": _("No notifications found for the provided ids."),
+                "code": "notifications_not_found",
+            },
             status=status.HTTP_404_NOT_FOUND,
         )
 

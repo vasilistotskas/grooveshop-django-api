@@ -73,7 +73,10 @@ class BoxNowLabelView(APIView):
         except BoxNowShipment.DoesNotExist:
             from rest_framework.exceptions import NotFound
 
-            raise NotFound(f"No shipment found with parcel ID {parcel_id!r}.")
+            raise NotFound(
+                f"No shipment found with parcel ID {parcel_id!r}.",
+                code="shipment_not_found",
+            )
 
         # Enforce IsOwnerOrAdminOrGuest against the Order.
         self.check_object_permissions(request, shipment.order)
@@ -136,7 +139,10 @@ class BoxNowCancelView(APIView):
         except BoxNowShipment.DoesNotExist:
             from rest_framework.exceptions import NotFound
 
-            raise NotFound(f"No shipment found with parcel ID {parcel_id!r}.")
+            raise NotFound(
+                f"No shipment found with parcel ID {parcel_id!r}.",
+                code="shipment_not_found",
+            )
 
         reason: str = request.data.get("reason", "")
 

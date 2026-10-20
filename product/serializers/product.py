@@ -252,27 +252,34 @@ class ProductWriteSerializer(
     def validate_price(self, value: Money) -> Money:
         if value.amount <= 0:
             raise serializers.ValidationError(
-                _("Price must be greater than zero.")
+                _("Price must be greater than zero."), code="price_not_positive"
             )
         if value.amount > 99999:
-            raise serializers.ValidationError(_("Price cannot exceed 99,999."))
+            raise serializers.ValidationError(
+                _("Price cannot exceed 99,999."), code="price_too_large"
+            )
         return value
 
     def validate_stock(self, value: int) -> int:
         if value < 0:
-            raise serializers.ValidationError(_("Stock cannot be negative."))
+            raise serializers.ValidationError(
+                _("Stock cannot be negative."), code="stock_negative"
+            )
         return value
 
     def validate_discount_percent(self, value: int) -> int:
         if value < 0 or value > 100:
             raise serializers.ValidationError(
-                _("Discount percent must be between 0 and 100.")
+                _("Discount percent must be between 0 and 100."),
+                code="discount_out_of_range",
             )
         return value
 
     def validate_slug(self, value: str) -> str:
         if not value:
-            raise serializers.ValidationError(_("Slug is required."))
+            raise serializers.ValidationError(
+                _("Slug is required."), code="slug_required"
+            )
 
         queryset = Product.objects.filter(slug=value)
         if self.instance:
@@ -280,7 +287,7 @@ class ProductWriteSerializer(
 
         if queryset.exists():
             raise serializers.ValidationError(
-                _("A post with this slug already exists.")
+                _("A post with this slug already exists."), code="slug_taken"
             )
 
         return value

@@ -76,7 +76,8 @@ class BusinessProfileWriteSerializer(serializers.Serializer):
         cleaned = VAT_PREFIX_RE.sub("", value.strip().upper()).strip()
         if not is_valid_greek_vat(cleaned):
             raise serializers.ValidationError(
-                _("Enter a valid Greek VAT number (ΑΦΜ).")
+                _("Enter a valid Greek VAT number (ΑΦΜ)."),
+                code="vat_id_invalid",
             )
         return cleaned
 

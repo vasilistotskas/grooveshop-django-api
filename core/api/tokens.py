@@ -62,7 +62,8 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
                 _(
                     "Token has exceeded its maximum lifetime. "
                     "Please log in again."
-                )
+                ),
+                code="token_expired",
             )
 
     def authenticate_credentials(self, token):

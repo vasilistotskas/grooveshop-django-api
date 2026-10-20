@@ -64,7 +64,7 @@ class TagWriteSerializer(
     def validate_sort_order(self, value: int) -> int:
         if value is not None and value < 0:
             raise serializers.ValidationError(
-                _("Sort order cannot be negative.")
+                _("Sort order cannot be negative."), code="sort_order_negative"
             )
         return value
 

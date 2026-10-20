@@ -82,7 +82,8 @@ class SubscriptionTopicWriteSerializer(
 
         if SubscriptionTopic.objects.filter(slug=value).exists():
             raise serializers.ValidationError(
-                _("A subscription topic with this slug already exists.")
+                _("A subscription topic with this slug already exists."),
+                code="topic_slug_taken",
             )
         return value
 
@@ -113,7 +114,8 @@ class SubscriptionTopicWriteSerializer(
                             "Only one active newsletter topic can be the "
                             "default."
                         )
-                    }
+                    },
+                    code="default_topic_exists",
                 )
         return attrs
 
@@ -153,10 +155,13 @@ class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
             topic = SubscriptionTopic.objects.get(id=value.id)
             if not topic.is_active:
                 raise serializers.ValidationError(
-                    _("This topic is not available for subscription.")
+                    _("This topic is not available for subscription."),
+                    code="topic_unavailable",
                 )
         except SubscriptionTopic.DoesNotExist as e:
-            raise serializers.ValidationError(_("Invalid topic ID.")) from e
+            raise serializers.ValidationError(
+                _("Invalid topic ID."), code="topic_invalid"
+            ) from e
 
         if self.instance is None:
             request = self.context.get("request")
@@ -170,7 +175,8 @@ class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
                         == UserSubscription.SubscriptionStatus.ACTIVE
                     ):
                         raise serializers.ValidationError(
-                            _("You are already subscribed to this topic.")
+                            _("You are already subscribed to this topic."),
+                            code="already_subscribed",
                         )
                     elif (
                         existing.status
@@ -179,7 +185,8 @@ class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
                         raise serializers.ValidationError(
                             _(
                                 "Your subscription to this topic is pending confirmation."
-                            )
+                            ),
+                            code="subscription_pending",
                         )
 
         return value
@@ -209,10 +216,13 @@ class UserSubscriptionWriteSerializer(
             topic = SubscriptionTopic.objects.get(id=value.id)
             if not topic.is_active:
                 raise serializers.ValidationError(
-                    _("This topic is not available for subscription.")
+                    _("This topic is not available for subscription."),
+                    code="topic_unavailable",
                 )
         except SubscriptionTopic.DoesNotExist as e:
-            raise serializers.ValidationError(_("Invalid topic ID.")) from e
+            raise serializers.ValidationError(
+                _("Invalid topic ID."), code="topic_invalid"
+            ) from e
 
         if self.instance is None:
             request = self.context.get("request")
@@ -226,7 +236,8 @@ class UserSubscriptionWriteSerializer(
                         == UserSubscription.SubscriptionStatus.ACTIVE
                     ):
                         raise serializers.ValidationError(
-                            _("You are already subscribed to this topic.")
+                            _("You are already subscribed to this topic."),
+                            code="already_subscribed",
                         )
                     elif (
                         existing.status
@@ -235,7 +246,8 @@ class UserSubscriptionWriteSerializer(
                         raise serializers.ValidationError(
                             _(
                                 "Your subscription to this topic is pending confirmation."
-                            )
+                            ),
+                            code="subscription_pending",
                         )
 
         return value
@@ -262,7 +274,10 @@ class BulkSubscriptionSerializer(serializers.Serializer):
         invalid_ids = set(value) - existing_ids
         if invalid_ids:
             raise serializers.ValidationError(
-                _("Invalid or inactive topic IDs: {}").format(list(invalid_ids))
+                _("Invalid or inactive topic IDs: {}").format(
+                    list(invalid_ids)
+                ),
+                code="topic_ids_invalid",
             )
 
         return value
@@ -305,7 +320,7 @@ class NewsletterSubscribeSerializer(serializers.Serializer):
     def validate_consent(self, value: bool) -> bool:
         if value is not True:
             raise serializers.ValidationError(
-                _("Consent is required to subscribe.")
+                _("Consent is required to subscribe."), code="consent_required"
             )
         return value
 

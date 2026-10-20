@@ -93,7 +93,8 @@ class ProductCategoryImageWriteSerializer(
 
             if existing.exists():
                 raise serializers.ValidationError(
-                    f"An image of type '{image_type}' already exists for this category."
+                    f"An image of type '{image_type}' already exists for this category.",
+                    code="image_type_exists",
                 )
 
         return super().validate(attrs)
@@ -109,7 +110,7 @@ class ProductCategoryImageBulkUpdateSerializer(serializers.Serializer):
     def validate_image_ids(self, value: list[int]) -> list[int]:
         if not value:
             raise serializers.ValidationError(
-                "At least one image ID is required."
+                "At least one image ID is required.", code="image_ids_required"
             )
 
         existing_ids = ProductCategoryImage.objects.filter(
@@ -119,7 +120,8 @@ class ProductCategoryImageBulkUpdateSerializer(serializers.Serializer):
         missing_ids = set(value) - set(existing_ids)
         if missing_ids:
             raise serializers.ValidationError(
-                f"Images with IDs {list(missing_ids)} do not exist."
+                f"Images with IDs {list(missing_ids)} do not exist.",
+                code="images_not_found",
             )
 
         return value

@@ -637,7 +637,10 @@ def list_settings(request):
         logger.exception("Error listing settings")
 
         return Response(
-            {"detail": _("Failed to retrieve settings")},
+            {
+                "detail": _("Failed to retrieve settings"),
+                "code": "settings_unavailable",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -799,6 +802,7 @@ def get_setting_by_key(request):
             error_data = {
                 "detail": _("Setting key is required"),
                 "error": "missing_key",
+                "code": "missing_key",
             }
             return Response(
                 error_data,
@@ -827,7 +831,10 @@ def get_setting_by_key(request):
             and not Setting.objects.filter(name=key).exists()
         ):
             return Response(
-                {"detail": _("Setting not found or access denied.")},
+                {
+                    "detail": _("Setting not found or access denied."),
+                    "code": "setting_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -835,7 +842,10 @@ def get_setting_by_key(request):
             not is_store_staff(request.user)
         ):
             return Response(
-                {"detail": _("Setting not found or access denied.")},
+                {
+                    "detail": _("Setting not found or access denied."),
+                    "code": "setting_not_found",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -853,6 +863,7 @@ def get_setting_by_key(request):
             error_data = {
                 "detail": _("Setting '%(key)s' not found") % {"key": key},
                 "error": "not_found",
+                "code": "setting_not_found",
             }
             return Response(
                 error_data,
@@ -863,7 +874,10 @@ def get_setting_by_key(request):
         logger.exception("Error retrieving setting")
 
         return Response(
-            {"detail": _("Failed to retrieve setting")},
+            {
+                "detail": _("Failed to retrieve setting"),
+                "code": "setting_unavailable",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -922,6 +936,9 @@ def get_public_settings(request):
         logger.exception("Error retrieving public settings")
 
         return Response(
-            {"detail": _("Failed to retrieve settings")},
+            {
+                "detail": _("Failed to retrieve settings"),
+                "code": "settings_unavailable",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

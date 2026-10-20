@@ -82,6 +82,10 @@ def test_validation_errors_are_per_field_lists_under_camel_case_keys(
     body = response.json()
     assert "payWayId" in body
     assert "pay_way_id" not in body
-    for messages in body.values():
+    assert body["code"] == "required"
+    assert "payWayId" in body["fields"]
+    for key, messages in body.items():
+        if key in {"code", "fields"}:
+            continue
         assert isinstance(messages, list)
         assert all(isinstance(message, str) for message in messages)

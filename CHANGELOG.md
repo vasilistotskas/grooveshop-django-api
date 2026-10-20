@@ -3,6 +3,21 @@
 
 
 
+## v3.142.3 (2026-10-20)
+
+### Bug fixes
+
+* fix: retire the unused team role, erase guest alerts and contact messages, edit LinkedIn (#285)
+
+- Remove the retired MEMBER team role: no default role, forms offer an
+  empty choice first, and existing MEMBER rows become inactive STAFF rows
+  so nobody gains access.
+- Erase guest product alerts and contact messages sent from an address the
+  account has verified, the same rows the data export already includes.
+- Let a store edit its LinkedIn link, which the Branding tab already shows.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e733e09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e733e09e02e7f03b42822244e1583e63c08a520e))
+
 ## v3.142.2 (2026-10-20)
 
 ### Bug fixes

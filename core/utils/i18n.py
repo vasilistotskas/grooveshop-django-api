@@ -10,7 +10,7 @@ def available_language_codes() -> frozenset[str]:
     Read from ``PARLER_LANGUAGES`` rather than ``settings.LANGUAGES``
     because the callers are asking about TRANSLATION rows, and parler is
     what decides which of those exist. The two agree today (``el``,
-    ``en``, ``de``); parler is the one that would still be right if a UI
+    ``en``); parler is the one that would still be right if a UI
     language were added without translated content behind it.
 
     ``SITE_ID`` first, then parler's global bucket — which is the
@@ -92,3 +92,20 @@ def stated_request_language(request) -> str:
 
 def resolve_request_language(request) -> str:
     return stated_request_language(request) or settings.LANGUAGE_CODE
+
+
+def delete_translations_in(language_code: str, *model_labels: str):
+    """A ``RunPython`` forward step that deletes the rows of *language_code*
+    from the named parler translation models (``"app_label.ModelName"``).
+
+    For a language the platform stopped serving: its rows would otherwise
+    be indexed and listed by anything that reads every translation row.
+    There is no way back; the content is gone."""
+
+    def forward(apps, schema_editor):
+        for label in model_labels:
+            apps.get_model(label).objects.filter(
+                language_code=language_code
+            ).delete()
+
+    return forward

@@ -59,7 +59,7 @@ class CountryTranslationFactory(factory.django.DjangoModelFactory):
 
 
 @custom_seeding(
-    description="Creates countries based on PARLER_LANGUAGES settings (el→GR, en→GB, de→DE)",
+    description="Creates countries based on PARLER_LANGUAGES settings (el→GR, en→GB)",
     settings_key="PARLER_LANGUAGES",
 )
 class CountryFactory(CustomDjangoModelFactory):

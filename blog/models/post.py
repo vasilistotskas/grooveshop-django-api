@@ -272,13 +272,6 @@ class BlogPostTranslation(
             "υπερθέρμανση": ["καίει", "καίγεται"],
             "καίει": ["καίγεται", "υπερθέρμανση"],
             "καίγεται": ["καίει", "υπερθέρμανση"],
-            # German synonyms
-            "artikel": ["blog", "beitrag"],
-            "beitrag": ["artikel", "blog"],
-            "anleitung": ["tutorial", "leitfaden"],
-            "leitfaden": ["anleitung", "tutorial"],
-            "bewertung": ["analyse", "rezension"],
-            "rezension": ["bewertung", "analyse"],
         }
         typo_tolerance = {
             "enabled": True,

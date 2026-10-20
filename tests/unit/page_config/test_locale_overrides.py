@@ -111,7 +111,7 @@ class TestSectionLocaleOverrides(TestCase):
         self.assertEqual(section["props"]["heading"], GREEK_HEADING)
 
     def test_a_locale_with_no_override_falls_back_to_the_default(self):
-        (section,) = self._sections(locale="de")
+        (section,) = self._sections(locale="fr")
 
         self.assertEqual(section["props"]["heading"], GREEK_HEADING)
 

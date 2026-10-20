@@ -867,7 +867,7 @@ from devtools.factories import CustomDjangoModelFactory
 from your_app.models import YourModel
 
 fake = Faker()
-available_languages = ["el", "en", "de"]
+available_languages = ["el", "en"]
 
 
 class YourModelTranslationFactory(factory.django.DjangoModelFactory):

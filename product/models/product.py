@@ -755,17 +755,12 @@ class ProductTranslation(
             "notebook": ["laptop", "portable computer"],
             "phone": ["mobile", "smartphone", "cellphone"],
             "mobile": ["phone", "smartphone", "cellphone"],
-            "smartphone": ["phone", "mobile", "cellphone", "handy"],
+            "smartphone": ["phone", "mobile", "cellphone"],
             # Greek synonyms
             "υπολογιστής": ["κομπιούτερ", "pc"],
             "κομπιούτερ": ["υπολογιστής", "pc"],
             "τηλέφωνο": ["κινητό"],
             "κινητό": ["τηλέφωνο"],
-            # German synonyms
-            "handy": ["smartphone", "mobiltelefon"],
-            "mobiltelefon": ["handy", "smartphone"],
-            "computer": ["rechner", "pc"],
-            "rechner": ["computer", "pc"],
         }
         # Same thresholds as BlogPostTranslation — cross-index
         # consistency matters because both feed the federated search.

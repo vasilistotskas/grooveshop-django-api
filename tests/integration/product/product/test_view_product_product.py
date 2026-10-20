@@ -519,10 +519,10 @@ class ProductViewSetTestCase(APITestCase):
                         "seo_description": "Complex Product SEO Description",
                         "seo_keywords": "complex, product, test",
                     },
-                    "de": {
-                        "name": "Complex Product DE",
-                        "description": "Complex product description DE",
-                        "seo_title": "Complex Product SEO Title DE",
+                    "el": {
+                        "name": "Complex Product EL",
+                        "description": "Complex product description EL",
+                        "seo_title": "Complex Product SEO Title EL",
                     },
                 }
             ),
@@ -555,12 +555,12 @@ class ProductViewSetTestCase(APITestCase):
             )
             self.assertEqual(product.seo_keywords, "complex, product, test")
 
-        if "de" in [
+        if "el" in [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]:
-            product.set_current_language("de")
-            self.assertEqual(product.name, "Complex Product DE")
-            self.assertEqual(product.seo_title, "Complex Product SEO Title DE")
+            product.set_current_language("el")
+            self.assertEqual(product.name, "Complex Product EL")
+            self.assertEqual(product.seo_title, "Complex Product SEO Title EL")
             self.assertEqual(product.seo_description, "")
 
     def test_queryset_optimization(self):

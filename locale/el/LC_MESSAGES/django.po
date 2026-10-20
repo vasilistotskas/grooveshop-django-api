@@ -5472,9 +5472,6 @@ msgstr "Γενικός τύπος εκπλήρωσης, ανεξάρτητος �
 msgid "Generic template for any status update"
 msgstr "Γενικό πρότυπο για οποιαδήποτε ενημέρωση κατάστασης"
 
-msgid "German"
-msgstr "Γερμανικά"
-
 msgid "Get Discount Percent"
 msgstr "Ποσοστό έκπτωσης λήψης"
 
@@ -6708,11 +6705,11 @@ msgstr "Γλώσσα που καταγράφεται κατά τη δημιου�
 msgid "Language code for translations (%s)"
 msgstr "Κωδικός γλώσσας για μεταφράσεις (%s)"
 
-msgid "Language code for translations (el, en, de)"
-msgstr "Κωδικός γλώσσας για μεταφράσεις (el, en, de)"
+msgid "Language code for translations (el, en)"
+msgstr "Κωδικός γλώσσας για μεταφράσεις (el, en)"
 
-msgid "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
-msgstr "Κωδικός γλώσσας για φιλτράρισμα αποτελεσμάτων (π.χ. 'en', 'el', 'de'). Αν δεν δοθεί, αναζητά σε όλες τις γλώσσες."
+msgid "Language code to filter results (e.g., 'en', 'el'). If not provided, searches all languages."
+msgstr "Κωδικός γλώσσας για φιλτράρισμα αποτελεσμάτων (π.χ. 'en', 'el'). Αν δεν δοθεί, αναζητά σε όλες τις γλώσσες."
 
 msgid "Language the subscription was made in; its emails use it."
 msgstr "Η γλώσσα στην οποία έγινε η εγγραφή· τη χρησιμοποιούν τα email της."

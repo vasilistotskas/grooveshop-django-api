@@ -546,7 +546,7 @@ class Command(BaseCommand):
             "--locales",
             type=str,
             default=languages_comma_separated,
-            help="Specific locales to use (comma-separated, e.g., 'en,de,el')",
+            help="Specific locales to use (comma-separated, e.g., 'en,el')",
         )
 
         parser.add_argument(

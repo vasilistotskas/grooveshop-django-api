@@ -442,7 +442,6 @@ SITE_ID = int(getenv("SITE_ID", "1"))
 LANGUAGES = (
     ("el", _("Greek")),
     ("en", _("English")),
-    ("de", _("German")),
 )
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -2947,10 +2946,6 @@ _PARLER_LANG_TUPLE = (
         "code": "en",
         "name": "english",
     },
-    {
-        "code": "de",
-        "name": "german",
-    },
 )
 # Ordered fallback chain: the authoring language first, then every other
 # configured one. Derived, so adding a language to _PARLER_LANG_TUPLE
@@ -2960,7 +2955,7 @@ _PARLER_LANG_TUPLE = (
 # most. parler walks ``[active_language] + fallbacks`` and SKIPS the
 # active language (parler/models.py ``_get_translated_model``), so with
 # ``en`` active the only candidate was ``en`` itself and nothing was
-# tried at all — while ``de`` fell back to ``en``, which this platform's
+# tried at all — while any other language fell back to ``en``, which this platform's
 # Greek content does not have either. Both raised
 # TranslationDoesNotExist, and because that class deliberately inherits
 # AttributeError ("causes the templates to handle the missing attributes
@@ -2996,7 +2991,7 @@ LANGUAGE_COUNTRY_MAPPING = {
         "alpha_3": "GRC",
         "iso_cc": 300,
         "phone_code": "30",
-        "names": {"el": "Ελλάδα", "en": "Greece", "de": "Griechenland"},
+        "names": {"el": "Ελλάδα", "en": "Greece"},
     },
     "en": {
         "alpha_2": "GB",
@@ -3006,15 +3001,7 @@ LANGUAGE_COUNTRY_MAPPING = {
         "names": {
             "el": "Ηνωμένο Βασίλειο",
             "en": "United Kingdom",
-            "de": "Vereinigtes Königreich",
         },
-    },
-    "de": {
-        "alpha_2": "DE",
-        "alpha_3": "DEU",
-        "iso_cc": 276,
-        "phone_code": "49",
-        "names": {"el": "Γερμανία", "en": "Germany", "de": "Deutschland"},
     },
 }
 
@@ -3025,7 +3012,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Ανατολική Μακεδονία και Θράκη",
                 "en": "East Macedonia and Thrace",
-                "de": "Ostmakedonien und Thrakien",
             },
         },
         {
@@ -3033,7 +3019,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Κεντρική Μακεδονία",
                 "en": "Central Macedonia",
-                "de": "Zentralmakedonien",
             },
         },
         {
@@ -3041,23 +3026,21 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Δυτική Μακεδονία",
                 "en": "West Macedonia",
-                "de": "Westmakedonien",
             },
         },
         {
             "alpha": "EPI",
-            "names": {"el": "Ήπειρος", "en": "Epirus", "de": "Epirus"},
+            "names": {"el": "Ήπειρος", "en": "Epirus"},
         },
         {
             "alpha": "THS",
-            "names": {"el": "Θεσσαλία", "en": "Thessaly", "de": "Thessalien"},
+            "names": {"el": "Θεσσαλία", "en": "Thessaly"},
         },
         {
             "alpha": "ION",
             "names": {
                 "el": "Ιόνια Νησιά",
                 "en": "Ionian Islands",
-                "de": "Ionische Inseln",
             },
         },
         {
@@ -3065,7 +3048,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Δυτική Ελλάδα",
                 "en": "West Greece",
-                "de": "Westgriechenland",
             },
         },
         {
@@ -3073,19 +3055,17 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Στερεά Ελλάδα",
                 "en": "Central Greece",
-                "de": "Mittelgriechenland",
             },
         },
         {
             "alpha": "ATT",
-            "names": {"el": "Αττική", "en": "Attica", "de": "Attika"},
+            "names": {"el": "Αττική", "en": "Attica"},
         },
         {
             "alpha": "PEL",
             "names": {
                 "el": "Πελοπόννησος",
                 "en": "Peloponnese",
-                "de": "Peloponnes",
             },
         },
         {
@@ -3093,7 +3073,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Βόρειο Αιγαίο",
                 "en": "North Aegean",
-                "de": "Nordägäis",
             },
         },
         {
@@ -3101,33 +3080,31 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Νότιο Αιγαίο",
                 "en": "South Aegean",
-                "de": "Südägάις",
             },
         },
         {
             "alpha": "CRT",
-            "names": {"el": "Κρήτη", "en": "Crete", "de": "Kreta"},
+            "names": {"el": "Κρήτη", "en": "Crete"},
         },
     ],
     "GB": [
         {
             "alpha": "ENG",
-            "names": {"el": "Αγγλία", "en": "England", "de": "England"},
+            "names": {"el": "Αγγλία", "en": "England"},
         },
         {
             "alpha": "SCT",
-            "names": {"el": "Σκωτία", "en": "Scotland", "de": "Schottland"},
+            "names": {"el": "Σκωτία", "en": "Scotland"},
         },
         {
             "alpha": "WLS",
-            "names": {"el": "Ουαλία", "en": "Wales", "de": "Wales"},
+            "names": {"el": "Ουαλία", "en": "Wales"},
         },
         {
             "alpha": "NIR",
             "names": {
                 "el": "Βόρεια Ιρλανδία",
                 "en": "Northern Ireland",
-                "de": "Nordirland",
             },
         },
     ],
@@ -3137,40 +3114,37 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Βάδη-Βυρτεμβέργη",
                 "en": "Baden-Württemberg",
-                "de": "Baden-Württemberg",
             },
         },
         {
             "alpha": "BY",
-            "names": {"el": "Βαυαρία", "en": "Bavaria", "de": "Bayern"},
+            "names": {"el": "Βαυαρία", "en": "Bavaria"},
         },
         {
             "alpha": "BE",
-            "names": {"el": "Βερολίνο", "en": "Berlin", "de": "Berlin"},
+            "names": {"el": "Βερολίνο", "en": "Berlin"},
         },
         {
             "alpha": "BB",
             "names": {
                 "el": "Βρανδεμβούργο",
                 "en": "Brandenburg",
-                "de": "Brandenburg",
             },
         },
         {
             "alpha": "HB",
-            "names": {"el": "Βρέμη", "en": "Bremen", "de": "Bremen"},
+            "names": {"el": "Βρέμη", "en": "Bremen"},
         },
         {
             "alpha": "HH",
-            "names": {"el": "Αμβούργο", "en": "Hamburg", "de": "Hamburg"},
+            "names": {"el": "Αμβούργο", "en": "Hamburg"},
         },
-        {"alpha": "HE", "names": {"el": "Έσση", "en": "Hesse", "de": "Hessen"}},
+        {"alpha": "HE", "names": {"el": "Έσση", "en": "Hesse"}},
         {
             "alpha": "MV",
             "names": {
                 "el": "Μεκλεμβούργο-Πομερανία",
                 "en": "Mecklenburg-Western Pomerania",
-                "de": "Mecklenburg-Vorpommern",
             },
         },
         {
@@ -3178,7 +3152,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Κάτω Σαξονία",
                 "en": "Lower Saxony",
-                "de": "Niedersachsen",
             },
         },
         {
@@ -3186,7 +3159,6 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Βόρεια Ρηνανία-Βεστφαλία",
                 "en": "North Rhine-Westphalia",
-                "de": "Nordrhein-Westfalen",
             },
         },
         {
@@ -3194,23 +3166,21 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Ρηνανία-Παλατινάτο",
                 "en": "Rhineland-Palatinate",
-                "de": "Rheinland-Pfalz",
             },
         },
         {
             "alpha": "SL",
-            "names": {"el": "Σάαρλαντ", "en": "Saarland", "de": "Saarland"},
+            "names": {"el": "Σάαρλαντ", "en": "Saarland"},
         },
         {
             "alpha": "SN",
-            "names": {"el": "Σαξονία", "en": "Saxony", "de": "Sachsen"},
+            "names": {"el": "Σαξονία", "en": "Saxony"},
         },
         {
             "alpha": "ST",
             "names": {
                 "el": "Σαξονία-Άνχαλτ",
                 "en": "Saxony-Anhalt",
-                "de": "Sachsen-Anhalt",
             },
         },
         {
@@ -3218,12 +3188,11 @@ COUNTRY_REGIONS_MAPPING = {
             "names": {
                 "el": "Σλέσβιχ-Χολστάιν",
                 "en": "Schleswig-Holstein",
-                "de": "Schleswig-Holstein",
             },
         },
         {
             "alpha": "TH",
-            "names": {"el": "Θουριγγία", "en": "Thuringia", "de": "Thüringen"},
+            "names": {"el": "Θουριγγία", "en": "Thuringia"},
         },
     ],
 }
@@ -3610,7 +3579,6 @@ UNFOLD = {
     "LANGUAGE_FLAGS": {
         "el": "🇬🇷",
         "en": "🇬🇧",
-        "de": "🇩🇪",
     },
     # ⌘K / Ctrl+K command palette history. What the palette finds is
     # decided by admin.search.CommandSearchMixin, not by this block.

@@ -76,7 +76,7 @@ class TestFreshTenantSeeding:
         seed()
 
         for tier in LoyaltyTier.objects.all():
-            for language_code in ("el", "en", "de"):
+            for language_code in ("el", "en"):
                 translation = LoyaltyTierTranslation.objects.get(
                     master=tier, language_code=language_code
                 )

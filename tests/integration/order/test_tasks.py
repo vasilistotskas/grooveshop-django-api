@@ -203,7 +203,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         pay_way = PayWayFactory.create_offline_payment()
         # Set the WYSIWYG HTML across every parler language so the order's
         # resolved language always returns it (overrides the factory faker).
-        for lang in ("el", "en", "de"):
+        for lang in ("el", "en"):
             pay_way.set_current_language(lang)
             pay_way.instructions = html_instr
         pay_way.save()

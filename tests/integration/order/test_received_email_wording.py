@@ -43,7 +43,7 @@ def _send(
     """Send the confirmation for an order, unpaid unless told otherwise;
     return the subject and the text and HTML bodies."""
     pay_way = PayWayFactory(settlement=settlement, active=True)
-    for language in ("el", "en", "de"):
+    for language in ("el", "en"):
         pay_way.set_current_language(language)
         pay_way.instructions = INSTRUCTIONS
     pay_way.save()

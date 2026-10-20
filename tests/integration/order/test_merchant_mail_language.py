@@ -64,13 +64,6 @@ class TestNewOrderEmail:
         assert sent.subject == subject.format(id=order.id)
         assert sent.to == [CONTACT]
 
-    def test_a_german_store_gets_german(self, store, order):
-        store("de")
-
-        send_admin_new_order_email.run(order.id)
-
-        assert mail.outbox[0].subject == f"Neue Bestellung — #{order.id}"
-
 
 class TestNewBusinessProfileEmail:
     @pytest.mark.parametrize(

@@ -74,13 +74,13 @@ class PayWayModelTestCase(TestCase):
         self.credit_card.set_current_language("en")
         self.assertEqual(self.credit_card.description, "Pay with credit card")
 
-        self.bank_transfer.set_current_language("de")
-        self.bank_transfer.description = "Per Überweisung zahlen"
+        self.bank_transfer.set_current_language("el")
+        self.bank_transfer.description = "Πληρωμή με τραπεζική μεταφορά"
         self.bank_transfer.save()
 
-        self.bank_transfer.set_current_language("de")
+        self.bank_transfer.set_current_language("el")
         self.assertEqual(
-            self.bank_transfer.description, "Per Überweisung zahlen"
+            self.bank_transfer.description, "Πληρωμή με τραπεζική μεταφορά"
         )
         self.bank_transfer.set_current_language("en")
         self.assertEqual(
@@ -88,7 +88,7 @@ class PayWayModelTestCase(TestCase):
         )
 
     def test_key_does_not_depend_on_the_language(self):
-        for language in ("el", "en", "de"):
+        for language in ("el", "en"):
             self.bank_transfer.set_current_language(language)
             self.assertEqual(self.bank_transfer.key, PayWayEnum.BANK_TRANSFER)
 

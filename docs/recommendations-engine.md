@@ -28,7 +28,7 @@ treat **cold start as the normal state, not the edge case**.
 | Relation semantics | fashion · plants · electronics · food · services | "related" means *other colour*, *the pot for this plant*, *compatible accessory* — none inferable |
 | Signal availability | some tenants set no brand, no tags, no attributes | content strategies silently produce empty sets |
 | Pricing context | B2B `CustomerGroup` + `PriceListItem` | the same suggestion carries a different price per viewer |
-| Locale | el · en · de | a cached suggestion set leaks the wrong language |
+| Locale | el · en | a cached suggestion set leaks the wrong language |
 | Plan tier | Free → Standard → Pro | no capability ladder to sell |
 
 What existed before this design: two ad-hoc recommenders — *same

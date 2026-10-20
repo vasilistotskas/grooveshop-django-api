@@ -5433,9 +5433,6 @@ msgstr "Generic Tag list/detail and the M2M-through TaggedItem cache. Tags are s
 msgid "Generic fulfilment kind, independent of provider."
 msgstr "Generic fulfilment kind, independent of provider."
 
-msgid "German"
-msgstr "German"
-
 msgid "Get Discount Percent"
 msgstr "Get Discount Percent"
 
@@ -6638,11 +6635,11 @@ msgstr "Language captured at order creation, used when rendering order emails."
 msgid "Language code for translations (%s)"
 msgstr "Language code for translations (%s)"
 
-msgid "Language code for translations (el, en, de)"
-msgstr "Language code for translations (el, en, de)"
+msgid "Language code for translations (el, en)"
+msgstr "Language code for translations (el, en)"
 
-msgid "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
-msgstr "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
+msgid "Language code to filter results (e.g., 'en', 'el'). If not provided, searches all languages."
+msgstr "Language code to filter results (e.g., 'en', 'el'). If not provided, searches all languages."
 
 msgid "Language the subscription was made in; its emails use it."
 msgstr "Language the subscription was made in; its emails use it."

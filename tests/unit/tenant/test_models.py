@@ -647,11 +647,11 @@ def test_theme_metadata_bad_font_mono_raises():
 
 
 def test_locales_are_limited_to_the_storefront_ones():
-    """Django carries ``de`` content, but the storefront has no ``/de``
-    routes: a store serving it would link visitors to 404s."""
+    """A locale the storefront has no routes for would link visitors to
+    404s."""
     from core.utils.tenant_urls import STOREFRONT_LOCALES
 
-    t = _unsaved_tenant(default_locale="de", available_locales=["el", "de"])
+    t = _unsaved_tenant(default_locale="fr", available_locales=["el", "fr"])
     with pytest.raises(ValidationError) as exc_info:
         t.clean_fields()
     assert {"default_locale", "available_locales"} <= set(

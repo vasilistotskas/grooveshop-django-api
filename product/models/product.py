@@ -4,6 +4,7 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -456,6 +457,7 @@ class Product(
         self.__dict__["announced_discount_percent"] = value
 
     @property
+    @admin.display(description=_("Likes Count"))
     def likes_count(self) -> int:
         """Return the number of likes/favourites for this product."""
         # If annotation exists, use it

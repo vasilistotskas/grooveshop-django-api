@@ -2839,12 +2839,13 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "stock_before",
         "stock_after",
         "order",
-        "reason",
+        "reason_display",
         "actor",
         "created_at",
     )
-    # ``actor`` shows whichever of the two is set; neither is ever edited.
-    exclude = ("performed_by", "performed_by_staff_id")
+    # Shown read-only as ``reason_display`` and ``actor``; a log row is
+    # never edited.
+    exclude = ("reason", "reason_code", "performed_by", "performed_by_staff_id")
     date_hierarchy = "created_at"
     list_select_related = ("product", "order", "performed_by")
     staff_actor_fields = ("performed_by_staff",)

@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Count
 from django.utils import timezone
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from unfold.admin import GenericTabularInline
@@ -93,12 +94,8 @@ class ContentTypeFilter(DropdownFilter):
     parameter_name = "content_type"
 
     def lookups(self, request, model_admin):
-        types = (
-            ContentType.objects.filter(taggeditem__isnull=False)
-            .distinct()
-            .values_list("id", "model")
-        )
-        return [(cid, model.title()) for cid, model in types]
+        types = ContentType.objects.filter(taggeditem__isnull=False).distinct()
+        return [(ct.id, capfirst(ct.name)) for ct in types]
 
     def queryset(self, request, queryset):
         if self.value():

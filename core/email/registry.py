@@ -7,6 +7,8 @@ from pathlib import Path
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 
 from core.email.config import EmailTemplateConfig
 from order.enum.status import OrderStatus
@@ -18,8 +20,8 @@ class EmailTemplateInfo:
 
     name: str
     path: str
-    category: str
-    description: str
+    category: StrOrPromise
+    description: StrOrPromise
     order_statuses: list[OrderStatus]
     has_html: bool
     has_text: bool
@@ -161,18 +163,10 @@ class EmailTemplateRegistry:
             )
             return
 
-        # ONE display name per directory. Config-backed templates carry
-        # a category_name ("Order Lifecycle"); everything else in the
-        # same folder must land under the same heading rather than a
-        # second, titleised one ("Order").
-        display_category = next(
-            (
-                cfg.name
-                for cfg in EmailTemplateConfig.CATEGORIES.values()
-                if cfg.path == category_path
-            ),
-            category_path.replace("_", " ").title(),
-        )
+        # ONE heading per directory, so a config-backed template and its
+        # siblings land together. No fallback: a directory without a
+        # heading raises, and a test lists every directory on disk.
+        display_category = EmailTemplateConfig.DIRECTORY_HEADINGS[category_path]
 
         for html_file in html_files:
             try:
@@ -194,7 +188,7 @@ class EmailTemplateRegistry:
                     template_name,
                     {
                         "category": display_category,
-                        "description": "Email template",
+                        "description": _("Email template"),
                         "statuses": [],
                         "is_used": True,
                     },
@@ -248,7 +242,9 @@ class EmailTemplateRegistry:
         """Get specific template by name."""
         return self._templates.get(name)
 
-    def get_by_category(self, category: str) -> list[EmailTemplateInfo]:
+    def get_by_category(
+        self, category: StrOrPromise
+    ) -> list[EmailTemplateInfo]:
         """Get templates by category."""
         return [
             template
@@ -256,7 +252,7 @@ class EmailTemplateRegistry:
             if template.category == category
         ]
 
-    def get_categories(self) -> list[str]:
+    def get_categories(self) -> list[StrOrPromise]:
         """Get all template categories."""
         categories = {
             template.category for template in self._templates.values()

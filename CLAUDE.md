@@ -43,6 +43,13 @@ uv run python manage.py seed_all
 # Generate OpenAPI schema (used by Nuxt frontend for types)
 uv run python manage.py spectacular --color --file schema.yml
 
+# Translations: extract new messages into the Greek/English/German catalogues.
+# The command writes the canonical form (sorted, no #: locations, pinned
+# header) that tests/unit/test_locale_catalogue.py enforces, so parallel PRs
+# adding different messages merge cleanly. Never hand-append to a .po, and
+# rerun this after saving in Rosetta (it rewrites the file unsorted).
+uv run python manage.py makemessages -l el -l en -l de
+
 # Meilisearch index management
 uv run python manage.py meilisearch_sync_all_indexes
 uv run python manage.py meilisearch_sync_index product.ProductTranslation

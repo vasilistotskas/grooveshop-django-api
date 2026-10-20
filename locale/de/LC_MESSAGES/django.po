@@ -5359,6 +5359,12 @@ msgstr ""
 msgid "Refund reversal"
 msgstr ""
 
+msgid "Refund this order's payment first."
+msgstr ""
+
+msgid "Refund this order's payment first: %(amount)s can still be refunded."
+msgstr ""
+
 msgid "Refunded"
 msgstr ""
 

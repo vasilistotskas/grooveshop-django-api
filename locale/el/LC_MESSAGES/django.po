@@ -9959,6 +9959,12 @@ msgstr "Επιστροφή χρημάτων για την παραγγελία #
 msgid "Refund reversal"
 msgstr "Αντιστροφή επιστροφής"
 
+msgid "Refund this order's payment first."
+msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας."
+
+msgid "Refund this order's payment first: %(amount)s can still be refunded."
+msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας: μπορούν ακόμη να επιστραφούν %(amount)s."
+
 msgid "Refunded"
 msgstr "Επιστροφή Χρημάτων"
 

@@ -122,15 +122,19 @@ class PaymentProvider(ABC):
 
         Called before an unpaid order's stock is released, and before a
         retry replaces the payment. A payment link or session ends by
-        itself at the expiry it was created with, so the default has
-        nothing to do. A provider whose payment object has no expiry (a
-        Stripe PaymentIntent) or can be ended early (a Viva payment
-        order) closes it here, reading what it needs from the order.
-        False means the payment may still land (the provider says it is
-        past the point of no return, or would not cancel it): the order
-        must stay open for its webhook.
+        itself at the expiry it was created with, which the order stores
+        as its hold (``payment_hold_expires_at``), so the default is closed
+        once that hold has ended and not before: a failed Viva payment
+        order, for one, stays payable until then. A provider whose payment
+        object has no expiry (a Stripe PaymentIntent) cancels it here
+        instead and needs no wait. False means the payment may still land
+        (the hold is running, or the provider says it is past the point of
+        no return, processing or succeeded): the order must stay open for
+        its webhook.
         """
-        return True
+        from order import payment_hold
+
+        return payment_hold.hold_ended(order)
 
     @abstractmethod
     def process_payment(
@@ -428,8 +432,9 @@ class StripePaymentProvider(PaymentProvider):
     def close_payment(self, order: Order) -> bool:
         """Cancel the order's PaymentIntent, which has no expiry of its own.
 
-        A hosted Checkout Session ends at its ``expires_at`` and records no
-        ``payment_id`` on the order, so it has nothing to cancel here. An
+        A hosted Checkout Session ends at its ``expires_at`` (the stored
+        hold) and records no ``payment_id`` on the order, so it has nothing
+        to cancel here and waits for the hold like any link. An
         intent opened by ``process_payment`` stays confirmable until
         canceled, so it is canceled here before the stock is released.
         Stripe refuses once the intent is processing or succeeded (or
@@ -439,7 +444,7 @@ class StripePaymentProvider(PaymentProvider):
         """
         payment_id = order.payment_id or ""
         if not payment_id.startswith("pi_"):
-            return True
+            return super().close_payment(order)
         try:
             intent = stripe.PaymentIntent.cancel(
                 payment_id,
@@ -1005,55 +1010,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.token_cache_key = (
             f"viva_wallet_access_token_{'live' if self.live_mode else 'demo'}"
         )
-
-    def close_payment(self, order: Order) -> bool:
-        """Cancel every payment order code issued for *order*.
-
-        A Viva payment order stays payable after a failed transaction until
-        its expiry (``paymentTimeout``), and the shopper may retry on it.
-        Once the stored hold has ended no code can land, so nothing is
-        asked. Before that, each code is cancelled with Cancel Payment
-        Order (``DELETE /api/orders/{orderCode}``, Basic auth with the
-        tenant's merchant id and API key,
-        https://developer.viva.com/apis-for-payments/payment-api/); a code
-        Viva will not cancel (the documentation lists 401 and 404, and says
-        nothing of a paid or expired code) leaves the order open for its
-        webhook.
-        """
-        import requests
-
-        from order import payment_hold
-        from order.views.viva_webhook import order_viva_codes
-
-        if payment_hold.hold_ended(order):
-            return True
-        for code in sorted(order_viva_codes(order)):
-            response = requests.delete(
-                f"{self.transactions_url}/api/orders/{code}",
-                headers={"Authorization": self._get_basic_auth_header()},
-                timeout=30,
-            )
-            if 400 <= response.status_code < 500:
-                logger.warning(
-                    "Viva Wallet would not cancel payment order %s: HTTP %s",
-                    code,
-                    response.status_code,
-                    extra={"order_id": order.pk},
-                )
-                return False
-            response.raise_for_status()
-            data = response.json()
-            if data.get("Success") is not True or data.get("ErrorCode") != 0:
-                logger.warning(
-                    "Viva Wallet would not cancel payment order %s: "
-                    "ErrorCode=%s ErrorText=%s",
-                    code,
-                    data.get("ErrorCode"),
-                    data.get("ErrorText"),
-                    extra={"order_id": order.pk},
-                )
-                return False
-        return True
 
     def _get_access_token(self) -> str:
         from base64 import b64encode

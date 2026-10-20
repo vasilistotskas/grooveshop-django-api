@@ -292,7 +292,7 @@ msgstr "%(name)s (ενεργή)"
 
 #, python-format
 msgid "%(name)s (bytes deleted)"
-msgstr "%(name)s (τα bytes διαγράφηκαν)"
+msgstr "%(name)s (το περιεχόμενο διαγράφηκε)"
 
 #, python-format
 msgid "%(name)s (copy)"
@@ -471,7 +471,7 @@ msgstr[1] "%(type)s %(points)s πόντοι (χρήστης %(user)s)"
 
 #, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
-msgstr "Ο/Η %(user)s έλαβε προσαρμογή %(points)d πόντων επιβράβευσης."
+msgstr "Ο/Η %(user)s έλαβε προσαρμογή %(points)d πόντων πιστότητας."
 
 #, python-format
 msgid "%(value)s%% VAT"
@@ -537,7 +537,7 @@ msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "Το αναγνωριστικό ζώνης Cloudflare αποτελείται από 32 πεζούς δεκαεξαδικούς χαρακτήρες."
 
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
-msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι επιβράβευσης ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
+msgstr "Μια ολοκληρωμένη πληρωμή χρειάζεται οφειλόμενο ποσό, εκτός αν εκπτώσεις, πόντοι πιστότητας ή δωροκάρτες καλύπτουν όλο το σύνολο της παραγγελίας."
 
 msgid "A content page with this slug already exists."
 msgstr "Υπάρχει ήδη σελίδα περιεχομένου με αυτό το slug."
@@ -953,7 +953,7 @@ msgid "Active Tags"
 msgstr "Ενεργές ετικέτες"
 
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
-msgstr "Ενεργές μέθοδοι πληρωμής που μπορεί να εξοφλήσει αυτός ο συνδυασμός (provider, kind), με τους ίδιους κανόνες που εφαρμόζει το checkout όταν τον επιλέγει ο αγοραστής. Δηλώνεται ως γεγονός ανά επιλογή και όχι ως 'αποκλειστικό σε αυτή τη γραμμή': το storefront συγχωνεύει πολλούς μεταφορείς σε μία κάρτα παράδοσης στο σπίτι, οπότε μόνο αυτό γνωρίζει ποιες γραμμές εμφανίζει πραγματικά και μπορεί να υπολογίσει τι ξεκλειδώνει αποκλειστικά μια συγκεκριμένη επιλογή. Επιτρέπει στο βήμα παράδοσης να προβάλλει ένα προϊόν αποκλειστικό του μεταφορέα — η BOX NOW Αντικαταβολή είναι διαθέσιμη ΜΟΝΟ μέσω locker BoxNow, και ένας αγοραστής που δεν επιλέγει ποτέ locker δεν έχει τρόπο να ανακαλύψει ότι υπάρχει."
+msgstr "Ενεργές μέθοδοι πληρωμής που μπορεί να εξοφλήσει αυτός ο συνδυασμός (provider, kind), με τους ίδιους κανόνες που εφαρμόζει η ολοκλήρωση αγοράς όταν τον επιλέγει ο αγοραστής. Δηλώνεται ως γεγονός ανά επιλογή και όχι ως 'αποκλειστικό σε αυτή τη γραμμή': το storefront συγχωνεύει πολλούς μεταφορείς σε μία κάρτα παράδοσης στο σπίτι, οπότε μόνο αυτό γνωρίζει ποιες γραμμές εμφανίζει πραγματικά και μπορεί να υπολογίσει τι ξεκλειδώνει αποκλειστικά μια συγκεκριμένη επιλογή. Επιτρέπει στο βήμα παράδοσης να προβάλλει ένα προϊόν αποκλειστικό του μεταφορέα — η BOX NOW Αντικαταβολή είναι διαθέσιμη ΜΟΝΟ μέσω locker BoxNow, και ένας αγοραστής που δεν επιλέγει ποτέ locker δεν έχει τρόπο να ανακαλύψει ότι υπάρχει."
 
 #, python-format
 msgid "Active products with fewer than %(count)s left"
@@ -1124,7 +1124,7 @@ msgid "Allow AI-agent platforms to complete Stripe payments server-side with Sha
 msgstr "Επιτρέπει σε πλατφόρμες AI agent να ολοκληρώνουν πληρωμές Stripe server-side με SharedPaymentTokens σε αυτό το κατάστημα. Απαιτεί ο λογαριασμός Stripe του καταστήματος να είναι εγγεγραμμένος στο Stripe Agentic Commerce."
 
 msgid "Allow Return"
-msgstr "Επιτρέπεται επιστροφή"
+msgstr "Επιτρέπεται επιστροφή προϊόντων"
 
 msgid "Allowed CSP sources"
 msgstr "Επιτρεπόμενες πηγές CSP"
@@ -1148,7 +1148,7 @@ msgid "Already subscribed to this topic."
 msgstr "Ήδη εγγεγραμμένος σε αυτό το θέμα."
 
 msgid "Already unsubscribed"
-msgstr "Ήδη έχει γίνει διαγραφή"
+msgstr "Ήδη έχει γίνει απεγγραφή"
 
 msgid "Alt Text"
 msgstr "Εναλλακτικό κείμενο"
@@ -1245,7 +1245,7 @@ msgid "Apply index settings updates to Meilisearch without reindexing"
 msgstr "Εφαρμογή ενημερώσεων ρυθμίσεων index στο Meilisearch χωρίς επανευρετηρίαση"
 
 msgid "Apply only to customers with no previous orders. For guests this is checked against the checkout email and is best-effort."
-msgstr "Εφαρμογή μόνο σε πελάτες χωρίς προηγούμενες παραγγελίες. Για επισκέπτες ελέγχεται με βάση το email του checkout και είναι κατά προσέγγιση."
+msgstr "Εφαρμογή μόνο σε πελάτες χωρίς προηγούμενες παραγγελίες. Για επισκέπτες ελέγχεται με βάση το email ολοκλήρωσης αγοράς και είναι κατά προσέγγιση."
 
 msgid "Apply to inactive products"
 msgstr "Εφαρμογή σε ανενεργά προϊόντα"
@@ -1367,6 +1367,12 @@ msgstr "Απαιτείται ταυτοποίηση για την επανάλη
 msgid "Authentication is required to view your orders"
 msgstr "Απαιτείται ταυτοποίηση για να δείτε τις παραγγελίες σας"
 
+msgid "Authenticator code"
+msgstr "Κωδικός εφαρμογής ταυτοποίησης"
+
+msgid "Authenticator set up. Save the recovery codes below, then log in again with a code."
+msgstr "Η εφαρμογή ταυτοποίησης ρυθμίστηκε. Αποθηκεύστε τους κωδικούς ανάκτησης παρακάτω και συνδεθείτε ξανά με έναν κωδικό."
+
 msgid "Author"
 msgstr "Συντάκτης"
 
@@ -1402,6 +1408,9 @@ msgstr "Μέση παραγγελία"
 
 msgid "Awaiting a decision"
 msgstr "Αναμένεται απόφαση"
+
+msgid "B2B"
+msgstr "B2B"
 
 msgid "B2B Enabled"
 msgstr "Ενεργοποιημένο B2B"
@@ -1495,7 +1504,7 @@ msgid "Batch reorder categories by updating their sort_order values."
 msgstr "Μαζική αναδιάταξη κατηγοριών με ενημέρωση των τιμών sort_order."
 
 msgid "Bearer token the agent platform uses on this tenant's /acp/* checkout surface (served to the agent gateway only via the internal-token-gated tenant resolve endpoint). Per-tenant — a token minted for one store must never drive another store's checkout. Empty disables ACP for this tenant."
-msgstr "Bearer token που χρησιμοποιεί η πλατφόρμα agent στην επιφάνεια checkout /acp/* αυτού του καταστήματος (παρέχεται στο agent gateway μόνο μέσω του endpoint tenant resolve που προστατεύεται με internal token). Ανά κατάστημα — ένα token που έχει εκδοθεί για ένα κατάστημα δεν πρέπει ποτέ να χρησιμοποιείται στο checkout άλλου καταστήματος. Κενό → απενεργοποιεί το ACP για αυτό το κατάστημα."
+msgstr "Bearer token που χρησιμοποιεί η πλατφόρμα agent στην επιφάνεια ολοκλήρωσης αγοράς /acp/* αυτού του καταστήματος (παρέχεται στο agent gateway μόνο μέσω του endpoint tenant resolve που προστατεύεται με internal token). Ανά κατάστημα — ένα token που έχει εκδοθεί για ένα κατάστημα δεν πρέπει ποτέ να χρησιμοποιείται στην ολοκλήρωση αγοράς άλλου καταστήματος. Κενό → απενεργοποιεί το ACP για αυτό το κατάστημα."
 
 msgid "Before"
 msgstr "Πριν"
@@ -1798,10 +1807,10 @@ msgid "Brand"
 msgstr "Μάρκα"
 
 msgid "Brand assets shown on the storefront's checkout shipping picker and the order summary. ``Logo`` is used for home-delivery rows and as the fallback for pickup-point rows. ``Pickup-point logo`` is optional — set it only when you want the locker card to look different from the home-delivery card for the same carrier (e.g. an ACS Smartpoint locker illustration vs the ACS courier mark). PNG/JPG/SVG. When both are blank the storefront renders its bundled default for the carrier."
-msgstr "Στοιχεία επωνυμίας που εμφανίζονται στον επιλογέα αποστολής στο checkout του καταστήματος και στη σύνοψη της παραγγελίας. Το ``Logo`` χρησιμοποιείται για τις γραμμές παράδοσης κατ' οίκον και ως εφεδρικό για τις γραμμές σημείων παραλαβής. Το ``Λογότυπο σημείου παραλαβής`` είναι προαιρετικό — ορίστε το μόνο όταν θέλετε η κάρτα του locker να φαίνεται διαφορετική από την κάρτα παράδοσης κατ' οίκον για τον ίδιο μεταφορέα (π.χ. εικόνα locker ACS Smartpoint έναντι του σήματος ταχυμεταφορών ACS). PNG/JPG/SVG. Όταν και τα δύο είναι κενά, το κατάστημα εμφανίζει το ενσωματωμένο προεπιλεγμένο για τον μεταφορέα."
+msgstr "Στοιχεία επωνυμίας που εμφανίζονται στον επιλογέα αποστολής στην ολοκλήρωση αγοράς του καταστήματος και στη σύνοψη της παραγγελίας. Το ``Logo`` χρησιμοποιείται για τις γραμμές παράδοσης κατ' οίκον και ως εφεδρικό για τις γραμμές σημείων παραλαβής. Το ``Λογότυπο σημείου παραλαβής`` είναι προαιρετικό — ορίστε το μόνο όταν θέλετε η κάρτα του locker να φαίνεται διαφορετική από την κάρτα παράδοσης κατ' οίκον για τον ίδιο μεταφορέα (π.χ. εικόνα locker ACS Smartpoint έναντι του σήματος ταχυμεταφορών ACS). PNG/JPG/SVG. Όταν και τα δύο είναι κενά, το κατάστημα εμφανίζει το ενσωματωμένο προεπιλεγμένο για τον μεταφορέα."
 
 msgid "Branding"
-msgstr "Επωνυμία"
+msgstr "Ταυτότητα"
 
 msgid "Brands"
 msgstr "Μάρκες"
@@ -2198,7 +2207,7 @@ msgid "Cart is empty"
 msgstr "Το καλάθι είναι άδειο"
 
 msgid "Cart is empty. Please add items before checkout."
-msgstr "Το καλάθι είναι άδειο. Παρακαλούμε προσθέστε είδη πριν το checkout."
+msgstr "Το καλάθι είναι άδειο. Παρακαλούμε προσθέστε είδη πριν από την ολοκλήρωση αγοράς."
 
 msgid "Cart is not provided."
 msgstr "Δεν έχει παρασχεθεί καλάθι."
@@ -2214,10 +2223,10 @@ msgid "Cart not found"
 msgstr "Το καλάθι δεν βρέθηκε"
 
 msgid "Cart not found. Please add items to cart before checkout."
-msgstr "Το καλάθι δεν βρέθηκε. Παρακαλούμε προσθέστε είδη στο καλάθι πριν το checkout."
+msgstr "Το καλάθι δεν βρέθηκε. Παρακαλούμε προσθέστε είδη στο καλάθι πριν από την ολοκλήρωση αγοράς."
 
 msgid "Cart not ready for checkout"
-msgstr "Το καλάθι δεν είναι έτοιμο για checkout"
+msgstr "Το καλάθι δεν είναι έτοιμο για ολοκλήρωση αγοράς"
 
 msgid "Cart source"
 msgstr "Πηγή καλαθιού"
@@ -2398,13 +2407,13 @@ msgid "Check your email"
 msgstr "Ελέγξτε το email σας"
 
 msgid "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
-msgstr "Ελέγχεται σε κάθε checkout και αποθηκευμένη διεύθυνση. Αρχικές τιμές από το Address Data Service της Google."
+msgstr "Ελέγχεται σε κάθε ολοκλήρωση αγοράς και αποθηκευμένη διεύθυνση. Αρχικές τιμές από το Address Data Service της Google."
 
 msgid "Checkout"
 msgstr "Ολοκλήρωση αγοράς"
 
 msgid "Checkout email — used for guest per-customer limits"
-msgstr "Email του checkout — χρησιμοποιείται για τα όρια ανά πελάτη των επισκεπτών"
+msgstr "Email ολοκλήρωσης αγοράς — χρησιμοποιείται για τα όρια ανά πελάτη των επισκεπτών"
 
 msgid "Checkout email. Lets promotion eligibility checks that depend on customer identity (first-order-only, per-customer limits) run against the same identity the order-create verification will use, keeping the PaymentIntent amount in lockstep."
 msgstr "Email ολοκλήρωσης αγοράς. Επιτρέπει στους ελέγχους επιλεξιμότητας προσφορών που εξαρτώνται από την ταυτότητα του πελάτη (μόνο για πρώτη παραγγελία, όρια ανά πελάτη) να εκτελούνται με την ίδια ταυτότητα που θα χρησιμοποιήσει η επαλήθευση κατά τη δημιουργία παραγγελίας, ώστε το ποσό του PaymentIntent να παραμένει συγχρονισμένο."
@@ -2647,7 +2656,7 @@ msgid "Configuration"
 msgstr "Διαμόρφωση"
 
 msgid "Configure loyalty points earning for this product. Points coefficient multiplies the global points factor, and bonus points are awarded as a fixed amount on purchase."
-msgstr "Διαμορφώστε την απόκτηση πόντων επιβράβευσης για αυτό το προϊόν. Ο συντελεστής πόντων πολλαπλασιάζει τον καθολικό συντελεστή πόντων και οι μπόνους πόντοι αποδίδονται ως σταθερό ποσό κατά την αγορά."
+msgstr "Διαμορφώστε την απόκτηση πόντων πιστότητας για αυτό το προϊόν. Ο συντελεστής πόντων πολλαπλασιάζει τον καθολικό συντελεστή πόντων και οι μπόνους πόντοι αποδίδονται ως σταθερό ποσό κατά την αγορά."
 
 msgid "Confirm a pending subscription using the confirmation token."
 msgstr "Επιβεβαίωση εκκρεμούς εγγραφής με χρήση του token επιβεβαίωσης."
@@ -2808,10 +2817,10 @@ msgid "Conversion label for adding a product to the cart."
 msgstr "Ετικέτα μετατροπής για την προσθήκη προϊόντος στο καλάθι."
 
 msgid "Conversion label for starting the checkout."
-msgstr "Ετικέτα μετατροπής για την έναρξη του checkout."
+msgstr "Ετικέτα μετατροπής για την έναρξη της ολοκλήρωσης αγοράς."
 
 msgid "Conversion label for the shopper submitting payment details at checkout. Sent with the cart value and currency."
-msgstr "Ετικέτα μετατροπής για την υποβολή των στοιχείων πληρωμής από τον πελάτη στο checkout. Στέλνεται με την αξία του καλαθιού και το νόμισμα."
+msgstr "Ετικέτα μετατροπής για την υποβολή των στοιχείων πληρωμής από τον πελάτη στην ολοκλήρωση αγοράς. Στέλνεται με την αξία του καλαθιού και το νόμισμα."
 
 msgid "Copy each item from a past order back into the authenticated user's active cart. Items whose products are inactive or out of stock are returned in skipped_items; quantities are capped at current stock."
 msgstr "Αντιγραφή κάθε είδους από προηγούμενη παραγγελία πίσω στο ενεργό καλάθι του συνδεδεμένου χρήστη. Τα είδη των οποίων τα προϊόντα είναι ανενεργά ή εξαντλημένα επιστρέφονται στο skipped_items· οι ποσότητες περιορίζονται στο τρέχον απόθεμα."
@@ -2873,7 +2882,7 @@ msgid "Country alpha-2 code (e.g., 'GR', 'US')"
 msgstr "Κωδικός χώρας alpha-2 (π.χ. 'GR', 'US')"
 
 msgid "Country and region pickers used during checkout address selection."
-msgstr "Επιλογείς χώρας και περιφέρειας που χρησιμοποιούνται κατά την επιλογή διεύθυνσης στο checkout."
+msgstr "Επιλογείς χώρας και περιφέρειας που χρησιμοποιούνται κατά την επιλογή διεύθυνσης στην ολοκλήρωση αγοράς."
 
 msgid "Country code"
 msgstr "Κωδικός χώρας"
@@ -2922,10 +2931,10 @@ msgid "Create a fresh Stripe PaymentIntent for an order whose previous payment f
 msgstr "Δημιουργία νέου Stripe PaymentIntent για παραγγελία της οποίας η προηγούμενη πληρωμή απέτυχε ή δεν ολοκληρώθηκε ποτέ, ώστε ο πελάτης να μπορεί να δοκιμάσει ξανά χωρίς να ξεκινήσει νέα παραγγελία."
 
 msgid "Create a hosted checkout session (Stripe or Viva Wallet). The customer will be redirected to the provider's checkout page to complete payment."
-msgstr "Δημιουργία φιλοξενούμενης συνεδρίας checkout (Stripe ή Viva Wallet). Ο πελάτης θα ανακατευθυνθεί στη σελίδα πληρωμής του παρόχου για να ολοκληρώσει την πληρωμή."
+msgstr "Δημιουργία φιλοξενούμενης συνεδρίας ολοκλήρωσης αγοράς (Stripe ή Viva Wallet). Ο πελάτης θα ανακατευθυνθεί στη σελίδα πληρωμής του παρόχου για να ολοκληρώσει την πληρωμή."
 
 msgid "Create a hosted checkout session for an order"
-msgstr "Δημιουργία φιλοξενούμενης συνεδρίας checkout για παραγγελία"
+msgstr "Δημιουργία φιλοξενούμενης συνεδρίας ολοκλήρωσης αγοράς για παραγγελία"
 
 #, python-format
 msgid "Create a new %(name)s. Requires authentication."
@@ -3692,6 +3701,9 @@ msgstr "Προεπισκόπηση email"
 msgid "Email removed"
 msgstr "Το email αφαιρέθηκε"
 
+msgid "Email template"
+msgstr "Πρότυπο email"
+
 msgid "Emails & Engagement"
 msgstr "Email & Δέσμευση πελατών"
 
@@ -3799,6 +3811,9 @@ msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μ
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
+
+msgid "Enter the code from your authenticator app."
+msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης."
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
@@ -4008,7 +4023,7 @@ msgid "Failed to charge the shared payment token."
 msgstr "Αποτυχία χρέωσης του κοινόχρηστου token πληρωμής."
 
 msgid "Failed to create checkout session."
-msgstr "Αποτυχία δημιουργίας συνεδρίας checkout."
+msgstr "Αποτυχία δημιουργίας συνεδρίας ολοκλήρωσης αγοράς."
 
 #, python-brace-format
 msgid "Failed to create order: {error}"
@@ -5078,7 +5093,7 @@ msgid "Filter orders from the last 30 days"
 msgstr "Φίλτρο παραγγελιών των τελευταίων 30 ημερών"
 
 msgid "Filter orders that have status update timestamp"
-msgstr "Φίλτρο παραγγελιών με χρονοσήμανση ενημέρωσης κατάστασης"
+msgstr "Φίλτρο παραγγελιών με ημερομηνία και ώρα ενημέρωσης κατάστασης"
 
 msgid "Filter orders that have/don't have a user"
 msgstr "Φίλτρο παραγγελιών με/χωρίς χρήστη"
@@ -5108,7 +5123,7 @@ msgid "Filter partially refunded items"
 msgstr "Φίλτρο μερικώς επιστραμμένων αντικειμένων"
 
 msgid "Filter pay ways by the shipping kind. Pair with ``shippingProviderCode`` for one carrier's rules; on its own it returns only the pay ways every carrier serving that kind accepts, which is what a provider-agnostic ``home_delivery`` checkout needs."
-msgstr "Φίλτρο τρόπων πληρωμής ανά είδος αποστολής. Συνδυάστε το με ``shippingProviderCode`` για τους κανόνες ενός μεταφορέα· από μόνο του επιστρέφει μόνο τους τρόπους πληρωμής που δέχεται κάθε μεταφορέας που εξυπηρετεί αυτό το είδος, κάτι που χρειάζεται ένα checkout ``home_delivery`` ανεξάρτητο από πάροχο."
+msgstr "Φίλτρο τρόπων πληρωμής ανά είδος αποστολής. Συνδυάστε το με ``shippingProviderCode`` για τους κανόνες ενός μεταφορέα· από μόνο του επιστρέφει μόνο τους τρόπους πληρωμής που δέχεται κάθε μεταφορέας που εξυπηρετεί αυτό το είδος, κάτι που χρειάζεται μια ολοκλήρωση αγοράς ``home_delivery`` ανεξάρτητο από πάροχο."
 
 msgid "Filter pay ways compatible with the given shipping carrier. Each carrier declares which settlements it can physically perform, per kind: a BoxNow locker takes a card at its terminal (PAY ON THE GO) and never courier cash, while an ACS courier is the exact opposite. Has no effect without ``shippingKind`` — the rules are per-kind, so a carrier alone says nothing."
 msgstr "Φίλτρο τρόπων πληρωμής συμβατών με τη δεδομένη εταιρεία μεταφοράς. Κάθε μεταφορέας δηλώνει ποιους διακανονισμούς μπορεί να εκτελέσει φυσικά, ανά είδος: ένα locker BoxNow δέχεται κάρτα στο τερματικό του (PAY ON THE GO) και ποτέ μετρητά στον κούριερ, ενώ ένας κούριερ ACS είναι το ακριβώς αντίθετο. Δεν έχει καμία επίδραση χωρίς ``shippingKind`` — οι κανόνες ισχύουν ανά είδος, οπότε ένας μεταφορέας από μόνος του δεν προσδιορίζει τίποτα."
@@ -5150,10 +5165,10 @@ msgid "Filter subscriptions that have metadata"
 msgstr "Φίλτρο εγγραφών με metadata"
 
 msgid "Filter subscriptions unsubscribed after this date"
-msgstr "Φίλτρο εγγραφών με διαγραφή μετά από αυτή την ημερομηνία"
+msgstr "Φίλτρο εγγραφών με απεγγραφή μετά από αυτή την ημερομηνία"
 
 msgid "Filter subscriptions unsubscribed before this date"
-msgstr "Φίλτρο εγγραφών με διαγραφή πριν από αυτή την ημερομηνία"
+msgstr "Φίλτρο εγγραφών με απεγγραφή πριν από αυτή την ημερομηνία"
 
 msgid "Filter tags not used anywhere"
 msgstr "Φίλτρο ετικετών που δεν χρησιμοποιούνται"
@@ -5324,6 +5339,9 @@ msgstr "Οι σύνδεσμοι του υποσέλιδου ανήκουν σε 
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "Για ειδοποιήσεις price_drop: ενεργοποιείται όταν η τιμή του προϊόντος πέσει στο ή κάτω από αυτή την τιμή. Αγνοείται για ειδοποιήσεις επαναδιαθεσιμότητας."
 
+msgid "Forgotten your password or username?"
+msgstr "Ξεχάσατε τον κωδικό πρόσβασης ή το όνομα χρήστη;"
+
 msgid "Format"
 msgstr "Μορφή"
 
@@ -5378,7 +5396,7 @@ msgid "From Email verified"
 msgstr "Επαληθευμένο Email Αποστολέα"
 
 msgid "From now on, your wholesale prices apply automatically while you are signed in — in the cart, at checkout, and on your invoices."
-msgstr "Από εδώ και πέρα, οι τιμές χονδρικής σας εφαρμόζονται αυτόματα όσο είστε συνδεδεμένοι — στο καλάθι, στο ταμείο και στα τιμολόγιά σας."
+msgstr "Από εδώ και πέρα, οι τιμές χονδρικής σας εφαρμόζονται αυτόματα όσο είστε συνδεδεμένοι — στο καλάθι, στην ολοκλήρωση αγοράς και στα τιμολόγιά σας."
 
 msgid "From product"
 msgstr "Από προϊόν"
@@ -5426,6 +5444,9 @@ msgstr "Λίστα/λεπτομέρειες γενικών ετικετών κα
 
 msgid "Generic fulfilment kind, independent of provider."
 msgstr "Γενικός τύπος εκπλήρωσης, ανεξάρτητος από τον πάροχο."
+
+msgid "Generic template for any status update"
+msgstr "Γενικό πρότυπο για οποιαδήποτε ενημέρωση κατάστασης"
 
 msgid "German"
 msgstr "Γερμανικά"
@@ -5836,7 +5857,7 @@ msgid "Google Ads Add-to-Cart Label"
 msgstr "Ετικέτα Προσθήκης στο Καλάθι Google Ads"
 
 msgid "Google Ads Begin-Checkout Label"
-msgstr "Ετικέτα Έναρξης Checkout Google Ads"
+msgstr "Ετικέτα έναρξης ολοκλήρωσης αγοράς Google Ads"
 
 msgid "Google Ads Conversion ID"
 msgstr "Αναγνωριστικό Μετατροπών Google Ads"
@@ -6113,6 +6134,9 @@ msgstr "Όνομα σε αναγνώσιμη μορφή για το θέμα"
 msgid "Human-readable reason for the stock change"
 msgstr "Αιτιολογία σε αναγνώσιμη μορφή για τη μεταβολή αποθέματος"
 
+msgid "Human-readable reason for the stock change, when it has no reason code"
+msgstr "Αιτία της αλλαγής αποθέματος σε κείμενο, όταν δεν υπάρχει κωδικός αιτίας"
+
 msgid "Hurry — popular items may sell out quickly!"
 msgstr "Βιαστείτε — τα δημοφιλή προϊόντα εξαντλούνται γρήγορα!"
 
@@ -6322,6 +6346,9 @@ msgstr "Ανενεργές ετικέτες"
 msgid "Inactive Users"
 msgstr "Ανενεργοί χρήστες"
 
+msgid "Inactive user notification"
+msgstr "Ειδοποίηση ανενεργού χρήστη"
+
 msgid "Include related surfaces"
 msgstr "Συμπερίληψη σχετικών επιφανειών"
 
@@ -6450,7 +6477,7 @@ msgid "Invalid language code."
 msgstr "Μη έγκυρος κωδικός γλώσσας."
 
 msgid "Invalid or expired unsubscribe link"
-msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος διαγραφής"
+msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος απεγγραφής"
 
 msgid "Invalid or inactive topic IDs: {}"
 msgstr "Μη έγκυρα ή ανενεργά ID θεμάτων: {}"
@@ -6484,7 +6511,7 @@ msgid "Invalid topic ID."
 msgstr "Μη έγκυρο ID θέματος."
 
 msgid "Invalid unsubscribe link"
-msgstr "Μη έγκυρος σύνδεσμος διαγραφής"
+msgstr "Μη έγκυρος σύνδεσμος απεγγραφής"
 
 msgid "Invoice"
 msgstr "Τιμολόγιο"
@@ -6740,7 +6767,7 @@ msgid "Latest entries"
 msgstr "Πρόσφατες καταχωρήσεις"
 
 msgid "Latest expected delivery date, fixed when the order was placed from the chosen shipping rate, the dispatch cutoff and business days. Null when the rate advertises no estimate. A promise made at checkout: later rate edits do not move it."
-msgstr "Η αργότερη αναμενόμενη ημερομηνία παράδοσης, που καθορίζεται κατά την καταχώριση της παραγγελίας από την επιλεγμένη τιμή αποστολής, την ώρα αποκοπής αποστολής και τις εργάσιμες ημέρες. Κενή όταν η τιμή αποστολής δεν διαφημίζει εκτίμηση. Δέσμευση που δίνεται στο ταμείο: μεταγενέστερες αλλαγές της τιμής αποστολής δεν την μετακινούν."
+msgstr "Η αργότερη αναμενόμενη ημερομηνία παράδοσης, που καθορίζεται κατά την καταχώριση της παραγγελίας από την επιλεγμένη τιμή αποστολής, την ώρα αποκοπής αποστολής και τις εργάσιμες ημέρες. Κενή όταν η τιμή αποστολής δεν διαφημίζει εκτίμηση. Δέσμευση που δίνεται στην ολοκλήρωση αγοράς: μεταγενέστερες αλλαγές της τιμής αποστολής δεν την μετακινούν."
 
 msgid "Latest orders"
 msgstr "Πρόσφατες παραγγελίες"
@@ -6768,7 +6795,7 @@ msgid "Legal form (e.g. sole trader, IKE, AE)"
 msgstr "Νομική μορφή (π.χ. ατομική, ΙΚΕ, ΑΕ)"
 
 msgid "Let AI-agent platforms choose an online payment method, placing the order and handing the buyer the payment page. When off, agents can only complete with methods they can settle themselves (e.g. cash on delivery) and card buyers are handed off to the storefront checkout."
-msgstr "Επιτρέπει στις πλατφόρμες AI πρακτόρων να επιλέγουν μέθοδο online πληρωμής, καταχωρώντας την παραγγελία και παραδίδοντας στον αγοραστή τη σελίδα πληρωμής. Όταν είναι απενεργοποιημένο, οι πράκτορες μπορούν να ολοκληρώσουν μόνο με μεθόδους που μπορούν να εξοφλήσουν οι ίδιοι (π.χ. αντικαταβολή) και οι αγοραστές με κάρτα παραπέμπονται στο checkout του storefront."
+msgstr "Επιτρέπει στις πλατφόρμες AI πρακτόρων να επιλέγουν μέθοδο online πληρωμής, καταχωρώντας την παραγγελία και παραδίδοντας στον αγοραστή τη σελίδα πληρωμής. Όταν είναι απενεργοποιημένο, οι πράκτορες μπορούν να ολοκληρώσουν μόνο με μεθόδους που μπορούν να εξοφλήσουν οι ίδιοι (π.χ. αντικαταβολή) και οι αγοραστές με κάρτα παραπέμπονται στην ολοκλήρωση αγοράς του storefront."
 
 msgid "Level"
 msgstr "Επίπεδο"
@@ -6792,6 +6819,9 @@ msgstr "Επισήμανση ή αναίρεση επισήμανσης σχολ
 
 msgid "Likes"
 msgstr "Επισημάνσεις"
+
+msgid "Likes Count"
+msgstr "Πλήθος επισημάνσεων"
 
 msgid "Limit"
 msgstr "Όριο"
@@ -6899,7 +6929,7 @@ msgid "List of reservation IDs to release (at most {max})"
 msgstr "Λίστα ID δεσμεύσεων προς αποδέσμευση (έως {max})"
 
 msgid "List of topic IDs to subscribe/unsubscribe"
-msgstr "Λίστα ID θεμάτων για εγγραφή/διαγραφή"
+msgstr "Λίστα ID θεμάτων για εγγραφή/απεγγραφή"
 
 msgid "List public offers"
 msgstr "Λίστα δημόσιων προσφορών"
@@ -6985,6 +7015,9 @@ msgstr "Τύπος locker (π.χ. apm, warehouse)"
 
 msgid "Log a click on a search result"
 msgstr "Καταγραφή κλικ σε αποτέλεσμα αναζήτησης"
+
+msgid "Log in"
+msgstr "Σύνδεση"
 
 msgid "Logo"
 msgstr "Λογότυπο"
@@ -7081,7 +7114,7 @@ msgid "Loyalty Points"
 msgstr "Πόντοι πιστότητας"
 
 msgid "Loyalty Program Hero"
-msgstr "Κεντρική ενότητα προγράμματος επιβράβευσης"
+msgstr "Κεντρική ενότητα προγράμματος πιστότητας"
 
 msgid "Loyalty Tier"
 msgstr "Βαθμίδα Πιστότητας"
@@ -7120,7 +7153,7 @@ msgid "Loyalty redemption requires a signed-in customer."
 msgstr "Η εξαργύρωση πόντων απαιτεί συνδεδεμένο πελάτη."
 
 msgid "Loyalty settings, tiers, and summaries surfaced on the storefront. Backend Loyalty ViewSets are not ``@cache_methods``-decorated so this purge only hits the Nuxt SSR cache."
-msgstr "Ρυθμίσεις πιστότητας, επίπεδα και συνόψεις που εμφανίζονται στο κατάστημα. Τα backend Loyalty ViewSets δεν φέρουν τον διακοσμητή ``@cache_methods``, άρα η εκκαθάριση αυτή αφορά μόνο την cache του Nuxt SSR."
+msgstr "Ρυθμίσεις πιστότητας, βαθμίδες και συνόψεις που εμφανίζονται στο κατάστημα. Τα backend Loyalty ViewSets δεν φέρουν τον διακοσμητή ``@cache_methods``, άρα η εκκαθάριση αυτή αφορά μόνο την cache του Nuxt SSR."
 
 msgid "Loyalty system is currently disabled."
 msgstr "Το σύστημα πιστότητας είναι προσωρινά απενεργοποιημένο."
@@ -7173,6 +7206,9 @@ msgstr "Διαχειριστείτε τις προτιμήσεις σας"
 msgid "Manual"
 msgstr "Χειροκίνητη"
 
+msgid "Manual stock adjustment via admin panel"
+msgstr "Χειροκίνητη προσαρμογή αποθέματος από τη διαχείριση"
+
 msgid "Mark all notifications as seen"
 msgstr "Σήμανση όλων ως ορατές"
 
@@ -7207,10 +7243,10 @@ msgid "Mark selected orders as processing"
 msgstr "Επισήμανση επιλεγμένων παραγγελιών ως «Σε επεξεργασία»"
 
 msgid "Mark selected orders as refunded"
-msgstr "Σήμανση επιλεγμένων παραγγελιών ως επιστραφέντων χρημάτων"
+msgstr "Σήμανση επιλεγμένων παραγγελιών ως με επιστροφή χρημάτων"
 
 msgid "Mark selected orders as returned"
-msgstr "Σήμανση επιλεγμένων παραγγελιών ως επιστραμμένων"
+msgstr "Σήμανση επιλεγμένων παραγγελιών ως με επιστροφή προϊόντων"
 
 msgid "Mark selected orders as shipped"
 msgstr "Σήμανση επιλεγμένων παραγγελιών ως απεσταλμένων"
@@ -7237,10 +7273,10 @@ msgid "Marketing Campaigns"
 msgstr "Καμπάνιες marketing"
 
 msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
-msgstr "Γενικός διακόπτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής) — όταν είναι κλειστός, δεν εμφανίζεται στο checkout, ανεξάρτητα από το ``is_active`` του παρόχου."
+msgstr "Γενικός διακόπτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής) — όταν είναι κλειστός, δεν εμφανίζεται στην ολοκλήρωση αγοράς, ανεξάρτητα από το ``is_active`` του παρόχου."
 
 msgid "Master switch — when False the provider is hidden from checkout regardless of capability flags."
-msgstr "Κύριος διακόπτης — όταν είναι False, ο πάροχος αποκρύπτεται από το checkout ανεξάρτητα από τις σημαίες δυνατοτήτων."
+msgstr "Κύριος διακόπτης — όταν είναι False, ο πάροχος αποκρύπτεται από την ολοκλήρωση αγοράς ανεξάρτητα από τις σημαίες δυνατοτήτων."
 
 msgid "Matched by"
 msgstr "Αντιστοίχιση μέσω"
@@ -7410,6 +7446,9 @@ msgstr "Μεταδεδομένα"
 msgid "Method"
 msgstr "Τρόπος"
 
+msgid "Method not allowed."
+msgstr "Η μέθοδος δεν επιτρέπεται."
+
 msgid "Mid-range (€50-€100)"
 msgstr "Μεσαία κατηγορία (€50-€100)"
 
@@ -7432,7 +7471,7 @@ msgid "Minimum fill cannot exceed the limit."
 msgstr "Η ελάχιστη πλήρωση δεν μπορεί να υπερβαίνει το όριο."
 
 msgid "Minimum level to achieve this tier"
-msgstr "Ελάχιστο επίπεδο για την επίτευξη αυτού του tier"
+msgstr "Ελάχιστο επίπεδο για την επίτευξη αυτής της βαθμίδας"
 
 msgid "Minimum likes filter (likes_count >= value)"
 msgstr "Φίλτρο ελάχιστων επισημάνσεων (likes_count >= value)"
@@ -7483,7 +7522,7 @@ msgid "Multipart child voucher numbers, last create-voucher response, last error
 msgstr "Αριθμοί θυγατρικών vouchers πολλαπλών δεμάτων, τελευταία απόκριση δημιουργίας voucher, τελευταίος φάκελος σφάλματος, URL POD σε cache."
 
 msgid "Multiplier applied to earned points for users in this tier"
-msgstr "Πολλαπλασιαστής που εφαρμόζεται στους πόντους που κερδίζουν οι χρήστες σε αυτό το tier"
+msgstr "Πολλαπλασιαστής που εφαρμόζεται στους πόντους που κερδίζουν οι χρήστες σε αυτή τη βαθμίδα"
 
 msgid "Multiplier for loyalty points calculation (0 = no calculated points)"
 msgstr "Πολλαπλασιαστής για τον υπολογισμό πόντων πιστότητας (0 = χωρίς υπολογιζόμενους πόντους)"
@@ -7646,7 +7685,7 @@ msgid "Newsletter Signup"
 msgstr "Εγγραφή στο newsletter"
 
 msgid "Newsletter form"
-msgstr "Φόρμα ενημερωτικού δελτίου"
+msgstr "Φόρμα newsletter"
 
 msgid "Next Number"
 msgstr "Επόμενος αριθμός"
@@ -7879,7 +7918,7 @@ msgid "Note Added"
 msgstr "Σημείωση προστέθηκε"
 
 msgid "Note: Ensure all money fields use the same currency (EUR preferred) to avoid calculation errors. Discounts and gift-card amounts are stamped at checkout — editing them here does NOT re-charge or refund the customer."
-msgstr "⚠️ Σημείωση: Βεβαιωθείτε ότι όλα τα χρηματικά πεδία χρησιμοποιούν το ίδιο νόμισμα (κατά προτίμηση EUR) για την αποφυγή σφαλμάτων υπολογισμού. Οι εκπτώσεις και τα ποσά δωροκαρτών αποτυπώνονται στο ταμείο — η επεξεργασία τους εδώ ΔΕΝ χρεώνει ξανά ούτε επιστρέφει χρήματα στον πελάτη."
+msgstr "⚠️ Σημείωση: Βεβαιωθείτε ότι όλα τα χρηματικά πεδία χρησιμοποιούν το ίδιο νόμισμα (κατά προτίμηση EUR) για την αποφυγή σφαλμάτων υπολογισμού. Οι εκπτώσεις και τα ποσά δωροκαρτών αποτυπώνονται στην ολοκλήρωση αγοράς — η επεξεργασία τους εδώ ΔΕΝ χρεώνει ξανά ούτε επιστρέφει χρήματα στον πελάτη."
 
 msgid "Notes"
 msgstr "Σημειώσεις"
@@ -8049,7 +8088,7 @@ msgid "Only one active newsletter topic can be the default."
 msgstr "Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
 
 msgid "Only platform superusers may perform this action."
-msgstr "Μόνο οι superusers της πλατφόρμας μπορούν να εκτελέσουν αυτή την ενέργεια."
+msgstr "Μόνο οι υπερχρήστες της πλατφόρμας μπορούν να εκτελέσουν αυτή την ενέργεια."
 
 msgid "Only staff can add tracking information"
 msgstr "Μόνο το προσωπικό μπορεί να προσθέσει πληροφορίες παρακολούθησης"
@@ -8201,7 +8240,7 @@ msgstr "Η παραγγελία #%(order_id)s δεν έχει δείγμα απ�
 
 #, python-format
 msgid "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
-msgstr "Η παραγγελία #%(order_id)s επιστράφηκε πλήρως πριν εκδοθεί η απόδειξή της, άρα δεν υπάρχει πώληση προς τεκμηρίωση."
+msgstr "Η παραγγελία #%(order_id)s επιστράφηκε πλήρως πριν εκδοθεί η απόδειξή της, άρα δεν υπάρχει πώληση που να τεκμηριωθεί."
 
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
@@ -8261,11 +8300,11 @@ msgstr "Η παραγγελία %(order_id)s επισημάνθηκε ως «Σ�
 
 #, python-format
 msgid "Order %(order_id)s marked as refunded"
-msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως επιστραφέντων χρημάτων"
+msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως με επιστροφή χρημάτων"
 
 #, python-format
 msgid "Order %(order_id)s marked as returned"
-msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως επιστραμμένη"
+msgstr "Η παραγγελία %(order_id)s σημειώθηκε ως με επιστροφή προϊόντων"
 
 #, python-format
 msgid "Order %(order_id)s marked as shipped"
@@ -8362,6 +8401,9 @@ msgstr "Πληροφορίες Είδους Παραγγελίας"
 msgid "Order Items"
 msgstr "Προϊόντα Παραγγελίας"
 
+msgid "Order Lifecycle"
+msgstr "Κύκλος ζωής παραγγελίας"
+
 msgid "Order Number"
 msgstr "Αριθμός Παραγγελίας"
 
@@ -8447,7 +8489,7 @@ msgid "Order processing"
 msgstr "Επεξεργασία παραγγελίας"
 
 msgid "Order refunded"
-msgstr "Επιστροφή χρημάτων παραγγελίας"
+msgstr "Επιστράφηκαν τα χρήματα της παραγγελίας"
 
 msgid "Order shipped"
 msgstr "Η παραγγελία απεστάλη"
@@ -8473,7 +8515,7 @@ msgid "Orders"
 msgstr "Παραγγελίες"
 
 msgid "Orders & Checkout"
-msgstr "Παραγγελίες & Ταμείο"
+msgstr "Παραγγελίες & Ολοκλήρωση αγοράς"
 
 msgid "Orders and revenue are read from each store every 30 minutes."
 msgstr "Οι παραγγελίες και τα έσοδα διαβάζονται από κάθε κατάστημα ανά 30 λεπτά."
@@ -8604,7 +8646,7 @@ msgid "Paid amount of every order whose payment completed."
 msgstr "Καταβληθέν ποσό κάθε παραγγελίας της οποίας η πληρωμή ολοκληρώθηκε."
 
 msgid "Paid online at checkout"
-msgstr "Πληρωμή online κατά το checkout"
+msgstr "Πληρωμή online κατά την ολοκλήρωση αγοράς"
 
 msgid "Paid orders"
 msgstr "Πληρωμένες παραγγελίες"
@@ -8935,7 +8977,7 @@ msgid "Payment-method exclusions"
 msgstr "Εξαιρέσεις μεθόδων πληρωμής"
 
 msgid "Payment-method list and detail responses, plus the checkout sidebar that displays them. Purge after enabling/disabling a PayWay or changing its cost."
-msgstr "Αποκρίσεις λίστας και λεπτομερειών μεθόδων πληρωμής, καθώς και η πλαϊνή στήλη checkout που τις εμφανίζει. Εκκαθαρίστε μετά την ενεργοποίηση/απενεργοποίηση μιας μεθόδου πληρωμής ή την αλλαγή του κόστους της."
+msgstr "Αποκρίσεις λίστας και λεπτομερειών μεθόδων πληρωμής, καθώς και η πλαϊνή στήλη ολοκλήρωσης αγοράς που τις εμφανίζει. Εκκαθαρίστε μετά την ενεργοποίηση/απενεργοποίηση μιας μεθόδου πληρωμής ή την αλλαγή του κόστους της."
 
 msgid "Payments"
 msgstr "Πληρωμές"
@@ -8953,7 +8995,7 @@ msgid "Pending Confirmation"
 msgstr "Εκκρεμεί Επιβεβαίωση"
 
 msgid "Pending checkout"
-msgstr "Εκκρεμές checkout"
+msgstr "Εκκρεμής ολοκλήρωση αγοράς"
 
 msgid "Pending confirmation"
 msgstr "Εκκρεμεί επιβεβαίωση"
@@ -9399,7 +9441,7 @@ msgid "Primary address line"
 msgstr "Κύρια γραμμή διεύθυνσης"
 
 msgid "Primary brand logo shown on the checkout shipping picker and the order summary — used for home-delivery rows and as the fallback for pickup-point rows when ``logo_pickup_point`` is empty. PNG/JPG/SVG. Falls back to a shipped default in the storefront when blank, so a fresh deploy without uploaded assets still renders."
-msgstr "Κύριο λογότυπο μάρκας που εμφανίζεται στον επιλογέα αποστολής του checkout και στη σύνοψη παραγγελίας — χρησιμοποιείται για γραμμές κατ' οίκον παράδοσης και ως εναλλακτική λύση για γραμμές σημείου παραλαβής όταν το ``logo_pickup_point`` είναι κενό. PNG/JPG/SVG. Επιστρέφει σε προεπιλογή του καταστήματος όταν είναι κενό, ώστε μια νέα ανάπτυξη χωρίς μεταφορτωμένα αρχεία να αποδίδεται κανονικά."
+msgstr "Κύριο λογότυπο μάρκας που εμφανίζεται στον επιλογέα αποστολής της ολοκλήρωσης αγοράς και στη σύνοψη παραγγελίας — χρησιμοποιείται για γραμμές κατ' οίκον παράδοσης και ως εναλλακτική λύση για γραμμές σημείου παραλαβής όταν το ``logo_pickup_point`` είναι κενό. PNG/JPG/SVG. Επιστρέφει σε προεπιλογή του καταστήματος όταν είναι κενό, ώστε μια νέα ανάπτυξη χωρίς μεταφορτωμένα αρχεία να αποδίδεται κανονικά."
 
 msgid "Print labels for selected shipments"
 msgstr "Εκτύπωση ετικετών για τις επιλεγμένες αποστολές"
@@ -9797,10 +9839,10 @@ msgid "RETAIL RECEIPT"
 msgstr "ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ ΠΩΛΗΣΗΣ"
 
 msgid "RFC 8058 one-click unsubscribe from a topic"
-msgstr "Διαγραφή με ένα κλικ από θέμα κατά RFC 8058"
+msgstr "Απεγγραφή με ένα κλικ από θέμα κατά RFC 8058"
 
 msgid "RFC 8058 one-click unsubscribe from all topics"
-msgstr "Διαγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
+msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
 
 msgid "RabbitMQ"
 msgstr "RabbitMQ"
@@ -9878,6 +9920,9 @@ msgstr "Έτοιμο για παραλαβή"
 
 msgid "Reason"
 msgstr "Αιτία"
+
+msgid "Reason Code"
+msgstr "Κωδικός αιτίας"
 
 msgid "Reason for the refund"
 msgstr "Αιτία της επιστροφής χρημάτων"
@@ -10025,6 +10070,9 @@ msgstr "Καταχώρηση πληρωμής"
 msgid "Records the transfer on the order's payment ledger and marks the order paid. Who confirmed it, when and how much is kept on the order. Only for a bank-transfer order that is still waiting for its payment."
 msgstr "Καταγράφει τη μεταφορά στο καθολικό πληρωμών της παραγγελίας και την επισημαίνει ως πληρωμένη. Ποιος την επιβεβαίωσε, πότε και πόσο διατηρείται στην παραγγελία. Μόνο για παραγγελία τραπεζικής μεταφοράς που περιμένει ακόμη την πληρωμή της."
 
+msgid "Recovery codes (shown once, each works once):"
+msgstr "Κωδικοί ανάκτησης (εμφανίζονται μία φορά, ο καθένας ισχύει μία φορά):"
+
 msgid "Reddit URL"
 msgstr "URL Reddit"
 
@@ -10069,7 +10117,7 @@ msgid "Refreshed"
 msgstr "Ανανεώθηκε"
 
 msgid "Refund"
-msgstr "Επιστροφή Χρημάτων"
+msgstr "Επιστροφή χρημάτων"
 
 msgid "Refund (amount, reason)"
 msgstr "Επιστροφή χρημάτων (ποσό, λόγος)"
@@ -10130,7 +10178,7 @@ msgid "Refund this order's payment first: %(amount)s can still be refunded."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας: μπορούν ακόμη να επιστραφούν %(amount)s."
 
 msgid "Refunded"
-msgstr "Επιστροφή Χρημάτων"
+msgstr "Επιστράφηκαν τα χρήματα"
 
 msgid "Refunded Amount"
 msgstr "Επιστραφέν ποσό"
@@ -10235,7 +10283,7 @@ msgstr "Σχετικό URL για λήψη του PDF voucher μέσω του pr
 
 #, python-brace-format
 msgid "Relative media path (``media/{schema}/uploads/shipping/…``) of the operator-uploaded brand logo, resolved per (provider, kind) so the home-delivery row and the pickup-point row of the same carrier can show different images; the storefront renders it through media-stream at the size it shows. Null when no logo is uploaded — the storefront then falls back to its bundled default."
-msgstr "Σχετική διαδρομή πολυμέσων (``media/{schema}/uploads/shipping/…``) του λογότυπου μάρκας που ανέβασε ο χειριστής, υπολογισμένη ανά (πάροχο, τύπο) ώστε η γραμμή κατ' οίκον παράδοσης και η γραμμή σημείου παραλαβής του ίδιου μεταφορέα να μπορούν να εμφανίζουν διαφορετικές εικόνες· το storefront την εμφανίζει μέσω του media-stream στο μέγεθος που χρειάζεται. Null όταν δεν έχει μεταφορτωθεί λογότυπο — το storefront τότε επιστρέφει στην ενσωματωμένη προεπιλογή του."
+msgstr "Σχετική διαδρομή πολυμέσων (``media/{schema}/uploads/shipping/…``) του λογότυπου που ανέβασε ο διαχειριστής, ορισμένη ανά (πάροχο, είδος), ώστε η γραμμή παράδοσης στο σπίτι και η γραμμή σημείου παραλαβής του ίδιου μεταφορέα να μπορούν να εμφανίζουν διαφορετικές εικόνες· το κατάστημα την εμφανίζει μέσω του media-stream στο μέγεθος που χρειάζεται. Κενό όταν δεν έχει ανέβει λογότυπο — τότε το κατάστημα χρησιμοποιεί την ενσωματωμένη προεπιλογή του."
 
 msgid "Release"
 msgstr "Αποδέσμευση"
@@ -10247,7 +10295,7 @@ msgid "Release stock reservations"
 msgstr "Αποδέσμευση δεσμεύσεων αποθέματος"
 
 msgid "Release stock reservations when checkout is abandoned or payment fails. This makes the reserved stock available for other customers."
-msgstr "Απελευθέρωση δεσμεύσεων αποθέματος όταν το checkout εγκαταλείπεται ή η πληρωμή αποτυγχάνει. Αυτό καθιστά το δεσμευμένο απόθεμα διαθέσιμο για άλλους πελάτες."
+msgstr "Απελευθέρωση δεσμεύσεων αποθέματος όταν η ολοκλήρωση αγοράς εγκαταλείπεται ή η πληρωμή αποτυγχάνει. Αυτό καθιστά το δεσμευμένο απόθεμα διαθέσιμο για άλλους πελάτες."
 
 msgid "Remaining balance"
 msgstr "Υπόλοιπο"
@@ -10257,6 +10305,9 @@ msgstr "Υπόλοιπο πληρωμής της παραγγελίας"
 
 msgid "Reminder Count"
 msgstr "Πλήθος υπενθυμίσεων"
+
+msgid "Reminder for pending orders after 24 hours"
+msgstr "Υπενθύμιση για παραγγελίες σε εκκρεμότητα μετά από 24 ώρες"
 
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
@@ -10346,7 +10397,7 @@ msgid "Reserve"
 msgstr "Δέσμευση"
 
 msgid "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations with 15-minute TTL. Returns list of reservation IDs to be used during order creation."
-msgstr "Δέσμευση αποθέματος για όλα τα είδη του καλαθιού κατά το checkout. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος με διάρκεια ζωής 15 λεπτών. Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά τη δημιουργία της παραγγελίας."
+msgstr "Δέσμευση αποθέματος για όλα τα είδη του καλαθιού κατά την ολοκλήρωση αγοράς. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος με διάρκεια ζωής 15 λεπτών. Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά τη δημιουργία της παραγγελίας."
 
 msgid "Reserve stock for cart items"
 msgstr "Δέσμευση αποθέματος για αντικείμενα καλαθιού"
@@ -10425,7 +10476,7 @@ msgid "Retention Until"
 msgstr "Διατήρηση Έως"
 
 msgid "Retire selected shipments (mark CANCELED, stop polling)"
-msgstr "Απόσυρση επιλεγμένων αποστολών (σήμανση ως CANCELED, διακοπή παρακολούθησης)"
+msgstr "Απόσυρση επιλεγμένων αποστολών (σήμανση ως ακυρωμένες, διακοπή παρακολούθησης)"
 
 #, python-format
 msgid "Retired %(count)d shipment(s) — polling stops for them."
@@ -10701,6 +10752,9 @@ msgstr "Η σάρωση απέτυχε"
 msgid "Scan status"
 msgstr "Κατάσταση σάρωσης"
 
+msgid "Scan this code with an authenticator app, or type the secret in:"
+msgstr "Σαρώστε αυτόν τον κωδικό με μια εφαρμογή ταυτοποίησης ή πληκτρολογήστε το μυστικό κλειδί:"
+
 msgid "Scan to verify"
 msgstr "Σάρωση για επαλήθευση"
 
@@ -10878,6 +10932,9 @@ msgstr "Επίλεξε τουλάχιστον μία περιοχή cache για
 msgid "Select none"
 msgstr "Καμία επιλογή"
 
+msgid "Select value"
+msgstr "Επιλέξτε τιμή"
+
 msgid "Selected:"
 msgstr "Επιλεγμένα:"
 
@@ -10913,6 +10970,15 @@ msgstr "Απεστάλη"
 
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Αποστέλλεται στον πάροχο ώστε μια επανάληψη να μην αποτελεί δεύτερη επιστροφή."
+
+msgid "Sent when order is canceled"
+msgstr "Αποστέλλεται όταν η παραγγελία ακυρωθεί"
+
+msgid "Sent when order is delivered"
+msgstr "Αποστέλλεται όταν η παραγγελία παραδοθεί"
+
+msgid "Sent when order is shipped"
+msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
 
 msgid "Seo Description"
 msgstr "Περιγραφή SEO"
@@ -10985,6 +11051,9 @@ msgstr "Ορίστε το ποσοστό ΦΠΑ (0.0% - 100.0%)"
 
 msgid "Set this address as the user's main address."
 msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας διεύθυνσης του χρήστη."
+
+msgid "Set up your authenticator app with the secret below, then enter the code it shows."
+msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης με το μυστικό κλειδί παρακάτω και μετά εισαγάγετε τον κωδικό που εμφανίζει."
 
 #, python-format
 msgid "Setting '%(key)s' not found"
@@ -11268,7 +11337,7 @@ msgid "Sort order cannot be negative."
 msgstr "Η σειρά δεν μπορεί να είναι αρνητική."
 
 msgid "Sort order in checkout — lower numbers appear first."
-msgstr "Σειρά ταξινόμησης στο checkout — οι μικρότεροι αριθμοί εμφανίζονται πρώτοι."
+msgstr "Σειρά ταξινόμησης στην ολοκλήρωση αγοράς — οι μικρότεροι αριθμοί εμφανίζονται πρώτοι."
 
 msgid "Sortable Fields"
 msgstr "Πεδία ταξινόμησης"
@@ -11296,6 +11365,9 @@ msgstr "Συγκεκριμένα προϊόντα"
 
 msgid "Specimen unavailable"
 msgstr "Το δείγμα δεν είναι διαθέσιμο"
+
+msgid "Stable code for a reason that is always the same text; translated when shown"
+msgstr "Σταθερός κωδικός για αιτία με πάντα το ίδιο κείμενο· μεταφράζεται κατά την εμφάνιση"
 
 msgid "Stable code for why the cancel was refused. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Σταθερός κωδικός για τον λόγο απόρριψης της ακύρωσης. Διακλαδώστε με βάση αυτόν, ποτέ με βάση το ``detail``, που είναι στη γλώσσα του αιτήματος."
@@ -11385,6 +11457,15 @@ msgstr "Αναγνωριστικό κατάστασης"
 
 msgid "Status Updated At"
 msgstr "Κατάσταση ενημερώθηκε στις"
+
+msgid "Status update for completed orders"
+msgstr "Ενημέρωση κατάστασης για ολοκληρωμένες παραγγελίες"
+
+msgid "Status update for refunded orders"
+msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή χρημάτων"
+
+msgid "Status update for returned orders"
+msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή προϊόντων"
 
 msgid "Stock"
 msgstr "Απόθεμα"
@@ -11637,7 +11718,7 @@ msgid "Subscribe an email address to the newsletter"
 msgstr "Εγγραφή μιας διεύθυνσης email στο ενημερωτικό δελτίο"
 
 msgid "Subscribe or unsubscribe from multiple topics at once."
-msgstr "Εγγραφή ή διαγραφή από πολλαπλά θέματα ταυτόχρονα."
+msgstr "Εγγραφή ή απεγγραφή από πολλαπλά θέματα ταυτόχρονα."
 
 msgid "Subscribe the current user to a specific subscription topic."
 msgstr "Εγγραφή του τρέχοντος χρήστη σε συγκεκριμένο θέμα εγγραφής."
@@ -11654,7 +11735,7 @@ msgstr "Εγγραφή %(sub)s"
 
 #, python-format
 msgid "Subscribed %(sub)s · Unsubscribed %(unsub)s"
-msgstr "Εγγραφή %(sub)s · Διαγραφή %(unsub)s"
+msgstr "Εγγραφή %(sub)s · Απεγγραφή %(unsub)s"
 
 msgid "Subscribed At"
 msgstr "Εγγραφή στις"
@@ -11682,6 +11763,9 @@ msgstr "Θέμα Συνδρομής"
 
 msgid "Subscription Topics"
 msgstr "Θέματα Συνδρομών"
+
+msgid "Subscription confirmation email"
+msgstr "Email επιβεβαίωσης συνδρομής"
 
 msgid "Subscription pending confirmation."
 msgstr "Η εγγραφή εκκρεμεί επιβεβαίωσης."
@@ -11711,10 +11795,10 @@ msgid "Success message for username update"
 msgstr "Μήνυμα επιτυχίας για ενημέρωση ονόματος χρήστη"
 
 msgid "Successfully unsubscribed"
-msgstr "Επιτυχής διαγραφή"
+msgstr "Επιτυχής απεγγραφή"
 
 msgid "Successfully unsubscribed."
-msgstr "Επιτυχής διαγραφή."
+msgstr "Επιτυχής απεγγραφή."
 
 msgid "Suggested products for a surface"
 msgstr "Προτεινόμενα προϊόντα για μια επιφάνεια"
@@ -11931,7 +12015,7 @@ msgid "Thank you. Check your inbox for a link to confirm your subscription."
 msgstr "Ευχαριστούμε. Θα βρείτε στα εισερχόμενά σας έναν σύνδεσμο για να επιβεβαιώσετε την εγγραφή σας."
 
 msgid "Thanks for shopping with us. Your loyalty points have been credited to your account."
-msgstr "Ευχαριστούμε που ψώνισες μαζί μας. Οι πόντοι επιβράβευσης πιστώθηκαν στον λογαριασμό σου."
+msgstr "Ευχαριστούμε που ψώνισες μαζί μας. Οι πόντοι πιστότητας πιστώθηκαν στον λογαριασμό σου."
 
 msgid "Thanks — we've received your order and will keep you posted as it progresses."
 msgstr "Ευχαριστούμε — λάβαμε την παραγγελία σου και θα σε κρατάμε ενήμερο καθώς προχωράει."
@@ -11947,6 +12031,9 @@ msgstr ""
 #, python-format
 msgid "Thanks,<br>The %(site_name)s team"
 msgstr "Ευχαριστούμε,<br>Η ομάδα του %(site_name)s"
+
+msgid "That code is not correct."
+msgstr "Ο κωδικός δεν είναι σωστός."
 
 msgid "That file is too large."
 msgstr "Αυτό το αρχείο είναι πολύ μεγάλο."
@@ -11979,7 +12066,7 @@ msgid "The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. N
 msgstr "Το Ocp-Apim-Subscription-Key από την πύλη προγραμματιστών myDATA. Μυστικό. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το myDATA."
 
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
-msgstr "Τα διαπιστευτήρια Viva Wallet και Stripe κάθε tenant είναι οι δικοί του λογαριασμοί εμπόρου για το checkout των πελατών του — άσχετα με το τι οφείλει ο έμπορος στην πλατφόρμα. Το Stripe Connect Account ID είναι δεσμευμένο για μελλοντικό κανάλι χρέωσης της πλατφόρμας και παραμένει αδρανές σήμερα."
+msgstr "Τα διαπιστευτήρια Viva Wallet και Stripe κάθε tenant είναι οι δικοί του λογαριασμοί εμπόρου για την ολοκλήρωση αγοράς των πελατών του — άσχετα με το τι οφείλει ο έμπορος στην πλατφόρμα. Το Stripe Connect Account ID είναι δεσμευμένο για μελλοντικό κανάλι χρέωσης της πλατφόρμας και παραμένει αδρανές σήμερα."
 
 msgid "The aade-user-id of the store's TAXISnet myDATA developer account. No platform fallback — empty disables myDATA."
 msgstr "Το aade-user-id του λογαριασμού προγραμματιστή myDATA του καταστήματος στο TAXISnet. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το myDATA."
@@ -12027,7 +12114,7 @@ msgid "The code has reached its usage limit"
 msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης του"
 
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
-msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα του checkout. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
+msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
 
 msgid "The coupon code can no longer be used."
 msgstr "Ο κωδικός κουπονιού δεν μπορεί πλέον να χρησιμοποιηθεί."
@@ -12045,10 +12132,10 @@ msgid "The destination this option was priced for."
 msgstr "Ο προορισμός για τον οποίο τιμολογήθηκε αυτή η επιλογή."
 
 msgid "The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed."
-msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Καταγράφηκε ως chargeback στο ταμείο πληρωμών της παραγγελίας, άρα δεν μπορεί πλέον να επιστραφεί. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Καταγράφηκε ως chargeback στο καθολικό πληρωμών της παραγγελίας, άρα δεν μπορεί πλέον να επιστραφεί. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
 
 msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
-msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το ταμείο πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το καθολικό πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
 
 msgid "The exact consent sentence shown to the subscriber."
 msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο συνδρομητής."
@@ -12199,10 +12286,13 @@ msgid "The refund could not be processed."
 msgstr "Η επιστροφή χρημάτων δεν ήταν δυνατό να ολοκληρωθεί."
 
 msgid "The refund that gave back points the customer had spent, when this row is one."
-msgstr "Η επιστροφή που έδωσε πίσω πόντους που είχε ξοδέψει ο πελάτης, όταν η γραμμή είναι τέτοια."
+msgstr "Η επιστροφή μέσω της οποίας επιστράφηκαν οι πόντοι που είχε ξοδέψει ο πελάτης, αν η γραμμή προέρχεται από επιστροφή."
 
 msgid "The refund that returned this credit, when it was one."
-msgstr "Η επιστροφή που έδωσε πίσω αυτή την πίστωση, όταν πρόκειται για τέτοια."
+msgstr "Η επιστροφή μέσω της οποίας επιστράφηκε αυτή η πίστωση, αν προέρχεται από επιστροφή."
+
+msgid "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
+msgstr "Η επιστροφή που επέστρεψε αξία σε δωροκάρτες και πόντους και την οποία πιστώνει αυτό το παραστατικό· καμία για επιστροφή από πάροχο."
 
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
@@ -12346,6 +12436,9 @@ msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "Αυτός είναι ένας μοναδικός σύνδεσμος λήψης. Αποθηκεύστε το αρχείο κάπου ασφαλές — δεν διατηρούμε αντίγραφο μετά τη λήξη του συνδέσμου."
 
+msgid "This is above the limit a staff member can put on gift cards in one step. The store's owner can do it."
+msgstr "Αυτό ξεπερνά το όριο που μπορεί να βάλει ένα μέλος του προσωπικού σε δωροκάρτες σε ένα βήμα. Μπορεί να το κάνει ο ιδιοκτήτης του καταστήματος."
+
 #, python-format
 msgid "This is an automated message from %(site_name)s."
 msgstr "Αυτό είναι ένα αυτοματοποιημένο μήνυμα από το %(site_name)s."
@@ -12466,6 +12559,9 @@ msgstr "Αυτή η επιφάνεια δεν έχει προϊόν από το 
 msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
 msgstr "Αυτό ξεπερνά το όριο που μπορεί να βάλει ένα μέλος του προσωπικού σε δωροκάρτες μέσα σε μια ημέρα. Μπορεί να το κάνει ο ιδιοκτήτης του καταστήματος."
 
+msgid "This tenant cannot be destroyed right now."
+msgstr "Αυτό το κατάστημα δεν μπορεί να διαγραφεί αυτή τη στιγμή."
+
 msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 msgstr "Αυτό το κατάστημα είναι αναλώσιμο δείγμα επίδειξης, όχι πραγματικός έμπορος. Επιτρέπει στο manage.py seed_demo_store να αντικαθιστά τον κατάλογο, τις διατάξεις και την πλοήγησή του χωρίς --force. Μην το ενεργοποιείτε ποτέ σε κατάστημα που δέχεται πραγματικές παραγγελίες."
 
@@ -12513,43 +12609,43 @@ msgid "TikTok profile URL. Must use https://. Empty → link hidden in storefron
 msgstr "URL προφίλ TikTok. Πρέπει να χρησιμοποιεί https://. Κενό → ο σύνδεσμος κρύβεται στο footer του storefront."
 
 msgid "Timestamp"
-msgstr "Χρονοσήμανση"
+msgstr "Ημερομηνία και ώρα"
 
 msgid "Timestamp AADE assigned the MARK."
-msgstr "Χρονοσήμανση απόδοσης του MARK από την ΑΑΔΕ."
+msgstr "Ημερομηνία και ώρα απόδοσης του MARK από την ΑΑΔΕ."
 
 msgid "Timestamp from 'data.time' in the webhook payload"
-msgstr "Χρονοσήμανση από το 'data.time' στο payload του webhook"
+msgstr "Ημερομηνία και ώρα από το 'data.time' στο payload του webhook"
 
 msgid "Timestamp of the first transmission attempt — preserved across retries so reporting reflects the original send time."
-msgstr "Χρονοσήμανση της πρώτης προσπάθειας αποστολής — διατηρείται σε όλες τις επαναλήψεις ώστε οι αναφορές να αντικατοπτρίζουν τον αρχικό χρόνο αποστολής."
+msgstr "Ημερομηνία και ώρα της πρώτης προσπάθειας αποστολής — διατηρείται σε όλες τις επαναλήψεις ώστε οι αναφορές να αντικατοπτρίζουν τον αρχικό χρόνο αποστολής."
 
 msgid "Timestamp of the most recent re-engagement email."
-msgstr "Χρονοσήμανση του πιο πρόσφατου email επανενεργοποίησης."
+msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email επανενεργοποίησης."
 
 msgid "Timestamp of the most recent reminder email."
-msgstr "Χρονοσήμανση του πιο πρόσφατου email υπενθύμισης."
+msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email υπενθύμισης."
 
 msgid "Timestamp of the most recent sync from BoxNow API"
-msgstr "Χρονοσήμανση του πιο πρόσφατου συγχρονισμού από το API του BoxNow"
+msgstr "Ημερομηνία και ώρα του πιο πρόσφατου συγχρονισμού από το API του BoxNow"
 
 msgid "Timestamp the envelope was generated"
-msgstr "Χρονοσήμανση δημιουργίας του φακέλου"
+msgstr "Ημερομηνία και ώρα δημιουργίας του φακέλου"
 
 msgid "Timestamp when GrooveShop received the webhook (separate from event_time)"
-msgstr "Χρονοσήμανση λήψης του webhook από το GrooveShop (διαφορετική από το event_time)"
+msgstr "Ημερομηνία και ώρα λήψης του webhook από το GrooveShop (διαφορετική από το event_time)"
 
 msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
-msgstr "Χρονοσήμανση λήξης της δέσμευσης (συνήθως 15 λεπτά από τη δημιουργία)"
+msgstr "Ημερομηνία και ώρα λήξης της δέσμευσης (συνήθως 15 λεπτά από τη δημιουργία)"
 
 msgid "Timestamp when the event occurred at BoxNow"
-msgstr "Χρονοσήμανση όταν συνέβη το συμβάν στο BoxNow"
+msgstr "Ημερομηνία και ώρα όταν συνέβη το συμβάν στο BoxNow"
 
 msgid "Timestamp when this tenant was last suspended. Set automatically by the suspend admin action. Required to be at least 24 hours in the past before the tenant can be permanently destroyed."
 msgstr "Χρονική στιγμή τελευταίας αναστολής αυτού του καταστήματος. Ορίζεται αυτόματα από την ενέργεια αναστολής στο admin. Απαιτείται να έχουν περάσει τουλάχιστον 24 ώρες πριν το κατάστημα μπορεί να διαγραφεί οριστικά."
 
 msgid "Timestamps"
-msgstr "Χρονοσημάνσεις"
+msgstr "Ημερομηνίες"
 
 msgid "Timing"
 msgstr "Χρονισμός"
@@ -12609,6 +12705,9 @@ msgstr "Πάρα πολλά ids — ζήτησε έως {max} ανά κλήση.
 msgid "Too many requests. Try again in a while."
 msgstr "Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο."
 
+msgid "Too many wrong codes. Try again in a few minutes."
+msgstr "Πάρα πολλοί λανθασμένοι κωδικοί. Δοκιμάστε ξανά σε λίγα λεπτά."
+
 msgid "Top searches"
 msgstr "Κορυφαίες αναζητήσεις"
 
@@ -12655,7 +12754,7 @@ msgid "Total cart weight in grams. ACS uses it to bucket the live quote against 
 msgstr "Συνολικό βάρος καλαθιού σε γραμμάρια. Η ACS το χρησιμοποιεί για να κατατάξει τη ζωντανή προσφορά στο πραγματικό εύρος τιμολόγησης ώστε ο αγοραστής να βλέπει την ίδια τιμή που θα χρεώσει η έκδοση voucher. Το BoxNow το αγνοεί. Προεπιλογή το ελάχιστο χρεώσιμο βάρος ACS (500g) όταν παραλείπεται."
 
 msgid "Total cart weight in grams. Forwarded to /api/v1/shipping/options at checkout so ACS live pricing quotes against the actual weight bracket the voucher mint will charge."
-msgstr "Συνολικό βάρος καλαθιού σε γραμμάρια. Προωθείται στο /api/v1/shipping/options κατά το checkout ώστε η ζωντανή τιμολόγηση ACS να υπολογίζει βάσει του πραγματικού εύρους βάρους που θα χρεώσει η έκδοση voucher."
+msgstr "Συνολικό βάρος καλαθιού σε γραμμάρια. Προωθείται στο /api/v1/shipping/options κατά την ολοκλήρωση αγοράς ώστε η ζωντανή τιμολόγηση ACS να υπολογίζει βάσει του πραγματικού εύρους βάρους που θα χρεώσει η έκδοση voucher."
 
 msgid "Total charge amount (cart + shipping + payment fee)"
 msgstr "Συνολικό ποσό χρέωσης (καλάθι + αποστολή + έξοδα πληρωμής)"
@@ -12900,28 +12999,28 @@ msgid "Unseen"
 msgstr "Μη αναγνωσμένη"
 
 msgid "Unsubscribe"
-msgstr "Διαγραφή"
-
-msgid "Unsubscribe from a topic"
-msgstr "Διαγραφή από θέμα"
-
-msgid "Unsubscribe from a topic via email link (GET)"
-msgstr "Διαγραφή από θέμα μέσω συνδέσμου email (GET)"
-
-msgid "Unsubscribe from all topics via email link (GET)"
-msgstr "Διαγραφή από όλα τα θέματα μέσω συνδέσμου email (GET)"
-
-msgid "Unsubscribe here"
-msgstr "Διαγραφή εδώ"
-
-msgid "Unsubscribe the current user from a specific subscription topic."
-msgstr "Διαγραφή του τρέχοντος χρήστη από συγκεκριμένο θέμα εγγραφής."
-
-msgid "Unsubscribed"
 msgstr "Απεγγραφή"
 
+msgid "Unsubscribe from a topic"
+msgstr "Απεγγραφή από θέμα"
+
+msgid "Unsubscribe from a topic via email link (GET)"
+msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"
+
+msgid "Unsubscribe from all topics via email link (GET)"
+msgstr "Απεγγραφή από όλα τα θέματα μέσω συνδέσμου email (GET)"
+
+msgid "Unsubscribe here"
+msgstr "Απεγγραφή εδώ"
+
+msgid "Unsubscribe the current user from a specific subscription topic."
+msgstr "Απεγγραφή του τρέχοντος χρήστη από συγκεκριμένο θέμα εγγραφής."
+
+msgid "Unsubscribed"
+msgstr "Απεγγράφηκε"
+
 msgid "Unsubscribed At"
-msgstr "Διαγραφή στις"
+msgstr "Απεγγραφή στις"
 
 #, python-format
 msgid "Unsupported currency: %(currency)s. Supported: EUR, USD"
@@ -12959,7 +13058,7 @@ msgstr "Μπορούν να επιστραφούν ακόμη έως %(refundabl
 
 #, python-format
 msgid "Up to %(refundable)s can still be refunded: %(provider)s through the payment provider, then %(stored)s back onto the gift cards and loyalty points the order paid with. Enter the value of what the customer returned."
-msgstr "Μπορούν να επιστραφούν έως %(refundable)s: %(provider)s μέσω του παρόχου πληρωμών και μετά %(stored)s πίσω στις δωροκάρτες και τους πόντους πιστότητας που πλήρωσαν την παραγγελία. Εισάγετε την αξία όσων επέστρεψε ο πελάτης."
+msgstr "Μπορείτε να επιστρέψετε έως %(refundable)s: %(provider)s μέσω του παρόχου πληρωμών και %(stored)s πίσω στις δωροκάρτες και τους πόντους πιστότητας με τους οποίους πληρώθηκε η παραγγελία. Εισαγάγετε την αξία των προϊόντων που επέστρεψε ο πελάτης."
 
 #, python-format
 msgid "Update %(name)s information. Requires authentication."
@@ -13087,6 +13186,9 @@ msgstr "ID χρήστη"
 msgid "User ID. Leave empty for guest orders."
 msgstr "ID χρήστη. Αφήστε κενό για παραγγελίες επισκεπτών."
 
+msgid "User Management"
+msgstr "Διαχείριση χρηστών"
+
 msgid "User Sessions"
 msgstr "Συνεδρίες χρήστη"
 
@@ -13167,7 +13269,7 @@ msgid "VAT breakdown"
 msgstr "Ανάλυση ΦΠΑ"
 
 msgid "VAT contained in total_price once promotion_discount is taken off. A price discount reduces the taxable base, so this is the figure the invoice will carry. Loyalty points are redeemed against the order and are not reflected here."
-msgstr "ΦΠΑ που περιέχεται στο total_price αφού αφαιρεθεί το promotion_discount. Μια έκπτωση τιμής μειώνει τη φορολογητέα βάση, οπότε αυτό είναι το ποσό που θα φέρει το τιμολόγιο. Οι πόντοι επιβράβευσης εξαργυρώνονται στην παραγγελία και δεν αντικατοπτρίζονται εδώ."
+msgstr "ΦΠΑ που περιέχεται στο total_price αφού αφαιρεθεί το promotion_discount. Μια έκπτωση τιμής μειώνει τη φορολογητέα βάση, οπότε αυτό είναι το ποσό που θα φέρει το τιμολόγιο. Οι πόντοι πιστότητας εξαργυρώνονται στην παραγγελία και δεν αντικατοπτρίζονται εδώ."
 
 msgid "VAT number (ΑΦΜ)"
 msgstr "ΑΦΜ"
@@ -13536,6 +13638,9 @@ msgstr "Καλώς ήρθατε πίσω — πάμε!"
 msgid "Welcome To"
 msgstr "Καλώς ήρθατε στο"
 
+msgid "Welcome back to"
+msgstr "Καλώς ήρθατε ξανά στο"
+
 msgid "Well Reviewed (>7.0)"
 msgstr "Καλά Αξιολογημένα (>7.0)"
 
@@ -13588,7 +13693,7 @@ msgid "When enabled, this attribute is rendered as a variant selector (e.g. Colo
 msgstr "Όταν είναι ενεργοποιημένο, αυτό το χαρακτηριστικό εμφανίζεται ως επιλογέας παραλλαγής (π.χ. Χρώμα, Μνήμη) σε όλη την ομάδα παραλλαγών ενός προϊόντος αντί ως απλή προδιαγραφή μόνο για ανάγνωση."
 
 msgid "When set, only checkouts with this email can redeem the code — covers guests without an account"
-msgstr "Όταν ορίζεται, μόνο checkout με αυτό το email μπορούν να εξαργυρώσουν τον κωδικό — καλύπτει επισκέπτες χωρίς λογαριασμό"
+msgstr "Όταν ορίζεται, μόνο αγορές με αυτό το email μπορούν να εξαργυρώσουν τον κωδικό — καλύπτει επισκέπτες χωρίς λογαριασμό"
 
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "Όταν ορίζεται, μόνο αυτός ο πελάτης μπορεί να εξαργυρώσει τον κωδικό (προσωπικό κουπόνι)"
@@ -13809,8 +13914,14 @@ msgstr "Ναι: τα προϊόντα επέστρεψαν ή δεν παραδ�
 msgid "You already have an active alert of this kind for this product."
 msgstr "Έχετε ήδη ενεργή ειδοποίηση αυτού του τύπου για αυτό το προϊόν."
 
+msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
+msgstr "Έχετε ήδη {count} παραγγελίες που περιμένουν πληρωμή. Πληρώστε ή ακυρώστε μία πριν κάνετε άλλη."
+
 msgid "You are already subscribed to this topic."
 msgstr "Είστε ήδη εγγεγραμμένος/η σε αυτό το θέμα."
+
+msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
+msgstr "Έχετε ταυτοποιηθεί ως %(username)s, αλλά δεν έχετε εξουσιοδότηση για πρόσβαση σε αυτή τη σελίδα. Θέλετε να συνδεθείτε με διαφορετικό λογαριασμό;"
 
 msgid "You are not subscribed to this topic."
 msgstr "Δεν είστε εγγεγραμμένος/η σε αυτό το θέμα."

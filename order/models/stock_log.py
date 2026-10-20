@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.contrib import admin
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext
@@ -7,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
+from order.enum.stock_log_reason import StockLogReason
 from order.managers.stock import StockLogManager
 from tenant.staff_actors import StaffActor
 
@@ -85,10 +87,26 @@ class StockLog(TimeStampMixinModel):
         _("Stock After"),
         help_text=_("Stock level after the operation"),
     )
+    reason_code = models.CharField(
+        _("Reason Code"),
+        max_length=50,
+        choices=StockLogReason.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Stable code for a reason that is always the same text; "
+            "translated when shown"
+        ),
+    )
     reason = models.CharField(
         _("Reason"),
         max_length=255,
-        help_text=_("Human-readable reason for the stock change"),
+        blank=True,
+        help_text=_(
+            "Human-readable reason for the stock change, when it has "
+            "no reason code"
+        ),
     )
     performed_by = models.ForeignKey(
         "user.UserAccount",
@@ -161,6 +179,14 @@ class StockLog(TimeStampMixinModel):
         """Who made the change: the staff member, else the shopper whose
         reservation it was, else nobody (a system operation)."""
         return self.performed_by_staff or self.performed_by
+
+    @property
+    @admin.display(description=_("Reason"))
+    def reason_display(self) -> str:
+        """The reason in the active language: the code's label, else the text."""
+        if self.reason_code:
+            return self.get_reason_code_display()
+        return self.reason
 
     @property
     def is_increase(self) -> bool:

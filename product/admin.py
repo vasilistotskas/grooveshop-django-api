@@ -765,7 +765,7 @@ class StockLogDatasetAdmin(RelatedDatasetAdmin):
                 obj.order_id,
                 _("Order #%(id)s") % {"id": obj.order_id},
             )
-        return obj.reason or "—"
+        return obj.reason_display or "—"
 
     @admin.display(description=_("By"))
     def performed_by_display(self, obj):
@@ -1574,7 +1574,7 @@ class ProductAdmin(
                 {"content": f"{log.quantity_delta:+d}", "class": "text-right"},
                 {"content": log.stock_before, "class": "text-right"},
                 {"content": log.stock_after, "class": "text-right"},
-                log.reason or "—",
+                log.reason_display or "—",
                 link_cell(
                     reverse("admin:order_order_change", args=[log.order_id]),
                     f"#{log.order_id}",

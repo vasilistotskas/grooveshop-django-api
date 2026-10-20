@@ -7,6 +7,7 @@ from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
+from order.enum.stock_log_reason import StockLogReason
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 from tenant.celery import dispatch_on_commit
@@ -122,6 +123,9 @@ def post_create_historical_record_callback(
             quantity_delta=quantity_delta,
             stock_before=old_stock,
             stock_after=new_stock,
+            reason_code=StockLogReason.MANUAL_ADJUSTMENT,
+            # The text the release before reason codes reads; kept until a
+            # release that no longer reads it is the only one serving.
             reason="Manual stock adjustment via admin panel",
             performed_by_staff_id=performed_by_staff_id,
             order=None,

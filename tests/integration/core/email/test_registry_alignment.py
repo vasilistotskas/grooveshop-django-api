@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
+from core.email.config import EmailTemplateConfig
 from core.email.registry import EmailTemplateRegistry
 
 EMAIL_ROOT = Path(settings.BASE_DIR) / "core" / "templates" / "emails"
@@ -115,3 +116,24 @@ class TestEveryPreviewRenders:
             assert "order" in preview.context_data, (
                 f"{name} previewed without an order in context"
             )
+
+
+class TestEveryDirectoryHasAHeading:
+    def test_every_template_directory_has_a_heading(self):
+        """A new directory must get a translated heading, never a guess."""
+        directories = {
+            entry.name
+            for entry in EMAIL_ROOT.iterdir()
+            if entry.is_dir() and entry.name != "base"
+        }
+        missing = directories - set(EmailTemplateConfig.DIRECTORY_HEADINGS)
+        assert missing == set(), (
+            f"template directories without a heading: {sorted(missing)}"
+        )
+
+    def test_no_heading_is_left_over_for_a_removed_directory(self):
+        directories = {
+            entry.name for entry in EMAIL_ROOT.iterdir() if entry.is_dir()
+        }
+        stale = set(EmailTemplateConfig.DIRECTORY_HEADINGS) - directories
+        assert stale == set()

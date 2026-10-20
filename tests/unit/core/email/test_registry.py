@@ -1,6 +1,7 @@
 """Unit tests for email template registry."""
 
 import pytest
+from django.utils.functional import Promise
 
 from core.email.registry import EmailTemplateInfo, EmailTemplateRegistry
 from order.enum.status import OrderStatus
@@ -44,7 +45,7 @@ class TestEmailTemplateRegistry:
         categories = registry.get_categories()
         assert isinstance(categories, list)
         assert len(categories) > 0
-        assert all(isinstance(c, str) for c in categories)
+        assert all(isinstance(c, str | Promise) for c in categories)
 
     def test_get_by_category(self, registry):
         """Test getting templates by category."""

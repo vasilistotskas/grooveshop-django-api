@@ -7,6 +7,7 @@ is changed manually (e.g., via admin panel).
 
 import pytest
 
+from order.enum.stock_log_reason import StockLogReason
 from order.models.stock_log import StockLog
 from product.factories import ProductFactory
 from tests.utils.staff import stamp_platform_identity
@@ -36,7 +37,7 @@ class TestStockChangeSignals:
         assert log.quantity_delta == 5
         assert log.stock_before == 10
         assert log.stock_after == 15
-        assert log.reason == "Manual stock adjustment via admin panel"
+        assert log.reason_code == StockLogReason.MANUAL_ADJUSTMENT
         assert log.performed_by_staff_id == user.pk
         assert log.performed_by is None
         assert log.order is None
@@ -60,7 +61,7 @@ class TestStockChangeSignals:
         assert log.quantity_delta == -5
         assert log.stock_before == 20
         assert log.stock_after == 15
-        assert log.reason == "Manual stock adjustment via admin panel"
+        assert log.reason_code == StockLogReason.MANUAL_ADJUSTMENT
         assert log.performed_by_staff_id == user.pk
         assert log.performed_by is None
 

@@ -1816,9 +1816,57 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 30,
     },
     {
-        "name": "ORDER_AUTO_CANCEL_PENDING_HOURS",
+        "name": "ORDER_ONLINE_PAYMENT_HOLD_MINUTES",
         "type": "int",
-        "value": 24,
+        "value": 30,
+        "validator": "order.payment_hold.validate_hold_minutes_setting",
+        "description": (
+            "How long an online-payment order holds its stock while it "
+            "waits for the payment. It is also how long the payment link "
+            "stays payable: the provider is told the same expiry, so the "
+            "order is canceled and its stock released only when the "
+            "payment can no longer succeed. Between 30 and 1092 minutes "
+            "(the shortest Stripe session and the longest Viva payment "
+            "order); Stripe never expires a session sooner than 30."
+        ),
+    },
+    {
+        "name": "ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES",
+        "type": "int",
+        "value": 60,
+        "validator": "order.payment_hold.validate_max_hold_minutes_setting",
+        "description": (
+            "The longest an online-payment order may hold its stock in "
+            "total, counted from when it was placed. Opening a new "
+            "payment link (a retry) can move the hold later, never past "
+            "this. Once it has passed the order can no longer be paid "
+            "and the shopper places a new one from their cart. At least "
+            "the hold above, and at least 31 for Stripe to open a "
+            "payment page."
+        ),
+    },
+    {
+        "name": "ORDER_ONLINE_PAYMENT_GRACE_MINUTES",
+        "type": "int",
+        "value": 5,
+        "description": (
+            "How long after its payment link expires an unpaid "
+            "online-payment order is kept before it is canceled, so a "
+            "payment confirmation still on its way reaches an open "
+            "order. A confirmation after the cancel is still booked, but "
+            "needs a refund."
+        ),
+    },
+    {
+        "name": "ORDER_UNPAID_ONLINE_ALERT_THRESHOLD",
+        "type": "int",
+        "value": 25,
+        "description": (
+            "Raise an operations alert when this many online-payment "
+            "orders are waiting for their payment at once: a pile-up "
+            "holds stock that other shoppers cannot buy. 0 turns the "
+            "alert off."
+        ),
     },
     {
         "name": "ORDER_MAX_UNPAID_ONLINE_ORDERS",
@@ -1828,7 +1876,7 @@ EXTRA_SETTINGS_DEFAULTS = [
             "How many online-payment orders still waiting for their "
             "payment one customer (the account, or the email for a "
             "guest) can have at once. Each holds its stock until it is "
-            "paid or auto-canceled (ORDER_AUTO_CANCEL_PENDING_HOURS), so "
+            "paid or auto-canceled (ORDER_ONLINE_PAYMENT_HOLD_MINUTES), so "
             "this bounds the stock a customer can lock without paying. "
             "0 turns the limit off."
         ),

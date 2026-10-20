@@ -5,6 +5,7 @@ from html import unescape
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
 from django.db.models import F
@@ -26,6 +27,7 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order import payment_hold
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import (
@@ -35,7 +37,7 @@ from order.models import (
     RefundNotification,
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
-from order.payment import payment_provider_label
+from order.payment import get_payment_provider_class, payment_provider_label
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
@@ -2150,10 +2152,14 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     Two buckets:
     - Orders with FAILED payment older than
       ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30)
-    - Orders with PENDING payment older than
-      ORDER_AUTO_CANCEL_PENDING_HOURS (default 24) — covers the case
-      where the customer abandoned online checkout without triggering
-      any webhook.
+    - Orders with PENDING payment whose hold has ended: the payment link
+      or session stopped being payable (``Order.payment_hold_expires_at``,
+      ORDER_ONLINE_PAYMENT_HOLD_MINUTES) plus
+      ORDER_ONLINE_PAYMENT_GRACE_MINUTES for a confirmation still on its
+      way. The stock is released only when the payment can no longer
+      succeed, so a late payment cannot book money for goods nobody
+      reserved. Before cancelling, the provider is asked to close a
+      payment that has no expiry of its own (a Stripe PaymentIntent).
 
     Delegates to OrderService.cancel_order which restores stock via
     StockManager.increment_stock and releases any outstanding
@@ -2162,11 +2168,9 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     failed_minutes = Setting.get(
         "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES", default=30
     )
-    pending_hours = Setting.get("ORDER_AUTO_CANCEL_PENDING_HOURS", default=24)
 
     now = timezone.now()
     failed_cutoff = now - timedelta(minutes=failed_minutes)
-    pending_cutoff = now - timedelta(hours=pending_hours)
 
     failed_qs = Order.objects.filter(
         status=OrderStatus.PENDING,
@@ -2175,18 +2179,12 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     )
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
-    # pays, sometimes for days. Positive filter also excludes orders
-    # with no pay_way at all (NULL) which are treated as
-    # offline-equivalent for this bucket.
-    pending_qs = Order.objects.filter(
-        status=OrderStatus.PENDING,
-        payment_status=PaymentStatus.PENDING,
-        created_at__lt=pending_cutoff,
-        # Auto-cancel only applies to online payments that never
-        # completed. Collect-on-delivery orders legitimately sit
-        # PENDING until the carrier remits (measured ACS lag ~4 days),
-        # so cancelling them would kill live orders.
-        pay_way__settlement=PaySettlement.ONLINE,
+    # pays, sometimes for days (measured ACS lag ~4 days), so cancelling
+    # them would kill live orders. ``expired_unpaid_online_orders``
+    # selects the online ones; an order with no pay_way at all (NULL) is
+    # treated as offline-equivalent.
+    pending_qs = payment_hold.expired_unpaid_online_orders(now).select_related(
+        "pay_way"
     )
 
     # Never auto-cancel an order Viva confirmed a charge for. The webhook
@@ -2211,7 +2209,29 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     canceled_failed = 0
     canceled_pending = 0
+    skipped_open = 0
     errors = 0
+
+    def _payment_closed(order):
+        # Outside the row lock: this is a provider round trip. No
+        # registered provider, or one that cannot be built (credentials
+        # removed), cannot confirm a payment either, so the order is
+        # cancelled as before.
+        provider_class = get_payment_provider_class(order.pay_way.provider_code)
+        if provider_class is None:
+            return True
+        try:
+            provider = provider_class()
+        except ImproperlyConfigured:
+            return True
+        closed = provider.close_payment(order.payment_id or "")
+        if not closed:
+            logger.warning(
+                "Auto-cancel skipped order %s: its payment is already "
+                "being processed by the provider",
+                order.id,
+            )
+        return closed
 
     def _cancel_with_lock(order, reason):
         # Re-fetch under row lock so concurrent beat workers can't both
@@ -2249,6 +2269,9 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     for order in pending_qs.iterator():
         try:
+            if not _payment_closed(order):
+                skipped_open += 1
+                continue
             if _cancel_with_lock(
                 order,
                 "Auto-canceled: payment never completed",
@@ -2269,9 +2292,26 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
             canceled_pending,
             errors,
         )
+
+    # What is still held after the sweep: a pile-up of orders nobody is
+    # paying for locks stock other shoppers cannot buy.
+    alert_threshold = int(Setting.get(payment_hold.ALERT_SETTING))
+    if alert_threshold > 0:
+        unpaid = payment_hold.unpaid_online_orders().count()
+        if unpaid >= alert_threshold:
+            logger.warning(
+                payment_hold.SPIKE_MESSAGE,
+                extra={
+                    "fields": {
+                        "unpaid_online_orders": unpaid,
+                        "threshold": alert_threshold,
+                    }
+                },
+            )
     return {
         "canceled_failed": canceled_failed,
         "canceled_pending": canceled_pending,
+        "skipped_open": skipped_open,
         "errors": errors,
     }
 

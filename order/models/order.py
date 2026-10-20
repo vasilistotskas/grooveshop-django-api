@@ -244,6 +244,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         choices=PaymentStatus.choices,
         default=PaymentStatus.PENDING,
     )
+    payment_hold_expires_at = models.DateTimeField(
+        _("Payment Hold Expires At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the payment link or session last opened for this order "
+            "stops being payable. The stock stays reserved until then "
+            "(plus a short grace window), after which the order is "
+            "canceled if still unpaid. Empty until a payment is opened."
+        ),
+    )
     # The gateway that took the charge; ``pay_way`` is the method the
     # shopper chose, labelled "Payment Method" like its admin section.
     payment_method = models.CharField(

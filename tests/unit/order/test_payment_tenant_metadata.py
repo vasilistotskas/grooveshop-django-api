@@ -173,11 +173,11 @@ class TestCheckoutSessionMetadata:
     ):
         bind_tenant_and_schema(_fake_tenant(schema_name="webside"))
         mock_session.return_value = mock.Mock(
-            id="cs_1", url="https://stripe/cs_1"
+            id="cs_1", url="https://stripe/cs_1", expires_at=1_800_000_000
         )
 
         provider = StripePaymentProvider()
-        provider.create_checkout_session(
+        ok, _data = provider.create_checkout_session(
             amount=amount,
             order_id="order-5",
             success_url="https://webside.gr/ok",
@@ -186,6 +186,7 @@ class TestCheckoutSessionMetadata:
             subject="order-uuid",
         )
 
+        assert ok
         kwargs = mock_session.call_args.kwargs
         assert kwargs["metadata"]["tenant_schema"] == "webside"
         assert (

@@ -115,6 +115,7 @@ class StripePaymentAmountTestCase(TestCase):
         mock_session = mock.Mock()
         mock_session.id = "cs_test"
         mock_session.url = "https://checkout.stripe.com/test"
+        mock_session.expires_at = 1_800_000_000
         mock_session_create.return_value = mock_session
 
         provider = StripePaymentProvider()
@@ -156,6 +157,7 @@ class StripePaymentAmountTestCase(TestCase):
         mock_session = mock.Mock()
         mock_session.id = "cs_test"
         mock_session.url = "https://checkout.stripe.com/test"
+        mock_session.expires_at = 1_800_000_000
         mock_session_create.return_value = mock_session
 
         provider = StripePaymentProvider()

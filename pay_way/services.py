@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
 from typing import Any
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 
+from order import payment_hold
 from order.enum.status import (
     PaymentStatus,
 )
@@ -271,6 +273,30 @@ class PayWayService:
         if not provider:
             return False, {"error": _("Payment provider not available")}
 
+        # A retry replaces the order's payment, so the one it replaces is
+        # closed first: a Stripe PaymentIntent has no expiry and could
+        # otherwise be confirmed from an old tab after the stock was
+        # released. One already past the point of no return stays the
+        # order's payment and the retry is refused.
+        if order.payment_id:
+            try:
+                previous_closed = provider.close_payment(order.payment_id)
+            except Exception:
+                logger.exception(
+                    "Could not close the previous payment of order %s",
+                    order.id,
+                )
+                return False, {
+                    "error": _("The previous payment could not be closed."),
+                    "code": "previous_payment_not_closed",
+                }
+            if not previous_closed:
+                return False, {
+                    "error": _("The previous payment is still in progress."),
+                    "code": "previous_payment_in_progress",
+                }
+
+        hold_expires_at = payment_hold.deadline(order)
         success, payment_data = provider.process_payment(
             # Amount owed, not the raw total — a loyalty redemption is
             # deducted by calculate_order_total_amount().
@@ -282,11 +308,20 @@ class PayWayService:
                 **kwargs,
                 "purpose": PaymentPurpose.ORDER,
                 "subject": str(order.uuid),
+                # The payment stops being payable when the stock hold ends.
+                "expires_at": hold_expires_at,
             },
         )
 
         if success:
-            PayWayService._record_opened_payment(order, pay_way, payment_data)
+            PayWayService._record_opened_payment(
+                order,
+                pay_way,
+                payment_data,
+                # The expiry the provider applied, else the one asked for
+                # (a PaymentIntent has none: the sweep cancels it).
+                hold_expires_at=payment_data.get("expires_at", hold_expires_at),
+            )
 
             if order.payment_status == PaymentStatus.COMPLETED:
                 order.mark_as_paid(
@@ -298,7 +333,11 @@ class PayWayService:
 
     @staticmethod
     def _record_opened_payment(
-        order: Order, pay_way: PayWay, payment_data: dict[str, Any]
+        order: Order,
+        pay_way: PayWay,
+        payment_data: dict[str, Any],
+        *,
+        hold_expires_at: datetime,
     ) -> None:
         """Store the payment the provider just opened on *order*.
 
@@ -323,8 +362,14 @@ class PayWayService:
                 "status", PaymentStatus.PROCESSING
             )
             locked.payment_id = payment_data.get("payment_id", "")
+            locked.payment_hold_expires_at = hold_expires_at
             locked.save(
-                update_fields=["payment_method", "payment_status", "payment_id"]
+                update_fields=[
+                    "payment_method",
+                    "payment_status",
+                    "payment_id",
+                    "payment_hold_expires_at",
+                ]
             )
         order.payment_method = locked.payment_method
         order.payment_status = locked.payment_status

@@ -8698,6 +8698,9 @@ msgstr "Η πληρωμή απέτυχε — Παραγγελία #{order_id}"
 msgid "Payment Gateway"
 msgstr "Πύλη πληρωμής"
 
+msgid "Payment Hold Expires At"
+msgstr "Λήξη κράτησης πληρωμής"
+
 msgid "Payment ID"
 msgstr "ID πληρωμής"
 
@@ -11997,6 +12000,12 @@ msgstr "Η πλατφόρμα ενημέρωσε τα νομικά της κεί
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "Η πλατφόρμα μπορεί να εκδίδει αποδείξεις λιανικής μόνο για επιχείρηση που απαλλάσσεται από τον φορολογικό ηλεκτρονικό μηχανισμό (ΦΗΜ). Καταχωρίστε τη νομική βάση στο MYDATA_FHM_EXEMPTION_GROUND ή απενεργοποιήστε το MYDATA_ENABLED και εκδίδετε τις αποδείξεις από τον ΦΗΜ ή τον πάροχο ηλεκτρονικής τιμολόγησής σας."
 
+msgid "The previous payment could not be closed."
+msgstr "Η προηγούμενη πληρωμή δεν μπόρεσε να κλείσει."
+
+msgid "The previous payment is still in progress."
+msgstr "Η προηγούμενη πληρωμή βρίσκεται ακόμη σε εξέλιξη."
+
 msgid "The product the shopper is looking at."
 msgstr "Το προϊόν που βλέπει ο αγοραστής."
 
@@ -12100,6 +12109,9 @@ msgstr "Τα καταστήματα της πλατφόρμας, τα πλάνα
 
 msgid "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 msgstr "Το ΔΙΚΟ του καταστήματος μυστικό κλειδί Stripe (sk_live_*, sk_test_* ή περιορισμένο κλειδί rk_*). Μυστικό — δεν πρέπει ποτέ να εκτίθεται στον browser. Κενό σημαίνει ότι το Stripe δεν είναι διαθέσιμο για αυτό το κατάστημα — δεν υπάρχει εναλλακτική τιμή σε επίπεδο πλατφόρμας."
+
+msgid "The time to pay for this order has run out. Place a new order from your cart."
+msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Η αξία με την οποία κρίνονται τα δωρεάν μεταφορικά και το δωρεάν τέλος πληρωμής: τα προϊόντα μετά τις εκπτώσεις προωθήσεων και κουπονιών, χωρίς μεταφορικά και τέλη. Συγκρίνετε ένα όριο «δωρεάν πάνω από» με αυτήν, ποτέ με το total_price."
@@ -13433,6 +13445,9 @@ msgstr "Πότε ενημερώθηκε ο πελάτης ότι το δέμα �
 
 msgid "When the download link stops working."
 msgstr "Πότε σταματά να λειτουργεί ο σύνδεσμος λήψης."
+
+msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
+msgstr "Πότε παύει να ισχύει ο τελευταίος σύνδεσμος ή η τελευταία συνεδρία πληρωμής που άνοιξε για αυτή την παραγγελία. Το απόθεμα παραμένει δεσμευμένο μέχρι τότε (συν ένα σύντομο περιθώριο), και μετά η παραγγελία ακυρώνεται αν παραμένει απλήρωτη. Κενό μέχρι να ανοίξει πληρωμή."
 
 msgid "When the product was favourited"
 msgstr "Πότε προστέθηκε το προϊόν στα αγαπημένα"

@@ -3,6 +3,48 @@
 
 
 
+## v3.143.3 (2026-10-20)
+
+### Bug fixes
+
+* fix(admin): stock history names the staff member, never a shopper with the same id (#293) ([`dedc1b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dedc1b38f147e4a725d84423b1d696c29f47251f))
+
+* fix(admin): stock history names the staff member, never a shopper with the same id
+
+Staff are platform identities, while stock logs, products, shipments,
+gift cards, loyalty and B2B rows live in a store's schema, where a user
+foreign key names the shopper who shares the id. These columns now hold
+a plain staff id read from the public schema (tenant.staff_actors); the
+stock log keeps its shopper foreign key beside it. Existing admin-written
+stock rows move to the staff column.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`dedc1b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dedc1b38f147e4a725d84423b1d696c29f47251f))
+
+* fix(giftcard): count the staff daily limit by the stored staff id
+
+created_by is now a staff id read through a property, so the daily total
+filters on created_by_id. A user with no staff identity writes rows with
+no actor that could never be counted, so for them the limit refuses.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`dedc1b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dedc1b38f147e4a725d84423b1d696c29f47251f))
+
+* fix(admin): move every staff-written stock row and close the review gaps
+
+- order 0087 moves every staff-caused stock row (restocks, refunds,
+  adjustments, the stock-edit signal), not only the stock-edit ones; a
+  shopper stays named only on their own reservation, release and sale.
+- ACS COD writes store the staff id through staff_id().
+- The ACS pickup list and payout forms no longer expose the raw ids.
+- A deleted staff account resolves to its stand-in in the prefetch, so a
+  page of its rows costs one query, not one per row.
+- Greek: use the catalogue's terms for reconciling a payout.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`dedc1b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dedc1b38f147e4a725d84423b1d696c29f47251f))
+
 ## v3.143.2 (2026-10-20)
 
 ### Bug fixes

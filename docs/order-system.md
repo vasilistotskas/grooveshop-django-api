@@ -1021,25 +1021,50 @@ accepting Cyprus orders at the Greek flat rate.
   `AcsCodPayout` is ever created for it.
 - HTTP 403/406 (`AcsAuthError`) is **retryable**; only a persistent
   rejection means a bad key/IP. ACS answers 406 to overlapping calls
-  from one account: 2026-10-20 prod saw 22% of tracking calls rejected
-  (2% in July), every one inside the `poll_acs_tracking_batch` fan-out,
-  where each poll makes two calls of 0.6 to 4 s so six to eight were in
-  flight across the worker pods. Staggering task *start* times does not
-  bound that, so `AcsClient._call` (every alias) takes one of
-  `ACS_MAX_CONCURRENT_REQUESTS` (default 3) Redis slots per ACS
-  `Company_ID` and store (`shipping_acs/concurrency.py`: `cache.add`
-  slot keys with a `ACS_SLOT_TTL_SECONDS` lease so a killed worker frees
-  its slot, released in `finally`). A call finding every slot taken waits
-  up to `ACS_SLOT_WAIT_SECONDS`, then raises `AcsRetryableError` for
-  Celery to retry; with Redis down the cap is skipped, not the call.
-  ACS publishes no concurrency or rate figure (the old "10 req/sec" had
-  no source we could find), so 3 is a starting point to tune against the
-  406 rate. The batch spaces its dispatches by
-  `ACS_POLL_DISPATCH_SPACING_SECONDS` (default 1 s, about what three
-  slots serve) so polls do not all queue for a slot, and
-  `poll_acs_tracking_one` retries at 10, 20, 40, 80, 160 s with no jitter
-  (Celery's jitter draws from zero, which re-entered the congestion at
-  once).
+  from one account. 2026-10-20 prod saw 22% of tracking calls rejected
+  (2% in July), every one inside the `poll_acs_tracking_batch` fan-out:
+  each poll makes two calls of 0.6 to 4 s, so six to eight were in
+  flight across the worker pods (celery-worker went from 2 to 3
+  replicas around 10-19; rejections went from 7-31 a day to 106, then
+  224). Staggering task *start* times does not bound that, so
+  `AcsClient._call` (every alias) takes one of
+  `ACS_MAX_CONCURRENT_REQUESTS` slots per ACS `Company_ID` and store
+  (`shipping_acs/concurrency.py`).
+  - **Why 2.** ACS publishes no concurrency or rate figure; the number
+    is ours. Measured 2026-10-21 over 10 days of production logs
+    (10-11 to 10-20, VictoriaLogs): for every tracking task, how many
+    ACS tasks were in flight when it started, against whether ACS
+    rejected it.
+
+    | In flight | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9+ |
+    |---|---|---|---|---|---|---|---|---|---|
+    | Rejected | 0.9% | 2.0% | 3.6% | 4.0% | 6.9% | 7.9% | 11% | 17% | 19-50% |
+
+    2 halves the rate against 3 and still serves the batch (below).
+    Re-measure the same way before changing it; there is no
+    zero-rejection setting, 1 in flight still saw 0.9%.
+  - **Dispatch spacing.** Mean poll task duration was about 2 s
+    (`ACS_POLL_AVERAGE_TASK_SECONDS`), so 2 slots serve one poll a
+    second. `ACS_POLL_DISPATCH_SPACING_SECONDS` is derived as
+    duration / slots (1 s), so the 200-shipment cap dispatches in about
+    200 s, well inside the 13-minute batch lock and 15-minute tick, and
+    polls do not queue for a slot past `ACS_SLOT_WAIT_SECONDS`.
+  - **Slots.** redis-py `Lock` keys (`CustomCache.lock`, tenant-keyed),
+    non-blocking, with a per-holder token: release deletes the key only
+    while the token is still the holder's, so a lease that ran out and
+    was taken by another worker is never deleted from under it. The
+    lease is `client.worst_case_request_seconds` (every connect attempt
+    of `_RETRY_CONFIG` at `ACS_HTTP_TIMEOUT`, urllib3's backoff, then
+    one read: 78 s at the 15 s default), derived, not configured. A
+    killed worker frees its slot when the lease ends.
+  - **Full cap.** A call waits up to `ACS_SLOT_WAIT_SECONDS`, then raises
+    `AcsRetryableError` for Celery to retry. With Redis unreachable the
+    cap is skipped and logged: a rejected call was never processed, and
+    `core/caches.py` sets the policy that an unreachable Redis costs
+    speed, not requests.
+  - **Retries.** `poll_acs_tracking_one` retries at 10, 20, 40, 80, 160 s
+    with no jitter (Celery's jitter draws from zero, which re-entered the
+    congestion at once).
 - A refused or uncollected COD parcel: ACS records `attempted` (order →
   SHIPPED), texts the customer and holds the parcel about ten days, then
   reports `returned_flag=1` → shipment RETURNED → order RETURNED, and the

@@ -10,25 +10,32 @@ flight at once. The cap therefore lives where every call passes through,
 ``AcsClient._call``, and counts requests in flight rather than requests
 started.
 
-ACS publishes no concurrency or rate figure we could find (the manual is
-not in this repository), so the limit is a setting
-(``ACS_MAX_CONCURRENT_REQUESTS``) to be tuned against the 406 rate, not a
-documented number.
+ACS publishes no concurrency or rate figure; the limit
+(``ACS_MAX_CONCURRENT_REQUESTS``, default 2) comes from our own
+measurement. Over 10 days of production logs (2026-10-11 to 10-20), each
+tracking task was matched against the number of ACS tasks in flight when
+it started: 0.9% rejected at 1, 2.0% at 2, 3.6% at 3, 4.0% at 4, 6.9% at
+5, 7.9% at 6, 11% at 7, 17% at 8 and 19-50% at 9 or more. The full table
+and the dispatch-spacing arithmetic are in ``docs/order-system.md``.
 
-The semaphore is ``ACS_MAX_CONCURRENT_REQUESTS`` slot keys, each taken
-with ``cache.add`` (an atomic ``SET NX`` with a TTL) and deleted when the
-request ends. The TTL is the safety net for a worker that dies holding a
-slot: the slot frees itself. It is sized far above a request's timeout, so
-a slot expiring under a live request is not a case the code defends
-against. Keys go through the tenant cache key function, so each store's
-account has its own slots, and carry the ACS ``Company_ID`` so a store
-with more than one account would not share them.
+The semaphore is ``ACS_MAX_CONCURRENT_REQUESTS`` redis-py ``Lock`` keys
+(``CustomCache.lock``), each non-blocking with a lease. A lock carries a
+per-holder token and ``release`` deletes the key only while the token is
+still its own, so a lease that ran out and was taken by another worker is
+never deleted from under it. The lease is the worst case of one request
+(``client.worst_case_request_seconds``), so a live request outlives it
+only through the cases that function documents; a worker killed mid-call
+frees its slot when the lease ends. Keys go through the tenant cache key
+function, so each store's account has its own slots, and carry the ACS
+``Company_ID`` so a store with more than one account would not share them.
 
 A caller that finds every slot taken waits a bounded time, then raises
 ``AcsRetryableError`` so Celery retries with backoff instead of a worker
-sitting on it. With Redis unreachable the limit is skipped (and logged):
-a cache outage must cost the cap, not every ACS call, which is how the
-rest of the cache layer treats it (``core.caches``).
+sitting on it. With Redis unreachable the cap is skipped and logged: it
+only prevents 406s (a rejected call was never processed), and
+``core.caches`` states that "an unreachable Redis must cost speed, not
+requests", so a cache outage must not fail checkout quotes or voucher
+mints.
 """
 
 from __future__ import annotations
@@ -41,6 +48,8 @@ from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.cache import cache
+from redis.exceptions import LockError
+from redis.lock import Lock
 
 from core.caches import REDIS_UNAVAILABLE, BurstLogger
 from shipping_acs.exceptions import AcsRetryableError
@@ -62,17 +71,16 @@ def _slot_key(account: str, slot: int) -> str:
     return f"acs:slot:{account}:{slot}"
 
 
-def _acquire(account: str, alias: str) -> str:
+def _acquire(account: str, alias: str, lease_seconds: float) -> Lock:
     limit = settings.ACS_MAX_CONCURRENT_REQUESTS
-    ttl = settings.ACS_SLOT_TTL_SECONDS
     wait = settings.ACS_SLOT_WAIT_SECONDS
     deadline = time.monotonic() + wait
     while True:
         # A random start spreads the contention across the slot keys.
         for slot in random.sample(range(limit), limit):
-            key = _slot_key(account, slot)
-            if cache.add(key, 1, ttl):
-                return key
+            lock = cache.lock(_slot_key(account, slot), timeout=lease_seconds)
+            if lock.acquire():
+                return lock
         if time.monotonic() >= deadline:
             logger.warning(
                 "ACS %s: all %s request slots busy for %ss, retrying later",
@@ -90,15 +98,18 @@ def _acquire(account: str, alias: str) -> str:
 
 
 @contextmanager
-def acs_request_slot(*, account: str, alias: str) -> Generator[None]:
+def acs_request_slot(
+    *, account: str, alias: str, lease_seconds: float
+) -> Generator[None]:
     """Hold one of the account's request slots for the ``with`` body.
 
     Raises :class:`AcsRetryableError` when no slot frees within
     ``ACS_SLOT_WAIT_SECONDS``. The slot is released on any exit,
-    exceptions included.
+    exceptions included, and only while this holder still owns it.
+    ``lease_seconds`` is how long the slot survives a holder that dies.
     """
     try:
-        key = _acquire(account, alias)
+        lock = _acquire(account, alias, lease_seconds)
     except REDIS_UNAVAILABLE as exc:
         _redis_down.report(exc)
         yield
@@ -106,4 +117,16 @@ def acs_request_slot(*, account: str, alias: str) -> Generator[None]:
     try:
         yield
     finally:
-        cache.delete(key)
+        try:
+            lock.release()
+        except LockError as exc:
+            # The lease ran out and the slot is another holder's now (or
+            # gone); leaving it alone is the point of the token.
+            logger.warning(
+                "ACS %s: request slot lease expired before release: %s",
+                alias,
+                exc,
+            )
+        except REDIS_UNAVAILABLE as exc:
+            # The lease frees the slot; the ACS answer must not be lost.
+            _redis_down.report(exc)

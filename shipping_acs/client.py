@@ -52,6 +52,32 @@ _RETRY_CONFIG = Retry(
 )
 
 
+def worst_case_request_seconds(timeout: float) -> float:
+    """Longest one ``_call`` can hold the connection to ACS.
+
+    ``requests`` applies ``timeout`` to the connect and to each read
+    separately, and ``_RETRY_CONFIG`` re-attempts a failed connect
+    ``min(total, connect)`` times with urllib3's backoff in between (none
+    before the first retry, ``factor * 2 ** (n - 1)`` capped at
+    ``backoff_max`` after the n-th error). Every attempt can spend the
+    whole connect timeout, then the one read that gets an answer can spend
+    the read timeout. The slot lease in ``shipping_acs.concurrency`` is
+    this figure, so it outlives any request by construction. DNS
+    resolution is outside ``timeout`` and a body trickled slower than one
+    chunk per ``timeout`` is not bounded by it; the holder-token release
+    keeps an expired lease harmless to the next holder either way.
+    """
+    retries = min(_RETRY_CONFIG.total or 0, _RETRY_CONFIG.connect or 0)
+    backoff = sum(
+        min(
+            _RETRY_CONFIG.backoff_max,
+            _RETRY_CONFIG.backoff_factor * 2 ** (errors - 1),
+        )
+        for errors in range(2, retries + 1)
+    )
+    return (retries + 1) * timeout + backoff + timeout
+
+
 class AcsClient:
     """Thin RPC wrapper around the ACS REST API.
 
@@ -153,7 +179,11 @@ class AcsClient:
         try:
             # Every ACS call, whatever the alias, takes a slot: ACS
             # rejects overlapping calls from one account with a 406.
-            with acs_request_slot(account=self.company_id, alias=alias):
+            with acs_request_slot(
+                account=self.company_id,
+                alias=alias,
+                lease_seconds=worst_case_request_seconds(self.timeout),
+            ):
                 response = self._session.post(
                     self.api_base_url,
                     json=body,

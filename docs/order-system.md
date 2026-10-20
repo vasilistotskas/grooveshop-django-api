@@ -1274,7 +1274,7 @@ premature "shipped"); now it sends only the confirmation.
   "complete your order" mail a day later reached an order that was already
   gone; `check_pending_orders`, its template and `PENDING_ORDER_REMINDER_*`
   were removed (`Order.reminder_count` / `last_reminder_sent_at` leave the
-  model in `order` 0084 and the columns are dropped one release later).
+  model in `order` 0084 and the columns are dropped by `order` 0090).
 - A refused create answers 400 with a stable `error.type`
   (`order/enum/create_error.py: OrderCreateErrorType`); `detail` and
   `cart` are display text in the request's language, never a contract.

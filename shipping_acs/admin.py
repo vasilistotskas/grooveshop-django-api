@@ -79,6 +79,18 @@ class CodReceivedOutsideAcsForm(BaseDialogForm):
     )
 
 
+class CancelVoucherForm(BaseDialogForm):
+    reason = forms.CharField(
+        label=_("Reason"),
+        required=False,
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "Why the voucher is cancelled (for example a corrected "
+            "address). Kept on the shipment."
+        ),
+    )
+
+
 class ReconcilePayoutForm(BaseDialogForm):
     note = forms.CharField(
         label=_("Note"),
@@ -385,7 +397,10 @@ class AcsShipmentAdmin(BaseModelAdmin):
     # page they already work on, next to the "not printed" filter.
     actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
-    actions_detail = ["record_cod_received_outside_acs"]
+    actions_detail = [
+        "record_cod_received_outside_acs",
+        "cancel_voucher_only",
+    ]
     actions = [
         "bulk_print_labels",
         "bulk_repoll_tracking",
@@ -635,6 +650,58 @@ class AcsShipmentAdmin(BaseModelAdmin):
                 _("COD recorded as received outside ACS."),
                 messages.SUCCESS,
             )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acsshipment_change",
+                    args=[object_id],
+                ),
+            }
+        )
+
+    @action(
+        description=_("Cancel ACS voucher"),
+        icon="cancel",
+        variant=ActionVariant.DANGER,
+        dialog=ActionDialog(
+            title=_("Cancel the ACS voucher"),
+            description=_(
+                "Cancels only the voucher at ACS; the order stays as it "
+                "is. Use it when the parcel data changed (a new address) "
+                "and then press “Issue ACS voucher now” for a fresh one. "
+                "ACS refuses a voucher already on an issued pickup list."
+            ),
+            form_class=CancelVoucherForm,
+        ),
+    )
+    def cancel_voucher_only(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        if shipment.shipment_state == AcsShipmentState.CANCELED:
+            self.message_user(
+                request,
+                _("The voucher is already cancelled."),
+                messages.WARNING,
+            )
+        else:
+            try:
+                AcsService.cancel_voucher(
+                    shipment,
+                    reason=form.cleaned_data["reason"] or "admin cancel",
+                )
+            except AcsError as exc:
+                # Names the cause (already on a pickup list, ACS refused).
+                self.message_user(request, str(exc), messages.ERROR)
+            else:
+                self.message_user(
+                    request,
+                    _("The ACS voucher was cancelled."),
+                    messages.SUCCESS,
+                )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(

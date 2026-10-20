@@ -1020,8 +1020,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "ACS origin station code (up to 8 chars). "
-            "No platform fallback — empty disables ACS."
+            "ACS origin station code (up to 8 chars), used to quote "
+            "shipping. Optional: when empty it is taken from the "
+            "billing code. No platform fallback."
         ),
     )
 
@@ -1064,8 +1065,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "Phone number for BoxNow shipment notifications. "
-            "No platform fallback — empty disables BoxNow."
+            "Phone number for BoxNow shipment notifications, sent as the "
+            "sender's contact number. Optional: left out of the request "
+            "when empty. No platform fallback."
         ),
     )
     box_now_live_mode = models.BooleanField(

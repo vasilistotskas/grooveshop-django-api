@@ -578,7 +578,8 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         icon="local_shipping",
     )
     def create_parcel_action(self, request, object_id):
-        """Re-dispatch parcel creation after its data was corrected.
+        """Re-dispatch parcel creation after its data was corrected, or
+        issue a new parcel for a cancelled one.
 
         The BoxNow counterpart of ACS's "Issue ACS voucher now". A
         permanent BoxNow rejection (bad locker, bad phone) leaves the row
@@ -587,6 +588,8 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         """
         from django.shortcuts import redirect
 
+        from order.enum.status import OrderStatus
+        from shipping_boxnow.services import BoxNowService
         from shipping_boxnow.tasks import create_boxnow_shipment_for_order
 
         change_url = reverse(
@@ -600,7 +603,8 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             messages.error(request, _("Shipment not found."))
             return redirect(change_url)
 
-        if shipment.delivery_request_id:
+        reissue = shipment.parcel_state == BoxNowParcelState.CANCELED
+        if shipment.delivery_request_id and not reissue:
             messages.warning(
                 request,
                 _("This shipment already has a BoxNow parcel."),
@@ -621,6 +625,35 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 % {"order": shipment.order_id},
             )
             return redirect(change_url)
+
+        if reissue and shipment.order.status == OrderStatus.CANCELED:
+            messages.error(
+                request,
+                _(
+                    "Order #%(order)s is canceled — a new parcel would "
+                    "ship an order nobody wants."
+                )
+                % {"order": shipment.order_id},
+            )
+            return redirect(change_url)
+
+        # A CANCELED parcel keeps its delivery request, which makes the
+        # creation task return the dead parcel. Reset it first so a new
+        # one is created.
+        if reissue:
+            try:
+                BoxNowService.reset_shipment_for_reissue(shipment)
+            except Exception as exc:
+                messages.error(
+                    request,
+                    _("Cannot reset the parcel for reissue: %(err)s")
+                    % {"err": str(exc)},
+                )
+                return redirect(change_url)
+            messages.info(
+                request,
+                _("Cancelled parcel reset — creating a new one."),
+            )
 
         create_boxnow_shipment_for_order.delay(shipment.order_id)
         messages.info(request, _("Parcel creation task dispatched."))

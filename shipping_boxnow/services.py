@@ -14,7 +14,7 @@ from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
-from shipping_boxnow.exceptions import BoxNowAPIError
+from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowConfigError
 from shipping_boxnow.models import (
     BoxNowLocker,
     BoxNowParcelEvent,
@@ -158,22 +158,39 @@ def _has_usable_coordinates(dest: dict) -> bool:
     return abs(lat) <= 90 and abs(lng) <= 180
 
 
-def is_configured() -> bool:
-    """Return True when the active tenant has usable BoxNow API credentials.
+#: The ``Tenant.box_now_*`` fields BoxNow needs, in the order they are
+#: reported. Each one's help text says "empty disables BoxNow" and none has a
+#: stand-in. ``box_now_notify_phone`` is not here: BoxNow's integration
+#: manual (§4.4, "Request a delivery") asks for the sender's name only; the
+#: phone goes out as ``origin.contactNumber`` when the store set one.
+REQUIRED_TENANT_FIELDS = (
+    ("box_now_client_id", "client_id"),
+    ("box_now_client_secret", "client_secret"),
+    ("box_now_partner_id", "partner_id"),
+    ("box_now_warehouse_id", "warehouse_id"),
+)
 
-    Mirrors the required-field check in ``BoxNowClient.__init__`` — the
-    single source of truth for "can we actually call the BoxNow API".
-    Used by ``BoxNowCarrier.is_kind_enabled`` (hides BoxNow from
-    checkout entirely when False) and the BoxNow fanout Celery tasks
-    (skip an unconfigured tenant cleanly instead of raising
-    ``BoxNowConfigError``).
-    """
+
+def missing_credentials() -> list[str]:
+    """The required ``Tenant.box_now_*`` fields the active tenant left empty."""
     from tenant.credentials import box_now_credentials
 
     creds = box_now_credentials()
-    return bool(
-        creds["client_id"] and creds["client_secret"] and creds["partner_id"]
-    )
+    return [field for field, key in REQUIRED_TENANT_FIELDS if not creds[key]]
+
+
+def is_configured() -> bool:
+    """Return True when the active tenant has set every BoxNow field.
+
+    The single source of truth for "BoxNow is on for this store": empty
+    means off, as the store profile says. Used by
+    ``BoxNowCarrier.is_kind_enabled`` (hides BoxNow from checkout
+    entirely when False), by ``create_shipment_for_order`` (raises
+    ``BoxNowConfigError`` rather than send a parcel with made-up origin
+    data) and by the BoxNow fanout Celery tasks (skip an unconfigured
+    tenant cleanly instead of raising ``BoxNowConfigError``).
+    """
+    return not missing_credentials()
 
 
 class BoxNowService:
@@ -269,6 +286,15 @@ class BoxNowService:
             if shipment.order.awaits_online_payment:
                 raise ShipmentAwaitingPaymentError(order.id)
 
+            # Before the claim is stamped, so a store that fills the
+            # field in can dispatch again at once instead of waiting
+            # out a claim nobody holds.
+            if missing := missing_credentials():
+                raise BoxNowConfigError(
+                    "Missing required Tenant BoxNow fields: "
+                    + ", ".join(missing)
+                )
+
             metadata = shipment.metadata or {}
             started_raw = metadata.get("mint_started_at")
             if started_raw:
@@ -362,9 +388,9 @@ class BoxNowService:
         )
 
         bn_creds = box_now_credentials()
-        notify_phone = bn_creds["notify_phone"] or "+302100000000"
+        notify_phone = bn_creds["notify_phone"]
         site_name = tenant_site_name() or "GrooveShop"
-        warehouse_id = str(bn_creds["warehouse_id"] or "2")
+        warehouse_id = str(bn_creds["warehouse_id"])
         amount_due = getattr(order, "amount_due", None)
         invoice_value = str(amount_due.amount) if amount_due else "0.00"
         # ``notifyOnAccepted`` is the PARTNER (operations) email per
@@ -429,7 +455,7 @@ class BoxNowService:
             "amountToBeCollected": amount_to_collect_str,
             "notifyOnAccepted": partner_notify_email,
             "origin": {
-                "contactNumber": notify_phone,
+                **({"contactNumber": notify_phone} if notify_phone else {}),
                 "contactEmail": partner_notify_email,
                 "contactName": site_name,
                 "locationId": warehouse_id,
@@ -823,6 +849,78 @@ class BoxNowService:
             "cancel_shipment: parcel_id=%s cancelled successfully",
             parcel_id,
         )
+
+    @classmethod
+    def reset_shipment_for_reissue(cls, shipment: BoxNowShipment) -> None:
+        """Clear a CANCELED shipment's parcel so a fresh one can be created.
+
+        A cancelled parcel keeps its ``delivery_request_id`` and
+        ``parcel_id``, and :meth:`create_shipment_for_order` returns the
+        existing shipment as soon as it sees a delivery request, so a
+        cancelled-before-pickup order could never be re-shipped (the same
+        dead end ``AcsService.reset_shipment_for_remint`` removes). If
+        BoxNow still answers the new request with P410 (duplicate order
+        number), the creation task raises its usual alert.
+
+        The old identifiers move to ``metadata['previous_parcels']``; the
+        state returns to ``PENDING_CREATION`` and the normal creation path
+        issues the new parcel. Refuses unless the parcel is CANCELED.
+        """
+        with transaction.atomic():
+            locked = BoxNowShipment.objects.select_for_update().get(
+                pk=shipment.pk
+            )
+            if locked.parcel_state != BoxNowParcelState.CANCELED:
+                raise BoxNowAPIError(
+                    409,
+                    message=(
+                        "Only a CANCELED parcel can be reissued "
+                        f"(shipment={locked.pk} is {locked.parcel_state})."
+                    ),
+                )
+
+            metadata = dict(locked.metadata or {})
+            if locked.delivery_request_id or locked.parcel_id:
+                metadata.setdefault("previous_parcels", []).append(
+                    {
+                        "delivery_request_id": locked.delivery_request_id,
+                        "parcel_id": locked.parcel_id,
+                        "cancelled_at": (
+                            locked.cancel_requested_at.isoformat()
+                            if locked.cancel_requested_at
+                            else None
+                        ),
+                    }
+                )
+            metadata.pop("mint_started_at", None)
+
+            previous = locked.parcel_id
+            locked.delivery_request_id = None
+            locked.parcel_id = None
+            locked.parcel_state = BoxNowParcelState.PENDING_CREATION
+            locked.cancel_requested_at = None
+            locked.label_url = ""
+            locked.metadata = metadata
+            locked._change_reason = "Reset for reissue via admin"
+            locked.save(
+                update_fields=[
+                    "delivery_request_id",
+                    "parcel_id",
+                    "parcel_state",
+                    "cancel_requested_at",
+                    "label_url",
+                    "metadata",
+                    "updated_at",
+                ]
+            )
+            logger.info(
+                "reset_shipment_for_reissue: shipment=%s (order=%s) reset to "
+                "PENDING_CREATION; previous parcel %s archived to "
+                "metadata.previous_parcels",
+                locked.pk,
+                locked.order_id,
+                previous,
+            )
 
     # ------------------------------------------------------------------
     # apply_webhook_event

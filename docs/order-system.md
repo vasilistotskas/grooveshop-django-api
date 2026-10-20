@@ -868,6 +868,12 @@ Rules both carriers share:
   writes an `OrderHistory` note, both carrying the carrier's own remedy
   ("Fix the address on the order, then press Issue ACS voucher now").
   Nothing retries a business error, so re-dispatching is that button.
+- **Cancelling only the ACS voucher**: the voucher detail page has
+  "Cancel ACS voucher" (`AcsShipmentAdmin.cancel_voucher_only` →
+  `AcsService.cancel_voucher`, `ACS_Delete_Voucher`). The order is not
+  touched; ACS refuses a voucher already on an issued pickup list and the
+  refusal is shown. "Issue ACS voucher now" then mints a fresh one
+  (`reset_shipment_for_remint`).
 
 ### 5.0 Shipping pricing: `ShippingRate`
 
@@ -1102,7 +1108,31 @@ accepting Cyprus orders at the Greek flat rate.
   every tenant is off.
 - "Create BoxNow parcel now" (shipment detail action) re-dispatches a
   row left in `pending_creation` by a business error, once its data is
-  fixed — the counterpart of ACS's "Issue ACS voucher now".
+  fixed — the counterpart of ACS's "Issue ACS voucher now". On a
+  `canceled` parcel it first archives the dead parcel to
+  `metadata["previous_parcels"]` and resets the row
+  (`BoxNowService.reset_shipment_for_reissue`), because a cancelled parcel
+  keeps its `delivery_request_id` and creation returns an existing
+  shipment unchanged; it refuses when the order itself is cancelled.
+  BoxNow's `orderNumber` is still the order id, so BoxNow answering the
+  new request with `P410` (duplicate) raises the usual creation alert.
+- **Known limit: the compartment size is not derived.** `BoxNowShipment.
+  compartment_size` is what the checkout sends
+  (`boxnow_compartment_size`, the storefront defaults to 1 = Small) and a
+  customer never chooses it. A product carries a weight but no length,
+  width or height, and a BoxNow compartment is a dimensional limit, so the
+  smallest size that fits cannot be computed until products carry
+  dimensions.
+- **BoxNow is on only when its credentials and warehouse are set**: client
+  id, secret, partner id and warehouse id
+  (`shipping_boxnow.services.missing_credentials`, one rule for
+  `is_configured` and the parcel creation). The warehouse goes out as
+  `origin.locationId` and is never replaced by a stand-in; a store that
+  left one empty has BoxNow hidden at checkout, and a parcel for an order
+  placed before that raises `BoxNowConfigError` naming the field.
+  `box_now_notify_phone` is optional (BoxNow's integration manual, §4.4
+  "Request a delivery", asks for the sender's name only): it is sent as
+  `origin.contactNumber` when set and omitted otherwise.
 - Webhook handler: `BoxNowService.apply_webhook_event` — idempotent on `webhook_message_id`.
 - The webhook view (`shipping_boxnow/views/webhook.py`) answers 400 (BoxNow does not retry) to any body it cannot read as a JSON object: bytes that are not UTF-8 (decoded strictly first, RFC 8259 §8.1 — `json.loads` on bytes would sniff UTF-16/32, while the signed-data extractor walks the raw bytes), invalid JSON, JSON nested past the decoder's stack, or valid JSON that is not an object (`[]`, `"x"`, `null`). Those used to raise inside the unauthenticated view and return 500, which BoxNow retries.
 

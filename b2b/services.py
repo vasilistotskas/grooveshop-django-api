@@ -22,6 +22,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext
 from djmoney.money import Money
 from extra_settings.models import Setting
 
@@ -384,21 +385,33 @@ class B2BService:
                 parts = [part.strip() for part in line.split(",", 1)]
             if len(parts) != 2 or not parts[0] or not parts[1]:
                 errors.append(
-                    f"line {line_no}: expected 'sku;net_price', got {line!r}"
+                    gettext(
+                        "Line %(line)d: expected 'sku;net_price', got %(text)r."
+                    )
+                    % {"line": line_no, "text": line}
                 )
                 continue
             sku, price_raw = parts
             try:
                 net = Decimal(price_raw.replace(",", "."))
             except InvalidOperation:
-                errors.append(f"line {line_no}: invalid price {price_raw!r}")
+                errors.append(
+                    gettext("Line %(line)d: invalid price %(price)r.")
+                    % {"line": line_no, "price": price_raw}
+                )
                 continue
             if net < 0:
-                errors.append(f"line {line_no}: negative price {price_raw!r}")
+                errors.append(
+                    gettext("Line %(line)d: negative price %(price)r.")
+                    % {"line": line_no, "price": price_raw}
+                )
                 continue
             product = Product.objects.filter(sku=sku).first()
             if product is None:
-                errors.append(f"line {line_no}: unknown SKU {sku!r}")
+                errors.append(
+                    gettext("Line %(line)d: unknown SKU %(sku)r.")
+                    % {"line": line_no, "sku": sku}
+                )
                 continue
             _item, was_created = PriceListItem.objects.update_or_create(
                 group=group,

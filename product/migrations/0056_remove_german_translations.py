@@ -6,7 +6,7 @@ from core.utils.i18n import delete_translations_in
 class Migration(migrations.Migration):
     """German is no longer a language of the platform: drop its rows."""
 
-    dependencies = [("product", "0053_review_status_labels")]
+    dependencies = [("product", "0055_favourites_setting_description")]
 
     operations = [
         migrations.RunPython(

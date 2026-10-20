@@ -39,6 +39,7 @@ from giftcard.models import (
     GiftCardTransaction,
 )
 from tenant.celery import dispatch_on_commit
+from tenant.staff_actors import staff_id
 
 logger = logging.getLogger(__name__)
 
@@ -145,8 +146,12 @@ class GiftCardService:
         """What *user* put on gift cards in the last 24 hours: the cards
         they issued and the balance they added, across the admin add form
         and the balance adjustment. Removals do not offset it."""
+        actor = staff_id(user)
+        if actor is None:
+            # Only staff rows carry an actor; nothing to sum for anyone else.
+            return Decimal(0)
         total = GiftCardTransaction.objects.filter(
-            created_by=user,
+            created_by_id=actor,
             kind__in=(
                 GiftCardTransactionKind.ISSUE,
                 GiftCardTransactionKind.ADJUST,
@@ -161,9 +166,16 @@ class GiftCardService:
         """True when adding *amount* takes *user* past the daily limit.
 
         Call it with :meth:`lock_staff_issuing` held, in the transaction
-        that writes the row, or the total it reads can be stale."""
+        that writes the row, or the total it reads can be stale.
+
+        A user with no staff identity is always past it: the rows they
+        write carry no actor, so their total could never be counted."""
         limit = cls.staff_daily_limit()
-        return limit > 0 and cls.issued_by_in_last_day(user) + amount > limit
+        if limit <= 0:
+            return False
+        if staff_id(user) is None:
+            return True
+        return cls.issued_by_in_last_day(user) + amount > limit
 
     @classmethod
     def over_daily_limit(cls, user, amount: Decimal) -> bool:

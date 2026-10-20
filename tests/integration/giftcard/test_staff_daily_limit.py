@@ -39,6 +39,7 @@ from tests.integration.giftcard.test_staff_issue_limit import (
     _user,
     tenant,  # noqa: F401  (fixture)
 )
+from tests.utils.staff import stamp_platform_identity
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -125,7 +126,7 @@ class TestTheDailyTotal:
 
         with _limits(daily=1000):
             _issue(staff, "900.00")
-            GiftCardTransaction.objects.filter(created_by=staff).update(
+            GiftCardTransaction.objects.filter(created_by_id=staff.pk).update(
                 created_at=timezone.now() - timedelta(hours=25)
             )
             again = _issue(staff, "900.00")
@@ -171,7 +172,7 @@ class TestAboveTheDailyLimit:
 
         assert "initial_value" not in second.errors
         rows = GiftCardTransaction.objects.filter(
-            created_by=owner, kind=GiftCardTransactionKind.ISSUE
+            created_by_id=owner.pk, kind=GiftCardTransactionKind.ISSUE
         ).order_by("id")
         assert "daily limit" not in rows[0].description
         assert "above the staff daily limit of 1000" in rows[1].description
@@ -227,7 +228,7 @@ def test_the_default_is_declared_for_every_store():
 def test_two_requests_cannot_both_pass_on_the_same_total():
     """Both read a total of zero and each adds 600 against a limit of 1000.
     Without the per-member lock both would be written."""
-    staff = UserAccountFactory()
+    staff = stamp_platform_identity(UserAccountFactory())
     barrier = threading.Barrier(2)
     outcomes: list[bool] = []
 

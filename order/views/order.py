@@ -19,6 +19,7 @@ from drf_spectacular.utils import (
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
+    APIException,
     NotAuthenticated,
     NotFound,
     PermissionDenied,
@@ -68,6 +69,7 @@ from order.exceptions import (
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
     PaymentVerificationError,
+    RefundOutstandingError,
     StockReservationError,
 )
 from order.filters import OrderFilter
@@ -108,6 +110,16 @@ from pay_way.services import PayWayService
 from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
+
+
+class RefundOutstanding(APIException):
+    """409: the order cannot be marked REFUNDED while money paid for it can
+    still be refunded; staff refund it first."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = _("Refund this order's payment first.")
+    default_code = "refund_outstanding"
+
 
 # The pk-addressed actions a guest may call on their own order. A guest
 # proves ownership with the order's uuid in ``?uuid=``
@@ -2380,6 +2392,16 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
 
+        except RefundOutstandingError as e:
+            raise RefundOutstanding(
+                _(
+                    "Refund this order's payment first: %(amount)s can still "
+                    "be refunded."
+                )
+                % {"amount": e.refundable}
+                if e.refundable > 0
+                else None
+            ) from e
         except InvalidStatusTransitionError as e:
             logger.warning("Invalid status transition: %s", e)
             raise ValidationError(

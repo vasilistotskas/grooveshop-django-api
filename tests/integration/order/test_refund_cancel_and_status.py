@@ -295,3 +295,45 @@ class TestAPaidOrderTheLedgerNeverRecorded:
 
         order.refresh_from_db()
         assert order.status == OrderStatus.REFUNDED
+
+
+class TestMarkingRefundedOverTheApi:
+    """The admin reports the refusal; the endpoint answered a logged 500."""
+
+    @staticmethod
+    def _post(order):
+        from django.urls import reverse
+        from rest_framework.test import APIClient
+
+        from tests.utils.staff import stamp_platform_identity
+
+        client = APIClient(HTTP_ACCEPT_LANGUAGE="en")
+        client.force_authenticate(
+            user=stamp_platform_identity(
+                UserAccountFactory(is_staff=True, is_superuser=True)
+            )
+        )
+        return client.post(
+            reverse("order-update-status", kwargs={"pk": order.pk}),
+            {"status": OrderStatus.REFUNDED},
+            format="json",
+        )
+
+    def test_it_is_a_coded_409_naming_what_is_left(self):
+        order, _charge = _paid_order(status=OrderStatus.RETURNED)
+
+        response = self._post(order)
+
+        assert response.status_code == 409
+        body = response.json()
+        assert body["code"] == "refund_outstanding"
+        assert "100.00" in body["detail"]
+        order.refresh_from_db()
+        assert order.status == OrderStatus.RETURNED
+
+    def test_it_succeeds_once_the_payment_is_refunded(self):
+        order, _charge = _paid_order(status=OrderStatus.RETURNED)
+        with FakeStripeRefunds():
+            OrderService.refund_order(order)
+
+        assert self._post(order).status_code == 200

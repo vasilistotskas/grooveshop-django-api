@@ -9904,6 +9904,12 @@ msgstr "Refund processed for order #{order_id}"
 msgid "Refund reversal"
 msgstr "Refund reversal"
 
+msgid "Refund this order's payment first."
+msgstr "Refund this order's payment first."
+
+msgid "Refund this order's payment first: %(amount)s can still be refunded."
+msgstr "Refund this order's payment first: %(amount)s can still be refunded."
+
 msgid "Refunded"
 msgstr "Refunded"
 

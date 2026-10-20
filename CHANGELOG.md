@@ -3,6 +3,43 @@
 
 
 
+## v3.143.7 (2026-10-20)
+
+### Bug fixes
+
+* fix(i18n): remove German, which no store serves (#297)
+
+No tenant has German available or as its default, yet Django still
+carried it as a content language: every parler model could hold a `de`
+row, `settings.LANGUAGES` offered it, the OpenAPI document listed it in
+every `languageCode` filter and every `translations` object, the search
+indexes carried German synonyms, and a third catalogue had to be kept
+in step.
+
+German leaves PARLER_LANGUAGES, LANGUAGES and the admin language flags,
+the German country, region and synonym data, and locale/de. The el and
+en catalogues lose the strings that named German and are normalised with
+core.utils.po_catalogue.
+
+One data migration per app deletes the existing `de` translation rows
+(blog, country, loyalty, notification, order, page_config, pay_way,
+product, promotion, region, tag, user). They remove rows only, never a
+column or table, so the release still serving is unaffected. The search
+`language_code` help text change is state-only. Every other model that
+stores a language code holds a preference, not a translation row, and is
+left as it is.
+
+Tests that exercised German now use el/en, and the German-store email
+test is dropped. This replaces the earlier attempt, rebased on today's
+main with every migration renumbered after its app's current leaf.
+
+The schema loses `de` from the optional `languageCode` query enum
+(178 operations) and from the optional `translations` object of 73
+request and response schemas. Meilisearch keeps the deleted rows'
+documents until the indexes are rebuilt.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c76baf0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c76baf029089335cc5321297f4c0860c54ef59a6))
+
 ## v3.143.6 (2026-10-20)
 
 ### Bug fixes

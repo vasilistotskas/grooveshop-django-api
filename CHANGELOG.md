@@ -3,6 +3,68 @@
 
 
 
+## v3.143.6 (2026-10-20)
+
+### Bug fixes
+
+* fix(admin): a step-by-step sign-in for the staff second factor (#296) ([`1d9f3dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9f3dd9aa502b528ea5ecb38c5973e0502e881b))
+
+* fix(admin): a step-by-step sign-in for the staff second factor
+
+The platform superuser's second factor was delivered by raising form
+errors: the set-up and recovery instructions rendered as red errors under
+"Please correct the error below", step 1's labels stayed on screen with
+empty inputs, several strings were untranslated, and the user had to log
+in a second time after enrolling.
+
+The sign-in is now a real multi-step flow held in the session. After the
+password, a superuser gets a pending sign-in (user id, step, when the step
+began; PENDING_SESSION_KEY) and the page shows the next step: the code
+(enrolled), or the authenticator set-up (QR, copyable secret) followed by
+the recovery codes shown once with copy and download buttons, whose
+confirmation completes the same sign-in. The pending sign-in expires after
+STAFF_MFA_PENDING_SIGN_IN_SECONDS, and ends on success, on "use another
+account", on expiry and whenever another password is submitted. Steps are
+not errors; only a wrong password or code, a lockout or an expired
+sign-in is.
+
+The login page is redesigned on Unfold's own message components with a
+step indicator, per-step headings and helper text, a large centred code
+input and a layout that holds at 360px. Every new string has a Greek
+translation.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`1d9f3dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9f3dd9aa502b528ea5ecb38c5973e0502e881b))
+
+* fix(admin): style the login inputs and fit the page on a phone
+
+- The login form builds on unfold.forms.AuthenticationForm, which adds
+  Unfold's input classes; Django's own left the email and password inputs
+  without a border, invisible on the page.
+- The password-reset button wraps instead of pushing a 360px screen wide.
+- The setup step asks for the authenticator code only: recovery codes do
+  not exist yet at that point.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`1d9f3dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9f3dd9aa502b528ea5ecb38c5973e0502e881b))
+
+* fix(i18n): give the setup-step code label its English text
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`1d9f3dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9f3dd9aa502b528ea5ecb38c5973e0502e881b))
+
+* fix(admin): a refused copy says so, and a quick second click restores the label
+
+- A clipboard write that fails (no secure context, permission refused)
+  selects the text for a manual copy and says so: the recovery codes are
+  shown once.
+- The button keeps its original label across repeated clicks.
+- The clock-restart test pins the time, and the recovery test checks the
+  buttons' targets, so both can fail.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`1d9f3dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d9f3dd9aa502b528ea5ecb38c5973e0502e881b))
+
 ## v3.143.5 (2026-10-20)
 
 ### Bug fixes

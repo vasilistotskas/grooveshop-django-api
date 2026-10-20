@@ -15,6 +15,10 @@ from order.enum.status import RETURN_HANDLING_STATUSES
 from order.managers.item import OrderItemManager
 from vat.models import validate_mydata_vat_rate
 
+# The restock reason is written to ``StockLog.reason`` (255) after a prefix of
+# about 45 characters, so it is capped well under that wherever it is typed.
+RESTOCK_REASON_MAX_LENGTH = 150
+
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)

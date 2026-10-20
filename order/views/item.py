@@ -253,7 +253,7 @@ class OrderItemViewSet(BaseModelViewSet):
                     "user_id": request.user.id,
                 },
             )
-            raise DRFValidationError({"detail": e.messages}) from e
+            raise DRFValidationError({"detail": " ".join(e.messages)}) from e
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(

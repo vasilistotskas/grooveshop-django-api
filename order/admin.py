@@ -74,7 +74,7 @@ from order.invoicing import (
 from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
-from order.models.item import OrderItem
+from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.retail_credit import CreditCounter, RetailCredit
@@ -428,8 +428,7 @@ class RestockReturnedForm(BaseDialogForm):
 
     reason = forms.CharField(
         label=_("Reason"),
-        # Written to the stock log (255) after a fixed prefix.
-        max_length=150,
+        max_length=RESTOCK_REASON_MAX_LENGTH,
         widget=UnfoldAdminTextInputWidget,
         help_text=_("Recorded on the stock log with your name."),
     )

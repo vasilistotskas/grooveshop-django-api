@@ -29,7 +29,7 @@ def staff():
         return UserAccount.objects.create_user(
             email="mt-restock-staff@example.com",
             username="mtrestockstaff",
-            password="x-passw0rd!",
+            password=None,
             is_staff=True,
         )
 

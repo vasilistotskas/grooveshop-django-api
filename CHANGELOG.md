@@ -3,6 +3,171 @@
 
 
 
+## v3.142.1 (2026-10-20)
+
+### Bug fixes
+
+* fix(orders): release an unpaid online order's stock when its payment link expires (#266) ([`d76de99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d76de997bea53ebe281af2bc389410eecf464d44))
+
+* fix(orders): release an unpaid online order's stock when its payment link expires
+
+An unpaid online-payment order held its stock for a fixed 24 hours
+(ORDER_AUTO_CANCEL_PENDING_HOURS) whatever the state of its payment
+link. The hold is now the link's own lifetime: ORDER_ONLINE_PAYMENT_HOLD_MINUTES
+(per store, default 30) is passed to Viva (paymentTimeout) and Stripe
+(Checkout Session expires_at) wherever a payment is opened, the expiry
+the provider applied is stored on Order.payment_hold_expires_at, and
+auto_cancel_stuck_pending_orders releases the stock once that instant
+plus ORDER_ONLINE_PAYMENT_GRACE_MINUTES has passed. A Stripe
+PaymentIntent has no expiry, so the sweep cancels it first and leaves
+an order whose payment is already processing to its webhook. A payment
+that still arrives later takes the existing payment-after-cancel path.
+
+The sweep also logs orders:unpaid_online_spike when
+ORDER_UNPAID_ONLINE_ALERT_THRESHOLD or more online orders are waiting.
+
+ORDER_AUTO_CANCEL_PENDING_HOURS is removed; orders already waiting keep
+their 24 hours through a data migration.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d76de99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d76de997bea53ebe281af2bc389410eecf464d44))
+
+* fix(orders): bound the total payment hold and close the payment a retry replaces
+
+A new or retried payment link can no longer move the stock hold past
+ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES from the order's creation; a
+Stripe session that no longer fits answers payment_window_expired. A
+retry cancels the PaymentIntent it replaces before opening the next.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d76de99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d76de997bea53ebe281af2bc389410eecf464d44))
+
+* fix(orders): follow the bank-transfer migration with the payment-hold ones
+
+Renumber the payment-hold migrations after order 0081 so the order app has
+a single leaf.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d76de99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d76de997bea53ebe281af2bc389410eecf464d44))
+
+* fix(i18n): keep the payment-hold catalogue entries in canonical form
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d76de99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d76de997bea53ebe281af2bc389410eecf464d44))
+
+* fix(orders): answer a refund-outstanding status change with a coded 409 (#288) ([`7284ff7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7284ff7aac28c156cf4caa395cc3d05ceb5a79b3))
+
+* fix(orders): answer a refund-outstanding status change with a coded 409
+
+POST /order/{id}/update_status marking an order REFUNDED while money paid
+for it can still be refunded fell into the catch-all and answered a logged
+500 server_error, while the admin action reports the refusal. It now
+answers 409 refund_outstanding naming what is left. Also removes
+_verify_viva_refund, which nothing but its own docstrings referenced; the
+webhook handlers call _verify_viva_reversal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`7284ff7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7284ff7aac28c156cf4caa395cc3d05ceb5a79b3))
+
+* fix(i18n): keep the new catalogue entries in canonical form
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7284ff7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7284ff7aac28c156cf4caa395cc3d05ceb5a79b3))
+
+* fix(giftcard): cap what one staff member can issue per day (#286) ([`0972dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0972dac6e9c16c431fab1a65a46a03c941de5dbf))
+
+* fix(giftcard): cap what one staff member can issue per day
+
+GIFT_CARD_STAFF_ISSUE_LIMIT caps a single step, which a person can repeat.
+A new per-store GIFT_CARD_STAFF_DAILY_LIMIT (default 1000, 0 = off) caps
+what one staff member issued or added over any rolling 24 hours across the
+admin add form and the balance adjustment. Above it only the store's owner
+or a platform superuser may continue, noted on the ledger and in the admin
+log like the per-step limit. The total is read and the row written in one
+transaction under a per-member advisory lock, so parallel requests cannot
+both pass on the same total.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0972dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0972dac6e9c16c431fab1a65a46a03c941de5dbf))
+
+* fix(i18n): keep the new catalogue entries in canonical form
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0972dac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0972dac6e9c16c431fab1a65a46a03c941de5dbf))
+
+* fix(cart): caption the cart source as a cart's and judge activity by one line (#284) ([`8d157d6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d157d6f875015403fb6aa3351f5d7f05654e908))
+
+* fix(cart): caption the cart source as a cart's and judge activity by one line
+
+The cart list's source column and filter were captioned "Order source".
+The Activity column called a cart "Active" for an hour and "Recent" after
+it, while the Activity Status filter called it active for 24 hours; both
+now use CART_ABANDONED_HOURS, the line the Abandoned filter and the
+cleanup task already share, and the filter's other buckets split what is
+past it by how long it has been idle.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`8d157d6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d157d6f875015403fb6aa3351f5d7f05654e908))
+
+* fix(i18n): keep the new catalogue entries in canonical form
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8d157d6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d157d6f875015403fb6aa3351f5d7f05654e908))
+
+* fix(shipping): no made-up BoxNow origin, reissue a cancelled parcel, cancel only an ACS voucher (#280) ([`06b70d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06b70d9608478de43c36314ca9e47689bd0b52b1))
+
+* fix(shipping): no made-up BoxNow origin, reissue a cancelled parcel, cancel only an ACS voucher
+
+* BoxNow sent a placeholder phone ("+302100000000") and warehouse ("2")
+  when the store left the fields empty, although their help text says empty
+  disables BoxNow. All five Tenant.box_now_* fields are now required
+  (missing_credentials, the one rule behind is_configured and parcel
+  creation); a missing one raises BoxNowConfigError naming it, before the
+  claim is stamped.
+* A cancelled parcel kept its delivery_request_id, so creation returned the
+  dead parcel. "Create BoxNow parcel now" resets a CANCELED parcel first
+  (reset_shipment_for_reissue archives the old ids to
+  metadata.previous_parcels), and refuses when the order is cancelled.
+* "Cancel ACS voucher" on the voucher page cancels only the voucher at ACS
+  (ACS_Delete_Voucher), leaving the order alone; ACS' refusal for a voucher
+  on an issued pickup list is shown.
+* Tenant.acs_station_origin said empty disables ACS; ACS is off only
+  without credentials, and an empty station is derived from the billing
+  code. The help text says so.
+* The price-list import's error lines are translated.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`06b70d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06b70d9608478de43c36314ca9e47689bd0b52b1))
+
+* fix(shipping): BoxNow notify phone is optional
+
+BoxNow integration manual v1.69 section 4.4 asks for the sender name only,
+so an empty box_now_notify_phone no longer turns BoxNow off; origin.contactNumber
+is sent only when set. Warehouse and credentials stay required.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`06b70d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06b70d9608478de43c36314ca9e47689bd0b52b1))
+
+### Build system
+
+* build(i18n): keep translation catalogues sorted so parallel PRs merge cleanly (#290)
+
+Every PR that added a message appended it to the end of each .po, so any
+two open PRs conflicted. The catalogues are now sorted by msgid, carry no
+command shadowing Django's writes that form, and a test fails on a
+catalogue that is not in it. Two branches adding different messages
+merged with one conflict before and none after.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`bdceccc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bdceccc15332d853eaf091de92bf0400127e21e8))
+
 ## v3.142.0 (2026-10-20)
 
 ### Bug fixes

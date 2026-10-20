@@ -30,7 +30,7 @@ def staff():
         user = UserAccount.objects.create_user(
             email="mt-actor-staff@example.com",
             username="mtactorstaff",
-            password="x-passw0rd!",
+            password=None,
             is_staff=True,
         )
     return stamp_platform_identity(user)
@@ -47,7 +47,7 @@ def shopper_with_the_staff_id(mt_tenant, staff):
             email="mt-actor-shopper@example.com",
             username="mtactorshopper",
         )
-        shopper.set_password("x-passw0rd!")
+        shopper.set_unusable_password()
         shopper.save()
     return shopper
 
@@ -150,7 +150,7 @@ def test_a_shopper_on_the_api_is_not_recorded_as_staff(mt_tenant, product):
             email="mt-actor-api-shopper@example.com",
             username="mtactorapishopper",
         )
-        shopper.set_password("x-passw0rd!")
+        shopper.set_unusable_password()
         shopper.save()
 
         StockManager.adjust_stock(product, 1, performed_by=shopper)

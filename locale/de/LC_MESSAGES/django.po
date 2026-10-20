@@ -4727,6 +4727,9 @@ msgstr ""
 msgid "Payment Failed - Order #{order_id}"
 msgstr ""
 
+msgid "Payment Hold Expires At"
+msgstr ""
+
 msgid "Payment ID"
 msgstr ""
 
@@ -6320,6 +6323,12 @@ msgstr "Die Zahlungsart ist kostenlos, sobald die Produkte nach Rabatten und ohn
 msgid "The payment this share is refunded against."
 msgstr ""
 
+msgid "The previous payment could not be closed."
+msgstr ""
+
+msgid "The previous payment is still in progress."
+msgstr ""
+
 msgid "The quantity exceeds the available stock."
 msgstr ""
 
@@ -6349,6 +6358,9 @@ msgstr "Die ausgewählte Versandart ist für das ausgewählte Land nicht verfüg
 
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "Die Shopzeile in den weiteren Sprachen des Storefronts, nach Sprache gegliedert, z. B. {\"en\": \"...\"}. Die Zeile der Standardsprache ist die Shopbeschreibung; eine fehlende Sprache greift darauf zurück."
+
+msgid "The time to pay for this order has run out. Place a new order from your cart."
+msgstr ""
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Der Wert, nach dem kostenloser Versand und eine kostenlose Zahlungsgebühr beurteilt werden: die Produkte nach Aktions- und Gutscheinrabatten, ohne Versand und Gebühren. Vergleichen Sie eine Grenze „kostenlos ab“ damit, nie mit total_price."
@@ -7142,6 +7154,9 @@ msgstr ""
 
 msgid "When an operator recorded that the merchant received this parcel's COD money by a route ACS never reported. Clears the unremitted-COD alert for the parcel; ACS's own payout rows are untouched."
 msgstr "Wann ein Bearbeiter erfasst hat, dass der Händler die Nachnahme dieses Pakets auf einem Weg erhalten hat, den ACS nie gemeldet hat. Hebt die Warnung zu nicht ausgezahlter Nachnahme für das Paket auf; die Auszahlungsdatensätze von ACS bleiben unverändert."
+
+msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
+msgstr ""
 
 msgid "When the reduction in force began; empty when the product is not reduced."
 msgstr ""

@@ -8565,6 +8565,9 @@ msgstr "Payment Failed - Order #{order_id}"
 msgid "Payment Gateway"
 msgstr "Payment Gateway"
 
+msgid "Payment Hold Expires At"
+msgstr "Payment Hold Expires At"
+
 msgid "Payment ID"
 msgstr "Payment ID"
 
@@ -11793,6 +11796,12 @@ msgstr "The platform has updated its legal text, and these pages were not change
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 
+msgid "The previous payment could not be closed."
+msgstr "The previous payment could not be closed."
+
+msgid "The previous payment is still in progress."
+msgstr "The previous payment is still in progress."
+
 msgid "The product the shopper is looking at."
 msgstr "The product the shopper is looking at."
 
@@ -11890,6 +11899,9 @@ msgstr "The stores on this platform, their plans and the health of background wo
 
 msgid "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 msgstr "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
+
+msgid "The time to pay for this order has run out. Place a new order from your cart."
+msgstr "The time to pay for this order has run out. Place a new order from your cart."
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
@@ -13193,6 +13205,9 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 
 msgid "When the download link stops working."
 msgstr "When the download link stops working."
+
+msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
+msgstr "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 
 msgid "When the product was favourited"
 msgstr "When the product was favourited"

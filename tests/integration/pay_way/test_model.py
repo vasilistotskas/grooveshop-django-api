@@ -101,33 +101,6 @@ class PayWayModelTestCase(TestCase):
             self.pay_on_delivery.settlement, PaySettlement.COURIER_CASH
         )
 
-    def test_deprecated_booleans_track_settlement(self):
-        # The two columns survive for one release (expand/contract) and
-        # ``save()`` derives them, so a row can never disagree with
-        # itself while the previous pods still read them. Delete this
-        # test with the columns.
-        self.assertTrue(self.credit_card.is_online_payment)
-        self.assertFalse(self.credit_card.requires_confirmation)
-
-        self.assertFalse(self.bank_transfer.is_online_payment)
-        self.assertTrue(self.bank_transfer.requires_confirmation)
-
-        self.assertFalse(self.pay_on_delivery.is_online_payment)
-        self.assertFalse(self.pay_on_delivery.requires_confirmation)
-
-    def test_deprecated_booleans_cannot_be_written_directly(self):
-        # Writing the mirror must not create a row that contradicts its
-        # settlement — that divergence is what let a courier-COD
-        # pay-way mint a BoxNow locker voucher.
-        self.pay_on_delivery.is_online_payment = True
-        self.pay_on_delivery.save()
-        self.pay_on_delivery.refresh_from_db()
-
-        self.assertFalse(self.pay_on_delivery.is_online_payment)
-        self.assertEqual(
-            self.pay_on_delivery.settlement, PaySettlement.COURIER_CASH
-        )
-
     def test_is_collected_on_delivery_spans_both_products(self):
         # Both COD-shaped settlements need a non-zero voucher amount,
         # and this property must NOT distinguish them — that is what

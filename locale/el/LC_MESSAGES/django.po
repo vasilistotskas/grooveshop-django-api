@@ -3356,15 +3356,6 @@ msgstr "Μη κανονικοποιημένο ID APM BoxNow — διατηρεί
 msgid "Depot"
 msgstr "Κέντρο διανομής (depot)"
 
-msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
-msgstr "Παρωχημένο αντίγραφο του ``settlement == OFFLINE_TRANSFER``. Αφαιρείται στην έκδοση μετά την εισαγωγή του settlement."
-
-msgid "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
-msgstr "Παρωχημένο αντίγραφο του ``settlement == ONLINE``. Αφαιρείται στην έκδοση μετά την εισαγωγή του settlement."
-
-msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
-msgstr "Παρωχημένο — χρησιμοποιήστε ``settlement=online``. Αφαιρείται μαζί με τη στήλη στην έκδοση μετά την εισαγωγή του settlement."
-
 msgid "Description"
 msgstr "Περιγραφή"
 
@@ -4582,9 +4573,6 @@ msgstr "Φίλτρο ανά τύπο ειδοποίησης (χωρίς διάκ
 
 msgid "Filter by object ID"
 msgstr "Φίλτρο ανά ID αντικειμένου"
-
-msgid "Filter by online payment methods"
-msgstr "Φίλτρο ανά online μεθόδους πληρωμής"
 
 msgid "Filter by order ID"
 msgstr "Φίλτρο ανά ID παραγγελίας"
@@ -6548,9 +6536,6 @@ msgstr "Διαγραμμένο"
 
 msgid "Is Main"
 msgstr "Κύριο"
-
-msgid "Is Online Payment"
-msgstr "Είναι online πληρωμή"
 
 msgid "Is Published"
 msgstr "Δημοσιευμένο"
@@ -14748,6 +14733,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Delta"
 #~ msgstr "Διαφορά"
 
+#~ msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
+#~ msgstr "Παρωχημένο αντίγραφο του ``settlement == OFFLINE_TRANSFER``. Αφαιρείται στην έκδοση μετά την εισαγωγή του settlement."
+
+#~ msgid "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
+#~ msgstr "Παρωχημένο αντίγραφο του ``settlement == ONLINE``. Αφαιρείται στην έκδοση μετά την εισαγωγή του settlement."
+
+#~ msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
+#~ msgstr "Παρωχημένο — χρησιμοποιήστε ``settlement=online``. Αφαιρείται μαζί με τη στήλη στην έκδοση μετά την εισαγωγή του settlement."
+
 #~ msgid "Display & Branding"
 #~ msgstr "Εμφάνιση & Branding"
 
@@ -14803,6 +14797,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Filter by deleted status (staff only)"
 #~ msgstr "Φίλτρο ανά κατάσταση διαγραφής (μόνο για προσωπικό)"
+
+#~ msgid "Filter by online payment methods"
+#~ msgstr "Φίλτρο ανά online μεθόδους πληρωμής"
 
 #~ msgid "Filter by online payment status"
 #~ msgstr "Φίλτρο ανά κατάσταση online πληρωμής"
@@ -14907,6 +14904,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "Invalid points amount: %(val)s"
 #~ msgstr "Μη έγκυρο ποσό πόντων: %(val)s"
+
+#~ msgid "Is Online Payment"
+#~ msgstr "Είναι online πληρωμή"
 
 #~ msgid "Item Analytics"
 #~ msgstr "Αναλυτικά αντικειμένων"

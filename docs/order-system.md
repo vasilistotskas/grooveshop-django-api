@@ -15,7 +15,7 @@ Three orthogonal axes describe every order in the system:
 |---|---|---|
 | `Order.status` | `PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `COMPLETED`, `CANCELED`, `RETURNED`, `REFUNDED` | The fulfilment state. |
 | `Order.payment_status` | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `REFUNDED`, `PARTIALLY_REFUNDED`, `CANCELED` | The financial state. **Decoupled from `status`** — important for COD where the parcel can be SHIPPED while payment is still PENDING. |
-| `Order.pay_way.settlement` | `online`, `courier_cash`, `carrier_terminal`, `offline_transfer` | How the money changes hands. Drives which create path runs (online → webhook completes payment; the rest → collected later) AND which carriers may serve the order — a carrier declares the settlements it can physically perform (`supported_settlements`). The `is_online_payment` / `requires_confirmation` booleans are DEPRECATED mirrors kept for one release; read `settlement`. |
+| `Order.pay_way.settlement` | `online`, `courier_cash`, `carrier_terminal`, `offline_transfer` | How the money changes hands. Drives which create path runs (online → webhook completes payment; the rest → collected later) AND which carriers may serve the order — a carrier declares the settlements it can physically perform (`supported_settlements`). The pay way's former `is_online_payment` / `requires_confirmation` booleans are gone from the API and the model; their columns are dropped in the following release (`pay_way` 0034 is the expand step). The order's `isOnlinePayment` is a different field, computed from `settlement`. |
 
 Two order columns look like "the payment method" and are not
 interchangeable:

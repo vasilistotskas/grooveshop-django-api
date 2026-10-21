@@ -141,10 +141,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         lookup_expr="icontains",
         help_text=_("Filter by payment method key (case-insensitive)"),
     )
-    pay_way__is_online_payment = filters.BooleanFilter(
-        field_name="pay_way__is_online_payment",
-        help_text=_("Filter by online payment methods"),
-    )
 
     status_updated_after = filters.DateTimeFilter(
         field_name="status_updated_at",

@@ -3349,15 +3349,6 @@ msgstr "Denormalised BoxNow APM ID — preserved even if the BoxNowLocker row is
 msgid "Depot"
 msgstr "Depot"
 
-msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
-msgstr "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
-
-msgid "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
-msgstr "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
-
-msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
-msgstr "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
-
 msgid "Description"
 msgstr "Description"
 
@@ -4575,9 +4566,6 @@ msgstr "Filter by notification type (case-insensitive)"
 
 msgid "Filter by object ID"
 msgstr "Filter by object ID"
-
-msgid "Filter by online payment methods"
-msgstr "Filter by online payment methods"
 
 msgid "Filter by order ID"
 msgstr "Filter by order ID"
@@ -6539,9 +6527,6 @@ msgstr "Is Deleted"
 
 msgid "Is Main"
 msgstr "Is Main"
-
-msgid "Is Online Payment"
-msgstr "Is Online Payment"
 
 msgid "Is Published"
 msgstr "Is Published"
@@ -14519,8 +14504,20 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"
 
+#~ msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
+#~ msgstr "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
+
+#~ msgid "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
+#~ msgstr "Deprecated mirror of ``settlement == ONLINE``. Dropped in the release after settlement lands."
+
+#~ msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
+#~ msgstr "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
+
 #~ msgid "False"
 #~ msgstr "False"
+
+#~ msgid "Filter by online payment methods"
+#~ msgstr "Filter by online payment methods"
 
 #~ msgid "Fully Refunded"
 #~ msgstr "Fully Refunded"
@@ -14536,6 +14533,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 #~ msgstr "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
+
+#~ msgid "Is Online Payment"
+#~ msgstr "Is Online Payment"
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"

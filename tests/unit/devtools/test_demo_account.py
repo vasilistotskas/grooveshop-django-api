@@ -829,7 +829,9 @@ def _prepare_store():
             settlement=PaySettlement.CARRIER_TERMINAL.value
         ),
         PaySettlement.COURIER_CASH.value: lambda: (
-            PayWayFactory.create_offline_payment(requires_confirmation=False)
+            PayWayFactory.create_offline_payment(
+                settlement=PaySettlement.COURIER_CASH
+            )
         ),
     }
     for settlement, make in wanted.items():

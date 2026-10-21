@@ -59,17 +59,6 @@ class PayWayFilter(
         choices=PaySettlement.choices,
         help_text=_("Filter by how the money changes hands"),
     )
-    is_online_payment = filters.BooleanFilter(
-        field_name="is_online_payment",
-        help_text=_(
-            "Deprecated — use ``settlement=online``. Removed with the "
-            "column in the release after settlement lands."
-        ),
-    )
-    requires_confirmation = filters.BooleanFilter(
-        field_name="requires_confirmation",
-        help_text=_("Filter by confirmation requirement"),
-    )
     key = filters.ChoiceFilter(
         field_name="key",
         choices=PayWayEnum.choices,
@@ -124,8 +113,6 @@ class PayWayFilter(
             "cost": ["gte", "lte"],
             "free_threshold": ["gte", "lte"],
             "provider_code": ["icontains"],
-            "is_online_payment": ["exact"],
-            "requires_confirmation": ["exact"],
             "sort_order": ["exact", "gte", "lte"],
             "uuid": ["exact"],
         }

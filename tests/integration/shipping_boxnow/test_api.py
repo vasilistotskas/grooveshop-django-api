@@ -165,3 +165,103 @@ class TestLockerNearestEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         data = response.json()
         assert data["code"] == "P423"
+
+    def _post(self, **extra):
+        return self.client.post(
+            self._url(),
+            {
+                "city": "Chalandri",
+                "street": "Leoforos 125",
+                "postalCode": "15232",
+                **extra,
+            },
+            format="json",
+        )
+
+    @staticmethod
+    def _cart(*, dimensions):
+        from measurement.measures import Distance
+
+        from cart.factories.cart import CartFactory
+        from cart.factories.item import CartItemFactory
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(
+            active=True, stock=20, num_images=0, num_reviews=0
+        )
+        length, width, height = dimensions
+        product.length = Distance(cm=length)
+        product.width = Distance(cm=width)
+        product.height = Distance(cm=height)
+        product.save()
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=product, quantity=1)
+        return cart
+
+    def _searched_size(self, **headers):
+        mock_client = MagicMock()
+        mock_client.return_value.find_closest_locker.return_value = {
+            "id": "4",
+            "type": "apm",
+        }
+        with patch("shipping_boxnow.client.BoxNowClient", mock_client):
+            response = self.client.post(
+                self._url(),
+                {
+                    "city": "Chalandri",
+                    "street": "Leoforos 125",
+                    "postalCode": "15232",
+                },
+                format="json",
+                **headers,
+            )
+        assert response.status_code == status.HTTP_200_OK
+        return mock_client.return_value.find_closest_locker.call_args.kwargs[
+            "compartment_size"
+        ]
+
+    def test_search_asks_for_the_size_the_cart_needs(self):
+        cart = self._cart(dimensions=(30, 20, 12))
+        assert self._searched_size(HTTP_X_CART_ID=str(cart.uuid)) == 2
+
+    def test_search_without_a_cart_uses_the_store_default(self):
+        assert self._searched_size() == 1
+
+    def test_search_with_an_unknown_cart_uses_the_store_default(self):
+        import uuid
+
+        assert self._searched_size(HTTP_X_CART_ID=str(uuid.uuid4())) == 1
+
+    def test_a_size_sent_by_the_client_is_ignored(self):
+        mock_client = MagicMock()
+        mock_client.return_value.find_closest_locker.return_value = {
+            "id": "4",
+            "type": "apm",
+        }
+        with patch("shipping_boxnow.client.BoxNowClient", mock_client):
+            response = self._post(compartmentSize=3)
+        assert response.status_code == status.HTTP_200_OK
+        assert (
+            mock_client.return_value.find_closest_locker.call_args.kwargs[
+                "compartment_size"
+            ]
+            == 1
+        )
+
+    def test_a_cart_that_fits_no_compartment_is_refused_before_boxnow(self):
+        cart = self._cart(dimensions=(80, 50, 40))
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.client.BoxNowClient", mock_client):
+            response = self.client.post(
+                self._url(),
+                {
+                    "city": "Chalandri",
+                    "street": "Leoforos 125",
+                    "postalCode": "15232",
+                },
+                format="json",
+                HTTP_X_CART_ID=str(cart.uuid),
+            )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "parcel_too_large"
+        mock_client.return_value.find_closest_locker.assert_not_called()

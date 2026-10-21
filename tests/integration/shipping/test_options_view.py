@@ -223,6 +223,88 @@ class TestRateFields:
         assert opt["exceedsMaxWeight"] is False
 
 
+class TestParcelSize:
+    """``exceedsParcelSize``: the cart is found by ``X-Cart-Id`` (or the
+    signed-in user) like every cart endpoint, and the carrier's parcel
+    rule decides. No cart, or an unknown one, behaves as before."""
+
+    @staticmethod
+    def _cart(*, dimensions):
+        from measurement.measures import Distance
+
+        from cart.factories.cart import CartFactory
+        from cart.factories.item import CartItemFactory
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(
+            active=True, stock=20, num_images=0, num_reviews=0
+        )
+        length, width, height = dimensions
+        product.length = Distance(cm=length)
+        product.width = Distance(cm=width)
+        product.height = Distance(cm=height)
+        product.save()
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=product, quantity=1)
+        return cart
+
+    @staticmethod
+    def _boxnow(client, **headers):
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}, **headers
+        )
+        assert response.status_code == status.HTTP_200_OK
+        return next(o for o in response.json() if o["providerCode"] == "boxnow")
+
+    @pytest.fixture(autouse=True)
+    def _boxnow_on(self, boxnow_configured_tenant):
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+
+    def test_a_cart_that_fits_is_not_flagged(self):
+        cart = self._cart(dimensions=(30, 20, 5))
+        option = self._boxnow(APIClient(), HTTP_X_CART_ID=str(cart.uuid))
+        assert option["exceedsParcelSize"] is False
+
+    def test_a_cart_that_fits_no_compartment_is_flagged_but_listed(self):
+        cart = self._cart(dimensions=(80, 50, 40))
+        option = self._boxnow(APIClient(), HTTP_X_CART_ID=str(cart.uuid))
+        assert option["exceedsParcelSize"] is True
+
+    def test_the_signed_in_users_cart_is_found_without_a_header(self):
+        from user.factories.account import UserAccountFactory
+
+        cart = self._cart(dimensions=(80, 50, 40))
+        user = UserAccountFactory(num_addresses=0)
+        cart.user = user
+        cart.save()
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        assert self._boxnow(client)["exceedsParcelSize"] is True
+
+    def test_an_unknown_cart_behaves_as_no_cart(self):
+        import uuid
+
+        option = self._boxnow(APIClient(), HTTP_X_CART_ID=str(uuid.uuid4()))
+        assert option["exceedsParcelSize"] is False
+
+    def test_no_cart_is_never_flagged(self):
+        assert self._boxnow(APIClient())["exceedsParcelSize"] is False
+
+    def test_home_delivery_options_are_never_flagged(self):
+        """Only the locker has parcel sizes: ``flat_rate`` has no limit."""
+        ShippingProvider.objects.filter(code="flat_rate").update(is_active=True)
+        cart = self._cart(dimensions=(80, 50, 40))
+        response = APIClient().get(
+            reverse("shipping-options"),
+            {"country_code": "GR"},
+            HTTP_X_CART_ID=str(cart.uuid),
+        )
+        flat = [o for o in response.json() if o["providerCode"] == "flat_rate"]
+        assert flat
+        assert all(o["exceedsParcelSize"] is False for o in flat)
+
+
 def _name_it(pay_way, enum_value: str):
     """Write the enum key and hand back a fresh instance.
 

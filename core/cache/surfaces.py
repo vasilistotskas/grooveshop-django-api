@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from core.cache.registry import CacheSurface, register_surface
@@ -94,27 +93,6 @@ def _escaped_pathname(path: str) -> str:
     if path in ("", "/"):
         return "index"
     return "".join(ch for ch in path if ch.isalnum())[:16]
-
-
-def _nuxt_locale_homes() -> tuple[str, ...]:
-    """Nuxt patterns for the home page of every prefixed locale (``/en``).
-
-    ``_nuxt_routes`` already covers the prefixed pages BENEATH a route —
-    ``/en/products`` is stored as ``enproducts…``, which ``*products*``
-    matches — but not a locale's home: ``/en`` is stored under the bare
-    segment ``en``, and ``_nuxt_routes("/en")`` would give ``*en*``, which
-    matches nearly every key. The segment is followed by ``.<hash>``, so
-    ``*en.*`` matches it and, at most, a page whose escaped path happens
-    to end in ``en`` — an over-purge, which is safe.
-
-    The locales are Django's own; a language the storefront does not
-    route only adds a pattern that matches nothing.
-    """
-    return tuple(
-        f"{NUXT_ROUTE_PREFIX}_:*{code}.*"
-        for code, _name in settings.LANGUAGES
-        if code != settings.LANGUAGE_CODE
-    )
 
 
 def _nuxt_functions(*names: str) -> tuple[str, ...]:
@@ -455,17 +433,13 @@ def register_default_surfaces() -> None:
             # from it. Without the route half a layout edit sits behind
             # Nitro's SSR cache for the rest of its TTL.
             #
-            # Only the pages this surface's data builds, so a layout edit
-            # does not evict the whole site's SSR cache: the builder-driven
-            # pages (every app/pages/*.vue that calls usePageConfig, minus
-            # the catalogue and blog listings, which their own surfaces
-            # cover) and the four legal pages rendered from ContentPage.
-            # All of them sit in the storefront's PRERENDERED_ROUTES at
-            # ``swr: 3600`` — before 2026-09-18 the marketing trio and the
-            # legal pages were missing here, so a policy edit purged its
-            # JSON and then served the old HTML for the rest of the hour.
-            # "/" resolves to Nitro's ``index`` segment via
-            # _escaped_pathname.
+            # Every cached page of the store, not a list of paths: a
+            # navigation menu renders on every page, and a layout or
+            # section edit reaches any custom ContentPage, whose path is
+            # whatever the merchant typed. A fixed list left those stale
+            # for up to 600 s. The purge endpoint narrows the one pattern
+            # to this store's keys (``host``), as for ``store_pages``, and
+            # a route-prefix pattern queues the edge purge.
             # These are ``defineCachedEventHandler`` NAMES from the Nuxt
             # repo, not guesses — verified against the ``name:`` field of
             # server/api/page-config/[pageType].get.ts,
@@ -481,21 +455,7 @@ def register_default_surfaces() -> None:
                 "ContentPageViewSet",
                 "ContentPageDetailViewSet",
             )
-            + _nuxt_routes(
-                "/",
-                "/about",
-                "/contact",
-                "/feedback",
-                "/info",
-                "/vision",
-                "/what-is-microlearning",
-                "/why-microlearning",
-                "/terms-of-use",
-                "/privacy-policy",
-                "/cookies-policy",
-                "/return-policy",
-            )
-            + _nuxt_locale_homes(),
+            + (f"{NUXT_ROUTE_PREFIX}_:*",),
             invalidated_by=(
                 "page_config.ContentPage",
                 "page_config.ContentPageTranslation",

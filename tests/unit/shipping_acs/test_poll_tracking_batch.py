@@ -1,9 +1,9 @@
 """Verify the distributed lock guarding ``poll_acs_tracking_batch``.
 
-ACS rate-limits at 10 req/sec. The batch task fans out to per-shipment
-sub-tasks via ``apply_async(countdown=...)``. Two Celery workers
-running the same beat tick would both dispatch the full N-task fan-out
-— doubling the API rate. We guard with a Redis-backed ``cache.add``
+The batch task fans out to per-shipment sub-tasks via
+``apply_async(countdown=...)``. Two Celery workers running the same
+beat tick would both dispatch the full N-task fan-out — doubling the
+load on the ACS request slots. We guard with a Redis-backed ``cache.add``
 mutex; this test suite verifies the guard fires.
 
 DummyCache (used in unit tests per project memory) returns True for

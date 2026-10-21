@@ -374,7 +374,10 @@ class TestEndpointShaping:
         client = self._ok({"id": "apm-9", "distance": 120})
 
         result = client.find_closest_locker(
-            city="Athens", street="Ermou 1", postal_code="10563"
+            city="Athens",
+            street="Ermou 1",
+            postal_code="10563",
+            compartment_size=2,
         )
 
         assert result == {"id": "apm-9", "distance": 120}
@@ -388,7 +391,7 @@ class TestEndpointShaping:
             "street": "Ermou 1",
             "postalCode": "10563",
             "region": "el-GR",
-            "compartmentSize": 1,
+            "compartmentSize": 2,
         }
 
     def test_update_delivery_request_puts_allow_return(self):

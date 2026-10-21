@@ -1414,10 +1414,11 @@ def get_celery_beat_schedule():
             "options": {"queue": "celery", "expires": 300},
         },
         # Poll ACS_Trackingsummary every 15 min for non-terminal
-        # shipments. Sub-tasks fan out internally with a 0.2s
-        # countdown stagger so we stay well within ACS's 10 req/sec
-        # cap. Distributed mutex inside the task body prevents two
-        # workers from each running the full fan-out concurrently.
+        # shipments. Sub-tasks fan out internally spaced by
+        # ACS_POLL_DISPATCH_SPACING_SECONDS; the calls in flight are
+        # capped by shipping_acs.concurrency. Distributed mutex inside
+        # the task body prevents two workers from each running the full
+        # fan-out concurrently.
         "poll-acs-tracking": {
             # Beat fires in the public schema. Without the fanout wrapper
             # the worker would query `AcsShipment` in public — where no
@@ -1746,6 +1747,21 @@ EXTRA_SETTINGS_DEFAULTS = [
             "pickup option. Defaults False so a fresh deploy hides "
             "the option until ops have synced AcsStation rows and "
             "verified the picker; flip in Django admin to expose."
+        ),
+    },
+    {
+        "name": "BOXNOW_DEFAULT_COMPARTMENT_SIZE",
+        "type": "int",
+        "value": 1,
+        "validator": (
+            "shipping_boxnow.packing.validate_default_compartment_size"
+        ),
+        "description": (
+            "BOX NOW compartment booked for products that have no "
+            "length, width and height: 1 = Small, 2 = Medium, 3 = "
+            "Large. With dimensions on every product the size is "
+            "derived from them and this is not used; with some it is "
+            "the minimum."
         ),
     },
     {
@@ -4391,6 +4407,44 @@ ACS_API_BASE_URL = getenv(
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+# Requests in flight per ACS account across every pod
+# (``shipping_acs/concurrency.py``). ACS answers 406 to overlapping calls
+# and publishes no figure, so the default is our own measurement: 10 days
+# of production logs (2026-10-11 to 10-20), each tracking task against how
+# many ACS tasks were in flight at its start, gave a rejection rate of 0.9%
+# at 1, 2.0% at 2, 3.6% at 3, 7.9% at 6, 17% at 8 and 19-50% at 9 or more
+# (table in ``docs/order-system.md``). 2 halves the rate against 3; with
+# the reserve below the polls run one at a time and still finish inside
+# their tick, see the spacing.
+ACS_MAX_CONCURRENT_REQUESTS = int(getenv("ACS_MAX_CONCURRENT_REQUESTS", "2"))
+# How long a call waits for a free slot before it is retried through Celery.
+ACS_SLOT_WAIT_SECONDS = int(getenv("ACS_SLOT_WAIT_SECONDS", "10"))
+# Slots the background tracking polls may NOT take, so a shopper's call
+# (checkout price quote, address validation) always finds one free instead
+# of waiting behind the batch. Polls then run on the remaining slots only.
+ACS_INTERACTIVE_RESERVED_SLOTS = int(
+    getenv("ACS_INTERACTIVE_RESERVED_SLOTS", "1")
+)
+if not 0 <= ACS_INTERACTIVE_RESERVED_SLOTS < ACS_MAX_CONCURRENT_REQUESTS:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "ACS_INTERACTIVE_RESERVED_SLOTS must leave the polls at least one "
+        "of ACS_MAX_CONCURRENT_REQUESTS slots."
+    )
+ACS_POLL_SLOTS = ACS_MAX_CONCURRENT_REQUESTS - ACS_INTERACTIVE_RESERVED_SLOTS
+# Measured mean duration of one ``poll_acs_tracking_one`` (two ACS calls),
+# same logs. The poll slots serve ``poll slots / duration`` polls a second,
+# so the batch dispatches one every ``duration / poll slots`` seconds (2 s
+# at the defaults, about 400 s for the 200-shipment cap, inside the 15
+# minute tick) and the polls never queue for a slot longer than
+# ``ACS_SLOT_WAIT_SECONDS``.
+ACS_POLL_AVERAGE_TASK_SECONDS = float(
+    getenv("ACS_POLL_AVERAGE_TASK_SECONDS", "2.0")
+)
+ACS_POLL_DISPATCH_SPACING_SECONDS = (
+    ACS_POLL_AVERAGE_TASK_SECONDS / ACS_POLL_SLOTS
+)
 # Days without a tracking event before a non-terminal shipment is
 # reported by check_stale_acs_shipments to the store's operators
 # (platform ADMINS only as a fallback).

@@ -185,44 +185,29 @@ class TestPageConfigSurface:
         assert "cache:nitro:handlers:pageConfig*" in patterns
         # ...and the HTML already built from it. Purging only the first
         # leaves the storefront serving the old page.
-        assert "cache:nitro:routes:_:*index*" in patterns
+        assert "cache:nitro:routes:_:*" in patterns
 
-    def test_covers_the_builder_driven_page_types_only(self):
-        """Not a blanket route purge: usePageConfig is called with a
-        fixed set of page types, so a layout edit should not evict the
-        catalogue's and blog's renders too."""
+    def test_purges_every_cached_page_of_the_store(self):
+        """A menu edit shows on every page and a layout edit on any
+        custom content page, whose path is the merchant's own. A fixed
+        list of routes left those pages stale for up to 600 s. The purge
+        endpoint keeps only the purging store's keys (``host``)."""
+        endpoint = _endpoint_regex
         patterns = get_surface("page_config").nuxt_patterns
 
-        assert "cache:nitro:routes:_:*" not in patterns
-        for path in (
-            "index",
-            "about",
-            "contact",
-            "feedback",
-            "vision",
-            "whatismicrolearn",
-            "whymicrolearning",
+        for key in (
+            "cache:nitro:routes:_:index.a1:host.b2.json",
+            "cache:nitro:routes:_:enproducts.a1:host.b2.json",
+            "cache:nitro:routes:_:mycustomlandingpa.a1:host.b2.json",
+            "cache:nitro:routes:_:blogpost42mnhmhr.a1:host.b2.json",
         ):
-            assert f"cache:nitro:routes:_:*{path}*" in patterns
-        for path in ("blog", "products"):
-            assert f"cache:nitro:routes:_:*{path}*" not in patterns
-
-    def test_covers_the_legal_pages_rendered_from_content_pages(self):
-        """The surface purges ``ContentPageDetailViewSet`` — the JSON a
-        legal page is built from — so it must also drop the HTML built
-        from it. The four legal routes are prerendered at ``swr: 3600``
-        on the storefront; without these a policy edit purged its JSON
-        and served the old clause for the rest of the hour.
-        """
-        patterns = get_surface("page_config").nuxt_patterns
-
-        for path in (
-            "termsofuse",
-            "privacypolicy",
-            "cookiespolicy",
-            "returnpolicy",
-        ):
-            assert f"cache:nitro:routes:_:*{path}*" in patterns
+            assert any(endpoint(p).match(key) for p in patterns), key
+        # Pages only, not another cache family.
+        assert not any(
+            endpoint(p).match("cache:nitro:functions:sitemap:x")
+            for p in patterns
+            if p.startswith("cache:nitro:routes:")
+        )
 
     def test_declares_no_django_patterns(self):
         """Nothing in page_config is ``@cache_methods``-decorated — not
@@ -397,15 +382,6 @@ class TestPrefixedLocalePages:
         assert self._matches(
             "page_config", "cache:nitro:routes:_:index.a:host.b.json"
         )
-
-    def test_the_locale_home_pattern_is_not_a_catch_all(self):
-        """``*en*`` would match nearly every key; ``*en.*`` only a segment
-        that ends in ``en``."""
-        for key in (
-            "cache:nitro:routes:_:enproducts.a1:host.b2.json",
-            "cache:nitro:routes:_:blogpost42mnhmhr.a1:host.b2.json",
-        ):
-            assert not self._matches("page_config", key), key
 
     def test_family_patterns_reach_prefixed_pages(self):
         assert self._matches(

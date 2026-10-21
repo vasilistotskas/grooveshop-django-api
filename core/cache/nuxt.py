@@ -30,26 +30,55 @@ def _resolve_token() -> str | None:
     return getattr(settings, "NUXT_CACHE_PURGE_TOKEN", "") or None
 
 
+class StoreHostUnresolvedError(Exception):
+    """A purge runs in a store's schema but the store's host is unknown."""
+
+    def __init__(self, schema_name: str) -> None:
+        self.schema_name = schema_name
+        super().__init__(f"no primary domain for store schema {schema_name!r}")
+
+
 def _current_tenant_host() -> str | None:
-    """The purging tenant's primary storefront domain, or None.
+    """The purging store's primary storefront domain; None for a platform purge.
 
     A merchant cache purge runs inside that tenant's schema context, so
     ``connection.tenant`` is the store issuing it. Passing its host to
     the Nuxt purge endpoint scopes the eviction to that store's cached
-    keys (the SSR cache is shared across every tenant). None on the
-    public/platform schema — a platform purge is deliberately global.
+    keys (the SSR cache is shared across every tenant). None only on the
+    public schema (or with no tenant bound at all) — a platform purge is
+    deliberately global.
+
+    A store whose host cannot be found must NOT come back as None, or its
+    purge would go out host-less and evict every store's pages. Nothing
+    in the model guarantees a primary domain (``DomainMixin.save`` only
+    promotes a store's first domain; a store with none, or whose domains
+    an admin removed, has none), so this raises
+    :class:`StoreHostUnresolvedError` instead, as it does when the lookup
+    itself fails with a database error (``request_purge`` never raises).
     """
+    from django.db import DatabaseError, connection
+    from django_tenants.utils import get_public_schema_name
+
     from tenant.membership import bound_tenant
 
-    tenant = bound_tenant()
-    domains = getattr(tenant, "domains", None)
-    if domains is None:  # public schema, or a bare FakeTenant
+    current = getattr(connection, "tenant", None)
+    schema_name = getattr(current, "schema_name", None)
+    if current is None or schema_name == get_public_schema_name():
         return None
+
     try:
-        primary = domains.filter(is_primary=True).first()
-    except Exception:
-        return None
-    return primary.domain if primary else None
+        tenant = bound_tenant()
+        domains = getattr(tenant, "domains", None)
+        primary = (
+            domains.filter(is_primary=True).first()
+            if domains is not None
+            else None
+        )
+    except DatabaseError as exc:
+        raise StoreHostUnresolvedError(str(schema_name)) from exc
+    if primary is None:
+        raise StoreHostUnresolvedError(str(schema_name))
+    return primary.domain
 
 
 def is_configured() -> bool:
@@ -89,7 +118,23 @@ def request_purge(
     }
     if tenant_config:
         payload["tenantConfig"] = True
-    host = _current_tenant_host()
+    try:
+        host = _current_tenant_host()
+    except StoreHostUnresolvedError as exc:
+        # Sending this without a host would be a platform-wide purge.
+        logger.error(
+            "Nuxt cache purge skipped for store schema %s: %s; the store's "
+            "cached pages were not purged",
+            exc.schema_name,
+            exc.__cause__ or exc,
+            exc_info=exc.__cause__ is not None,
+        )
+        return NuxtPurgeResult(
+            matched=0,
+            deleted=0,
+            blocked=0,
+            error=f"store host unresolved for {exc.schema_name}",
+        )
     if host:
         payload["host"] = host
     headers = {

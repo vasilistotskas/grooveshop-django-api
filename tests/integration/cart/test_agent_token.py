@@ -304,6 +304,134 @@ class TestAllowedActions:
         assert not guest.items.exists()
 
 
+class TestShippingReads:
+    """``/shipping/options`` and the nearest-locker lookup read the cart
+    only to tell whether it fits a carrier's parcels, so the token works
+    there like on ``GET /cart``."""
+
+    @staticmethod
+    def _oversize(cart):
+        from measurement.measures import Distance
+
+        product = _product()
+        product.length = Distance(cm=80)
+        product.width = Distance(cm=50)
+        product.height = Distance(cm=40)
+        product.save()
+        CartItemFactory(cart=cart, product=product, quantity=1)
+
+    @staticmethod
+    def _boxnow_option(client, **headers):
+        from shipping.models import ShippingProvider
+
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
+        response = client.get(
+            reverse("shipping-options"), {"country_code": "GR"}, **headers
+        )
+        if response.status_code != status.HTTP_200_OK:
+            return response, None
+        return response, next(
+            o for o in response.json() if o["providerCode"] == "boxnow"
+        )
+
+    @staticmethod
+    def _nearest(client, **headers):
+        from unittest.mock import MagicMock
+
+        boxnow = MagicMock()
+        boxnow.return_value.find_closest_locker.return_value = {
+            "id": "4",
+            "type": "apm",
+        }
+        with patch("shipping_boxnow.client.BoxNowClient", boxnow):
+            response = client.post(
+                reverse("shipping-boxnow-locker-nearest"),
+                {"city": "A", "street": "B 1", "postalCode": "15232"},
+                format="json",
+                **headers,
+            )
+        return response, boxnow
+
+    def test_options_flag_the_owners_cart(
+        self, shopper, boxnow_configured_tenant
+    ):
+        _user, cart, _auth, client = shopper
+        self._oversize(cart)
+
+        response, option = self._boxnow_option(_gateway(_mint(client)))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert option["exceedsParcelSize"] is True
+
+    def test_nearest_asks_for_the_owners_size(self, shopper):
+        from measurement.measures import Distance
+
+        _user, cart, _auth, client = shopper
+        product = _product()
+        product.length = Distance(cm=30)
+        product.width = Distance(cm=20)
+        product.height = Distance(cm=12)
+        product.save()
+        CartItemFactory(cart=cart, product=product, quantity=1)
+
+        response, boxnow = self._nearest(_gateway(_mint(client)))
+
+        assert response.status_code == status.HTTP_200_OK
+        kwargs = boxnow.return_value.find_closest_locker.call_args.kwargs
+        assert kwargs["compartment_size"] == 2
+
+    def test_nearest_refuses_the_owners_oversize_cart(self, shopper):
+        _user, cart, _auth, client = shopper
+        self._oversize(cart)
+
+        response, boxnow = self._nearest(_gateway(_mint(client)))
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        boxnow.return_value.find_closest_locker.assert_not_called()
+
+    def test_an_invalid_token_is_a_401_never_a_guest_cart(
+        self, shopper, boxnow_configured_tenant
+    ):
+        guest = CartFactory(user=None, num_cart_items=0)
+        self._oversize(guest)
+        carts_before = Cart.objects.count()
+        gateway = _gateway("not-a-minted-token")
+
+        options, _option = self._boxnow_option(
+            gateway, HTTP_X_CART_ID=str(guest.uuid)
+        )
+        nearest, boxnow = self._nearest(gateway, HTTP_X_CART_ID=str(guest.uuid))
+
+        for response in (options, nearest):
+            assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        boxnow.return_value.find_closest_locker.assert_not_called()
+        assert Cart.objects.count() == carts_before
+
+    def test_the_token_wins_over_cart_id(
+        self, shopper, boxnow_configured_tenant
+    ):
+        """The owner's cart fits; the guest cart named by ``X-Cart-Id``
+        does not. The flag follows the token."""
+        _user, cart, _auth, client = shopper
+        guest = CartFactory(user=None, num_cart_items=0)
+        self._oversize(guest)
+
+        _response, option = self._boxnow_option(
+            _gateway(_mint(client)), HTTP_X_CART_ID=str(guest.uuid)
+        )
+
+        assert option["exceedsParcelSize"] is False
+        assert not cart.items.exists()
+
+    def test_the_token_still_gets_403_outside_the_allowlist(self, shopper):
+        _user, _cart, _auth, client = shopper
+        response = _gateway(_mint(client)).post(
+            reverse("cart-reserve-stock"), {}, format="json"
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.data["detail"].code == "cart_token_not_permitted"
+
+
 class TestRefusedActions:
     @pytest.mark.parametrize(
         ("method", "url_name"),

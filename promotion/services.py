@@ -18,6 +18,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -42,6 +43,9 @@ from promotion.models import (
     PromotionCode,
     PromotionRedemption,
 )
+
+if TYPE_CHECKING:
+    from product.models.product import Product
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +88,7 @@ class GiftEntitlement:
     ``product`` added to the order at price 0."""
 
     promotion: Promotion
-    product: object
+    product: Product
     quantity: int
 
 
@@ -740,22 +744,21 @@ class PromotionEngine:
         return {pk: weight for pk, weight in weights.items() if weight > 0}
 
     @classmethod
-    def gift_weight_grams(cls, result: CartDiscountResult) -> int:
-        """Extra parcel weight the entitled gift items add.
+    def gift_pairs(
+        cls, result: CartDiscountResult
+    ) -> list[tuple[Product, int]]:
+        """``(product, quantity)`` of the entitled gifts, as cart lines.
 
-        Shipping quotes are weight-banded (ACS) — every surface that
-        prices shipping (payment-intent, verification, creation) must
-        include the gifts or the courier voucher upcharges later.
+        Gifts become physical order lines (``_inject_promotion_gifts``),
+        so everything that sizes the parcel counts them with the cart:
+        the weight bracket ACS quotes, the weight cap, and the carrier's
+        parcel size. Add these to the cart's own pairs on every surface
+        that prices or sizes shipping (payment-intent, verification,
+        creation, the shipment row, the options). The engine already
+        leaves out a gift that is out of stock; one that loses a later
+        stock race only makes the parcel look bigger, which is safe.
         """
-        if not result.gift_items:
-            return 0
-        from shipping.utils import (
-            compute_total_weight_grams,
-        )
-
-        return compute_total_weight_grams(
-            (gift.product, gift.quantity) for gift in result.gift_items
-        )
+        return [(gift.product, gift.quantity) for gift in result.gift_items]
 
     @classmethod
     def record(cls, order, result: CartDiscountResult) -> Money:

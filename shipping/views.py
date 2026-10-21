@@ -18,7 +18,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cart.services import cart_item_pairs
+from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
 from shipping.models import ShippingProvider
 from shipping.serializers import (
     FreeShippingInfoQuerySerializer,
@@ -78,8 +81,16 @@ class ShippingOptionsView(APIView):
                 required=False,
                 type=int,
             ),
+            *CART_TOKEN_HEADERS,
         ],
-        responses=ShippingOptionSerializer(many=True),
+        responses={
+            200: ShippingOptionSerializer(many=True),
+            # A missing or malformed query parameter, and an
+            # ``X-Cart-Token`` that is unknown, expired or revoked (never
+            # answered with another cart).
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
         tags=["Shipping"],
     )
     def get(self, request: Request) -> Response:
@@ -92,11 +103,16 @@ class ShippingOptionsView(APIView):
         currency = query.validated_data.get("currency") or "EUR"
         weight_grams = query.validated_data.get("weight_grams")
 
+        # The caller's cart, found the way every cart endpoint finds it
+        # (``X-Cart-Id`` / the signed-in user). None when it names none.
+        items = cart_item_pairs(request)
+
         options = ShippingService.available_options(
             country_code=country_code,
             order_value_amount=amount,
             currency=currency,
             weight_grams=weight_grams,
+            items=items,
         )
         serializer = ShippingOptionSerializer(options, many=True)
         return Response(serializer.data)

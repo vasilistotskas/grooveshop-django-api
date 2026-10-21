@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -970,9 +970,10 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             _cart_total = cart.total_price
-            _cart_weight_grams = compute_total_weight_grams(
+            _cart_pairs = [
                 (item.product, item.quantity) for item in cart.items.all()
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            _cart_weight_grams = compute_total_weight_grams(_cart_pairs)
             _threshold_value = cls.threshold_value(_cart_total, promo_discount)
             _shipping_cost = cls.shipping_cost(
                 order_value=_threshold_value,
@@ -983,6 +984,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=_cart_weight_grams,
+                items=_cart_pairs,
                 free=promo_result.free_shipping,
             )
             # Pay-way fee: waived on the same value as free shipping —
@@ -1190,9 +1192,10 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             cart_total = cart.total_price
-            cart_weight_grams = compute_total_weight_grams(
+            parcel_items = [
                 (ci.product, ci.quantity) for ci in cart_items
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            cart_weight_grams = compute_total_weight_grams(parcel_items)
             threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
                 order_value=threshold_value,
@@ -1203,6 +1206,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
+                items=parcel_items,
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -1234,10 +1238,6 @@ class OrderService:
                 order, attribution or AttributionInput(), cart=cart
             )
 
-            # Reuse the already-locked/materialised cart_items list rather
-            # than issuing a second SELECT on the same rows.
-            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
-
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
             # (boxnow_locker_id, acs_station_external_id, etc.) and
@@ -1245,7 +1245,7 @@ class OrderService:
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(
-                order, payload=shipping_address, items=cart_items_pairs
+                order, payload=shipping_address, items=parcel_items
             )
 
             # Initialize metadata with cart snapshot
@@ -1770,9 +1770,10 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             cart_total = cart.total_price
-            cart_weight_grams = compute_total_weight_grams(
+            parcel_items = [
                 (ci.product, ci.quantity) for ci in cart_items
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            cart_weight_grams = compute_total_weight_grams(parcel_items)
             threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
                 order_value=threshold_value,
@@ -1783,6 +1784,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
+                items=parcel_items,
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -1821,15 +1823,11 @@ class OrderService:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
 
-            # Reuse the already-locked/materialised cart_items list rather
-            # than issuing a second SELECT on the same rows.
-            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
-
             # Provider-agnostic shipment row creation via the registry.
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(
-                order, payload=shipping_address, items=cart_items_pairs
+                order, payload=shipping_address, items=parcel_items
             )
 
             # Initialize metadata with cart snapshot
@@ -4717,9 +4715,13 @@ class OrderService:
         shipping_kind: str | None = None,
         weight_grams: int | None = None,
         *,
+        items: Iterable[tuple[Any, int]] | None = None,
         free: bool = False,
     ) -> Money:
         """The shipping price for a (provider, kind, country) — or 0 when ``free``.
+
+        ``items`` are the cart's ``(product, quantity)`` pairs, checked
+        against the carrier's parcel sizes next to the weight cap.
 
         ``order_value`` is :meth:`threshold_value`, never the gross cart
         total: the free-shipping threshold is judged on the products after
@@ -4745,6 +4747,7 @@ class OrderService:
         """
         from shipping.enum import ShippingKind
         from shipping.exceptions import (
+            ShippingParcelTooLargeError,
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
@@ -4783,6 +4786,7 @@ class OrderService:
                     kind=shipping_kind,
                     country_code=country_id,
                     weight_grams=weight_grams,
+                    items=items,
                 )
                 return Money(0, order_value.currency)
 
@@ -4792,6 +4796,7 @@ class OrderService:
                 country_code=country_id,
                 region_id=region_id,
                 weight_grams=weight_grams,
+                items=items,
                 order_value=order_value,
             )
         except ShippingUnavailableError as exc:
@@ -4808,6 +4813,22 @@ class OrderService:
                             _(
                                 "The selected shipping method is not "
                                 "available for the selected country."
+                            )
+                        )
+                    ]
+                },
+            ) from exc
+        except ShippingParcelTooLargeError as exc:
+            raise InvalidOrderDataError(
+                str(
+                    _("The cart is too large for the selected shipping method.")
+                ),
+                field_errors={
+                    "shipping_provider_code": [
+                        str(
+                            _(
+                                "The cart is too large for the selected "
+                                "shipping method."
                             )
                         )
                     ]

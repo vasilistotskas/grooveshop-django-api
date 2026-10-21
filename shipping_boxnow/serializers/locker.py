@@ -76,7 +76,8 @@ class BoxNowNearestLockerRequestSerializer(serializers.Serializer):
     Request body for ``POST /lockers/nearest``.
 
     Maps to the BoxNow ``/api/v2/delivery-requests:checkAddressDelivery``
-    endpoint parameters.
+    endpoint parameters. The compartment size is not an input: the server
+    derives it from the caller's cart (``X-Cart-Id``).
     """
 
     city = serializers.CharField(
@@ -96,13 +97,6 @@ class BoxNowNearestLockerRequestSerializer(serializers.Serializer):
         default="el-GR",
         required=False,
         help_text=_("IETF language tag / region code (default: el-GR)"),
-    )
-    compartment_size = serializers.IntegerField(
-        min_value=1,
-        max_value=3,
-        default=1,
-        required=False,
-        help_text=_("Required compartment size: 1=Small, 2=Medium, 3=Large"),
     )
 
 

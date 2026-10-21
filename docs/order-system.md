@@ -1019,10 +1019,67 @@ accepting Cyprus orders at the Greek flat rate.
   the order paid through `_mark_cod_order_paid_if_pending` (silent, a
   no-op if already paid). `_unremitted_cod_rows` then skips the parcel. No
   `AcsCodPayout` is ever created for it.
-- HTTP 403/406 (`AcsAuthError`) is **retryable**: prod ACS returns
-  sporadic transient 406s (~2% of tracking polls, self-healing —
-  verified 2026-07-11); only a persistent rejection means a bad
-  key/IP.
+- HTTP 403/406 (`AcsAuthError`) is **retryable**; only a persistent
+  rejection means a bad key/IP. ACS answers 406 to overlapping calls
+  from one account. 2026-10-20 prod saw 22% of tracking calls rejected
+  (2% in July), every one inside the `poll_acs_tracking_batch` fan-out:
+  each poll makes two calls of 0.6 to 4 s, so six to eight were in
+  flight across the worker pods (celery-worker went from 2 to 3
+  replicas around 10-19; rejections went from 7-31 a day to 106, then
+  224). Staggering task *start* times does not bound that, so
+  `AcsClient._call` (every alias) takes one of
+  `ACS_MAX_CONCURRENT_REQUESTS` slots per ACS `Company_ID` and store
+  (`shipping_acs/concurrency.py`).
+  - **Why 2.** ACS publishes no concurrency or rate figure; the number
+    is ours. Measured 2026-10-21 over 10 days of production logs
+    (10-11 to 10-20, VictoriaLogs): for every tracking task, how many
+    ACS tasks were in flight when it started, against whether ACS
+    rejected it.
+
+    | In flight | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9+ |
+    |---|---|---|---|---|---|---|---|---|---|
+    | Rejected | 0.9% | 2.0% | 3.6% | 4.0% | 6.9% | 7.9% | 11% | 17% | 19-50% |
+
+    2 halves the rate against 3 and still serves the batch (below).
+    Re-measure the same way before changing it; there is no
+    zero-rejection setting, 1 in flight still saw 0.9%.
+  - **Reserved slot.** The poll batch is paced to keep its slots busy, so
+    without a reserve a shopper's `price_calculation` or
+    `address_validation` could wait the full `ACS_SLOT_WAIT_SECONDS`
+    behind it and then fall back or 502. The last
+    `ACS_INTERACTIVE_RESERVED_SLOTS` (default 1) slots are for interactive
+    calls only: the tracking polls (`tracking_summary` /
+    `tracking_details`, `background=True` in `AcsClient._call`) may take
+    the other `ACS_MAX_CONCURRENT_REQUESTS - reserved` slots, every other
+    alias may take any slot and tries the reserve first. One pool with a
+    priority split, not a second pool. At 2 slots the polls run one at a
+    time, the measured 0.9% level, and one slot stays free for shoppers.
+    A setting that leaves the polls no slot refuses to start.
+  - **Dispatch spacing.** Mean poll task duration was about 2 s
+    (`ACS_POLL_AVERAGE_TASK_SECONDS`), so one poll slot serves one poll
+    every 2 s. `ACS_POLL_DISPATCH_SPACING_SECONDS` is derived as
+    duration / poll slots (2 s), so the 200-shipment cap finishes about
+    400 s after the tick: inside the 15-minute cutoff (a shipment polled
+    in the last 15 minutes is not a candidate) and the 13-minute batch
+    lock (which is held only while the batch enqueues the polls, so it
+    never competes with them). Polls do not queue past
+    `ACS_SLOT_WAIT_SECONDS`.
+  - **Slots.** redis-py `Lock` keys (`CustomCache.lock`, tenant-keyed),
+    non-blocking, with a per-holder token: release deletes the key only
+    while the token is still the holder's, so a lease that ran out and
+    was taken by another worker is never deleted from under it. The
+    lease is `client.worst_case_request_seconds` (every connect attempt
+    of `_RETRY_CONFIG` at `ACS_HTTP_TIMEOUT`, urllib3's backoff, then
+    one read: 78 s at the 15 s default), derived, not configured. A
+    killed worker frees its slot when the lease ends.
+  - **Full cap.** A call waits up to `ACS_SLOT_WAIT_SECONDS`, then raises
+    `AcsRetryableError` for Celery to retry. With Redis unreachable the
+    cap is skipped and logged: a rejected call was never processed, and
+    `core/caches.py` sets the policy that an unreachable Redis costs
+    speed, not requests.
+  - **Retries.** `poll_acs_tracking_one` retries at 10, 20, 40, 80, 160 s
+    with no jitter (Celery's jitter draws from zero, which re-entered the
+    congestion at once).
 - A refused or uncollected COD parcel: ACS records `attempted` (order →
   SHIPPED), texts the customer and holds the parcel about ten days, then
   reports `returned_flag=1` → shipment RETURNED → order RETURNED, and the
@@ -1116,13 +1173,57 @@ accepting Cyprus orders at the Greek flat rate.
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
   new request with `P410` (duplicate) raises the usual creation alert.
-- **Known limit: the compartment size is not derived.** `BoxNowShipment.
-  compartment_size` is what the checkout sends
-  (`boxnow_compartment_size`, the storefront defaults to 1 = Small) and a
-  customer never chooses it. A product carries a weight but no length,
-  width or height, and a BoxNow compartment is a dimensional limit, so the
-  smallest size that fits cannot be computed until products carry
-  dimensions.
+- **The compartment size is derived from the products' dimensions**
+  (`shipping_boxnow/packing.py`). `Product.length` / `width` / `height`
+  are nullable `Distance` fields (stored in metres, edited in cm, mm, m or
+  inch next to the weight in the product admin; not in the API, nothing
+  outside the server reads them). Limits are `COMPARTMENT_LIMITS_CM`
+  (`shipping_boxnow/enum/compartment_size.py`), BOX NOW's published sizes
+  (https://boxnow.gr/en/faq): Small H8, Medium H17, Large H36, all W45 x
+  L60 cm. The FAQ also lists a Mini (H8 x W24 x L60); the partner API has
+  no value for it (manual v7.2, error P406: "one of required sizes 1, 2 or 3
+  (Small, Medium or Large)", and the OpenAPI spec 1.68, both under
+  `boxnow.gr/media/hidden/`), so it is booked as Small. The
+  20 kg weight limit stays on `ShippingRate.max_weight_grams`. The rule is
+  conservative, never undersizing: each unit lies on its smallest side
+  (height = smallest dimension), its other two sides must fit W45 x L60,
+  and units are stacked (no side-by-side packing), so the parcel's height
+  is the sum of the units' heights; the answer is the smallest size whose
+  height holds the stack. Dimensions compare at millimetre precision
+  (metres are floats). `create_shipment_row` stores the result on
+  `BoxNowShipment.compartment_size`, which goes out as
+  `items[].compartmentSize`.
+  **The checkout no longer supplies a size** (the server owns it; an old
+  client still sending `boxnowCompartmentSize` is ignored, not rejected).
+  **Products without dimensions** get the store's
+  `BOXNOW_DEFAULT_COMPARTMENT_SIZE` setting (1 = Small by default, 2 and 3
+  allowed, validated). A cart with some measured and some unmeasured items
+  takes the larger of the derived size and that setting; with every item
+  measured the derived size wins. The free gifts a cart is entitled to
+  (`PromotionEngine.gift_pairs`) are added to the cart's lines everywhere the
+  parcel is weighed or sized (payment intent, order verification and creation,
+  the shipment row, the options flag, the locker search), because they become
+  physical order lines. A gift the engine leaves out (sold out) adds nothing;
+  one lost to a later stock race only makes the booked size larger.
+- **A cart that fits no compartment is refused at checkout**, next to the
+  weight cap: `ShippingService.assert_available(items=...)` asks the
+  adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by
+  default) and a `ShippingParcelTooLargeError` becomes the 400
+  `invalid_order_data` ("The cart is too large for the selected shipping
+  method.") on `shippingProviderCode`, from order creation and from the
+  create-payment-intent endpoint. `/shipping/options` finds the cart the
+  way every cart endpoint does (`X-Cart-Id`, or the signed-in user's
+  cart; `CartService`) and flags each option the cart does not fit with
+  `exceeds_parcel_size`, by the same `assert_parcel_fits` rule. The option
+  is still listed. With no cart, or an unknown one, it is always false.
+  The response varies by cart, so a shared cache in front of this route
+  must not serve it across carts.
+  `POST /shipping/boxnow/lockers/nearest` (the closest-locker lookup)
+  derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
+  (the store default when there is none) and refuses a cart that fits no
+  compartment with 400 `parcel_too_large`; the old `compartment_size` body
+  field is gone. The storefront's locker picker is BoxNow's own iframe
+  widget, which this API does not drive.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for
@@ -1274,7 +1375,7 @@ premature "shipped"); now it sends only the confirmation.
   "complete your order" mail a day later reached an order that was already
   gone; `check_pending_orders`, its template and `PENDING_ORDER_REMINDER_*`
   were removed (`Order.reminder_count` / `last_reminder_sent_at` leave the
-  model in `order` 0084 and the columns are dropped one release later).
+  model in `order` 0084 and the columns are dropped by `order` 0090).
 - A refused create answers 400 with a stable `error.type`
   (`order/enum/create_error.py: OrderCreateErrorType`); `detail` and
   `cart` are display text in the request's language, never a contract.
@@ -1356,7 +1457,7 @@ An online-payment order reserves its stock at creation, so how long it may wait 
   - Stripe PaymentIntent (the order-first `create_payment_intent` / `retry-payment` flow): a PaymentIntent has no expiry, so the sweep cancels it (`StripePaymentProvider.close_payment`, reason `abandoned`) before it releases the stock. An intent Stripe will not cancel (processing, succeeded) leaves the order open for its webhook; the sweep reports `skipped_open`. A retry closes the intent it replaces the same way before it opens the new one (`PayWayService.process_payment`): otherwise the old intent's client secret could still be confirmed after the sweep released the stock. An intent past the point of no return refuses the retry (`previous_payment_in_progress`), and a provider outage refuses it too (`previous_payment_not_closed`).
 - **The expiry actually applied is the one stored.** The provider returns `expires_at` (Stripe's own value; for Viva, the reply time plus the timeout, never earlier than Viva's clock) and the caller stores it in `Order.payment_hold_expires_at`, so the two always end together even where the provider moved it. A new link or session replaces it. Until a payment is opened the hold runs from `created_at`.
 - **The total is bounded.** `ORDER_ONLINE_PAYMENT_MAX_HOLD_MINUTES` (default 60, at least the hold) caps the hold from the order's creation: a new link asks for `min(now + hold, created_at + max)` (Viva is told the remaining seconds), so retries cannot chain the stock lock. When no link fits any more the endpoint answers 400 `payment_window_expired` before the provider is called: for every start (`create_payment_intent`, `create_checkout_session`, `retry-payment`, `confirm_agent_payment`) once the limit has passed, and for a hosted session also when less than the provider's `min_hosted_session` is left (Stripe: 31 minutes, because a shorter session cannot be opened and a longer one would outlive the limit). A retry inside the window works as before. The shopper places a new order from their cart: the cart is kept while an order awaits its payment and a cancel leaves it alone. Orders stamped by migration `0083` carry `created_at + 24h`, so a retry on one older than the maximum is refused too.
-- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5) is added to the stored instant, and the 15 minute beat adds its own slack, so a confirmation already on its way reaches an open order. Only unpaid (`PENDING` / `PENDING`) orders of an `ONLINE` pay way are swept; COD and carrier-collected orders are not (§4.4).
+- **The sweep.** `ORDER_ONLINE_PAYMENT_GRACE_MINUTES` (default 5) is added to the stored instant, and the 15 minute beat adds its own slack, so a confirmation already on its way reaches an open order. Only unpaid (`PENDING` / `PENDING`) orders of an `ONLINE` pay way are swept; COD and carrier-collected orders are not (§4.4). A `PENDING` order whose payment FAILED is swept too, `ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES` (default 30) after the failure: a failed attempt does not end the payment, the shopper may confirm the same PaymentIntent with another card or retry the same Viva payment order. Both buckets ask the provider to close the payment first (`close_payment(order)`): Stripe cancels the PaymentIntent and the order is canceled at once, whatever its hold says. A provider with nothing to cancel (Viva, whose payment order stays payable after a failed transaction until its own expiry; a hosted Stripe Checkout Session, which records no `payment_id` and ends at its `expires_at`) is closed once the stored hold (`payment_hold_expires_at`, plus the grace window) has ended and not before. A provider that cannot be built (its credentials were removed) cannot close anything and takes the same wait. A payment that is not closed (that wait, or a Stripe intent that succeeded or is processing) leaves the order open for its webhook and counts `skipped_open`.
 - **A payment that still arrives after the cancel** is not lost: Viva `_handle_payment_created` and Stripe `handle_payment_succeeded` / `checkout.session.completed` route it to `OrderService.record_payment_after_cancel` (§2.2): the money is booked, the order stays CANCELED, ops is alerted and the order appears in "Canceled orders to refund". Stripe re-delivers a failed webhook for up to three days, and a late success is handled the same way.
 - **Alert.** After each sweep, when `ORDER_UNPAID_ONLINE_ALERT_THRESHOLD` (default 25, `0` = off) or more online orders are still unpaid, the task logs `orders:unpaid_online_spike` at WARNING with `unpaid_online_orders` and `threshold`. The `GrooveShopUnpaidOnlineOrdersSpike` rule in `grooveshop-infrastructure` (`logs-alerting/vmrule-grooveshop-logs.yaml`) matches that message.
 - **Replaces `ORDER_AUTO_CANCEL_PENDING_HOURS`** (the fixed 24 hours). Migration `0083` stamps the orders already waiting with `created_at + 24h` so none is released earlier than it was promised, and deletes the old setting row.

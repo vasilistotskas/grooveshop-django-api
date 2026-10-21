@@ -124,9 +124,6 @@ def post_create_historical_record_callback(
             stock_before=old_stock,
             stock_after=new_stock,
             reason_code=StockLogReason.MANUAL_ADJUSTMENT,
-            # The text the release before reason codes reads; kept until a
-            # release that no longer reads it is the only one serving.
-            reason="Manual stock adjustment via admin panel",
             performed_by_staff_id=performed_by_staff_id,
             order=None,
         )

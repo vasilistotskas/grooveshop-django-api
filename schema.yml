@@ -27348,6 +27348,18 @@ paths:
                 items:
                   $ref: '#/components/schemas/ShippingOption'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/shipping/providers:
     get:
       operationId: api_v1_shipping_providers_list

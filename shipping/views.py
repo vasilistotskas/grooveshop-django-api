@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from cart.services import cart_item_pairs
 from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
 from shipping.models import ShippingProvider
 from shipping.serializers import (
     FreeShippingInfoQuerySerializer,
@@ -82,7 +83,14 @@ class ShippingOptionsView(APIView):
             ),
             *CART_TOKEN_HEADERS,
         ],
-        responses=ShippingOptionSerializer(many=True),
+        responses={
+            200: ShippingOptionSerializer(many=True),
+            # A missing or malformed query parameter, and an
+            # ``X-Cart-Token`` that is unknown, expired or revoked (never
+            # answered with another cart).
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
         tags=["Shipping"],
     )
     def get(self, request: Request) -> Response:

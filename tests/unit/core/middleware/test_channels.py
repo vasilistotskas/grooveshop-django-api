@@ -58,8 +58,14 @@ def _patch_prefixed_key(key="ws:ticket:abc"):
     )
 
 
-class TestAuthenticateTicketWithoutUser(SimpleTestCase):
-    """Paths that return before the user lookup, so touch no database."""
+class TestAuthenticateTicketWithoutUser(TransactionTestCase):
+    """Paths that return before the user lookup, so run no query.
+
+    ``database_sync_to_async`` still calls ``close_old_connections()``
+    on the thread it runs in, which closes a connection held inside a
+    test transaction: the same reason as ``TestAuthenticateTicket``
+    below, though nothing is written here.
+    """
 
     async def test_empty_string_returns_anonymous(self):
         result = await authenticate_ticket("")

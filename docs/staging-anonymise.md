@@ -22,6 +22,20 @@ The command refuses to run unless `SYSTEM_ENV` is `staging`, and
 `devtools.anonymise.engine.anonymise_database` refuses again, so no caller can
 skip the check. Production's value is `production`.
 
+## No nightly dump on staging
+
+Staging is a refreshable clone, so its own `pg_dump` has nothing to protect.
+`DATABASE_BACKUPS_ENABLED=False` (default `True`, which is production's
+behaviour) removes both `scheduled-database-backup` and `cleanup-old-backups`
+from `CELERY_BEAT_SCHEDULE`. `DatabaseScheduler` never deletes a row whose
+entry left the schedule, and the restored production database carries those
+rows, so `core/beat.py` deletes them every time beat starts
+(`beat_init` in `core/celery.py`, named by `CELERY_BEAT_UNSCHEDULED_ENTRIES`).
+A refresh that swaps in a database while beat keeps running leaves the rows
+until the next beat restart. Nothing else reads the dump directory: the health
+monitor checks the database, Redis and Celery, never the existence or age of a
+backup, so no alert depends on it.
+
 ## What it does
 
 The whole run is one transaction over the public schema and every tenant

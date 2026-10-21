@@ -199,6 +199,13 @@ Tasks are split by domain:
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 - `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
+**Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps
+`scheduled-database-backup` and `cleanup-old-backups` in the beat schedule;
+staging sets it `False`. `DatabaseScheduler` never deletes a row whose entry
+left `CELERY_BEAT_SCHEDULE`, so `core/beat.py` deletes the rows named by
+`CELERY_BEAT_UNSCHEDULED_ENTRIES` on every beat start. See
+`docs/staging-anonymise.md`.
+
 **Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
 successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`
 keeps failures and retries, which land in `django_celery_results` in the

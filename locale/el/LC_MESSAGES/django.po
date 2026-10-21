@@ -350,6 +350,7 @@ msgid_plural "%(num)d years"
 msgstr[0] "%(num)d έτος"
 msgstr[1] "%(num)d έτη"
 
+#, python-format
 msgid "%(outcome)s (chargeback %(chargeback)s)"
 msgstr "%(outcome)s (chargeback %(chargeback)s)"
 
@@ -645,9 +646,6 @@ msgstr "Ένας έγκυρος ταχυδρομικός κώδικας που �
 msgid "A valid ΑΦΜ is required when requesting an invoice (document_type=INVOICE)."
 msgstr "Απαιτείται έγκυρο ΑΦΜ κατά το αίτημα έκδοσης τιμολογίου (document_type=INVOICE)."
 
-msgid "A validation error occurred while restocking the item. Please check your input and try again."
-msgstr "Παρουσιάστηκε σφάλμα επικύρωσης κατά την επαναφορά του προϊόντος στο απόθεμα. Ελέγξτε τα στοιχεία σας και δοκιμάστε ξανά."
-
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "Πεδίο ``aa`` ΑΑΔΕ — αυστηρά αύξων ακέραιος εντός ``(series, year)``. Πρέπει να είναι χωρίς κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
 
@@ -759,9 +757,6 @@ msgstr "Η ACS δεν εξέδωσε τη λίστα παραλαβής: %(err)s
 
 msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
 msgstr "Κωδικός σταθμού αφετηρίας ACS (έως 8 χαρακτήρες), για τον υπολογισμό μεταφορικών. Προαιρετικό: όταν είναι κενός, προκύπτει από τον κωδικό χρέωσης. Χωρίς εναλλακτική τιμή πλατφόρμας."
-
-msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
-msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
 msgid "ACS parcel out for delivery"
 msgstr "Δέμα ACS προς παράδοση"
@@ -928,12 +923,10 @@ msgstr "Ενεργή"
 msgid "Active (Has ISO Code)"
 msgstr "Ενεργό (Έχει κωδικό ISO)"
 
-msgid "Active (Last 24h)"
-msgstr "Ενεργό (τελευταίες 24h)"
-
 msgid "Active (Pending / In transit)"
 msgstr "Ενεργά (Εκκρεμή / Σε μεταφορά)"
 
+#, python-format
 msgid "Active (last %(hours)s h)"
 msgstr "Ενεργά (τελευταίες %(hours)s ώρες)"
 
@@ -1050,20 +1043,11 @@ msgstr "Διαχειριστής"
 msgid "Admin display name for this layout."
 msgstr "Όνομα εμφάνισης αυτής της διάταξης στη διαχείριση."
 
-msgid "Admin user who created this adjustment"
-msgstr "Χρήστης διαχειριστής που δημιούργησε αυτή την προσαρμογή"
-
 msgid "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που δημιούργησε αυτή την προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
-msgid "Admin who made a manual adjustment"
-msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή"
-
 msgid "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
-
-msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
-msgstr "Διαχειριστής που ενεργοποίησε τη χειροκίνητη έκδοση. Null όταν η λίστα εκδόθηκε από την καθημερινή εργασία Celery beat. Αποθηκεύει ID χρήστη του schema της ΠΛΑΤΦΟΡΜΑΣ· δεν επιβάλλεται ως FK (δείτε το db_constraint παραπάνω)."
 
 msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που ενεργοποίησε την χειροκίνητη έκδοση· κενό όταν τη λίστα εξέδωσε η ημερήσια προγραμματισμένη εργασία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
@@ -1758,9 +1742,6 @@ msgstr "Αναγνωριστικό Αποθήκης BoxNow"
 msgid "BoxNow Webhook Secret"
 msgstr "Webhook Secret BoxNow"
 
-msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
-msgstr "Μέγεθος θυρίδας BoxNow: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"
-
 msgid "BoxNow delivery-request ID returned from POST /api/v1/delivery-requests"
 msgstr "ID αιτήματος παράδοσης BoxNow που επιστρέφεται από το POST /api/v1/delivery-requests"
 
@@ -2354,9 +2335,11 @@ msgstr "Αμφισβήτηση χρέωσης (chargeback) %(amount)s"
 msgid "Chargeback %(amount)s (disputed %(requested)s, %(returned)s already returned)"
 msgstr "Chargeback %(amount)s (αμφισβητήθηκαν %(requested)s, %(returned)s έχουν ήδη επιστραφεί)"
 
+#, python-format
 msgid "Chargeback %(amount)s: goods returned, the sale is reversed (decided by %(who)s)."
 msgstr "Chargeback %(amount)s: τα προϊόντα επέστρεψαν, η πώληση αντιστρέφεται (απόφαση: %(who)s)."
 
+#, python-format
 msgid "Chargeback %(amount)s: the customer kept the goods, the sale stands (decided by %(who)s)."
 msgstr "Chargeback %(amount)s: ο πελάτης κράτησε τα προϊόντα, η πώληση ισχύει (απόφαση: %(who)s)."
 
@@ -2633,9 +2616,6 @@ msgstr "Πλήρες"
 
 msgid "Complete Profile"
 msgstr "Συμπλήρωση προφίλ"
-
-msgid "Complete Your Order"
-msgstr "Ολοκληρώστε την Παραγγελία σας"
 
 msgid "Complete payment with an agent-granted Stripe token"
 msgstr "Ολοκλήρωση πληρωμής με token Stripe που παραχωρήθηκε από AI πράκτορα"
@@ -5830,9 +5810,6 @@ msgstr "Προφίλ Github"
 msgid "Give the bank's transaction reference for the transfer."
 msgstr "Δώστε τον αριθμό συναλλαγής της τράπεζας για τη μεταφορά."
 
-msgid "Go to Your Account"
-msgstr "Μετάβαση στον Λογαριασμό σας"
-
 msgid "Goes well with"
 msgstr "Ταιριάζει με"
 
@@ -6155,9 +6132,6 @@ msgstr "Μήνυμα σε αναγνώσιμη μορφή που συνόδευ�
 msgid "Human-readable name for the topic"
 msgstr "Όνομα σε αναγνώσιμη μορφή για το θέμα"
 
-msgid "Human-readable reason for the stock change"
-msgstr "Αιτιολογία σε αναγνώσιμη μορφή για τη μεταβολή αποθέματος"
-
 msgid "Human-readable reason for the stock change, when it has no reason code"
 msgstr "Αιτία της αλλαγής αποθέματος σε κείμενο, όταν δεν υπάρχει κωδικός αιτίας"
 
@@ -6299,9 +6273,6 @@ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρα�
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
-
-msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
-msgstr "Αν αντιμετωπίζετε προβλήματα με την πληρωμή σας ή έχετε ερωτήσεις σχετικά με την παραγγελία σας, μη διστάσετε να επικοινωνήσετε με την ομάδα εξυπηρέτησης πελατών μας."
 
 msgid "Image"
 msgstr "Εικόνα"
@@ -6756,9 +6727,6 @@ msgstr "Τελευταία ανάκτηση στις"
 
 msgid "Last Re-engagement Email At"
 msgstr "Τελευταίο re-engagement email"
-
-msgid "Last Reminder Sent At"
-msgstr "Τελευταία Υπενθύμιση Απεστάλη Στις"
 
 msgid "Last Synced At"
 msgstr "Τελευταίος συγχρονισμός"
@@ -8009,9 +7977,6 @@ msgstr "Πλήθος συμβάντων που επιβεβαίωσε η Meta. �
 msgid "Number of loyalty points to redeem for discount on this order"
 msgstr "Αριθμός πόντων πιστότητας προς εξαργύρωση για έκπτωση σε αυτή την παραγγελία"
 
-msgid "Number of pending-order reminder emails sent."
-msgstr "Αριθμός emails υπενθύμισης εκκρεμούς παραγγελίας που εστάλησαν."
-
 msgid "Number of re-engagement emails sent to this user."
 msgstr "Αριθμός emails επανενεργοποίησης που εστάλησαν σε αυτόν τον χρήστη."
 
@@ -8082,9 +8047,6 @@ msgstr "Προεπισκόπηση προσφορών"
 
 msgid "Office"
 msgstr "Γραφείο"
-
-msgid "Old (7+ days)"
-msgstr "Παλιό (7+ ημέρες)"
 
 msgid "On Sale (>0%)"
 msgstr "Σε προσφορά (>0%)"
@@ -8171,14 +8133,8 @@ msgstr "Ταυτότητα του χειριστή που καταγράφετα
 msgid "Operator who reconciled the payout. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Χειριστής που συμφώνησε την απόδοση. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
-msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
-msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
-
 msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Χειριστής που κατέγραψε τον διακανονισμό. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
-
-msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
-msgstr "Ο χειριστής που κατέγραψε την εκκαθάριση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
 
 msgid "Option Selector"
 msgstr "Επιλογέας επιλογών"
@@ -8246,9 +8202,11 @@ msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακ
 msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
 msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη — ένα νέο δέμα θα έστελνε παραγγελία που κανείς δεν θέλει."
 
+#, python-format
 msgid "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
 msgstr "Η παραγγελία #%(order_id)s έχει ήδη απόδειξη, επομένως η απόφαση ότι τα προϊόντα επέστρεψαν δεν μπορεί πλέον να αλλάξει."
 
+#, python-format
 msgid "Order #%(order_id)s has no chargeback to decide."
 msgstr "Η παραγγελία #%(order_id)s δεν έχει chargeback για απόφαση."
 
@@ -8382,9 +8340,11 @@ msgstr[1] "Παραγγελία %(order_id)s: %(count)s τεμάχια επαν�
 msgid "Order %(order_id)s: %(refunded)s of %(requested)s refunded; the rest was declined: %(reason)s"
 msgstr "Παραγγελία %(order_id)s: επιστράφηκαν %(refunded)s από %(requested)s· το υπόλοιπο απορρίφθηκε: %(reason)s"
 
+#, python-format
 msgid "Order %(order_id)s: nothing to change."
 msgstr "Παραγγελία %(order_id)s: δεν υπάρχει κάτι προς αλλαγή."
 
+#, python-format
 msgid "Order %(order_id)s: the chargeback is settled."
 msgstr "Παραγγελία %(order_id)s: το chargeback διευθετήθηκε."
 
@@ -8446,9 +8406,6 @@ msgstr "Λάβαμε την Παραγγελία σας! — #{order_id}"
 
 msgid "Order Related"
 msgstr "Σχετικά με παραγγελίες"
-
-msgid "Order Reminder"
-msgstr "Υπενθύμιση Παραγγελίας"
 
 msgid "Order Shipped"
 msgstr "Η Παραγγελία Απεστάλη"
@@ -9126,9 +9083,6 @@ msgstr "Ο κωδικός κλήσης πρέπει να είναι μεταξύ
 
 msgid "Phone number for BoxNow shipment notifications, sent as the sender's contact number. Optional: left out of the request when empty. No platform fallback."
 msgstr "Τηλέφωνο για τις ειδοποιήσεις αποστολής BoxNow, που στέλνεται ως τηλέφωνο επικοινωνίας του αποστολέα. Προαιρετικό: παραλείπεται από το αίτημα όταν είναι κενό. Χωρίς εναλλακτική τιμή πλατφόρμας."
-
-msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
-msgstr "Αριθμός τηλεφώνου για ειδοποιήσεις αποστολών BoxNow. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το BoxNow."
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Η μορφή επικύρωσης τηλεφώνου για αυτή τη χώρα, όπως προκύπτει από τη βιβλιοθήκη ``phonenumbers`` που χρησιμοποιεί το Django — δεν αποθηκεύεται ποτέ. Null μόνο για δεσμευμένο κωδικό alpha-2 για τον οποίο η ``phonenumbers`` δεν έχει δεδομένα."
@@ -10004,9 +9958,6 @@ msgstr "Παραλήφθηκε στις"
 msgid "Received at"
 msgstr "Παραλήφθηκε στις"
 
-msgid "Recent"
-msgstr "Πρόσφατη"
-
 msgid "Recent (Last 7 days)"
 msgstr "Πρόσφατα (Τελευταίες 7 ημέρες)"
 
@@ -10210,6 +10161,7 @@ msgstr "Αντιστροφή επιστροφής"
 msgid "Refund this order's payment first."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας."
 
+#, python-format
 msgid "Refund this order's payment first: %(amount)s can still be refunded."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας: μπορούν ακόμη να επιστραφούν %(amount)s."
 
@@ -10338,16 +10290,6 @@ msgstr "Υπόλοιπο"
 
 msgid "Remaining payment on this order"
 msgstr "Υπόλοιπο πληρωμής της παραγγελίας"
-
-msgid "Reminder Count"
-msgstr "Πλήθος υπενθυμίσεων"
-
-msgid "Reminder for pending orders after 24 hours"
-msgstr "Υπενθύμιση για παραγγελίες σε εκκρεμότητα μετά από 24 ώρες"
-
-#, python-brace-format
-msgid "Reminder: Complete Your Order #{order_id}"
-msgstr "Υπενθύμιση: ολοκληρώστε την παραγγελία σας #{order_id}"
 
 #, python-format
 msgid "Remove %(locale)s: the default locale's line is Store Description."
@@ -12672,9 +12614,6 @@ msgstr "Ημερομηνία και ώρα της πρώτης προσπάθε�
 msgid "Timestamp of the most recent re-engagement email."
 msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email επανενεργοποίησης."
 
-msgid "Timestamp of the most recent reminder email."
-msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email υπενθύμισης."
-
 msgid "Timestamp of the most recent sync from BoxNow API"
 msgstr "Ημερομηνία και ώρα του πιο πρόσφατου συγχρονισμού από το API του BoxNow"
 
@@ -12718,9 +12657,6 @@ msgstr "Προς έκδοση στο timologio"
 #, python-format
 msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
 msgstr "Για να επανέλθει το κατάστημά σας, κανονίστε την ανανέωση απαντώντας σε αυτό το email ή επικοινωνώντας μαζί μας στο %(email)s. Μόλις καταχωρηθεί, το κατάστημά σας επανενεργοποιείται αυτόματα."
-
-msgid "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
-msgstr "Για να ολοκληρώσετε την αγορά σας, παρακαλούμε ολοκληρώστε την πληρωμή σας. Αν έχετε ήδη ολοκληρώσει την πληρωμή, παρακαλούμε αγνοήστε αυτό το μήνυμα καθώς μπορεί να χρειαστεί λίγος χρόνος για την ενημέρωση του συστήματός μας."
 
 msgid "To issue in timologio"
 msgstr "Για έκδοση στο timologio"
@@ -12774,9 +12710,6 @@ msgstr "Σύνολο"
 
 msgid "Total (incl. VAT)"
 msgstr "Σύνολο (με ΦΠΑ)"
-
-msgid "Total Amount"
-msgstr "Συνολικό Ποσό"
 
 msgid "Total Items"
 msgstr "Συνολικά αντικείμενα"
@@ -13277,9 +13210,6 @@ msgstr "Χρήστης που έκανε την αλλαγή, αν ισχύει.
 msgid "User who made the reservation (null for guest users)"
 msgstr "Χρήστης που έκανε τη δέσμευση (null για επισκέπτες)"
 
-msgid "User who performed the operation (null for system operations)"
-msgstr "Χρήστης που εκτέλεσε τη λειτουργία (null για λειτουργίες συστήματος)"
-
 msgid "Username"
 msgstr "Όνομα χρήστη"
 
@@ -13378,9 +13308,6 @@ msgstr "Ισχύει έως"
 
 msgid "Validation"
 msgstr "Επαλήθευση"
-
-msgid "Validation error"
-msgstr "Σφάλμα επαλήθευσης"
 
 msgid "Value"
 msgstr "Τιμή"
@@ -13639,10 +13566,6 @@ msgstr "Ελπίζουμε να είστε ικανοποιημένοι με τ�
 
 msgid "We miss you!"
 msgstr "Μας λείπετε!"
-
-#, python-format
-msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
-msgstr "Παρατηρήσαμε ότι η παραγγελία σας #%(order_id)s που τοποθετήθηκε στις %(order_date)s είναι ακόμα σε κατάσταση αναμονής."
 
 msgid "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!"
 msgstr "Παρατηρήσαμε ότι δεν μας έχετε επισκεφθεί εδώ και καιρό, και θέλαμε να επικοινωνήσουμε γιατί μας λείπετε!"
@@ -13978,12 +13901,14 @@ msgstr "Ναι: τα προϊόντα επέστρεψαν ή δεν παραδ�
 msgid "You already have an active alert of this kind for this product."
 msgstr "Έχετε ήδη ενεργή ειδοποίηση αυτού του τύπου για αυτό το προϊόν."
 
+#, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "Έχετε ήδη {count} παραγγελίες που περιμένουν πληρωμή. Πληρώστε ή ακυρώστε μία πριν κάνετε άλλη."
 
 msgid "You are already subscribed to this topic."
 msgstr "Είστε ήδη εγγεγραμμένος/η σε αυτό το θέμα."
 
+#, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
 msgstr "Έχετε ταυτοποιηθεί ως %(username)s, αλλά δεν έχετε εξουσιοδότηση για πρόσβαση σε αυτή τη σελίδα. Θέλετε να συνδεθείτε με διαφορετικό λογαριασμό;"
 
@@ -14012,9 +13937,6 @@ msgstr "Μπορείτε να παρακολουθήσετε το δέμα σα�
 
 msgid "You can update your details from your account page and submit the application again — it will be reviewed anew."
 msgstr "Μπορείτε να ενημερώσετε τα στοιχεία σας από τη σελίδα του λογαριασμού σας και να υποβάλετε ξανά την αίτηση — θα εξεταστεί εκ νέου."
-
-msgid "You can view your order status by logging into your account on our website."
-msgstr "Μπορείτε να δείτε την κατάσταση της παραγγελίας σας συνδέοντας στον λογαριασμό σας στην ιστοσελίδα μας."
 
 msgid "You do not have permission to access this cart item."
 msgstr "Δεν έχετε δικαίωμα πρόσβασης σε αυτό το είδος καλαθιού."
@@ -14664,14 +14586,23 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "A user with this email already exists."
 #~ msgstr "Υπάρχει ήδη χρήστης με αυτό το email."
 
+#~ msgid "A validation error occurred while restocking the item. Please check your input and try again."
+#~ msgstr "Παρουσιάστηκε σφάλμα επικύρωσης κατά την επαναφορά του προϊόντος στο απόθεμα. Ελέγξτε τα στοιχεία σας και δοκιμάστε ξανά."
+
 #~ msgid "ACS order without an AcsShipment row — likely a race during order creation or an upgrade-time data gap. Inspect order.history for clues."
 #~ msgstr "Παραγγελία ACS χωρίς εγγραφή AcsShipment — πιθανόν race condition κατά τη δημιουργία της παραγγελίας ή κενό δεδομένων κατά την αναβάθμιση. Ελέγξτε το order.history για ενδείξεις."
+
+#~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
+#~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
 #~ msgid "Account Credentials"
 #~ msgstr "Διαπιστευτήρια λογαριασμού"
 
 #~ msgid "Activate selected subscriptions"
 #~ msgstr "Ενεργοποίηση επιλεγμένων συνδρομών"
+
+#~ msgid "Active (Last 24h)"
+#~ msgstr "Ενεργό (τελευταίες 24h)"
 
 #~ msgid "Active Carts"
 #~ msgstr "Ενεργά Καλάθια"
@@ -14691,6 +14622,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "Admin adjustment of %(points)d points applied to %(user)s. This action is logged and cannot be undone."
 #~ msgstr "Εφαρμόστηκε προσαρμογή διαχειριστή %(points)d πόντων στον/στην %(user)s. Αυτή η ενέργεια καταγράφεται και δεν μπορεί να αναιρεθεί."
+
+#~ msgid "Admin user who created this adjustment"
+#~ msgstr "Χρήστης διαχειριστής που δημιούργησε αυτή την προσαρμογή"
+
+#~ msgid "Admin who made a manual adjustment"
+#~ msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή"
+
+#~ msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
+#~ msgstr "Διαχειριστής που ενεργοποίησε τη χειροκίνητη έκδοση. Null όταν η λίστα εκδόθηκε από την καθημερινή εργασία Celery beat. Αποθηκεύει ID χρήστη του schema της ΠΛΑΤΦΟΡΜΑΣ· δεν επιβάλλεται ως FK (δείτε το db_constraint παραπάνω)."
 
 #~ msgid "Advanced Configuration"
 #~ msgstr "Προηγμένη Διαμόρφωση"
@@ -14735,6 +14675,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Bio & Description"
 #~ msgstr "Βιογραφικό & Περιγραφή"
 
+#~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
+#~ msgstr "Μέγεθος θυρίδας BoxNow: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"
+
 #, python-format
 #~ msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated."
 #~ msgstr "Ο συγχρονισμός locker BoxNow ολοκληρώθηκε: %(created)d δημιουργήθηκαν, %(updated)d ενημερώθηκαν, %(deactivated)d απενεργοποιήθηκαν."
@@ -14760,6 +14703,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Collapse/Expand"
 #~ msgstr "Σύμπτυξη/Επέκταση"
+
+#~ msgid "Complete Your Order"
+#~ msgstr "Ολοκληρώστε την Παραγγελία σας"
 
 #~ msgid "Completed Orders"
 #~ msgstr "Ολοκληρωμένες παραγγελίες"
@@ -14912,6 +14858,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Get user's subscriptions"
 #~ msgstr "Λήψη συνδρομών χρήστη"
 
+#~ msgid "Go to Your Account"
+#~ msgstr "Μετάβαση στον Λογαριασμό σας"
+
 #~ msgid "Group by Continent"
 #~ msgstr "Ομαδοποίηση ανά ήπειρο"
 
@@ -14925,6 +14874,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "High VAT (25% - 50%)"
 #~ msgstr "Υψηλός ΦΠΑ (25% - 50%)"
 
+#~ msgid "Human-readable reason for the stock change"
+#~ msgstr "Αιτιολογία σε αναγνώσιμη μορφή για τη μεταβολή αποθέματος"
+
 #~ msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR')."
 #~ msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 (π.χ. 'GR')."
 
@@ -14933,6 +14885,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "If you have any questions about your order, please contact our customer service."
 #~ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
+
+#~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
+#~ msgstr "Αν αντιμετωπίζετε προβλήματα με την πληρωμή σας ή έχετε ερωτήσεις σχετικά με την παραγγελία σας, μη διστάσετε να επικοινωνήσετε με την ομάδα εξυπηρέτησης πελατών μας."
 
 #~ msgid "In Fulfillment (Shipped/Delivered)"
 #~ msgstr "Σε Διεκπεραίωση (Απεσταλμένες/Παραδομένες)"
@@ -14961,6 +14916,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Language code filter (e.g., en, el, de)"
 #~ msgstr "Φίλτρο κωδικού γλώσσας (π.χ. en, el, de)"
+
+#~ msgid "Last Reminder Sent At"
+#~ msgstr "Τελευταία Υπενθύμιση Απεστάλη Στις"
 
 #~ msgid "Last activity"
 #~ msgstr "Τελευταία δραστηριότητα"
@@ -15064,6 +15022,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Null when the provider defers to the global flat rate."
 #~ msgstr "Null όταν ο πάροχος παραπέμπει στη γενική πάγια χρέωση."
 
+#~ msgid "Number of pending-order reminder emails sent."
+#~ msgstr "Αριθμός emails υπενθύμισης εκκρεμούς παραγγελίας που εστάλησαν."
+
 #~ msgid "OK"
 #~ msgstr "OK"
 
@@ -15082,6 +15043,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Offline (Simple)"
 #~ msgstr "Εκτός σύνδεσης (απλή)"
 
+#~ msgid "Old (7+ days)"
+#~ msgstr "Παλιό (7+ ημέρες)"
+
 #~ msgid "Online"
 #~ msgstr "Online"
 
@@ -15090,6 +15054,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Only superusers may adjust loyalty points directly."
 #~ msgstr "Μόνο οι υπερχρήστες μπορούν να προσαρμόσουν απευθείας τους πόντους επιβράβευσης."
+
+#~ msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
+#~ msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
+
+#~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
+#~ msgstr "Ο χειριστής που κατέγραψε την εκκαθάριση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
 
 #~ msgid "Optional ISO 3166-1 alpha-2 country code — drives the country-level shipping multiplier. Match what the order-create body will carry."
 #~ msgstr "Προαιρετικός κωδικός χώρας ISO 3166-1 alpha-2 — καθορίζει τον συντελεστή αποστολής σε επίπεδο χώρας. Πρέπει να ταιριάζει με αυτόν που θα φέρει το αίτημα δημιουργίας παραγγελίας."
@@ -15104,6 +15074,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Order Analytics"
 #~ msgstr "Αναλυτικά παραγγελιών"
+
+#~ msgid "Order Reminder"
+#~ msgstr "Υπενθύμιση Παραγγελίας"
 
 #~ msgid "Order Summary"
 #~ msgstr "Σύνοψη Παραγγελίας"
@@ -15159,6 +15132,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Personal Information"
 #~ msgstr "Προσωπικά Στοιχεία"
+
+#~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
+#~ msgstr "Αριθμός τηλεφώνου για ειδοποιήσεις αποστολών BoxNow. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το BoxNow."
 
 #~ msgid "Pickup logo"
 #~ msgstr "Λογότυπο σημείου παραλαβής"
@@ -15229,6 +15205,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Real Order"
 #~ msgstr "Πραγματική παραγγελία"
 
+#~ msgid "Recent"
+#~ msgstr "Πρόσφατη"
+
 #~ msgid "Recent Activity"
 #~ msgstr "Πρόσφατη δραστηριότητα"
 
@@ -15237,6 +15216,16 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Refund an order payment"
 #~ msgstr "Επιστροφή πληρωμής παραγγελίας"
+
+#~ msgid "Reminder Count"
+#~ msgstr "Πλήθος υπενθυμίσεων"
+
+#~ msgid "Reminder for pending orders after 24 hours"
+#~ msgstr "Υπενθύμιση για παραγγελίες σε εκκρεμότητα μετά από 24 ώρες"
+
+#, python-brace-format
+#~ msgid "Reminder: Complete Your Order #{order_id}"
+#~ msgstr "Υπενθύμιση: ολοκληρώστε την παραγγελία σας #{order_id}"
 
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"
@@ -15385,11 +15374,20 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Time"
 #~ msgstr "Ώρα"
 
+#~ msgid "Timestamp of the most recent reminder email."
+#~ msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email υπενθύμισης."
+
+#~ msgid "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
+#~ msgstr "Για να ολοκληρώσετε την αγορά σας, παρακαλούμε ολοκληρώστε την πληρωμή σας. Αν έχετε ήδη ολοκληρώσει την πληρωμή, παρακαλούμε αγνοήστε αυτό το μήνυμα καθώς μπορεί να χρειαστεί λίγος χρόνος για την ενημέρωση του συστήματός μας."
+
 #~ msgid "Topic ID is required."
 #~ msgstr "Το ID θέματος είναι υποχρεωτικό."
 
 #~ msgid "Topic not found or not active."
 #~ msgstr "Δεν βρέθηκε ή είναι ανενεργό το θέμα."
+
+#~ msgid "Total Amount"
+#~ msgstr "Συνολικό Ποσό"
 
 #, python-brace-format
 #~ msgid "Tracking available for order #{order_id}"
@@ -15422,8 +15420,14 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "User not found."
 #~ msgstr "Δεν βρέθηκε χρήστης."
 
+#~ msgid "User who performed the operation (null for system operations)"
+#~ msgstr "Χρήστης που εκτέλεσε τη λειτουργία (null για λειτουργίες συστήματος)"
+
 #~ msgid "VAT Range"
 #~ msgstr "Εύρος ΦΠΑ"
+
+#~ msgid "Validation error"
+#~ msgstr "Σφάλμα επαλήθευσης"
 
 #~ msgid "Very High VAT (50%+)"
 #~ msgstr "Πολύ Υψηλός ΦΠΑ (50%+)"
@@ -15448,6 +15452,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "WEEKLY NEWSLETTER - %(site_name)s"
 #~ msgstr "ΕΒΔΟΜΑΔΙΑΙΟ NEWSLETTER - %(site_name)s"
 
+#, python-format
+#~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
+#~ msgstr "Παρατηρήσαμε ότι η παραγγελία σας #%(order_id)s που τοποθετήθηκε στις %(order_date)s είναι ακόμα σε κατάσταση αναμονής."
+
 #~ msgid "We're getting your items ready — you'll hear from us again once they're on the way."
 #~ msgstr "Ετοιμάζουμε τα προϊόντα σου — θα σε ειδοποιήσουμε ξανά μόλις ξεκινήσουν το ταξίδι τους."
 
@@ -15470,6 +15478,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Whether this payment method requires manual confirmation (e.g., bank transfer)"
 #~ msgstr "Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση (π.χ. τραπεζική κατάθεση)"
+
+#~ msgid "You can view your order status by logging into your account on our website."
+#~ msgstr "Μπορείτε να δείτε την κατάσταση της παραγγελίας σας συνδέοντας στον λογαριασμό σας στην ιστοσελίδα μας."
 
 #~ msgid "You're receiving this because you're subscribed to our newsletter."
 #~ msgstr "Λαμβάνετε αυτό το email επειδή είστε εγγεγραμμένος/η στο newsletter μας."

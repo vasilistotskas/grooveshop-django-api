@@ -111,6 +111,13 @@ def window_closed(
     return hold_limit(order) - (now or timezone.now()) <= minimum
 
 
+def hold_ended(order: Order, now: datetime | None = None) -> bool:
+    """True when *order*'s hold, plus the grace window, has ended: the
+    instant :func:`expired_unpaid_online_orders` selects on, for one order."""
+    ends = order.payment_hold_expires_at or (order.created_at + hold_window())
+    return ends < (now or timezone.now()) - grace_window()
+
+
 def unpaid_online_orders() -> QuerySet[Order]:
     """Online-payment orders still waiting for their payment.
 

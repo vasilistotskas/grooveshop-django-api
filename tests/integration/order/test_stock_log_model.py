@@ -311,3 +311,70 @@ class TestReasonCodeMigration:
         assert manual.reason == "Manual stock adjustment via admin panel"
         assert other.reason_code == ""
         assert other.reason == "Order created"
+
+
+@pytest.mark.django_db
+class TestBlankDuplicateReasonMigration:
+    MODULE = "order.migrations.0091_stocklog_blank_duplicate_reason"
+    TEXT = "Manual stock adjustment via admin panel"
+
+    def _log(self, **kwargs):
+        return StockLog.objects.create(
+            product=ProductFactory(stock=5),
+            operation_type=StockLog.OPERATION_INCREMENT,
+            quantity_delta=1,
+            stock_before=5,
+            stock_after=6,
+            **kwargs,
+        )
+
+    def test_only_a_coded_row_with_the_sentence_is_blanked(self):
+        migration = import_module(self.MODULE)
+        duplicate = self._log(
+            reason_code=StockLogReason.MANUAL_ADJUSTMENT, reason=self.TEXT
+        )
+        coded_with_own_wording = self._log(
+            reason_code=StockLogReason.MANUAL_ADJUSTMENT, reason="Recount"
+        )
+        uncoded_with_sentence = self._log(reason=self.TEXT)
+        other = self._log(reason="Order created")
+
+        migration.blank_duplicate_text(django_apps, None)
+        for row in (
+            duplicate,
+            coded_with_own_wording,
+            uncoded_with_sentence,
+            other,
+        ):
+            row.refresh_from_db()
+
+        assert duplicate.reason == ""
+        assert duplicate.reason_display == self.TEXT
+        assert coded_with_own_wording.reason == "Recount"
+        assert uncoded_with_sentence.reason == self.TEXT
+        assert other.reason == "Order created"
+
+    def test_a_second_run_changes_nothing(self):
+        migration = import_module(self.MODULE)
+        row = self._log(
+            reason_code=StockLogReason.MANUAL_ADJUSTMENT, reason=self.TEXT
+        )
+
+        migration.blank_duplicate_text(django_apps, None)
+        migration.blank_duplicate_text(django_apps, None)
+        row.refresh_from_db()
+
+        assert row.reason == ""
+        assert row.reason_code == StockLogReason.MANUAL_ADJUSTMENT
+
+    def test_reverse_writes_the_sentence_back_for_a_coded_row(self):
+        migration = import_module(self.MODULE)
+        coded = self._log(reason_code=StockLogReason.MANUAL_ADJUSTMENT)
+        other = self._log(reason="")
+
+        migration.restore_text(django_apps, None)
+        coded.refresh_from_db()
+        other.refresh_from_db()
+
+        assert coded.reason == self.TEXT
+        assert other.reason == ""

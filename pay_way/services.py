@@ -280,7 +280,7 @@ class PayWayService:
         # order's payment and the retry is refused.
         if order.payment_id:
             try:
-                previous_closed = provider.close_payment(order.payment_id)
+                previous_closed = provider.close_payment(order)
             except Exception:
                 logger.exception(
                     "Could not close the previous payment of order %s",

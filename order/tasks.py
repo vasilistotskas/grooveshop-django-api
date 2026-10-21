@@ -2046,15 +2046,22 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     Two buckets:
     - Orders with FAILED payment older than
-      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30)
+      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30). A failed
+      attempt leaves a Viva payment order payable until its expiry and a
+      Stripe PaymentIntent open for another card, so the provider is asked
+      to close the payment first, like the next bucket.
     - Orders with PENDING payment whose hold has ended: the payment link
       or session stopped being payable (``Order.payment_hold_expires_at``,
       ORDER_ONLINE_PAYMENT_HOLD_MINUTES) plus
       ORDER_ONLINE_PAYMENT_GRACE_MINUTES for a confirmation still on its
       way. The stock is released only when the payment can no longer
       succeed, so a late payment cannot book money for goods nobody
-      reserved. Before cancelling, the provider is asked to close a
-      payment that has no expiry of its own (a Stripe PaymentIntent).
+      reserved.
+
+    Before cancelling either bucket, the provider is asked to close a
+    payment that has no expiry of its own (a Stripe PaymentIntent). One the
+    provider says is past the point of no return (processing, succeeded)
+    leaves the order open: its webhook settles it.
 
     Delegates to OrderService.cancel_order which restores stock via
     StockManager.increment_stock and releases any outstanding
@@ -2071,7 +2078,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         status=OrderStatus.PENDING,
         payment_status=PaymentStatus.FAILED,
         updated_at__lt=failed_cutoff,
-    )
+    ).select_related("pay_way")
     # Only auto-cancel online-payment orders — offline methods (COD,
     # bank transfer) are expected to sit PENDING until the customer
     # pays, sometimes for days (measured ACS lag ~4 days), so cancelling
@@ -2108,22 +2115,28 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     errors = 0
 
     def _payment_closed(order):
-        # Outside the row lock: this is a provider round trip. No
-        # registered provider, or one that cannot be built (credentials
-        # removed), cannot confirm a payment either, so the order is
-        # cancelled as before.
+        # Outside the row lock: this is a provider round trip. An order
+        # with no pay way (SET_NULL when it is deleted) or a pay way with
+        # no registered provider has no online payment to close. A
+        # provider that cannot be built (credentials removed) cannot close
+        # the payment either, but the payment may still land (a Viva
+        # payment order stays payable until it expires), so it waits for
+        # the stored hold like any payment that could not be closed.
+        if order.pay_way is None:
+            return True
         provider_class = get_payment_provider_class(order.pay_way.provider_code)
         if provider_class is None:
             return True
         try:
             provider = provider_class()
         except ImproperlyConfigured:
-            return True
-        closed = provider.close_payment(order.payment_id or "")
+            closed = payment_hold.hold_ended(order)
+        else:
+            closed = provider.close_payment(order)
         if not closed:
             logger.warning(
-                "Auto-cancel skipped order %s: its payment is already "
-                "being processed by the provider",
+                "Auto-cancel skipped order %s: its payment may still land "
+                "(the provider is processing it, or its hold is running)",
                 order.id,
             )
         return closed
@@ -2150,6 +2163,12 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     for order in failed_qs.iterator():
         try:
+            # A failed attempt leaves a Stripe PaymentIntent open for
+            # another card: it is closed like a stale one, or the shopper
+            # could still pay an order whose stock was released.
+            if not _payment_closed(order):
+                skipped_open += 1
+                continue
             if _cancel_with_lock(
                 order,
                 "Auto-canceled: payment failed and not retried",

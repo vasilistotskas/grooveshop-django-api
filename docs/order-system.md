@@ -1184,8 +1184,12 @@ accepting Cyprus orders at the Greek flat rate.
   `BOXNOW_DEFAULT_COMPARTMENT_SIZE` setting (1 = Small by default, 2 and 3
   allowed, validated). A cart with some measured and some unmeasured items
   takes the larger of the derived size and that setting; with every item
-  measured the derived size wins. Gift items from a
-  promotion are not measured.
+  measured the derived size wins. The free gifts a cart is entitled to
+  (`PromotionEngine.gift_pairs`) are added to the cart's lines everywhere the
+  parcel is weighed or sized (payment intent, order verification and creation,
+  the shipment row, the options flag, the locker search), because they become
+  physical order lines. A gift the engine leaves out (sold out) adds nothing;
+  one lost to a later stock race only makes the booked size larger.
 - **A cart that fits no compartment is refused at checkout**, next to the
   weight cap: `ShippingService.assert_available(items=...)` asks the
   adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by

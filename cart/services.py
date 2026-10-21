@@ -57,6 +57,7 @@ def cart_item_pairs(
 ) -> list[tuple[Product, int]] | None:
     """``(product, quantity)`` for the cart the request addresses.
 
+    Plus the free gifts the cart is entitled to (``gift_pairs``).
     ``None`` when it addresses none (no header, an unknown cart, a guest
     without one); an empty list for a cart with no lines. The shipping
     endpoints that ask whether the cart fits a carrier's parcels read it
@@ -65,10 +66,18 @@ def cart_item_pairs(
     ``X-Cart-Token`` is accepted (the signed-in shopper's chat): it wins
     over ``X-Cart-Id`` and an invalid one is a 401, never a guest cart.
     """
-    cart = CartService(request, accepts_cart_token=True).cart
+    from promotion.services import PromotionEngine
+
+    service = CartService(request, accepts_cart_token=True)
+    cart = service.cart
     if cart is None:
         return None
-    return [(item.product, item.quantity) for item in cart.get_items()]
+    # The gifts the cart is entitled to ride in the parcel too; the
+    # preview evaluation is the one the cart read runs.
+    promo_result = PromotionEngine.evaluate(cart, user=service.owner)
+    return [
+        (item.product, item.quantity) for item in cart.get_items()
+    ] + PromotionEngine.gift_pairs(promo_result)
 
 
 class CartAttributionService:

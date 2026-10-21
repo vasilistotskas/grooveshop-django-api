@@ -1025,10 +1025,8 @@ class CartViewSet(BaseModelViewSet):
         cart_total = cart.total_price
         cart_items = [
             (item.product, item.quantity) for item in cart.items.all()
-        ]
-        cart_weight_grams = compute_total_weight_grams(
-            cart_items
-        ) + PromotionEngine.gift_weight_grams(promo_result)
+        ] + PromotionEngine.gift_pairs(promo_result)
+        cart_weight_grams = compute_total_weight_grams(cart_items)
         try:
             threshold_value = OrderService.threshold_value(
                 cart_total, promo_result.discount_total

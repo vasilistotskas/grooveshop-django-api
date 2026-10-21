@@ -972,10 +972,8 @@ class OrderService:
             _cart_total = cart.total_price
             _cart_pairs = [
                 (item.product, item.quantity) for item in cart.items.all()
-            ]
-            _cart_weight_grams = compute_total_weight_grams(
-                _cart_pairs
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            _cart_weight_grams = compute_total_weight_grams(_cart_pairs)
             _threshold_value = cls.threshold_value(_cart_total, promo_discount)
             _shipping_cost = cls.shipping_cost(
                 order_value=_threshold_value,
@@ -1194,9 +1192,10 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             cart_total = cart.total_price
-            cart_weight_grams = compute_total_weight_grams(
+            parcel_items = [
                 (ci.product, ci.quantity) for ci in cart_items
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            cart_weight_grams = compute_total_weight_grams(parcel_items)
             threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
                 order_value=threshold_value,
@@ -1207,7 +1206,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
-                items=[(ci.product, ci.quantity) for ci in cart_items],
+                items=parcel_items,
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -1239,10 +1238,6 @@ class OrderService:
                 order, attribution or AttributionInput(), cart=cart
             )
 
-            # Reuse the already-locked/materialised cart_items list rather
-            # than issuing a second SELECT on the same rows.
-            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
-
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
             # (boxnow_locker_id, acs_station_external_id, etc.) and
@@ -1250,7 +1245,7 @@ class OrderService:
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(
-                order, payload=shipping_address, items=cart_items_pairs
+                order, payload=shipping_address, items=parcel_items
             )
 
             # Initialize metadata with cart snapshot
@@ -1775,9 +1770,10 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             cart_total = cart.total_price
-            cart_weight_grams = compute_total_weight_grams(
+            parcel_items = [
                 (ci.product, ci.quantity) for ci in cart_items
-            ) + PromotionEngine.gift_weight_grams(promo_result)
+            ] + PromotionEngine.gift_pairs(promo_result)
+            cart_weight_grams = compute_total_weight_grams(parcel_items)
             threshold_value = cls.threshold_value(cart_total, promo_discount)
             shipping_cost = cls.shipping_cost(
                 order_value=threshold_value,
@@ -1788,7 +1784,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
-                items=[(ci.product, ci.quantity) for ci in cart_items],
+                items=parcel_items,
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -1827,15 +1823,11 @@ class OrderService:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
 
-            # Reuse the already-locked/materialised cart_items list rather
-            # than issuing a second SELECT on the same rows.
-            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
-
             # Provider-agnostic shipment row creation via the registry.
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(
-                order, payload=shipping_address, items=cart_items_pairs
+                order, payload=shipping_address, items=parcel_items
             )
 
             # Initialize metadata with cart snapshot

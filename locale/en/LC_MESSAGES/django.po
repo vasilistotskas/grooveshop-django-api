@@ -602,7 +602,7 @@ msgid "A seed product is required for this surface."
 msgstr "A seed product is required for this surface."
 
 msgid "A share paid back through a payment provider, or the value of what the order paid with gift cards and points."
-msgstr ""
+msgstr "A share paid back through a payment provider, or the value of what the order paid with gift cards and points."
 
 msgid "A shipping provider is required for locker / pickup-point delivery."
 msgstr "A shipping provider is required for locker / pickup-point delivery."
@@ -683,12 +683,11 @@ msgstr "ACS COD payouts"
 
 #, python-format
 msgid "ACS COD reconcile: %(total)d unattributable payout row(s)"
-msgstr ""
+msgstr "ACS COD reconcile: %(total)d unattributable payout row(s)"
 
-#, fuzzy, python-format
-#| msgid "COD parcels never remitted"
+#, python-format
 msgid "ACS COD: %(count)d delivered parcel(s) never remitted"
-msgstr "COD parcels never remitted"
+msgstr "ACS COD: %(count)d delivered parcel(s) never remitted"
 
 msgid "ACS Comments field."
 msgstr "ACS Comments field."
@@ -795,10 +794,8 @@ msgstr "ACS tracking event"
 msgid "ACS tracking events"
 msgstr "ACS tracking events"
 
-#, fuzzy
-#| msgid "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions."
 msgid "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
-msgstr "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions."
+msgstr "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
 
 msgid "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination). Distinguishes individual lockers within a station area."
 msgstr "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination). Distinguishes individual lockers within a station area."
@@ -1068,10 +1065,8 @@ msgstr "After"
 msgid "Agent API"
 msgstr "Agent API"
 
-#, fuzzy
-#| msgid "Agent Commerce Enabled"
 msgid "Agent Commerce"
-msgstr "Agent Commerce Enabled"
+msgstr "Agent Commerce"
 
 msgid "Agent Commerce Enabled"
 msgstr "Agent Commerce Enabled"
@@ -1394,7 +1389,7 @@ msgid "Awaiting a decision"
 msgstr "Awaiting a decision"
 
 msgid "B2B"
-msgstr ""
+msgstr "B2B"
 
 msgid "B2B Enabled"
 msgstr "B2B Enabled"
@@ -2576,8 +2571,6 @@ msgstr "Common reasons for failed payments:"
 msgid "Company"
 msgstr "Company"
 
-#, fuzzy
-#| msgid "Company"
 msgctxt "business profile tab"
 msgid "Company"
 msgstr "Company"
@@ -3184,10 +3177,8 @@ msgstr "Data type for this setting's value"
 msgid "Date"
 msgstr "Date"
 
-#, fuzzy
-#| msgid "Date ACS paid (or expects to pay) the partner. Forms half of the idempotency key together with voucher_no."
 msgid "Date ACS paid (or expects to pay) the partner. Forms half of the idempotency key together with voucher_no, or the row fingerprint when there is no voucher."
-msgstr "Date ACS paid (or expects to pay) the partner. Forms half of the idempotency key together with voucher_no."
+msgstr "Date ACS paid (or expects to pay) the partner. Forms half of the idempotency key together with voucher_no, or the row fingerprint when there is no voucher."
 
 msgid "Date Canceled"
 msgstr "Date Canceled"
@@ -3513,7 +3504,7 @@ msgid "Disposable / temporary email addresses are not allowed"
 msgstr "Disposable / temporary email addresses are not allowed"
 
 msgid "Dispute ID"
-msgstr ""
+msgstr "Dispute ID"
 
 msgid "Distance from the supplied address in kilometres"
 msgstr "Distance from the supplied address in kilometres"
@@ -3564,10 +3555,8 @@ msgstr "Don't want to receive these emails?"
 msgid "Don't want to receive these reminders?"
 msgstr "Don't want to receive these reminders?"
 
-#, fuzzy
-#| msgid "Format"
 msgid "Dormant"
-msgstr "Format"
+msgstr "Dormant"
 
 msgid "Download"
 msgstr "Download"
@@ -3709,15 +3698,11 @@ msgstr "Email preview"
 msgid "Email removed"
 msgstr "Email removed"
 
-#, fuzzy
-#| msgid "Email Templates"
 msgid "Email template"
-msgstr "Email Templates"
+msgstr "Email template"
 
-#, fuzzy
-#| msgid "Loyalty & Engagement"
 msgid "Emails & Engagement"
-msgstr "Loyalty & Engagement"
+msgstr "Emails & Engagement"
 
 msgid "Empty cart"
 msgstr "Empty cart"
@@ -3755,10 +3740,8 @@ msgstr "End must be after start."
 msgid "Ended"
 msgstr "Ended"
 
-#, fuzzy
-#| msgid "Ended"
 msgid "Ended At"
-msgstr "Ended"
+msgstr "Ended At"
 
 msgid "Ends At"
 msgstr "Ends At"
@@ -5354,7 +5337,7 @@ msgid "For price_drop alerts: trigger when the product's price falls to or below
 msgstr "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 
 msgid "Forgotten your password or username?"
-msgstr ""
+msgstr "Forgotten your password or username?"
 
 msgid "Format"
 msgstr "Format"
@@ -5459,7 +5442,7 @@ msgid "Generic fulfilment kind, independent of provider."
 msgstr "Generic fulfilment kind, independent of provider."
 
 msgid "Generic template for any status update"
-msgstr ""
+msgstr "Generic template for any status update"
 
 msgid "Get Discount Percent"
 msgstr "Get Discount Percent"
@@ -5726,15 +5709,11 @@ msgstr "Gift Card"
 msgid "Gift Card Amount"
 msgstr "Gift Card Amount"
 
-#, fuzzy
-#| msgid "Gift Card Purchase"
 msgid "Gift Card Pause"
-msgstr "Gift Card Purchase"
+msgstr "Gift Card Pause"
 
-#, fuzzy
-#| msgid "Gift Card Purchases"
 msgid "Gift Card Pauses"
-msgstr "Gift Card Purchases"
+msgstr "Gift Card Pauses"
 
 msgid "Gift Card Purchase"
 msgstr "Gift Card Purchase"
@@ -5807,17 +5786,15 @@ msgstr "Gift card {amount}"
 msgid "Gift cards"
 msgstr "Gift cards"
 
-#, fuzzy
-#| msgid "Gift card {amount}"
 msgid "Gift cards and points"
-msgstr "Gift card {amount}"
+msgstr "Gift cards and points"
 
 msgid "Gift cards are not available."
 msgstr "Gift cards are not available."
 
 #, python-format
 msgid "Gift cards off from %(start)s"
-msgstr ""
+msgstr "Gift cards off from %(start)s"
 
 msgid "Github Profile"
 msgstr "Github Profile"
@@ -6094,8 +6071,6 @@ msgstr "Highest threshold across active providers — the subtotal at which ever
 msgid "Home"
 msgstr "Home"
 
-#, fuzzy
-#| msgid "Home"
 msgctxt "navigation link"
 msgid "Home"
 msgstr "Home"
@@ -6119,10 +6094,10 @@ msgid "How the money changes hands. This is the authoritative discriminator for 
 msgstr "How the money changes hands. This is the authoritative discriminator for the shipping layer: a carrier declares which settlements it can physically perform, and the voucher's payment mode derives from it. Do not re-derive it from the deprecated booleans below."
 
 msgid "How the payout was accounted for (the off-system sale, the invoice, the ACS report line), as written by the operator."
-msgstr ""
+msgstr "How the payout was accounted for (the off-system sale, the invoice, the ACS report line), as written by the operator."
 
 msgid "How the payout was accounted for (the off-system sale, the invoice, the line of the ACS report). Kept on the payout."
-msgstr ""
+msgstr "How the payout was accounted for (the off-system sale, the invoice, the line of the ACS report). Kept on the payout."
 
 msgid "How to complete your payment"
 msgstr "How to complete your payment"
@@ -6148,10 +6123,8 @@ msgstr "Human-readable message that accompanied the error code."
 msgid "Human-readable name for the topic"
 msgstr "Human-readable name for the topic"
 
-#, fuzzy
-#| msgid "Human-readable reason for the stock change"
 msgid "Human-readable reason for the stock change, when it has no reason code"
-msgstr "Human-readable reason for the stock change"
+msgstr "Human-readable reason for the stock change, when it has no reason code"
 
 msgid "Hurry — popular items may sell out quickly!"
 msgstr "Hurry — popular items may sell out quickly!"
@@ -6362,10 +6335,8 @@ msgstr "Inactive Tags"
 msgid "Inactive Users"
 msgstr "Inactive Users"
 
-#, fuzzy
-#| msgid "Get user's notifications"
 msgid "Inactive user notification"
-msgstr "Get user's notifications"
+msgstr "Inactive user notification"
 
 msgid "Include related surfaces"
 msgstr "Include related surfaces"
@@ -6626,10 +6597,8 @@ msgstr "Issued by the store outside the platform"
 msgid "Issued in timologio"
 msgstr "Issued in timologio"
 
-#, fuzzy
-#| msgid "Issued by admin"
 msgid "Issued via admin"
-msgstr "Issued by admin"
+msgstr "Issued via admin"
 
 msgid "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 msgstr "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
@@ -6839,10 +6808,8 @@ msgstr "Like or unlike a comment. Toggles the like status."
 msgid "Likes"
 msgstr "Likes"
 
-#, fuzzy
-#| msgid "View Count"
 msgid "Likes Count"
-msgstr "View Count"
+msgstr "Likes Count"
 
 msgid "Limit"
 msgstr "Limit"
@@ -7037,7 +7004,7 @@ msgid "Log a click on a search result"
 msgstr "Log a click on a search result"
 
 msgid "Log in"
-msgstr ""
+msgstr "Log in"
 
 msgid "Logo"
 msgstr "Logo"
@@ -7124,15 +7091,11 @@ msgstr "Loyalty Discount"
 msgid "Loyalty Enabled"
 msgstr "Loyalty Enabled"
 
-#, fuzzy
-#| msgid "Loyalty Points"
 msgid "Loyalty Pause"
-msgstr "Loyalty Points"
+msgstr "Loyalty Pause"
 
-#, fuzzy
-#| msgid "Loyalty Tiers"
 msgid "Loyalty Pauses"
-msgstr "Loyalty Tiers"
+msgstr "Loyalty Pauses"
 
 msgid "Loyalty Points"
 msgstr "Loyalty Points"
@@ -7155,7 +7118,7 @@ msgstr "Loyalty discount (%(discount)s %(currency)s) exceeds the maximum allowed
 
 #, python-format
 msgid "Loyalty off from %(start)s"
-msgstr ""
+msgstr "Loyalty off from %(start)s"
 
 msgid "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
 msgstr "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
@@ -7231,7 +7194,7 @@ msgid "Manual"
 msgstr "Manual"
 
 msgid "Manual stock adjustment via admin panel"
-msgstr ""
+msgstr "Manual stock adjustment via admin panel"
 
 msgid "Mark all notifications as seen"
 msgstr "Mark all notifications as seen"
@@ -7246,15 +7209,13 @@ msgid "Mark all of the authenticated user's notifications as unseen."
 msgstr "Mark all of the authenticated user's notifications as unseen."
 
 msgid "Mark as reconciled"
-msgstr ""
+msgstr "Mark as reconciled"
 
 msgid "Mark as spam and delete"
 msgstr "Mark as spam and delete"
 
-#, fuzzy
-#| msgid "Mark platform legal update as reviewed"
 msgid "Mark payout as reconciled"
-msgstr "Mark platform legal update as reviewed"
+msgstr "Mark payout as reconciled"
 
 msgid "Mark platform legal update as reviewed"
 msgstr "Mark platform legal update as reviewed"
@@ -7307,10 +7268,8 @@ msgstr "Master switch — when False the provider is hidden from checkout regard
 msgid "Matched by"
 msgstr "Matched by"
 
-#, fuzzy
-#| msgid "Matches no shipment"
 msgid "Matches no shipment, not reconciled"
-msgstr "Matches no shipment"
+msgstr "Matches no shipment, not reconciled"
 
 msgid "Max Weight (grams)"
 msgstr "Max Weight (grams)"
@@ -7475,7 +7434,7 @@ msgid "Method"
 msgstr "Method"
 
 msgid "Method not allowed."
-msgstr ""
+msgstr "Method not allowed."
 
 msgid "Mid-range (€50-€100)"
 msgstr "Mid-range (€50-€100)"
@@ -7543,10 +7502,8 @@ msgstr "Mode"
 msgid "Moderation"
 msgstr "Moderation"
 
-#, fuzzy
-#| msgid "ACS payouts matching no shipment"
 msgid "Money ACS paid out that no shipment explains"
-msgstr "ACS payouts matching no shipment"
+msgstr "Money ACS paid out that no shipment explains"
 
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
@@ -7924,10 +7881,8 @@ msgstr "Not in Use"
 msgid "Not printed"
 msgstr "Not printed"
 
-#, fuzzy
-#| msgid "Reconciled by"
 msgid "Not reconciled"
-msgstr "Reconciled by"
+msgstr "Not reconciled"
 
 msgid "Not scanned"
 msgstr "Not scanned"
@@ -8156,10 +8111,8 @@ msgstr "Operation"
 msgid "Operation Type"
 msgstr "Operation Type"
 
-#, fuzzy
-#| msgid "Operation Type"
 msgid "Operational Alerts"
-msgstr "Operation Type"
+msgstr "Operational Alerts"
 
 msgid "Operational note from BoxNow"
 msgstr "Operational note from BoxNow"
@@ -8264,7 +8217,7 @@ msgstr "Order #%(order_id)s has no specimen receipt."
 
 #, python-format
 msgid "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
-msgstr ""
+msgstr "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
 
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
@@ -8427,10 +8380,8 @@ msgstr "Order Item Information"
 msgid "Order Items"
 msgstr "Order Items"
 
-#, fuzzy
-#| msgid "Order canceled"
 msgid "Order Lifecycle"
-msgstr "Order canceled"
+msgstr "Order Lifecycle"
 
 msgid "Order Number"
 msgstr "Order Number"
@@ -8539,10 +8490,8 @@ msgstr "Ordered list of strategy codes; a strategy the plan does not allow, or t
 msgid "Orders"
 msgstr "Orders"
 
-#, fuzzy
-#| msgid "Order & Locker"
 msgid "Orders & Checkout"
-msgstr "Order & Locker"
+msgstr "Orders & Checkout"
 
 msgid "Orders and revenue are read from each store every 30 minutes."
 msgstr "Orders and revenue are read from each store every 30 minutes."
@@ -8979,10 +8928,8 @@ msgstr "Payment methods"
 msgid "Payment not found"
 msgstr "Payment not found"
 
-#, fuzzy
-#| msgid "Payment provider name"
 msgid "Payment provider"
-msgstr "Payment provider name"
+msgstr "Payment provider"
 
 msgid "Payment provider name"
 msgstr "Payment provider name"
@@ -9018,7 +8965,7 @@ msgid "Payments"
 msgstr "Payments"
 
 msgid "Payout marked as reconciled."
-msgstr ""
+msgstr "Payout marked as reconciled."
 
 msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
 msgstr "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
@@ -9208,10 +9155,8 @@ msgstr "Platform legal text revision"
 msgid "Platform storefront"
 msgstr "Platform storefront"
 
-#, fuzzy
-#| msgid "Platform storefront"
 msgid "Platform superusers"
-msgstr "Platform storefront"
+msgstr "Platform superusers"
 
 msgid "Platform update to review"
 msgstr "Platform update to review"
@@ -9711,10 +9656,8 @@ msgstr "Promotional Image"
 msgid "Promotions"
 msgstr "Promotions"
 
-#, fuzzy
-#| msgid "Promotion Codes"
 msgid "Promotions & Gift Cards"
-msgstr "Promotion Codes"
+msgstr "Promotions & Gift Cards"
 
 msgid "Promotions Enabled"
 msgstr "Promotions Enabled"
@@ -9960,10 +9903,8 @@ msgstr "Ready for Pickup"
 msgid "Reason"
 msgstr "Reason"
 
-#, fuzzy
-#| msgid "Region Code"
 msgid "Reason Code"
-msgstr "Region Code"
+msgstr "Reason Code"
 
 msgid "Reason for the refund"
 msgstr "Reason for the refund"
@@ -10066,15 +10007,11 @@ msgstr "Recommendations"
 msgid "Recommendations Enabled"
 msgstr "Recommendations Enabled"
 
-#, fuzzy
-#| msgid "Reconciled by"
 msgid "Reconciled"
-msgstr "Reconciled by"
+msgstr "Reconciled"
 
-#, fuzzy
-#| msgid "Reconciled by"
 msgid "Reconciled at"
-msgstr "Reconciled by"
+msgstr "Reconciled at"
 
 msgid "Reconciled by"
 msgstr "Reconciled by"
@@ -10082,10 +10019,8 @@ msgstr "Reconciled by"
 msgid "Reconciliation"
 msgstr "Reconciliation"
 
-#, fuzzy
-#| msgid "Reconciliation"
 msgid "Reconciliation note"
-msgstr "Reconciliation"
+msgstr "Reconciliation note"
 
 msgid "Record COD received outside ACS"
 msgstr "Record COD received outside ACS"
@@ -10192,10 +10127,8 @@ msgstr "Refund amount ({refund}) cannot exceed the refundable amount ({refundabl
 msgid "Refund amount must be greater than 0"
 msgstr "Refund amount must be greater than 0"
 
-#, fuzzy
-#| msgid "Refund Attempt"
 msgid "Refund attempt"
-msgstr "Refund Attempt"
+msgstr "Refund attempt"
 
 #, python-format
 msgid "Refund attempt %(key)s of %(amount)s"
@@ -10325,10 +10258,9 @@ msgstr "Relative URL to download the parcel label PDF via the Django proxy endpo
 msgid "Relative URL to download the voucher PDF via the Django proxy."
 msgstr "Relative URL to download the voucher PDF via the Django proxy."
 
-#, fuzzy, python-brace-format
-#| msgid "Absolute URL for the operator-uploaded brand logo, resolved per (provider, kind) so the home-delivery row and the pickup-point row of the same carrier can show different images. Null when no logo is uploaded — the storefront then falls back to its bundled default. ``settings.MEDIA_URL`` is absolute in every environment so this is always a full URL when present."
+#, python-brace-format
 msgid "Relative media path (``media/{schema}/uploads/shipping/…``) of the operator-uploaded brand logo, resolved per (provider, kind) so the home-delivery row and the pickup-point row of the same carrier can show different images; the storefront renders it through media-stream at the size it shows. Null when no logo is uploaded — the storefront then falls back to its bundled default."
-msgstr "Absolute URL for the operator-uploaded brand logo, resolved per (provider, kind) so the home-delivery row and the pickup-point row of the same carrier can show different images. Null when no logo is uploaded — the storefront then falls back to its bundled default. ``settings.MEDIA_URL`` is absolute in every environment so this is always a full URL when present."
+msgstr "Relative media path (``media/{schema}/uploads/shipping/…``) of the operator-uploaded brand logo, resolved per (provider, kind) so the home-delivery row and the pickup-point row of the same carrier can show different images; the storefront renders it through media-stream at the size it shows. Null when no logo is uploaded — the storefront then falls back to its bundled default."
 
 msgid "Release"
 msgstr "Release"
@@ -10620,8 +10552,6 @@ msgstr "Revenue"
 msgid "Review"
 msgstr "Review"
 
-#, fuzzy
-#| msgid "Review"
 msgctxt "business profile tab"
 msgid "Review"
 msgstr "Review"
@@ -10677,10 +10607,8 @@ msgstr "Rich Text Block"
 msgid "Role"
 msgstr "Role"
 
-#, fuzzy
-#| msgid "Event fingerprint"
 msgid "Row fingerprint"
-msgstr "Event fingerprint"
+msgstr "Row fingerprint"
 
 msgid "Run"
 msgstr "Run"
@@ -10704,7 +10632,7 @@ msgid "SHA-1 of shipment_id|event_time|action|location — replaces BoxNow's web
 msgstr "SHA-1 of shipment_id|event_time|action|location — replaces BoxNow's webhook_message_id since ACS has no event ID."
 
 msgid "SHA-256 of the ACS fields that identify the row. Set only for a row with no readable voucher: it is that row's idempotency key, so a rerun updates it instead of storing it twice."
-msgstr ""
+msgstr "SHA-256 of the ACS fields that identify the row. Set only for a row with no readable voucher: it is that row's idempotency key, so a rerun updates it instead of storing it twice."
 
 msgid "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 msgstr "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
@@ -10872,10 +10800,8 @@ msgstr "Search blog posts using MeiliSearch. Provides full-text search with high
 msgid "Search by ID, SKU, name, description, or category name."
 msgstr "Search by ID, SKU, name, description, or category name."
 
-#, fuzzy
-#| msgid "Search by email, username, name, phone, city, address, or bio."
 msgid "Search by email, username or name."
-msgstr "Search by email, username, name, phone, city, address, or bio."
+msgstr "Search by email, username or name."
 
 msgid "Search by email, username, name, phone, city, address, or bio."
 msgstr "Search by email, username, name, phone, city, address, or bio."
@@ -10979,10 +10905,8 @@ msgstr "Select at least one cache surface to purge."
 msgid "Select none"
 msgstr "Select none"
 
-#, fuzzy
-#| msgid "Select all"
 msgid "Select value"
-msgstr "Select all"
+msgstr "Select value"
 
 msgid "Selected:"
 msgstr "Selected:"
@@ -11020,20 +10944,14 @@ msgstr "Sent"
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Sent to the provider so a repeat is not a second refund."
 
-#, fuzzy
-#| msgid "Order #{order_id} canceled"
 msgid "Sent when order is canceled"
-msgstr "Order #{order_id} canceled"
+msgstr "Sent when order is canceled"
 
-#, fuzzy
-#| msgid "Mark selected orders as delivered"
 msgid "Sent when order is delivered"
-msgstr "Mark selected orders as delivered"
+msgstr "Sent when order is delivered"
 
-#, fuzzy
-#| msgid "Mark selected orders as shipped"
 msgid "Sent when order is shipped"
-msgstr "Mark selected orders as shipped"
+msgstr "Sent when order is shipped"
 
 msgid "Seo Description"
 msgstr "Seo Description"
@@ -11422,7 +11340,7 @@ msgid "Specimen unavailable"
 msgstr "Specimen unavailable"
 
 msgid "Stable code for a reason that is always the same text; translated when shown"
-msgstr ""
+msgstr "Stable code for a reason that is always the same text; translated when shown"
 
 msgid "Stable code for why the cancel was refused. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Stable code for why the cancel was refused. Branch on this, never on ``detail``, which is in the request's language."
@@ -11486,10 +11404,8 @@ msgstr "Standard Rate"
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 
-#, fuzzy
-#| msgid "Starts At"
 msgid "Started At"
-msgstr "Starts At"
+msgstr "Started At"
 
 msgid "Starts At"
 msgstr "Starts At"
@@ -11515,16 +11431,14 @@ msgstr "Status ID"
 msgid "Status Updated At"
 msgstr "Status Updated At"
 
-#, fuzzy
-#| msgid "Filter completed orders"
 msgid "Status update for completed orders"
-msgstr "Filter completed orders"
+msgstr "Status update for completed orders"
 
 msgid "Status update for refunded orders"
-msgstr ""
+msgstr "Status update for refunded orders"
 
 msgid "Status update for returned orders"
-msgstr ""
+msgstr "Status update for returned orders"
 
 #, python-format
 msgid "Step %(current)s of %(total)s"
@@ -11629,23 +11543,17 @@ msgstr "Store figures"
 msgid "Store name at the time of destruction, for the audit trail."
 msgstr "Store name at the time of destruction, for the audit trail."
 
-#, fuzzy
-#| msgid "Store Profile"
 msgid "Store role"
-msgstr "Store Profile"
+msgstr "Store role"
 
-#, fuzzy
-#| msgid "Store Profile"
 msgid "Store roles"
-msgstr "Store Profile"
+msgstr "Store roles"
 
 msgid "Store search"
 msgstr "Store search"
 
-#, fuzzy
-#| msgid "Stores"
 msgid "Store staff"
-msgstr "Stores"
+msgstr "Store staff"
 
 msgid "Store vertical"
 msgstr "Store vertical"
@@ -11656,10 +11564,8 @@ msgstr "Stored in the per-tenant PRIVATE tree. Reachable only by streaming it th
 msgid "Stored normalised: 9 digits, no EL/GR prefix"
 msgstr "Stored normalised: 9 digits, no EL/GR prefix"
 
-#, fuzzy
-#| msgid "Storefront pages"
 msgid "Storefront UI"
-msgstr "Storefront pages"
+msgstr "Storefront UI"
 
 msgid "Storefront pages"
 msgstr "Storefront pages"
@@ -11744,11 +11650,11 @@ msgstr "Stripe SharedPaymentToken (spt_…) granted to this store by the agent p
 
 #, python-format
 msgid "Stripe dispute closed: dispute_id=%(dispute_id)s, status=%(status)s"
-msgstr ""
+msgstr "Stripe dispute closed: dispute_id=%(dispute_id)s, status=%(status)s"
 
 #, python-format
 msgid "Stripe dispute created: dispute_id=%(dispute_id)s, charge_id=%(charge_id)s, reason=%(reason)s"
-msgstr ""
+msgstr "Stripe dispute created: dispute_id=%(dispute_id)s, charge_id=%(charge_id)s, reason=%(reason)s"
 
 msgid "Stripe key mode mismatch: the secret key and the publishable key must both be live or both be test."
 msgstr "Stripe key mode mismatch: the secret key and the publishable key must both be live or both be test."
@@ -11838,10 +11744,8 @@ msgstr "Subscription Topic"
 msgid "Subscription Topics"
 msgstr "Subscription Topics"
 
-#, fuzzy
-#| msgid "Subscription pending confirmation."
 msgid "Subscription confirmation email"
-msgstr "Subscription pending confirmation."
+msgstr "Subscription confirmation email"
 
 msgid "Subscription pending confirmation."
 msgstr "Subscription pending confirmation."
@@ -12291,7 +12195,7 @@ msgid "The order total is below this wholesale tier's minimum of {minimum}."
 msgstr "The order total is below this wholesale tier's minimum of {minimum}."
 
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
-msgstr ""
+msgstr "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 
 msgid "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
 msgstr "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
@@ -12305,10 +12209,8 @@ msgstr "The payment method is free once the products, after discounts and exclud
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
 
-#, fuzzy
-#| msgid "The payment this share is refunded against."
 msgid "The payment this share is refunded against; none for gift cards and points."
-msgstr "The payment this share is refunded against."
+msgstr "The payment this share is refunded against; none for gift cards and points."
 
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
@@ -12368,15 +12270,13 @@ msgid "The refund could not be processed."
 msgstr "The refund could not be processed."
 
 msgid "The refund that gave back points the customer had spent, when this row is one."
-msgstr ""
+msgstr "The refund that gave back points the customer had spent, when this row is one."
 
 msgid "The refund that returned this credit, when it was one."
-msgstr ""
+msgstr "The refund that returned this credit, when it was one."
 
-#, fuzzy
-#| msgid "The ledger chargeback whose goods came back, which this document credits; none for a refund or a settlement."
 msgid "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
-msgstr "The ledger chargeback whose goods came back, which this document credits; none for a refund or a settlement."
+msgstr "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
 
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
@@ -12520,10 +12420,8 @@ msgstr "This field is required"
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 
-#, fuzzy
-#| msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
 msgid "This is above the limit a staff member can put on gift cards in one step. The store's owner can do it."
-msgstr "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
+msgstr "This is above the limit a staff member can put on gift cards in one step. The store's owner can do it."
 
 #, python-format
 msgid "This is an automated message from %(site_name)s."
@@ -12589,15 +12487,11 @@ msgstr "This order's payment status does not allow a retry."
 msgid "This payment method is not available for this store."
 msgstr "This payment method is not available for this store."
 
-#, fuzzy
-#| msgid "The voucher is already cancelled."
 msgid "This payout is already reconciled."
-msgstr "The voucher is already cancelled."
+msgstr "This payout is already reconciled."
 
-#, fuzzy
-#| msgid "This order was not paid through a payment provider, so there is nothing to refund here."
 msgid "This payout is tied to a shipment; there is nothing to reconcile."
-msgstr "This order was not paid through a payment provider, so there is nothing to refund here."
+msgstr "This payout is tied to a shipment; there is nothing to reconcile."
 
 msgid "This person is already on the team."
 msgstr "This person is already on the team."
@@ -12649,10 +12543,8 @@ msgstr "This surface has no product to start from, so these strategies have noth
 msgid "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
 msgstr "This takes you above the limit a staff member can put on gift cards in a day. The store's owner can do it."
 
-#, fuzzy
-#| msgid "The cart cannot be checked out."
 msgid "This tenant cannot be destroyed right now."
-msgstr "The cart cannot be checked out."
+msgstr "This tenant cannot be destroyed right now."
 
 msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 msgstr "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
@@ -12845,10 +12737,8 @@ msgstr "Total charge amount (cart + shipping + payment fee)"
 msgid "Total discount granted by promotions/coupons, snapshotted at order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption rows. Deducted by calculate_order_total_amount()."
 msgstr "Total discount granted by promotions/coupons, snapshotted at order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption rows. Deducted by calculate_order_total_amount()."
 
-#, fuzzy
-#| msgid "Events received"
 msgid "Total likes received"
-msgstr "Events received"
+msgstr "Total likes received"
 
 msgid "Totals"
 msgstr "Totals"
@@ -13146,7 +13036,7 @@ msgstr "Up to %(refundable)s can still be refunded."
 
 #, python-format
 msgid "Up to %(refundable)s can still be refunded: %(provider)s through the payment provider, then %(stored)s back onto the gift cards and loyalty points the order paid with. Enter the value of what the customer returned."
-msgstr ""
+msgstr "Up to %(refundable)s can still be refunded: %(provider)s through the payment provider, then %(stored)s back onto the gift cards and loyalty points the order paid with. Enter the value of what the customer returned."
 
 #, python-format
 msgid "Update %(name)s information. Requires authentication."
@@ -13229,7 +13119,7 @@ msgid "Use another account"
 msgstr "Use another account"
 
 msgid "Use once this payout has been accounted for although no shipment of the store explains it. It stops counting as needing attention on the dashboard. The payout itself is kept unchanged."
-msgstr ""
+msgstr "Use once this payout has been accounted for although no shipment of the store explains it. It stops counting as needing attention on the dashboard. The payout itself is kept unchanged."
 
 #, python-format
 msgid "Use only regular-expression syntax the storefront reads the same way: “%(construct)s” is not supported."
@@ -13277,10 +13167,8 @@ msgstr "User ID"
 msgid "User ID. Leave empty for guest orders."
 msgstr "User ID. Leave empty for guest orders."
 
-#, fuzzy
-#| msgid "Cache Management"
 msgid "User Management"
-msgstr "Cache Management"
+msgstr "User Management"
 
 msgid "User Sessions"
 msgstr "User Sessions"
@@ -13583,11 +13471,11 @@ msgstr "Viva Wallet Webhook Verification Key"
 
 #, python-format
 msgid "Viva Wallet dispute opened: sale transaction=%(dispute_id)s, status=%(status)s"
-msgstr ""
+msgstr "Viva Wallet dispute opened: sale transaction=%(dispute_id)s, status=%(status)s"
 
 #, python-format
 msgid "Viva Wallet dispute won: sale transaction=%(dispute_id)s"
-msgstr ""
+msgstr "Viva Wallet dispute won: sale transaction=%(dispute_id)s"
 
 msgid "Viva Wallet merchant ID. No platform fallback — empty disables Viva Wallet."
 msgstr "Viva Wallet merchant ID. No platform fallback — empty disables Viva Wallet."
@@ -13727,10 +13615,8 @@ msgstr "Welcome Back - Let's Go!"
 msgid "Welcome To"
 msgstr "Welcome To"
 
-#, fuzzy
-#| msgid "Welcome Back"
 msgid "Welcome back to"
-msgstr "Welcome Back"
+msgstr "Welcome back to"
 
 msgid "Well Reviewed (>7.0)"
 msgstr "Well Reviewed (>7.0)"
@@ -13790,7 +13676,7 @@ msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "When set, only this customer can redeem the code (personal coupon)"
 
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
-msgstr ""
+msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "When the current confirmation link was issued. The link expires a week later."
@@ -14010,14 +13896,14 @@ msgstr "You already have an active alert of this kind for this product."
 
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
-msgstr ""
+msgstr "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 
 msgid "You are already subscribed to this topic."
 msgstr "You are already subscribed to this topic."
 
 #, python-format
 msgid "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
-msgstr ""
+msgstr "You are authenticated as %(username)s, but are not authorized to access this page. Would you like to login to a different account?"
 
 msgid "You are not subscribed to this topic."
 msgstr "You are not subscribed to this topic."
@@ -14447,10 +14333,8 @@ msgstr "granted"
 msgid "in the payment reference."
 msgstr "in the payment reference."
 
-#, fuzzy
-#| msgid "Inactive"
 msgid "inactive"
-msgstr "Inactive"
+msgstr "inactive"
 
 #, python-format
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
@@ -14590,7 +14474,7 @@ msgid "week"
 msgstr "week"
 
 msgid "without voucher"
-msgstr ""
+msgstr "without voucher"
 
 msgid "© 2026"
 msgstr "© 2026"

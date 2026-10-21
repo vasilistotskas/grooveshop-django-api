@@ -29,6 +29,13 @@ frees its slot when the lease ends. Keys go through the tenant cache key
 function, so each store's account has its own slots, and carry the ACS
 ``Company_ID`` so a store with more than one account would not share them.
 
+The last ``ACS_INTERACTIVE_RESERVED_SLOTS`` slots (default 1) are for
+interactive calls only. The poll batch is paced to keep the poll slots
+busy, so without a reserve a shopper's price quote or address validation
+could wait the full ``ACS_SLOT_WAIT_SECONDS`` behind it and then fall back
+or fail. It is a priority split of one pool, not a second pool: an
+interactive call may take any slot, a poll never the reserved ones.
+
 A caller that finds every slot taken waits a bounded time, then raises
 ``AcsRetryableError`` so Celery retries with backoff instead of a worker
 sitting on it. With Redis unreachable the cap is skipped and logged: it
@@ -71,13 +78,30 @@ def _slot_key(account: str, slot: int) -> str:
     return f"acs:slot:{account}:{slot}"
 
 
-def _acquire(account: str, alias: str, lease_seconds: float) -> Lock:
+def _slot_order(*, background: bool) -> list[int]:
+    """The slot numbers a call may try, in a random order within a tier.
+
+    The last ``ACS_INTERACTIVE_RESERVED_SLOTS`` slots are for interactive
+    calls only; a background poll tries the others. An interactive call
+    tries its reserved slots first, so it leaves the poll slots to the
+    polls and only spills into them when the reserve is busy.
+    """
+    limit = settings.ACS_MAX_CONCURRENT_REQUESTS
+    polls = list(range(limit - settings.ACS_INTERACTIVE_RESERVED_SLOTS))
+    reserved = list(range(len(polls), limit))
+    random.shuffle(polls)
+    random.shuffle(reserved)
+    return polls if background else reserved + polls
+
+
+def _acquire(
+    account: str, alias: str, lease_seconds: float, *, background: bool
+) -> Lock:
     limit = settings.ACS_MAX_CONCURRENT_REQUESTS
     wait = settings.ACS_SLOT_WAIT_SECONDS
     deadline = time.monotonic() + wait
     while True:
-        # A random start spreads the contention across the slot keys.
-        for slot in random.sample(range(limit), limit):
+        for slot in _slot_order(background=background):
             lock = cache.lock(_slot_key(account, slot), timeout=lease_seconds)
             if lock.acquire():
                 return lock
@@ -99,7 +123,7 @@ def _acquire(account: str, alias: str, lease_seconds: float) -> Lock:
 
 @contextmanager
 def acs_request_slot(
-    *, account: str, alias: str, lease_seconds: float
+    *, account: str, alias: str, lease_seconds: float, background: bool = False
 ) -> Generator[None]:
     """Hold one of the account's request slots for the ``with`` body.
 
@@ -107,9 +131,10 @@ def acs_request_slot(
     ``ACS_SLOT_WAIT_SECONDS``. The slot is released on any exit,
     exceptions included, and only while this holder still owns it.
     ``lease_seconds`` is how long the slot survives a holder that dies.
+    ``background`` (the tracking polls) excludes the reserved slots.
     """
     try:
-        lock = _acquire(account, alias, lease_seconds)
+        lock = _acquire(account, alias, lease_seconds, background=background)
     except REDIS_UNAVAILABLE as exc:
         _redis_down.report(exc)
         yield

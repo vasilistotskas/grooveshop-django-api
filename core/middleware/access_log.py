@@ -1,4 +1,4 @@
-"""One INFO access line per request, with its latency.
+"""One access line per request, with its latency and error code.
 
 Gunicorn's access log carries no duration and the ``django`` logger only
 speaks at WARNING, so the one per-request latency Django exposed was
@@ -22,8 +22,21 @@ Where it sits in ``MIDDLEWARE`` is part of the contract:
   so only a layer above it sees them; the duration also includes
   tenant resolution.
 
+An error response also names its ``code``, the stable identifier of the
+API error contract (``docs/error-contract.md``), so a spike of one code
+(checkout's ``payment_intent_failed``, a 5xx) can be counted and alerted
+on per route. It is read here, from the response, rather than in the
+exception handler, because the handler only sees RAISED errors: the
+order, cart and payment views build most of their error responses
+themselves (``return Response({..., "code": ...}, status=4xx)``) and
+those never reach it. This layer sees both, and logs each response once.
+A 5xx line is a WARNING, everything else INFO; ``django.request`` still
+logs the 5xx at ERROR, with the traceback when there is one, so the
+traceback is never repeated here.
+
 Never logged: the raw path (it carries ids), the query string, headers,
-cookies, bodies. The route is the URL PATTERN the request resolved to.
+cookies, bodies, error messages. The route is the URL PATTERN the request
+resolved to; the code is a fixed identifier, never text a client sent.
 """
 
 from __future__ import annotations
@@ -32,6 +45,9 @@ import logging
 import time
 
 from django.urls import Resolver404, resolve
+from rest_framework import status
+
+from core.api.exception_handler import CODE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +77,25 @@ def _route_of(request) -> str:
     return match.route or "/"
 
 
+def _code_of(response) -> str | None:
+    """The error ``code`` of an API error response, else ``None``.
+
+    Only a DRF ``Response`` carries ``data``; Django's own error pages
+    (an unhandled exception's 500, an unknown host's 404) have no code.
+    A validation body with a FIELD named ``code`` (a coupon code) holds a
+    list there and no top-level code, so only a string counts.
+    """
+    if response.status_code < status.HTTP_400_BAD_REQUEST:
+        return None
+    data = getattr(response, "data", None)
+    if not isinstance(data, dict):
+        return None
+    code = data.get(CODE_KEY)
+    return code if isinstance(code, str) else None
+
+
 class AccessLogMiddleware:
-    """Log ``method route status duration_ms`` once per request.
+    """Log ``method route status duration_ms [code]`` once per request.
 
     Sync-only like every other middleware here; Django adapts it for the
     ASGI stack and both sync and async views. The duration runs until
@@ -81,19 +114,25 @@ class AccessLogMiddleware:
         duration_ms = round((time.perf_counter() - started) * 1000, 1)
 
         route = _route_of(request)
-        logger.info(
-            "%s %s %s %.1fms",
+        fields: dict[str, object] = {
+            "method": request.method,
+            "route": route,
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+        }
+        code = _code_of(response)
+        if code is not None:
+            fields["code"] = code
+        logger.log(
+            logging.WARNING
+            if response.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR
+            else logging.INFO,
+            "%s %s %s %.1fms%s",
             request.method,
             route,
             response.status_code,
             duration_ms,
-            extra={
-                "fields": {
-                    "method": request.method,
-                    "route": route,
-                    "status": response.status_code,
-                    "duration_ms": duration_ms,
-                }
-            },
+            f" {code}" if code is not None else "",
+            extra={"fields": fields},
         )
         return response

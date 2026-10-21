@@ -106,6 +106,16 @@ class ShippingOptionSerializer(serializers.Serializer):
             "one fewer option and no explanation."
         ),
     )
+    exceeds_parcel_size = serializers.BooleanField(
+        help_text=_(
+            "True when the caller's cart (identified by the same "
+            "``X-Cart-Id`` header as every cart endpoint) holds items "
+            "that do not fit this carrier's parcels. Always false when "
+            "no cart is identified. The option is still returned, like "
+            "``exceeds_max_weight``, so the storefront can show it "
+            "disabled with a reason."
+        ),
+    )
     delivery_days_min = serializers.IntegerField(
         allow_null=True,
         help_text=_(

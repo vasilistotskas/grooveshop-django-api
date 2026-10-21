@@ -12814,6 +12814,9 @@ msgstr "True αν έχει σταλεί email στον πελάτη για αυ�
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True όταν το ``weight_grams`` του αιτήματος ξεπερνά το ``max_weight_grams``. Η επιλογή επιστρέφεται κανονικά αντί να κρύβεται — το κατάστημα τη δείχνει απενεργοποιημένη με την αιτία, ώστε ένα βαρύ καλάθι να μη βλέπει ποτέ μια επιλογή λιγότερη χωρίς εξήγηση."
 
+msgid "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
+msgstr "Αληθές όταν το καλάθι του καλούντος (που αναγνωρίζεται με την ίδια κεφαλίδα ``X-Cart-Id`` όπως σε κάθε endpoint του καλαθιού) περιέχει προϊόντα που δεν χωρούν στα δέματα αυτού του μεταφορέα. Πάντα ψευδές όταν δεν αναγνωρίζεται καλάθι. Η επιλογή εξακολουθεί να επιστρέφεται, όπως το ``exceeds_max_weight``, ώστε το storefront να την εμφανίζει απενεργοποιημένη με αιτιολογία."
+
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True όταν το κατάστημα έχει προεπιλεγμένο θέμα newsletter, δηλαδή όταν μια υποβολή της φόρμας newsletter μπορεί να εξυπηρετηθεί."
 

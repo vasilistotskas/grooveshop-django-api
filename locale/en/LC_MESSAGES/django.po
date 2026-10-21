@@ -12807,6 +12807,9 @@ msgstr "True if the customer has been emailed about this abandoned reservation"
 msgid "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 msgstr "True when the caller's ``weight_grams`` exceeds ``max_weight_grams``. The option is still returned rather than hidden — the storefront shows it disabled with a reason, so a heavy cart never sees a checkout step with one fewer option and no explanation."
 
+msgid "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
+msgstr "True when the caller's cart (identified by the same ``X-Cart-Id`` header as every cart endpoint) holds items that do not fit this carrier's parcels. Always false when no cart is identified. The option is still returned, like ``exceeds_max_weight``, so the storefront can show it disabled with a reason."
+
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 

@@ -19,6 +19,7 @@ from djmoney.money import Money
 
 from shipping.enum import ShippingKind
 from shipping.exceptions import (
+    ShippingParcelTooLargeError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
@@ -260,6 +261,7 @@ class ShippingService:
         order_value_amount: float = 0.0,
         currency: str = "EUR",
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
@@ -280,8 +282,12 @@ class ShippingService:
         A cart heavier than the rate's ``max_weight_grams`` still gets
         its row, flagged ``exceeds_max_weight`` — the storefront shows
         it disabled with a reason rather than a step that silently has
-        one fewer option.
+        one fewer option. The same goes for ``items`` (the cart's
+        ``(product, quantity)`` pairs, when the caller's cart is known)
+        that do not fit the carrier's parcels: ``exceeds_parcel_size``,
+        decided by the rule :meth:`assert_available` enforces.
         """
+        items = None if items is None else list(items)
         country_code = country_code.upper()
         order_value = Money(order_value_amount, currency)
 
@@ -334,6 +340,12 @@ class ShippingService:
                     and rate.max_weight_grams is not None
                     and weight_grams > rate.max_weight_grams
                 )
+                exceeds_parcel_size = False
+                if items is not None:
+                    try:
+                        adapter.assert_parcel_fits(kind=kind, items=items)
+                    except ShippingParcelTooLargeError:
+                        exceeds_parcel_size = True
                 price = cls._priced(
                     rate,
                     country_code=country_code,
@@ -366,6 +378,7 @@ class ShippingService:
                         "country_code": country_code,
                         "max_weight_grams": rate.max_weight_grams,
                         "exceeds_max_weight": exceeds_max_weight,
+                        "exceeds_parcel_size": exceeds_parcel_size,
                         "delivery_days_min": rate.delivery_days_min,
                         "delivery_days_max": rate.delivery_days_max,
                     }

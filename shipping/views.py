@@ -18,6 +18,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cart.services import CartService
+from cart.views.cart import GUEST_CART_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
 from shipping.models import ShippingProvider
 from shipping.serializers import (
@@ -78,6 +80,7 @@ class ShippingOptionsView(APIView):
                 required=False,
                 type=int,
             ),
+            *GUEST_CART_HEADERS,
         ],
         responses=ShippingOptionSerializer(many=True),
         tags=["Shipping"],
@@ -92,11 +95,21 @@ class ShippingOptionsView(APIView):
         currency = query.validated_data.get("currency") or "EUR"
         weight_grams = query.validated_data.get("weight_grams")
 
+        # The caller's cart, found the way every cart endpoint finds it
+        # (``X-Cart-Id`` / the signed-in user). None when it names none.
+        cart = CartService(request).cart
+        items = (
+            None
+            if cart is None
+            else [(item.product, item.quantity) for item in cart.get_items()]
+        )
+
         options = ShippingService.available_options(
             country_code=country_code,
             order_value_amount=amount,
             currency=currency,
             weight_grams=weight_grams,
+            items=items,
         )
         serializer = ShippingOptionSerializer(options, many=True)
         return Response(serializer.data)

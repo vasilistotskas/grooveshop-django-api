@@ -1150,10 +1150,13 @@ accepting Cyprus orders at the Greek flat rate.
   default) and a `ShippingParcelTooLargeError` becomes the 400
   `invalid_order_data` ("The cart is too large for the selected shipping
   method.") on `shippingProviderCode`, from order creation and from the
-  create-payment-intent endpoint. `/shipping/options` does not know the
-  cart's items, so it still lists BoxNow for such a cart; flagging it
-  there (like `exceeds_max_weight`) needs a response field and a
-  storefront change, not built yet.
+  create-payment-intent endpoint. `/shipping/options` finds the cart the
+  way every cart endpoint does (`X-Cart-Id`, or the signed-in user's
+  cart; `CartService`) and flags each option the cart does not fit with
+  `exceeds_parcel_size`, by the same `assert_parcel_fits` rule. The option
+  is still listed. With no cart, or an unknown one, it is always false.
+  The response varies by cart, so a shared cache in front of this route
+  must not serve it across carts.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

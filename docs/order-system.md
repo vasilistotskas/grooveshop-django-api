@@ -1123,8 +1123,10 @@ accepting Cyprus orders at the Greek flat rate.
   outside the server reads them). Limits are `COMPARTMENT_LIMITS_CM`
   (`shipping_boxnow/enum/compartment_size.py`), BOX NOW's published sizes
   (https://boxnow.gr/en/faq): Small H8, Medium H17, Large H36, all W45 x
-  L60 cm. The FAQ also lists a Mini (H8 x W24 x L60); the partner API's
-  `compartmentSize` has no value for it, so it is booked as Small. The
+  L60 cm. The FAQ also lists a Mini (H8 x W24 x L60); the partner API has
+  no value for it (manual v7.2, error P406: "one of required sizes 1, 2 or 3
+  (Small, Medium or Large)", and the OpenAPI spec 1.68, both under
+  `boxnow.gr/media/hidden/`), so it is booked as Small. The
   20 kg weight limit stays on `ShippingRate.max_weight_grams`. The rule is
   conservative, never undersizing: each unit lies on its smallest side
   (height = smallest dimension), its other two sides must fit W45 x L60,
@@ -1134,11 +1136,13 @@ accepting Cyprus orders at the Greek flat rate.
   (metres are floats). `create_shipment_row` stores the result on
   `BoxNowShipment.compartment_size`, which goes out as
   `items[].compartmentSize`.
-  **Products without dimensions keep the previous behaviour:** the size
-  the checkout sent (`boxnow_compartment_size`, the storefront sends 1 =
-  Small, a customer never chooses it). A cart with some measured and some
-  unmeasured items takes the larger of the derived size and that value;
-  with every item measured the derived size wins. Gift items from a
+  **The checkout no longer supplies a size** (the server owns it; an old
+  client still sending `boxnowCompartmentSize` is ignored, not rejected).
+  **Products without dimensions** get the store's
+  `BOXNOW_DEFAULT_COMPARTMENT_SIZE` setting (1 = Small by default, 2 and 3
+  allowed, validated). A cart with some measured and some unmeasured items
+  takes the larger of the derived size and that setting; with every item
+  measured the derived size wins. Gift items from a
   promotion are not measured.
 - **A cart that fits no compartment is refused at checkout**, next to the
   weight cap: `ShippingService.assert_available(items=...)` asks the

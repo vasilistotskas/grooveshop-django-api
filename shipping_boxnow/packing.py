@@ -16,15 +16,17 @@ the locker):
 * The result is the smallest size whose height holds the stack.
 
 Only items with all three dimensions count. What a missing dimension
-does to the size is the caller's decision (``derive_compartment``
-reports it), because the current behaviour for that case belongs to the
-checkout payload, not to the packing arithmetic.
+does to the size is decided by ``resolve_compartment_size`` from the
+store's ``BOXNOW_DEFAULT_COMPARTMENT_SIZE``; ``derive_compartment`` only
+reports it.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any, NamedTuple
+
+from django.conf import settings
 
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping_boxnow.enum import COMPARTMENT_LIMITS_CM, BoxNowCompartmentSize
@@ -119,25 +121,50 @@ def derive_compartment(
     )
 
 
+DEFAULT_SIZE_SETTING = "BOXNOW_DEFAULT_COMPARTMENT_SIZE"
+
+
+def validate_default_compartment_size(value: object) -> bool:
+    """django-extra-settings validator for ``BOXNOW_DEFAULT_COMPARTMENT_SIZE``."""
+    try:
+        BoxNowCompartmentSize(int(str(value)))
+    except ValueError:
+        return False
+    return True
+
+
+def default_compartment_size() -> BoxNowCompartmentSize:
+    """The store's size for products that carry no dimensions."""
+    from extra_settings.models import Setting
+
+    default = next(
+        entry["value"]
+        for entry in settings.EXTRA_SETTINGS_DEFAULTS
+        if entry["name"] == DEFAULT_SIZE_SETTING
+    )
+    raw = Setting.get(DEFAULT_SIZE_SETTING, default=default)
+    try:
+        return BoxNowCompartmentSize(int(raw))
+    except ValueError as exc:
+        raise ValueError(
+            f"{DEFAULT_SIZE_SETTING} is not a BoxNow compartment size: {raw!r}"
+        ) from exc
+
+
 def resolve_compartment_size(
     items: Iterable[tuple[Any, int]] | None,
-    *,
-    requested: int,
-) -> int:
+) -> BoxNowCompartmentSize:
     """The compartment size to book for ``items``.
 
-    ``requested`` is the size the checkout sent (``boxnow_compartment_size``,
-    1 = Small when the storefront sends nothing). It is the size used
-    where the products carry no dimensions, and a floor where only some
-    do: derived from the measured items alone, the size could be too
-    small for the unmeasured ones. When every item is measured the
-    derived size is the answer and ``requested`` is ignored.
+    Where the products carry no dimensions the size is the store's
+    ``BOXNOW_DEFAULT_COMPARTMENT_SIZE`` (Small unless changed), and where
+    only some do it is a floor: derived from the measured items alone,
+    the size could be too small for the unmeasured ones. When every item
+    is measured the derived size is the answer and the setting is ignored.
     """
-    if items is None:
-        return requested
-    derivation = derive_compartment(items)
+    derivation = derive_compartment(items or [])
     if derivation.size is None:
-        return requested
+        return default_compartment_size()
     if derivation.complete:
         return derivation.size
-    return max(derivation.size, requested)
+    return max(derivation.size, default_compartment_size())

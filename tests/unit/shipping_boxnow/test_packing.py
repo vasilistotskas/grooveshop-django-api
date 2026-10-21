@@ -9,11 +9,18 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from extra_settings.models import Setting
 from measurement.measures import Distance
 
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping_boxnow.enum import BoxNowCompartmentSize as Size
-from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
+from shipping_boxnow.packing import (
+    DEFAULT_SIZE_SETTING,
+    default_compartment_size,
+    derive_compartment,
+    resolve_compartment_size,
+    validate_default_compartment_size,
+)
 
 
 def _product(length=None, width=None, height=None):
@@ -116,26 +123,55 @@ def test_ignores_lines_without_a_product_or_quantity():
     )
 
 
-def test_resolve_keeps_the_requested_size_without_dimensions():
-    assert (
-        resolve_compartment_size([(_product(), 1)], requested=1) == Size.SMALL
+def _default_size(size: int) -> None:
+    Setting.objects.update_or_create(
+        name=DEFAULT_SIZE_SETTING,
+        defaults={"value_type": "int", "value_int": size},
     )
-    assert resolve_compartment_size(None, requested=2) == Size.MEDIUM
 
 
-def test_resolve_ignores_the_requested_size_when_every_item_is_measured():
-    items = [(_product(30, 20, 5), 1)]
-    assert resolve_compartment_size(items, requested=3) == Size.SMALL
+@pytest.mark.django_db
+def test_default_size_is_small_until_the_store_changes_it():
+    assert default_compartment_size() == Size.SMALL
+    _default_size(3)
+    assert default_compartment_size() == Size.LARGE
 
 
-def test_resolve_never_goes_below_what_the_measured_items_need():
+@pytest.mark.django_db
+def test_an_unreadable_default_size_names_the_setting():
+    _default_size(7)
+    with pytest.raises(ValueError, match=DEFAULT_SIZE_SETTING):
+        default_compartment_size()
+
+
+@pytest.mark.parametrize(
+    ("value", "valid"),
+    [(1, True), (3, True), ("2", True), (0, False), (4, False), ("x", False)],
+)
+def test_default_size_validator(value, valid):
+    assert validate_default_compartment_size(value) is valid
+
+
+@pytest.mark.django_db
+def test_resolve_uses_the_store_default_without_dimensions():
+    assert resolve_compartment_size([(_product(), 1)]) == Size.SMALL
+    assert resolve_compartment_size(None) == Size.SMALL
+    _default_size(2)
+    assert resolve_compartment_size([(_product(), 1)]) == Size.MEDIUM
+
+
+@pytest.mark.django_db
+def test_resolve_ignores_the_default_when_every_item_is_measured():
+    _default_size(3)
+    assert resolve_compartment_size([(_product(30, 20, 5), 1)]) == Size.SMALL
+
+
+@pytest.mark.django_db
+def test_resolve_takes_the_larger_of_derived_and_default_for_a_mix():
     items = [(_product(30, 20, 12), 1), (_product(), 1)]
-    assert resolve_compartment_size(items, requested=1) == Size.MEDIUM
-
-
-def test_resolve_keeps_a_larger_requested_size_when_some_items_are_unmeasured():
-    items = [(_product(30, 20, 5), 1), (_product(), 1)]
-    assert resolve_compartment_size(items, requested=3) == Size.LARGE
+    assert resolve_compartment_size(items) == Size.MEDIUM
+    _default_size(3)
+    assert resolve_compartment_size(items) == Size.LARGE
 
 
 @pytest.mark.django_db

@@ -126,7 +126,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             # pair (see ``order/services._resolve_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
-            "boxnow_compartment_size": 1,
         }
         if include_locker_id:
             payload["boxnow_locker_id"] = locker_id
@@ -384,7 +383,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.product.height = Distance(cm=height)
         self.product.save()
 
-    def _place_order(self, mock_validate_address, mock_validate_cart, mock_pp):
+    def _place_order(
+        self, mock_validate_address, mock_validate_cart, mock_pp, **extra
+    ):
         self._bind_boxnow_tenant()
         mock_validate_cart.return_value = {
             "valid": True,
@@ -396,10 +397,37 @@ class TestOrderCreateWithBoxNow(APITestCase):
         self.client.force_authenticate(user=self.user)
         return self.client.post(
             self.create_url,
-            self._build_payload(pay_way_id=self.online_pay_way.id),
+            {
+                **self._build_payload(pay_way_id=self.online_pay_way.id),
+                **extra,
+            },
             format="json",
             HTTP_X_CART_ID=str(self.cart.uuid),
         )
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_client_sent_compartment_size_is_ignored(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        """The server owns the parcel size: the storefront's old
+        ``boxnowCompartmentSize`` input is dropped, not rejected."""
+        response = self._place_order(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_get_payment_provider,
+            boxnow_compartment_size=3,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, (
+            f"Unexpected response: {response.json()}"
+        )
+        shipment = BoxNowShipment.objects.get()
+        assert shipment.compartment_size == 1
 
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")

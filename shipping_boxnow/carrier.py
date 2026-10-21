@@ -29,10 +29,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "boxnow"
 
     # Carrier-specific request-body keys popped before Order.create().
-    payload_keys: ClassVar[tuple[str, ...]] = (
-        "boxnow_locker_id",
-        "boxnow_compartment_size",
-    )
+    payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -232,7 +229,6 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         Reads:
         * ``boxnow_locker_id`` (string)
-        * ``boxnow_compartment_size`` (1, 2, 3)
 
         Computes the parcel weight from the cart line items so the
         BoxNow voucher PDF prints the real weight (BoxNow tariffs by
@@ -248,10 +244,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
             return
 
         locker_id = payload.get("boxnow_locker_id", "") or ""
-        compartment_size = resolve_compartment_size(
-            items,
-            requested=int(payload.get("boxnow_compartment_size", 1) or 1),
-        )
+        compartment_size = resolve_compartment_size(items)
 
         weight_grams = 0
         if items is not None:

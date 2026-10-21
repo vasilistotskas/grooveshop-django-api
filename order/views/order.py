@@ -1366,9 +1366,6 @@ class OrderViewSet(BaseModelViewSet):
             # carrier means listing its keys on the adapter, not
             # editing this dict.
             "boxnow_locker_id": validated_data.get("boxnow_locker_id", ""),
-            "boxnow_compartment_size": validated_data.get(
-                "boxnow_compartment_size", 1
-            ),
             "acs_station_external_id": validated_data.get(
                 "acs_station_external_id", ""
             ),

@@ -39866,12 +39866,6 @@ components:
           type: string
           description: ID locker APM BoxNow από το widget
           maxLength: 64
-        boxnowCompartmentSize:
-          type: integer
-          maximum: 3
-          minimum: 1
-          default: 1
-          description: 'Μέγεθος θυρίδας BoxNow: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο'
         shippingProviderCode:
           description: Κωδικός μεταφορέα από /api/v1/shipping/options (π.χ. 'acs').
           oneOf:

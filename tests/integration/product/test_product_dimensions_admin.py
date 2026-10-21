@@ -84,3 +84,41 @@ def test_a_product_without_dimensions_is_valid_and_they_persist():
 
     assert product.length.cm == pytest.approx(30)
     assert product.width is None
+
+
+@pytest.mark.django_db
+def test_csv_export_carries_the_three_dimensions(product_admin, admin_request):
+    import csv
+    import io
+
+    from django.contrib.messages.storage.fallback import FallbackStorage
+
+    from admin.export import ExportActionMixin
+
+    admin_request.session = {}
+    admin_request._messages = FallbackStorage(admin_request)
+    measured = ProductFactory(num_images=0, num_reviews=0)
+    measured.length = Distance(cm=30)
+    measured.width = Distance(cm=20)
+    measured.height = Distance(cm=5)
+    measured.save()
+    bare = ProductFactory(num_images=0, num_reviews=0)
+
+    response = ExportActionMixin.export_csv(
+        product_admin,
+        admin_request,
+        Product.objects.filter(pk__in=[measured.pk, bare.pk]).order_by("pk"),
+    )
+
+    rows = list(csv.reader(io.StringIO(response.content.decode("utf-8"))))
+    header, first, second = rows
+    index = {
+        name: header.index(str(Product._meta.get_field(name).verbose_name))
+        for name in DIMENSIONS
+    }
+    assert [first[index[name]] for name in index] == [
+        "30.0 cm",
+        "20.0 cm",
+        "5.0 cm",
+    ]
+    assert [second[index[name]] for name in index] == ["", "", ""]

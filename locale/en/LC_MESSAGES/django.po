@@ -10335,9 +10335,6 @@ msgstr "Requested On"
 msgid "Required Level"
 msgstr "Required Level"
 
-msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
-msgstr "Required compartment size: 1=Small, 2=Medium, 3=Large"
-
 msgid "Required for guests; authenticated buyers default to their account email"
 msgstr "Required for guests; authenticated buyers default to their account email"
 
@@ -14581,6 +14578,9 @@ msgstr "…and {count} more lines with errors."
 #, python-brace-format
 #~ msgid "Reminder: Complete Your Order #{order_id}"
 #~ msgstr "Reminder: Complete Your Order #{order_id}"
+
+#~ msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
+#~ msgstr "Required compartment size: 1=Small, 2=Medium, 3=Large"
 
 #, python-format
 #~ msgid "Review #%(id)s: %(comment)s"

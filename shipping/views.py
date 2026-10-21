@@ -18,7 +18,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from cart.services import CartService
+from cart.services import cart_item_pairs
 from cart.views.cart import GUEST_CART_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
 from shipping.models import ShippingProvider
@@ -97,12 +97,7 @@ class ShippingOptionsView(APIView):
 
         # The caller's cart, found the way every cart endpoint finds it
         # (``X-Cart-Id`` / the signed-in user). None when it names none.
-        cart = CartService(request).cart
-        items = (
-            None
-            if cart is None
-            else [(item.product, item.quantity) for item in cart.get_items()]
-        )
+        items = cart_item_pairs(request)
 
         options = ShippingService.available_options(
             country_code=country_code,

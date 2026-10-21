@@ -23,6 +23,8 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
     from rest_framework.request import Request
 
+    from product.models.product import Product
+
 
 class CartServiceInitException(Exception):
     pass
@@ -48,6 +50,22 @@ def cart_uuid_from_request(request: Request | HttpRequest) -> uuid.UUID | None:
         return uuid.UUID(str(raw))
     except ValueError, TypeError, AttributeError:
         return None
+
+
+def cart_item_pairs(
+    request: Request | HttpRequest,
+) -> list[tuple[Product, int]] | None:
+    """``(product, quantity)`` for the cart the request addresses.
+
+    ``None`` when it addresses none (no header, an unknown cart, a guest
+    without one); an empty list for a cart with no lines. The shipping
+    endpoints that ask whether the cart fits a carrier's parcels read it
+    through here, so they find the cart exactly as the cart endpoints do.
+    """
+    cart = CartService(request).cart
+    if cart is None:
+        return None
+    return [(item.product, item.quantity) for item in cart.get_items()]
 
 
 class CartAttributionService:

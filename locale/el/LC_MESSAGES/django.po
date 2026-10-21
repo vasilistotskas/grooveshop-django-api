@@ -10346,9 +10346,6 @@ msgstr "Ημερομηνία αιτήματος"
 msgid "Required Level"
 msgstr "Απαιτούμενο επίπεδο"
 
-msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
-msgstr "Απαιτούμενο μέγεθος θυρίδας: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"
-
 msgid "Required for guests; authenticated buyers default to their account email"
 msgstr "Υποχρεωτικό για επισκέπτες· για συνδεδεμένους αγοραστές η προεπιλογή είναι το email του λογαριασμού τους"
 
@@ -15229,6 +15226,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-brace-format
 #~ msgid "Reminder: Complete Your Order #{order_id}"
 #~ msgstr "Υπενθύμιση: ολοκληρώστε την παραγγελία σας #{order_id}"
+
+#~ msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
+#~ msgstr "Απαιτούμενο μέγεθος θυρίδας: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"
 
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"

@@ -1157,6 +1157,12 @@ accepting Cyprus orders at the Greek flat rate.
   is still listed. With no cart, or an unknown one, it is always false.
   The response varies by cart, so a shared cache in front of this route
   must not serve it across carts.
+  `POST /shipping/boxnow/lockers/nearest` (the closest-locker lookup)
+  derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
+  (the store default when there is none) and refuses a cart that fits no
+  compartment with 400 `parcel_too_large`; the old `compartment_size` body
+  field is gone. The storefront's locker picker is BoxNow's own iframe
+  widget, which this API does not drive.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

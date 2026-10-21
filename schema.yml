@@ -35069,7 +35069,8 @@ components:
         Request body for ``POST /lockers/nearest``.
 
         Maps to the BoxNow ``/api/v2/delivery-requests:checkAddressDelivery``
-        endpoint parameters.
+        endpoint parameters. The compartment size is not an input: the server
+        derives it from the caller's cart (``X-Cart-Id``).
       properties:
         city:
           type: string
@@ -35092,12 +35093,6 @@ components:
           default: el-GR
           description: 'Ετικέτα γλώσσας IETF / κωδικός περιφέρειας (προεπιλογή: el-GR)'
           maxLength: 8
-        compartmentSize:
-          type: integer
-          maximum: 3
-          minimum: 1
-          default: 1
-          description: 'Απαιτούμενο μέγεθος θυρίδας: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο'
       required:
       - city
       - postalCode

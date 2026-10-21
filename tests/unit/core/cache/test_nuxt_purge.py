@@ -88,6 +88,27 @@ class TestStoreWithoutAPrimaryDomain:
         assert len(errors) == 1
         assert "purge_scope_tenant" in errors[0].getMessage()
 
+    def test_a_database_error_in_the_lookup_is_a_refusal_not_a_raise(
+        self, _configured, bound_tenant, caplog
+    ):
+        from django.db import OperationalError
+
+        with (
+            caplog.at_level("ERROR", logger="core.cache.nuxt"),
+            mock.patch(
+                "tenant.membership.bound_tenant",
+                side_effect=OperationalError("connection lost"),
+            ),
+            mock.patch("core.cache.nuxt.requests.post") as post,
+        ):
+            result = nuxt_client.request_purge(["cache:nitro:routes:_:*"])
+        post.assert_not_called()
+        assert result.error
+        (record,) = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert "purge_scope_tenant" in record.getMessage()
+        assert "connection lost" in record.getMessage()
+        assert record.exc_info is not None
+
     def test_a_store_with_only_a_secondary_domain_is_refused_too(
         self, _configured, bound_tenant
     ):

@@ -3,6 +3,415 @@
 
 
 
+## v3.144.0 (2026-10-21)
+
+### Bug fixes
+
+* fix(deps): drop certifi's compromised emSign roots (#302)
+
+certifi 2026.10.19 removes the emSign root CAs whose intermediate keys
+were compromised (GHSA-6q48-6c7w-9gw2, critical), which Trivy now fails
+the release on.
+
+
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b812364`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b812364fae836d6a712e58d138661dd9136c39b1))
+
+* fix(shipping_acs): cap in-flight ACS requests per account across the cluster
+
+ACS answers 406 to overlapping calls from one account. Production saw 22%
+of tracking calls rejected on 2026-10-20 (2% in July), all inside the
+poll_acs_tracking_batch fan-out. The batch staggered only task start
+times, but each poll makes two calls of 0.6 to 4 s, so six to eight were
+in flight across the worker pods.
+
+AcsClient._call, which every alias goes through, now takes one of
+ACS_MAX_CONCURRENT_REQUESTS Redis slots per Company_ID and store
+(shipping_acs/concurrency.py). Slots are cache.add keys with a TTL lease
+so a killed worker frees its slot, and are released in finally. A call
+that finds every slot taken waits up to ACS_SLOT_WAIT_SECONDS, then
+raises AcsRetryableError for Celery to retry. With Redis unreachable the
+cap is skipped rather than failing the call.
+
+The batch spaces dispatches by ACS_POLL_DISPATCH_SPACING_SECONDS, and
+poll_acs_tracking_one retries at 10, 20, 40, 80, 160 s without jitter:
+Celery's jitter draws from zero, so the first retry could re-enter the
+same congestion at once. The unsourced "10 req/sec" claims are removed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(order): lock the order while a receipt nets the ledger
+
+A receipt nets the refunds the ledger holds when it is built, and a
+refund made after its row is credited by comparing created_at with the
+row's. A refund inserted but not yet committed while the receipt was
+built was invisible to the netting yet older than the row, so neither
+the receipt nor a credit document ever accounted for it.
+
+Every refund path writes its ledger row under the order lock; the
+receipt row is now created under the same lock, and the full-refund
+guard is judged again under it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(order): close a failed payment before the sweep cancels its order
+
+The failed-payment bucket of auto_cancel_stuck_pending_orders cancelled
+the order and released its stock without asking the provider to close the
+payment. A failed attempt leaves a Stripe PaymentIntent open for another
+card, and a Viva payment order payable until it expires, so the shopper
+could still pay an order whose stock was gone.
+
+Both buckets now go through the same close_payment step: the intent is
+cancelled, one that succeeded meanwhile leaves the order open for its
+webhook, and a failed order waits for its stored payment hold (plus the
+grace window) to end.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(shipping_acs): base the ACS request cap on measured rejections, release slots by token
+
+Ten days of production logs (2026-10-11 to 10-20), matching each tracking
+task to the ACS tasks in flight at its start, put the rejection rate at
+0.9% for 1, 2.0% for 2, 3.6% for 3, 7.9% for 6 and 17% for 8. The default
+cap is now 2, and the poll dispatch spacing is derived from the measured
+mean task duration and the slot count instead of set by hand.
+
+A slot is now a redis-py Lock (CustomCache.lock) with a per-holder token,
+so a holder whose lease ran out can no longer delete the slot the next
+worker took. The lease is derived from the client's real worst case (every
+connect attempt of the retry config, urllib3 backoff, one read) rather
+than a separate setting, so it outlives a request by construction.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(order): close a failed Viva payment order instead of waiting it out
+
+close_payment now takes the order, so a provider reads what it needs from
+it: Stripe its payment_id, Viva the payment order codes in metadata. Viva
+cancels each code with Cancel Payment Order using the tenant's own
+credentials, asks nothing once the stored hold has ended, and leaves the
+order open for its webhook when it will not cancel a code.
+
+This replaces the hold-expiry filter on the failed-payment bucket, which
+delayed every provider. The wait now exists only for a payment that could
+not be closed, so a cancelled Stripe PaymentIntent releases its stock at
+once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(order): an unbuildable provider waits for the hold like any open payment
+
+The sweep cancelled a failed order at once when its provider could not be
+built, e.g. removed Viva credentials, although a Viva payment order stays
+payable until it expires. It now routes that case through the same
+hold_ended check as a payment that could not be closed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(tests): make the no-user ticket tests database tests
+
+database_sync_to_async calls close_old_connections() on the thread it runs
+in, which asks a connection left open by an earlier database test for its
+autocommit state. pytest-django's blocker refuses that in a SimpleTestCase,
+so the first TestAuthenticateTicketWithoutUser test to follow a database
+test on the same worker failed. Reproduced on origin/main with
+test_repoll_tracking followed by the class. The class is now a
+TransactionTestCase, like TestAuthenticateTicket beside it, since
+pytest.mark.django_db is a no-op on a Django unittest class.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(i18n): give the new English messages their own text, not fuzzy guesses
+
+The regeneration matched 59 English messages to unrelated msgids as
+fuzzy and left 33 empty. The source strings are English, so each takes
+its msgid as msgstr like the existing entries; no fuzzy or empty live
+entry remains in either catalogue.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(cache): purge every cached storefront page of the store on a page_config edit
+
+The page_config surface named a fixed list of routes. A navigation menu
+renders on every page, and a layout or section edit reaches any custom
+ContentPage, whose path is whatever the merchant typed, so those pages
+kept the old render for up to 600 s. The surface now purges the whole
+route family; the Nuxt purge endpoint narrows it to the purging store's
+host, as for store_pages, and a route-prefix pattern still queues the edge
+purge. The fixed route list and the locale-home helper it needed are gone.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(cache): never send a store's Nuxt purge without its host
+
+_current_tenant_host returned None both for the public schema and for a
+store whose primary domain could not be found, and request_purge omits the
+host when it is None. The storefront endpoint reads a host-less request as
+a platform-wide purge, so a store with no primary domain (nothing in the
+model guarantees one) evicted every store's cached pages and API data.
+
+The lookup now returns None only for the public schema or no bound tenant,
+and raises StoreHostUnresolvedError for a store without a host. request_purge
+logs an ERROR naming the schema and sends nothing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(cache): treat a database error in the purge host lookup as an unresolved host
+
+The primary-domain lookup ran outside any handler, so a database error
+escaped request_purge despite its never-raises contract and could interrupt
+the admin action. It is now a StoreHostUnresolvedError: the purge logs an
+ERROR with the exception, sends nothing and returns the error result.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(shipping_acs): keep an ACS request slot free for interactive calls
+
+The poll batch is paced to fill every slot, so a checkout price quote or an
+address validation could wait the full slot wait behind it and then fall
+back or fail. The last ACS_INTERACTIVE_RESERVED_SLOTS slots (default 1) now
+serve interactive calls only: the tracking polls take the others, every
+other alias may take any slot and tries the reserve first. One pool with a
+priority split, not a second pool.
+
+The poll dispatch spacing is derived from the poll slots instead of all of
+them (2 s at the defaults, about 400 s for 200 shipments, inside the
+15-minute cutoff). A reserve that leaves the polls no slot refuses to start.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* fix(shipping): count the free gifts when the parcel is sized
+
+Promotional gifts become physical order lines, but the BoxNow size and
+the parcel-fit check only saw the cart's own lines, so a gift with
+dimensions could need a bigger compartment than the one booked. The
+entitled gifts (PromotionEngine.gift_pairs, which already leaves out
+sold-out ones) now join the cart pairs for the weight bracket, the
+parcel check and the shipment row on both order paths, the payment
+intent, the order verification, and for the options flag and locker
+search. gift_weight_grams is replaced by the same pairs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+### Chores
+
+* chore(order): drop the retired pending-order reminder columns
+
+Order.reminder_count and last_reminder_sent_at left Django's state in
+order 0084, which production has run for a release. Nothing reads them,
+so this is the contract step: a RunSQL drop declaring contract_of, with a
+reverse that restores the shape 0084 left.
+
+The user re-engagement counters from user 0022 are still read by the
+re-engagement email task and stay.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* chore(i18n): regenerate the catalogues with makemessages
+
+The Greek and English catalogues had fallen behind the source: strings
+removed from the code were still live and English lacked newer ones.
+Output of makemessages -l el -l en, no hand edits besides the msgstr
+of the new dimension labels.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+### Documentation
+
+* docs(api): declare X-Cart-Id on the nearest-locker operation
+
+The endpoint reads the caller's cart from that header to derive the
+compartment size, so the contract now says so.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* docs(error-contract): name the access line's one client-controlled value
+
+The access line logs correlation_id, taken from the client's
+X-Correlation-ID. The page said no header reaches the line. It now says
+which value is client-controlled and what CorrelationIdMiddleware bounds:
+control characters removed, 64 characters at most, nothing else checked.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* docs(api): declare the 400 and 401 answers of /shipping/options
+
+A missing query parameter answers 400 and an unknown, expired or revoked
+X-Cart-Token answers 401; only the 200 was in the contract. The same
+error body the other endpoints declare.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+### Features
+
+* feat: ACS request cap, BoxNow parcel sizes, payment sweep and error-code logging (#301) ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(logging): record the API error code on the access line
+
+Every API error carries a stable code, but nothing recorded which codes
+were returned, so a spike of one (a payment provider failing checkout, a
+5xx on one route) stayed invisible until a customer complained.
+
+The per-request access line now names the error response's code, read
+from the response body, beside the method, route pattern, status and the
+tenant schema it already carried. It is read there rather than in the
+exception handler because the handler only sees raised errors, while the
+order, cart and payment views build most of their error responses
+themselves; the access line sees both and logs each response once. A 5xx
+line is logged at WARNING, everything else stays INFO; django.request
+keeps logging the 5xx and its traceback at ERROR, so nothing is repeated.
+
+No message text, body, query string or header is logged. A field named
+code (a coupon's) is not taken for the error code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(shipping_boxnow): derive the compartment size from product dimensions
+
+Products gain nullable length, width and height (Distance
+MeasurementFields, edited next to the weight in the admin). The BoxNow
+shipment row now books the smallest compartment that holds the cart:
+each unit lies on its smallest side, its other sides must fit the
+45 x 60 cm footprint and units stack, against BOX NOW's published
+Small/Medium/Large heights of 8, 17 and 36 cm.
+
+Products without dimensions keep the size the checkout sent; a cart
+that mixes measured and unmeasured items takes the larger of the two.
+A cart that fits no compartment is refused at checkout with the same
+400 as an over-weight cart, through a new
+ShippingCarrierInterface.assert_parcel_fits hook checked in
+ShippingService.assert_available.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(shipping_boxnow): the server owns the compartment size
+
+The checkout no longer supplies boxnow_compartment_size: the customer
+never chose it and the storefront always sent 1. An old client that
+still sends it is ignored. Products without dimensions get the new
+per-store BOXNOW_DEFAULT_COMPARTMENT_SIZE setting (Small by default,
+validated to 1 to 3); a cart with some measured items takes the larger
+of the derived size and that setting.
+
+The Mini size BOX NOW lists in its FAQ has no compartmentSize value in
+the partner API (manual v7.2 error P406, OpenAPI 1.68), so it stays
+booked as Small; the sources are cited next to the limits. A test now
+covers the dimensions in the product CSV export.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(shipping): flag the options a cart does not fit
+
+GET /shipping/options now finds the caller's cart the way every cart
+endpoint does (X-Cart-Id, or the signed-in user's cart) and marks each
+option whose carrier cannot take it with exceeds_parcel_size, using the
+same assert_parcel_fits rule as quote and availability. The option is
+still listed, like exceeds_max_weight. With no cart, or an unknown one,
+the field is false and nothing else changes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(shipping_boxnow): search lockers for the size the cart needs
+
+The nearest-locker lookup now derives the compartment size from the
+caller's cart (X-Cart-Id, the store default when it names none) and
+asks BoxNow only for lockers with that size free. A cart that fits no
+compartment is refused with 400 parcel_too_large before BoxNow is
+called. The client-supplied compartment_size body field is removed, as
+the order one was. Options and this endpoint share cart_item_pairs, so
+both find the cart the way every cart endpoint does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* feat(shipping): let the cart token read parcel fit
+
+GET /shipping/options and the nearest-locker lookup resolve the cart
+with accepts_cart_token, so the signed-in shopper's chat gets
+exceedsParcelSize and the derived locker size for their own cart. They
+are reads that reveal only fit, like GET /cart. The token still wins
+over X-Cart-Id and an invalid one is a 401, never a guest cart.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+### Refactoring
+
+* refactor(order): stop storing the stock reason a code already says
+
+The manual stock adjustment wrote reason_code and, beside it, the English
+sentence, kept only for the release before reason codes. That release is
+gone and the serving one reads the code first, so the signal writes the
+code alone and a data migration blanks the sentence on rows that carry
+both. A coded row with its own wording is never touched; the other
+writers pass free text with ids in it and have no fixed reason to code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* refactor(shipping): drop the unused provider code from the parcel-size error
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
+* refactor(order): wait for the hold only when a payment is not closed
+
+The default close_payment is now closed once the order's stored hold has
+ended and not before, instead of always True, and a Stripe order with no
+PaymentIntent falls back to it. A provider that cancels (Stripe) needs no
+wait. This drops the Viva order cancel added just before: the stored
+hold is the expiry Viva applied, so after it no payment can land.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW
+
+* Revert "refactor(order): wait for the hold only when a payment is not closed"
+
+Restores the Viva payment order cancel: close_payment takes the order, Stripe
+cancels the PaymentIntent, Viva cancels each code with the tenant's own
+credentials and asks nothing once the stored hold has ended, so the wait
+applies only to a payment that could not be closed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW
+
+* Revert "Revert "refactor(order): wait for the hold only when a payment is not closed""
+
+Final design for the failed-payment sweep: the default close_payment waits
+for the order's stored hold, Stripe cancels its PaymentIntent, and Viva
+takes the default.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`b5f829a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f829a2368b02471092d3cc03bc0bc3f35b470a))
+
 ## v3.143.8 (2026-10-20)
 
 ### Bug fixes

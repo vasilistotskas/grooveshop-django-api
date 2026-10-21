@@ -3,6 +3,7 @@ import os
 
 from celery import Celery
 from celery.signals import (
+    beat_init,
     before_task_publish,
     setup_logging,
     task_postrun,
@@ -130,6 +131,18 @@ def create_celery_app():
             "Worker refreshed translations from DB (version %s)",
             remote_version,
         )
+
+    @beat_init.connect(weak=False)
+    def delete_unscheduled_entries(**kwargs):
+        """Drop the beat rows this environment's settings no longer schedule.
+
+        ``beat_init`` fires for any scheduler and however beat is launched
+        (the manifests pass ``--scheduler`` on the command line, which a
+        scheduler subclass set in settings would lose to).
+        """
+        from core.beat import delete_unscheduled_periodic_tasks
+
+        delete_unscheduled_periodic_tasks()
 
     @worker_process_shutdown.connect(weak=False)
     def shutdown_worker_process(**kwargs):

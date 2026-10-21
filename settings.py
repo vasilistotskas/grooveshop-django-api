@@ -1067,6 +1067,20 @@ TENANT_BILLING = {
 }
 
 
+# The nightly pg_dump (and the pruning of its output) is production's
+# disaster-recovery copy. An environment that is itself a refreshable,
+# anonymised clone of production (staging) sets this to False: it then
+# schedules neither entry, and ``core.beat`` deletes the rows the cloned
+# database brings along, because DatabaseScheduler never removes a row
+# whose entry left CELERY_BEAT_SCHEDULE. On by default: production relies
+# on the dump.
+DATABASE_BACKUPS_ENABLED = getenv("DATABASE_BACKUPS_ENABLED", "True") == "True"
+DATABASE_BACKUP_BEAT_ENTRIES = (
+    "scheduled-database-backup",
+    "cleanup-old-backups",
+)
+
+
 def get_celery_beat_schedule():
     base_schedule = {
         "monitor-system-health": {
@@ -1471,6 +1485,10 @@ def get_celery_beat_schedule():
         },
     }
 
+    if not DATABASE_BACKUPS_ENABLED:
+        for name in DATABASE_BACKUP_BEAT_ENTRIES:
+            del base_schedule[name]
+
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
         base_schedule.update(
             {
@@ -1488,6 +1506,11 @@ def get_celery_beat_schedule():
 
 
 CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
+# Entries this environment must NOT run: ``core.beat`` deletes their
+# PeriodicTask rows when beat starts.
+CELERY_BEAT_UNSCHEDULED_ENTRIES = (
+    () if DATABASE_BACKUPS_ENABLED else DATABASE_BACKUP_BEAT_ENTRIES
+)
 
 CHANNEL_LAYERS = {
     "default": {

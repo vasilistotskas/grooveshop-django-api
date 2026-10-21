@@ -199,6 +199,13 @@ Tasks are split by domain:
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 - `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
+**Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps
+`scheduled-database-backup` and `cleanup-old-backups` in the beat schedule;
+staging sets it `False`. `DatabaseScheduler` never deletes a row whose entry
+left `CELERY_BEAT_SCHEDULE`, so `core/beat.py` deletes the rows named by
+`CELERY_BEAT_UNSCHEDULED_ENTRIES` on every beat start. See
+`docs/staging-anonymise.md`.
+
 **Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
 successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`
 keeps failures and retries, which land in `django_celery_results` in the
@@ -229,7 +236,7 @@ All factories extend `CustomDjangoModelFactory` from `devtools/factories.py`. Ke
 
 Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories.
 
-Settings read while Django sets up live in `tests/settings.py`, selected with `--ds=tests.settings` in `addopts` (the option outranks a `DJANGO_SETTINGS_MODULE` env var, which every container gets from `env_file: .env`). It pins `DISABLE_CACHE`, `ENABLE_DEBUG_TOOLBAR`, `APPEND_SLASH` and `DEBUG` in the environment before `settings.py` loads, so the developer's `.env` cannot make a local run differ from CI, and declares `CACHES` as `tests.cache.WorkerScopedCache` (Redis, `clear()` scoped to its own `KEY_PREFIX`). The cache prefix and the per-run `MEDIA_ROOT` both follow `TEST_NAMESPACE` — the test database name plus the xdist worker — so two sessions on one machine never touch each other's state **as long as they use different `DB_NAME`s**: a second `-n N` run beside a full run must set its own `DB_NAME=…` (or use `-n0`), or it truncates the full run's `test_<DB_NAME>_gwN` databases. pytest-django imports `conftest.py` only after `django.setup()`, so a value assigned there is too late for anything an `AppConfig.ready()` or the cache registry reads. Key `conftest.py` settings:
+Settings read while Django sets up live in `tests/settings.py`, selected with `--ds=tests.settings` in `addopts` (the option outranks a `DJANGO_SETTINGS_MODULE` env var, which every container gets from `env_file: .env`). It pins `DISABLE_CACHE`, `ENABLE_DEBUG_TOOLBAR`, `APPEND_SLASH`, `DEBUG` and `DATABASE_BACKUPS_ENABLED` in the environment before `settings.py` loads, so the developer's `.env` cannot make a local run differ from CI, and declares `CACHES` as `tests.cache.WorkerScopedCache` (Redis, `clear()` scoped to its own `KEY_PREFIX`). The cache prefix and the per-run `MEDIA_ROOT` both follow `TEST_NAMESPACE` — the test database name plus the xdist worker — so two sessions on one machine never touch each other's state **as long as they use different `DB_NAME`s**: a second `-n N` run beside a full run must set its own `DB_NAME=…` (or use `-n0`), or it truncates the full run's `test_<DB_NAME>_gwN` databases. pytest-django imports `conftest.py` only after `django.setup()`, so a value assigned there is too late for anything an `AppConfig.ready()` or the cache registry reads. Key `conftest.py` settings:
 - MD5 password hasher (faster than default)
 - `MEILISEARCH["OFFLINE"] = True`
 - `CELERY_TASK_ALWAYS_EAGER = True` with `EAGER_PROPAGATES` — a task body that fails raises into the test

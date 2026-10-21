@@ -3,6 +3,40 @@
 
 
 
+## v3.145.0 (2026-10-21)
+
+### Features
+
+* feat(ops): switch the nightly database dump off per environment (#303) ([`102551f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/102551f0c3ba901a9a9bb5570d021e913351443d))
+
+* feat(core): make the nightly database dump switchable per environment
+
+DATABASE_BACKUPS_ENABLED (default True, production's behaviour) keeps
+scheduled-database-backup and cleanup-old-backups in the beat schedule.
+Off drops both entries, and core.beat deletes their PeriodicTask rows on
+every beat start (beat_init), because DatabaseScheduler never removes a row
+whose entry left CELERY_BEAT_SCHEDULE and a database cloned from production
+brings those rows along.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW ([`102551f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/102551f0c3ba901a9a9bb5570d021e913351443d))
+
+### Testing
+
+* test(core): pin DATABASE_BACKUPS_ENABLED for the suite
+
+tests/settings.py pins it to production's value before settings.py
+loads, like DEBUG and APPEND_SLASH, so an .env copied from staging
+cannot turn the dump off for the suite. The enabled-mode tests now say
+which mode they test instead of relying on the ambient import.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019AxRFmUeF2TfQ45pKZw9KW
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`102551f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/102551f0c3ba901a9a9bb5570d021e913351443d))
+
 ## v3.144.0 (2026-10-21)
 
 ### Bug fixes

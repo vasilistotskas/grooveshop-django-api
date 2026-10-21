@@ -218,6 +218,14 @@ class TestCacheServiceHook:
             CacheService.purge(["products"], include_related=False)
         schedule.assert_called_once()
 
+    def test_a_page_config_purge_schedules_an_edge_purge(self):
+        with (
+            mock.patch.object(edge, "schedule_purge") as schedule,
+            mock.patch("core.cache.nuxt.request_purge"),
+        ):
+            CacheService.purge(["page_config"], include_related=False)
+        schedule.assert_called_once()
+
     def test_a_dry_run_purges_nothing_at_the_edge(self):
         with (
             mock.patch.object(edge, "schedule_purge") as schedule,

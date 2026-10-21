@@ -12,6 +12,7 @@ from django.core.cache.backends.redis import RedisCache, RedisCacheClient
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
+from redis.lock import Lock
 from redis.retry import Retry
 
 logger = logging.getLogger(__name__)
@@ -441,6 +442,23 @@ class CustomCache(RedisCache):
         members, _ = pipe.execute()
         return frozenset(
             m.decode("utf-8") if isinstance(m, bytes) else m for m in members
+        )
+
+    def lock(self, key: str, *, timeout: float) -> Lock:
+        """A redis-py ``Lock`` on *key* (tenant-keyed), expiring after *timeout*.
+
+        For a lease whose release must not delete another holder's: the
+        lock stores a per-holder token and ``release`` compares it before
+        deleting, so a lease that expired and was taken by someone else is
+        left alone (``release`` raises ``LockNotOwnedError`` instead).
+        Non-blocking: ``acquire()`` returns ``False`` when taken.
+        Raises on an unreachable Redis, like ``add``.
+        """
+        return self._cache.get_client(None, write=True).lock(
+            self.make_key(key),
+            timeout=timeout,
+            blocking=False,
+            thread_local=False,
         )
 
     def clear_by_prefixes(

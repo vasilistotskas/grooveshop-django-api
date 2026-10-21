@@ -22,6 +22,7 @@ from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from shipping_acs.concurrency import acs_request_slot
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
@@ -49,6 +50,32 @@ _RETRY_CONFIG = Retry(
     backoff_factor=0.5,
     raise_on_status=False,
 )
+
+
+def worst_case_request_seconds(timeout: float) -> float:
+    """Longest one ``_call`` can hold the connection to ACS.
+
+    ``requests`` applies ``timeout`` to the connect and to each read
+    separately, and ``_RETRY_CONFIG`` re-attempts a failed connect
+    ``min(total, connect)`` times with urllib3's backoff in between (none
+    before the first retry, ``factor * 2 ** (n - 1)`` capped at
+    ``backoff_max`` after the n-th error). Every attempt can spend the
+    whole connect timeout, then the one read that gets an answer can spend
+    the read timeout. The slot lease in ``shipping_acs.concurrency`` is
+    this figure, so it outlives any request by construction. DNS
+    resolution is outside ``timeout`` and a body trickled slower than one
+    chunk per ``timeout`` is not bounded by it; the holder-token release
+    keeps an expired lease harmless to the next holder either way.
+    """
+    retries = min(_RETRY_CONFIG.total or 0, _RETRY_CONFIG.connect or 0)
+    backoff = sum(
+        min(
+            _RETRY_CONFIG.backoff_max,
+            _RETRY_CONFIG.backoff_factor * 2 ** (errors - 1),
+        )
+        for errors in range(2, retries + 1)
+    )
+    return (retries + 1) * timeout + backoff + timeout
 
 
 class AcsClient:
@@ -150,16 +177,23 @@ class AcsClient:
         }
 
         try:
-            response = self._session.post(
-                self.api_base_url,
-                json=body,
-                headers={
-                    "AcsApiKey": self.api_key,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                timeout=self.timeout,
-            )
+            # Every ACS call, whatever the alias, takes a slot: ACS
+            # rejects overlapping calls from one account with a 406.
+            with acs_request_slot(
+                account=self.company_id,
+                alias=alias,
+                lease_seconds=worst_case_request_seconds(self.timeout),
+            ):
+                response = self._session.post(
+                    self.api_base_url,
+                    json=body,
+                    headers={
+                        "AcsApiKey": self.api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    timeout=self.timeout,
+                )
         except requests.ConnectionError as exc:
             raise AcsRetryableError(
                 alias=alias,
@@ -176,18 +210,19 @@ class AcsClient:
                 error_message=f"ACS timeout after {self.timeout}s: {exc}",
             ) from exc
 
-        # Auth failures bypass the JSON envelope. Production ACS also
-        # returns sporadic transient 403/406s (~2% of tracking polls,
-        # self-healing on retry), so AcsAuthError is retryable — see
-        # its docstring. Only a *persistent* rejection indicates a bad
-        # key or a de-listed IP.
+        # Auth failures bypass the JSON envelope. ACS answers 406 to
+        # overlapping calls from one account, which ``acs_request_slot``
+        # now bounds; a rejection that still gets through was never
+        # processed, so AcsAuthError is retryable — see its docstring.
+        # Only a *persistent* rejection indicates a bad key or a
+        # de-listed IP.
         if response.status_code in (403, 406):
             raise AcsAuthError(
                 alias=alias,
                 error_message=(
                     "ACS rejected the request at the auth layer "
-                    "(usually a transient rejection that succeeds on "
-                    "retry; persistent failures mean an invalid "
+                    "(usually too many calls in flight at once, which "
+                    "succeeds on retry; persistent failures mean an invalid "
                     "AcsApiKey or a calling IP missing from the "
                     "allow-list)."
                 ),

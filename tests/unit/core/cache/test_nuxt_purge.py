@@ -58,6 +58,64 @@ class TestCurrentTenantHost:
         assert nuxt_client._current_tenant_host() is None
 
 
+class TestStoreWithoutAPrimaryDomain:
+    """A store whose host cannot be found must never purge platform-wide."""
+
+    @pytest.fixture
+    def domainless(self, bound_tenant):
+        bound_tenant.domains.all().delete()
+        return bound_tenant
+
+    def test_the_host_lookup_refuses_instead_of_answering_none(
+        self, domainless
+    ):
+        with pytest.raises(nuxt_client.StoreHostUnresolvedError) as raised:
+            nuxt_client._current_tenant_host()
+        assert raised.value.schema_name == "purge_scope_tenant"
+
+    def test_no_request_is_sent_and_an_error_is_logged(
+        self, _configured, domainless, caplog
+    ):
+        with (
+            caplog.at_level("ERROR", logger="core.cache.nuxt"),
+            mock.patch("core.cache.nuxt.requests.post") as post,
+        ):
+            result = nuxt_client.request_purge(["cache:nitro:routes:_:*"])
+        post.assert_not_called()
+        assert result.error and "purge_scope_tenant" in result.error
+        assert (result.matched, result.deleted) == (0, 0)
+        errors = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert len(errors) == 1
+        assert "purge_scope_tenant" in errors[0].getMessage()
+
+    def test_a_store_with_only_a_secondary_domain_is_refused_too(
+        self, _configured, bound_tenant
+    ):
+        bound_tenant.domains.filter(is_primary=True).delete()
+        with mock.patch("core.cache.nuxt.requests.post") as post:
+            result = nuxt_client.request_purge(["cache:nitro:routes:_:*"])
+        post.assert_not_called()
+        assert result.error
+
+    def test_the_public_schema_purge_stays_platform_wide(
+        self, _configured, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        from django.db import connection
+
+        monkeypatch.setattr(
+            connection,
+            "tenant",
+            SimpleNamespace(schema_name="public"),
+            raising=False,
+        )
+        with mock.patch("core.cache.nuxt.requests.post") as post:
+            post.return_value.json.return_value = {}
+            nuxt_client.request_purge(["cache:nitro:routes:_:*"])
+        assert "host" not in post.call_args.kwargs["json"]
+
+
 class TestRequestPurgeHostScoping:
     def _capture_payload(self):
         posted = {}

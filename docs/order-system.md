@@ -1158,13 +1158,53 @@ accepting Cyprus orders at the Greek flat rate.
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
   new request with `P410` (duplicate) raises the usual creation alert.
-- **Known limit: the compartment size is not derived.** `BoxNowShipment.
-  compartment_size` is what the checkout sends
-  (`boxnow_compartment_size`, the storefront defaults to 1 = Small) and a
-  customer never chooses it. A product carries a weight but no length,
-  width or height, and a BoxNow compartment is a dimensional limit, so the
-  smallest size that fits cannot be computed until products carry
-  dimensions.
+- **The compartment size is derived from the products' dimensions**
+  (`shipping_boxnow/packing.py`). `Product.length` / `width` / `height`
+  are nullable `Distance` fields (stored in metres, edited in cm, mm, m or
+  inch next to the weight in the product admin; not in the API, nothing
+  outside the server reads them). Limits are `COMPARTMENT_LIMITS_CM`
+  (`shipping_boxnow/enum/compartment_size.py`), BOX NOW's published sizes
+  (https://boxnow.gr/en/faq): Small H8, Medium H17, Large H36, all W45 x
+  L60 cm. The FAQ also lists a Mini (H8 x W24 x L60); the partner API has
+  no value for it (manual v7.2, error P406: "one of required sizes 1, 2 or 3
+  (Small, Medium or Large)", and the OpenAPI spec 1.68, both under
+  `boxnow.gr/media/hidden/`), so it is booked as Small. The
+  20 kg weight limit stays on `ShippingRate.max_weight_grams`. The rule is
+  conservative, never undersizing: each unit lies on its smallest side
+  (height = smallest dimension), its other two sides must fit W45 x L60,
+  and units are stacked (no side-by-side packing), so the parcel's height
+  is the sum of the units' heights; the answer is the smallest size whose
+  height holds the stack. Dimensions compare at millimetre precision
+  (metres are floats). `create_shipment_row` stores the result on
+  `BoxNowShipment.compartment_size`, which goes out as
+  `items[].compartmentSize`.
+  **The checkout no longer supplies a size** (the server owns it; an old
+  client still sending `boxnowCompartmentSize` is ignored, not rejected).
+  **Products without dimensions** get the store's
+  `BOXNOW_DEFAULT_COMPARTMENT_SIZE` setting (1 = Small by default, 2 and 3
+  allowed, validated). A cart with some measured and some unmeasured items
+  takes the larger of the derived size and that setting; with every item
+  measured the derived size wins. Gift items from a
+  promotion are not measured.
+- **A cart that fits no compartment is refused at checkout**, next to the
+  weight cap: `ShippingService.assert_available(items=...)` asks the
+  adapter (`ShippingCarrierInterface.assert_parcel_fits`, no limit by
+  default) and a `ShippingParcelTooLargeError` becomes the 400
+  `invalid_order_data` ("The cart is too large for the selected shipping
+  method.") on `shippingProviderCode`, from order creation and from the
+  create-payment-intent endpoint. `/shipping/options` finds the cart the
+  way every cart endpoint does (`X-Cart-Id`, or the signed-in user's
+  cart; `CartService`) and flags each option the cart does not fit with
+  `exceeds_parcel_size`, by the same `assert_parcel_fits` rule. The option
+  is still listed. With no cart, or an unknown one, it is always false.
+  The response varies by cart, so a shared cache in front of this route
+  must not serve it across carts.
+  `POST /shipping/boxnow/lockers/nearest` (the closest-locker lookup)
+  derives its `requiredSize` the same way, from the cart at `X-Cart-Id`
+  (the store default when there is none) and refuses a cart that fits no
+  compartment with 400 `parcel_too_large`; the old `compartment_size` body
+  field is gone. The storefront's locker picker is BoxNow's own iframe
+  widget, which this API does not drive.
 - **BoxNow is on only when its credentials and warehouse are set**: client
   id, secret, partner id and warehouse id
   (`shipping_boxnow.services.missing_credentials`, one rule for

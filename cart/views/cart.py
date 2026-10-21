@@ -1023,8 +1023,11 @@ class CartViewSet(BaseModelViewSet):
         )
 
         cart_total = cart.total_price
-        cart_weight_grams = compute_total_weight_grams(
+        cart_items = [
             (item.product, item.quantity) for item in cart.items.all()
+        ]
+        cart_weight_grams = compute_total_weight_grams(
+            cart_items
         ) + PromotionEngine.gift_weight_grams(promo_result)
         try:
             threshold_value = OrderService.threshold_value(
@@ -1037,6 +1040,7 @@ class CartViewSet(BaseModelViewSet):
                 shipping_provider_code=shipping_provider_code,
                 shipping_kind=shipping_kind,
                 weight_grams=cart_weight_grams,
+                items=cart_items,
                 free=promo_result.free_shipping,
             )
         except InvalidOrderDataError as exc:

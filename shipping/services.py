@@ -10,7 +10,7 @@ price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -19,6 +19,7 @@ from djmoney.money import Money
 
 from shipping.enum import ShippingKind
 from shipping.exceptions import (
+    ShippingParcelTooLargeError,
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
@@ -260,6 +261,7 @@ class ShippingService:
         order_value_amount: float = 0.0,
         currency: str = "EUR",
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
@@ -280,8 +282,12 @@ class ShippingService:
         A cart heavier than the rate's ``max_weight_grams`` still gets
         its row, flagged ``exceeds_max_weight`` — the storefront shows
         it disabled with a reason rather than a step that silently has
-        one fewer option.
+        one fewer option. The same goes for ``items`` (the cart's
+        ``(product, quantity)`` pairs, when the caller's cart is known)
+        that do not fit the carrier's parcels: ``exceeds_parcel_size``,
+        decided by the rule :meth:`assert_available` enforces.
         """
+        items = None if items is None else list(items)
         country_code = country_code.upper()
         order_value = Money(order_value_amount, currency)
 
@@ -334,6 +340,12 @@ class ShippingService:
                     and rate.max_weight_grams is not None
                     and weight_grams > rate.max_weight_grams
                 )
+                exceeds_parcel_size = False
+                if items is not None:
+                    try:
+                        adapter.assert_parcel_fits(kind=kind, items=items)
+                    except ShippingParcelTooLargeError:
+                        exceeds_parcel_size = True
                 price = cls._priced(
                     rate,
                     country_code=country_code,
@@ -366,6 +378,7 @@ class ShippingService:
                         "country_code": country_code,
                         "max_weight_grams": rate.max_weight_grams,
                         "exceeds_max_weight": exceeds_max_weight,
+                        "exceeds_parcel_size": exceeds_parcel_size,
                         "delivery_days_min": rate.delivery_days_min,
                         "delivery_days_max": rate.delivery_days_max,
                     }
@@ -691,8 +704,14 @@ class ShippingService:
         kind: str | None,
         country_code: str | None,
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
     ) -> ShippingRate:
-        """:meth:`active_rate`, plus the weight-cap check.
+        """:meth:`active_rate`, plus the weight-cap and parcel-size checks.
+
+        ``items`` are the cart's ``(product, quantity)`` pairs; the
+        carrier adapter decides whether they fit its parcels
+        (``ShippingCarrierInterface.assert_parcel_fits``). ``None``
+        skips that check.
 
         Used directly (not through :meth:`quote`) by callers that need
         to gate on availability without needing a priced amount — e.g.
@@ -710,6 +729,10 @@ class ShippingService:
             raise ShippingWeightExceededError(
                 weight_grams=weight_grams,
                 max_weight_grams=rate.max_weight_grams,
+            )
+        if items is not None:
+            get_provider(rate.provider.code).assert_parcel_fits(
+                kind=ShippingKind(rate.kind), items=items
             )
         return rate
 
@@ -758,9 +781,10 @@ class ShippingService:
         country_code: str | None,
         region_id: str | None = None,
         weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
         order_value: Money,
     ) -> Money:
-        """Gate on availability + weight cap, then price the shipment.
+        """Gate on availability, weight cap and parcel size, then price.
 
         The single entry point ``OrderService.shipping_cost`` and the
         create-payment-intent view use — replaces the old
@@ -776,6 +800,7 @@ class ShippingService:
             kind=kind,
             country_code=country_code,
             weight_grams=weight_grams,
+            items=items,
         )
         price = cls._priced(
             rate,

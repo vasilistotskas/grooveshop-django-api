@@ -19,7 +19,7 @@ abstraction *dynamic*: adding a new provider is one new app + one
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.exceptions import ShippingProviderNotFoundError
@@ -117,6 +117,21 @@ class ShippingCarrierInterface(ABC):
 
         Empty dict when the payload is valid for this provider+kind.
         """
+
+    def assert_parcel_fits(
+        self,
+        *,
+        kind: ShippingKind,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Raise ``ShippingParcelTooLargeError`` when ``items`` cannot ship.
+
+        ``items`` are ``(product, quantity)`` pairs. Called next to the
+        rate's weight cap, so a carrier with fixed parcel sizes (a
+        locker) refuses at checkout rather than at the courier.
+        Default: no size limit.
+        """
+        return
 
     def live_quote(
         self,

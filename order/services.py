@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -970,8 +970,11 @@ class OrderService:
             from shipping.utils import compute_total_weight_grams
 
             _cart_total = cart.total_price
-            _cart_weight_grams = compute_total_weight_grams(
+            _cart_pairs = [
                 (item.product, item.quantity) for item in cart.items.all()
+            ]
+            _cart_weight_grams = compute_total_weight_grams(
+                _cart_pairs
             ) + PromotionEngine.gift_weight_grams(promo_result)
             _threshold_value = cls.threshold_value(_cart_total, promo_discount)
             _shipping_cost = cls.shipping_cost(
@@ -983,6 +986,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=_cart_weight_grams,
+                items=_cart_pairs,
                 free=promo_result.free_shipping,
             )
             # Pay-way fee: waived on the same value as free shipping —
@@ -1203,6 +1207,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
+                items=[(ci.product, ci.quantity) for ci in cart_items],
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -1783,6 +1788,7 @@ class OrderService:
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
                 weight_grams=cart_weight_grams,
+                items=[(ci.product, ci.quantity) for ci in cart_items],
                 free=promo_result.free_shipping,
             )
             order_data["shipping_price"] = shipping_cost
@@ -4717,9 +4723,13 @@ class OrderService:
         shipping_kind: str | None = None,
         weight_grams: int | None = None,
         *,
+        items: Iterable[tuple[Any, int]] | None = None,
         free: bool = False,
     ) -> Money:
         """The shipping price for a (provider, kind, country) — or 0 when ``free``.
+
+        ``items`` are the cart's ``(product, quantity)`` pairs, checked
+        against the carrier's parcel sizes next to the weight cap.
 
         ``order_value`` is :meth:`threshold_value`, never the gross cart
         total: the free-shipping threshold is judged on the products after
@@ -4745,6 +4755,7 @@ class OrderService:
         """
         from shipping.enum import ShippingKind
         from shipping.exceptions import (
+            ShippingParcelTooLargeError,
             ShippingUnavailableError,
             ShippingWeightExceededError,
         )
@@ -4783,6 +4794,7 @@ class OrderService:
                     kind=shipping_kind,
                     country_code=country_id,
                     weight_grams=weight_grams,
+                    items=items,
                 )
                 return Money(0, order_value.currency)
 
@@ -4792,6 +4804,7 @@ class OrderService:
                 country_code=country_id,
                 region_id=region_id,
                 weight_grams=weight_grams,
+                items=items,
                 order_value=order_value,
             )
         except ShippingUnavailableError as exc:
@@ -4808,6 +4821,22 @@ class OrderService:
                             _(
                                 "The selected shipping method is not "
                                 "available for the selected country."
+                            )
+                        )
+                    ]
+                },
+            ) from exc
+        except ShippingParcelTooLargeError as exc:
+            raise InvalidOrderDataError(
+                str(
+                    _("The cart is too large for the selected shipping method.")
+                ),
+                field_errors={
+                    "shipping_provider_code": [
+                        str(
+                            _(
+                                "The cart is too large for the selected "
+                                "shipping method."
                             )
                         )
                     ]

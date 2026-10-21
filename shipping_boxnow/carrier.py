@@ -8,13 +8,14 @@ class so behaviour is unchanged from the pre-abstraction code path.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.interfaces import ShippingCarrierInterface, register_provider
 from shipping_boxnow.exceptions import BoxNowUnsupportedSettlementError
+from shipping_boxnow.packing import derive_compartment, resolve_compartment_size
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -28,10 +29,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "boxnow"
 
     # Carrier-specific request-body keys popped before Order.create().
-    payload_keys: ClassVar[tuple[str, ...]] = (
-        "boxnow_locker_id",
-        "boxnow_compartment_size",
-    )
+    payload_keys: ClassVar[tuple[str, ...]] = ("boxnow_locker_id",)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -200,6 +198,17 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         return {}
 
+    def assert_parcel_fits(
+        self,
+        *,
+        kind: ShippingKind,
+        items: Iterable[tuple[Any, int]],
+    ) -> None:
+        """Refuse a cart whose measured items fit no BoxNow compartment."""
+        if kind != ShippingKind.PICKUP_POINT:
+            return
+        derive_compartment(items)
+
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)
     # ------------------------------------------------------------------
@@ -220,11 +229,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         Reads:
         * ``boxnow_locker_id`` (string)
-        * ``boxnow_compartment_size`` (1, 2, 3)
 
         Computes the parcel weight from the cart line items so the
         BoxNow voucher PDF prints the real weight (BoxNow tariffs by
-        weight bracket).
+        weight bracket), and the compartment size from their
+        dimensions (``shipping_boxnow.packing``).
         """
         from shipping.utils import compute_total_weight_grams
         from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
@@ -235,7 +244,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
             return
 
         locker_id = payload.get("boxnow_locker_id", "") or ""
-        compartment_size = int(payload.get("boxnow_compartment_size", 1) or 1)
+        compartment_size = resolve_compartment_size(items)
 
         weight_grams = 0
         if items is not None:

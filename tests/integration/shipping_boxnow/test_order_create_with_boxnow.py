@@ -126,7 +126,6 @@ class TestOrderCreateWithBoxNow(APITestCase):
             # pair (see ``order/services._resolve_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
-            "boxnow_compartment_size": 1,
         }
         if include_locker_id:
             payload["boxnow_locker_id"] = locker_id
@@ -375,3 +374,120 @@ class TestOrderCreateWithBoxNow(APITestCase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         body_str = str(response.json()).lower()
         assert "shipping" in body_str or "unavailable" in body_str
+
+    def _measure_product(self, length, width, height):
+        from measurement.measures import Distance
+
+        self.product.length = Distance(cm=length)
+        self.product.width = Distance(cm=width)
+        self.product.height = Distance(cm=height)
+        self.product.save()
+
+    def _place_order(
+        self, mock_validate_address, mock_validate_cart, mock_pp, **extra
+    ):
+        self._bind_boxnow_tenant()
+        mock_validate_cart.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        mock_validate_address.return_value = None
+        self._mock_payment_success(mock_pp)
+        self.client.force_authenticate(user=self.user)
+        return self.client.post(
+            self.create_url,
+            {
+                **self._build_payload(pay_way_id=self.online_pay_way.id),
+                **extra,
+            },
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.uuid),
+        )
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_client_sent_compartment_size_is_ignored(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        """The server owns the parcel size: the storefront's old
+        ``boxnowCompartmentSize`` input is dropped, not rejected."""
+        response = self._place_order(
+            mock_validate_address,
+            mock_validate_cart,
+            mock_get_payment_provider,
+            boxnow_compartment_size=3,
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, (
+            f"Unexpected response: {response.json()}"
+        )
+        shipment = BoxNowShipment.objects.get()
+        assert shipment.compartment_size == 1
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_compartment_size_is_derived_and_sent_to_boxnow(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        # 3 x 5 cm stacked = 15 cm: Medium, though the checkout sent 1.
+        self._measure_product(30, 20, 5)
+        item = self.cart.items.get()
+        item.quantity = 3
+        item.save()
+
+        response = self._place_order(
+            mock_validate_address, mock_validate_cart, mock_get_payment_provider
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, (
+            f"Unexpected response: {response.json()}"
+        )
+        from order.models.order import Order
+        from shipping_boxnow.enum import BoxNowCompartmentSize
+        from shipping_boxnow.services import BoxNowService
+
+        order = Order.objects.latest("id")
+        shipment = BoxNowShipment.objects.get(order=order)
+        assert shipment.compartment_size == BoxNowCompartmentSize.MEDIUM
+
+        client = MagicMock()
+        client.return_value.create_delivery_request.return_value = {
+            "id": "42224",
+            "parcels": [{"id": "9219709201"}],
+        }
+        with patch("shipping_boxnow.services.BoxNowClient", client):
+            BoxNowService.create_shipment_for_order(order)
+        sent = client.return_value.create_delivery_request.call_args[0][0]
+        assert (
+            sent["items"][0]["compartmentSize"] == BoxNowCompartmentSize.MEDIUM
+        )
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_cart_that_fits_no_compartment_is_refused_at_checkout(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        self._measure_product(80, 50, 40)
+
+        response = self._place_order(
+            mock_validate_address, mock_validate_cart, mock_get_payment_provider
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, (
+            f"Unexpected response: {response.json()}"
+        )
+        assert "shippingProviderCode" in response.json()["fieldErrors"]
+        assert not BoxNowShipment.objects.exists()

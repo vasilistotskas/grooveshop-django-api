@@ -1172,13 +1172,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("BoxNow APM locker ID from the widget"),
     )
-    boxnow_compartment_size = serializers.IntegerField(
-        min_value=1,
-        max_value=3,
-        required=False,
-        default=1,
-        help_text=_("BoxNow compartment size: 1=Small, 2=Medium, 3=Large"),
-    )
 
     # Shipping abstraction: ``(shipping_provider_code, shipping_kind)``
     # is the single source of truth for carrier dispatch. Validated

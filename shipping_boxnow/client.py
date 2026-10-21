@@ -457,7 +457,7 @@ class BoxNowClient:
         street: str,
         postal_code: str,
         region: str = "el-GR",
-        compartment_size: int = 1,
+        compartment_size: int,
     ) -> dict:
         """
         Find the closest APM locker to a given address.
@@ -471,7 +471,7 @@ class BoxNowClient:
             street:           Street address.
             postal_code:      Postal code.
             region:           Region/locale string (default ``"el-GR"``).
-            compartment_size: Required compartment size 1-3 (default 1).
+            compartment_size: Required compartment size, 1-3.
 
         Returns:
             Locker dict including ``id``, ``distance``, coordinates, etc.

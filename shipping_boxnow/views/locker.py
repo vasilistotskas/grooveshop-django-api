@@ -10,11 +10,15 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from cart.services import cart_item_pairs
+from cart.views.cart import GUEST_CART_HEADERS
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import BoxNowNearestThrottle
 from core.api.views import BaseModelViewSet
@@ -25,7 +29,9 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
+from shipping.exceptions import ShippingParcelTooLargeError
 from shipping_boxnow.models import BoxNowLocker
+from shipping_boxnow.packing import resolve_compartment_size
 from shipping_boxnow.serializers import (
     BoxNowLockerDetailSerializer,
     BoxNowLockerSerializer,
@@ -50,6 +56,7 @@ serializers_config: SerializersConfig = {
             " address-delivery-check API."
         ),
         tags=["BoxNow lockers"],
+        parameters=GUEST_CART_HEADERS,
     ),
 }
 
@@ -111,13 +118,30 @@ class BoxNowLockerViewSet(BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         vd = serializer.validated_data
+        # Only lockers with a free compartment of the size this cart
+        # needs: derived from the caller's cart (``X-Cart-Id``), the
+        # store default when it names none.
+        try:
+            compartment_size = resolve_compartment_size(
+                cart_item_pairs(request)
+            )
+        except ShippingParcelTooLargeError as exc:
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "The cart is too large for the selected shipping "
+                        "method."
+                    )
+                },
+                code="parcel_too_large",
+            ) from exc
         try:
             locker = BoxNowClient().find_closest_locker(
                 city=vd["city"],
                 street=vd["street"],
                 postal_code=vd["postal_code"],
                 region=vd.get("region", "el-GR"),
-                compartment_size=vd.get("compartment_size", 1),
+                compartment_size=compartment_size,
             )
         except BoxNowAPIError as exc:
             logger.warning(

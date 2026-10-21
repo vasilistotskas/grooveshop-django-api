@@ -45,7 +45,7 @@ from admin.displays import (
 from admin.export import ExportActionMixin
 from admin.filters import AnnotatedRangeFilter, LikesCountFilter
 from core.forms.measurement import MeasurementWidget
-from core.units import WeightUnits
+from core.units import DistanceUnits, WeightUnits
 from order.models.order import Order
 from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
@@ -943,6 +943,9 @@ class ProductAdmin(
                     "reduction_started_at",
                     "stock",
                     "weight",
+                    "length",
+                    "width",
+                    "height",
                     "low_stock_threshold",
                 ),
                 "classes": ("tab",),
@@ -1024,6 +1027,10 @@ class ProductAdmin(
         form.base_fields["weight"].widget = MeasurementWidget(
             unit_choices=WeightUnits.CHOICES
         )
+        for name in ("length", "width", "height"):
+            form.base_fields[name].widget = MeasurementWidget(
+                unit_choices=DistanceUnits.CHOICES
+            )
         return form
 
     def get_queryset(self, request):

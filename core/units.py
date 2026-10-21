@@ -1,9 +1,9 @@
 """Unit vocabularies for ``MeasurementField``.
 
-Only weight is modelled: ``Product.weight`` is the one measurement
-this platform stores. Distance, area and volume enums lived here too,
-along with a ``MeasurementUnits`` type built by folding all four
-together, and nothing ever read them.
+Weight (``Product.weight``) and distance (``Product.length`` / ``width``
+/ ``height``) are the measurements this platform stores. Area and volume
+enums lived here too, along with a ``MeasurementUnits`` type built by
+folding all of them together, and nothing ever read them.
 """
 
 from enum import StrEnum
@@ -23,4 +23,19 @@ WeightUnits.CHOICES = [
     (WeightUnits.OZ, "Ounce"),
     (WeightUnits.KG, "kg"),
     (WeightUnits.TONNE, "Tonne"),
+]
+
+
+class DistanceUnits(StrEnum):
+    CM = "cm"
+    MM = "mm"
+    M = "m"
+    INCH = "inch"
+
+
+DistanceUnits.CHOICES = [
+    (DistanceUnits.CM, "cm"),
+    (DistanceUnits.MM, "mm"),
+    (DistanceUnits.M, "m"),
+    (DistanceUnits.INCH, "inch"),
 ]

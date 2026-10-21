@@ -1750,6 +1750,21 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "BOXNOW_DEFAULT_COMPARTMENT_SIZE",
+        "type": "int",
+        "value": 1,
+        "validator": (
+            "shipping_boxnow.packing.validate_default_compartment_size"
+        ),
+        "description": (
+            "BOX NOW compartment booked for products that have no "
+            "length, width and height: 1 = Small, 2 = Medium, 3 = "
+            "Large. With dimensions on every product the size is "
+            "derived from them and this is not used; with some it is "
+            "the minimum."
+        ),
+    },
+    {
         "name": "ACS_DYNAMIC_PRICING_ENABLED",
         "type": "bool",
         "value": False,

@@ -124,8 +124,15 @@ line sees both, once each. In production it is one JSON object (the
 ```
 
 - `route` is the URL pattern, never the path; `schema` is the store. No
-  message text, body, query string or header is logged, so no user input
-  or personal data reaches the line.
+  message text, body or query string is logged, and the one header that
+  is, `correlation_id`, is the only client-controlled value in the line.
+  It is the client's `X-Correlation-ID` when one is sent (a UUID the
+  storefront mints otherwise), bounded by `CorrelationIdMiddleware`: C0
+  control characters and DEL are removed and the result is cut to 64
+  characters. Nothing else is checked, so it can hold any other
+  character, personal data included; the JSON formatter escapes it, so it
+  cannot add a field or a line, and it must be treated as untrusted when
+  read back (never as a key, a path or a template).
 - `level` is `WARNING` for a 5xx and `INFO` otherwise. `django.request`
   still logs every 5xx at `ERROR` (with the traceback when an exception
   caused it); the access line never repeats the traceback.

@@ -52,6 +52,11 @@ _PINNED_ENVIRONMENT = {
     # ``tests/conftest.py`` turns ``settings.DEBUG`` off for requests;
     # an ``.env`` with DEBUG off would throttle the whole suite.
     "DEBUG": "True",
+    # Production's value (the default). Decides at import time whether
+    # the nightly dump is in ``CELERY_BEAT_SCHEDULE`` and what
+    # ``CELERY_BEAT_UNSCHEDULED_ENTRIES`` holds; an ``.env`` copied from
+    # staging would otherwise turn the dump off for the whole suite.
+    "DATABASE_BACKUPS_ENABLED": "True",
 }
 environ.update(_PINNED_ENVIRONMENT)
 

@@ -29,6 +29,11 @@ BACKUP_ENTRIES = {
 
 
 @pytest.fixture
+def backups_on(monkeypatch):
+    monkeypatch.setattr(settings_module, "DATABASE_BACKUPS_ENABLED", True)
+
+
+@pytest.fixture
 def backups_off(monkeypatch):
     monkeypatch.setattr(settings_module, "DATABASE_BACKUPS_ENABLED", False)
 
@@ -46,7 +51,7 @@ def _cloned_rows() -> None:
     )
 
 
-def test_on_schedules_both_entries():
+def test_on_schedules_both_entries(backups_on):
     schedule = settings_module.get_celery_beat_schedule()
 
     for name, task in BACKUP_ENTRIES.items():
@@ -60,7 +65,9 @@ def test_off_schedules_neither_entry(backups_off):
     assert "monitor-system-health" in schedule
 
 
-def test_the_setting_defaults_to_on():
+def test_the_suite_runs_with_backups_on_and_nothing_unscheduled():
+    # ``tests/settings.py`` pins the production value before
+    # ``settings.py`` is imported, so no ``.env`` can flip it here.
     assert settings_module.DATABASE_BACKUPS_ENABLED is True
     assert settings_module.CELERY_BEAT_UNSCHEDULED_ENTRIES == ()
 
@@ -74,7 +81,8 @@ def test_the_unscheduled_entries_are_exactly_the_backup_entries():
 def test_on_keeps_every_row():
     _cloned_rows()
 
-    assert delete_unscheduled_periodic_tasks() == 0
+    with override_settings(CELERY_BEAT_UNSCHEDULED_ENTRIES=()):
+        assert delete_unscheduled_periodic_tasks() == 0
     assert PeriodicTask.objects.filter(name__in=BACKUP_ENTRIES).count() == 2
 
 

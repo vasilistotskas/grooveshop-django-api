@@ -53,9 +53,10 @@ def _current_tenant_host() -> str | None:
     in the model guarantees a primary domain (``DomainMixin.save`` only
     promotes a store's first domain; a store with none, or whose domains
     an admin removed, has none), so this raises
-    :class:`StoreHostUnresolvedError` instead.
+    :class:`StoreHostUnresolvedError` instead, as it does when the lookup
+    itself fails with a database error (``request_purge`` never raises).
     """
-    from django.db import connection
+    from django.db import DatabaseError, connection
     from django_tenants.utils import get_public_schema_name
 
     from tenant.membership import bound_tenant
@@ -65,11 +66,16 @@ def _current_tenant_host() -> str | None:
     if current is None or schema_name == get_public_schema_name():
         return None
 
-    tenant = bound_tenant()
-    domains = getattr(tenant, "domains", None)
-    primary = (
-        domains.filter(is_primary=True).first() if domains is not None else None
-    )
+    try:
+        tenant = bound_tenant()
+        domains = getattr(tenant, "domains", None)
+        primary = (
+            domains.filter(is_primary=True).first()
+            if domains is not None
+            else None
+        )
+    except DatabaseError as exc:
+        raise StoreHostUnresolvedError(str(schema_name)) from exc
     if primary is None:
         raise StoreHostUnresolvedError(str(schema_name))
     return primary.domain
@@ -120,7 +126,8 @@ def request_purge(
             "Nuxt cache purge skipped for store schema %s: %s; the store's "
             "cached pages were not purged",
             exc.schema_name,
-            exc,
+            exc.__cause__ or exc,
+            exc_info=exc.__cause__ is not None,
         )
         return NuxtPurgeResult(
             matched=0,

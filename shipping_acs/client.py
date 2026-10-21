@@ -164,8 +164,13 @@ class AcsClient:
         self,
         alias: str,
         params: dict[str, Any] | None = None,
+        *,
+        background: bool = False,
     ) -> dict[str, Any]:
         """Perform an ACS RPC call.
+
+        ``background`` marks the tracking polls, which may not take the
+        slots reserved for interactive calls (``acs_request_slot``).
 
         Returns the unwrapped ``ACSOutputResponce`` payload (note the
         misspelling — keep it on the wire side).  Raises typed
@@ -183,6 +188,7 @@ class AcsClient:
                 account=self.company_id,
                 alias=alias,
                 lease_seconds=worst_case_request_seconds(self.timeout),
+                background=background,
             ):
                 response = self._session.post(
                     self.api_base_url,
@@ -444,13 +450,17 @@ class AcsClient:
         Maps to the first ``Table_Data`` row of ``ACS_Trackingsummary``,
         or {} when the voucher is unknown.
         """
-        envelope = self._call("ACS_Trackingsummary", {"Voucher_No": voucher_no})
+        envelope = self._call(
+            "ACS_Trackingsummary", {"Voucher_No": voucher_no}, background=True
+        )
         rows = self._table_output(envelope)
         return rows[0] if rows else {}
 
     def tracking_details(self, voucher_no: str) -> list[dict[str, Any]]:
         """Return the full event history for ``voucher_no``."""
-        envelope = self._call("ACS_TrackingDetails", {"Voucher_No": voucher_no})
+        envelope = self._call(
+            "ACS_TrackingDetails", {"Voucher_No": voucher_no}, background=True
+        )
         return self._table_output(envelope)
 
     def pod_from_reference_no(self, reference_no: str) -> bytes:

@@ -30,6 +30,13 @@ pytestmark = pytest.mark.django_db
 LEASE = 30
 
 
+@pytest.fixture(autouse=True)
+def _no_reserve(settings):
+    """The slot tests below count plain slots; ``TestReservedSlots`` sets
+    its own reserve."""
+    settings.ACS_INTERACTIVE_RESERVED_SLOTS = 0
+
+
 @pytest.fixture
 def account() -> str:
     """A fresh account per test, so slots left behind never leak across."""
@@ -261,6 +268,72 @@ class TestClientUsesTheCap:
             pass
 
 
+class TestReservedSlots:
+    @pytest.fixture(autouse=True)
+    def _two_slots_one_reserved(self, settings):
+        settings.ACS_MAX_CONCURRENT_REQUESTS = 2
+        settings.ACS_INTERACTIVE_RESERVED_SLOTS = 1
+        settings.ACS_SLOT_WAIT_SECONDS = 0
+
+    def _slot(self, account, *, background):
+        return acs_request_slot(
+            account=account,
+            alias="A",
+            lease_seconds=LEASE,
+            background=background,
+        )
+
+    def test_polls_never_take_the_reserved_slot(self, account):
+        with self._slot(account, background=True):
+            with pytest.raises(AcsRetryableError):
+                with self._slot(account, background=True):
+                    pass
+
+    def test_an_interactive_call_gets_a_slot_while_polls_hold_theirs(
+        self, account
+    ):
+        with self._slot(account, background=True):
+            with self._slot(account, background=False):
+                pass
+
+    def test_interactive_calls_fill_the_reserve_before_the_poll_slots(
+        self, account
+    ):
+        with self._slot(account, background=False):
+            # The interactive call sat in the reserve, so a poll still fits.
+            with self._slot(account, background=True):
+                pass
+
+    def test_interactive_calls_may_use_every_slot(self, account):
+        with self._slot(account, background=False):
+            with self._slot(account, background=False):
+                with pytest.raises(AcsRetryableError):
+                    with self._slot(account, background=False):
+                        pass
+
+    def test_tracking_calls_are_the_background_ones(self, account):
+        session = MagicMock()
+        session.post.return_value = _ok_response()
+        client = AcsClient(
+            api_key="k",
+            company_id=account,
+            company_password="p",
+            user_id="u",
+            user_password="p",
+            billing_code="b",
+            api_base_url="https://example/acs",
+            session=session,
+        )
+        with self._slot(account, background=True):
+            # The poll slot is taken: tracking is refused, a quote is not.
+            with pytest.raises(AcsRetryableError):
+                client.tracking_summary("V1")
+            with pytest.raises(AcsRetryableError):
+                client.tracking_details("V1")
+            client.price_calculation({})
+            client.address_validation(address="x")
+
+
 class TestLease:
     def test_worst_case_covers_every_connect_attempt_backoff_and_read(self):
         # 3 connect retries = 4 attempts of 15 s, urllib3 backoff of
@@ -296,12 +369,13 @@ class TestLease:
 
 class TestSettingsBasis:
     def test_defaults_come_from_the_measurement(self, settings):
+        import settings as settings_module
+
         assert settings.ACS_MAX_CONCURRENT_REQUESTS == 2
-        assert (
-            settings.ACS_POLL_DISPATCH_SPACING_SECONDS
-            == settings.ACS_POLL_AVERAGE_TASK_SECONDS
-            / settings.ACS_MAX_CONCURRENT_REQUESTS
-        )
+        # The fixture above zeroes the reserve; read the module's own.
+        assert settings_module.ACS_INTERACTIVE_RESERVED_SLOTS == 1
+        assert settings_module.ACS_POLL_SLOTS == 1
+        assert settings_module.ACS_POLL_DISPATCH_SPACING_SECONDS == 2.0
 
 
 class TestPollTasks:

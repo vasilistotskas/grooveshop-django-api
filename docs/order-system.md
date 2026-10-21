@@ -1043,12 +1043,27 @@ accepting Cyprus orders at the Greek flat rate.
     2 halves the rate against 3 and still serves the batch (below).
     Re-measure the same way before changing it; there is no
     zero-rejection setting, 1 in flight still saw 0.9%.
+  - **Reserved slot.** The poll batch is paced to keep its slots busy, so
+    without a reserve a shopper's `price_calculation` or
+    `address_validation` could wait the full `ACS_SLOT_WAIT_SECONDS`
+    behind it and then fall back or 502. The last
+    `ACS_INTERACTIVE_RESERVED_SLOTS` (default 1) slots are for interactive
+    calls only: the tracking polls (`tracking_summary` /
+    `tracking_details`, `background=True` in `AcsClient._call`) may take
+    the other `ACS_MAX_CONCURRENT_REQUESTS - reserved` slots, every other
+    alias may take any slot and tries the reserve first. One pool with a
+    priority split, not a second pool. At 2 slots the polls run one at a
+    time, the measured 0.9% level, and one slot stays free for shoppers.
+    A setting that leaves the polls no slot refuses to start.
   - **Dispatch spacing.** Mean poll task duration was about 2 s
-    (`ACS_POLL_AVERAGE_TASK_SECONDS`), so 2 slots serve one poll a
-    second. `ACS_POLL_DISPATCH_SPACING_SECONDS` is derived as
-    duration / slots (1 s), so the 200-shipment cap dispatches in about
-    200 s, well inside the 13-minute batch lock and 15-minute tick, and
-    polls do not queue for a slot past `ACS_SLOT_WAIT_SECONDS`.
+    (`ACS_POLL_AVERAGE_TASK_SECONDS`), so one poll slot serves one poll
+    every 2 s. `ACS_POLL_DISPATCH_SPACING_SECONDS` is derived as
+    duration / poll slots (2 s), so the 200-shipment cap finishes about
+    400 s after the tick: inside the 15-minute cutoff (a shipment polled
+    in the last 15 minutes is not a candidate) and the 13-minute batch
+    lock (which is held only while the batch enqueues the polls, so it
+    never competes with them). Polls do not queue past
+    `ACS_SLOT_WAIT_SECONDS`.
   - **Slots.** redis-py `Lock` keys (`CustomCache.lock`, tenant-keyed),
     non-blocking, with a per-holder token: release deletes the key only
     while the token is still the holder's, so a lease that ran out and

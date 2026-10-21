@@ -27120,6 +27120,15 @@ paths:
       description: Accepts a delivery address and returns the closest available BoxNow
         locker by calling the BoxNow address-delivery-check API.
       summary: Find nearest BoxNow locker
+      parameters:
+      - in: header
+        name: X-Cart-Id
+        schema:
+          type: string
+          format: uuid
+        description: Cart UUID for guest users. Used to identify and maintain guest
+          cart sessions. Sequential integer IDs were enumerable metadata, so the public
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - BoxNow lockers
       requestBody:

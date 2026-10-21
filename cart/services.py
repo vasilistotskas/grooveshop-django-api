@@ -61,8 +61,11 @@ def cart_item_pairs(
     without one); an empty list for a cart with no lines. The shipping
     endpoints that ask whether the cart fits a carrier's parcels read it
     through here, so they find the cart exactly as the cart endpoints do.
+    They are reads that reveal only fit, like ``GET /cart``, so a
+    ``X-Cart-Token`` is accepted (the signed-in shopper's chat): it wins
+    over ``X-Cart-Id`` and an invalid one is a 401, never a guest cart.
     """
-    cart = CartService(request).cart
+    cart = CartService(request, accepts_cart_token=True).cart
     if cart is None:
         return None
     return [(item.product, item.quantity) for item in cart.get_items()]

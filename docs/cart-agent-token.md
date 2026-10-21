@@ -39,11 +39,13 @@ The gateway then sends `X-Cart-Token: <token>` on its calls.
 | `GET /cart`, `GET /cart/coupons` | yes |
 | `GET/POST /cart/item`, `GET/PUT/PATCH/DELETE /cart/item/<id>` | yes |
 | `POST/DELETE /cart/coupon` | yes |
+| `GET /shipping/options`, `POST /shipping/boxnow/lockers/nearest` | yes (they read the cart only to tell whether it fits a carrier's parcels: `exceedsParcelSize`, the locker `requiredSize`) |
 | `PUT/PATCH/DELETE /cart`, `reserve-stock`, `release-reservations`, `create-payment-intent`, orders, everything else | **403** `cart_token_not_permitted` |
 
-The allowlist is `CartViewSet._CART_TOKEN_ACTIONS` plus every action of
-`CartItemViewSet`; both pass `accepts_cart_token` to `CartService`, whose
-default is `False`. It is deliberately **not** an authentication class:
+The allowlist is `CartViewSet._CART_TOKEN_ACTIONS`, every action of
+`CartItemViewSet` and the two shipping reads (through `cart_item_pairs`);
+each passes `accepts_cart_token` to `CartService`, whose default is
+`False`. It is deliberately **not** an authentication class:
 the request stays anonymous, so no other endpoint (profile, orders)
 treats the header as a login.
 

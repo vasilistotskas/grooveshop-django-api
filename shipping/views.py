@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from cart.services import cart_item_pairs
-from cart.views.cart import GUEST_CART_HEADERS
+from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
 from shipping.models import ShippingProvider
 from shipping.serializers import (
@@ -80,7 +80,7 @@ class ShippingOptionsView(APIView):
                 required=False,
                 type=int,
             ),
-            *GUEST_CART_HEADERS,
+            *CART_TOKEN_HEADERS,
         ],
         responses=ShippingOptionSerializer(many=True),
         tags=["Shipping"],

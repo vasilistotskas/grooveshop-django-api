@@ -27129,6 +27129,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       tags:
       - BoxNow lockers
       requestBody:
@@ -27285,6 +27294,15 @@ paths:
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
           identifier is the UUID inherited from ``UUIDModel``.
+      - in: header
+        name: X-Cart-Token
+        schema:
+          type: string
+        description: 'Cart token from ``POST /api/v1/cart/agent-token``: acts on the
+          signed-in shopper''s own cart, for the shopping assistant. When sent, ``X-Cart-Id``
+          is ignored. An unknown, expired or revoked token is refused with 401, never
+          answered with another cart; an endpoint that does not accept it refuses
+          it with 403.'
       - in: query
         name: countryCode
         schema:

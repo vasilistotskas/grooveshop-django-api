@@ -18,7 +18,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from cart.services import cart_item_pairs
-from cart.views.cart import GUEST_CART_HEADERS
+from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import BoxNowNearestThrottle
 from core.api.views import BaseModelViewSet
@@ -56,7 +56,7 @@ serializers_config: SerializersConfig = {
             " address-delivery-check API."
         ),
         tags=["BoxNow lockers"],
-        parameters=GUEST_CART_HEADERS,
+        parameters=CART_TOKEN_HEADERS,
     ),
 }
 

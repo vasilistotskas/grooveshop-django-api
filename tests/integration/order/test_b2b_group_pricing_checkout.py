@@ -70,7 +70,6 @@ def _cart_for(user, price="100.00", vat_rate=None, quantity=1):
 
 def _pay_way(**kwargs):
     defaults = {
-        "is_online_payment": False,
         "cost": Money(Decimal(0), "EUR"),
         "free_threshold": Money(Decimal(0), "EUR"),
     }

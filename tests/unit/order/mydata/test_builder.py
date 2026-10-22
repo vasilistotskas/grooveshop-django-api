@@ -236,13 +236,8 @@ class BuildInvoiceXmlTestCase(TestCase):
         invoice.order.payment_id = ""
         invoice.order.save(update_fields=["payment_id"])
         if invoice.order.pay_way is not None:
-            # Set ``settlement``, not ``is_online_payment``. The latter
-            # is now a derived mirror that ``PayWay.save()`` recomputes
-            # from settlement, so assigning it here was silently
-            # overwritten and the pay-way stayed ONLINE — the builder
-            # then emitted type 6 and this test failed with
-            # ``'6' != '3'``. Courier cash-on-delivery is what "COD"
-            # means for a myDATA cash payment method.
+            # Courier cash-on-delivery is what "COD" means for a myDATA
+            # cash payment method.
             invoice.order.pay_way.settlement = PaySettlement.COURIER_CASH
             invoice.order.pay_way.save(update_fields=["settlement"])
         built = self._build(invoice)
@@ -258,13 +253,11 @@ class BuildInvoiceXmlTestCase(TestCase):
         An ONLINE pay way with no ``payment_id`` is an anomaly (probably
         mid-flow) and is filed as Web Banking (6), never Cash (3).
 
-        It used to read ``getattr(pay_way, "is_online_payment", False)``
-        — a DEPRECATED mirror of ``settlement`` that is scheduled to be
-        dropped. On the day the column went, that ``False`` default
-        would have flipped every order on this branch to Cash and
-        submitted the wrong classification to AADE with no error
-        anywhere. Asserting on ``settlement`` keeps the discriminator
-        where the authority is.
+        It used to read ``getattr(pay_way, "is_online_payment", False)``,
+        a mirror of ``settlement`` that has since been removed. Once the
+        field went, that ``False`` default would have flipped every order
+        on this branch to Cash and submitted the wrong classification to
+        AADE with no error anywhere.
         """
         invoice = self._issued_invoice()
         invoice.order.payment_id = ""
@@ -279,33 +272,6 @@ class BuildInvoiceXmlTestCase(TestCase):
             _localise("invoice/paymentMethods/paymentMethodDetails/type")
         ).text
         self.assertEqual(pay_type, "6")
-
-    def test_payment_type_ignores_the_deprecated_mirror(self):
-        """Proves the mirror is no longer consulted at all.
-
-        ``PayWay.save()`` derives the booleans from ``settlement``, so
-        the only way to make them disagree is to write past ``save()``.
-        With ``is_online_payment`` forced True underneath a
-        COURIER_CASH settlement, the classification must still be Cash.
-        """
-        from pay_way.models import PayWay
-
-        invoice = self._issued_invoice()
-        invoice.order.payment_id = ""
-        invoice.order.save(update_fields=["payment_id"])
-        pay_way = invoice.order.pay_way
-        self.assertIsNotNone(pay_way)
-        pay_way.settlement = PaySettlement.COURIER_CASH
-        pay_way.save(update_fields=["settlement"])
-        PayWay.objects.filter(pk=pay_way.pk).update(is_online_payment=True)
-        invoice.order.refresh_from_db()
-
-        built = self._build(invoice)
-        root = fromstring(built.xml_bytes)
-        pay_type = root.find(
-            _localise("invoice/paymentMethods/paymentMethodDetails/type")
-        ).text
-        self.assertEqual(pay_type, "3")
 
     def test_unknown_vat_rate_raises_not_silently_remapped(self):
         """Regression: silent fallback to category 7 (0%) on unknown

@@ -183,39 +183,36 @@ class PayWayFilterTest(APITestCase):
         self.assertEqual(len(result_ids), 1)
         self.assertIn(self.paypal_payment.id, result_ids)
 
-    def test_payment_type_filters(self):
+    def test_settlement_filter(self):
         url = reverse("payway-list")
 
-        response = self.client.get(url, {"is_online_payment": "true"})
+        response = self.client.get(
+            url, {"settlement": PaySettlement.ONLINE.value}
+        )
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.stripe_payment.id, result_ids)
-        self.assertIn(self.paypal_payment.id, result_ids)
-        self.assertIn(self.high_cost_payment.id, result_ids)
-        self.assertNotIn(self.bank_transfer.id, result_ids)
-        self.assertNotIn(self.cash_payment.id, result_ids)
+        result_ids = {r["id"] for r in response.data["results"]}
+        self.assertEqual(
+            result_ids,
+            {
+                self.stripe_payment.id,
+                self.paypal_payment.id,
+                self.high_cost_payment.id,
+            },
+        )
 
-        response = self.client.get(url, {"is_online_payment": "false"})
+        response = self.client.get(
+            url, {"settlement": PaySettlement.OFFLINE_TRANSFER.value}
+        )
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.bank_transfer.id, result_ids)
-        self.assertIn(self.cash_payment.id, result_ids)
-        self.assertNotIn(self.stripe_payment.id, result_ids)
+        result_ids = {r["id"] for r in response.data["results"]}
+        self.assertEqual(result_ids, {self.bank_transfer.id})
 
-        response = self.client.get(url, {"requires_confirmation": "true"})
+        response = self.client.get(
+            url, {"settlement": PaySettlement.COURIER_CASH.value}
+        )
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertEqual(len(result_ids), 1)
-        self.assertIn(self.bank_transfer.id, result_ids)
-
-        response = self.client.get(url, {"requires_confirmation": "false"})
-        self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertIn(self.stripe_payment.id, result_ids)
-        self.assertIn(self.paypal_payment.id, result_ids)
-        self.assertIn(self.cash_payment.id, result_ids)
-        self.assertIn(self.high_cost_payment.id, result_ids)
-        self.assertNotIn(self.bank_transfer.id, result_ids)
+        result_ids = {r["id"] for r in response.data["results"]}
+        self.assertEqual(result_ids, {self.cash_payment.id})
 
     def test_translation_filters(self):
         url = reverse("payway-list")
@@ -301,31 +298,23 @@ class PayWayFilterTest(APITestCase):
         response = self.client.get(
             url,
             {
-                "isOnlinePayment": "true",
+                "providerCode": "stripe",
                 "active": "true",
             },
         )
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
-        self.assertGreater(
-            len(result_ids), 0, "Should return some online payment methods"
-        )
-        self.assertNotIn(self.bank_transfer.id, result_ids)
+        self.assertEqual(result_ids, [self.stripe_payment.id])
 
         response = self.client.get(
             url,
             {
                 "costMin": "2.00",
                 "costMax": "5.00",
-                "requiresConfirmation": "false",
-                "hasConfiguration": "true",
             },
         )
         self.assertEqual(response.status_code, 200)
-        result_ids = [r["id"] for r in response.data["results"]]
-        self.assertGreaterEqual(
-            len(result_ids), 0, "CamelCase filter combination should work"
-        )
+        self.assertTrue(response.data["results"])
         for result in response.data["results"]:
             cost = float(result["cost"])
             self.assertGreaterEqual(cost, 2.00, "Cost should be >= 2.00")
@@ -339,8 +328,7 @@ class PayWayFilterTest(APITestCase):
             {
                 "active": "true",
                 "cost_min": "2.00",
-                "is_online_payment": "true",
-                "requires_confirmation": "false",
+                "settlement": PaySettlement.ONLINE.value,
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -358,9 +346,8 @@ class PayWayFilterTest(APITestCase):
             url,
             {
                 "active": "true",
-                "isOnlinePayment": "true",
+                "settlement": PaySettlement.ONLINE.value,
                 "costMax": "5.00",
-                "requiresConfirmation": "false",
                 "ordering": "cost",
             },
         )
@@ -408,7 +395,7 @@ class PayWayFilterTest(APITestCase):
             url,
             {
                 "active": "true",
-                "is_online_payment": "true",
+                "settlement": PaySettlement.ONLINE.value,
             },
         )
         self.assertEqual(response.status_code, 200)

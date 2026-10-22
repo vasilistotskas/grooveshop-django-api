@@ -7,7 +7,8 @@ class PaySettlement(models.TextChoices):
 
     This is the single discriminator the shipping layer needs, and it
     exists because the previous one — ``PayWay.is_cash_on_delivery``,
-    derived from ``is_online_payment`` and ``requires_confirmation`` —
+    derived from the since-removed ``is_online_payment`` and
+    ``requires_confirmation`` booleans —
     conflated two genuinely different products and shipped two bugs:
 
     * 2026-05-01 (``891d5663`` / ``8fb8dcbc``): BoxNow's PAY ON THE GO

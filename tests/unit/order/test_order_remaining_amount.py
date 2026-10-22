@@ -25,6 +25,7 @@ from order.factories.payment_transaction import PaymentTransactionFactory
 from order.payment_ledger import PaymentLedger
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 
 pytestmark = pytest.mark.django_db
@@ -143,7 +144,8 @@ class TestACashOnDeliveryOrder:
     def _cod_order():
         return _order(
             pay_way=PayWayFactory.create_offline_payment(
-                provider_code="cash_on_delivery", requires_confirmation=False
+                provider_code="cash_on_delivery",
+                settlement=PaySettlement.COURIER_CASH,
             )
         )
 

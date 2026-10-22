@@ -25,6 +25,7 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment_binding import PaymentPurpose
 from order.services import OrderService
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
 from product.factories.product import ProductFactory
@@ -296,7 +297,8 @@ class TestRetryPaymentRefusals:
                 provider_code="viva_wallet"
             ),
             lambda: PayWayFactory.create_offline_payment(
-                provider_code="cash_on_delivery", requires_confirmation=False
+                provider_code="cash_on_delivery",
+                settlement=PaySettlement.COURIER_CASH,
             ),
         ],
         ids=["hosted_viva", "cash_on_delivery"],

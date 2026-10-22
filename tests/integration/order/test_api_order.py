@@ -13,6 +13,7 @@ from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
@@ -32,7 +33,7 @@ class CheckoutAPITestCase(APITestCase):
         # until this call.
         enable_rate(cls.country)
         cls.pay_way = PayWayFactory.create_offline_payment(
-            provider_code="cash", requires_confirmation=False
+            provider_code="cash", settlement=PaySettlement.COURIER_CASH
         )
         cls.product1 = ProductFactory.create(
             stock=20, num_images=0, num_reviews=0, active=True

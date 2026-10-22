@@ -51,8 +51,6 @@ class PayWayViewSet(BaseModelViewSet):
         "cost",
         "free_threshold",
         "provider_code",
-        "is_online_payment",
-        "requires_confirmation",
         "sort_order",
     ]
     ordering = ["sort_order", "-created_at"]

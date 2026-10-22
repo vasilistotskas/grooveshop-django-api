@@ -64,13 +64,14 @@ def generate_provider_data():
     flake depending on the random seed. Tests that want an online
     pay-way call ``create_online_payment`` and mock the credentials.
     """
-    providers = [("bank_transfer", True), ("cash", False), ("", False)]
+    providers = [
+        ("bank_transfer", PaySettlement.OFFLINE_TRANSFER),
+        ("cash", PaySettlement.COURIER_CASH),
+        ("", PaySettlement.COURIER_CASH),
+    ]
 
-    provider_code, requires_confirmation = random.choice(providers)
-    return {
-        "provider_code": provider_code,
-        "requires_confirmation": requires_confirmation,
-    }
+    provider_code, settlement = random.choice(providers)
+    return {"provider_code": provider_code, "settlement": settlement.value}
 
 
 class PayWayFactory(factory.django.DjangoModelFactory):
@@ -89,23 +90,14 @@ class PayWayFactory(factory.django.DjangoModelFactory):
     )
     # ONE draw feeds both fields. They were independent LazyFunction
     # calls into generate_provider_data(), which handed out incoherent
-    # rows — an offline code marked is_online_payment=True (which then
-    # failed at checkout with "Unknown payment provider").
+    # rows — an offline code settled online (which then failed at
+    # checkout with "Unknown payment provider").
     key = factory.Iterator([choice.value for choice in PayWayEnum])
     provider_data = factory.LazyFunction(generate_provider_data)
     provider_code = factory.LazyAttribute(
         lambda o: o.provider_data["provider_code"]
     )
-    # ``settlement`` is the only field set; ``PayWay.save()`` derives
-    # the two deprecated booleans from it, so setting those here would
-    # be overwritten and could hand out a self-contradicting row.
-    settlement = factory.LazyAttribute(
-        lambda o: (
-            PaySettlement.OFFLINE_TRANSFER.value
-            if o.provider_data["requires_confirmation"]
-            else PaySettlement.COURIER_CASH.value
-        )
-    )
+    settlement = factory.LazyAttribute(lambda o: o.provider_data["settlement"])
 
     class Meta:
         model = PayWay
@@ -138,20 +130,15 @@ class PayWayFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_offline_payment(
-        cls, provider_code="bank_transfer", requires_confirmation=True, **kwargs
+        cls,
+        provider_code="bank_transfer",
+        settlement=PaySettlement.OFFLINE_TRANSFER,
+        **kwargs,
     ):
         kwargs.setdefault("active", True)
-        # ``requires_confirmation`` is kept as the parameter name so the
-        # existing call sites read unchanged, but it now selects a
-        # settlement: confirmation-style offline pay-ways are settled
-        # off-platform, the rest are collected by the courier.
         return cls.create(
             provider_code=provider_code,
-            settlement=(
-                PaySettlement.OFFLINE_TRANSFER.value
-                if requires_confirmation
-                else PaySettlement.COURIER_CASH.value
-            ),
+            settlement=PaySettlement(settlement).value,
             **kwargs,
         )
 

@@ -28,6 +28,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.payment import StripePaymentProvider
+from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 
 SPT = "spt_test_123"
@@ -225,7 +226,8 @@ class ConfirmAgentPaymentEndpointTestCase(APITestCase):
     @override_settings(AGENT_STRIPE_DELEGATED_ENABLED=True)
     def test_non_stripe_pay_way_rejected(self) -> None:
         pay_way = PayWayFactory.create_offline_payment(
-            provider_code="cash_on_delivery", requires_confirmation=False
+            provider_code="cash_on_delivery",
+            settlement=PaySettlement.COURIER_CASH,
         )
         order = OrderFactory(
             user=None,

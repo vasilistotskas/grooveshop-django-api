@@ -41,11 +41,6 @@ class PayWaySerializer(
             "icon_filename",
             "provider_code",
             "settlement",
-            # Deprecated mirrors of ``settlement``, still emitted for
-            # one release so the storefront can migrate off them
-            # separately from the column drop. Read ``settlement``.
-            "is_online_payment",
-            "requires_confirmation",
         )
         read_only_fields = (
             "id",
@@ -85,8 +80,6 @@ class PayWayWriteSerializer(
         return value
 
     def validate(self, attrs):
-        # ``settlement`` is the only writable truth; the two booleans
-        # are derived in ``PayWay.save()`` and are not accepted here.
         settlement = attrs.get("settlement") or getattr(
             self.instance, "settlement", None
         )

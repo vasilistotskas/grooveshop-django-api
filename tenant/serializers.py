@@ -313,11 +313,8 @@ class TenantConfigSerializer(serializers.Serializer):
             # whatever schema the connection happened to be left on.
             # Everything an agent can complete WITHOUT redirecting the
             # shopper to a hosted card page — i.e. every settlement
-            # except ONLINE. Reading ``settlement`` rather than the
-            # deprecated ``is_online_payment`` mirror also means the
-            # locker-terminal instrument (BoxNow PAY ON THE GO) is
-            # advertised correctly instead of being lumped in with
-            # courier cash-on-delivery.
+            # except ONLINE, the locker-terminal instrument (BoxNow PAY
+            # ON THE GO) included beside courier cash-on-delivery.
             from pay_way.enum.settlement import PaySettlement
 
             codes = list(

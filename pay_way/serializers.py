@@ -80,8 +80,6 @@ class PayWayWriteSerializer(
         return value
 
     def validate(self, attrs):
-        # ``settlement`` is the only writable truth; the two booleans
-        # are derived in ``PayWay.save()`` and are not accepted here.
         settlement = attrs.get("settlement") or getattr(
             self.instance, "settlement", None
         )

@@ -3,6 +3,66 @@
 
 
 
+## v3.146.0 (2026-10-22)
+
+### Continuous integration
+
+* ci: give the multi-tenant lane a limit its measured runs fit (#307)
+
+The lane spends nearly all its time building two store schemas
+through the full migration history (244 s and 89 s locally, under a
+minute for the 150 tests). Its CI runs took 8-14 minutes over the
+last two days, and one was cancelled at the 15-minute limit right
+after "150 passed". The limit is now 25 minutes, with the
+measurement, why splitting would not help, and why cloning the
+second schema is not the answer recorded beside it.
+
+
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`bf1f3cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bf1f3cc45fc6e496b6d1336387a9cbf04f8b334c))
+
+### Documentation
+
+* docs(pay_way): drop comments that still describe the removed mirrors
+
+The write serializer said the two booleans are derived in
+PayWay.save(), and the tenant's agent payment list contrasted itself
+with the is_online_payment mirror; neither exists any more.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8cd6b6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8cd6b6f418bf2ace5f05379979caf639fd26e62e))
+
+### Features
+
+* feat(pay_way): stop sending the deprecated isOnlinePayment and requiresConfirmation (#305) ([`8cd6b6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8cd6b6f418bf2ace5f05379979caf639fd26e62e))
+
+* feat(pay_way): stop sending the deprecated isOnlinePayment and requiresConfirmation
+
+Release C of the is_online_payment retirement. settlement has been the
+only stored truth since release B; the two booleans were mirrors that
+PayWay.save() derived from it. They leave the pay way's API (response
+fields, the isOnlinePayment / requiresConfirmation filters and ordering
+keys), the order filter payWay_IsOnlinePayment, and the model.
+
+pay_way 0034 is the expand step: both columns get a database default,
+so this release's inserts, which no longer name them, succeed while the
+release still serving writes them; then the fields and the
+pay_way_online_ix index leave Django's state only. The next release
+drops the columns and the index. The order's isOnlinePayment is a
+separate field computed from settlement and stays.
+
+The factory's requires_confirmation parameter, kept so old call sites
+read unchanged, becomes settlement. The fresh-store seeding checks move
+to the multi-tenant lane, which migrates a real store schema through
+the history instead of replaying 0019 and 0020 against today's model.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`8cd6b6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8cd6b6f418bf2ace5f05379979caf639fd26e62e))
+
 ## v3.145.1 (2026-10-22)
 
 ### Bug fixes

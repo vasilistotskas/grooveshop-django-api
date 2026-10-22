@@ -3,6 +3,24 @@
 
 
 
+## v3.146.1 (2026-10-22)
+
+### Bug fixes
+
+* fix(pay_way): drop the columns of the retired online mirrors (#308)
+
+Release D of the is_online_payment retirement. 0034 (release C, in
+production since 2026-10-22) took is_online_payment, requires_confirmation
+and pay_way_online_ix out of Django's state; nothing reads or writes them
+any more, so 0035 drops the index and both columns (contract_of 0034).
+Its reverse re-creates them in 0034's shape and refills them from
+settlement, which they only ever mirrored.
+
+
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`228b956`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228b956a1094abaf82c24737e48319273225726a))
+
 ## v3.146.0 (2026-10-22)
 
 ### Continuous integration

@@ -3,6 +3,43 @@
 
 
 
+## v3.145.1 (2026-10-22)
+
+### Bug fixes
+
+* fix(deps): bump pypdf past four DoS advisories and virtualenv past a high one (#306)
+
+pypdf 6.19.0 -> 6.21.2 (floor raised to the first fixed release,
+6.20.1): infinite loops in PdfWriter.find_outline_item, in removing tree
+items and on an EOF in the xref table, and large memory use for streams
+with several filters. It merges the ACS label PDFs for bulk printing.
+
+virtualenv 21.14.4 -> 21.14.12 (with python-discovery 1.6.4): the bash
+activate script ran commands from an environment name with a backslash
+before $. It only arrives through pre-commit, a dev tool.
+
+
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a4001e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4001e95cf4a3d1d6db3dc569beb514dd330e9c9))
+
+### Continuous integration
+
+* ci: give the throwaway Meilisearch a plain key instead of a secret (#304)
+
+The test and migration jobs start a Meilisearch service whose master key
+came from the MEILI_MASTER_KEY repository secret. Dependabot-triggered
+workflows receive no Actions secrets, so the key was empty, settings
+import raised "MEILISEARCH['MASTER_KEY'] is required", and every
+Dependabot PR failed five jobs. The container lives for one job and
+holds test data, like its PostgreSQL password, so the key is now a
+workflow-level value the services read through env.
+
+Also bumps astral-sh/setup-uv to v10.3.0 (supersedes the Dependabot PR,
+which could not pass for the reason above).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2bb8cb5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2bb8cb5d7793f008105e936342298dd7d0ae4310))
+
 ## v3.145.0 (2026-10-21)
 
 ### Features

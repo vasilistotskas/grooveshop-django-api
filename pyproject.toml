@@ -63,7 +63,7 @@ dependencies = [
   "facebook-business==26.0.2",
   "uvicorn-worker>=0.4.0",
   "websockets>=17.3",
-  "pypdf>=6.0",
+  "pypdf>=6.20.1",
   "cryptography==50.0.2",
 ]
 

@@ -481,12 +481,19 @@ jobs:
   test-mt:
     name: Testing (multi-tenant lane)
     runs-on: ubuntu-latest
-    # The lane runs serially and its green runs took 9.5-9.8 minutes by
-    # 2026-09-26, so a 10-minute limit killed it on any slower runner
-    # (5a5dd664 and 07610cf7 were cancelled at exactly 10:00 with no test
-    # failing). Raise it again only with a fresh measurement; a lane that
-    # keeps growing should be split, not given an open-ended limit.
-    timeout-minutes: 15
+    # Nearly all of the lane is building its two store schemas through
+    # the full migration history: locally on 2026-10-22, 244 s for the
+    # first and 89 s for the second, against under a minute for the 150
+    # tests. That cost grows with every migration, and splitting the lane
+    # would not cut it, since each shard would build the schemas again.
+    # Its green CI runs took 8-14 minutes on 2026-10-21/22, and one was
+    # cancelled at the old 15-minute limit right after "150 passed". 25
+    # leaves room for slower runners; raise it again only with a fresh
+    # measurement. (Creating the second schema by cloning the first,
+    # TENANT_CREATION_FAKES_MIGRATIONS, is not the way out: django-tenants
+    # warns it can be slower, and it would copy the first store's test
+    # rows into the store the isolation tests compare it with.)
+    timeout-minutes: 25
     # ``tests_mt/`` is a SIBLING of ``tests/``, deliberately excluded from
     # `testpaths` and from the ``testing`` job above: it keeps the real
     # ``TenantSyncRouter`` + ``TenantMainMiddleware`` (the main suite strips

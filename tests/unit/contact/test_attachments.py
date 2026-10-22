@@ -73,7 +73,8 @@ class TestAttachmentPolicy:
         assert policy.max_bytes == 1024 * 1024
 
     @pytest.mark.parametrize(
-        "value", ["", "   ", " , ", "pdf", "application/", "a/b/c"]
+        "value",
+        ["", "   ", " , ", "pdf", "application/", "a/b/c", "image/ png"],
     )
     def test_the_admin_refuses_a_type_list_that_names_no_type(self, value):
         assert validate_attachment_types_setting(value) is False

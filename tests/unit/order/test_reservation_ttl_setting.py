@@ -29,3 +29,15 @@ def test_the_manager_reads_the_stores_ttl():
     )
 
     assert StockManager.get_reservation_ttl_minutes() == 45
+
+
+@pytest.mark.django_db
+def test_a_ttl_written_past_the_admin_refuses_to_reserve():
+    """No reservation that expires on creation: it would sell the
+    same stock twice."""
+    Setting.objects.filter(name="STOCK_RESERVATION_TTL_MINUTES").update(
+        value_int=0
+    )
+
+    with pytest.raises(ValueError, match="STOCK_RESERVATION_TTL_MINUTES"):
+        StockManager.get_reservation_ttl_minutes()

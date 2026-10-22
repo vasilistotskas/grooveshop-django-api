@@ -43,6 +43,8 @@ INTAKE_WINDOW_HOURS = 24
 #: Control characters, which have no business in a stored filename.
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 _WHITESPACE_RE = re.compile(r"\s+")
+#: One ``type/subtype`` entry of the allow-list.
+_MIME_TYPE_RE = re.compile(r"[^\s/]+/[^\s/]+")
 
 
 def parse_attachment_types(value: object) -> tuple[str, ...]:
@@ -59,12 +61,12 @@ def validate_attachment_types_setting(value: object) -> bool:
 
     An empty allow-list cannot be saved: a store that wants no uploads
     turns ``CONTACT_ATTACHMENTS_ENABLED`` off. Every entry must have
-    the ``type/subtype`` shape it is matched against.
+    the ``type/subtype`` shape it is matched against, with no
+    whitespace inside it (``image/ png`` would never match).
     """
     types = parse_attachment_types(value)
     return bool(types) and all(
-        len(part) == 2 and all(part)
-        for part in (entry.split("/") for entry in types)
+        _MIME_TYPE_RE.fullmatch(entry) for entry in types
     )
 
 

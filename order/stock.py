@@ -48,8 +48,21 @@ class StockManager:
 
     @classmethod
     def get_reservation_ttl_minutes(cls) -> int:
-        """The store's ``STOCK_RESERVATION_TTL_MINUTES``."""
-        return int(store_setting("STOCK_RESERVATION_TTL_MINUTES"))
+        """The store's ``STOCK_RESERVATION_TTL_MINUTES``.
+
+        Raises ``ValueError`` naming the setting when it is not a
+        positive whole number. The admin refuses one, but the ORM,
+        seeders and migrations write it unchecked, and a reservation
+        that expires on creation would let the same stock be sold
+        twice; refusing to reserve is the safe answer, not a guess.
+        """
+        ttl = store_setting("STOCK_RESERVATION_TTL_MINUTES")
+        if not validate_reservation_ttl_minutes_setting(ttl):
+            raise ValueError(
+                "STOCK_RESERVATION_TTL_MINUTES setting is not a positive "
+                f"whole number of minutes: {ttl!r}"
+            )
+        return ttl
 
     @classmethod
     def lock_products(cls, product_ids: Iterable[int]) -> None:

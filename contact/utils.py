@@ -132,6 +132,6 @@ def validate_feedback_content(
 
 def contact_retention_days() -> int:
     """Days the active store keeps enquiries and feedback; 0 keeps all."""
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
-    return int(Setting.get("CONTACT_RETENTION_DAYS", default=365))
+    return int(store_setting("CONTACT_RETENTION_DAYS"))

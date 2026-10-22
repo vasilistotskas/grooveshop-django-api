@@ -20,6 +20,7 @@ from django.db.models.signals import post_save, pre_save
 from django.utils.module_loading import import_string
 from django_tenants.utils import get_public_schema_name
 
+from core.store_settings import declared_default
 from tenant.celery import dispatch_on_commit
 from tenant.permissions import IsSettingEnabled
 
@@ -39,7 +40,10 @@ def on_switch_change(
     moved, for work that must wait until a copy of the ``Tenant`` row
     cached elsewhere has expired.
     """
-    defaults = {gate.setting_key: gate.default for gate in setting_gates}
+    defaults = {
+        gate.setting_key: declared_default(gate.setting_key)
+        for gate in setting_gates
+    }
     uid = f"tenant.switch.{task}"
     setting_mark = f"_switch_before:{task}"
     seeded_mark = f"_switch_seeded:{task}"

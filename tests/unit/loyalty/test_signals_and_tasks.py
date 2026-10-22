@@ -281,7 +281,9 @@ class TestTaskIdempotency:
         mock_settings = _loyalty_settings(enabled=True)
 
         # First call — should create EARN transactions
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             first_result = LoyaltyService.award_order_points(order.id)
 
         assert first_result > 0
@@ -296,7 +298,9 @@ class TestTaskIdempotency:
         xp_after_first = user.total_xp
 
         # Second call — should be a no-op (idempotent)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             second_result = LoyaltyService.award_order_points(order.id)
 
         assert second_result == 0
@@ -325,13 +329,17 @@ class TestTaskIdempotency:
 
         mock_settings = _loyalty_settings(enabled=True)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             result1 = process_order_points(order.id)
 
         assert result1["status"] == "success"
         assert result1["points_awarded"] > 0
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             result2 = process_order_points(order.id)
 
         # Second call succeeds but awards 0 points (idempotent)

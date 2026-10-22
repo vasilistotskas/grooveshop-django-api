@@ -3,8 +3,8 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from order.exceptions import (
     InsufficientStockError,
     ProductNotFoundError,
@@ -13,6 +13,15 @@ from order.exceptions import (
 from order.models import StockLog, StockReservation
 from product.models import Product
 from tenant.staff_actors import staff_id
+
+
+def validate_reservation_ttl_minutes_setting(value: object) -> bool:
+    """django-extra-settings validator for ``STOCK_RESERVATION_TTL_MINUTES``.
+
+    A reservation that expires on creation (or before it) would hand the
+    stock straight back while the shopper is still checking out.
+    """
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 class StockManager:
@@ -31,8 +40,6 @@ class StockManager:
     race conditions and ensure atomicity.
     """
 
-    RESERVATION_TTL_MINUTES_DEFAULT = 15
-
     # How many expired reservations one cleanup transaction handles.
     # Bounded so a backlog cannot exceed `statement_timeout` (30s) or
     # `idle_in_transaction_session_timeout` (10s) and roll the whole
@@ -41,19 +48,8 @@ class StockManager:
 
     @classmethod
     def get_reservation_ttl_minutes(cls) -> int:
-        """
-        Get the stock reservation TTL from django-extra-settings.
-
-        Returns:
-            int: Reservation TTL in minutes (default: 15)
-        """
-        ttl = Setting.get(
-            "STOCK_RESERVATION_TTL_MINUTES",
-            default=cls.RESERVATION_TTL_MINUTES_DEFAULT,
-        )
-        if not isinstance(ttl, int) or ttl <= 0:
-            return cls.RESERVATION_TTL_MINUTES_DEFAULT
-        return ttl
+        """The store's ``STOCK_RESERVATION_TTL_MINUTES``."""
+        return int(store_setting("STOCK_RESERVATION_TTL_MINUTES"))
 
     @classmethod
     def lock_products(cls, product_ids: Iterable[int]) -> None:

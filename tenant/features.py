@@ -116,11 +116,11 @@ def effective_features(tenant) -> dict[str, bool]:
     if tenant.schema_name == get_public_schema_name():
         return dict.fromkeys(STORE_FEATURES, False)
 
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     with schema_context(tenant.schema_name):
         setting_on = {
-            gate: bool(Setting.get(gate.setting_key, default=gate.default))
+            gate: bool(store_setting(gate.setting_key))
             for feature in STORE_FEATURES.values()
             for gate in feature.settings
         }
@@ -143,8 +143,7 @@ def feature_on(name: str) -> bool:
     platform host has none and is never gated) and every setting it
     needs, read in the active schema.
     """
-    from extra_settings.models import Setting
-
+    from core.store_settings import store_setting
     from tenant.membership import get_current_tenant
 
     feature = STORE_FEATURES[name]
@@ -154,6 +153,5 @@ def feature_on(name: str) -> bool:
         and tenant is not None
         and not getattr(tenant, feature.plan.feature_flag, True)
     ) and all(
-        bool(Setting.get(gate.setting_key, default=gate.default))
-        for gate in feature.settings
+        bool(store_setting(gate.setting_key)) for gate in feature.settings
     )

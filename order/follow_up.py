@@ -38,18 +38,15 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 FOLLOW_UP_DAYS_SETTING = "ORDER_FOLLOW_UP_DAYS"
-FOLLOW_UP_DAYS_DEFAULT = 7
 
 
 def follow_up_days() -> int:
     """The store's threshold in calendar days; ``0`` means off."""
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     return max(
         0,
-        int(
-            Setting.get(FOLLOW_UP_DAYS_SETTING, default=FOLLOW_UP_DAYS_DEFAULT)
-        ),
+        int(store_setting(FOLLOW_UP_DAYS_SETTING)),
     )
 
 

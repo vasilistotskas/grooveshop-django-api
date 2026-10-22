@@ -175,10 +175,10 @@ def tenant_contact_email() -> str:
     tenant_email = _get_tenant_field("contact_email")
     if tenant_email:
         return tenant_email
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     try:
-        setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
+        setting_value = store_setting("CONTACT_EMAIL") or ""
     except Exception:
         # A database blip must not break every outbound email, but it
         # must not be swallowed silently either.

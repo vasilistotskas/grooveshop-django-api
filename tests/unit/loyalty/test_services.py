@@ -172,7 +172,7 @@ class TestDisabledSystem:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=self._mock_settings_disabled,
             ),
             pytest.raises(ValidationError, match="disabled"),
@@ -186,7 +186,7 @@ class TestDisabledSystem:
         product = _make_mock_product()
 
         with patch(
-            "loyalty.services.Setting.get",
+            "extra_settings.models.Setting.get",
             side_effect=self._mock_settings_disabled,
         ):
             result = LoyaltyService.get_product_potential_points(product)
@@ -220,7 +220,9 @@ class TestZeroCoefficient:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             result = LoyaltyService.calculate_item_points(
                 product, quantity=1, tier_multiplier=Decimal("1.0")
             )
@@ -244,7 +246,9 @@ class TestZeroCoefficient:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             result = LoyaltyService.calculate_item_points(
                 product, quantity=3, tier_multiplier=Decimal("1.0")
             )
@@ -265,7 +269,7 @@ class TestZeroXPPerLevel:
         user = MagicMock()
         user.total_xp = 5000
 
-        with patch("loyalty.services.Setting.get", return_value=0):
+        with patch("extra_settings.models.Setting.get", return_value=0):
             level = LoyaltyService.get_user_level(user)
 
         assert level == 1
@@ -274,7 +278,7 @@ class TestZeroXPPerLevel:
         user = MagicMock()
         user.total_xp = 5000
 
-        with patch("loyalty.services.Setting.get", return_value=-100):
+        with patch("extra_settings.models.Setting.get", return_value=-100):
             level = LoyaltyService.get_user_level(user)
 
         assert level == 1
@@ -347,7 +351,9 @@ class TestBalanceClampingOnReversal:
             return settings_map.get(key, default)
 
         # Now reverse the order — should clamp to 0, not go to -80
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             reversed_amount = LoyaltyService.reverse_order_points(order.id)
 
         # Only 20 should be reversed (clamped from 100 to 20)
@@ -430,7 +436,9 @@ class TestRedeemClawbackOnReversal:
         def mock_settings(key, default=None):
             return {"LOYALTY_ENABLED": True}.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.reverse_order_points(order.id)
 
         # Earn fully reversed (restore happens first, so no clamp) and the 50
@@ -469,7 +477,9 @@ class TestReversalOfAnOrderWithoutLoyaltyActivity:
         def mock_settings(key, default=None):
             return {"LOYALTY_ENABLED": True}.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             reversed_amount = LoyaltyService.reverse_order_points(
                 quiet_order.id
             )
@@ -513,7 +523,9 @@ class TestOverRedemptionRejection:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             with pytest.raises(
                 ValidationError, match="Insufficient points balance"
             ):
@@ -545,7 +557,9 @@ class TestOverRedemptionRejection:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user, 50, "EUR", max_discount=Decimal(99999)
             )
@@ -582,8 +596,14 @@ class TestInvalidCurrency:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
-            with pytest.raises(ValidationError, match="Unsupported currency"):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
+            # The supported list is every currency with a declared ratio.
+            with pytest.raises(
+                ValidationError,
+                match="Unsupported currency: GBP. Supported: EUR, USD",
+            ):
                 LoyaltyService.redeem_points(
                     user, 50, "GBP", max_discount=Decimal(99999)
                 )
@@ -610,7 +630,9 @@ class TestNegativePointsAmount:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             with pytest.raises(
                 ValidationError, match="Points amount must be positive"
             ):
@@ -629,7 +651,9 @@ class TestNegativePointsAmount:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             with pytest.raises(
                 ValidationError, match="Points amount must be positive"
             ):
@@ -676,7 +700,9 @@ class TestOrderMetadataIntegration:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user, 150, "EUR", max_discount=Decimal(99999), order=order
             )
@@ -718,7 +744,9 @@ class TestOrderMetadataIntegration:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.redeem_points(
                 user, 50, "EUR", max_discount=Decimal(99999), order=order
             )
@@ -749,7 +777,9 @@ class TestOrderMetadataIntegration:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user, 50, "EUR", max_discount=Decimal(99999)
             )
@@ -789,7 +819,9 @@ class TestOrderMetadataIntegration:
             }
             return settings_map.get(key, default)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user, 200, "USD", max_discount=Decimal(99999), order=order
             )

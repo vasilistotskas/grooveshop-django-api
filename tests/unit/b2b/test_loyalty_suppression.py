@@ -28,7 +28,7 @@ def _settings(values):
     def _get(key, default=None):
         return values.get(key, default)
 
-    return patch("b2b.services.Setting.get", side_effect=_get)
+    return patch("extra_settings.models.Setting.get", side_effect=_get)
 
 
 def _cart_for(user):

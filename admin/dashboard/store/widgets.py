@@ -765,8 +765,7 @@ class StoreAlerts(DashboardWidget):
         )
 
     def _legal_identity(self) -> list[dict[str, Any]]:
-        from extra_settings.models import Setting
-
+        from core.store_settings import store_setting
         from tenant.legal_identity import (
             merchant_legal_identity,
             missing_disclosure_fields,
@@ -792,7 +791,7 @@ class StoreAlerts(DashboardWidget):
             )
         # Only a store that issues tax documents needs these, and for it
         # a gap is an outage: every submission to AADE fails.
-        if Setting.get("MYDATA_ENABLED", default=False) and (
+        if store_setting("MYDATA_ENABLED") and (
             missing := missing_tax_document_fields(identity)
         ):
             alerts.append(

@@ -18,7 +18,6 @@ from django.template.loader import render_to_string
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
-from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
@@ -36,6 +35,7 @@ from core.retry import (
     TRANSIENT_ERRORS,
     is_permanent_failure,
 )
+from core.store_settings import store_setting
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
@@ -413,7 +413,7 @@ def clear_expired_notifications_task(days=365):
 )
 def cleanup_abandoned_carts():
     try:
-        days = Setting.get("ABANDONED_CART_CLEANUP_DAYS", default=7)
+        days = store_setting("ABANDONED_CART_CLEANUP_DAYS")
         cutoff_date = timezone.now() - timedelta(days=days)
 
         with transaction.atomic():
@@ -450,7 +450,7 @@ def cleanup_abandoned_carts():
 )
 def cleanup_old_guest_carts():
     try:
-        days = Setting.get("OLD_GUEST_CART_CLEANUP_DAYS", default=30)
+        days = store_setting("OLD_GUEST_CART_CLEANUP_DAYS")
         cutoff_date = timezone.now() - timedelta(days=days)
 
         # Delete ALL sufficiently-old guest carts, empty or not. The
@@ -607,9 +607,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         Dictionary with task execution statistics
     """
     now = timezone.now()
-    max_emails = Setting.get("REENGAGEMENT_EMAIL_MAX_COUNT", default=3)
-    cooldown_days = Setting.get("REENGAGEMENT_EMAIL_COOLDOWN_DAYS", default=90)
-    inactive_days = Setting.get("INACTIVE_USER_THRESHOLD_DAYS", default=60)
+    max_emails = store_setting("REENGAGEMENT_EMAIL_MAX_COUNT")
+    cooldown_days = store_setting("REENGAGEMENT_EMAIL_COOLDOWN_DAYS")
+    inactive_days = store_setting("INACTIVE_USER_THRESHOLD_DAYS")
     cutoff_date = now - timedelta(days=inactive_days)
     cooldown_cutoff = now - timedelta(days=cooldown_days)
 

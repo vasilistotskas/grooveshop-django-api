@@ -57,7 +57,7 @@ def _loyalty_settings(extra=None):
     def _get(key, default=None):
         return values.get(key, default)
 
-    return patch("loyalty.services.Setting.get", side_effect=_get)
+    return patch("extra_settings.models.Setting.get", side_effect=_get)
 
 
 class TestB2BAccrualGate:

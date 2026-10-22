@@ -75,3 +75,17 @@ def test_an_unknown_key_is_indistinguishable_from_a_refused_one():
         for key in ("SECRET_KEY", "NO_SUCH_SETTING_AT_ALL")
     ]
     assert responses == [404, 404]
+
+
+def test_a_row_the_platform_does_not_declare_is_not_served():
+    from extra_settings.models import Setting
+
+    Setting.objects.create(
+        name="UNDECLARED_PROBE_SETTING",
+        value_type=Setting.TYPE_STRING,
+        value_string="hidden",
+    )
+    response = _staff_client().get(
+        reverse("api-settings-get"), {"key": "UNDECLARED_PROBE_SETTING"}
+    )
+    assert response.status_code == 404

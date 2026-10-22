@@ -10480,8 +10480,8 @@ msgstr "Ανάκτηση όλων των ρυθμίσεων με τα ονόμα
 msgid "Retrieve an order by UUID"
 msgstr "Ανάκτηση παραγγελίας με UUID"
 
-msgid "Retrieve every anonymously readable store setting in one call, keyed by setting name. Only PUBLIC_SETTING_KEYS are ever included; a key without a row (or with an empty value) is omitted so the caller applies its own default."
-msgstr "Ανάκτηση όλων των ρυθμίσεων καταστήματος που είναι αναγνώσιμες ανώνυμα, σε μία κλήση, με κλειδί το όνομα της ρύθμισης. Περιλαμβάνονται μόνο τα PUBLIC_SETTING_KEYS· ένα κλειδί χωρίς εγγραφή (ή με κενή τιμή) παραλείπεται, ώστε ο καλών να εφαρμόσει τη δική του προεπιλογή."
+msgid "Retrieve every anonymously readable store setting in one call, keyed by setting name: every PUBLIC_SETTING_KEYS entry, with the store's value or, when the store has none, the value the platform declares for it."
+msgstr "Ανάκτηση όλων των ρυθμίσεων καταστήματος που είναι αναγνώσιμες ανώνυμα, σε μία κλήση, με κλειδί το όνομα της ρύθμισης: κάθε κλειδί των PUBLIC_SETTING_KEYS, με την τιμή του καταστήματος ή, αν το κατάστημα δεν έχει, την τιμή που δηλώνει η πλατφόρμα."
 
 msgid "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 msgstr "Ανάκτηση της τρέχουσας κατάστασης πληρωμής από τον πάροχο πληρωμών. Αυτό λαμβάνει την πιο πρόσφατη κατάσταση απευθείας από το Stripe/PayPal."
@@ -11020,10 +11020,6 @@ msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας 
 
 msgid "Set up your authenticator app"
 msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
-
-#, python-format
-msgid "Setting '%(key)s' not found"
-msgstr "Δεν βρέθηκε η ρύθμιση '%(key)s'"
 
 msgid "Setting Information"
 msgstr "Πληροφορίες Ρύθμισης"
@@ -12993,8 +12989,8 @@ msgid "Unsubscribed At"
 msgstr "Απεγγραφή στις"
 
 #, python-format
-msgid "Unsupported currency: %(currency)s. Supported: EUR, USD"
-msgstr "Μη υποστηριζόμενο νόμισμα: %(currency)s. Υποστηρίζονται: EUR, USD"
+msgid "Unsupported currency: %(currency)s. Supported: %(supported)s"
+msgstr "Μη υποστηριζόμενο νόμισμα: %(currency)s. Υποστηρίζονται: %(supported)s"
 
 msgid "Unsupported language code."
 msgstr "Μη υποστηριζόμενος κωδικός γλώσσας."
@@ -15263,6 +15259,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Sender address for outbound email from this tenant (e.g. 'no-reply@myshop.com'). Empty falls back to settings.DEFAULT_FROM_EMAIL."
 #~ msgstr "Διεύθυνση αποστολέα για εξερχόμενα email από αυτό το κατάστημα (π.χ. 'no-reply@myshop.com'). Κενό → χρησιμοποιείται η τιμή settings.DEFAULT_FROM_EMAIL."
+
+#, python-format
+#~ msgid "Setting '%(key)s' not found"
+#~ msgstr "Δεν βρέθηκε η ρύθμιση '%(key)s'"
 
 #~ msgid "Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"
 #~ msgstr "Όνομα κλειδιού ρύθμισης (π.χ. CHECKOUT_SHIPPING_PRICE)"

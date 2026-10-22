@@ -1352,7 +1352,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         4. The delivery address passes ``core.validators.address`` for
            its country, and the postcode is stored normalised.
         """
-        from extra_settings.models import Setting
+        from core.store_settings import store_setting
 
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
@@ -1376,8 +1376,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
         document_type = attrs.get("document_type", "RECEIPT")
         billing_vat_id = attrs.get("billing_vat_id", "")
-        if document_type == "INVOICE" and not Setting.get(
-            "B2B_INVOICING_ENABLED", default=True
+        if document_type == "INVOICE" and not store_setting(
+            "B2B_INVOICING_ENABLED"
         ):
             raise serializers.ValidationError(
                 {"document_type": _("B2B invoicing is currently disabled.")},

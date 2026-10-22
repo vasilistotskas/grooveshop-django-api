@@ -17,6 +17,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.api.views import PUBLIC_SETTING_KEYS
+from core.store_settings import declared_default
 
 pytestmark = pytest.mark.django_db
 
@@ -29,17 +30,19 @@ def _public_settings() -> dict[str, str]:
     return payload["settings"]
 
 
-def test_anonymous_caller_gets_every_public_key_with_a_row():
+def test_anonymous_caller_gets_every_public_key():
     values = _public_settings()
-    seeded_public = set(
-        Setting.objects.filter(name__in=PUBLIC_SETTING_KEYS).values_list(
-            "name", flat=True
-        )
-    )
-    # Every public row is served, nothing else is.
-    assert set(values) == seeded_public
-    assert seeded_public, "the fixture DB seeds public settings"
+
+    assert set(values) == PUBLIC_SETTING_KEYS
     assert all(isinstance(v, str) for v in values.values())
+
+
+def test_a_key_without_a_row_is_served_with_its_declared_value():
+    Setting.objects.filter(name="GIFT_CARD_MAX_AMOUNT").delete()
+
+    assert _public_settings()["GIFT_CARD_MAX_AMOUNT"] == str(
+        declared_default("GIFT_CARD_MAX_AMOUNT")
+    )
 
 
 def test_a_private_setting_row_is_never_exposed():
@@ -72,9 +75,10 @@ def test_json_typed_settings_are_json_encoded():
     assert json.loads(_public_settings()["BUSINESS_HOURS"]) == hours
 
 
-def test_a_row_without_a_value_is_omitted():
-    """A null value is "no value": the caller applies its own default
-    rather than parsing the string ``"None"``.
+def test_a_row_without_a_value_reads_as_its_declared_value():
+    """A null value is "no value", as in ``Setting.get``: the key is
+    served with the value it is declared with, never the string
+    ``"None"``.
 
     Only the date/time/duration/url columns are nullable in
     django-extra-settings, so the probe is a datetime-typed row.
@@ -87,7 +91,9 @@ def test_a_row_without_a_value_is_omitted():
         },
     )
 
-    assert "STORE_GEO_LAT" not in _public_settings()
+    assert _public_settings()["STORE_GEO_LAT"] == str(
+        declared_default("STORE_GEO_LAT")
+    )
 
 
 def test_the_demo_account_keys_are_public_and_default_to_off():

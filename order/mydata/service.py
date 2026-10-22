@@ -32,8 +32,8 @@ from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from order.models.retail_credit import RetailCredit
 from order.mydata.builder import build_credit_xml, build_receipt_xml
 from order.mydata.client import MyDataClient
@@ -422,7 +422,7 @@ def _build_document(invoice: Any, *, config: Any, issuer_vat: str):
 def _resolve_issuer_vat() -> str:
     """Read the seller VAT from extra_settings. Kept separate so
     tests can monkey-patch without spinning the whole config stack."""
-    return str(Setting.get("INVOICE_SELLER_VAT_ID", default="") or "")
+    return str(store_setting("INVOICE_SELLER_VAT_ID") or "")
 
 
 def _persist_submission_intent(

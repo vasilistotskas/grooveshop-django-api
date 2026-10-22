@@ -97,11 +97,11 @@ class TestSummaryEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -137,11 +137,11 @@ class TestSummaryEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -162,11 +162,11 @@ class TestSummaryEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -185,11 +185,11 @@ class TestSummaryEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -327,7 +327,8 @@ class TestRedeemEndpoint:
         client.force_authenticate(user=user)
 
         with patch(
-            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_enabled,
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
@@ -365,7 +366,8 @@ class TestRedeemEndpoint:
         client = APIClient()
         client.force_authenticate(user=user)
         with patch(
-            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_enabled,
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
@@ -405,7 +407,8 @@ class TestRedeemEndpoint:
         client = APIClient()
         client.force_authenticate(user=user)
         with patch(
-            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_enabled,
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
@@ -445,7 +448,8 @@ class TestRedeemEndpoint:
         client.force_authenticate(user=user)
 
         with patch(
-            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_enabled,
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
@@ -483,7 +487,8 @@ class TestRedeemEndpoint:
         client.force_authenticate(user=user)
 
         with patch(
-            "loyalty.services.Setting.get", side_effect=_mock_settings_disabled
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_disabled,
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
@@ -533,11 +538,11 @@ class TestProductPointsEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -562,11 +567,11 @@ class TestProductPointsEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):
@@ -586,11 +591,11 @@ class TestProductPointsEndpoint:
 
         with (
             patch(
-                "loyalty.services.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
             patch(
-                "loyalty.views.loyalty.Setting.get",
+                "extra_settings.models.Setting.get",
                 side_effect=_mock_settings_enabled,
             ),
         ):

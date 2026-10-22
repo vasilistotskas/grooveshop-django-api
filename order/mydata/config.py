@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from django.conf import settings
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from tenant.credentials import mydata_credentials
 from tenant.membership import is_demo_store
 
@@ -132,27 +132,24 @@ def load_config() -> MyDataConfig:
     invocation — not cached."""
     credentials = mydata_credentials()
     return MyDataConfig(
-        enabled=bool(Setting.get("MYDATA_ENABLED", default=False)),
+        enabled=bool(store_setting("MYDATA_ENABLED")),
         fhm_exemption_ground=str(
-            Setting.get("MYDATA_FHM_EXEMPTION_GROUND", default="")
+            store_setting("MYDATA_FHM_EXEMPTION_GROUND")
         ).strip(),
         takes_real_orders=settings.REAL_ORDERS_DEPLOYMENT
         and not is_demo_store(),
-        auto_submit=bool(Setting.get("MYDATA_AUTO_SUBMIT", default=False)),
-        environment=_environment(
-            Setting.get("MYDATA_ENVIRONMENT", default="dev")
-        ),
+        auto_submit=bool(store_setting("MYDATA_AUTO_SUBMIT")),
+        environment=_environment(store_setting("MYDATA_ENVIRONMENT")),
         user_id=credentials["user_id"],
         subscription_key=credentials["subscription_key"],
         invoice_series_prefix=str(
-            Setting.get("MYDATA_INVOICE_SERIES_PREFIX", default="GRVP")
-            or "GRVP"
+            store_setting("MYDATA_INVOICE_SERIES_PREFIX") or "GRVP"
         ),
         credit_series_prefix=str(
-            Setting.get("MYDATA_CREDIT_SERIES_PREFIX", default="GRVC") or "GRVC"
+            store_setting("MYDATA_CREDIT_SERIES_PREFIX") or "GRVC"
         ),
-        issuer_branch=int(Setting.get("MYDATA_ISSUER_BRANCH", default=0) or 0),
+        issuer_branch=int(store_setting("MYDATA_ISSUER_BRANCH") or 0),
         request_timeout_seconds=int(
-            Setting.get("MYDATA_REQUEST_TIMEOUT_SECONDS", default=30) or 30
+            store_setting("MYDATA_REQUEST_TIMEOUT_SECONDS") or 30
         ),
     )

@@ -45,7 +45,7 @@ SETTING = "GIFT_CARD_STAFF_ISSUE_LIMIT"
 
 def _limit(value):
     return patch(
-        "giftcard.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: (
             value if key == SETTING else default
         ),

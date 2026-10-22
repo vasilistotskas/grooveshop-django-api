@@ -42,8 +42,8 @@ def enable_promotions():
         }.get(key, default)
 
     with (
-        patch("promotion.services.Setting.get", side_effect=_get),
-        patch("loyalty.services.Setting.get", side_effect=_get),
+        patch("extra_settings.models.Setting.get", side_effect=_get),
+        patch("extra_settings.models.Setting.get", side_effect=_get),
     ):
         yield
 

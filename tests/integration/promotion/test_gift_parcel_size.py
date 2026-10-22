@@ -48,7 +48,7 @@ def promotions_on():
 
     # The BoxNow tenant stand-in carries no plan flags.
     with (
-        patch("promotion.services.Setting.get", side_effect=_get),
+        patch("extra_settings.models.Setting.get", side_effect=_get),
         patch("tenant.membership.tenant_plan_allows", return_value=True),
     ):
         yield

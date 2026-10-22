@@ -21,8 +21,8 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from meta_capi.events import META_EVENT_ID_KEYS, ContentType, StandardEvent
@@ -131,7 +131,7 @@ def is_capi_enabled() -> bool:
     ``Setting.get``'s lookup cost (one indexed PK fetch per call,
     not per event-type).
     """
-    if not bool(Setting.get("META_CAPI_ENABLED", default=False)):
+    if not bool(store_setting("META_CAPI_ENABLED")):
         return False
     # Tenant-only credentials, no platform fallback — an unconfigured
     # tenant is simply "disabled", not an error.

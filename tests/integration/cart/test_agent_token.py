@@ -223,7 +223,7 @@ class TestAllowedActions:
         def _get(key, default=None):
             return {"PROMOTIONS_ENABLED": True}.get(key, default)
 
-        with patch("promotion.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             applied = gateway.post(
                 reverse("cart-coupon"), {"code": code.code}, format="json"
             )
@@ -255,7 +255,7 @@ class TestAllowedActions:
         def _get(key, default=None):
             return {"PROMOTIONS_ENABLED": True}.get(key, default)
 
-        with patch("promotion.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             listed = gateway.get(reverse("cart-coupons"))
             applied = gateway.post(
                 reverse("cart-coupon"), {"code": code.code}, format="json"
@@ -278,7 +278,7 @@ class TestAllowedActions:
         def _get(key, default=None):
             return {"PROMOTIONS_ENABLED": True}.get(key, default)
 
-        with patch("promotion.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             applied = gateway.post(
                 reverse("cart-coupon"), {"code": code.code}, format="json"
             )

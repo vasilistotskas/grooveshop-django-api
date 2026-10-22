@@ -24,8 +24,8 @@ from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from giftcard.enum import (
     GiftCardPurchaseStatus,
     GiftCardSource,
@@ -82,7 +82,7 @@ class GiftCardService:
 
         if not tenant_plan_allows("gift_cards_enabled"):
             return False
-        return bool(Setting.get("GIFT_CARDS_ENABLED", default=False))
+        return bool(store_setting("GIFT_CARDS_ENABLED"))
 
     # ── issuing ────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ class GiftCardService:
 
     @classmethod
     def default_expiry(cls):
-        days = int(Setting.get("GIFT_CARD_VALIDITY_DAYS", default=1825) or 0)
+        days = int(store_setting("GIFT_CARD_VALIDITY_DAYS") or 0)
         if days <= 0:
             return None
         return timezone.now() + timedelta(days=days)
@@ -108,18 +108,14 @@ class GiftCardService:
     def staff_issue_limit() -> Decimal:
         """The most a staff member may put on gift cards in one step
         (``GIFT_CARD_STAFF_ISSUE_LIMIT``, per store); ``0`` is no limit."""
-        return Decimal(
-            str(Setting.get("GIFT_CARD_STAFF_ISSUE_LIMIT", default=500))
-        )
+        return Decimal(str(store_setting("GIFT_CARD_STAFF_ISSUE_LIMIT")))
 
     @staticmethod
     def staff_daily_limit() -> Decimal:
         """The most one staff member may put on gift cards in any rolling
         24 hours (``GIFT_CARD_STAFF_DAILY_LIMIT``, per store); ``0`` is no
         limit."""
-        return Decimal(
-            str(Setting.get("GIFT_CARD_STAFF_DAILY_LIMIT", default=1000))
-        )
+        return Decimal(str(store_setting("GIFT_CARD_STAFF_DAILY_LIMIT")))
 
     @staticmethod
     def lock_staff_issuing(user) -> None:
@@ -414,8 +410,8 @@ class GiftCardService:
 
     @classmethod
     def validate_purchase_amount(cls, amount: Decimal) -> None:
-        minimum = Decimal(str(Setting.get("GIFT_CARD_MIN_AMOUNT", default=10)))
-        maximum = Decimal(str(Setting.get("GIFT_CARD_MAX_AMOUNT", default=500)))
+        minimum = Decimal(str(store_setting("GIFT_CARD_MIN_AMOUNT")))
+        maximum = Decimal(str(store_setting("GIFT_CARD_MAX_AMOUNT")))
         if not (minimum <= amount <= maximum):
             raise GiftCardError(
                 "gift_card_invalid_amount",

@@ -238,10 +238,10 @@ def _gift_card_payment_type() -> int:
     Μετρητά; 5 = Επί πιστώσει is the usual alternative). Invalid
     values fall back to Cash rather than producing a schema error.
     """
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     try:
-        value = int(Setting.get("MYDATA_GIFT_CARD_PAYMENT_TYPE", default=3))
+        value = int(store_setting("MYDATA_GIFT_CARD_PAYMENT_TYPE"))
     except TypeError, ValueError:
         value = PAYMENT_METHOD_CASH
     if value not in {1, 2, 3, 4, 5, 6, 7}:

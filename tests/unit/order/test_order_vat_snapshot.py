@@ -253,7 +253,7 @@ class TestCheckoutWritesTheRateTheCartUsed:
         paid = _product("24")
 
         with patch(
-            "promotion.services.Setting.get",
+            "extra_settings.models.Setting.get",
             side_effect=lambda key, default=None: {
                 "PROMOTIONS_ENABLED": True
             }.get(key, default),

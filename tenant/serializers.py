@@ -236,7 +236,8 @@ class TenantConfigSerializer(serializers.Serializer):
 
     def get_agent_commerce_enabled(self, obj) -> bool:
         from django_tenants.utils import get_public_schema_name, schema_context
-        from extra_settings.models import Setting
+
+        from core.store_settings import store_setting
 
         # The control plane is not a store. It has no catalogue and no
         # pay ways, so every agent surface below is false by
@@ -252,17 +253,18 @@ class TenantConfigSerializer(serializers.Serializer):
         if not obj.agent_commerce_enabled:
             return False
         with schema_context(obj.schema_name):
-            return bool(Setting.get("AGENT_COMMERCE_ENABLED", default=True))
+            return bool(store_setting("AGENT_COMMERCE_ENABLED"))
 
     def get_product_feeds_enabled(self, obj) -> bool:
         from django_tenants.utils import schema_context
-        from extra_settings.models import Setting
+
+        from core.store_settings import store_setting
 
         # Subordinate to the agent-commerce gate.
         if not self.get_agent_commerce_enabled(obj):
             return False
         with schema_context(obj.schema_name):
-            return bool(Setting.get("PRODUCT_FEEDS_ENABLED", default=True))
+            return bool(store_setting("PRODUCT_FEEDS_ENABLED"))
 
     # Provider codes an AI agent can settle on its own, in the order the
     # merchant presents them. The agent gateway advertises one UCP payment
@@ -285,16 +287,15 @@ class TenantConfigSerializer(serializers.Serializer):
 
     def get_agent_hosted_payment_enabled(self, obj) -> bool:
         from django_tenants.utils import schema_context
-        from extra_settings.models import Setting
+
+        from core.store_settings import store_setting
 
         if not self.get_agent_commerce_enabled(obj):
             return False
         if not obj.agent_hosted_payment_enabled:
             return False
         with schema_context(obj.schema_name):
-            return bool(
-                Setting.get("AGENT_HOSTED_PAYMENT_ENABLED", default=True)
-            )
+            return bool(store_setting("AGENT_HOSTED_PAYMENT_ENABLED"))
 
     agent_payment_instruments = serializers.SerializerMethodField()
 

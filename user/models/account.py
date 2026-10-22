@@ -272,9 +272,9 @@ class UserAccount(
 
     @property
     def loyalty_level(self) -> int:
-        from extra_settings.models import Setting
+        from core.store_settings import store_setting
 
-        xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
+        xp_per_level = store_setting("LOYALTY_XP_PER_LEVEL")
         if xp_per_level <= 0:
             return 1
         return 1 + (self.total_xp // xp_per_level)

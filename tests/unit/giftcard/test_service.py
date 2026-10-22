@@ -235,7 +235,7 @@ class TestExpiry:
         )
 
         with patch(
-            "giftcard.services.Setting.get",
+            "extra_settings.models.Setting.get",
             side_effect=lambda key, default=None: (
                 False if key == "GIFT_CARDS_ENABLED" else default
             ),

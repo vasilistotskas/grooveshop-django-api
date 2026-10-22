@@ -123,7 +123,7 @@ class TestBindCart:
         def _get(key, default=None):
             return {"B2B_WHOLESALE_ENABLED": True}.get(key, default)
 
-        with patch("b2b.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             context = B2BPricingService.bind_cart(cart, profile.user)
 
         assert context is not None

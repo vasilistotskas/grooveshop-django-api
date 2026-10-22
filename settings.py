@@ -1760,6 +1760,11 @@ MEILISEARCH = {
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "10"))
 SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", "10"))
 
+# Store settings are per-store rows read through
+# ``core.store_settings.store_setting``, which falls back to the value
+# declared below. django-extra-settings would otherwise answer a missing
+# row with a same-named attribute of this module first.
+EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS = False
 EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "ACS_SMARTPOINT_ENABLED",
@@ -1808,6 +1813,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
         "value": 30,
+        "validator": "order.stock.validate_reservation_ttl_minutes_setting",
     },
     {
         "name": "B2B_INVOICING_ENABLED",
@@ -2256,6 +2262,7 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "CONTACT_ATTACHMENTS_TYPES",
         "type": "string",
         "value": "application/pdf",
+        "validator": "contact.attachments.validate_attachment_types_setting",
         "description": (
             "Comma-separated MIME allow-list, matched against the type "
             "the file's MAGIC BYTES say it is - never its extension or "
@@ -4408,9 +4415,6 @@ BOXNOW_STAGE_LOCATION_API_BASE_URL = getenv(
 # therefore refuses to talk to the production BoxNow API at all: a stale
 # flag fails loudly instead of booking a real parcel.
 BOXNOW_LIVE_MODE_ALLOWED = SYSTEM_ENV != "staging"
-BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
-    getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
-)
 # Shipping price + free-shipping threshold are NOT mirrored as Django
 # settings: they live in `extra_settings.Setting` rows (BOXNOW_SHIPPING_PRICE
 # / BOXNOW_FREE_SHIPPING_THRESHOLD). Both Django (calculate_shipping_cost)

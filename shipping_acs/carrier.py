@@ -147,9 +147,9 @@ class AcsCarrier(ShippingCarrierInterface):
         if not acs_config.is_configured():
             return False
         if kind == ShippingKind.PICKUP_POINT:
-            from extra_settings.models import Setting
+            from core.store_settings import store_setting
 
-            return bool(Setting.get("ACS_SMARTPOINT_ENABLED", default=False))
+            return bool(store_setting("ACS_SMARTPOINT_ENABLED"))
         return True
 
     # ------------------------------------------------------------------
@@ -322,9 +322,9 @@ class AcsCarrier(ShippingCarrierInterface):
         the live API call fails — a transient ACS outage must never
         block checkout.
         """
-        from extra_settings.models import Setting
+        from core.store_settings import store_setting
 
-        if not bool(Setting.get("ACS_DYNAMIC_PRICING_ENABLED", default=False)):
+        if not bool(store_setting("ACS_DYNAMIC_PRICING_ENABLED")):
             return None
 
         quote = self._fetch_live_quote(

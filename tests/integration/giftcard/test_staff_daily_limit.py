@@ -51,7 +51,7 @@ DAILY = "GIFT_CARD_STAFF_DAILY_LIMIT"
 def _limits(*, step=0, daily):
     values = {STEP: step, DAILY: daily}
     return patch(
-        "giftcard.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: values.get(key, default),
     )
 

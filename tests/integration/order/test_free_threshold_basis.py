@@ -46,7 +46,7 @@ def _promotions_on():
     def _get(key, default=None):
         return {"PROMOTIONS_ENABLED": True}.get(key, default)
 
-    with patch("promotion.services.Setting.get", side_effect=_get):
+    with patch("extra_settings.models.Setting.get", side_effect=_get):
         yield
 
 

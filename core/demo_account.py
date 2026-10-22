@@ -37,13 +37,13 @@ def demo_account_emails() -> frozenset[str]:
     Turning the flag off therefore both hides the card and releases the
     guard, in one place.
     """
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     try:
-        if not Setting.get("DEMO_ACCOUNT_ENABLED", False):
+        if not store_setting("DEMO_ACCOUNT_ENABLED"):
             return frozenset()
         emails = {
-            str(Setting.get(name, "") or "").strip().lower()
+            str(store_setting(name) or "").strip().lower()
             for name in _EMAIL_SETTINGS
         }
     except Exception:
@@ -86,7 +86,7 @@ def demo_store_mailboxes() -> frozenset[str]:
     ``demo_account_emails`` is: the gate is ``DEMO_ACCOUNT_ENABLED``,
     which only a tenant flagged ``is_demo`` is ever seeded with.
     """
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
     accounts = demo_account_emails()
     if not accounts:
@@ -94,7 +94,7 @@ def demo_store_mailboxes() -> frozenset[str]:
 
     try:
         published = {
-            str(Setting.get(name, "") or "").strip().lower()
+            str(store_setting(name) or "").strip().lower()
             for name in _STORE_MAILBOX_SETTINGS
         }
     except Exception:

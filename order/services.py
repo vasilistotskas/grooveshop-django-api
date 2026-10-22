@@ -12,8 +12,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
 from order.attribution import (
     AttributionInput,
@@ -1533,7 +1533,7 @@ class OrderService:
         """
         if PaySettlement(pay_way.settlement) != PaySettlement.ONLINE:
             return
-        limit = int(Setting.get("ORDER_MAX_UNPAID_ONLINE_ORDERS", default=5))
+        limit = int(store_setting("ORDER_MAX_UNPAID_ONLINE_ORDERS"))
         if limit <= 0:
             return
         waiting = Order.objects.filter(

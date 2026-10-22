@@ -17,6 +17,7 @@ from contact.attachments import (
     AttachmentPolicy,
     sanitize_filename,
     sniff_content_type,
+    validate_attachment_types_setting,
 )
 
 PDF_BYTES = b"%PDF-1.7\n%\xc7\xec\x8f\xa2\n1 0 obj\n<<>>\nendobj\n"
@@ -71,9 +72,23 @@ class TestAttachmentPolicy:
         assert policy.max_count == 1
         assert policy.max_bytes == 1024 * 1024
 
-    def test_blank_type_list_falls_back_to_documents(self):
+    @pytest.mark.parametrize(
+        "value", ["", "   ", " , ", "pdf", "application/", "a/b/c"]
+    )
+    def test_the_admin_refuses_a_type_list_that_names_no_type(self, value):
+        assert validate_attachment_types_setting(value) is False
+
+    def test_the_admin_accepts_a_type_list(self):
+        assert validate_attachment_types_setting(
+            "application/pdf, image/vnd.dwg"
+        )
+
+    def test_a_blank_type_list_written_past_the_admin_accepts_nothing(self):
+        """Fails closed: this is the platform's only anonymous upload."""
         _set("CONTACT_ATTACHMENTS_TYPES", value_string="   ")
-        assert AttachmentPolicy().allowed_types == ("application/pdf",)
+        policy = AttachmentPolicy()
+        assert policy.allowed_types == ()
+        assert policy.accepts("application/pdf") is False
 
     def test_accepts_is_case_insensitive_and_refuses_none(self):
         _set("CONTACT_ATTACHMENTS_TYPES", value_string="application/pdf")

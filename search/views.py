@@ -13,7 +13,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -29,6 +28,7 @@ from blog.models.post import BlogPostTranslation
 from core.api.permissions import IsStoreStaff
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
+from core.store_settings import store_setting
 from meili._client import client as meili_client
 from meili.querysets import HIGHLIGHT_POST_TAG, HIGHLIGHT_PRE_TAG
 from product.attribute_selection import (
@@ -96,7 +96,7 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
 
 
 def _get_max_search_limit() -> int:
-    return Setting.get("SEARCH_MAX_LIMIT", default=100)
+    return store_setting("SEARCH_MAX_LIMIT")
 
 
 def _parse_int(value: str | None, default: int, name: str) -> int:

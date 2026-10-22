@@ -69,7 +69,7 @@ class TestB2BPromotionGate:
                 "PROMOTIONS_ENABLED": True,
             }.get(key, default)
 
-        with patch("b2b.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             result = PromotionEngine.evaluate(cart)
 
         # 10% now applies ON TOP of the bound line prices (100 → 90 net,
@@ -141,7 +141,7 @@ class TestB2BPromotionGate:
                 "PROMOTIONS_ENABLED": True,
             }.get(key, default)
 
-        with patch("b2b.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             result = PromotionEngine.evaluate(cart)
 
         # One free unit at the WHOLESALE price.

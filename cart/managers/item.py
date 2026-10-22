@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 
 from django.db import models
 from django.utils import timezone
-from extra_settings.models import Setting
 
 from core.managers import OptimizedManager, OptimizedQuerySet
+from core.store_settings import store_setting
 
 if TYPE_CHECKING:
     from typing import Self
@@ -108,12 +108,12 @@ class CartItemQuerySet(OptimizedQuerySet):
         return self.filter(product__price__gte=threshold)
 
     def in_active_carts(self):
-        abandoned_threshold = Setting.get("CART_ABANDONED_HOURS", default=24)
+        abandoned_threshold = store_setting("CART_ABANDONED_HOURS")
         cutoff_time = timezone.now() - timedelta(hours=abandoned_threshold)
         return self.filter(cart__last_activity__gte=cutoff_time)
 
     def in_abandoned_carts(self):
-        abandoned_threshold = Setting.get("CART_ABANDONED_HOURS", default=24)
+        abandoned_threshold = store_setting("CART_ABANDONED_HOURS")
         cutoff_time = timezone.now() - timedelta(hours=abandoned_threshold)
         return self.filter(cart__last_activity__lt=cutoff_time)
 

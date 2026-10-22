@@ -62,7 +62,7 @@ def awarded_order():
         quantity=1,
         price=Money(Decimal("100.00"), "EUR"),
     )
-    with patch("loyalty.services.Setting.get", side_effect=_enabled):
+    with patch("extra_settings.models.Setting.get", side_effect=_enabled):
         earned = LoyaltyService.award_order_points(order.id)
     assert earned > 0
     return order, earned
@@ -94,7 +94,7 @@ def test_status_only_refund_reverses_the_points(
     assert _balance(order.user) == earned
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         OrderService.update_order_status(order, OrderStatus.REFUNDED)
@@ -111,7 +111,7 @@ def test_returned_alone_keeps_the_points(
     order.save(update_fields=["status"])
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         OrderService.update_order_status(order, OrderStatus.RETURNED)
@@ -129,7 +129,7 @@ def test_a_partial_refund_keeps_the_points(
     order, earned = awarded_order
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         order.payment_status = PaymentStatus.PARTIALLY_REFUNDED
@@ -153,7 +153,7 @@ def test_the_refund_that_completes_the_order_reverses_the_points(
     order, _earned = awarded_order
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         order.payment_status = PaymentStatus.REFUNDED
@@ -178,7 +178,7 @@ def test_refund_then_status_move_reverses_exactly_once(
     other = _other_points(order.user)
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         # What OrderService.refund_order does once the provider agrees.
@@ -195,7 +195,7 @@ def test_refund_then_status_move_reverses_exactly_once(
     assert _reversals(order).count() == 1
 
     with (
-        patch("loyalty.services.Setting.get", side_effect=_enabled),
+        patch("extra_settings.models.Setting.get", side_effect=_enabled),
         django_capture_on_commit_callbacks(execute=True),
     ):
         OrderService.update_order_status(order, OrderStatus.REFUNDED)

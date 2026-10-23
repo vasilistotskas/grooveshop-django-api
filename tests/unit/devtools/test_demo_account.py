@@ -29,6 +29,7 @@ from django.utils import timezone
 from core.api.views import PUBLIC_SETTING_KEYS
 from devtools import demo_account
 from devtools.demo_catalogue import PRODUCTS
+from tenant.features import preference_setting_keys
 
 
 class TestDataset(TestCase):
@@ -105,11 +106,13 @@ class TestShowcaseSettings(TestCase):
             assert name in declared, f"{name} is not an EXTRA_SETTINGS default"
 
     def test_every_key_is_published_to_the_storefront(self):
-        """The login card reads them from ``/settings/public``; a key
-        left off the allow-list makes the card fail closed and render
-        nothing at all."""
+        """The login card reads the credentials from ``/settings/public``
+        and its on switch from ``TenantConfig.preferences``; a key that
+        reaches the storefront by neither makes the card fail closed and
+        render nothing at all."""
+        published = PUBLIC_SETTING_KEYS | preference_setting_keys()
         for name in demo_account.showcase_settings():
-            assert name in PUBLIC_SETTING_KEYS, name
+            assert name in published, name
 
     def test_the_settings_match_the_accounts_that_are_seeded(self):
         values = demo_account.showcase_settings()

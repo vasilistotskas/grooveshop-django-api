@@ -645,30 +645,31 @@ def list_settings(request):
         )
 
 
+# The store VALUES a storefront renders: figures, texts, hours, contact
+# details. A store switch is never here: a feature is served in
+# ``TenantConfig.features`` and a preference in ``TenantConfig.preferences``
+# (``tenant/features.py``), Django's one answer for each, and a switch
+# published here too would be a second answer a client could read instead.
+# ``tests/integration/core/test_settings_public_api.py`` refuses one.
 PUBLIC_SETTING_KEYS = frozenset(
     {
         # Shipping price/free-threshold is a per-country ``ShippingRate``
         # row now (``/api/v1/shipping/options`` and
-        # ``/api/v1/shipping/free-shipping-info``), not a Setting — the
-        # six CHECKOUT_SHIPPING_PRICE / FREE_SHIPPING_THRESHOLD /
-        # BOXNOW_* / ACS_* pricing keys are gone.
-        # The carriers' own settings (e.g. ACS_DYNAMIC_PRICING_ENABLED)
-        # are server-side only and stay admin-gated.
+        # ``/api/v1/shipping/free-shipping-info``), not a Setting. The
+        # carriers' own settings (e.g. ACS_DYNAMIC_PRICING_ENABLED) are
+        # server-side only and stay admin-gated.
         # Storefront's "order before HH:MM" line next to a rate's
         # delivery days.
         "DISPATCH_CUTOFF",
-        "LOYALTY_ENABLED",
-        "PROMOTIONS_ENABLED",
-        # Runtime half of the recommendations gate — the storefront's
-        # ProductSuggestions strip reads it with useSettingFlag.
-        "PRODUCT_SUGGESTIONS_ENABLED",
-        "GIFT_CARDS_ENABLED",
         # Purchase-form bounds for the storefront gift-card page.
         "GIFT_CARD_MIN_AMOUNT",
         "GIFT_CARD_MAX_AMOUNT",
         # Drives the storefront's "Valid for N years" line; the server
         # reads it again when it stamps ``expires_at``.
         "GIFT_CARD_VALIDITY_DAYS",
+        # The loyalty programme's figures the storefront explains and
+        # estimates with. Whether the programme is on is the ``loyalty``
+        # feature.
         "LOYALTY_REDEMPTION_RATIO_EUR",
         "LOYALTY_POINTS_FACTOR",
         "LOYALTY_TIER_MULTIPLIER_ENABLED",
@@ -676,17 +677,6 @@ PUBLIC_SETTING_KEYS = frozenset(
         "LOYALTY_NEW_CUSTOMER_BONUS_ENABLED",
         "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
         "LOYALTY_XP_PER_LEVEL",
-        "B2B_INVOICING_ENABLED",
-        # Runtime half of the wholesale-program gate; the plan half
-        # (Tenant.b2b_enabled) travels on TenantConfig. The other B2B_*
-        # settings are server-side pricing/rollout policy — not public.
-        "B2B_WHOLESALE_ENABLED",
-        # Store preferences are served in TenantConfig.preferences. These
-        # three stay public only because the frozen webside storefront
-        # tree still reads them here; they leave with that tree.
-        "RECENTLY_VIEWED_ENABLED",
-        "STICKY_ADD_TO_CART_ENABLED",
-        "CART_ENABLED",
         # Store presence: hours/geo feed the business-hours section,
         # footer open/closed badge and LocalBusiness schema.org.
         "BUSINESS_HOURS",
@@ -697,30 +687,18 @@ PUBLIC_SETTING_KEYS = frozenset(
         # merchant publishes for customers to visit, which is why they
         # are here and the INVOICE_SELLER_* seat is not.
         "STORE_OFFICES",
-        # Merchant feature toggles the storefront gates UI on (the
-        # endpoints themselves are ALSO gated server-side via
-        # tenant.permissions.IsSettingEnabled subclasses).
-        "PRODUCT_REVIEWS_ENABLED",
-        "BLOG_COMMENTS_ENABLED",
-        "FAVOURITES_ENABLED",
-        "NEWSLETTER_ENABLED",
-        "FEEDBACK_ENABLED",
-        "PRODUCT_ALERTS_ENABLED",
-        # The four the storefront needs to render the contact form's
+        # The three the storefront needs to render the contact form's
         # upload control and pre-check a file before spending a request
-        # on it. The server re-reads all four - a client is not a gate
-        # - and the retention window is deliberately NOT here: it is
+        # on it (whether uploads are on is the ``contact_attachments``
+        # feature). The server re-reads them - a client is not a gate -
+        # and the retention window is deliberately NOT here: it is
         # operator/legal policy, not something a visitor's form needs.
-        "CONTACT_ATTACHMENTS_ENABLED",
         "CONTACT_ATTACHMENTS_MAX_COUNT",
         "CONTACT_ATTACHMENTS_MAX_MB",
         "CONTACT_ATTACHMENTS_TYPES",
         # Public contact email for storefront footer/contact page.
         # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
         "CONTACT_EMAIL",
-        # Chat-widget kill switch — admin hides the storefront launcher
-        # per tenant without a deploy; the gateway /chat stays up.
-        "CHAT_WIDGET_ENABLED",
         # The strip above the header. Operator-authored text rendered on
         # every page, so it is public by construction.
         "ANNOUNCEMENT_BAR",
@@ -742,13 +720,6 @@ PUBLIC_SETTING_KEYS = frozenset(
         "DEMO_ACCOUNT_PASSWORD",
         "DEMO_ACCOUNT_B2B_EMAIL",
         "DEMO_ACCOUNT_B2B_PASSWORD",
-        # "My reviews" account page toggle. A STORE preference, not a
-        # plan flag: product-page reviews stay live regardless; this
-        # only governs the account surface. Previously (mis)implemented
-        # as the storefront's superuser-only preview mode — webside's
-        # owner wanted the page hidden, and a per-tenant setting the
-        # owner edits himself is the correct shape for that wish.
-        "ACCOUNT_REVIEWS_ENABLED",
     }
 )
 

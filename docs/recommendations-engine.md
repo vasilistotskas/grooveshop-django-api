@@ -413,8 +413,8 @@ Gating is two-tier like everything else: `Tenant.recommendations_enabled`
 (plan flag, declared beside `promotions_enabled` on `Tenant`;
 `IsRecommendationsEnabled` in `tenant/permissions.py`) **and** the
 per-schema `PRODUCT_SUGGESTIONS_ENABLED` extra-setting
-(`EXTRA_SETTINGS_DEFAULTS`, listed in `PUBLIC_SETTING_KEYS`,
-`core/api/views.py`), which `IsRecommendationsRuntimeEnabled` enforces on
+(`EXTRA_SETTINGS_DEFAULTS`; clients read the two combined as the
+`product_suggestions` feature in `TenantConfig.features`), which `IsRecommendationsRuntimeEnabled` enforces on
 both endpoints as well, so the server answers 404 whichever half is off.
 The paths with no request — the order email, the candidate rebuilds and
 the weight learning — read the same two tiers through

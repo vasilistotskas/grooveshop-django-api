@@ -24,6 +24,7 @@ from tenant.features import (
     feature_plan_flags,
     feature_setting_gates,
     feature_setting_keys,
+    preference_setting_keys,
 )
 from tests.utils.staff import store_tenant
 from tests.utils.store_settings import switch_store_settings
@@ -42,16 +43,19 @@ def purges(dispatch) -> list:
 
 
 @pytest.mark.parametrize(
-    "gate", feature_setting_gates(), ids=lambda gate: gate.setting_key
+    "key", sorted(feature_setting_keys() | preference_setting_keys())
 )
-def test_every_feature_setting_purges_its_store_at_once(
-    bind_tenant_and_schema, gate
+def test_every_feature_or_preference_setting_purges_its_store_at_once(
+    bind_tenant_and_schema, key
 ):
+    """A preference is served in the tenant payload beside the features,
+    so its switch purges the store's pages and the storefront's copy of
+    the payload just the same."""
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
-    current = bool(store_setting(gate.setting_key))
+    current = bool(store_setting(key))
 
     with patch(DISPATCH) as dispatch:
-        switch_store_settings(**{gate.setting_key: not current})
+        switch_store_settings(**{key: not current})
 
     assert purges(dispatch) == [
         call(purge_store_pages_task, schema_name="shop_one")

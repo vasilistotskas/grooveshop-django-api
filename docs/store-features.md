@@ -42,8 +42,12 @@ Two classes matter to a client:
 
 - **(a) store feature**: something the store offers, with API behaviour
   that must refuse when it is off. Lives in `STORE_FEATURES`.
-- **(b) presentation preference**: a UI choice with no API surface. Stays
-  a plain setting, read through one accessor by the storefront.
+- **(b) presentation preference**: a UI choice with no API surface.
+  Served in `TenantConfig.preferences` (`STORE_PREFERENCES` in
+  `tenant/features.py`), so a client reads it from the tenant payload like
+  a feature, never from a settings read that can fail. A switch purges the
+  store's pages and the storefront's copy of the payload, as a feature
+  switch does.
 
 A third group is read by no client at all: **(s) server-side switch**,
 consumed by tasks and integrations.
@@ -64,14 +68,14 @@ consumed by tasks and integrations.
 | `PRODUCT_ALERTS_ENABLED` | (a) `product_alerts` | |
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
-| `CART_ENABLED` | (a), **not yet in the table** | see "Not yet gated" |
-| `CATALOGUE_ENABLED` | (a), **not yet in the table** | see "Not yet gated" |
+| `CART_ENABLED` | (a), **not yet in the table** | `preferences.cart` until then; see "Not yet gated" |
+| `CATALOGUE_ENABLED` | (a), **not yet in the table** | `preferences.catalogue` until then; see "Not yet gated" |
 | `ACS_SMARTPOINT_ENABLED` | (a) option of a carrier | the shipping options response omits the locker option; no route to 404 |
 | `B2B_INVOICING_ENABLED` | (a) option of checkout | enforced by order validation (400), not a 404 gate |
-| `MOBILE_BOTTOM_NAV_ENABLED` | (b) | |
-| `STICKY_ADD_TO_CART_ENABLED` | (b) | |
-| `RECENTLY_VIEWED_ENABLED` | (b) | history is client-side |
-| `DEMO_ACCOUNT_ENABLED` | (b) | demo credentials card on the sign-in page |
+| `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
+| `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
+| `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
+| `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED`, `OPS_ALERT_*_ENABLED` | (s) | never read by a client |
 
@@ -124,7 +128,9 @@ the storefront chrome and pages. The agent gateway calls those routes
 `/product/category/all`) and does not read a `cart` or `catalogue`
 feature, so gating them at the API would turn a store's agent checkout and
 catalogue feeds into 404s before the gateway knows to stop offering them.
-They join the table after the gateway reads the feature, gateway first.
+Until then they are served as preferences (`preferences.cart`,
+`preferences.catalogue`). They join the table after the gateway reads the
+feature, gateway first, and leave `STORE_PREFERENCES` in the same change.
 
 ## Store languages
 

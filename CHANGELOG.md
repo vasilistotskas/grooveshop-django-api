@@ -3,6 +3,79 @@
 
 
 
+## v3.146.2 (2026-10-23)
+
+### Bug fixes
+
+* fix(settings): read every store setting with its declared default (#309) ([`64c406a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64c406a773c4a63c1731754f580afadc21a1ddd8))
+
+* fix(settings): read every store setting with its declared default
+
+A store setting row can be missing (an admin deleted it), and
+Setting.get then returned whatever default its caller passed. Each of
+89 readers passed its own literal, and several disagreed with
+settings.EXTRA_SETTINGS_DEFAULTS: the stock reservation fell back to 15
+minutes against a declared 30, contact attachment types to none against
+PDF, the payment-hold windows to None, which crashed.
+
+core/store_settings.py now owns the read: store_setting(name) returns
+the active schema's row, else the declared value, and raises for a name
+that is not declared; store_settings(names) does the same for several in
+one query. Every reader goes through it, so the declaration is the one
+place a default lives, including whether a feature gate fails open or
+closed (the gates' `default` attributes are gone).
+
+- EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS is off: a missing row never
+  reads a same-named Django setting. The only overlap,
+  BOXNOW_DEFAULT_COMPARTMENT_SIZE, was an env setting nothing read.
+- GET /api/v1/settings/public returns every public key, the row or the
+  declared value, so no client keeps a default of its own.
+  settings/get serves declared settings only.
+- Values are validated where they are saved: new validators for
+  STOCK_RESERVATION_TTL_MINUTES and CONTACT_ATTACHMENTS_TYPES replace
+  the fallbacks applied at the read. An attachment type list written
+  past the admin as blank accepts nothing.
+- The invoice seller snapshot no longer substitutes the site name for a
+  blank seller name: the settings are declared blank on purpose.
+- Loyalty's supported currencies are the ones with a declared ratio.
+- Tests patch extra_settings.models.Setting.get, never a module's own
+  import.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd ([`64c406a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64c406a773c4a63c1731754f580afadc21a1ddd8))
+
+* fix(settings): refuse a spaced MIME type and an unusable stored TTL
+
+The attachment allow-list validator accepted "image/ png", which can
+never match a sniffed type; each entry must now be type/subtype with
+no whitespace.
+
+A STOCK_RESERVATION_TTL_MINUTES row written past the admin (ORM,
+seeder, migration) could still be zero or negative, and a reservation
+that expires on creation lets the same stock be sold twice. The read
+now raises ValueError naming the setting, as DISPATCH_CUTOFF does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`64c406a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64c406a773c4a63c1731754f580afadc21a1ddd8))
+
+### Testing
+
+* test(product): pin the slug the category filter test looks up (#310)
+
+The slug filter matches by substring (icontains), and the test looked
+up a factory-made slug: whenever another random slug contained it, the
+filter returned two categories (main CI, run 39896114130). The probe
+now has a slug no factory slug can contain.
+
+
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4911d40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4911d40f9fb261bde68161784db4606b50167bfe))
+
 ## v3.146.1 (2026-10-22)
 
 ### Bug fixes

@@ -3,6 +3,40 @@
 
 
 
+## v3.147.1 (2026-10-23)
+
+### Bug fixes
+
+* fix(settings): stop publishing the preferences the tenant payload serves (#312) ([`130a529`](https://github.com/vasilistotskas/grooveshop-django-api/commit/130a5295cf82a39a172fc4113db05abe1ed81637))
+
+### Refactoring
+
+* refactor(settings): stop publishing the preferences the tenant payload serves
+
+MOBILE_BOTTOM_NAV_ENABLED, DEMO_ACCOUNT_ENABLED and CATALOGUE_ENABLED
+leave PUBLIC_SETTING_KEYS. Since storefront #208 no client reads them
+through /settings/public: they are TenantConfig.preferences. The other
+three preferences stay public only because the frozen webside storefront
+tree still reads them there.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd ([`130a529`](https://github.com/vasilistotskas/grooveshop-django-api/commit/130a5295cf82a39a172fc4113db05abe1ed81637))
+
+### Testing
+
+* test(devtools): the demo card's switch reaches the storefront as a preference
+
+The showcase settings must all reach the storefront, and
+DEMO_ACCOUNT_ENABLED now does through TenantConfig.preferences rather
+than /settings/public: check against both.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`130a529`](https://github.com/vasilistotskas/grooveshop-django-api/commit/130a5295cf82a39a172fc4113db05abe1ed81637))
+
 ## v3.147.0 (2026-10-23)
 
 ### Features

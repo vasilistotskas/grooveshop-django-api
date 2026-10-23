@@ -3,6 +3,25 @@
 
 
 
+## v3.148.1 (2026-10-23)
+
+### Bug fixes
+
+* fix(settings): publish store values only, never a feature or preference switch (#314)
+
+`/settings/public` still published 18 store switches (15 feature keys,
+3 preference keys) that TenantConfig already serves, so a client could
+read the raw setting instead of Django's answer. No client reads them
+since storefront v3.257.1 and the loyalty and invoicing releases, so the
+allowlist now holds values only, and a test refuses any key that is a
+feature or preference switch.
+
+Deletes the ACS_SMARTPOINT_ENABLED rows the previous release left in
+place: v3.148.0 stopped reading them, so the release still serving
+during the rollout no longer depends on them.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b591f24`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b591f240be38bd85774b43378a964bcf5821bc73))
+
 ## v3.148.0 (2026-10-23)
 
 ### Bug fixes

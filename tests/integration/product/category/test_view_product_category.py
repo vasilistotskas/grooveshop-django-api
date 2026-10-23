@@ -203,11 +203,15 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["id"], child_category.id)
 
-        response = self.client.get(url, {"slug": self.category.slug})
+        # `slug` matches by substring (icontains), so the probe needs a
+        # slug no factory-made one can contain: a random slug used to
+        # match a second category now and then.
+        probe = ProductCategoryFactory(slug="slug-filter-probe-category")
+        response = self.client.get(url, {"slug": probe.slug})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
-        self.assertEqual(response.data["results"][0]["id"], self.category.id)
+        self.assertEqual(response.data["results"][0]["id"], probe.id)
 
     def test_search_functionality(self):
         # Refresh to ensure we have the latest translations from factory

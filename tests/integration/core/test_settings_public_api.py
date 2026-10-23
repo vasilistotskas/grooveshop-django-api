@@ -96,18 +96,19 @@ def test_a_row_without_a_value_reads_as_its_declared_value():
     )
 
 
-def test_the_demo_account_keys_are_public_and_default_to_off():
+def test_the_demo_account_credentials_are_public_and_empty_by_default():
     """A demo store shows shared credentials on its login page.
 
     They are published deliberately — the card exists so a prospect can
-    see the logged-in storefront without signing up — which is why the
-    flag ships False and both values ship empty: a store that has not
-    asked for this must expose nothing, and the seeder writes the three
-    only on a tenant flagged ``is_demo``.
+    see the logged-in storefront without signing up — which is why both
+    values ship empty: a store that has not asked for this must expose
+    nothing, and the seeder writes them only on a tenant flagged
+    ``is_demo``. Whether the card shows is the ``demo_account``
+    preference, served in ``TenantConfig.preferences``, not here.
     """
     values = _public_settings()
 
-    assert values["DEMO_ACCOUNT_ENABLED"] == "False"
+    assert "DEMO_ACCOUNT_ENABLED" not in values
     assert values["DEMO_ACCOUNT_EMAIL"] == ""
     assert values["DEMO_ACCOUNT_PASSWORD"] == ""
 
@@ -131,3 +132,22 @@ def test_the_auth_panel_is_public_and_empty_by_default():
     values = _public_settings()
 
     assert values["AUTH_PANEL"] == "{}"
+
+
+def test_a_preference_no_client_reads_here_is_not_public():
+    """``TenantConfig.preferences`` carries the store preferences. Only
+    the three the frozen webside storefront still reads stay public."""
+    values = _public_settings()
+
+    for key in (
+        "MOBILE_BOTTOM_NAV_ENABLED",
+        "DEMO_ACCOUNT_ENABLED",
+        "CATALOGUE_ENABLED",
+    ):
+        assert key not in values, key
+    for key in (
+        "RECENTLY_VIEWED_ENABLED",
+        "STICKY_ADD_TO_CART_ENABLED",
+        "CART_ENABLED",
+    ):
+        assert key in values, key

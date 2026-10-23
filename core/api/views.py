@@ -683,14 +683,12 @@ PUBLIC_SETTING_KEYS = frozenset(
         # (Tenant.b2b_enabled) travels on TenantConfig. The other B2B_*
         # settings are server-side pricing/rollout policy — not public.
         "B2B_WHOLESALE_ENABLED",
+        # Store preferences are served in TenantConfig.preferences. These
+        # three stay public only because the frozen webside storefront
+        # tree still reads them here; they leave with that tree.
         "RECENTLY_VIEWED_ENABLED",
-        # Storefront chrome toggles — STORE preferences like
-        # ACCOUNT_REVIEWS_ENABLED below (same lineage too: both were
-        # previously (mis)gated behind superuser-only preview mode).
-        "MOBILE_BOTTOM_NAV_ENABLED",
         "STICKY_ADD_TO_CART_ENABLED",
         "CART_ENABLED",
-        "CATALOGUE_ENABLED",
         # Store presence: hours/geo feed the business-hours section,
         # footer open/closed badge and LocalBusiness schema.org.
         "BUSINESS_HOURS",
@@ -736,12 +734,12 @@ PUBLIC_SETTING_KEYS = frozenset(
         "FUNDING_BANNER",
         # Demo-store credentials, deliberately public: the login page
         # shows them so a prospect can see the logged-in storefront.
-        # Default off + empty everywhere; the demo seeder writes them
-        # only on a tenant flagged ``is_demo``, and a nightly task
-        # resets that account's data. Read
+        # Empty everywhere by default; the demo seeder writes them only
+        # on a tenant flagged ``is_demo``, and a nightly task resets
+        # that account's data. Whether the card shows is the
+        # ``demo_account`` preference in TenantConfig.preferences. Read
         # ``settings.EXTRA_SETTINGS_DEFAULTS`` before enabling this on
         # anything that is not a throwaway store.
-        "DEMO_ACCOUNT_ENABLED",
         "DEMO_ACCOUNT_EMAIL",
         "DEMO_ACCOUNT_PASSWORD",
         "DEMO_ACCOUNT_B2B_EMAIL",

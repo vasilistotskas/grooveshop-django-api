@@ -3,6 +3,48 @@
 
 
 
+## v3.148.0 (2026-10-23)
+
+### Bug fixes
+
+* fix(shipping): keep the ACS_SMARTPOINT_ENABLED rows for one release
+
+The PreSync hook migrates before the new pods roll, so deleting the rows
+here would make the release still serving read the setting's declared
+default (off) and hide ACS lockers until the rollout ends. The rows are
+deleted in the next release, once no running code reads them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VihXD9gRLAB4La1JwPb646
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`04a7926`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04a7926ac7dbad800e7b3c189444895dd3e5e420))
+
+### Features
+
+* feat(shipping): b2b_invoicing store feature, gate ACS lockers on synced stations (#313) ([`04a7926`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04a7926ac7dbad800e7b3c189444895dd3e5e420))
+
+* feat(shipping): b2b_invoicing store feature, gate ACS lockers on synced stations
+
+b2b_invoicing joins STORE_FEATURES (IsB2BInvoicingEnabled, no plan flag:
+invoicing is on every plan). TenantConfig.features gains b2bInvoicing and
+the order serializer refuses document_type=INVOICE through feature_on, so
+the API and the client read one answer. B2B_INVOICING_ENABLED stays in
+PUBLIC_SETTING_KEYS until the storefront stops reading it there.
+
+ACS_SMARTPOINT_ENABLED is deleted. AcsCarrier.is_kind_enabled now offers
+locker pickup only while active locker AcsStation rows exist for the
+delivery country (the rows the picker lists), so the option appears once
+the nightly sync_acs_stations has run. is_kind_enabled takes a required
+keyword country_code on the interface and every carrier; None means any
+country, which keeps ACS a candidate in the country-less pay-way filter
+so its pay-way rules still join the intersection. A data migration drops
+the stored setting rows so no dead switch is left in the admin.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VihXD9gRLAB4La1JwPb646 ([`04a7926`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04a7926ac7dbad800e7b3c189444895dd3e5e420))
+
 ## v3.147.1 (2026-10-23)
 
 ### Bug fixes

@@ -313,11 +313,11 @@ class ShippingService:
             ):
                 if not supported:
                     continue
-                # Per-kind feature flag (e.g. ACS_SMARTPOINT_ENABLED)
+                # Per-kind gate (e.g. ACS lockers need synced stations)
                 # — a provider can advertise capability via the
                 # ShippingProvider row but gate user-facing visibility
-                # on a Setting it controls itself.
-                if not adapter.is_kind_enabled(kind):
+                # on state it controls itself.
+                if not adapter.is_kind_enabled(kind, country_code=country_code):
                     continue
 
                 rate = (
@@ -479,9 +479,9 @@ class ShippingService:
           must both be True.
         * The provider's adapter must be registered (so a deploy
           missing a provider app doesn't surface stale rows).
-        * The carrier's ``is_kind_enabled(kind)`` hook lets a provider
-          gate a kind independently (e.g. ACS Smartpoint hidden
-          until ops flip ``ACS_SMARTPOINT_ENABLED``).
+        * The carrier's ``is_kind_enabled(kind, country_code=...)`` hook
+          lets a provider gate a kind independently (e.g. ACS lockers
+          hidden until the country's stations have been synced).
         * Rows whose rate has no ``free_shipping_threshold`` are
           skipped — a missing threshold is NOT the same as "free at
           €0".
@@ -519,7 +519,9 @@ class ShippingService:
 
             kind_enum = ShippingKind(rate.kind)
             adapter = get_provider(rate.provider.code)
-            if not adapter.is_kind_enabled(kind_enum):
+            if not adapter.is_kind_enabled(
+                kind_enum, country_code=resolved_country
+            ):
                 continue
 
             providers.append(
@@ -671,7 +673,7 @@ class ShippingService:
 
         adapter = get_provider(provider_code)
         kind_enum = ShippingKind(kind)
-        if not adapter.is_kind_enabled(kind_enum):
+        if not adapter.is_kind_enabled(kind_enum, country_code=country_code):
             raise ShippingUnavailableError(
                 provider_code=provider_code,
                 kind=kind,

@@ -128,8 +128,11 @@ class AcsCarrier(ShippingCarrierInterface):
             }
         )
 
-    def is_kind_enabled(self, kind: ShippingKind) -> bool:
-        """Gate ACS availability on tenant credentials + per-kind flags.
+    def is_kind_enabled(
+        self, kind: ShippingKind, *, country_code: str | None
+    ) -> bool:
+        """Gate ACS availability on tenant credentials and, for lockers,
+        on the stations the picker would list.
 
         An unconfigured tenant (no ``Tenant.acs_*`` credentials) gets
         NEITHER kind — ACS is entirely unavailable, not just missing
@@ -137,20 +140,40 @@ class AcsCarrier(ShippingCarrierInterface):
 
         Home delivery rides on ``ShippingProvider.is_active`` only —
         the same master switch ops use to enable ACS overall.
-        Smartpoint locker pickup adds a separate Setting toggle so
-        operations can disable just the locker UX (e.g. while the
-        AcsStation cache is being seeded for the first time) without
-        also taking home delivery offline.
+        Locker pickup also needs the nightly ``sync_acs_stations`` to
+        have filled the cache: the kind is enabled only while an active
+        ``AcsStation`` of a locker kind exists for ``country_code``, the
+        very rows the station picker lists, so checkout never offers a
+        picker with nothing in it.
+
+        ``country_code=None`` means "any country" (the pay-way filter
+        has no destination yet): enabled when a locker station exists in
+        any country. That keeps ACS a candidate whenever it could serve
+        the kind somewhere, so its pay-way rules join the intersection
+        instead of being dropped, and a pay way ACS would refuse is never
+        offered on the strength of not knowing the country.
         """
         from shipping_acs import config as acs_config
 
         if not acs_config.is_configured():
             return False
-        if kind == ShippingKind.PICKUP_POINT:
-            from core.store_settings import store_setting
+        if kind != ShippingKind.PICKUP_POINT:
+            return True
 
-            return bool(store_setting("ACS_SMARTPOINT_ENABLED"))
-        return True
+        from shipping_acs.models import AcsStation
+
+        stations = AcsStation.objects.filter(is_active=True)
+        if country_code is None:
+            stations = stations.filter(
+                shop_kind__in=acs_config.all_locker_kinds()
+            )
+        else:
+            country_code = country_code.upper()
+            stations = stations.filter(
+                country_code=country_code,
+                shop_kind__in=acs_config.shop_kinds_for_country(country_code),
+            )
+        return stations.exists()
 
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)

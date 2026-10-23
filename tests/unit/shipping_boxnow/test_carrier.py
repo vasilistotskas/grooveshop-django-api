@@ -19,7 +19,10 @@ pytestmark = pytest.mark.django_db
 
 def test_pickup_point_disabled_without_boxnow_credentials():
     adapter = get_provider("boxnow")
-    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is False
+    assert (
+        adapter.is_kind_enabled(ShippingKind.PICKUP_POINT, country_code="GR")
+        is False
+    )
 
 
 def test_home_delivery_disabled_without_boxnow_credentials():
@@ -27,11 +30,17 @@ def test_home_delivery_disabled_without_boxnow_credentials():
     still report False consistently (not raise) for an unsupported
     kind when unconfigured."""
     adapter = get_provider("boxnow")
-    assert adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY) is False
+    assert (
+        adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY, country_code="GR")
+        is False
+    )
 
 
 def test_pickup_point_enabled_with_boxnow_credentials(
     boxnow_configured_tenant,
 ):
     adapter = get_provider("boxnow")
-    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is True
+    assert (
+        adapter.is_kind_enabled(ShippingKind.PICKUP_POINT, country_code="GR")
+        is True
+    )

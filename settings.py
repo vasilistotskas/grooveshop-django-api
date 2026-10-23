@@ -1767,17 +1767,6 @@ SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", "10"))
 EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS = False
 EXTRA_SETTINGS_DEFAULTS = [
     {
-        "name": "ACS_SMARTPOINT_ENABLED",
-        "type": "bool",
-        "value": False,
-        "description": (
-            "Customer-facing toggle for the ACS Smartpoint locker "
-            "pickup option. Defaults False so a fresh deploy hides "
-            "the option until ops have synced AcsStation rows and "
-            "verified the picker; flip in Django admin to expose."
-        ),
-    },
-    {
         "name": "BOXNOW_DEFAULT_COMPARTMENT_SIZE",
         "type": "int",
         "value": 1,

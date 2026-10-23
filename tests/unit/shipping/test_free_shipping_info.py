@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any, ClassVar
-from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -33,25 +32,9 @@ from shipping.interfaces import (
 )
 from shipping.models import ShippingProvider
 from shipping.services import ShippingService
+from shipping_acs.models import AcsStation
 
 pytestmark = pytest.mark.django_db
-
-# ``ACS_SMARTPOINT_ENABLED`` is the only Setting ``is_kind_enabled``
-# still reads — pricing is entirely ``ShippingRate`` now. Mocked
-# rather than written via ``Setting.objects.update_or_create``, so the
-# tests do not depend on the ``Setting`` table.
-_DEFAULT_SETTING_OVERRIDES: dict[str, object] = {
-    "ACS_SMARTPOINT_ENABLED": True,
-}
-
-
-def _build_fake_setting_get(overrides: dict[str, object]):
-    def fake_get(name: str, default=None):
-        if name in overrides:
-            return overrides[name]
-        return default
-
-    return fake_get
 
 
 class _NoThresholdCarrier(ShippingCarrierInterface):
@@ -89,47 +72,32 @@ def cleanup_no_threshold():
 
 
 @pytest.fixture
-def _activate_acs_only(acs_configured_tenant):
+def _activate_acs_only(acs_configured_tenant, acs_locker_station):
     """Make ACS the sole active provider with both kinds enabled.
 
     Mirrors a real deploy where ops have flipped ACS on but BoxNow
     is still off (BoxNow ships disabled by default per the seed). The
     GR rates for both are already in place — the shipping migrations
-    seed them (``tests/migration_seed.py`` keeps them). Yields the Setting overrides dict so individual
-    tests can mutate it (e.g. flipping ``ACS_SMARTPOINT_ENABLED`` to
-    False). Also binds a tenant with ACS credentials —
-    ``is_kind_enabled`` hides ACS entirely for an unconfigured tenant
-    regardless of ``is_active``.
+    seed them (``tests/migration_seed.py`` keeps them) — and one GR
+    locker is cached, the row the nightly sync leaves behind. Also
+    binds a tenant with ACS credentials — ``is_kind_enabled`` hides ACS
+    entirely for an unconfigured tenant regardless of ``is_active``.
     """
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     ShippingProvider.objects.filter(code="boxnow").update(is_active=False)
-    overrides = dict(_DEFAULT_SETTING_OVERRIDES)
-    with patch(
-        "extra_settings.models.Setting.get",
-        side_effect=_build_fake_setting_get(overrides),
-    ):
-        yield overrides
 
 
 @pytest.fixture
-def _activate_both(acs_and_boxnow_configured_tenant):
-    """Activate both ACS and BoxNow with Smartpoint enabled.
+def _activate_both(acs_and_boxnow_configured_tenant, acs_locker_station):
+    """Activate both ACS and BoxNow, ACS with a cached GR locker.
 
-    Yields the Setting overrides dict so individual tests can mutate
-    per-carrier flags before exercising the code path. Binds a tenant
-    with BOTH ACS and BoxNow credentials configured — both carriers
-    are now gated on tenant credentials via ``is_kind_enabled``,
-    regardless of ``ShippingProvider.is_active``.
+    Binds a tenant with BOTH ACS and BoxNow credentials configured —
+    both carriers are gated on tenant credentials via
+    ``is_kind_enabled``, regardless of ``ShippingProvider.is_active``.
     """
     ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
         is_active=True
     )
-    overrides = dict(_DEFAULT_SETTING_OVERRIDES)
-    with patch(
-        "extra_settings.models.Setting.get",
-        side_effect=_build_fake_setting_get(overrides),
-    ):
-        yield overrides
 
 
 def test_default_currency_is_eur():
@@ -159,11 +127,10 @@ def test_acs_only_emits_both_kinds(_activate_acs_only):
     assert {row["provider_code"] for row in info["providers"]} == {"acs"}
 
 
-def test_acs_smartpoint_disabled_hides_pickup(_activate_acs_only):
-    # Flip ``ACS_SMARTPOINT_ENABLED`` to False via the mock dict the
-    # fixture yields. ``Setting.get`` is patched, so the override
-    # takes effect immediately without a DB write.
-    _activate_acs_only["ACS_SMARTPOINT_ENABLED"] = False
+def test_acs_without_stations_hides_pickup(_activate_acs_only):
+    # The nightly sync has not filled (or has deactivated) the
+    # country's lockers: the picker would be empty, so no pickup row.
+    AcsStation.objects.update(is_active=False)
     info = ShippingService.free_shipping_info()
     kinds = {row["kind"] for row in info["providers"]}
     assert kinds == {ShippingKind.HOME_DELIVERY.value}

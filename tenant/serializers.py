@@ -62,6 +62,7 @@ class StoreFeaturesSerializer(serializers.Serializer):
     promotions = serializers.BooleanField(read_only=True)
     gift_cards = serializers.BooleanField(read_only=True)
     wholesale = serializers.BooleanField(read_only=True)
+    b2b_invoicing = serializers.BooleanField(read_only=True)
     product_suggestions = serializers.BooleanField(read_only=True)
     product_alerts = serializers.BooleanField(read_only=True)
     contact_attachments = serializers.BooleanField(read_only=True)

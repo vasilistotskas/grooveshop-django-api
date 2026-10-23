@@ -1,83 +1,90 @@
-"""Unit tests for the Phase 2 ACS Smartpoint feature gates."""
+"""Unit tests for the ACS carrier's per-kind gates.
+
+Locker pickup is offered only while active locker ``AcsStation`` rows
+exist for the delivery country; there is no setting to flip.
+"""
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
-from extra_settings.models import Setting
 
 from shipping.enum import ShippingKind
 from shipping.interfaces import get_provider
+from shipping_acs.enum.shop_kind import AcsShopKind
+from shipping_acs.factories import AcsStationFactory
 
 pytestmark = pytest.mark.django_db
 
-
-def _patch_setting_get(value: bool):
-    """Patch ``Setting.get`` so the carrier reads our chosen value for
-    ``ACS_SMARTPOINT_ENABLED`` without touching the ``Setting`` table.
-
-    Patching the read site keeps the test off the ``Setting`` table
-    entirely.
-
-    The stub returns ``default`` for any non-ACS key so we don't reach
-    for ``Setting.get.__func__`` — which can crash under pytest-xdist
-    worker reuse if a prior test's MagicMock on ``Setting.get`` hasn't
-    been fully unwound by the time this fixture runs. The adapter
-    under test only consults ``ACS_SMARTPOINT_ENABLED`` in
-    ``is_kind_enabled(PICKUP_POINT)``, so the simpler stub is
-    behaviourally equivalent to a real cache miss for everything else.
-    """
-
-    def stub(cls, key, default=None):
-        if key == "ACS_SMARTPOINT_ENABLED":
-            return value
-        return default
-
-    return patch.object(Setting, "get", classmethod(stub))
+PICKUP = ShippingKind.PICKUP_POINT
+HOME = ShippingKind.HOME_DELIVERY
 
 
-@pytest.fixture
-def acs_setting_off():
-    with _patch_setting_get(False):
-        yield
-
-
-@pytest.fixture
-def acs_setting_on():
-    with _patch_setting_get(True):
-        yield
-
-
-def test_pickup_point_disabled_when_setting_off(acs_setting_off):
-    adapter = get_provider("acs")
-    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is False
-
-
-def test_home_delivery_always_enabled(acs_configured_tenant):
-    adapter = get_provider("acs")
-    assert adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY) is True
-
-
-def test_pickup_point_enabled_when_setting_on(
-    acs_setting_on, acs_configured_tenant
+def test_pickup_point_disabled_before_stations_are_synced(
+    acs_configured_tenant,
 ):
     adapter = get_provider("acs")
-    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is True
+    assert adapter.is_kind_enabled(PICKUP, country_code="GR") is False
+    assert adapter.is_kind_enabled(PICKUP, country_code=None) is False
 
 
-def test_pickup_point_disabled_without_acs_credentials(acs_setting_on):
-    """Even with the Smartpoint setting ON, an unconfigured tenant (no
-    Tenant.acs_* credentials) must see ACS entirely unavailable."""
+def test_home_delivery_needs_no_stations(acs_configured_tenant):
     adapter = get_provider("acs")
-    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is False
+    assert adapter.is_kind_enabled(HOME, country_code="GR") is True
+    assert adapter.is_kind_enabled(HOME, country_code=None) is True
+
+
+def test_pickup_point_enabled_with_a_locker_in_the_country(
+    acs_configured_tenant,
+):
+    AcsStationFactory(country_code="GR")
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code="GR") is True
+    assert adapter.is_kind_enabled(PICKUP, country_code="gr") is True
+
+
+def test_pickup_point_is_per_country(acs_configured_tenant):
+    AcsStationFactory(country_code="GR")
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code="CY") is False
+
+
+def test_without_a_country_any_country_with_a_locker_counts(
+    acs_configured_tenant,
+):
+    AcsStationFactory(country_code="GR")
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code=None) is True
+
+
+def test_deactivated_stations_do_not_count(acs_configured_tenant):
+    AcsStationFactory(country_code="GR", is_active=False)
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code="GR") is False
+    assert adapter.is_kind_enabled(PICKUP, country_code=None) is False
+
+
+def test_shops_are_not_lockers(acs_configured_tenant):
+    """The picker lists locker kinds only; a plain ACS shop must not
+    switch the locker option on."""
+    AcsStationFactory(country_code="GR", shop_kind=AcsShopKind.SHOP)
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code="GR") is False
+    assert adapter.is_kind_enabled(PICKUP, country_code=None) is False
+
+
+def test_pickup_point_disabled_without_acs_credentials():
+    """Stations alone do not make ACS available: an unconfigured tenant
+    (no Tenant.acs_* credentials) sees ACS entirely unavailable."""
+    AcsStationFactory(country_code="GR")
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(PICKUP, country_code="GR") is False
 
 
 def test_home_delivery_disabled_without_acs_credentials():
     """Home delivery also requires tenant ACS credentials, not just
     ``ShippingProvider.is_active``."""
     adapter = get_provider("acs")
-    assert adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY) is False
+    assert adapter.is_kind_enabled(HOME, country_code="GR") is False
 
 
 def test_validate_payload_blocks_when_locker_id_missing():

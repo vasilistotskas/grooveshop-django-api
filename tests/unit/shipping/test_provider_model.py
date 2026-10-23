@@ -35,8 +35,8 @@ def test_seed_migration_acs_supports_both_kinds():
     """Phase 2 migration flips ``supports_pickup_point`` to True so
     ACS can host both home delivery and Smartpoint pickups.
 
-    The customer-facing locker UX is gated behind
-    ``ACS_SMARTPOINT_ENABLED`` (a Setting), not the capability flag.
+    The customer-facing locker UX is gated on synced ``AcsStation``
+    rows (``AcsCarrier.is_kind_enabled``), not the capability flag.
     """
     acs = ShippingProvider.objects.get(code="acs")
     assert acs.supports_home_delivery is True

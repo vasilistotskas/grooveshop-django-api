@@ -889,7 +889,7 @@ accepting Cyprus orders at the Greek flat rate.
 
 - **`ShippingService.active_rate(provider_code, kind, country_code)`**
   is the single gate: an active provider, a registered adapter, the
-  provider supporting `kind`, `is_kind_enabled`, and an active rate row
+  provider supporting `kind`, `is_kind_enabled(kind, country_code=...)` (ACS lockers: active stations synced for that country), and an active rate row
   for that country — or `ShippingUnavailableError`.
   `assert_available(...)` adds the weight-cap check
   (`ShippingWeightExceededError`); both are used directly by a

@@ -12,7 +12,6 @@ Pins the contract that:
 from __future__ import annotations
 
 import io
-from unittest.mock import patch
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -31,14 +30,6 @@ def _make_png_upload(name: str = "logo.png") -> SimpleUploadedFile:
     Image.new("RGB", (8, 8), color=(0, 0, 0)).save(buf, format="PNG")
     buf.seek(0)
     return SimpleUploadedFile(name, buf.read(), content_type="image/png")
-
-
-# Mock ``Setting.get`` instead of writing rows via ``update_or_create``,
-# the same pattern as ``test_free_shipping_info.py``.
-def _setting_get_with_smartpoint_enabled(name: str, default=None):
-    if name == "ACS_SMARTPOINT_ENABLED":
-        return True
-    return default
 
 
 def test_logo_defaults_to_blank():
@@ -132,12 +123,8 @@ def test_logo_for_kind_unknown_kind_falls_back_to_primary():
     assert field.name == provider.logo.name
 
 
-@patch(
-    "extra_settings.models.Setting.get",
-    side_effect=_setting_get_with_smartpoint_enabled,
-)
 def test_options_endpoint_returns_null_logo_when_no_upload(
-    _mock_setting, acs_configured_tenant
+    acs_configured_tenant, acs_locker_station
 ):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
@@ -157,12 +144,8 @@ def test_options_endpoint_returns_null_logo_when_no_upload(
         assert "logoUrl" not in row
 
 
-@patch(
-    "extra_settings.models.Setting.get",
-    side_effect=_setting_get_with_smartpoint_enabled,
-)
 def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
-    _mock_setting, acs_configured_tenant
+    acs_configured_tenant, acs_locker_station
 ):
     """When ``logo_pickup_point`` is uploaded, the pickup_point
     option row carries IT as logoPath while the home_delivery row
@@ -206,12 +189,8 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
     assert "acs-smartpoint" in pickup_rows[0]["logoPath"]
 
 
-@patch(
-    "extra_settings.models.Setting.get",
-    side_effect=_setting_get_with_smartpoint_enabled,
-)
 def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
-    _mock_setting, acs_configured_tenant
+    acs_configured_tenant, acs_locker_station
 ):
     """When only ``logo`` is uploaded (no pickup-specific variant),
     both home_delivery and pickup_point rows share the same URL —
@@ -238,12 +217,8 @@ def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
     )
 
 
-@patch(
-    "extra_settings.models.Setting.get",
-    side_effect=_setting_get_with_smartpoint_enabled,
-)
 def test_options_endpoint_surfaces_uploaded_logo_path(
-    _mock_setting, acs_configured_tenant
+    acs_configured_tenant, acs_locker_station
 ):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     provider = ShippingProvider.objects.get(code="acs")

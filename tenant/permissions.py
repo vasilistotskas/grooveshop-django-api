@@ -272,6 +272,19 @@ class IsB2BWholesaleEnabled(IsSettingEnabled):
     setting_key = "B2B_WHOLESALE_ENABLED"
 
 
+class IsB2BInvoicingEnabled(IsSettingEnabled):
+    """Whether checkout offers an invoice instead of a receipt.
+
+    Not a route gate: there is no endpoint of its own to 404. The order
+    serializer refuses ``document_type=INVOICE`` through ``feature_on``
+    when this is off, and the storefront hides the toggle from the
+    ``b2b_invoicing`` feature. No plan flag: invoicing is available on
+    every plan, unlike the wholesale program (``IsB2BEnabled``).
+    """
+
+    setting_key = "B2B_INVOICING_ENABLED"
+
+
 class IsLoyaltyRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has switched loyalty off at runtime.
 

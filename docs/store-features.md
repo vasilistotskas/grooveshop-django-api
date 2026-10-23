@@ -70,8 +70,7 @@ consumed by tasks and integrations.
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
 | `CART_ENABLED` | (a), **not yet in the table** | `preferences.cart` until then; see "Not yet gated" |
 | `CATALOGUE_ENABLED` | (a), **not yet in the table** | `preferences.catalogue` until then; see "Not yet gated" |
-| `ACS_SMARTPOINT_ENABLED` | (a) option of a carrier | the shipping options response omits the locker option; no route to 404 |
-| `B2B_INVOICING_ENABLED` | (a) option of checkout | enforced by order validation (400), not a 404 gate |
+| `B2B_INVOICING_ENABLED` | (a) `b2b_invoicing` | no plan flag; refused by order validation (400, `invoicing_disabled`), not a 404 gate |
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
 | `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
 | `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
@@ -98,6 +97,7 @@ settings.
 | `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `promotion/views.py`, cart coupon actions |
 | `gift_cards` | `gift_cards_enabled` | `GIFT_CARDS_ENABLED` | `giftcard/views.py` |
 | `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `b2b/views.py` |
+| `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
 | `product_suggestions` | `recommendations_enabled` | `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
 | `product_alerts` | | `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |

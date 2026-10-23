@@ -3,6 +3,42 @@
 
 
 
+## v3.147.0 (2026-10-23)
+
+### Features
+
+* feat(tenant): serve the store preferences in TenantConfig (#311)
+
+The storefront read six boolean switches (bottom navigation, sticky
+add to cart, recently viewed, the demo account card, the cart and the
+catalogue) through /settings/public, and kept an answer of its own for
+each one for when that read fails. They are now served in the tenant
+payload as `preferences`, beside `features`, so a client reads them
+the same way: resolved on the server, with the request it already
+makes, never unreadable.
+
+- tenant/features.py: STORE_PREFERENCES (name -> setting key) and
+  effective_preferences(), which reads them in the store's own schema
+  (public: all off, as for features).
+- TenantConfigSerializer.preferences (StorePreferencesSerializer).
+  Required in the schema like `features`; additive, so this ships
+  before the storefront that reads it.
+- A preference flip bumps the store's resolve-cache generation and
+  queues the store-pages purge, which also drops the storefront's copy
+  of the payload, exactly as a feature flip does.
+- on_switch_change() takes the setting keys it watches instead of gate
+  classes: it only ever used each gate's key, and the preferences have
+  no gate.
+docs/store-features.md: class (b) and the cart/catalogue rows.
+
+The cart and the catalogue move to `features` once the agent gateway
+reads them (grooveshop-agent-gateway issue 27).
+
+
+Claude-Session: https://claude.ai/code/session_018UPRzQM7hfPTsKgtceSCqd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`82d8099`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82d80991db2d9d03537d23b044699e16148be841))
+
 ## v3.146.2 (2026-10-23)
 
 ### Bug fixes

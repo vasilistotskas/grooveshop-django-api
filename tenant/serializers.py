@@ -73,6 +73,24 @@ class StoreFeaturesSerializer(serializers.Serializer):
         return effective_features(instance)
 
 
+class StorePreferencesSerializer(serializers.Serializer):
+    """Each store preference's state (``tenant/features.py``): a switch the
+    API does not refuse on, served here so a client learns it from the
+    tenant payload instead of a settings read that can fail."""
+
+    mobile_bottom_nav = serializers.BooleanField(read_only=True)
+    sticky_add_to_cart = serializers.BooleanField(read_only=True)
+    recently_viewed = serializers.BooleanField(read_only=True)
+    demo_account = serializers.BooleanField(read_only=True)
+    cart = serializers.BooleanField(read_only=True)
+    catalogue = serializers.BooleanField(read_only=True)
+
+    def to_representation(self, instance) -> dict[str, bool]:
+        from tenant.features import effective_preferences
+
+        return effective_preferences(instance)
+
+
 class _ResendCooldownField(serializers.IntegerField):
     """``settings.ACCOUNT_RESEND_COOLDOWN_SECONDS``, read at render time.
 
@@ -206,6 +224,10 @@ class TenantConfigSerializer(serializers.Serializer):
     # gateway release before a Django release serving it reaches
     # production. The tenant row itself is the source.
     features = StoreFeaturesSerializer(source="*", read_only=True)
+    # Each store preference's state, read the same way. Required in the
+    # schema like ``features``: the storefront reads it in place of a
+    # settings read, so it ships after a Django release serving it.
+    preferences = StorePreferencesSerializer(source="*", read_only=True)
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
     promotions_enabled = serializers.BooleanField(read_only=True)

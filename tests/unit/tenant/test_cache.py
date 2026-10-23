@@ -325,6 +325,23 @@ class TestTenantSchemaWritesBumpTheGeneration:
             )
         assert _generation(tenant) == 1
 
+    def test_every_preference_setting_bumps(self, db):
+        """``TenantConfig.preferences`` is folded into the cached payload,
+        so a preference flip must move the generation like a feature."""
+        from types import SimpleNamespace
+
+        from tenant.features import STORE_PREFERENCES
+        from tenant.signals import bump_generation_on_agent_setting_change
+
+        tenant = store_tenant("gen_preference")
+        with patch("tenant.signals.connection") as conn:
+            conn.schema_name = tenant.schema_name
+            for key in STORE_PREFERENCES.values():
+                bump_generation_on_agent_setting_change(
+                    None, SimpleNamespace(name=key)
+                )
+        assert _generation(tenant) == len(STORE_PREFERENCES)
+
     def test_a_public_schema_write_bumps_nothing(self, db):
         """Seed and fixture loads run in public, which owns no
         storefront's pay-ways or settings."""

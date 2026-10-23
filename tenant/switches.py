@@ -13,6 +13,7 @@ writes the default the store already had.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from django.db import connection
@@ -22,28 +23,24 @@ from django_tenants.utils import get_public_schema_name
 
 from core.store_settings import declared_default
 from tenant.celery import dispatch_on_commit
-from tenant.permissions import IsSettingEnabled
 
 
 def on_switch_change(
     *,
-    setting_gates: tuple[type[IsSettingEnabled], ...],
+    setting_keys: Iterable[str],
     plan_flags: tuple[str, ...],
     task: str,
     plan_countdown: int = 0,
 ) -> None:
-    """Queue ``task`` (a dotted path) in the store's schema whenever the
-    setting of one of the store's ``setting_gates``, or one of the
+    """Queue ``task`` (a dotted path) in the store's schema whenever one
+    of the boolean store settings named in ``setting_keys``, or one of the
     ``plan_flags`` on its ``Tenant``, really changes.
 
     ``plan_countdown`` holds the task that many seconds when a plan flag
     moved, for work that must wait until a copy of the ``Tenant`` row
     cached elsewhere has expired.
     """
-    defaults = {
-        gate.setting_key: declared_default(gate.setting_key)
-        for gate in setting_gates
-    }
+    defaults = {key: declared_default(key) for key in setting_keys}
     uid = f"tenant.switch.{task}"
     setting_mark = f"_switch_before:{task}"
     seeded_mark = f"_switch_seeded:{task}"

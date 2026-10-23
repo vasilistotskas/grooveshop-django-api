@@ -5,6 +5,11 @@ store setting it needs are on. The table names the same permission classes
 that answer 404 for the feature, so what ``TenantConfig.features`` tells a
 client can never disagree with what the API serves, and no client has to
 combine the two tiers, or copy the settings' defaults, itself.
+
+Store preferences ride beside them in ``TenantConfig.preferences``: a
+store's switches that the API does not refuse on, so a client still learns
+each one's state from the tenant payload instead of a settings read that
+can fail (``docs/store-features.md``).
 """
 
 from __future__ import annotations
@@ -82,6 +87,21 @@ STORE_FEATURES: dict[str, StoreFeature] = {
 }
 
 
+#: Preference name (its key in ``TenantConfig.preferences``) → the store
+#: setting that holds it. Class (b) presentation preferences, plus the
+#: cart and the catalogue: features in every sense but that Django's API
+#: does not refuse on them yet, so they move to ``STORE_FEATURES`` once the
+#: agent gateway reads them (grooveshop-agent-gateway issue 27).
+STORE_PREFERENCES: dict[str, str] = {
+    "mobile_bottom_nav": "MOBILE_BOTTOM_NAV_ENABLED",
+    "sticky_add_to_cart": "STICKY_ADD_TO_CART_ENABLED",
+    "recently_viewed": "RECENTLY_VIEWED_ENABLED",
+    "demo_account": "DEMO_ACCOUNT_ENABLED",
+    "cart": "CART_ENABLED",
+    "catalogue": "CATALOGUE_ENABLED",
+}
+
+
 def feature_setting_gates() -> tuple[type[IsSettingEnabled], ...]:
     """Every store-setting gate some feature depends on, once each."""
     return tuple(
@@ -107,6 +127,24 @@ def feature_plan_flags() -> tuple[str, ...]:
 def feature_setting_keys() -> frozenset[str]:
     """Every store setting some feature depends on."""
     return frozenset(gate.setting_key for gate in feature_setting_gates())
+
+
+def preference_setting_keys() -> frozenset[str]:
+    """Every store setting behind a preference."""
+    return frozenset(STORE_PREFERENCES.values())
+
+
+def effective_preferences(tenant) -> dict[str, bool]:
+    """Every preference's state for ``tenant``, read in its own schema. The
+    platform is not a store, so every preference is off there."""
+    if tenant.schema_name == get_public_schema_name():
+        return dict.fromkeys(STORE_PREFERENCES, False)
+
+    from core.store_settings import store_settings
+
+    with schema_context(tenant.schema_name):
+        values = store_settings(STORE_PREFERENCES.values())
+    return {name: bool(values[key]) for name, key in STORE_PREFERENCES.items()}
 
 
 def effective_features(tenant) -> dict[str, bool]:

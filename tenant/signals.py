@@ -12,8 +12,8 @@ from region.models import Region
 from tenant.cache import bump_cache_generation
 from tenant.features import (
     feature_plan_flags,
-    feature_setting_gates,
     feature_setting_keys,
+    preference_setting_keys,
 )
 from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
@@ -22,10 +22,12 @@ from tenant.switches import on_switch_change
 
 # Every page the storefront has cached for a store shows what the store
 # offers (navigation, footer, product cards), so a feature switch purges
-# them all. The storefront reads the plan flags from its copy of the
-# resolve payload, so that purge waits until the copy has expired.
+# them all, and so does a preference switch (bottom navigation, cart,
+# catalogue). The purge also drops the storefront's copy of the resolve
+# payload, where both now live. The storefront reads the plan flags from
+# that copy too, so a plan purge waits until the copy has expired.
 on_switch_change(
-    setting_gates=feature_setting_gates(),
+    setting_keys=feature_setting_keys() | preference_setting_keys(),
     plan_flags=feature_plan_flags(),
     task="core.tasks.purge_store_pages_task",
     plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
@@ -35,7 +37,7 @@ on_switch_change(
 # ``available_locales``. The storefront reads it from its copy of the
 # resolve payload, so the purge waits until that copy has expired.
 on_switch_change(
-    setting_gates=(),
+    setting_keys=(),
     plan_flags=("available_locales",),
     task="core.tasks.purge_store_locales_task",
     plan_countdown=settings.STOREFRONT_TENANT_CACHE_SECONDS,
@@ -111,7 +113,8 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
 
     ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
     with the plan flag inside ``TenantConfigSerializer``, and so is every
-    feature switch in ``TenantConfig.features`` (``tenant/features.py``)
+    feature switch in ``TenantConfig.features`` and every preference in
+    ``TenantConfig.preferences`` (``tenant/features.py``)
     — without this bump a merchant toggle would sit behind the resolve
     cache for the full TTL. Setting rows live in the TENANT schema, so
     the current connection schema identifies whose generation to bump.
@@ -120,8 +123,9 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
         "AGENT_COMMERCE_ENABLED",
         "PRODUCT_FEEDS_ENABLED",
         "AGENT_HOSTED_PAYMENT_ENABLED",
-        # Folded into ``TenantConfig.features``.
+        # Folded into ``TenantConfig.features`` and ``.preferences``.
         *feature_setting_keys(),
+        *preference_setting_keys(),
     }:
         return
     _bump_generation_for_current_schema()

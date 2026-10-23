@@ -368,7 +368,7 @@ def notify_tier_up_live(
 # Loyalty switched off or on: open or close the pause that keeps points
 # from ageing while the programme is off (``LoyaltyService.sync_pause``).
 on_switch_change(
-    setting_gates=(IsLoyaltyRuntimeEnabled,),
+    setting_keys=(IsLoyaltyRuntimeEnabled.setting_key,),
     plan_flags=("loyalty_enabled",),
     task="loyalty.tasks.sync_loyalty_pause",
 )

@@ -128,7 +128,7 @@ def reindex_offer_on_redemption_delete(sender, instance, **kwargs):
 # left lists and search showing promotion prices the cart no longer
 # honoured for up to a day.
 on_switch_change(
-    setting_gates=(IsPromotionsRuntimeEnabled,),
+    setting_keys=(IsPromotionsRuntimeEnabled.setting_key,),
     plan_flags=("promotions_enabled",),
     task="product.tasks.reevaluate_price_episodes",
 )

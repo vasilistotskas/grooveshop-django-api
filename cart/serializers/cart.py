@@ -663,8 +663,8 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         ),
         help_text=_(
             "Fulfilment kind for the carrier (home_delivery or "
-            "pickup_point). Required so the per-kind feature flags "
-            "(e.g. ACS_SMARTPOINT_ENABLED) and BoxNow's PICKUP_POINT "
+            "pickup_point). Required so the per-kind gates (ACS "
+            "lockers need synced stations) and BoxNow's PICKUP_POINT "
             "gate are honoured."
         ),
     )

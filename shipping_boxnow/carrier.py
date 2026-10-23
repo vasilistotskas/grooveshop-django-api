@@ -124,7 +124,9 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # Per-kind feature gating
     # ------------------------------------------------------------------
 
-    def is_kind_enabled(self, kind: ShippingKind) -> bool:
+    def is_kind_enabled(
+        self, kind: ShippingKind, *, country_code: str | None
+    ) -> bool:
         """Gate BoxNow availability on tenant credentials.
 
         An unconfigured tenant (no ``Tenant.box_now_*`` credentials)

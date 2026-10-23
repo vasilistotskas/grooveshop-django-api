@@ -5393,8 +5393,8 @@ msgstr "Από εδώ και πέρα, οι τιμές χονδρικής σας
 msgid "From product"
 msgstr "Από προϊόν"
 
-msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind feature flags (e.g. ACS_SMARTPOINT_ENABLED) and BoxNow's PICKUP_POINT gate are honoured."
-msgstr "Τύπος εκπλήρωσης για τον μεταφορέα (home_delivery ή pickup_point). Απαιτείται ώστε να τηρούνται οι επιμέρους σημαίες λειτουργίας (π.χ. ACS_SMARTPOINT_ENABLED) και ο έλεγχος PICKUP_POINT του BoxNow."
+msgid "Fulfilment kind for the carrier (home_delivery or pickup_point). Required so the per-kind gates (ACS lockers need synced stations) and BoxNow's PICKUP_POINT gate are honoured."
+msgstr "Τύπος εκπλήρωσης για τον μεταφορέα (home_delivery ή pickup_point). Απαιτείται ώστε να τηρούνται οι επιμέρους έλεγχοι διαθεσιμότητας (οι θυρίδες ACS χρειάζονται συγχρονισμένους σταθμούς) και ο έλεγχος PICKUP_POINT του BoxNow."
 
 msgid "Full delivery-request response and diagnostics from BoxNow"
 msgstr "Πλήρης απόκριση αιτήματος παράδοσης και διαγνωστικά από το BoxNow"

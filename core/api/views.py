@@ -652,10 +652,8 @@ PUBLIC_SETTING_KEYS = frozenset(
         # ``/api/v1/shipping/free-shipping-info``), not a Setting — the
         # six CHECKOUT_SHIPPING_PRICE / FREE_SHIPPING_THRESHOLD /
         # BOXNOW_* / ACS_* pricing keys are gone.
-        # ACS toggle read by the Nuxt checkout — see useCheckoutForm.ts.
-        # The rest (e.g. ACS_DYNAMIC_PRICING_ENABLED) are server-side
-        # only and stay admin-gated.
-        "ACS_SMARTPOINT_ENABLED",
+        # The carriers' own settings (e.g. ACS_DYNAMIC_PRICING_ENABLED)
+        # are server-side only and stay admin-gated.
         # Storefront's "order before HH:MM" line next to a rate's
         # delivery days.
         "DISPATCH_CUTOFF",

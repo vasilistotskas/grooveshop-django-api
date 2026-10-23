@@ -205,7 +205,9 @@ class PayWayService:
             if not is_registered(provider.code):
                 continue
             adapter = get_provider(provider.code)
-            if not adapter.is_kind_enabled(kind_enum):
+            if not adapter.is_kind_enabled(
+                kind_enum, country_code=country_code
+            ):
                 continue
             candidates.append((provider.code, adapter))
 

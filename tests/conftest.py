@@ -655,6 +655,19 @@ def acs_configured_tenant(bind_tenant):
     return tenant
 
 
+@pytest.fixture
+def acs_locker_station(db):
+    """One active Greek Smartpoint locker in the ``AcsStation`` cache.
+
+    ``AcsCarrier.is_kind_enabled(PICKUP_POINT, country_code="GR")`` is
+    true only while the nightly sync has left such a row behind, so a
+    test that expects ACS locker pickup to be offered asks for this.
+    """
+    from shipping_acs.factories import AcsStationFactory
+
+    return AcsStationFactory(country_code="GR")
+
+
 _BOXNOW_TENANT_FIELDS: dict = {
     "box_now_client_id": "TEST_BOXNOW_CLIENT",
     "box_now_client_secret": "TEST_BOXNOW_SECRET",

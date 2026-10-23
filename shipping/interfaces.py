@@ -166,14 +166,24 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
-    def is_kind_enabled(self, kind: ShippingKind) -> bool:
+    def is_kind_enabled(
+        self, kind: ShippingKind, *, country_code: str | None
+    ) -> bool:
         """Return whether the provider's ``kind`` is enabled in checkout.
+
+        ``country_code`` is the delivery country (ISO alpha-2), for a
+        provider whose ``kind`` depends on data it holds per country. It
+        is ``None`` when the caller does not know the country yet, which
+        means "any country": answer True when the kind is enabled for at
+        least one, so the caller treats the provider as a candidate
+        rather than dropping it. The argument has no default so that a
+        caller states which of the two it means.
 
         Defaults to True so providers that only need the
         ``ShippingProvider.is_active`` master switch don't need to
-        override this hook.  Override when a provider has a per-kind
-        feature flag — e.g. ACS uses ``ACS_SMARTPOINT_ENABLED`` to gate
-        the locker pickup option independently of home delivery.
+        override this hook.  Override when a provider gates a kind on
+        its own state — e.g. ACS offers locker pickup only once it holds
+        stations for the country, independently of home delivery.
         """
         return True
 

@@ -32,6 +32,7 @@ from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
 )
+from tenant.features import feature_on
 
 CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
@@ -1340,8 +1341,8 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     def validate(self, attrs):
         """Cross-field rules for B2B invoicing and BoxNow shipping.
 
-        1. ``B2B_INVOICING_ENABLED`` gates the feature site-wide — when
-           off, ``document_type=INVOICE`` is rejected so the API can't
+        1. The ``b2b_invoicing`` store feature gates invoicing site-wide.
+           When off, ``document_type=INVOICE`` is rejected so the API can't
            be bypassed via direct calls while the UI hides the toggle.
         2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
            Otherwise the myDATA submission would silently downgrade to
@@ -1352,8 +1353,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         4. The delivery address passes ``core.validators.address`` for
            its country, and the postcode is stored normalised.
         """
-        from core.store_settings import store_setting
-
         country = Country.objects.filter(alpha_2=attrs["country_id"]).first()
         if country is None:
             raise serializers.ValidationError(
@@ -1376,9 +1375,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
         document_type = attrs.get("document_type", "RECEIPT")
         billing_vat_id = attrs.get("billing_vat_id", "")
-        if document_type == "INVOICE" and not store_setting(
-            "B2B_INVOICING_ENABLED"
-        ):
+        if document_type == "INVOICE" and not feature_on("b2b_invoicing"):
             raise serializers.ValidationError(
                 {"document_type": _("B2B invoicing is currently disabled.")},
                 code="invoicing_disabled",

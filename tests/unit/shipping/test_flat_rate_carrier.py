@@ -43,7 +43,13 @@ class TestRegistration(TestCase):
         credentials. This one has none to have.
         """
         carrier = FlatRateCarrier()
-        assert carrier.is_kind_enabled(ShippingKind.HOME_DELIVERY) is True
+        for country_code in ("GR", None):
+            assert (
+                carrier.is_kind_enabled(
+                    ShippingKind.HOME_DELIVERY, country_code=country_code
+                )
+                is True
+            )
 
     def test_it_has_no_live_quote_of_its_own(self):
         """The default ``live_quote`` — ``ShippingRate.price`` unchanged.

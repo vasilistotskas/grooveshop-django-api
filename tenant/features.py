@@ -23,6 +23,7 @@ from tenant.permissions import (
     IsAgentCommerceEnabled,
     IsAgentCommerceRuntimeEnabled,
     IsB2BEnabled,
+    IsB2BInvoicingEnabled,
     IsB2BWholesaleEnabled,
     IsBlogCommentsEnabled,
     IsBlogEnabled,
@@ -76,6 +77,7 @@ STORE_FEATURES: dict[str, StoreFeature] = {
     "product_suggestions": StoreFeature(
         IsRecommendationsEnabled, (IsRecommendationsRuntimeEnabled,)
     ),
+    "b2b_invoicing": StoreFeature(None, (IsB2BInvoicingEnabled,)),
     "product_alerts": StoreFeature(None, (IsProductAlertsEnabled,)),
     "contact_attachments": StoreFeature(None, (IsContactAttachmentsEnabled,)),
     # The widget talks to the agent gateway's chat, which only serves a

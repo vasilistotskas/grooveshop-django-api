@@ -645,16 +645,6 @@ def list_settings(request):
         )
 
 
-# Every key this API will resolve at all — the names the platform
-# declares as store settings. `Setting.get` falls through to
-# `django.conf.settings` for anything else (django-extra-settings'
-# `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS`, on by default), so an
-# unbounded key is a read of the Django settings module.
-STORE_SETTING_KEYS = frozenset(
-    entry["name"] for entry in settings.EXTRA_SETTINGS_DEFAULTS
-)
-
-
 PUBLIC_SETTING_KEYS = frozenset(
     {
         # Shipping price/free-threshold is a per-country ``ShippingRate``
@@ -794,7 +784,7 @@ def get_setting_by_key(request):
     All other keys require admin access.
     """
     try:
-        from extra_settings.models import Setting
+        from core.store_settings import DECLARED_DEFAULTS, store_setting
 
         key = request.query_params.get("key")
 
@@ -809,27 +799,13 @@ def get_setting_by_key(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # This endpoint serves STORE settings. `Setting.get` is not a
-        # store-settings lookup: django-extra-settings defaults
-        # `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS` to True, so on a
-        # miss it degenerates to `getattr(django.conf.settings, key)` —
-        # and `key` comes straight off the query string. Any staff token
-        # could read `SECRET_KEY`, `EMAIL_HOST_PASSWORD`, `DATABASES`
-        # (which carries the DB password) or the gateway's internal
-        # secret. `SECRET_KEY` alone lets the holder forge sessions and
-        # any `django.core.signing` value for every user on every
-        # tenant, so one store's operator became platform root.
-        #
-        # A key is servable when the platform DECLARES it or the tenant
-        # actually HAS it as a row; either way the value comes from the
-        # settings table, never from the fallback. A name with neither is
-        # now indistinguishable from one that does not exist. (A row
-        # named after a Django setting is no loophole: once the row
-        # exists, `Setting.get` returns the ROW.)
-        if (
-            key not in STORE_SETTING_KEYS
-            and not Setting.objects.filter(name=key).exists()
-        ):
+        # This endpoint serves the store settings the platform declares,
+        # nothing else. `key` comes straight off the query string, and
+        # an unbounded lookup once read the Django settings module
+        # through django-extra-settings' conf fallback: any staff token
+        # got `SECRET_KEY`. That fallback is off now, and an undeclared
+        # name is indistinguishable from one that does not exist.
+        if key not in DECLARED_DEFAULTS:
             return Response(
                 {
                     "detail": _("Setting not found or access denied."),
@@ -849,26 +825,13 @@ def get_setting_by_key(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        try:
-            setting_value = Setting.get(key)
-            serializer = SettingDetailSerializer(
-                {
-                    "name": key,
-                    "value": _serialize_setting_value(setting_value),
-                }
-            )
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Setting.DoesNotExist:
-            error_data = {
-                "detail": _("Setting '%(key)s' not found") % {"key": key},
-                "error": "not_found",
-                "code": "setting_not_found",
+        serializer = SettingDetailSerializer(
+            {
+                "name": key,
+                "value": _serialize_setting_value(store_setting(key)),
             }
-            return Response(
-                error_data,
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception:
         logger.exception("Error retrieving setting")
@@ -894,9 +857,9 @@ def _serialize_setting_value(value) -> str:
     summary=_("Get public settings"),
     description=_(
         "Retrieve every anonymously readable store setting in one call, "
-        "keyed by setting name. Only PUBLIC_SETTING_KEYS are ever "
-        "included; a key without a row (or with an empty value) is "
-        "omitted so the caller applies its own default."
+        "keyed by setting name: every PUBLIC_SETTING_KEYS entry, with "
+        "the store's value or, when the store has none, the value the "
+        "platform declares for it."
     ),
     tags=["Settings"],
     responses={
@@ -915,20 +878,19 @@ def get_public_settings(request):
     tenant schema replaces them; the storefront caches the payload per
     tenant.
 
-    No ``Setting.get``: that reads through django-extra-settings' own
-    cache and falls back to ``django.conf.settings`` on a miss, neither
-    of which a bulk read wants. The rows ARE the store's settings.
+    Every key is present with its effective value: the store's, else
+    the one the platform declares. So no client keeps a default of its
+    own that can drift from the declared one.
     """
     try:
-        from extra_settings.models import Setting
+        from core.store_settings import store_settings
 
-        values: dict[str, str] = {}
-        for setting in Setting.objects.filter(name__in=PUBLIC_SETTING_KEYS):
-            value = setting.value
-            if value is None:
-                continue
-            values[setting.name] = _serialize_setting_value(value)
-
+        values = {
+            key: _serialize_setting_value(value)
+            for key, value in sorted(
+                store_settings(PUBLIC_SETTING_KEYS).items()
+            )
+        }
         serializer = PublicSettingsSerializer({"settings": values})
         return Response(serializer.data, status=status.HTTP_200_OK)
 

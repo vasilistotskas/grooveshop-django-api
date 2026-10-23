@@ -51,7 +51,7 @@ def _order(user, *, metadata=None, status=OrderStatus.COMPLETED):
 def _settings(extra=None, *, enabled=True):
     values = {"LOYALTY_ENABLED": enabled, **(extra or {})}
     return patch(
-        "loyalty.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: values.get(key, default),
     )
 

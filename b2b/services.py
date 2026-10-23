@@ -24,11 +24,11 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 from djmoney.money import Money
-from extra_settings.models import Setting
 
 from b2b.enum import BusinessProfileStatus, ViesStatus
 from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
 from b2b.vies import ViesClient, ViesUnavailableError
+from core.store_settings import store_setting
 from product.models.product import _quantize_cents
 from tenant.celery import dispatch_on_commit
 
@@ -82,12 +82,12 @@ class B2BService:
 
         if not tenant_plan_allows("b2b_enabled"):
             return False
-        return bool(Setting.get("B2B_WHOLESALE_ENABLED", default=False))
+        return bool(store_setting("B2B_WHOLESALE_ENABLED"))
 
     @classmethod
     def promotions_allowed(cls) -> bool:
         """Whether promotions/coupons stack on top of wholesale prices."""
-        return bool(Setting.get("B2B_ALLOW_PROMOTIONS", default=False))
+        return bool(store_setting("B2B_ALLOW_PROMOTIONS"))
 
     @classmethod
     def loyalty_allowed(cls) -> bool:
@@ -100,7 +100,7 @@ class B2BService:
         subsidizing wholesale. Off by default; one switch so the two
         halves can never disagree.
         """
-        return bool(Setting.get("B2B_LOYALTY_ENABLED", default=False))
+        return bool(store_setting("B2B_LOYALTY_ENABLED"))
 
     @classmethod
     def suppresses_loyalty(cls, cart) -> bool:

@@ -43,7 +43,7 @@ def enable_wholesale():
 
     with (
         patch("extra_settings.models.Setting.get", side_effect=_get),
-        patch("b2b.services.Setting.get", side_effect=_get),
+        patch("extra_settings.models.Setting.get", side_effect=_get),
     ):
         yield
 

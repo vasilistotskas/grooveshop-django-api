@@ -54,7 +54,7 @@ def _gift_cards():
         "GIFT_CARD_MAX_AMOUNT": 500,
     }
     with patch(
-        "giftcard.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: values.get(key, default),
     ):
         yield

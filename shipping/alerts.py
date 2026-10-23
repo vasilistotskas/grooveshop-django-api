@@ -73,9 +73,9 @@ class OpsAlertKind(models.TextChoices):
 
 def ops_alert_enabled(kind: OpsAlertKind) -> bool:
     """Whether the active store wants this kind of alert emailed."""
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
-    return bool(Setting.get(kind.setting_name, default=True))
+    return bool(store_setting(kind.setting_name))
 
 
 def send_ops_alert(

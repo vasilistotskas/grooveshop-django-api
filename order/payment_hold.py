@@ -19,8 +19,8 @@ from datetime import datetime, timedelta
 from django.db.models import DateTimeField, ExpressionWrapper, F, QuerySet
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from order.payment import StripePaymentProvider, VivaWalletPaymentProvider
@@ -76,15 +76,15 @@ def validate_max_hold_minutes_setting(value: object) -> bool:
 
 
 def hold_window() -> timedelta:
-    return timedelta(minutes=int(Setting.get(HOLD_SETTING)))
+    return timedelta(minutes=int(store_setting(HOLD_SETTING)))
 
 
 def grace_window() -> timedelta:
-    return timedelta(minutes=int(Setting.get(GRACE_SETTING)))
+    return timedelta(minutes=int(store_setting(GRACE_SETTING)))
 
 
 def max_hold_window() -> timedelta:
-    return timedelta(minutes=int(Setting.get(MAX_HOLD_SETTING)))
+    return timedelta(minutes=int(store_setting(MAX_HOLD_SETTING)))
 
 
 def hold_limit(order: Order) -> datetime:

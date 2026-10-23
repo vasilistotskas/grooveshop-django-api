@@ -23,7 +23,7 @@ from tests.utils.store_settings import switch_store_settings
 
 pytestmark = pytest.mark.django_db
 
-SETTING_GET = "giftcard.services.Setting.get"
+SETTING_GET = "extra_settings.models.Setting.get"
 
 
 def _gift_cards(on: bool):

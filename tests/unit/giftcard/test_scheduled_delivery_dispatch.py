@@ -87,7 +87,7 @@ def test_sweep_waits_while_gift_cards_are_off(due_card):
     first sweep after the store turns gift cards back on."""
     with (
         patch(
-            "giftcard.services.Setting.get",
+            "extra_settings.models.Setting.get",
             side_effect=lambda key, default=None: (
                 False if key == "GIFT_CARDS_ENABLED" else default
             ),

@@ -10469,8 +10469,8 @@ msgstr "Retrieve all settings with their names, values, and types"
 msgid "Retrieve an order by UUID"
 msgstr "Retrieve an order by UUID"
 
-msgid "Retrieve every anonymously readable store setting in one call, keyed by setting name. Only PUBLIC_SETTING_KEYS are ever included; a key without a row (or with an empty value) is omitted so the caller applies its own default."
-msgstr "Retrieve every anonymously readable store setting in one call, keyed by setting name. Only PUBLIC_SETTING_KEYS are ever included; a key without a row (or with an empty value) is omitted so the caller applies its own default."
+msgid "Retrieve every anonymously readable store setting in one call, keyed by setting name: every PUBLIC_SETTING_KEYS entry, with the store's value or, when the store has none, the value the platform declares for it."
+msgstr "Retrieve every anonymously readable store setting in one call, keyed by setting name: every PUBLIC_SETTING_KEYS entry, with the store's value or, when the store has none, the value the platform declares for it."
 
 msgid "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
 msgstr "Retrieve the current payment status from the payment provider. This fetches the latest status directly from Stripe/PayPal."
@@ -11009,10 +11009,6 @@ msgstr "Set this address as the user's main address."
 
 msgid "Set up your authenticator app"
 msgstr "Set up your authenticator app"
-
-#, python-format
-msgid "Setting '%(key)s' not found"
-msgstr "Setting '%(key)s' not found"
 
 msgid "Setting Information"
 msgstr "Setting Information"
@@ -12986,8 +12982,8 @@ msgid "Unsubscribed At"
 msgstr "Unsubscribed At"
 
 #, python-format
-msgid "Unsupported currency: %(currency)s. Supported: EUR, USD"
-msgstr "Unsupported currency: %(currency)s. Supported: EUR, USD"
+msgid "Unsupported currency: %(currency)s. Supported: %(supported)s"
+msgstr "Unsupported currency: %(currency)s. Supported: %(supported)s"
 
 msgid "Unsupported language code."
 msgstr "Unsupported language code."
@@ -14585,6 +14581,10 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Review #%(id)s: %(comment)s"
 #~ msgstr "Review #%(id)s: %(comment)s"
+
+#, python-format
+#~ msgid "Setting '%(key)s' not found"
+#~ msgstr "Setting '%(key)s' not found"
 
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"

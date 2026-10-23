@@ -26,9 +26,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from extra_settings.models import Setting
-
 from b2b.services import B2BService
+from core.store_settings import store_setting
 from giftcard.services import GiftCardService
 from loyalty.services import LoyaltyService
 from promotion.services import PromotionEngine
@@ -78,7 +77,7 @@ def _availability(plan_flag: str, enabled: bool) -> Availability:
 
 
 def _setting(gate: type[IsSettingEnabled]) -> bool:
-    return bool(Setting.get(gate.setting_key, default=gate.default))
+    return bool(store_setting(gate.setting_key))
 
 
 @dataclass(frozen=True)
@@ -129,7 +128,7 @@ class StoreFeatures:
             favourites=_setting(IsFavouritesEnabled),
             newsletter=_setting(IsNewsletterEnabled),
             feedback=_setting(IsFeedbackEnabled),
-            mydata=bool(Setting.get(MYDATA_SETTING, default=False)),
+            mydata=bool(store_setting(MYDATA_SETTING)),
             acs=AcsCarrier.code in active_carriers,
             boxnow=BoxNowCarrier.code in active_carriers,
         )

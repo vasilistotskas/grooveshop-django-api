@@ -227,7 +227,7 @@ def test_shipped_receipt_is_dispatched_under_schema_context():
         return settings_by_key.get(name, default)
 
     with (
-        patch("order.mydata.config.Setting.get", side_effect=fake_get),
+        patch("extra_settings.models.Setting.get", side_effect=fake_get),
         patch("order.signals.handlers.dispatch_on_commit") as dispatch,
         schema_context(tenant.schema_name),
     ):
@@ -251,7 +251,7 @@ def test_shipped_receipt_is_not_dispatched_without_credentials():
 
     with (
         patch(
-            "order.mydata.config.Setting.get",
+            "extra_settings.models.Setting.get",
             side_effect=lambda name, default=None: settings_by_key.get(
                 name, default
             ),

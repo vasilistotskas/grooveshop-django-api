@@ -163,7 +163,9 @@ class TestOrderCompleteEarnFlow:
             price_basis="final_price",
         )
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             total_points = LoyaltyService.award_order_points(order.id)
 
         # product1: floor(100 * 1.0 * 1.0 * 2) + 0 = 200
@@ -199,7 +201,9 @@ class TestOrderCompleteEarnFlow:
 
         mock_settings = _loyalty_settings(enabled=True, xp_per_level=1000)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.recalculate_tier(user)
 
         user.refresh_from_db()
@@ -226,7 +230,9 @@ class TestOrderCompleteEarnFlow:
             tier_multiplier_enabled=True,
         )
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             total_points = LoyaltyService.award_order_points(order.id)
 
         # floor(100 * 1.0 * 1.0 * 1 * 2.0) + 0 = 200
@@ -258,7 +264,9 @@ class TestOrderCompleteThenCancelFlow:
         mock_settings = _loyalty_settings(enabled=True, points_factor=1.0)
 
         # Step 1: Award points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             earned = LoyaltyService.award_order_points(order.id)
 
         # floor(80 * 1.0 * 1.0 * 3) = 240
@@ -267,7 +275,9 @@ class TestOrderCompleteThenCancelFlow:
         assert user.total_xp == 240
 
         # Step 2: Reverse points (simulating cancel)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             reversed_pts = LoyaltyService.reverse_order_points(order.id)
 
         assert reversed_pts == 240
@@ -282,7 +292,9 @@ class TestOrderCompleteThenCancelFlow:
         assert sum(tx.points for tx in adjust_txs) == -240
 
         # Verify balance is zero
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             balance = LoyaltyService.get_user_balance(user)
         assert balance == 0
 
@@ -302,7 +314,9 @@ class TestOrderCompleteThenCancelFlow:
         mock_settings = _loyalty_settings(enabled=True, points_factor=1.0)
 
         # Award points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
 
         # Manually reduce XP to simulate partial spend elsewhere
@@ -310,7 +324,9 @@ class TestOrderCompleteThenCancelFlow:
         user.save(update_fields=["total_xp"])
 
         # Reverse — should clamp XP to 0 (not go negative)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.reverse_order_points(order.id)
 
         user.refresh_from_db()
@@ -328,7 +344,9 @@ class TestOrderCompleteThenCancelFlow:
 
         mock_settings = _loyalty_settings(enabled=True, xp_per_level=1000)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.recalculate_tier(user)
 
         user.refresh_from_db()
@@ -339,7 +357,9 @@ class TestOrderCompleteThenCancelFlow:
         user.total_xp = 1500
         user.save(update_fields=["total_xp"])
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.recalculate_tier(user)
 
         user.refresh_from_db()
@@ -372,14 +392,18 @@ class TestOrderCompleteAndRedeemFlow:
         )
 
         # Step 1: Award points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             earned = LoyaltyService.award_order_points(order.id)
 
         assert earned == 200
 
         # Step 2: Redeem 100 points
         redeem_order = _create_order(user)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user,
                 points_amount=100,
@@ -402,7 +426,9 @@ class TestOrderCompleteAndRedeemFlow:
         assert redeem_tx.reference_order == redeem_order
 
         # Verify remaining balance
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             balance = LoyaltyService.get_user_balance(user)
         assert balance == 100  # 200 earned - 100 redeemed
 
@@ -422,12 +448,16 @@ class TestOrderCompleteAndRedeemFlow:
         )
 
         # Award points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
 
         # Redeem 200 points on a new order
         redeem_order = _create_order(user)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user,
                 points_amount=200,
@@ -458,11 +488,15 @@ class TestOrderCompleteAndRedeemFlow:
         mock_settings = _loyalty_settings(enabled=True, points_factor=1.0)
 
         # Award 50 points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
 
         # Try to redeem 100 — should fail
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             with pytest.raises(
                 ValidationError, match="Insufficient points balance"
             ):
@@ -509,7 +543,9 @@ class TestNewCustomerBonusFlow:
         )
 
         # Award order points first
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             earned = LoyaltyService.award_order_points(order.id)
             bonus = LoyaltyService.check_new_customer_bonus(user, order)
 
@@ -528,7 +564,9 @@ class TestNewCustomerBonusFlow:
         assert "New customer bonus" in bonus_tx.description
 
         # Verify total balance = earned + bonus
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             balance = LoyaltyService.get_user_balance(user)
         assert balance == 250  # 100 + 150
 
@@ -550,7 +588,9 @@ class TestNewCustomerBonusFlow:
             new_customer_bonus_points=150,
         )
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order1.id)
             LoyaltyService.check_new_customer_bonus(user, order1)
 
@@ -561,7 +601,9 @@ class TestNewCustomerBonusFlow:
         order2 = _create_order(user)
         _create_order_item(order2, product2, quantity=1)
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order2.id)
             bonus2 = LoyaltyService.check_new_customer_bonus(user, order2)
 
@@ -590,7 +632,9 @@ class TestNewCustomerBonusFlow:
             new_customer_bonus_enabled=False,
         )
 
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
             bonus = LoyaltyService.check_new_customer_bonus(user, order)
 
@@ -630,7 +674,9 @@ class TestRedeemPointsCappedByProductsTotal:
         )
 
         # Award 200 points (200 EUR product)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
 
         # Give user extra points via bonus so they have more than products total
@@ -649,7 +695,9 @@ class TestRedeemPointsCappedByProductsTotal:
         _create_order_item(redeem_order, cheap_product, quantity=1)
 
         # Try to redeem 20000 points = 200 EUR, but max_discount = 150
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             with pytest.raises(ValidationError, match="exceeds the maximum"):
                 LoyaltyService.redeem_points(
                     user,
@@ -683,7 +731,9 @@ class TestRedeemPointsCappedByProductsTotal:
         )
 
         # Award 100 points
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             LoyaltyService.award_order_points(order.id)
 
         # Give extra points
@@ -696,7 +746,9 @@ class TestRedeemPointsCappedByProductsTotal:
 
         # Redeem 15000 points = 150 EUR, max_discount = 150
         redeem_order = _create_order(user)
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user,
                 points_amount=15000,
@@ -733,7 +785,9 @@ class TestRedeemPointsCappedByProductsTotal:
         )
 
         # Redeem 5000 points = 50 EUR, max_discount = 150 — well within cap
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             discount = LoyaltyService.redeem_points(
                 user,
                 points_amount=5000,
@@ -790,7 +844,9 @@ class TestConcurrentAwardOrderPoints:
         # Patched once, here: ``patch`` swaps a class attribute, so one
         # entered per thread could restore another thread's mock as the
         # "original" on exit and leave it installed for later tests.
-        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+        with patch(
+            "extra_settings.models.Setting.get", side_effect=mock_settings
+        ):
             threads = [
                 threading.Thread(target=award, args=(order.id,))
                 for order in (order1, order2)

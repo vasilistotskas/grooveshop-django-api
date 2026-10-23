@@ -18,7 +18,6 @@ from datetime import date, datetime, time, timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from django.conf import settings
 from django.utils import timezone
 
 if TYPE_CHECKING:
@@ -124,14 +123,9 @@ def configured_cutoff() -> time | None:
     an unreadable value means (``None`` here would wrongly read as "no
     cutoff, ships today").
     """
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
-    default = next(
-        entry["value"]
-        for entry in settings.EXTRA_SETTINGS_DEFAULTS
-        if entry["name"] == "DISPATCH_CUTOFF"
-    )
-    raw = Setting.get("DISPATCH_CUTOFF", default=default)
+    raw = store_setting("DISPATCH_CUTOFF")
     try:
         return parse_cutoff(raw)
     except ValueError as exc:

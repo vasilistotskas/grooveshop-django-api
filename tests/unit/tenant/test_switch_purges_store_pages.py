@@ -18,6 +18,7 @@ from extra_settings.models import Setting
 from core.cache.service import PurgeReport, SurfaceResult
 from core.cache.surfaces import STORE_PAGES_SURFACE
 from core.exceptions import StorePagesPurgeFailed
+from core.store_settings import declared_default, store_setting
 from core.tasks import purge_store_pages_task
 from tenant.features import (
     feature_plan_flags,
@@ -47,7 +48,7 @@ def test_every_feature_setting_purges_its_store_at_once(
     bind_tenant_and_schema, gate
 ):
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
-    current = bool(Setting.get(gate.setting_key, default=gate.default))
+    current = bool(store_setting(gate.setting_key))
 
     with patch(DISPATCH) as dispatch:
         switch_store_settings(**{gate.setting_key: not current})
@@ -89,7 +90,9 @@ def test_seeding_a_missing_feature_setting_purges_nothing(
     switched; the blank insert used to read as one, and the migrate of a
     new schema queued (and, with no broker, crashed on) the purge."""
     gate = next(
-        gate for gate in feature_setting_gates() if gate.default is True
+        gate
+        for gate in feature_setting_gates()
+        if declared_default(gate.setting_key) is True
     )
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
     Setting.objects.filter(name=gate.setting_key).delete()
@@ -98,12 +101,14 @@ def test_seeding_a_missing_feature_setting_purges_nothing(
         Setting.set_defaults_from_settings()
 
     assert purges(dispatch) == []
-    assert Setting.get(gate.setting_key) is True
+    assert store_setting(gate.setting_key) is True
 
 
 def test_a_switch_right_after_seeding_still_purges(bind_tenant_and_schema):
     gate = next(
-        gate for gate in feature_setting_gates() if gate.default is True
+        gate
+        for gate in feature_setting_gates()
+        if declared_default(gate.setting_key) is True
     )
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
     Setting.objects.filter(name=gate.setting_key).delete()

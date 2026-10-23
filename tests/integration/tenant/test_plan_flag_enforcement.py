@@ -60,7 +60,7 @@ class TestPlanFlagGatesTheMoneyPath:
                 "tenant.membership.get_current_tenant",
                 return_value=_tenant(**{plan_field: False}),
             ),
-            patch(f"{service.__module__}.Setting.get", return_value=True),
+            patch("extra_settings.models.Setting.get", return_value=True),
         ):
             assert service.is_enabled() is False, (
                 f"{service.__name__} honoured the merchant-editable "
@@ -75,7 +75,7 @@ class TestPlanFlagGatesTheMoneyPath:
                 "tenant.membership.get_current_tenant",
                 return_value=_tenant(**{plan_field: True}),
             ),
-            patch(f"{service.__module__}.Setting.get", return_value=False),
+            patch("extra_settings.models.Setting.get", return_value=False),
         ):
             assert service.is_enabled() is False
 
@@ -85,7 +85,7 @@ class TestPlanFlagGatesTheMoneyPath:
                 "tenant.membership.get_current_tenant",
                 return_value=_tenant(**{plan_field: True}),
             ),
-            patch(f"{service.__module__}.Setting.get", return_value=True),
+            patch("extra_settings.models.Setting.get", return_value=True),
         ):
             assert service.is_enabled() is True
 
@@ -95,7 +95,7 @@ class TestPlanFlagGatesTheMoneyPath:
         """Platform routines run without a tenant and must not be blocked."""
         with (
             patch("tenant.membership.get_current_tenant", return_value=None),
-            patch(f"{service.__module__}.Setting.get", return_value=True),
+            patch("extra_settings.models.Setting.get", return_value=True),
         ):
             assert service.is_enabled() is True
 
@@ -111,7 +111,7 @@ class TestPlanFlagGatesTheMoneyPath:
                 "tenant.membership.get_current_tenant",
                 return_value=SimpleNamespace(schema_name="acme"),
             ),
-            patch(f"{service.__module__}.Setting.get", return_value=True),
+            patch("extra_settings.models.Setting.get", return_value=True),
         ):
             assert service.is_enabled() is True
 

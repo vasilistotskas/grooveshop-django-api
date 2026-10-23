@@ -108,10 +108,9 @@ def recommendations_active() -> bool:
     request to run a permission on: the order email and the nightly
     jobs.
     """
-    from extra_settings.models import Setting
-
+    from core.store_settings import store_setting
     from tenant.membership import tenant_plan_allows
 
     if not tenant_plan_allows("recommendations_enabled"):
         return False
-    return bool(Setting.get("PRODUCT_SUGGESTIONS_ENABLED", default=False))
+    return bool(store_setting("PRODUCT_SUGGESTIONS_ENABLED"))

@@ -26,8 +26,8 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 from djmoney.money import Money
-from extra_settings.models import Setting
 
+from core.store_settings import store_setting
 from order.discounts import allocate_capped
 from promotion.enum import (
     BenefitType,
@@ -225,7 +225,7 @@ class PromotionEngine:
 
         if not tenant_plan_allows("promotions_enabled"):
             return False
-        return bool(Setting.get("PROMOTIONS_ENABLED", default=False))
+        return bool(store_setting("PROMOTIONS_ENABLED"))
 
     @classmethod
     def evaluate(

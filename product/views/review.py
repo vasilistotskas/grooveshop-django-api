@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
-from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -12,6 +11,7 @@ from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.camel_case_ordering import ActionOrdering
+from core.store_settings import store_setting
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -123,9 +123,7 @@ class ProductReviewViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]
-        purchase_required = Setting.get(
-            "PRODUCT_REVIEWS_PURCHASE_REQUIRED", default=True
-        )
+        purchase_required = store_setting("PRODUCT_REVIEWS_PURCHASE_REQUIRED")
         if (
             purchase_required
             and not purchase_items(

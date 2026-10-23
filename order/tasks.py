@@ -14,7 +14,6 @@ from django.utils import timezone, translation
 from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
 from djmoney.money import Money
-from extra_settings.models import Setting
 
 from core import celery_app
 from core.retry import (
@@ -22,6 +21,7 @@ from core.retry import (
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
 )
+from core.store_settings import store_setting
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import (
@@ -2067,9 +2067,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     StockManager.increment_stock and releases any outstanding
     StockReservation records.
     """
-    failed_minutes = Setting.get(
-        "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES", default=30
-    )
+    failed_minutes = store_setting("ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES")
 
     now = timezone.now()
     failed_cutoff = now - timedelta(minutes=failed_minutes)
@@ -2209,7 +2207,7 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     # What is still held after the sweep: a pile-up of orders nobody is
     # paying for locks stock other shoppers cannot buy.
-    alert_threshold = int(Setting.get(payment_hold.ALERT_SETTING))
+    alert_threshold = int(store_setting(payment_hold.ALERT_SETTING))
     if alert_threshold > 0:
         unpaid = payment_hold.unpaid_online_orders().count()
         if unpaid >= alert_threshold:
@@ -2249,7 +2247,7 @@ def send_checkout_abandonment_emails() -> int:
     from cart.models.cart import Cart
     from order.models.stock_reservation import StockReservation
 
-    hours = Setting.get("CHECKOUT_ABANDONMENT_HOURS", default=2)
+    hours = store_setting("CHECKOUT_ABANDONMENT_HOURS")
     cutoff = timezone.now() - timedelta(hours=hours)
 
     # NOTE: we intentionally do NOT filter on `consumed=False`. The

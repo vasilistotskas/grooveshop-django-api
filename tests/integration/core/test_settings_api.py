@@ -18,6 +18,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from core.api.views import PUBLIC_SETTING_KEYS
 from user.factories.account import UserAccountFactory
 
 # ---------------------------------------------------------------------------
@@ -64,6 +65,9 @@ STOREFRONT_FEATURE_TOGGLES = (
 
 # Public, but not a bool toggle: asserted separately.
 STOREFRONT_PUBLIC_VALUES = ("GIFT_CARD_VALIDITY_DAYS",)
+
+#: A declared store setting the storefront never reads anonymously.
+PRIVATE_STORE_SETTING = "STOCK_RESERVATION_TTL_MINUTES"
 
 
 def test_storefront_feature_toggles_ship_enabled():
@@ -188,18 +192,12 @@ class TestGetSettingByKeyAdminAccess:
     """Staff users can read any key, including non-whitelisted ones."""
 
     def test_non_whitelisted_key_returns_200_for_admin(self, admin_user):
-        """Admin can read any existing setting regardless of whitelist."""
-        from extra_settings.models import Setting
-
-        # Ensure the setting exists first.
-        Setting.objects.get_or_create(
-            name="DEEPL_AUTH_KEY",
-            defaults={"value_type": "string", "value_string": "test-key"},
-        )
+        """Admin can read any store setting regardless of whitelist."""
+        assert PRIVATE_STORE_SETTING not in PUBLIC_SETTING_KEYS
 
         client = _admin_client(admin_user)
         url = reverse("api-settings-get")
-        response = client.get(url, {"key": "DEEPL_AUTH_KEY"})
+        response = client.get(url, {"key": PRIVATE_STORE_SETTING})
         assert response.status_code == status.HTTP_200_OK
 
     def test_non_whitelisted_key_returns_404_for_regular_user(
@@ -209,7 +207,7 @@ class TestGetSettingByKeyAdminAccess:
         non-whitelisted keys."""
         client = _admin_client(regular_user)
         url = reverse("api-settings-get")
-        response = client.get(url, {"key": "DEEPL_AUTH_KEY"})
+        response = client.get(url, {"key": PRIVATE_STORE_SETTING})
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

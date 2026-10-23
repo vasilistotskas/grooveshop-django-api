@@ -14,6 +14,6 @@ def loyalty_settings(**values) -> _patch:
     """
     values = {"LOYALTY_ENABLED": True, **values}
     return patch(
-        "loyalty.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: values.get(key, default),
     )

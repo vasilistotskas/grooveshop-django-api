@@ -12,14 +12,12 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.conf import settings
 from django.utils import timezone, translation
 from extra_settings.models import Setting
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.follow_up import (
-    FOLLOW_UP_DAYS_DEFAULT,
     FOLLOW_UP_DAYS_SETTING,
     follow_up_reason,
     last_carrier_event_at,
@@ -64,15 +62,6 @@ def _flagged(now: datetime = NOW) -> set[int]:
     return set(
         Order.objects.needing_follow_up(now).values_list("pk", flat=True)
     )
-
-
-def test_the_default_matches_the_store_setting_seed():
-    seed = next(
-        entry
-        for entry in settings.EXTRA_SETTINGS_DEFAULTS
-        if entry["name"] == FOLLOW_UP_DAYS_SETTING
-    )
-    assert seed["value"] == FOLLOW_UP_DAYS_DEFAULT
 
 
 class TestCalendarDays:

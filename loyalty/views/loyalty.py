@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
-from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,6 +13,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from core.store_settings import store_setting
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -291,9 +291,7 @@ class LoyaltyViewSet(BaseModelViewSet):
         tier_multiplier_applied = (
             bool(request.user.loyalty_tier)
             and request.user.loyalty_tier.points_multiplier > 1
-            and bool(
-                Setting.get("LOYALTY_TIER_MULTIPLIER_ENABLED", default=False)
-            )
+            and bool(store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED"))
         )
 
         response_data = {

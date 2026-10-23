@@ -161,13 +161,13 @@ class IsSettingEnabled(BasePermission):
     edits at runtime (no plan/billing dimension). Same 404 semantics —
     a disabled feature is indistinguishable from a missing route.
 
-    ``Setting.get`` reads the ACTIVE schema, so the public/control
-    plane resolves the public schema's defaults (True) and is never
-    gated — mirroring the tenant-flag base's public-schema bypass.
+    The setting is read from the ACTIVE schema and falls back to its
+    declared value in ``settings.EXTRA_SETTINGS_DEFAULTS``, so whether a
+    gate fails open or closed is decided there, once. The public/control
+    plane resolves the public schema's rows the same way.
     """
 
     setting_key: str = ""
-    default: bool = True
 
     def has_permission(self, request, view) -> bool:
         # drf-spectacular introspects endpoints through mocked views
@@ -178,9 +178,9 @@ class IsSettingEnabled(BasePermission):
         # (the schema tests deliberately run without DB access).
         if getattr(view, "swagger_fake_view", False):
             return True
-        from extra_settings.models import Setting
+        from core.store_settings import store_setting
 
-        if not bool(Setting.get(self.setting_key, default=self.default)):
+        if not bool(store_setting(self.setting_key)):
             refuse(request, self, self.setting_key)
         return True
 
@@ -229,14 +229,13 @@ class IsFeedbackEnabled(IsSettingEnabled):
 class IsContactAttachmentsEnabled(IsSettingEnabled):
     """404 when the store does not accept contact-form attachments.
 
-    Fails CLOSED (``default=False``): this is the platform's only
+    Fails CLOSED (declared ``False``): this is the platform's only
     anonymous upload endpoint, so a store that has never thought about
     it must not be hosting one — including on the public/control plane,
     where the fail-open gates deliberately let everything through.
     """
 
     setting_key = "CONTACT_ATTACHMENTS_ENABLED"
-    default = False
 
 
 class IsProductAlertsEnabled(IsSettingEnabled):
@@ -265,13 +264,12 @@ class IsChatWidgetEnabled(IsSettingEnabled):
 class IsB2BWholesaleEnabled(IsSettingEnabled):
     """404 when the merchant has not turned the wholesale program on.
 
-    Fails CLOSED (``default=False``) — a commercial feature must not
+    Fails CLOSED (declared ``False``) — a commercial feature must not
     leak on a settings hiccup, matching the promotions/gift-cards
     posture rather than the chrome-feature fail-open default.
     """
 
     setting_key = "B2B_WHOLESALE_ENABLED"
-    default = False
 
 
 class IsLoyaltyRuntimeEnabled(IsSettingEnabled):
@@ -287,7 +285,6 @@ class IsLoyaltyRuntimeEnabled(IsSettingEnabled):
     """
 
     setting_key = "LOYALTY_ENABLED"
-    default = False
 
 
 class IsPromotionsRuntimeEnabled(IsSettingEnabled):
@@ -305,7 +302,6 @@ class IsPromotionsRuntimeEnabled(IsSettingEnabled):
     """
 
     setting_key = "PROMOTIONS_ENABLED"
-    default = False
 
 
 class IsGiftCardsRuntimeEnabled(IsSettingEnabled):
@@ -317,16 +313,14 @@ class IsGiftCardsRuntimeEnabled(IsSettingEnabled):
     """
 
     setting_key = "GIFT_CARDS_ENABLED"
-    default = False
 
 
 class IsRecommendationsRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has switched product suggestions off.
 
     The merchant tier of the recommendations gate;
-    ``IsRecommendationsEnabled`` above is the plan tier. Fails CLOSED,
-    the setting's own default.
+    ``IsRecommendationsEnabled`` above is the plan tier. Fails CLOSED
+    like the other commercial gates.
     """
 
     setting_key = "PRODUCT_SUGGESTIONS_ENABLED"
-    default = False

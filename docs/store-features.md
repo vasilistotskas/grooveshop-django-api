@@ -23,6 +23,13 @@ fallback for a setting it could not fetch.
 - A dependency is expressed by listing the parent's gates in the child's
   entry (`account_reviews` lists `IsProductReviewsEnabled` and its own
   switch), so one table row carries the whole chain.
+- Server code reads a store setting only through
+  `core.store_settings.store_setting` (or `store_settings` for several at
+  once). A store with no row for a setting reads the value it is declared
+  with in `settings.EXTRA_SETTINGS_DEFAULTS`, so that table is the one place
+  a default lives, including whether a gate fails open or closed. An
+  undeclared name raises. `GET /api/v1/settings/public` returns every public
+  key resolved the same way, so a client has no default of its own to keep.
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
   `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.

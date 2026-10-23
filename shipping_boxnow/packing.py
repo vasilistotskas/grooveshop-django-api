@@ -26,8 +26,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, NamedTuple
 
-from django.conf import settings
-
 from shipping.exceptions import ShippingParcelTooLargeError
 from shipping_boxnow.enum import COMPARTMENT_LIMITS_CM, BoxNowCompartmentSize
 
@@ -135,14 +133,9 @@ def validate_default_compartment_size(value: object) -> bool:
 
 def default_compartment_size() -> BoxNowCompartmentSize:
     """The store's size for products that carry no dimensions."""
-    from extra_settings.models import Setting
+    from core.store_settings import store_setting
 
-    default = next(
-        entry["value"]
-        for entry in settings.EXTRA_SETTINGS_DEFAULTS
-        if entry["name"] == DEFAULT_SIZE_SETTING
-    )
-    raw = Setting.get(DEFAULT_SIZE_SETTING, default=default)
+    raw = store_setting(DEFAULT_SIZE_SETTING)
     try:
         return BoxNowCompartmentSize(int(raw))
     except ValueError as exc:

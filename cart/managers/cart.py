@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 
 from django.db import models
 from django.utils import timezone
-from extra_settings.models import Setting
 
 from core.managers import OptimizedManager, OptimizedQuerySet
+from core.store_settings import store_setting
 
 if TYPE_CHECKING:
     from typing import Self
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def abandoned_hours() -> int:
     """How long a cart may sit idle before it counts as abandoned
     (``CART_ABANDONED_HOURS``, per store)."""
-    return Setting.get("CART_ABANDONED_HOURS", default=24)
+    return store_setting("CART_ABANDONED_HOURS")
 
 
 def abandoned_cutoff():

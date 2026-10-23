@@ -23,7 +23,8 @@ import filetype
 from django.conf import settings
 from django.db.models import Q, Sum
 from django.utils import timezone
-from extra_settings.models import Setting
+
+from core.store_settings import store_setting
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,31 @@ INTAKE_WINDOW_HOURS = 24
 #: Control characters, which have no business in a stored filename.
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 _WHITESPACE_RE = re.compile(r"\s+")
+#: One ``type/subtype`` entry of the allow-list.
+_MIME_TYPE_RE = re.compile(r"[^\s/]+/[^\s/]+")
+
+
+def parse_attachment_types(value: object) -> tuple[str, ...]:
+    """The MIME types in a ``CONTACT_ATTACHMENTS_TYPES`` value."""
+    return tuple(
+        part.strip().lower()
+        for part in str(value or "").split(",")
+        if part.strip()
+    )
+
+
+def validate_attachment_types_setting(value: object) -> bool:
+    """django-extra-settings validator for ``CONTACT_ATTACHMENTS_TYPES``.
+
+    An empty allow-list cannot be saved: a store that wants no uploads
+    turns ``CONTACT_ATTACHMENTS_ENABLED`` off. Every entry must have
+    the ``type/subtype`` shape it is matched against, with no
+    whitespace inside it (``image/ png`` would never match).
+    """
+    types = parse_attachment_types(value)
+    return bool(types) and all(
+        _MIME_TYPE_RE.fullmatch(entry) for entry in types
+    )
 
 
 class AttachmentPolicy:
@@ -67,30 +93,18 @@ class AttachmentPolicy:
     #: which a per-tenant setting cannot — a declared field's limits
     #: are fixed at class definition, before any tenant is bound.
     MAX_COUNT_CEILING = 20
-    #: The code default is the narrowest useful one. A store that wants
-    #: drawings or archives says so in its own settings; a store that
-    #: never thinks about it accepts documents only.
-    DEFAULT_TYPES = ("application/pdf",)
 
     def __init__(self) -> None:
-        self.enabled = bool(
-            Setting.get("CONTACT_ATTACHMENTS_ENABLED", default=False)
-        )
+        self.enabled = bool(store_setting("CONTACT_ATTACHMENTS_ENABLED"))
         self.max_count = min(
-            max(
-                1, int(Setting.get("CONTACT_ATTACHMENTS_MAX_COUNT", default=3))
-            ),
+            max(1, int(store_setting("CONTACT_ATTACHMENTS_MAX_COUNT"))),
             self.MAX_COUNT_CEILING,
         )
-        megabytes = max(
-            1, int(Setting.get("CONTACT_ATTACHMENTS_MAX_MB", default=10))
-        )
+        megabytes = max(1, int(store_setting("CONTACT_ATTACHMENTS_MAX_MB")))
         self.max_bytes = min(megabytes * 1024 * 1024, self.MAX_BYTES_CEILING)
-        raw = Setting.get("CONTACT_ATTACHMENTS_TYPES", default="") or ""
-        types = tuple(
-            part.strip().lower() for part in raw.split(",") if part.strip()
+        self.allowed_types = parse_attachment_types(
+            store_setting("CONTACT_ATTACHMENTS_TYPES")
         )
-        self.allowed_types = types or self.DEFAULT_TYPES
 
     @property
     def max_megabytes(self) -> int:

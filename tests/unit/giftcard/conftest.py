@@ -15,7 +15,7 @@ def enable_gift_cards():
     def _get(key, default=None):
         return GIFT_CARD_SETTINGS.get(key, default)
 
-    with patch("giftcard.services.Setting.get", side_effect=_get):
+    with patch("extra_settings.models.Setting.get", side_effect=_get):
         yield
 
 

@@ -35,7 +35,7 @@ SETTING = "ORDER_MAX_UNPAID_ONLINE_ORDERS"
 
 def _limit(value):
     return patch(
-        "order.services.Setting.get",
+        "extra_settings.models.Setting.get",
         side_effect=lambda key, default=None: (
             value if key == SETTING else default
         ),

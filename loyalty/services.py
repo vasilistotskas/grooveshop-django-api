@@ -8,14 +8,17 @@ from django.db import models, transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from extra_settings.models import Setting
 
+from core.store_settings import DECLARED_DEFAULTS, store_setting
 from loyalty.enum import PriceBasis, TransactionType
 from loyalty.models.pause import LoyaltyPause
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 
 logger = logging.getLogger(__name__)
+
+#: ``<prefix><ISO currency>``: points per one unit of that currency.
+REDEMPTION_RATIO_PREFIX = "LOYALTY_REDEMPTION_RATIO_"
 
 
 def _reversal_due(order_id: int) -> bool:
@@ -67,7 +70,7 @@ class LoyaltyService:
 
         if not tenant_plan_allows("loyalty_enabled"):
             return False
-        return bool(Setting.get("LOYALTY_ENABLED", default=False))
+        return bool(store_setting("LOYALTY_ENABLED"))
 
     @classmethod
     def get_price_basis_amount(cls, product) -> Decimal:
@@ -79,7 +82,7 @@ class LoyaltyService:
         - price_incl_vat_no_discount: product.price plus VAT on it
         - final_price: product.final_price (price + vat - discount)
         """
-        basis = Setting.get("LOYALTY_PRICE_BASIS", default="final_price")
+        basis = store_setting("LOYALTY_PRICE_BASIS")
         if basis == PriceBasis.PRICE_EXCL_VAT_NO_DISCOUNT:
             return Decimal(str(product.price.amount))
         elif basis == PriceBasis.PRICE_EXCL_VAT_WITH_DISCOUNT:
@@ -110,7 +113,7 @@ class LoyaltyService:
         The tier multiplier is only applied when LOYALTY_TIER_MULTIPLIER_ENABLED is true
         and the multiplier is greater than 1.0.
         """
-        factor = Decimal(str(Setting.get("LOYALTY_POINTS_FACTOR", default=1.0)))
+        factor = Decimal(str(store_setting("LOYALTY_POINTS_FACTOR")))
         price_basis = cls.get_price_basis_amount(product)
         calculated = (
             price_basis
@@ -119,9 +122,7 @@ class LoyaltyService:
             * quantity
         )
 
-        tier_enabled = Setting.get(
-            "LOYALTY_TIER_MULTIPLIER_ENABLED", default=False
-        )
+        tier_enabled = store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED")
         if tier_enabled and tier_multiplier > Decimal("1.0"):
             calculated = calculated * tier_multiplier
 
@@ -398,7 +399,7 @@ class LoyaltyService:
         # order cannot keep the points. Off: the reversal stops at zero and
         # the spent points survive the refund.
         allow_negative = bool(
-            Setting.get("LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE", default=True)
+            store_setting("LOYALTY_REFUND_ALLOWS_NEGATIVE_BALANCE")
         )
 
         for earn_tx in earn_transactions:
@@ -530,11 +531,19 @@ class LoyaltyService:
         if points_amount <= 0:
             raise ValidationError(_("Points amount must be positive."))
 
-        supported_currencies = {"EUR", "USD"}
-        if currency not in supported_currencies:
+        # A currency is redeemable when the platform declares its ratio.
+        ratio_key = f"{REDEMPTION_RATIO_PREFIX}{currency}"
+        if ratio_key not in DECLARED_DEFAULTS:
+            supported = sorted(
+                name.removeprefix(REDEMPTION_RATIO_PREFIX)
+                for name in DECLARED_DEFAULTS
+                if name.startswith(REDEMPTION_RATIO_PREFIX)
+            )
             raise ValidationError(
-                _("Unsupported currency: %(currency)s. Supported: EUR, USD")
-                % {"currency": currency}
+                _(
+                    "Unsupported currency: %(currency)s. Supported: %(supported)s"
+                )
+                % {"currency": currency, "supported": ", ".join(supported)}
             )
 
         if lock:
@@ -552,8 +561,7 @@ class LoyaltyService:
                 % {"balance": balance, "amount": points_amount}
             )
 
-        ratio_key = f"LOYALTY_REDEMPTION_RATIO_{currency}"
-        ratio = Decimal(str(Setting.get(ratio_key, default=100.0)))
+        ratio = Decimal(str(store_setting(ratio_key)))
         discount = Decimal(str(points_amount)) / ratio
 
         if discount > max_discount:
@@ -665,7 +673,7 @@ class LoyaltyService:
 
         Formula: 1 + floor(total_xp / XP_PER_LEVEL)
         """
-        xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
+        xp_per_level = store_setting("LOYALTY_XP_PER_LEVEL")
         if xp_per_level <= 0:
             return 1
         return 1 + (user.total_xp // xp_per_level)
@@ -685,7 +693,7 @@ class LoyaltyService:
         next_tier = LoyaltyTier.objects.get_next_tier(tier)
         points_to_next_tier = None
         if next_tier is not None:
-            xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
+            xp_per_level = store_setting("LOYALTY_XP_PER_LEVEL")
             if xp_per_level <= 0:
                 xp_per_level = 1000
             xp_needed_for_next_tier = (
@@ -738,9 +746,7 @@ class LoyaltyService:
         cls.sync_pause()
         if not cls.is_enabled():
             return 0
-        expiration_days = Setting.get(
-            "LOYALTY_POINTS_EXPIRATION_DAYS", default=0
-        )
+        expiration_days = store_setting("LOYALTY_POINTS_EXPIRATION_DAYS")
         if expiration_days <= 0:
             return 0
 
@@ -814,7 +820,7 @@ class LoyaltyService:
         awarded only on the user's first order (no prior EARN transactions
         excluding the current order).
         """
-        if not Setting.get("LOYALTY_NEW_CUSTOMER_BONUS_ENABLED", default=False):
+        if not store_setting("LOYALTY_NEW_CUSTOMER_BONUS_ENABLED"):
             return 0
 
         from django.contrib.auth import get_user_model
@@ -838,9 +844,7 @@ class LoyaltyService:
         ):
             return 0
 
-        bonus_points = Setting.get(
-            "LOYALTY_NEW_CUSTOMER_BONUS_POINTS", default=100
-        )
+        bonus_points = store_setting("LOYALTY_NEW_CUSTOMER_BONUS_POINTS")
         PointsTransaction.objects.create(
             user=user,
             points=bonus_points,

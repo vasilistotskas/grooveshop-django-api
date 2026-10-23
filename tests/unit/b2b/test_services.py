@@ -38,7 +38,7 @@ class TestIsEnabled:
 
         with (
             patch("tenant.membership.tenant_plan_allows", return_value=plan),
-            patch("b2b.services.Setting.get", side_effect=_get),
+            patch("extra_settings.models.Setting.get", side_effect=_get),
         ):
             assert B2BService.is_enabled() is expected
 
@@ -108,7 +108,7 @@ class TestPromotionsAllowed:
         def _get(key, default=None):
             return {"B2B_ALLOW_PROMOTIONS": True}.get(key, default)
 
-        with patch("b2b.services.Setting.get", side_effect=_get):
+        with patch("extra_settings.models.Setting.get", side_effect=_get):
             assert B2BService.promotions_allowed() is True
 
 

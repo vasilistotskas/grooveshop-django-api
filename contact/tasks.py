@@ -326,11 +326,10 @@ def purge_expired_attachment_files() -> int:
     The window is a merchant setting, so a store that must keep tender
     documents for a year says so without a deploy.
     """
-    from extra_settings.models import Setting
-
     from contact.models import ContactAttachment
+    from core.store_settings import store_setting
 
-    days = int(Setting.get("CONTACT_ATTACHMENTS_RETENTION_DAYS", default=90))
+    days = int(store_setting("CONTACT_ATTACHMENTS_RETENTION_DAYS"))
     if days <= 0:
         return 0
     cutoff = timezone.now() - timedelta(days=days)

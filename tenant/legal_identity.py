@@ -97,43 +97,22 @@ REQUIRED_TAX_DOCUMENT_FIELDS: tuple[str, ...] = (
 )
 
 
-def _read_settings(keys: tuple[str, ...]) -> dict[str, object]:
-    """``keys`` as ``Setting.get`` would return them, in one query at most.
-
-    ``Setting.get`` caches per key in the Django cache and only warms the
-    others after a hit on a row, so a store with unset keys, or a cold
-    cache, pays a query per key. This reads the extra_settings cache for
-    every key first, then fetches the keys it lacks together and caches
-    them the way the library does. A key with no row reads as ``None``.
-    """
-    from extra_settings.cache import get_cached_setting, set_cached_setting
-    from extra_settings.models import Setting
-
-    values = {key: get_cached_setting(key) for key in keys}
-    absent = [key for key, value in values.items() if value is None]
-    if absent:
-        for row in Setting.objects.filter(name__in=absent):
-            values[row.name] = row.value
-            set_cached_setting(row.name, row.value)
-    return values
-
-
 def merchant_legal_identity() -> dict[str, object]:
     """The current tenant's published legal identity.
 
     Every value is returned as stored, including blanks. Blanks are
     meaningful: a merchant who has not filled these in is not compliant,
     and the caller needs to be able to SEE that rather than receive a
-    plausible-looking fallback. ``order.invoicing`` deliberately does
-    fall back to the site name for its own rendering; that is an invoice
-    concern and does not belong in the published identity.
+    plausible-looking fallback.
     """
-    values = _read_settings((*SELLER_SETTING_KEYS.values(), IN_LIQUIDATION_KEY))
+    from core.store_settings import store_settings
+
+    values = store_settings((*SELLER_SETTING_KEYS.values(), IN_LIQUIDATION_KEY))
     identity: dict[str, object] = {
-        field: str(values.get(key) or "").strip()
+        field: str(values[key]).strip()
         for field, key in SELLER_SETTING_KEYS.items()
     }
-    identity["in_liquidation"] = bool(values.get(IN_LIQUIDATION_KEY))
+    identity["in_liquidation"] = bool(values[IN_LIQUIDATION_KEY])
     return identity
 
 

@@ -50,8 +50,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import override as translation_override
-from extra_settings.models import Setting
 
+from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
@@ -64,7 +64,6 @@ from order.models.retail_credit import RetailCredit
 from order.mydata.config import load_config as load_mydata_config
 from order.taxation import breakdown_by_rate, order_vat_lines
 from pay_way.enum.pay_way import PayWayEnum
-from tenant.credentials import tenant_contact_email, tenant_site_name
 from tenant.membership import is_demo_store
 
 logger = logging.getLogger(__name__)
@@ -125,23 +124,15 @@ class ReceiptNotIssuable(Exception):
 
 
 def _seller_snapshot() -> dict[str, str]:
-    """Resolve seller info from ``extra_settings`` with dev-friendly defaults.
+    """The seller's identity as the store has it, blanks included.
 
-    Falls back to ``tenant_site_name()`` / ``INFO_EMAIL`` when the
-    dedicated invoice settings haven't been populated — lets a fresh
-    install render SOMETHING without failing at render time.
+    The settings are declared blank so a store never ships a
+    plausible-but-wrong legal identity; the admin fills them in.
     """
-    default_name = tenant_site_name()
-    default_email = tenant_contact_email()
-    resolved = {}
-    for field, key in INVOICE_SELLER_SETTING_KEYS.items():
-        default = ""
-        if field == "name":
-            default = default_name
-        elif field == "email":
-            default = default_email
-        resolved[field] = Setting.get(key, default=default)
-    return resolved
+    values = store_settings(INVOICE_SELLER_SETTING_KEYS.values())
+    return {
+        field: values[key] for field, key in INVOICE_SELLER_SETTING_KEYS.items()
+    }
 
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:

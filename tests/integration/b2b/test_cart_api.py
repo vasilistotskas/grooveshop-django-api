@@ -140,8 +140,8 @@ class TestCouponGateOnWire:
             }.get(key, default)
 
         with (
-            patch("b2b.services.Setting.get", side_effect=_get),
-            patch("promotion.services.Setting.get", side_effect=_get),
+            patch("extra_settings.models.Setting.get", side_effect=_get),
+            patch("extra_settings.models.Setting.get", side_effect=_get),
         ):
             response = _client(user).post(
                 reverse("cart-coupon"), {"code": code.code}, format="json"
@@ -203,7 +203,7 @@ class TestPaymentIntentBinding:
                 return_value=provider,
             ),
             patch("extra_settings.models.Setting.get", side_effect=_get),
-            patch("b2b.services.Setting.get", side_effect=_get),
+            patch("extra_settings.models.Setting.get", side_effect=_get),
         ):
             response = _client(user).post(
                 reverse("cart-create-payment-intent"),

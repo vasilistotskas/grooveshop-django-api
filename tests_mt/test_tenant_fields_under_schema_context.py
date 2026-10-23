@@ -61,7 +61,7 @@ def test_schema_context_binds_a_fake_tenant_and_the_reader_upgrades_it(
 
 def test_myDATA_config_is_ready_under_schema_context(configured):
     with (
-        patch("order.mydata.config.Setting.get", side_effect=_setting_get),
+        patch("extra_settings.models.Setting.get", side_effect=_setting_get),
         schema_context(configured.schema_name),
     ):
         assert load_config().issues_automatically() is True

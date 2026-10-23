@@ -191,8 +191,7 @@ def send_gift_card_expiry_reminders(self) -> dict:
     """
     from datetime import timedelta
 
-    from extra_settings.models import Setting
-
+    from core.store_settings import store_setting
     from giftcard.enum import GiftCardStatus
     from giftcard.models import GiftCard
     from giftcard.services import GiftCardService
@@ -200,7 +199,7 @@ def send_gift_card_expiry_reminders(self) -> dict:
     if not GiftCardService.is_enabled():
         return {"status": "skipped", "reason": "gift cards off"}
 
-    days = int(Setting.get("GIFT_CARD_EXPIRY_REMINDER_DAYS", default=30) or 0)
+    days = int(store_setting("GIFT_CARD_EXPIRY_REMINDER_DAYS") or 0)
     if days <= 0:
         return {"status": "skipped", "reason": "disabled"}
 

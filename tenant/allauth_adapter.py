@@ -200,10 +200,11 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             return None
         try:
             from django_tenants.utils import schema_context
-            from extra_settings.models import Setting
+
+            from core.store_settings import store_setting
 
             with schema_context(tenant.schema_name):
-                value = Setting.get("SOCIAL_LOGIN_PROVIDERS", default=None)
+                value = store_setting("SOCIAL_LOGIN_PROVIDERS")
         except Exception:
             # Fail CLOSED: the whitelist is a security control. A DB blip
             # or a half-provisioned schema disables social login for this

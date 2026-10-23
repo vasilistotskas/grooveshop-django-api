@@ -30,6 +30,10 @@ fallback for a setting it could not fetch.
   a default lives, including whether a gate fails open or closed. An
   undeclared name raises. `GET /api/v1/settings/public` returns every public
   key resolved the same way, so a client has no default of its own to keep.
+  Those keys are store VALUES only: no feature or preference switch is
+  public (`PUBLIC_SETTING_KEYS`, enforced by
+  `tests/integration/core/test_settings_public_api.py`), so a client reads
+  a switch from `TenantConfig` and nowhere else.
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
   `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.

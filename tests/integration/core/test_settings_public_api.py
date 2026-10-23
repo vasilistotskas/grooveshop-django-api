@@ -18,6 +18,7 @@ from rest_framework.test import APIClient
 
 from core.api.views import PUBLIC_SETTING_KEYS
 from core.store_settings import declared_default
+from tenant.features import feature_setting_keys, preference_setting_keys
 
 pytestmark = pytest.mark.django_db
 
@@ -134,20 +135,15 @@ def test_the_auth_panel_is_public_and_empty_by_default():
     assert values["AUTH_PANEL"] == "{}"
 
 
-def test_a_preference_no_client_reads_here_is_not_public():
-    """``TenantConfig.preferences`` carries the store preferences. Only
-    the three the frozen webside storefront still reads stay public."""
-    values = _public_settings()
+def test_no_store_switch_is_public():
+    """A store feature is served in ``TenantConfig.features`` and a
+    preference in ``TenantConfig.preferences``, Django's one answer for
+    each; published here too, a client could read the switch instead and
+    disagree with it (the frozen webside storefront did until 2026-10-23).
+    """
+    switches = feature_setting_keys() | preference_setting_keys()
 
-    for key in (
-        "MOBILE_BOTTOM_NAV_ENABLED",
-        "DEMO_ACCOUNT_ENABLED",
-        "CATALOGUE_ENABLED",
-    ):
-        assert key not in values, key
-    for key in (
-        "RECENTLY_VIEWED_ENABLED",
-        "STICKY_ADD_TO_CART_ENABLED",
-        "CART_ENABLED",
-    ):
-        assert key in values, key
+    assert PUBLIC_SETTING_KEYS.isdisjoint(switches), sorted(
+        PUBLIC_SETTING_KEYS & switches
+    )
+    assert switches.isdisjoint(_public_settings())

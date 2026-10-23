@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.api.views import PUBLIC_SETTING_KEYS
+from tenant.features import feature_setting_keys, preference_setting_keys
 from user.factories.account import UserAccountFactory
 
 # ---------------------------------------------------------------------------
@@ -88,13 +89,13 @@ class TestGetSettingByKeyPublicAccess:
     """Anonymous callers can read whitelisted keys, nothing else."""
 
     def test_whitelisted_key_returns_200_anonymous(self):
-        """LOYALTY_ENABLED is in PUBLIC_SETTING_KEYS."""
+        """LOYALTY_POINTS_FACTOR is in PUBLIC_SETTING_KEYS."""
         client = _anon_client()
         url = reverse("api-settings-get")
-        response = client.get(url, {"key": "LOYALTY_ENABLED"})
+        response = client.get(url, {"key": "LOYALTY_POINTS_FACTOR"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["name"] == "LOYALTY_ENABLED"
+        assert data["name"] == "LOYALTY_POINTS_FACTOR"
         assert "value" in data
 
     def test_dispatch_cutoff_is_public_with_its_default(self):
@@ -115,21 +116,14 @@ class TestGetSettingByKeyPublicAccess:
         data = response.json()
         assert data["name"] == "CONTACT_EMAIL"
 
-    def test_storefront_feature_toggles_whitelisted_anonymous(self):
-        """Every storefront UI / merchant feature toggle the storefront
-        gates on must be readable anonymously.
-
-        Asserts membership of PUBLIC_SETTING_KEYS only; the defaults
-        themselves are asserted from the EXTRA_SETTINGS config above.
-        """
+    def test_no_store_switch_is_readable_anonymously(self):
+        """A feature or preference switch reaches a client only through
+        ``TenantConfig``; reading it here would be a second answer."""
         client = _anon_client()
         url = reverse("api-settings-get")
-        for key in STOREFRONT_FEATURE_TOGGLES:
+        for key in sorted(feature_setting_keys() | preference_setting_keys()):
             response = client.get(url, {"key": key})
-            assert response.status_code == status.HTTP_200_OK, key
-            data = response.json()
-            assert data["name"] == key
-            assert "value" in data, key
+            assert response.status_code == status.HTTP_404_NOT_FOUND, key
 
     def test_storefront_public_values_whitelisted_anonymous(self):
         client = _anon_client()
@@ -154,25 +148,12 @@ class TestGetSettingByKeyPublicAccess:
         assert response.data["code"] == "missing_key"
         assert response.data["error"] == "missing_key"
 
-    def test_recently_viewed_enabled_is_whitelisted(self):
-        client = _anon_client()
-        url = reverse("api-settings-get")
-        response = client.get(url, {"key": "RECENTLY_VIEWED_ENABLED"})
-        assert response.status_code == status.HTTP_200_OK
-
-    def test_b2b_wholesale_enabled_is_whitelisted(self):
-        """The storefront's two-tier B2B gate reads this anonymously."""
-        client = _anon_client()
-        url = reverse("api-settings-get")
-        response = client.get(url, {"key": "B2B_WHOLESALE_ENABLED"})
-        assert response.status_code == status.HTTP_200_OK
-
     @pytest.mark.parametrize(
         "key", ["B2B_ALLOW_PROMOTIONS", "B2B_LOYALTY_ENABLED"]
     )
     def test_b2b_policy_settings_stay_server_side(self, key):
-        """Pricing-policy knobs are NOT public — only the wholesale
-        gate itself is."""
+        """Pricing-policy knobs are NOT public, and the wholesale gate
+        is the ``wholesale`` feature in TenantConfig."""
         client = _anon_client()
         url = reverse("api-settings-get")
         response = client.get(url, {"key": key})

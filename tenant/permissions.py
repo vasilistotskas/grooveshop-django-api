@@ -244,6 +244,12 @@ class IsProductAlertsEnabled(IsSettingEnabled):
     setting_key = "PRODUCT_ALERTS_ENABLED"
 
 
+class IsPriceHistoryEnabled(IsSettingEnabled):
+    """404 when the merchant has turned the product price history off."""
+
+    setting_key = "PRICE_HISTORY_ENABLED"
+
+
 class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has turned agent commerce off at runtime."""
 

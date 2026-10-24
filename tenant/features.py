@@ -36,6 +36,7 @@ from tenant.permissions import (
     IsLoyaltyEnabled,
     IsLoyaltyRuntimeEnabled,
     IsNewsletterEnabled,
+    IsPriceHistoryEnabled,
     IsProductAlertsEnabled,
     IsProductReviewsEnabled,
     IsPromotionsEnabled,
@@ -79,6 +80,7 @@ STORE_FEATURES: dict[str, StoreFeature] = {
     ),
     "b2b_invoicing": StoreFeature(None, (IsB2BInvoicingEnabled,)),
     "product_alerts": StoreFeature(None, (IsProductAlertsEnabled,)),
+    "price_history": StoreFeature(None, (IsPriceHistoryEnabled,)),
     "contact_attachments": StoreFeature(None, (IsContactAttachmentsEnabled,)),
     # The widget talks to the agent gateway's chat, which only serves a
     # store whose agent commerce is on at both tiers.

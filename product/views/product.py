@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.db.models import Case, IntegerField, Q, When
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
@@ -26,6 +27,7 @@ from product.filters.product import ProductFilter
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.image import ProductImageSerializer
+from product.serializers.price_history import ProductPriceHistorySerializer
 from product.serializers.product import (
     ProductDetailSerializer,
     ProductRetrieveSerializer,
@@ -37,7 +39,7 @@ from product.serializers.variant import ProductVariantsResponseSerializer
 from product.views.review import PRODUCT_REVIEW_ORDERING
 from tag.serializers.tag import TagSerializer
 from tenant.membership import is_store_staff
-from tenant.permissions import IsProductReviewsEnabled
+from tenant.permissions import IsPriceHistoryEnabled, IsProductReviewsEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -134,6 +136,25 @@ serializers_config: SerializersConfig = {
             ),
         ],
     ),
+    "price_history": ActionConfig(
+        response=ProductPriceHistorySerializer,
+        operation_id="listProductPriceHistory",
+        summary=_("Get product price history"),
+        description=_(
+            "Every period the product's consumer price (VAT included, "
+            "promotions that need nothing from the basket applied) was "
+            "constant, oldest first. The period in force has no end date."
+        ),
+        tags=["Products"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="Product ID",
+            ),
+        ],
+    ),
     "variants": ActionConfig(
         response=ProductVariantsResponseSerializer,
         operation_id="listProductVariants",
@@ -199,6 +220,8 @@ class ProductViewSet(BaseModelViewSet):
             # The product's reviews are the reviews feature: with it off
             # they are gone here too, as on /product/review.
             return [IsProductReviewsEnabled(), AllowAny()]
+        if self.action == "price_history":
+            return [IsPriceHistoryEnabled(), AllowAny()]
         return [AllowAny()]
 
     ordering_fields = [
@@ -237,7 +260,13 @@ class ProductViewSet(BaseModelViewSet):
         # drf-spectacular derives the action's model from the class
         # ``queryset`` (Product) and django-filter asserts on the
         # mismatch while the schema is built.
-        if self.action in ["reviews", "images", "tags", "variants"]:
+        if self.action in [
+            "reviews",
+            "images",
+            "tags",
+            "variants",
+            "price_history",
+        ]:
             return None
         return ProductFilter
 
@@ -385,6 +414,30 @@ class ProductViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(
             tags, many=True, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_path="price-history",
+        pagination_class=None,
+    )
+    def price_history(self, request, pk=None):
+        # Scoped like the detail route: soft-deleted and unreleased
+        # products are unreachable for anyone but store staff.
+        products = Product.objects.exclude_deleted()
+        if not is_store_staff(request.user):
+            products = products.active()
+        product = get_object_or_404(products, pk=pk)
+
+        payload = {
+            "currency": settings.DEFAULT_CURRENCY,
+            "spells": product.price_spells.order_by("valid_from"),
+        }
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            payload, context=self.get_serializer_context()
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 

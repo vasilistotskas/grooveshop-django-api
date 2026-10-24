@@ -183,6 +183,7 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "NEWSLETTER_",
             "FEEDBACK_",
             "PRODUCT_ALERTS_",
+            "PRICE_HISTORY_",
         ),
     ),
     (gettext_noop("Invoicing & myDATA"), ("INVOICE_", "MYDATA_", "B2B_")),

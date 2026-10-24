@@ -3901,6 +3901,9 @@ msgstr "Every night, re-weight the strategies by how often the products each one
 msgid "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
 msgstr "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
 
+msgid "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
+msgstr "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
+
 msgid "Every search found something"
 msgstr "Every search found something"
 
@@ -5607,6 +5610,9 @@ msgstr "Get product images"
 
 msgid "Get product loyalty points preview"
 msgstr "Get product loyalty points preview"
+
+msgid "Get product price history"
+msgstr "Get product price history"
 
 msgid "Get product reviews"
 msgstr "Get product reviews"

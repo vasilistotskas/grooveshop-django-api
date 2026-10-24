@@ -3908,6 +3908,9 @@ msgstr "Κάθε βράδυ τα βάρη των στρατηγικών υπολ
 msgid "Every page the storefront has rendered and cached for this store, and its settings read. Purges itself when a store feature is switched on or off, because the navigation, footer and product cards of every page show what the store offers."
 msgstr "Όλες οι σελίδες του καταστήματος που έχουν αποθηκευτεί στην cache, και η ανάγνωση των ρυθμίσεών του. Καθαρίζεται αυτόματα όταν ενεργοποιείται ή απενεργοποιείται μια λειτουργία του καταστήματος, επειδή η πλοήγηση, το υποσέλιδο και οι κάρτες προϊόντων κάθε σελίδας δείχνουν τι προσφέρει το κατάστημα."
 
+msgid "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
+msgstr "Κάθε περίοδος κατά την οποία η τιμή του προϊόντος για τον καταναλωτή (με ΦΠΑ, με εκπτώσεις που δεν απαιτούν τίποτα από το καλάθι) ήταν σταθερή, από την παλαιότερη. Η ισχύουσα περίοδος δεν έχει ημερομηνία λήξης."
+
 msgid "Every search found something"
 msgstr "Όλες οι αναζητήσεις είχαν αποτελέσματα"
 
@@ -5615,6 +5618,9 @@ msgstr "Λήψη εικόνων προϊόντος"
 
 msgid "Get product loyalty points preview"
 msgstr "Λήψη προεπισκόπησης πόντων πιστότητας προϊόντος"
+
+msgid "Get product price history"
+msgstr "Λήψη ιστορικού τιμών προϊόντος"
 
 msgid "Get product reviews"
 msgstr "Λήψη κριτικών προϊόντος"

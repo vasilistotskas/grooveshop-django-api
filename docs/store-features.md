@@ -70,6 +70,7 @@ consumed by tasks and integrations.
 | `B2B_WHOLESALE_ENABLED` | (a) `wholesale` | needs the `b2b` plan flag |
 | `PRODUCT_SUGGESTIONS_ENABLED` | (a) `product_suggestions` | needs the `recommendations` plan flag |
 | `PRODUCT_ALERTS_ENABLED` | (a) `product_alerts` | |
+| `PRICE_HISTORY_ENABLED` | (a) `price_history` | default on: it shows prices the store already published |
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
 | `CART_ENABLED` | (a), **not yet in the table** | `preferences.cart` until then; see "Not yet gated" |
@@ -104,6 +105,7 @@ settings.
 | `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
 | `product_suggestions` | `recommendations_enabled` | `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
 | `product_alerts` | | `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
+| `price_history` | | `PRICE_HISTORY_ENABLED` | `product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
 

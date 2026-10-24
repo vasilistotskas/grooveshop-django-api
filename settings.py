@@ -2298,6 +2298,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRICE_HISTORY_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "The price trend chart on the product page: the product's "
+            "recorded consumer price over time, with its lowest and "
+            "highest price and the lowest price of the last 30 days."
+        ),
+    },
+    {
         "name": "AGENT_COMMERCE_ENABLED",
         "type": "bool",
         "value": True,

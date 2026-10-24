@@ -284,6 +284,13 @@ override-dependencies = [
     # sqlparse.parse/format/split; all fixed in 0.6.0. Transitive via
     # django and django-debug-toolbar, both of which floor at >=0.3.1.
     "sqlparse>=0.6.0",
+    # GHSA-9v8h-qqgm-4m35 (CRITICAL) — out-of-bounds write in the Brotli
+    # decoder ("Node2Shell"); fixed in 1.2.1. Transitive via
+    # weasyprint[woff] > fonttools[woff], which decodes WOFF2 fonts while
+    # rendering invoice PDFs. brotlicffi is its non-CPython twin (never
+    # installed here, but locked, and scanned).
+    "brotli>=1.2.1",
+    "brotlicffi>=1.2.1.0",
 ]
 
 # ─────────────────────────────────────────────────────────

@@ -1,0 +1,28 @@
+# Findings the Trivy job (.github/workflows/ci.yml) accepts, each with why
+# and until when. An entry is a decision, not a silence: it names the
+# package it covers (`purls`), says why the finding cannot reach this
+# application, and expires, after which the job fails again until the fix
+# is installed or the decision is renewed with a new reason.
+vulnerabilities:
+  # Twisted reaches this project only through daphne (`channels[daphne]`),
+  # which serves `manage.py runserver` in development; production runs
+  # Gunicorn with Uvicorn workers (Dockerfile, gunicorn.conf.py). daphne
+  # uses Twisted's HTTP stack, never the modules these are in. The only
+  # fixed release is 26.10.0rc1 (2026-10-22), a release candidate; move the
+  # `twisted` override in pyproject.toml to 26.10.0 once it is stable and
+  # delete these entries.
+  - id: CVE-2026-115775
+    purls:
+      - pkg:pypi/twisted
+    expired_at: 2026-11-21
+    statement: DoS in twisted.words XML stream parsing; not imported (daphne serves HTTP only, development only). Fix only in 26.10.0rc1.
+  - id: CVE-2026-115776
+    purls:
+      - pkg:pypi/twisted
+    expired_at: 2026-11-21
+    statement: DoS via unbounded IRC buffer in twisted.words.protocols.irc; not imported. Fix only in 26.10.0rc1.
+  - id: CVE-2026-115778
+    purls:
+      - pkg:pypi/twisted
+    expired_at: 2026-11-21
+    statement: DoS in Telnet negotiation (twisted.conch.telnet); not imported. Fix only in 26.10.0rc1.

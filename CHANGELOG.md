@@ -3,6 +3,26 @@
 
 
 
+## v3.148.2 (2026-10-24)
+
+### Bug fixes
+
+* fix(security): brotli 1.2.1 for the decoder overflow; accept twisted's unreachable DoS findings until 26.10.0 (#316)
+
+GHSA-9v8h-qqgm-4m35 (CRITICAL) is an out-of-bounds write in the Brotli
+decoder, reached through weasyprint > fonttools when invoice PDFs load
+WOFF2 fonts. Both bindings move to the fixed releases through the
+override list (brotli 1.2.1, brotlicffi 1.2.1.0).
+
+CVE-2026-115775/115776/115778 (HIGH) are DoS bugs in Twisted's XML
+stream, IRC and Telnet code. Twisted reaches the project only through
+daphne, which serves runserver in development and uses Twisted's HTTP
+stack only; no project code imports Twisted. The only fixed release is
+26.10.0rc1. .trivyignore.yaml accepts the three for twisted only, with
+the reason and an expiry of 2026-11-21, and the Trivy job reads it.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2edb8a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2edb8a359fecad90050c26f9ec52c3091c919a67))
+
 ## v3.148.1 (2026-10-23)
 
 ### Bug fixes

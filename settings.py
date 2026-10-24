@@ -2302,9 +2302,9 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "bool",
         "value": True,
         "description": (
-            "The price trend chart on the product page: the product's "
-            "recorded consumer price over time, with its lowest and "
-            "highest price and the lowest price of the last 30 days."
+            "The price trend on the product page: a button beside the "
+            "rating opens the product's recorded consumer price over "
+            "time, with its change and its lowest and highest price."
         ),
     },
     {

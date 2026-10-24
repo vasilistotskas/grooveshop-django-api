@@ -249,6 +249,11 @@ def register_default_surfaces() -> None:
                 "ProductImagesViewSet",
                 "ProductImageDetail",
                 "ProductReviewsViewSet",
+                # Keyed by tenant + product id; every spell is written by
+                # ``product.pricing.service`` through a Product save (a
+                # ``post_save`` on ``product.Product``) or
+                # ``sync_product_prices`` (``mark_surface_stale``).
+                "product-price-history",
                 "ProductTagsViewSet",
                 "ProductAttributeViewSet",
                 "ProductAttributeValueViewSet",

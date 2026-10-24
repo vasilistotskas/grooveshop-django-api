@@ -56,6 +56,11 @@ urlpatterns = [
         name="product-variants",
     ),
     path(
+        "product/<int:pk>/price-history",
+        ProductViewSet.as_view({"get": "price_history"}),
+        name="product-price-history",
+    ),
+    path(
         "product/brand",
         BrandViewSet.as_view({"get": "list"}),
         name="product-brand-list",

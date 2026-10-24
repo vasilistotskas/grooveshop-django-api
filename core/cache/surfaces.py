@@ -203,6 +203,7 @@ def register_default_surfaces() -> None:
                 "shipping.acs.nearest",
                 "shipping.acs.stations",
                 "shipping.freeShippingInfo",
+                "shipping.policy",
             ),
             # A rate's price, threshold, weight cap or active flag
             # changes what ``/shipping/options`` and

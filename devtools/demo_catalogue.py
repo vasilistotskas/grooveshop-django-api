@@ -201,6 +201,26 @@ class ProductRow:
     attributes: dict[str, tuple[str, str]] = field(default_factory=dict)
 
 
+#: Public names of the variant groups, keyed by the stable identifier a
+#: row carries in ``variant_group``. The name is what shoppers see and
+#: what shopping platforms receive as the group's item title, so each is
+#: a real product title in both languages, never the key.
+VARIANT_GROUP_NAMES: dict[str, tuple[str, str]] = {
+    "usbc-plain": ("Καλώδιο USB-C", "USB-C Cable"),
+    "usbc-braided": (
+        "Καλώδιο USB-C Υφασμάτινο 1.5m",
+        "Braided USB-C Cable 1.5m",
+    ),
+    "charger-gan": ("Φορτιστής GaN", "GaN Charger"),
+    "wireless-pad": ("Ασύρματος Φορτιστής 15W", "15W Wireless Charging Pad"),
+    "case-clear": ("Διάφανη Θήκη", "Clear Case"),
+    "earbuds-tws": ("Ασύρματα Ακουστικά", "Wireless Earbuds"),
+    "speaker-mini": ("Φορητό Ηχείο Bluetooth", "Portable Bluetooth Speaker"),
+    "stand-desk": ("Βάση Γραφείου", "Desk Stand"),
+    "powerbank-voltra": ("Powerbank", "Power Bank"),
+}
+
+
 def _p(*args, **kwargs) -> ProductRow:
     return ProductRow(*args, **kwargs)
 

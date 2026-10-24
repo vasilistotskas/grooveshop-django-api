@@ -20,14 +20,29 @@ class ProductVariantGroup(TranslatableModel, TimeStampMixinModel, UUIDModel):
     The variant *axes* themselves (Colour, Memory, …) are modelled with the
     existing ``Attribute`` / ``AttributeValue`` / ``ProductAttribute`` system;
     only attributes flagged ``is_variant`` are rendered as selectors.
+
+    The group's ``name`` is shown to shoppers (``variantGroupTitle``) and
+    published to shopping platforms as the group's item title, so it must
+    read as a product title, per language.
     """
 
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(_("Active"), default=True)
 
-    # Translatable admin label only (e.g. "Μαγνητικά κλιπ καλωδίων 6τμχ").
+    # Shopper-facing title (e.g. "Μαγνητικά κλιπ καλωδίων 6τμχ"), also sent
+    # to Google as the item group title.
     translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=255, blank=True, null=True)
+        name=models.CharField(
+            _("Name"),
+            max_length=255,
+            blank=True,
+            null=True,
+            help_text=_(
+                "Shown to shoppers and sent to shopping platforms (Google's "
+                "item group title) for every product in the group. Use the "
+                "product's title without the variation, per language."
+            ),
+        )
     )
 
     class Meta(TypedModelMeta):

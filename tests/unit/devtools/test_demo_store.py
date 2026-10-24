@@ -1820,6 +1820,19 @@ class TestProductVariantGroups:
         )
         assert len(first) == len(self._catalogue_groups())
 
+    def test_groups_carry_the_public_names_in_both_languages(self, seed):
+        from product.models import ProductVariantGroup
+
+        seed()
+
+        assert self._catalogue_groups() == set(demo_store.VARIANT_GROUP_NAMES)
+        for name_el, name_en in demo_store.VARIANT_GROUP_NAMES.values():
+            group = ProductVariantGroup.objects.get(
+                translations__language_code="el", translations__name=name_el
+            )
+            assert group.get_translation("el").name == name_el
+            assert group.get_translation("en").name == name_en
+
     def test_groups_earlier_runs_left_empty_are_removed(self, seed):
         from product.models import ProductVariantGroup
 

@@ -11193,6 +11193,9 @@ msgstr "Εμφάνιση λεπτομερών ρυθμίσεων index"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Να μην εμφανίζεται τίποτα αντί για λιγότερες προτάσεις από αυτόν τον αριθμό."
 
+msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
+msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
+
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
 

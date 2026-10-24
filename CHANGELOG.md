@@ -3,6 +3,57 @@
 
 
 
+## v3.149.0 (2026-10-24)
+
+### Bug fixes
+
+* fix(deps): gitpython 3.2.1 and virtualenv 21.14.13 for their security fixes (#317)
+
+Both are dev tools only (python-semantic-release and pre-commit).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`eebd591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eebd5917597c06045aa480e0ec94afeee2164504))
+
+### Features
+
+* feat(shipping): publish the store's shipping policy, date reductions, require profile URLs (#315) ([`3a6f2dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6f2dc13c338688f0103229fff6add8928316b3))
+
+* feat(shipping): publish the store's shipping policy, date reductions, require profile URLs
+
+GET /api/v1/shipping/policy lists one row per (provider, kind, country)
+the store really ships, from the ShippingRate: price, free-shipping
+threshold, delivery-day bounds and weight cap. Eligibility moves into
+ShippingService.offered_rates, which available_options now iterates too,
+so checkout and the policy cannot disagree. The view is cached with
+cache_methods and purged by the shipping surface, which now also watches
+AcsStation (the ACS locker gate).
+
+reductionStartedAt joins priorPrice and announcedDiscountPercent on the
+product, variant and agent favourite payloads. It is null exactly when
+priorPrice is, because the stored column is also set for a reduction that
+announces nothing.
+
+Tenant.socials_* now require a profile URL on the network's own hosts
+(SocialProfileUrlValidator, one class parametrised per network). A data
+migration blanks every stored value that fails the rule, so a bare
+https://twitter.com no longer reaches the footer link or the Organization
+sameAs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`3a6f2dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6f2dc13c338688f0103229fff6add8928316b3))
+
+* feat(shipping): purge the storefront's cached shipping policy with the surface
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`3a6f2dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6f2dc13c338688f0103229fff6add8928316b3))
+
+### Testing
+
+* test(tenant): assert the cleared social value's exact log arguments
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3a6f2dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a6f2dc13c338688f0103229fff6add8928316b3))
+
 ## v3.148.2 (2026-10-24)
 
 ### Bug fixes

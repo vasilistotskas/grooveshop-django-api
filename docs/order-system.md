@@ -945,6 +945,23 @@ accepting Cyprus orders at the Greek flat rate.
 - **`/shipping/free-shipping-info`** defaults to the first
   `ShippingService.shippable_country_codes()` entry when no
   `country_code` is given, echoing whichever it used.
+- **`ShippingService.offered_rates(country_code)`** is the one definition
+  of "the store ships this (provider, kind) to this country": an active
+  provider that supports the kind, a registered adapter, the adapter's
+  `is_kind_enabled` gate, and an active `ShippingRate`. `available_options`
+  (checkout) and `shipping_policy` both iterate it, so they cannot
+  disagree.
+- **`GET /shipping/policy`** is the store's standing policy for the
+  storefront's Organization `hasShippingService` markup: one row per
+  `offered_rates` entry over `shippable_country_codes()`, with the rate's
+  own `price`, `freeShippingThreshold`, `deliveryDaysMin`/`Max` and
+  `maxWeightGrams` (null when unset) and no cart input. Anonymous, cached
+  by `@cache_methods` (`ShippingPolicyView`); the `shipping` cache surface
+  purges it and declares `ShippingRate`, `ShippingProvider` and
+  `shipping_acs.AcsStation` (the locker gate) as `invalidated_by`. A
+  carrier's credentials live on the `Tenant` row, which no surface watches,
+  so connecting or removing one shows after the TTL or a manual purge of
+  the `shipping` surface.
 - **`?shippable=true` on `/country`** filters to
   `shippable_country_codes()`; always empty on the platform host,
   which has no tenant schema of its own to hold a rate.

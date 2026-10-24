@@ -10,6 +10,7 @@ from drf_spectacular.utils import (
 from measurement.measures import Weight
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
+from rest_framework.fields import get_attribute
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
@@ -28,6 +29,28 @@ from vat.models import Vat
 @extend_schema_field(generate_schema_multi_lang(Product))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
+
+
+class AnnouncedReductionStartField(serializers.DateTimeField):
+    """When the reduction in force began, only while one may be announced.
+
+    ``Product.reduction_started_at`` is also set while a reduction
+    exists but announces nothing (no 30-day reference), so it is read
+    together with ``prior_price``: the date is shown exactly when the
+    prior price is, and ``null`` otherwise. Reading both attributes by
+    name lets a model instance and an agent row dict share it.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("read_only", True)
+        kwargs.setdefault("allow_null", True)
+        kwargs["source"] = "*"
+        super().__init__(**kwargs)
+
+    def get_attribute(self, instance):
+        if get_attribute(instance, ["prior_price"]) is None:
+            return None
+        return get_attribute(instance, ["reduction_started_at"])
 
 
 class EffectivePriceFieldsSerializer(serializers.Serializer):
@@ -50,6 +73,9 @@ class EffectivePriceFieldsSerializer(serializers.Serializer):
     announced_discount_percent = serializers.IntegerField(
         read_only=True, allow_null=True
     )
+    # When that reduction began: the start of the period ``prior_price``
+    # is the reference for. ``null`` whenever ``prior_price`` is.
+    reduction_started_at = AnnouncedReductionStartField()
 
 
 # The merchant's markdown (``Product.discount_percent``) is an input, not an
@@ -122,6 +148,7 @@ class ProductSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
             "main_image_path",
             "review_average",
             "review_count",
@@ -144,6 +171,7 @@ class ProductSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
             "main_image_path",
             "review_average",
             "review_count",

@@ -22,6 +22,7 @@ from core.utils.tenant_urls import (
     storefront_language_choices,
 )
 from tenant.validators import (
+    SocialProfileUrlValidator,
     validate_reserved_schema_name,
 )
 
@@ -710,6 +711,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Discord URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("discord.gg", "discord.com"))],
         help_text=_(
             "Discord server invite URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -719,6 +721,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Facebook URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("facebook.com", "fb.com"))],
         help_text=_(
             "Facebook page URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -728,6 +731,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Instagram URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("instagram.com",))],
         help_text=_(
             "Instagram profile URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -737,6 +741,11 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Pinterest URL"),
         blank=True,
         default="",
+        validators=[
+            SocialProfileUrlValidator(
+                ("pinterest.com",), country_subdomains=True
+            )
+        ],
         help_text=_(
             "Pinterest profile URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -746,6 +755,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Reddit URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("reddit.com",))],
         help_text=_(
             "Reddit community/profile URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -755,6 +765,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("TikTok URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("tiktok.com",))],
         help_text=_(
             "TikTok profile URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -767,6 +778,11 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("LinkedIn URL"),
         blank=True,
         default="",
+        validators=[
+            SocialProfileUrlValidator(
+                ("linkedin.com",), country_subdomains=True
+            )
+        ],
         help_text=_(
             "LinkedIn company page URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -776,6 +792,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("Twitter / X URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("twitter.com", "x.com"))],
         help_text=_(
             "Twitter/X profile URL. Must use https://. "
             "Empty → link hidden in storefront footer."
@@ -785,6 +802,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         _("YouTube URL"),
         blank=True,
         default="",
+        validators=[SocialProfileUrlValidator(("youtube.com",))],
         help_text=_(
             "YouTube channel URL. Must use https://. "
             "Empty → link hidden in storefront footer."

@@ -195,6 +195,7 @@ def register_default_surfaces() -> None:
             django_patterns=(
                 "*BoxNowLockerViewSet_*",
                 "*AcsStationViewSet_*",
+                "*ShippingPolicyView_*",
             ),
             nuxt_patterns=_nuxt(
                 "shipping.options",
@@ -206,10 +207,13 @@ def register_default_surfaces() -> None:
             # A rate's price, threshold, weight cap or active flag
             # changes what ``/shipping/options`` and
             # ``/shipping/free-shipping-info`` return; a provider's
-            # active/capability flags do too.
+            # active/capability flags do too. ``/shipping/policy`` is
+            # cached here and also depends on the per-kind gate, which
+            # for ACS lockers is the synced ``AcsStation`` rows.
             invalidated_by=(
                 "shipping.ShippingRate",
                 "shipping.ShippingProvider",
+                "shipping_acs.AcsStation",
             ),
             icon="local_shipping",
             group="commerce",

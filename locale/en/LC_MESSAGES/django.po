@@ -3046,6 +3046,9 @@ msgstr "Currency is required when amount is provided"
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr "Currency must match the store's own currency (%(currency)s)."
 
+msgid "Currency of ``price`` and ``free_shipping_threshold``."
+msgstr "Currency of ``price`` and ``free_shipping_threshold``."
+
 msgid "Currency the response should advertise. Defaults to the platform default (settings.DEFAULT_CURRENCY)."
 msgstr "Currency the response should advertise. Defaults to the platform default (settings.DEFAULT_CURRENCY)."
 
@@ -3797,6 +3800,10 @@ msgstr "Enter a value between 0 and 100. For example, 25 for 25% discount."
 msgid "Enter how many units of at least one line came back."
 msgstr "Enter how many units of at least one line came back."
 
+#, python-format
+msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
+msgstr "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
+
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 
@@ -4046,6 +4053,9 @@ msgstr "False = sandbox / test credentials. Used by the admin UI to warn operato
 
 msgid "Fashion & apparel"
 msgstr "Fashion & apparel"
+
+msgid "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate."
+msgstr "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate."
 
 msgid "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate. Pair with the public ``DISPATCH_CUTOFF`` setting for the 'order before HH:MM' line. Day counts only, never dates, so the response stays cacheable."
 msgstr "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate. Pair with the public ``DISPATCH_CUTOFF`` setting for the 'order before HH:MM' line. Day counts only, never dates, so the response stays cacheable."
@@ -5979,6 +5989,9 @@ msgstr "Header"
 msgid "Header and mobile links hang off the menu directly."
 msgstr "Header and mobile links hang off the menu directly."
 
+msgid "Heaviest parcel the rate carries, or null for no cap."
+msgstr "Heaviest parcel the rate carries, or null for no cap."
+
 msgid "Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently."
 msgstr "Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently."
 
@@ -6164,6 +6177,9 @@ msgstr "ISO 3166-1 alpha-2 country code."
 
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
+
+msgid "ISO 3166-1 alpha-2 destination country."
+msgstr "ISO 3166-1 alpha-2 destination country."
 
 msgid "ISO 4217 currency code (e.g. EUR)"
 msgstr "ISO 4217 currency code (e.g. EUR)"
@@ -9591,6 +9607,9 @@ msgstr "Products assigned to this group. Add or remove members from each Product
 msgid "Products in these categories (subcategories included) are never counted or discounted by this promotion"
 msgstr "Products in these categories (subcategories included) are never counted or discounted by this promotion"
 
+msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
+msgstr "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
+
 msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
 msgstr "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
 
@@ -12228,6 +12247,9 @@ msgstr "The public offers listing and the per-product offer panel. An offer is a
 
 msgid "The quantity exceeds the available stock."
 msgstr "The quantity exceeds the available stock."
+
+msgid "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
+msgstr "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
 
 msgid "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."
 msgstr "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."

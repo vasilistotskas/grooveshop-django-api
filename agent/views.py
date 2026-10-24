@@ -188,6 +188,7 @@ class AgentFavouritesView(AgentAPIView):
                     "announced_discount_percent": (
                         product.announced_discount_percent
                     ),
+                    "reduction_started_at": product.reduction_started_at,
                     "currency": str(price.currency),
                     "in_stock": product.stock > 0,
                     "added_at": favourite.created_at,

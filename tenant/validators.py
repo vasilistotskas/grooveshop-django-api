@@ -5,9 +5,12 @@ Schemas instead (``tenant.json_schemas``)."""
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils.deconstruct import deconstructible
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name
 
@@ -658,3 +661,89 @@ def validate_reserved_schema_name(value: str) -> None:
             ),
             params={"value": value},
         )
+
+
+# ---------------------------------------------------------------------------
+# Social profile URLs (``Tenant.socials_*``)
+# ---------------------------------------------------------------------------
+
+#: A country subdomain such as ``gr.pinterest.com`` or ``uk.linkedin.com``.
+_COUNTRY_SUBDOMAIN_RE = re.compile(r"^[a-z]{2}$")
+
+
+@deconstructible
+class SocialProfileUrlValidator:
+    """A link to a profile on one social network, not the network itself.
+
+    The storefront renders each ``Tenant.socials_*`` value as a footer
+    link and as the Organization's schema.org ``sameAs``, so it has to
+    name the store's own page: ``https://twitter.com`` is a URL, but it
+    identifies nobody. A value passes when it is ``https``, its host is
+    one of ``domains`` (with or without ``www.``; a two-letter country
+    subdomain too when ``country_subdomains`` is on, for the networks
+    that serve profiles from ``gr.pinterest.com``), and its path names a
+    profile (anything but ``/``). Blank is the model field's business
+    (``blank=True``), never reaching a validator.
+
+    The hosts are exact, so ``twitter.com.evil.example``, userinfo
+    (``twitter.com@evil.example``) and ports do not pass.
+    """
+
+    code = "invalid_social_profile"
+
+    def __init__(
+        self, domains: Iterable[str], *, country_subdomains: bool = False
+    ) -> None:
+        self.domains = tuple(domains)
+        self.country_subdomains = country_subdomains
+
+    def __call__(self, value: str) -> None:
+        if not self._is_profile(value):
+            raise ValidationError(
+                _(
+                    "Enter the URL of your profile on %(hosts)s: https://, "
+                    "one of those hosts and a path naming the profile, not "
+                    "only the home page."
+                ),
+                code=self.code,
+                params={"hosts": ", ".join(self.domains)},
+            )
+
+    def _is_profile(self, value: str) -> bool:
+        try:
+            parts = urlsplit(value)
+            port = parts.port
+        except ValueError:
+            return False
+        return (
+            parts.scheme == "https"
+            and port is None
+            and parts.username is None
+            and self._host_allowed(parts.hostname)
+            and bool(parts.path.strip("/"))
+        )
+
+    def _host_allowed(self, host: str | None) -> bool:
+        if not host:
+            return False
+        for domain in self.domains:
+            if host in (domain, f"www.{domain}"):
+                return True
+            label, _dot, rest = host.partition(".")
+            if (
+                self.country_subdomains
+                and rest == domain
+                and _COUNTRY_SUBDOMAIN_RE.match(label)
+            ):
+                return True
+        return False
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, SocialProfileUrlValidator)
+            and other.domains == self.domains
+            and other.country_subdomains == self.country_subdomains
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.domains, self.country_subdomains))

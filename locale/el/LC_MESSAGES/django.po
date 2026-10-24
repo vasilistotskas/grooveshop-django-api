@@ -3052,6 +3052,9 @@ msgstr "Το νόμισμα είναι υποχρεωτικό όταν δίνε�
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr "Το νόμισμα πρέπει να είναι το νόμισμα του καταστήματος (%(currency)s)."
 
+msgid "Currency of ``price`` and ``free_shipping_threshold``."
+msgstr "Νόμισμα των ``price`` και ``free_shipping_threshold``."
+
 msgid "Currency the response should advertise. Defaults to the platform default (settings.DEFAULT_CURRENCY)."
 msgstr "Νόμισμα που πρέπει να δηλώνει η απόκριση. Προεπιλογή το προεπιλεγμένο νόμισμα της πλατφόρμας (settings.DEFAULT_CURRENCY)."
 
@@ -3804,6 +3807,10 @@ msgstr "Εισαγάγετε μια τιμή μεταξύ 0 και 100. Για �
 msgid "Enter how many units of at least one line came back."
 msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μίας γραμμής επιστράφηκαν."
 
+#, python-format
+msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
+msgstr "Εισαγάγετε τη διεύθυνση URL του προφίλ σας στο %(hosts)s: https://, ένας από αυτούς τους ιστότοπους και μια διαδρομή που δείχνει το προφίλ, όχι μόνο την αρχική σελίδα."
+
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
 
@@ -4053,6 +4060,9 @@ msgstr "False = διαπιστευτήρια sandbox / δοκιμής. Χρησ�
 
 msgid "Fashion & apparel"
 msgstr "Μόδα & ένδυση"
+
+msgid "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate."
+msgstr "Η ταχύτερη παράδοση σε εργάσιμες ημέρες μετά την αποστολή, ή null όταν η τιμή αποστολής δεν διαφημίζει εκτίμηση."
 
 msgid "Fastest delivery in business days after dispatch, or null when the rate advertises no estimate. Pair with the public ``DISPATCH_CUTOFF`` setting for the 'order before HH:MM' line. Day counts only, never dates, so the response stays cacheable."
 msgstr "Η ταχύτερη παράδοση σε εργάσιμες ημέρες μετά την αποστολή, ή null όταν η τιμή αποστολής δεν διαφημίζει εκτίμηση. Συνδυάστε με τη δημόσια ρύθμιση ``DISPATCH_CUTOFF`` για τη γραμμή «παραγγείλτε πριν τις ΩΩ:ΛΛ». Μόνο αριθμοί ημερών, ποτέ ημερομηνίες, ώστε η απάντηση να μπορεί να αποθηκεύεται στην cache."
@@ -5988,6 +5998,9 @@ msgstr "Κεφαλίδα"
 msgid "Header and mobile links hang off the menu directly."
 msgstr "Οι σύνδεσμοι της κεφαλίδας και του κινητού συνδέονται απευθείας στο μενού."
 
+msgid "Heaviest parcel the rate carries, or null for no cap."
+msgstr "Το βαρύτερο δέμα που μεταφέρει η τιμή αποστολής, ή null όταν δεν υπάρχει όριο."
+
 msgid "Heaviest parcel this combination will carry. Blank means no cap. A cart over the cap still lists the option (flagged ``exceeds_max_weight``) rather than disappearing silently."
 msgstr "Το βαρύτερο δέμα που μεταφέρει αυτός ο συνδυασμός. Κενό σημαίνει χωρίς όριο. Ένα καλάθι πάνω από το όριο εξακολουθεί να βλέπει την επιλογή (με την ένδειξη ``exceeds_max_weight``) αντί να εξαφανίζεται σιωπηλά."
 
@@ -6173,6 +6186,9 @@ msgstr "ISO 3166-1 alpha-2 κωδικός χώρας."
 
 msgid "ISO 3166-1 alpha-2 delivery country. Drops the pay ways an operator excluded for that country (e.g. BoxNow PAY ON THE GO in Cyprus). Has no effect without ``shippingKind``; when omitted only the every-country exclusions apply."
 msgstr "Χώρα παράδοσης (ISO 3166-1 alpha-2). Αφαιρεί τους τρόπους πληρωμής που ο διαχειριστής έχει αποκλείσει για τη χώρα αυτή (π.χ. BoxNow PAY ON THE GO στην Κύπρο). Δεν έχει επίδραση χωρίς το ``shippingKind``· αν παραλείπεται ισχύουν μόνο οι αποκλεισμοί για όλες τις χώρες."
+
+msgid "ISO 3166-1 alpha-2 destination country."
+msgstr "Χώρα προορισμού (ISO 3166-1 alpha-2)."
 
 msgid "ISO 4217 currency code (e.g. EUR)"
 msgstr "Κωδικός νομίσματος ISO 4217 (π.χ. EUR)"
@@ -9602,6 +9618,9 @@ msgstr "Προϊόντα που έχουν εκχωρηθεί σε αυτή τη
 msgid "Products in these categories (subcategories included) are never counted or discounted by this promotion"
 msgstr "Τα προϊόντα αυτών των κατηγοριών (συμπεριλαμβανομένων των υποκατηγοριών) δεν υπολογίζονται ούτε λαμβάνουν έκπτωση από αυτή την προσφορά"
 
+msgid "Products subtotal, after discounts and excluding shipping, from which this combination ships free. Null when it is never free."
+msgstr "Υποσύνολο προϊόντων, μετά τις εκπτώσεις και χωρίς τα μεταφορικά, από το οποίο ο συνδυασμός αποστέλλεται δωρεάν. Null όταν δεν γίνεται ποτέ δωρεάν."
+
 msgid "Products to show beside the seed product(s) on a given surface (product page, cart, out-of-stock, empty cart). Each item carries the strategy that produced it and, for merchant-curated links, the relation type. An empty list means the store has nothing worth showing here — render nothing. Report an impression event with impression_id once the strip is shown, and echo it on click events."
 msgstr "Προϊόντα προς εμφάνιση δίπλα στο προϊόν ή στα προϊόντα αναφοράς σε μια συγκεκριμένη επιφάνεια (σελίδα προϊόντος, καλάθι, εξαντλημένο προϊόν, άδειο καλάθι). Κάθε στοιχείο περιέχει τη στρατηγική που το παρήγαγε και, για συνδέσεις που επιμελήθηκε ο έμπορος, τον τύπο σχέσης. Μια κενή λίστα σημαίνει ότι το κατάστημα δεν έχει τίποτα αξιόλογο να δείξει εδώ — μην εμφανίσετε τίποτα. Αναφέρετε ένα συμβάν προβολής με το impression_id μόλις εμφανιστεί η λωρίδα και στείλτε το ξανά στα συμβάντα κλικ."
 
@@ -12235,6 +12254,9 @@ msgstr "Η δημόσια λίστα προσφορών και το πλαίσι
 
 msgid "The quantity exceeds the available stock."
 msgstr "Η ποσότητα υπερβαίνει το διαθέσιμο απόθεμα."
+
+msgid "The rate's own price for this (provider, country, kind), before a free-shipping threshold or a live carrier quote changes what a particular cart pays."
+msgstr "Η ίδια η τιμή αποστολής για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν το όριο δωρεάν αποστολής ή μια ζωντανή τιμή του courier αλλάξει όσα πληρώνει ένα συγκεκριμένο καλάθι."
 
 msgid "The rate's weight cap, or null when it has none. Compare against the cart weight the caller already knows — this row does not repeat it."
 msgstr "Το όριο βάρους της τιμής αποστολής, ή null όταν δεν έχει. Συγκρίνετέ το με το βάρος του καλαθιού που ήδη γνωρίζετε — αυτή η εγγραφή δεν το επαναλαμβάνει."

@@ -324,7 +324,9 @@ class TestNoDeadDjangoPatterns:
         dead = []
         for surface in iter_surfaces():
             for pattern in surface.django_patterns:
-                match = re.fullmatch(r"\*([A-Za-z0-9]+ViewSet)_\*", pattern)
+                match = re.fullmatch(
+                    r"\*([A-Za-z0-9]+View(?:Set)?)_\*", pattern
+                )
                 if match and match.group(1) not in decorated:
                     dead.append((surface.code, pattern))
 
@@ -345,7 +347,9 @@ class TestNoDeadDjangoPatterns:
         covered = set()
         for surface in iter_surfaces():
             for pattern in surface.django_patterns:
-                match = re.fullmatch(r"\*([A-Za-z0-9]+ViewSet)_\*", pattern)
+                match = re.fullmatch(
+                    r"\*([A-Za-z0-9]+View(?:Set)?)_\*", pattern
+                )
                 if match:
                     covered.add(match.group(1))
 

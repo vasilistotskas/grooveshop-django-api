@@ -10,7 +10,7 @@ price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -23,7 +23,11 @@ from shipping.exceptions import (
     ShippingUnavailableError,
     ShippingWeightExceededError,
 )
-from shipping.interfaces import get_provider, is_registered
+from shipping.interfaces import (
+    ShippingCarrierInterface,
+    get_provider,
+    is_registered,
+)
 from shipping.models import ShippingProvider, ShippingRate
 
 if TYPE_CHECKING:
@@ -291,16 +295,102 @@ class ShippingService:
         country_code = country_code.upper()
         order_value = Money(order_value_amount, currency)
 
-        qs = ShippingProvider.objects.filter(is_active=True).filter(
-            Q(supports_home_delivery=True) | Q(supports_pickup_point=True)
+        options: list[dict[str, Any]] = []
+        for provider, kind, adapter, rate in cls.offered_rates(country_code):
+            exceeds_max_weight = bool(
+                weight_grams is not None
+                and rate.max_weight_grams is not None
+                and weight_grams > rate.max_weight_grams
+            )
+            exceeds_parcel_size = False
+            if items is not None:
+                try:
+                    adapter.assert_parcel_fits(kind=kind, items=items)
+                except ShippingParcelTooLargeError:
+                    exceeds_parcel_size = True
+            price = cls._priced(
+                rate,
+                country_code=country_code,
+                region_id=None,
+                weight_grams=weight_grams,
+                order_value=order_value,
+            )
+
+            # Per-(provider, kind) logo: ``pickup_point`` rows
+            # prefer ``logo_pickup_point`` when uploaded so a
+            # carrier can have a distinct locker illustration vs
+            # its home-delivery brand mark (e.g. ACS home
+            # delivery vs ACS Smartpoint). The model handles the
+            # fallback chain; this view just consumes the
+            # resolved URL.
+            options.append(
+                {
+                    "provider_code": provider.code,
+                    "provider_name": provider.name,
+                    "kind": kind.value,
+                    "price": price.amount,
+                    "currency": str(price.currency),
+                    "live_mode": provider.live_mode,
+                    "priority": provider.priority,
+                    "logo_path": provider.logo_path_for_kind(kind.value),
+                    "metadata": provider.metadata or {},
+                    "pay_ways": cls._pay_ways_for(
+                        provider.code, kind, country_code
+                    ),
+                    "country_code": country_code,
+                    "max_weight_grams": rate.max_weight_grams,
+                    "exceeds_max_weight": exceeds_max_weight,
+                    "exceeds_parcel_size": exceeds_parcel_size,
+                    "delivery_days_min": rate.delivery_days_min,
+                    "delivery_days_max": rate.delivery_days_max,
+                }
+            )
+
+        options.sort(key=lambda opt: (opt["priority"], opt["provider_code"]))
+        return options
+
+    @classmethod
+    def offered_rates(
+        cls, country_code: str
+    ) -> Iterator[
+        tuple[
+            ShippingProvider,
+            ShippingKind,
+            ShippingCarrierInterface,
+            ShippingRate,
+        ]
+    ]:
+        """Every (provider, kind) this store ships to ``country_code``.
+
+        The one definition of "the store offers this", shared by
+        :meth:`available_options` (checkout) and :meth:`shipping_policy`
+        (the public policy), so the two can never disagree. A
+        combination is offered when:
+
+        * its ``ShippingProvider`` is active and supports the kind;
+        * the provider has an adapter registered (so deployments
+          missing a provider app don't surface its options);
+        * the adapter's per-kind gate (``is_kind_enabled``) lets it
+          through — a provider can advertise capability via the
+          ``ShippingProvider`` row but gate user-facing visibility on
+          state it controls itself (ACS lockers need synced stations);
+        * an active ``ShippingRate`` exists for
+          (provider, country_code, kind) — the single source of "does
+          this store ship this way to this country".
+        """
+        qs = (
+            ShippingProvider.objects.filter(is_active=True)
+            .filter(
+                Q(supports_home_delivery=True) | Q(supports_pickup_point=True)
+            )
+            .order_by("priority", "code")
         )
 
-        options: list[dict[str, Any]] = []
         for provider in qs:
             if not is_registered(provider.code):
                 logger.warning(
                     "Active ShippingProvider '%s' has no registered adapter "
-                    "— skipping in available_options()",
+                    "— skipping in offered_rates()",
                     provider.code,
                 )
                 continue
@@ -313,10 +403,6 @@ class ShippingService:
             ):
                 if not supported:
                     continue
-                # Per-kind gate (e.g. ACS lockers need synced stations)
-                # — a provider can advertise capability via the
-                # ShippingProvider row but gate user-facing visibility
-                # on state it controls itself.
                 if not adapter.is_kind_enabled(kind, country_code=country_code):
                     continue
 
@@ -335,57 +421,42 @@ class ShippingService:
                     # simply does not ship here.
                     continue
 
-                exceeds_max_weight = bool(
-                    weight_grams is not None
-                    and rate.max_weight_grams is not None
-                    and weight_grams > rate.max_weight_grams
-                )
-                exceeds_parcel_size = False
-                if items is not None:
-                    try:
-                        adapter.assert_parcel_fits(kind=kind, items=items)
-                    except ShippingParcelTooLargeError:
-                        exceeds_parcel_size = True
-                price = cls._priced(
-                    rate,
-                    country_code=country_code,
-                    region_id=None,
-                    weight_grams=weight_grams,
-                    order_value=order_value,
-                )
+                yield provider, kind, adapter, rate
 
-                # Per-(provider, kind) logo: ``pickup_point`` rows
-                # prefer ``logo_pickup_point`` when uploaded so a
-                # carrier can have a distinct locker illustration vs
-                # its home-delivery brand mark (e.g. ACS home
-                # delivery vs ACS Smartpoint). The model handles the
-                # fallback chain; this view just consumes the
-                # resolved URL.
-                options.append(
-                    {
-                        "provider_code": provider.code,
-                        "provider_name": provider.name,
-                        "kind": kind.value,
-                        "price": price.amount,
-                        "currency": str(price.currency),
-                        "live_mode": provider.live_mode,
-                        "priority": provider.priority,
-                        "logo_path": provider.logo_path_for_kind(kind.value),
-                        "metadata": provider.metadata or {},
-                        "pay_ways": cls._pay_ways_for(
-                            provider.code, kind, country_code
-                        ),
-                        "country_code": country_code,
-                        "max_weight_grams": rate.max_weight_grams,
-                        "exceeds_max_weight": exceeds_max_weight,
-                        "exceeds_parcel_size": exceeds_parcel_size,
-                        "delivery_days_min": rate.delivery_days_min,
-                        "delivery_days_max": rate.delivery_days_max,
-                    }
-                )
+    @classmethod
+    def shipping_policy(cls) -> list[dict[str, Any]]:
+        """The store's standing shipping policy, one row per offer.
 
-        options.sort(key=lambda opt: (opt["priority"], opt["provider_code"]))
-        return options
+        One row per (provider, kind, country) the store actually offers
+        (:meth:`offered_rates`), over :meth:`shippable_country_codes`,
+        straight from the ``ShippingRate``: no cart, weight or order
+        value is involved, so the price is the rate's own, before a
+        live carrier quote or a free-shipping threshold. Powers
+        ``GET /api/v1/shipping/policy`` which the storefront turns into
+        its Organization ``hasShippingService`` markup.
+        """
+        return [
+            {
+                "country_code": country_code,
+                "kind": kind.value,
+                "provider_code": provider.code,
+                "provider_name": provider.name,
+                "price": rate.price.amount,
+                "currency": str(rate.price.currency),
+                "free_shipping_threshold": (
+                    None
+                    if rate.free_shipping_threshold is None
+                    else rate.free_shipping_threshold.amount
+                ),
+                "delivery_days_min": rate.delivery_days_min,
+                "delivery_days_max": rate.delivery_days_max,
+                "max_weight_grams": rate.max_weight_grams,
+            }
+            for country_code in cls.shippable_country_codes()
+            for provider, kind, _adapter, rate in cls.offered_rates(
+                country_code
+            )
+        ]
 
     @staticmethod
     def _pay_ways_for(

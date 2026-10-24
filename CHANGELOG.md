@@ -3,6 +3,21 @@
 
 
 
+## v3.150.2 (2026-10-24)
+
+### Bug fixes
+
+* fix(settings): the price history setting describes what the store shows (#321)
+
+PRICE_HISTORY_ENABLED still promised "the lowest price of the last 30
+days", a figure the storefront dropped because it contradicted the
+Omnibus prior price. It now says what the store shows: a button beside
+the rating that opens the recorded price over time, with its change and
+its lowest and highest price. Existing rows take the new text on
+migrate (tenant/settings_metadata.py).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`418b7f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/418b7f7e46d9c86df3eae45845d812d7522e80b0))
+
 ## v3.150.1 (2026-10-24)
 
 ### Bug fixes

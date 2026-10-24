@@ -2272,6 +2272,14 @@ def seed_newsletter() -> dict[str, int]:
 #: at it put another store's brand in its tabs and PWA icon.
 DEMO_FAVICON_PATH = "/img/tenants/demo/favicon-512x512.png"
 
+#: The demo store's logo, beside the favicon: the same mark next to
+#: "GrooveShop" over "Demo" in its display face, one for light grounds
+#: and one for dark. It is also the store's share image (`og:image`) and
+#: its schema.org logo; without it the header printed the name as text
+#: and every shared page had no picture.
+DEMO_LOGO_LIGHT_PATH = "/img/tenants/demo/logo-light.png"
+DEMO_LOGO_DARK_PATH = "/img/tenants/demo/logo-dark.png"
+
 #: The store line the footer prints under the logo. `store_description`
 #: holds the default locale's wording (Greek); the other locales live in
 #: `store_description_i18n`.
@@ -2284,7 +2292,7 @@ DEMO_STORE_DESCRIPTION_I18N = {
 
 
 def seed_branding() -> dict[str, int]:
-    """Give the demo store its favicon and its store line.
+    """Give the demo store its favicon, its logo and its store line.
 
     Without one the storefront answers ``/favicon.ico`` with a 404 by
     design (an unbranded store shows the browser's default icon rather
@@ -2317,10 +2325,15 @@ def seed_branding() -> dict[str, int]:
             return {"skipped_no_primary_domain": 1}
 
         changed = []
-        favicon_url = f"https://{domain}{DEMO_FAVICON_PATH}"
-        if tenant.favicon_url != favicon_url:
-            tenant.favicon_url = favicon_url
-            changed.append("favicon_url")
+        for field, path in (
+            ("favicon_url", DEMO_FAVICON_PATH),
+            ("logo_light_url", DEMO_LOGO_LIGHT_PATH),
+            ("logo_dark_url", DEMO_LOGO_DARK_PATH),
+        ):
+            url = f"https://{domain}{path}"
+            if getattr(tenant, field) != url:
+                setattr(tenant, field, url)
+                changed.append(field)
         if tenant.store_description != DEMO_STORE_DESCRIPTION:
             tenant.store_description = DEMO_STORE_DESCRIPTION
             changed.append("store_description")

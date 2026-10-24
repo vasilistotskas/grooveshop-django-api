@@ -3,6 +3,23 @@
 
 
 
+## v3.151.0 (2026-10-24)
+
+### Features
+
+* feat(devtools): the demo store gets its logo (#322)
+
+seed_branding now points the demo tenant's logo_light_url and
+logo_dark_url at the storefront's img/tenants/demo/logo-{light,dark}.png
+on the demo's own primary domain, as it already did for the favicon.
+Without a logo the header printed the store name as text, and every
+shared page and the schema.org Organization had no image.
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6967a44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6967a441e388feedceeb7fd796f8e602b5a329c5))
+
 ## v3.150.2 (2026-10-24)
 
 ### Bug fixes

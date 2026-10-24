@@ -15,6 +15,7 @@ from decimal import Decimal
 from allauth.idp.oidc.models import Client, Token
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -179,6 +180,7 @@ class AgentAPITestCase(APITestCase):
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
             "currency",
             "added_at",
         ):
@@ -188,8 +190,11 @@ class AgentAPITestCase(APITestCase):
         product = ProductFactory(active=True, stock=5)
         # A queryset update leaves the stored price record as the test
         # sets it; the view must report it unchanged.
+        started = timezone.now() - timedelta(days=3)
         Product.objects.filter(pk=product.pk).update(
-            effective_price=Decimal("80.00"), prior_price=Decimal("100.00")
+            effective_price=Decimal("80.00"),
+            prior_price=Decimal("100.00"),
+            reduction_started_at=started,
         )
         ProductFavouriteFactory(user=self.user, product=product)
 
@@ -200,12 +205,15 @@ class AgentAPITestCase(APITestCase):
         self.assertEqual(Decimal(str(row["effective_price"])), Decimal(80))
         self.assertEqual(Decimal(str(row["prior_price"])), Decimal(100))
         self.assertEqual(row["announced_discount_percent"], 20)
+        self.assertEqual(parse_datetime(row["reduction_started_at"]), started)
 
     def test_favourites_report_no_announcement_without_prior_price(
         self,
     ) -> None:
         product = ProductFactory(active=True, stock=5)
-        Product.objects.filter(pk=product.pk).update(prior_price=None)
+        Product.objects.filter(pk=product.pk).update(
+            prior_price=None, reduction_started_at=timezone.now()
+        )
         ProductFavouriteFactory(user=self.user, product=product)
 
         self._bearer(["favourites:read"])
@@ -213,6 +221,7 @@ class AgentAPITestCase(APITestCase):
         row = response.data[0]
         self.assertIsNone(row["prior_price"])
         self.assertIsNone(row["announced_discount_percent"])
+        self.assertIsNone(row["reduction_started_at"])
 
     def test_favourites_requires_scope(self) -> None:
         self._bearer(["profile"])

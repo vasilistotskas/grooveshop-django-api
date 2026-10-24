@@ -118,6 +118,7 @@ class ProductVariantsActionTestCase(APITestCase):
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
             "main_image_path",
             "attribute_values",
         }
@@ -130,6 +131,7 @@ class ProductVariantsActionTestCase(APITestCase):
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
         ):
             self.assertEqual(variant[field], product[field], field)
         self.assertIsNotNone(variant["effective_price"])

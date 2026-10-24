@@ -128,6 +128,7 @@ What it cannot know:
 | Field | Where | Meaning |
 |---|---|---|
 | `priorPrice` | `ProductSerializer`, search hits, Meilisearch `prior_price` | the reference, null when nothing may be announced |
+| `reductionStartedAt` | `ProductSerializer`, `ProductVariantSerializer`, `AgentFavouriteSerializer` (one field, `AnnouncedReductionStartField`, in `EffectivePriceFieldsSerializer`) | when the reduction in force began; null exactly when `priorPrice` is, because `Product.reduction_started_at` is also set for a reduction that announces nothing. Not in search hits: they are index documents, and the field would need a Meilisearch attribute and a reindex |
 | `effectivePrice` | `ProductSerializer`, search hits | what the customer pays now, promotions included |
 | `announcedDiscountPercent` | `ProductSerializer`, search hits, Meilisearch `announced_discount_percent` | integer percent from `priorPrice` to `effectivePrice`, null with no announcement |
 | `effectivePrice`, `priorPrice`, `announcedDiscountPercent` | `AgentFavouriteSerializer` (`/api/v1/agent/me/favourites`) | the same three fields, one definition (`EffectivePriceFieldsSerializer`) shared with `ProductSerializer`; the row's `finalPrice` is **deprecated** there, to go once the agent gateway reads `effectivePrice` |

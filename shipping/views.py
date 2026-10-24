@@ -5,12 +5,16 @@
 * ``GET /api/v1/shipping/free-shipping-info`` — per-carrier free-
   shipping thresholds + aggregate min/max for the storefront's
   "Δωρεάν μεταφορικά άνω των X €" line on the PDP and cart summary.
+* ``GET /api/v1/shipping/policy`` — the store's standing shipping
+  policy (one row per provider × kind × country it offers), for the
+  storefront's Organization structured data.
 * ``GET /api/v1/shipping/providers`` — admin-only list of provider rows
   for diagnostics.
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
@@ -22,12 +26,14 @@ from cart.services import cart_item_pairs
 from cart.views.cart import CART_TOKEN_HEADERS
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
+from core.utils.views import cache_methods
 from shipping.models import ShippingProvider
 from shipping.serializers import (
     FreeShippingInfoQuerySerializer,
     FreeShippingInfoSerializer,
     ShippingOptionSerializer,
     ShippingOptionsQuerySerializer,
+    ShippingPolicyEntrySerializer,
     ShippingProviderSerializer,
 )
 from shipping.services import ShippingService
@@ -174,6 +180,38 @@ class FreeShippingInfoView(APIView):
             country_code=country_code,
         )
         serializer = FreeShippingInfoSerializer(info)
+        return Response(serializer.data)
+
+
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["get"])
+class ShippingPolicyView(APIView):
+    """The store's standing shipping policy.
+
+    Read-only and public. Built from the same eligibility as the
+    checkout's options (``ShippingService.offered_rates``) but with no
+    cart, weight or order value, so every shopper gets the same answer
+    and it is cached like the other public catalogue reads.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        operation_id="getShippingPolicy",
+        summary="The store's shipping policy",
+        description=(
+            "One row per (provider, kind, country) the store actually "
+            "ships: the rate's price, free-shipping threshold, delivery "
+            "estimate and weight cap. Eligibility is the checkout's own, "
+            "so a row appears here exactly when checkout would offer it "
+            "to that country."
+        ),
+        responses=ShippingPolicyEntrySerializer(many=True),
+        tags=["Shipping"],
+    )
+    def get(self, request: Request) -> Response:
+        serializer = ShippingPolicyEntrySerializer(
+            ShippingService.shipping_policy(), many=True
+        )
         return Response(serializer.data)
 
 

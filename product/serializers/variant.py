@@ -43,6 +43,7 @@ class ProductVariantSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "reduction_started_at",
             "main_image_path",
             "attribute_values",
         )

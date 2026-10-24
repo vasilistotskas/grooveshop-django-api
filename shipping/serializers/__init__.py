@@ -7,6 +7,7 @@ from shipping.serializers.option import (
     ShippingOptionSerializer,
     ShippingOptionsQuerySerializer,
 )
+from shipping.serializers.policy import ShippingPolicyEntrySerializer
 from shipping.serializers.provider import ShippingProviderSerializer
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "FreeShippingProviderEntrySerializer",
     "ShippingOptionSerializer",
     "ShippingOptionsQuerySerializer",
+    "ShippingPolicyEntrySerializer",
     "ShippingProviderSerializer",
 ]

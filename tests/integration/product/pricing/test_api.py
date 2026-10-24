@@ -84,6 +84,40 @@ class TestProductApi:
         assert body["announcedDiscountPercent"] == 20
         assert "discountPercent" not in body
 
+    def test_detail_says_when_the_announced_reduction_began(
+        self, category, vat
+    ):
+        product = reduced_product(category, vat)
+
+        body = (
+            APIClient()
+            .get(reverse("product-detail", kwargs={"pk": product.pk}))
+            .json()
+        )
+
+        assert datetime.fromisoformat(body["reductionStartedAt"]) == (
+            MARKED_DOWN
+        )
+
+    def test_a_reduction_with_no_prior_price_shows_no_start(
+        self, category, vat
+    ):
+        # ``reduction_started_at`` is also set for a reduction that
+        # announces nothing; exposing it would date an announcement
+        # that is not made.
+        product = reduced_product(category, vat)
+        assert product.reduction_started_at is not None
+        type(product).objects.filter(pk=product.pk).update(prior_price=None)
+
+        body = (
+            APIClient()
+            .get(reverse("product-detail", kwargs={"pk": product.pk}))
+            .json()
+        )
+
+        assert body["priorPrice"] is None
+        assert body["reductionStartedAt"] is None
+
     def test_a_product_that_is_not_reduced_announces_nothing(
         self, category, vat
     ):
@@ -96,6 +130,7 @@ class TestProductApi:
         body = response.json()
         assert body["priorPrice"] is None
         assert body["announcedDiscountPercent"] is None
+        assert body["reductionStartedAt"] is None
         assert body["effectivePrice"] == 124.0
 
     def test_a_young_product_with_a_markdown_announces_nothing(
@@ -171,6 +206,7 @@ class TestProductApi:
             "priorPrice",
             "effectivePrice",
             "announcedDiscountPercent",
+            "reductionStartedAt",
         ):
             assert "deprecated" not in properties[name]
 

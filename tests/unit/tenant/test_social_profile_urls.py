@@ -253,12 +253,9 @@ def test_the_migration_logs_each_cleared_value(caplog):
     with caplog.at_level("WARNING", logger=migration.logger.name):
         migration.blank_non_profile_socials(apps, SCHEMA_EDITOR)
 
-    assert any(
-        "mig_social_logged" in message
-        and "socials_twitter" in message
-        and "https://twitter.com" in message
-        for message in caplog.messages
-    )
+    assert [record.args for record in caplog.records] == [
+        ("mig_social_logged", "socials_twitter", "https://twitter.com")
+    ]
 
 
 def test_the_migration_reverses_as_a_no_op():

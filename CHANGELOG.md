@@ -3,6 +3,40 @@
 
 
 
+## v3.150.0 (2026-10-24)
+
+### Features
+
+* feat(product): serve a product's price history (#319)
+
+Add GET /api/v1/product/{id}/price-history returning every
+ProductPriceSpell of the product, oldest first, with the store currency.
+Visibility follows the product detail route (active, not soft-deleted
+unless the caller is store staff).
+
+Gate it behind a new price_history store feature, switched by
+PRICE_HISTORY_ENABLED (default on), exposed in TenantConfig.features and
+answering 404 when off. Register the storefront's product-price-history
+handler on the products cache surface so spell writes purge it.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ab3ca75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab3ca753e7ba1ea13d2dca8f31bddc89fa928759))
+
+* feat(product): expose variant flag, group title and image paths on products (#318)
+
+Add three read-only response fields Google Merchant Center feeds need:
+attributes[].isVariant (the Attribute.is_variant axis flag),
+variantGroupTitle (the variant group's name in the request language,
+null without a group or name) and imagePaths (every image, main first
+then sort_order, in the main_image_path format).
+
+Product.with_ordered_images() replaces with_main_image() on every
+queryset that feeds ProductSerializer (catalogue list/detail, cart,
+order, favourite, review) so the page stays one image query, and
+with_variant_group() joins the group with its translations. The detail
+queryset now also prefetches product attributes.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`09ae398`](https://github.com/vasilistotskas/grooveshop-django-api/commit/09ae3983476b04c9eb180605d6604c304d1b129e))
+
 ## v3.149.0 (2026-10-24)
 
 ### Bug fixes

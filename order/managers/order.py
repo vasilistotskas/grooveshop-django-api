@@ -127,7 +127,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def _enriched_items_prefetch(self) -> Prefetch:
         """Prefetch ``items`` with each item's product enriched for the
         embedded ``ProductSerializer`` — translations, category/vat/brand,
-        review/likes counts, main image and attributes — so serializing the
+        review/likes counts, images, variant group and attributes — so serializing the
         order's line items stays O(1) queries (G0226).
 
         Both the list (``OrderSerializer``) and detail
@@ -145,7 +145,8 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             Product.objects.with_translations()
             .with_category()
             .with_counts()
-            .with_main_image()
+            .with_ordered_images()
+            .with_variant_group()
             .with_product_attributes()
         )
         return Prefetch(

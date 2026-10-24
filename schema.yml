@@ -44190,6 +44190,11 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        imagePaths:
+          type: array
+          items:
+            type: string
+          readOnly: true
         reviewAverage:
           type: number
           format: double
@@ -44227,6 +44232,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/OfferKindEnum'
           - $ref: '#/components/schemas/NullEnum'
+        variantGroupTitle:
+          type: string
+          nullable: true
+          readOnly: true
       required:
       - announcedDiscountPercent
       - attributes
@@ -44237,6 +44246,7 @@ components:
       - effectivePrice
       - finalPrice
       - id
+      - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
@@ -44250,6 +44260,7 @@ components:
       - updatedAt
       - uuid
       - variantGroup
+      - variantGroupTitle
       - vatPercent
       - vatValue
       - viewCount
@@ -44368,6 +44379,9 @@ components:
           type: string
           description: Return translated attribute name.
           readOnly: true
+        isVariant:
+          type: boolean
+          readOnly: true
         attributeValueId:
           type: integer
         value:
@@ -44385,6 +44399,7 @@ components:
       - attributeValueId
       - createdAt
       - id
+      - isVariant
       - value
     ProductBrief:
       type: object
@@ -44980,6 +44995,11 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        imagePaths:
+          type: array
+          items:
+            type: string
+          readOnly: true
         reviewAverage:
           type: number
           format: double
@@ -45017,6 +45037,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/OfferKindEnum'
           - $ref: '#/components/schemas/NullEnum'
+        variantGroupTitle:
+          type: string
+          nullable: true
+          readOnly: true
         priceDropAlertsEnabled:
           type: boolean
           readOnly: true
@@ -45035,6 +45059,7 @@ components:
       - effectivePrice
       - finalPrice
       - id
+      - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
@@ -45049,6 +45074,7 @@ components:
       - updatedAt
       - uuid
       - variantGroup
+      - variantGroupTitle
       - vatPercent
       - vatValue
       - viewCount
@@ -45201,6 +45227,11 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        imagePaths:
+          type: array
+          items:
+            type: string
+          readOnly: true
         reviewAverage:
           type: number
           format: double
@@ -45238,6 +45269,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/OfferKindEnum'
           - $ref: '#/components/schemas/NullEnum'
+        variantGroupTitle:
+          type: string
+          nullable: true
+          readOnly: true
         priceDropAlertsEnabled:
           type: boolean
           readOnly: true
@@ -45256,6 +45291,7 @@ components:
       - effectivePrice
       - finalPrice
       - id
+      - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
@@ -45270,6 +45306,7 @@ components:
       - updatedAt
       - uuid
       - variantGroup
+      - variantGroupTitle
       - vatPercent
       - vatValue
       - viewCount
@@ -46106,6 +46143,11 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        imagePaths:
+          type: array
+          items:
+            type: string
+          readOnly: true
         reviewAverage:
           type: number
           format: double
@@ -46143,6 +46185,10 @@ components:
           oneOf:
           - $ref: '#/components/schemas/OfferKindEnum'
           - $ref: '#/components/schemas/NullEnum'
+        variantGroupTitle:
+          type: string
+          nullable: true
+          readOnly: true
         priceDropAlertsEnabled:
           type: boolean
           readOnly: true
@@ -46166,6 +46212,7 @@ components:
       - effectivePrice
       - finalPrice
       - id
+      - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
@@ -46181,6 +46228,7 @@ components:
       - updatedAt
       - uuid
       - variantGroup
+      - variantGroupTitle
       - vatPercent
       - vatValue
       - viewCount

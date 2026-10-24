@@ -110,6 +110,12 @@ class ProductSerializer(
     attributes = ProductAttributeSerializer(
         source="product_attributes", many=True, read_only=True
     )
+    # The group's translated name, in the request language. ``null``
+    # without a group or without a name.
+    variant_group_title = serializers.SerializerMethodField()
+    image_paths = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
     # Reads the ``with_offer_kind()`` annotation and nothing else: a
     # product nested in a cart, order or favourite line comes from a
     # queryset without it, and resolving it per row would add a query to
@@ -150,6 +156,7 @@ class ProductSerializer(
             "announced_discount_percent",
             "reduction_started_at",
             "main_image_path",
+            "image_paths",
             "review_average",
             "review_count",
             "likes_count",
@@ -158,6 +165,7 @@ class ProductSerializer(
             "uuid",
             "attributes",
             "offer_kind",
+            "variant_group_title",
         )
 
         read_only_fields = (
@@ -173,6 +181,7 @@ class ProductSerializer(
             "announced_discount_percent",
             "reduction_started_at",
             "main_image_path",
+            "image_paths",
             "review_average",
             "review_count",
             "likes_count",
@@ -183,6 +192,12 @@ class ProductSerializer(
             "uuid",
             "attributes",
         )
+
+    def get_variant_group_title(self, obj: Product) -> str | None:
+        group = obj.variant_group
+        if group is None:
+            return None
+        return group.safe_translation_getter("name") or None
 
     @cached_property
     def reviews_visible(self) -> bool:

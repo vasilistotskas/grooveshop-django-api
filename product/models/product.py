@@ -38,6 +38,7 @@ from core.units import DistanceUnits, WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
 from core.weight import zero_weight
 from meili.models import IndexMixin
+from product.managers.image import ORDERED_IMAGES
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
 from search.transliteration import (
@@ -575,10 +576,35 @@ class Product(
         return f"/products/{self.id}/{self.slug}"
 
     @property
+    def ordered_images(self) -> list[ProductImage]:
+        """Every image in display order: the main image, then ``sort_order``.
+
+        Reads the ``with_ordered_images()`` prefetch when the queryset
+        supplied it, so a serialized page stays O(1) queries.
+        """
+        prefetched = getattr(self, "_prefetched_images", None)
+        if prefetched is not None:
+            return prefetched
+        return list(
+            ProductImage.objects.filter(product_id=self.id).order_by(
+                *ORDERED_IMAGES
+            )
+        )
+
+    @property
+    def image_paths(self) -> list[str]:
+        """Storage path of every image, in the ``main_image_path`` format."""
+        return [image.main_image_path for image in self.ordered_images]
+
+    @property
     def main_image_path(self) -> str:
-        # Use prefetched main images if available (from for_list() queryset)
+        # Use prefetched images if available (from the queryset optimizers)
         # to avoid an N+1 query per product
         prefetched = getattr(self, "_prefetched_main_images", None)
+        if prefetched is None:
+            prefetched = getattr(self, "_prefetched_images", None)
+            if prefetched is not None:
+                prefetched = [i for i in prefetched if i.is_main]
         if prefetched is not None:
             product_image = prefetched[0] if prefetched else None
         else:

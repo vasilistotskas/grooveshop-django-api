@@ -11,6 +11,11 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
         source="attribute_value.attribute.id", read_only=True
     )
     attribute_name = serializers.SerializerMethodField()
+    # The axis flag: items of one variant group differ by the attributes
+    # flagged here (same notion as the ``variants`` action).
+    is_variant = serializers.BooleanField(
+        source="attribute_value.attribute.is_variant", read_only=True
+    )
     attribute_value_id = serializers.IntegerField(source="attribute_value.id")
     value = serializers.SerializerMethodField(
         method_name="get_translated_value"
@@ -22,6 +27,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             "id",
             "attribute_id",
             "attribute_name",
+            "is_variant",
             "attribute_value_id",
             "value",
             "created_at",
@@ -30,6 +36,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             "id",
             "attribute_id",
             "attribute_name",
+            "is_variant",
             "value",
             "created_at",
         ]

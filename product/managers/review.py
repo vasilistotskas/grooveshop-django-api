@@ -12,6 +12,7 @@ from core.managers import (
     TranslatableOptimizedQuerySet,
 )
 from product.enum.review import ReviewStatus
+from product.managers.image import ORDERED_IMAGES
 
 if TYPE_CHECKING:
     from typing import Self
@@ -53,19 +54,24 @@ class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
         return self.select_related("user")
 
     def with_product(self) -> Self:
-        """Select related product with translations and its main image.
+        """Select related product with translations, its images and its
+        variant group.
 
-        The main image lands in ``_prefetched_main_images``, which
-        ``Product.main_image_path`` reads instead of querying per row.
+        The images land in ``_prefetched_images``, which
+        ``Product.main_image_path`` and ``Product.image_paths`` read
+        instead of querying per row.
         """
         from product.models.image import ProductImage
 
-        return self.select_related("product").prefetch_related(
+        return self.select_related(
+            "product", "product__variant_group"
+        ).prefetch_related(
             "product__translations",
+            "product__variant_group__translations",
             Prefetch(
                 "product__images",
-                queryset=ProductImage.objects.filter(is_main=True),
-                to_attr="_prefetched_main_images",
+                queryset=ProductImage.objects.order_by(*ORDERED_IMAGES),
+                to_attr="_prefetched_images",
             ),
         )
 

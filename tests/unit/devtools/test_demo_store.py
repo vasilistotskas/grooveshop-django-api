@@ -1636,7 +1636,7 @@ def demo_tenant(db):
 
 
 class TestBranding:
-    """`seed_branding` gives the demo store its favicon on its OWN host.
+    """`seed_branding` gives the demo store its favicon and logo on its OWN host.
 
     Without one the storefront answers `/favicon.ico` with a 404 by
     design, which every browser logs and Lighthouse reports. The URL has
@@ -1654,11 +1654,25 @@ class TestBranding:
             return type(tenant).objects.get(pk=tenant.pk).favicon_url
 
     def test_points_the_favicon_at_the_primary_domain(self, demo_tenant):
-        assert demo_store.seed_branding() == {"updated": 3}
+        assert demo_store.seed_branding() == {"updated": 5}
 
         assert (
             self._favicon_url(demo_tenant)
             == "https://demo.example.test/img/tenants/demo/favicon-512x512.png"
+        )
+
+    def test_points_both_logos_at_the_primary_domain(self, demo_tenant):
+        from django_tenants.utils import get_public_schema_name, schema_context
+
+        demo_store.seed_branding()
+
+        with schema_context(get_public_schema_name()):
+            stored = type(demo_tenant).objects.get(pk=demo_tenant.pk)
+        assert stored.logo_light_url == (
+            "https://demo.example.test/img/tenants/demo/logo-light.png"
+        )
+        assert stored.logo_dark_url == (
+            "https://demo.example.test/img/tenants/demo/logo-dark.png"
         )
 
     def test_gives_the_store_its_line(self, demo_tenant):

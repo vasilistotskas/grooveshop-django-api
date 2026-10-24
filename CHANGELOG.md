@@ -3,6 +3,24 @@
 
 
 
+## v3.150.1 (2026-10-24)
+
+### Bug fixes
+
+* fix(product): variant group names are public titles (#320)
+
+ProductVariantGroup.name is exposed as variantGroupTitle and published to
+Google Merchant Center as the item group title, so it is shopper-facing,
+not an admin label. Document that on the model and the field (help_text,
+el + en catalogue entries), and seed the demo store's groups with real
+product titles in both languages instead of their slug keys.
+
+The rows' variant_group keys stay stable identifiers, mapped to the public
+names by VARIANT_GROUP_NAMES. group_for looks a group up by its public
+Greek name and rewrites both translations on every run.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3804804`](https://github.com/vasilistotskas/grooveshop-django-api/commit/380480451f29c278434148aa50114ce538a2347f))
+
 ## v3.150.0 (2026-10-24)
 
 ### Features

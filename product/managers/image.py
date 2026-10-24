@@ -15,6 +15,9 @@ from core.managers import (
 if TYPE_CHECKING:
     from typing import Self
 
+# A product's display order: the main image first, then ``sort_order``.
+ORDERED_IMAGES = ("-is_main", "sort_order", "id")
+
 
 class ProductImageQuerySet(TranslatableOptimizedQuerySet):
     """

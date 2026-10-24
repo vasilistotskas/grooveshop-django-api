@@ -23,6 +23,7 @@ from core.managers import (
 )
 from core.mixins import SoftDeleteQuerySetMixin
 from product.enum.review import ReviewStatus
+from product.managers.image import ORDERED_IMAGES
 
 if TYPE_CHECKING:
     from typing import Self
@@ -96,9 +97,28 @@ class ProductQuerySet(
             )
         )
 
-    def with_images(self) -> Self:
-        """Prefetch product images with translations."""
-        return self.prefetch_related("images__translations")
+    def with_ordered_images(self) -> Self:
+        """Prefetch every image in display order (main first).
+
+        Feeds ``Product.image_paths`` and ``Product.main_image_path``
+        from one query, so a serializer that shows both stays O(1).
+        """
+        from product.models.image import ProductImage
+
+        return self.prefetch_related(
+            Prefetch(
+                "images",
+                queryset=ProductImage.objects.order_by(*ORDERED_IMAGES),
+                to_attr="_prefetched_images",
+            )
+        )
+
+    def with_variant_group(self) -> Self:
+        """Select the variant group and prefetch its translations, for
+        ``variant_group_title``."""
+        return self.select_related("variant_group").prefetch_related(
+            "variant_group__translations"
+        )
 
     def with_tags(self) -> Self:
         """Prefetch product tags with translations."""
@@ -226,7 +246,8 @@ class ProductQuerySet(
             .with_category()
             .with_counts()
             .with_announced_discount_percent()
-            .with_main_image()
+            .with_ordered_images()
+            .with_variant_group()
             .with_product_attributes()
         )
 
@@ -234,7 +255,7 @@ class ProductQuerySet(
         """
         Optimized queryset for detail views.
 
-        Includes translations, category, counts, images and tags.
+        Includes translations, category, counts, images, attributes and tags.
         Does NOT filter by active status - allows viewing/editing any product by ID.
         """
         return (
@@ -242,7 +263,9 @@ class ProductQuerySet(
             .with_translations()
             .with_category()
             .with_counts()
-            .with_images()
+            .with_ordered_images()
+            .with_variant_group()
+            .with_product_attributes()
             .with_tags()
         )
 

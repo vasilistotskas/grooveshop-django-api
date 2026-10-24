@@ -28,10 +28,8 @@ class CartItemQuerySet(OptimizedQuerySet):
     def _with_enriched_product(self) -> Self:
         """Prefetch ``product`` with everything the embedded
         ``ProductSerializer`` renders — translations, category/vat/brand,
-        review/likes counts, the main image and attributes — so serializing N
-        cart items stays O(1) queries (G0088). The serializer exposes
-        ``main_image_path`` (not a full image list), so ``with_main_image()``
-        is exactly what feeds it.
+        review/likes counts, the images, variant group and attributes — so
+        serializing N cart items stays O(1) queries (G0088).
 
         The Product optimizers are composed directly rather than via
         ``Product.objects.for_list()`` because that filters to active
@@ -44,7 +42,8 @@ class CartItemQuerySet(OptimizedQuerySet):
             Product.objects.with_translations()
             .with_category()
             .with_counts()
-            .with_main_image()
+            .with_ordered_images()
+            .with_variant_group()
             .with_product_attributes()
         )
         return self.prefetch_related(

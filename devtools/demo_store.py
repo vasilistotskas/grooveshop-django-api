@@ -43,6 +43,7 @@ from devtools.demo_blog import seed_blog as _seed_blog
 from devtools.demo_catalogue import (
     CATEGORIES,
     PRODUCTS,
+    VARIANT_GROUP_NAMES,
     arrival_days_ago,
     arrival_hour,
     specs_for,
@@ -1687,16 +1688,20 @@ def seed_products() -> dict[str, int]:
     )
 
     def group_for(key: str) -> ProductVariantGroup:
-        # Found by its key (the Greek name it was created with), so a
-        # re-seed reuses the group instead of minting a new one per run.
+        # Found by its public Greek name, so a re-seed reuses the group
+        # instead of minting a new one per run; both languages are
+        # rewritten every time so an edited name lands in place.
         if key not in groups:
+            name_el, name_en = VARIANT_GROUP_NAMES[key]
             group = ProductVariantGroup.objects.filter(
-                translations__language_code="el", translations__name=key
+                translations__language_code="el", translations__name=name_el
             ).first()
             if group is None:
                 group = ProductVariantGroup(active=True)
-                _translate(group, "el", name=key)
-                group.save()
+            _translate(group, "el", name=name_el)
+            group.save()
+            _translate(group, "en", name=name_en)
+            group.save()
             groups[key] = group
         return groups[key]
 

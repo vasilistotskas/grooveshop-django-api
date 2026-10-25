@@ -235,6 +235,11 @@ msgstr[0] "%(count)s προγραμματισμένη εργασία ενεργ�
 msgstr[1] "%(count)s προγραμματισμένες εργασίες ενεργές"
 
 #, python-format
+msgctxt "return window"
+msgid "%(days)s days"
+msgstr "%(days)s ημέρες"
+
+#, python-format
 msgid "%(days)sd"
 msgstr "%(days)sημ"
 
@@ -5887,6 +5892,10 @@ msgstr "Google Pay"
 
 msgid "Google Search Console verification token (the content of the google-site-verification meta tag). Empty → not emitted."
 msgstr "Token επαλήθευσης Google Search Console (το περιεχόμενο του meta tag google-site-verification). Κενό → δεν προστίθεται."
+
+#, python-format
+msgid "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
+msgstr "Η Google ενημερώνεται για τους όρους επιστροφών σας από τις Ρυθμίσεις καταστήματος, όχι από αυτή τη σελίδα: προθεσμία επιστροφής %(window)s (RETURN_WINDOW_DAYS), μεταφορικά επιστροφής %(fees)s (RETURN_FEES). Αν αλλάξατε κάποιο από τα δύο εδώ, αλλάξτε και τη ρύθμιση."
 
 msgid "Google site verification"
 msgstr "Επαλήθευση ιστότοπου Google"
@@ -14429,8 +14438,17 @@ msgstr "χωρίς λήξη"
 msgid "none yet"
 msgstr "κανένα ακόμη"
 
+msgid "not stated"
+msgstr "δεν έχει οριστεί"
+
 msgid "order"
 msgstr "παραγγελία"
+
+msgid "paid by the customer"
+msgstr "τα πληρώνει ο πελάτης"
+
+msgid "paid by the store"
+msgstr "τα πληρώνει το κατάστημα"
 
 #, python-brace-format
 msgid "payment intent is in an invalid state: {status}"

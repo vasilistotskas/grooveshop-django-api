@@ -114,6 +114,14 @@ def test_the_demo_account_credentials_are_public_and_empty_by_default():
     assert values["DEMO_ACCOUNT_PASSWORD"] == ""
 
 
+def test_the_return_terms_are_public_and_not_stated_by_default():
+    """A store states no return window or fees until its admin sets them."""
+    values = _public_settings()
+
+    assert values["RETURN_WINDOW_DAYS"] == "0"
+    assert values["RETURN_FEES"] == ""
+
+
 def test_the_announcement_bar_is_public_and_empty_by_default():
     """Operator text rendered on every page, so public by construction."""
     values = _public_settings()

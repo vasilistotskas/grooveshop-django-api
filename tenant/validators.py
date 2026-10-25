@@ -88,6 +88,29 @@ def validate_dispatch_cutoff_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# RETURN_WINDOW_DAYS / RETURN_FEES extra_settings
+# ---------------------------------------------------------------------------
+
+# Who pays to send a return back: the return is free to the customer, or
+# the customer pays its shipping. Empty = the store has not said.
+RETURN_FEES_CHOICES = frozenset({"", "free", "customer"})
+
+
+def validate_return_window_days_setting(value: object) -> bool:
+    """django-extra-settings validator for ``RETURN_WINDOW_DAYS``.
+
+    A whole number of days, 0 for "not stated" (the storefront then
+    states only the link to the return-policy page).
+    """
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def validate_return_fees_setting(value: object) -> bool:
+    """django-extra-settings validator for ``RETURN_FEES``."""
+    return value is None or value in RETURN_FEES_CHOICES
+
+
+# ---------------------------------------------------------------------------
 # STORE_OFFICES extra_setting
 # ---------------------------------------------------------------------------
 

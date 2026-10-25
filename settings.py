@@ -2472,6 +2472,30 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "RETURN_WINDOW_DAYS",
+        "type": "int",
+        "value": 0,
+        "validator": "tenant.validators.validate_return_window_days_setting",
+        "description": (
+            "Days after delivery a customer can return a product, as the "
+            "return-policy page states it. The storefront gives it to "
+            "Google as the store's return policy for every country it "
+            "ships to. 0 = not stated: only the link to the return-policy "
+            "page is given."
+        ),
+    },
+    {
+        "name": "RETURN_FEES",
+        "type": "string",
+        "value": "",
+        "validator": "tenant.validators.validate_return_fees_setting",
+        "description": (
+            "Who pays to send a return back: 'free' (the store pays) or "
+            "'customer' (the customer pays the return shipping). Given to "
+            "Google with RETURN_WINDOW_DAYS. Empty = not stated."
+        ),
+    },
+    {
         "name": "GIFT_CARDS_ENABLED",
         "type": "bool",
         "value": False,

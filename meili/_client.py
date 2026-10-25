@@ -194,9 +194,21 @@ class Client:
     def get_index(self, index_name: str):
         return self.client.index(index_name)
 
+    def tenant_search_client(self) -> _Client:
+        """The read-only client for the schema this request runs in.
+
+        Every public search reads through it, so a store's queries run
+        on a token that can only see that store's indexes.
+        """
+        from django.db import connection
+
+        return self.search_client_for_schema(
+            getattr(connection, "schema_name", "public")
+        )
+
     def get_search_index(self, index_name: str):
-        """Return an index handle bound to the read-only search client."""
-        return self.search_client.index(index_name)
+        """Return an index handle bound to the tenant's search client."""
+        return self.tenant_search_client().index(index_name)
 
     def wait_for_task(
         self,

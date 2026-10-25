@@ -503,7 +503,9 @@ class IndexQuerySet[T: IndexMixin]:
             }
             for group in groups
         )
-        main, *counts = client.search_client.multi_search(queries)["results"]
+        main, *counts = client.tenant_search_client().multi_search(queries)[
+            "results"
+        ]
 
         distribution = main.setdefault("facetDistribution", {})
         for group, counted in zip(groups, counts, strict=True):

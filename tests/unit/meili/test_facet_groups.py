@@ -42,7 +42,7 @@ def engine():
 
 
 def _multi_search(client, *results):
-    client.search_client.multi_search.return_value = {
+    client.tenant_search_client.return_value.multi_search.return_value = {
         "results": [{"hits": [], **result} for result in results]
     }
 
@@ -100,20 +100,22 @@ class TestSearchWithGroupCounts:
         self._queryset(facets=("category",)).search("q")
 
         engine.get_search_index.return_value.search.assert_called_once()
-        engine.search_client.multi_search.assert_not_called()
+        engine.tenant_search_client.return_value.multi_search.assert_not_called()
 
     def test_no_groups_is_a_plain_search(self, engine):
         IndexQuerySet(FacetModel).set_facets(FACET).search("q")
 
         engine.get_search_index.return_value.search.assert_called_once()
-        engine.search_client.multi_search.assert_not_called()
+        engine.tenant_search_client.return_value.multi_search.assert_not_called()
 
     def test_one_count_query_per_group_leaves_out_its_own_clause(self, engine):
         _multi_search(engine, {}, {}, {})
 
         self._queryset().search("blue")
 
-        (queries,) = engine.search_client.multi_search.call_args.args
+        (queries,) = (
+            engine.tenant_search_client.return_value.multi_search.call_args.args
+        )
         main, first, second = queries
         assert main["indexUid"] == "facet_index"
         assert main["q"] == "blue"
@@ -143,7 +145,9 @@ class TestSearchWithGroupCounts:
 
         self._queryset().matching_strategy("all").locales("el").search("q")
 
-        (queries,) = engine.search_client.multi_search.call_args.args
+        (queries,) = (
+            engine.tenant_search_client.return_value.multi_search.call_args.args
+        )
         for query in queries:
             assert query["matchingStrategy"] == "all"
             assert query["locales"] == ["el"]

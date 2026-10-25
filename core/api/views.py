@@ -661,6 +661,11 @@ PUBLIC_SETTING_KEYS = frozenset(
         # Storefront's "order before HH:MM" line next to a rate's
         # delivery days.
         "DISPATCH_CUTOFF",
+        # The return terms the storefront's Organization schema.org node
+        # states (with the countries the store ships to), the same terms
+        # the store's public return-policy page gives.
+        "RETURN_WINDOW_DAYS",
+        "RETURN_FEES",
         # Purchase-form bounds for the storefront gift-card page.
         "GIFT_CARD_MIN_AMOUNT",
         "GIFT_CARD_MAX_AMOUNT",

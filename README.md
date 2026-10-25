@@ -7,7 +7,7 @@ Framework. Served as ASGI (Gunicorn managing Uvicorn workers) with real-time Web
 notifications via Django Channels; each store is a django-tenants schema resolved from
 the request host. Uses Knox + Django Allauth for authentication (token API + social/MFA),
 Celery with RabbitMQ broker for background tasks, PostgreSQL 18 for data storage, Redis
-for caching and Channels layer, and Meilisearch for federated search. Features include
+for caching and Channels layer, and Meilisearch for product and blog search. Features include
 multi-language support (Greek, English), Viva Wallet and Stripe payments,
 comprehensive test coverage, and a Django Unfold admin panel.
 
@@ -29,7 +29,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **meta_capi/** — Meta Conversions API event dispatch
 - **agent/** — OAuth-scoped API surface for AI agents (via the agent gateway)
 - **blog/** — Blog posts, categories, comments, authors, and tags
-- **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
+- **search/** — Meilisearch product and blog search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels)
 - **loyalty/** — Points, XP, tiers, and rewards system
@@ -46,7 +46,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 
 - **Authentication and User Management**: Knox token auth for API, Django Allauth for account management with social providers (Google, Facebook, GitHub, Discord), MFA/WebAuthn/Passkeys support
 - **Multi-Language Support**: django-parler translations for Greek (default) and English
-- **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking
+- **Advanced Search and Filtering**: Meilisearch-powered product and blog search with Greeklish support, instant search, and analytics tracking
 - **Payments**: Viva Wallet (primary) and Stripe via dj-stripe, plus offline
   methods such as cash on delivery. Credentials are per-tenant
 - **Loyalty System**: Points, XP, tiers, and rewards

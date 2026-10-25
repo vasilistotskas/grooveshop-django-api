@@ -29,8 +29,6 @@ from core.api.permissions import IsStoreStaff
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from core.store_settings import store_setting
-from meili._client import client as meili_client
-from meili.querysets import HIGHLIGHT_POST_TAG, HIGHLIGHT_PRE_TAG
 from product.attribute_selection import (
     ATTRIBUTE_VALUES_FIELD,
     AttributeSelection,
@@ -41,7 +39,6 @@ from search.models import SearchClick, SearchQuery
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
     BlogPostTranslationSerializer,
-    FederatedSearchResponseSerializer,
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
     SearchAnalyticsResponseSerializer,
@@ -50,7 +47,6 @@ from search.serializers import (
     TrendingSearchResponseSerializer,
 )
 from tenant.features import feature_on
-from tenant.membership import tenant_plan_allows
 from tenant.permissions import IsBlogEnabled
 
 if TYPE_CHECKING:
@@ -701,297 +697,6 @@ def product_meili_search(request):
 
 
 @extend_schema(  # ty: ignore[invalid-argument-type]
-    summary=_("Federated search across products and blog posts"),
-    description=_(
-        "Search multiple content types simultaneously using Meilisearch "
-        "multi_search API with federation mode. Results are weighted and merged "
-        "with products having weight 1.0 and blog posts having weight 0.7."
-    ),
-    tags=["Search"],
-    responses={
-        200: FederatedSearchResponseSerializer,
-        400: ErrorResponseSerializer,
-    },
-    parameters=[
-        OpenApiParameter(
-            name="query",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            description=_("Search query string"),
-            required=True,
-        ),
-        OpenApiParameter(
-            name="language_code",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            description=_(
-                "Language code to filter results (e.g., 'en', 'el'). "
-                "If not provided, searches all languages."
-            ),
-            required=False,
-        ),
-        OpenApiParameter(
-            name="limit",
-            type=int,
-            location=OpenApiParameter.QUERY,
-            description=_("Maximum total number of results to return"),
-            required=False,
-            default=20,
-        ),
-        OpenApiParameter(
-            name="offset",
-            type=int,
-            location=OpenApiParameter.QUERY,
-            description=_("Number of results to skip"),
-            required=False,
-            default=0,
-        ),
-    ],
-)
-@api_view(["GET"])
-# NOT gated on `IsBlogEnabled`: this endpoint also searches products,
-# and 404-ing it for a blog-disabled tenant would take their product
-# search down with it. The blog INDEX is dropped from the federation
-# instead — see below.
-@permission_classes([AllowAny])
-@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
-def federated_search(request):
-    """
-    Execute federated search using Meilisearch multi_search API.
-
-    Algorithm:
-    1. Parse and validate query parameters
-    2. Apply Greeklish expansion if language_code is 'el'
-    3. Build multi_search queries for ProductTranslation and BlogPostTranslation
-    4. Set federation weights (products: 1.0, blog_posts: 0.7)
-    5. Weight the merged ranking (products 1.0, blog posts 0.7)
-    6. Execute multi_search with federation mode
-    7. Enrich results with Django ORM objects
-    8. Return unified results with content_type field
-    """
-    # Parse and validate query parameters
-    query = request.query_params.get("query")
-    if not query:
-        raise ValidationError(
-            {"error": _("A search query is required.")}, code="query_required"
-        )
-
-    limit = min(
-        _parse_int(request.query_params.get("limit"), 20, "limit"),
-        _get_max_search_limit(),
-    )
-    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
-    language_code = _validate_language_code(
-        request.query_params.get("language_code")
-    )
-
-    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
-    # directly (see search/transliteration.py) — no query rewriting.
-    decoded_query = unquote(query)
-
-    # Build filters for language and content filtering
-    product_filters = []
-    blog_filters = []
-
-    if language_code:
-        escaped_lang = language_code.replace("\\", "\\\\").replace("'", "\\'")
-        product_filters.append(f"language_code = '{escaped_lang}'")
-        blog_filters.append(f"language_code = '{escaped_lang}'")
-
-    # Content filtering: exclude inactive/deleted products
-    product_filters.append("active = true")
-    product_filters.append("is_deleted = false")
-
-    # Content filtering: exclude unpublished blog posts
-    blog_filters.append("is_published = true")
-
-    # A tenant whose plan has `blog_enabled` off must not have its posts
-    # searchable. Indexing does not know about the flag —
-    # `BlogPostTranslation.meili_filter` gates on `is_published` alone —
-    # so the documents are there regardless, and the only place to stop
-    # them surfacing is here. Dropping the index rather than refusing
-    # the request keeps PRODUCT search working for that tenant.
-    queries = [
-        {
-            "indexUid": ProductTranslation.get_meili_index_name(),
-            "q": decoded_query,
-            "filter": product_filters,
-            "showMatchesPosition": True,
-            "showRankingScore": True,
-            "attributesToRetrieve": ["*"],
-            # As IndexQuerySet sends for the single-index endpoints:
-            # without it no hit carries ``_formatted``.
-            "attributesToHighlight": ["*"],
-            "highlightPreTag": HIGHLIGHT_PRE_TAG,
-            "highlightPostTag": HIGHLIGHT_POST_TAG,
-            "federationOptions": {"weight": 1.0},
-        }
-    ]
-    if tenant_plan_allows("blog_enabled"):
-        queries.append(
-            {
-                "indexUid": BlogPostTranslation.get_meili_index_name(),
-                "q": decoded_query,
-                "filter": blog_filters,
-                "showMatchesPosition": True,
-                "showRankingScore": True,
-                "attributesToRetrieve": ["*"],
-                "attributesToHighlight": ["*"],
-                "highlightPreTag": HIGHLIGHT_PRE_TAG,
-                "highlightPostTag": HIGHLIGHT_POST_TAG,
-                "federationOptions": {"weight": 0.7},
-            }
-        )
-
-    # Build multi_search queries with federation
-    try:
-        multi_search_params = {
-            "federation": {
-                "limit": limit,
-                "offset": offset,
-            },
-            "queries": queries,
-        }
-
-        # Execute multi_search with federation via the read-only search
-        # client SCOPED to this tenant's indexes (Meilisearch tenant
-        # token) — the engine refuses cross-tenant index access even if
-        # query-building code ever mis-prefixes an index name.
-        from django.db import connection as _connection
-
-        scoped_search = meili_client.search_client_for_schema(
-            getattr(_connection, "schema_name", "public")
-        )
-        results = scoped_search.multi_search(
-            queries=multi_search_params["queries"],
-            federation=multi_search_params["federation"],
-        )
-        _record_engine_time(request, results.get("processingTimeMs"))
-
-        relaxed_query = None
-        if not results.get("hits") and (
-            relaxed := _relaxed_query(decoded_query)
-        ):
-            # Fresh dicts — never mutate the already-submitted query
-            # objects (callers and tests may still hold references).
-            retry_queries = [
-                {**search_query, "q": relaxed}
-                for search_query in multi_search_params["queries"]
-            ]
-            results = scoped_search.multi_search(
-                queries=retry_queries,
-                federation=multi_search_params["federation"],
-            )
-            _record_engine_time(request, results.get("processingTimeMs"))
-            if results.get("hits"):
-                relaxed_query = relaxed
-
-    except Exception as e:
-        logger.error(f"Federated search failed: {e!s}")
-        raise ValidationError(
-            {"error": _("Search failed. Please try again later.")},
-            code="search_failed",
-        )
-
-    # Extract hits and metadata
-    hits = results.get("hits", [])
-    estimated_total_hits = results.get("estimatedTotalHits", 0)
-
-    # Collect IDs by model type for bulk fetching
-    product_ids = []
-    blog_ids = []
-    hit_metadata = []  # Parallel list of (index_type, obj_id, hit)
-
-    for hit in hits:
-        federation_metadata = hit.get("_federation", {})
-        index_uid = federation_metadata.get("indexUid", "")
-        obj_id = hit.get("id")
-        if not obj_id:
-            continue
-
-        if "ProductTranslation" in index_uid:
-            product_ids.append(obj_id)
-            hit_metadata.append(("product", obj_id, hit))
-        elif "BlogPostTranslation" in index_uid:
-            blog_ids.append(obj_id)
-            hit_metadata.append(("blog", obj_id, hit))
-        else:
-            logger.warning("Unknown index UID: %s", index_uid)
-
-    # Bulk fetch all objects (2 queries instead of N)
-    product_map = {}
-    blog_map = {}
-    if product_ids:
-        # Hydrate through the optimized search queryset so the serializer's
-        # per-hit master.{likes_count, review_average, main_image_path, …}
-        # access doesn't N+1 (G0351).
-        product_map = {
-            obj.pk: obj
-            for obj in ProductTranslation.get_search_result_queryset().filter(
-                pk__in=product_ids
-            )
-        }
-    if blog_ids:
-        # Now that `BlogPostTranslation` defines the optimized
-        # queryset, use it rather than the hand-rolled select_related
-        # this call site had to carry.
-        blog_map = {
-            obj.pk: obj
-            for obj in BlogPostTranslation.get_search_result_queryset().filter(
-                pk__in=blog_ids
-            )
-        }
-
-    # Enrich results preserving original order
-    reviews_visible = feature_on("product_reviews")
-    enriched_results = []
-    for index_type, obj_id, hit in hit_metadata:
-        try:
-            # Meilisearch returns string IDs; map keys are int PKs
-            int_id = int(obj_id)
-            if index_type == "product":
-                obj = product_map.get(int_id)
-                serializer_class = ProductTranslationSerializer
-            else:
-                obj = blog_map.get(int_id)
-                serializer_class = BlogPostTranslationSerializer
-
-            if not obj:
-                continue
-
-            context = {
-                "reviews_visible": reviews_visible,
-                "_formatted": hit.get("_formatted", {}),
-                "_matchesPosition": hit.get("_matchesPosition", {}),
-                "_rankingScore": hit.get("_rankingScore", None),
-            }
-
-            obj_data = serializer_class(obj, context=context).data
-            # Exposed as ``federation`` — a leading underscore gets
-            # mangled by the camelCase renderer ("_federation" ->
-            # "Federation").
-            obj_data["federation"] = hit.get("_federation", {})
-            enriched_results.append(obj_data)
-
-        except Exception as e:
-            logger.error("Error enriching result: %s", e)
-            continue
-
-    # Return response
-    return Response(
-        {
-            "query_id": uuid4(),
-            "relaxed_query": relaxed_query,
-            "limit": limit,
-            "offset": offset,
-            "estimated_total_hits": estimated_total_hits,
-            "results": enriched_results,
-        },
-        status=status.HTTP_200_OK,
-    )
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Log a click on a search result"),
     description=_(
         "Attribute a click on a search result to the query that produced "
@@ -1199,7 +904,7 @@ def search_analytics(request):
 
     # A query counts as zero-result only if it NEVER returned results
     # in the window (HAVING MAX(results_count) = 0): the storefront
-    # fires product/blog/federated sub-searches per user search, each
+    # fires product and blog sub-searches per user search, each
     # logged as its own row, so a per-row results_count=0 filter would
     # list queries whose other lane found plenty.
     zero_result_queries = (

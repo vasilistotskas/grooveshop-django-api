@@ -322,8 +322,8 @@ def requires_meilisearch(obj):
     real indexes, and every one of them assumed the developer's local
     engine already held indexes left over from a dev run. Pointed at the
     empty engine CI starts fresh for every job, product and blog search
-    returned HTTP 500 (``index_not_found``) and federated search HTTP
-    400 (a filter on an index with no ``filterableAttributes``) — 27
+    returned HTTP 500 (``index_not_found``) and the then-federated search
+    HTTP 400 (a filter on an index with no ``filterableAttributes``) — 27
     failures across two shards the first time the availability probe
     stopped mis-reporting the engine as absent.
     """

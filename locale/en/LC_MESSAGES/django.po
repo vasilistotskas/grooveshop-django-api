@@ -4093,9 +4093,6 @@ msgstr "Features"
 msgid "Features Grid"
 msgstr "Features Grid"
 
-msgid "Federated search across products and blog posts"
-msgstr "Federated search across products and blog posts"
-
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 
@@ -7310,9 +7307,6 @@ msgstr "Maximum price filter (effective_price <= value): the price the customer 
 
 msgid "Maximum total hits for pagination (maxTotalHits)"
 msgstr "Maximum total hits for pagination (maxTotalHits)"
-
-msgid "Maximum total number of results to return"
-msgstr "Maximum total number of results to return"
 
 msgid "Maximum values per facet (maxValuesPerFacet)"
 msgstr "Maximum values per facet (maxValuesPerFacet)"
@@ -10819,14 +10813,8 @@ msgstr "Search by order ID, UUID, customer email/name/phone, city, tracking numb
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Search by title, subtitle, slug, body, or author email/username."
 
-msgid "Search failed. Please try again later."
-msgstr "Search failed. Please try again later."
-
 msgid "Search index"
 msgstr "Search index"
-
-msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
-msgstr "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
 
 msgid "Search products using MeiliSearch with support for full-text search, price range, popularity, view count, and category filters. Returns facet distribution and statistics for dynamic filter UI."
 msgstr "Search products using MeiliSearch with support for full-text search, price range, popularity, view count, and category filters. Returns facet distribution and statistics for dynamic filter UI."
@@ -14543,6 +14531,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "False"
 #~ msgstr "False"
 
+#~ msgid "Federated search across products and blog posts"
+#~ msgstr "Federated search across products and blog posts"
+
 #~ msgid "Filter by online payment methods"
 #~ msgstr "Filter by online payment methods"
 
@@ -14566,6 +14557,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"
+
+#~ msgid "Maximum total number of results to return"
+#~ msgstr "Maximum total number of results to return"
 
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
@@ -14612,6 +14606,12 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Review #%(id)s: %(comment)s"
 #~ msgstr "Review #%(id)s: %(comment)s"
+
+#~ msgid "Search failed. Please try again later."
+#~ msgstr "Search failed. Please try again later."
+
+#~ msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
+#~ msgstr "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
 
 #, python-format
 #~ msgid "Setting '%(key)s' not found"

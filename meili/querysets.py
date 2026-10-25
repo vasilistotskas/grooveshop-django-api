@@ -42,8 +42,7 @@ class Point(NamedTuple):
     lng: float | str
 
 
-# The markup every search endpoint wraps a matched term in; the
-# federated search sends the same pair (search/views.py).
+# The markup every search endpoint wraps a matched term in.
 HIGHLIGHT_PRE_TAG = "<mark>"
 HIGHLIGHT_POST_TAG = "</mark>"
 

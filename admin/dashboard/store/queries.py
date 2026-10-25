@@ -346,7 +346,7 @@ def search(key: str) -> dict[str, Any]:
     the query lists also drop fragments under ``SEARCH_MIN_QUERY_LEN``.
     A query found nothing only if it NEVER returned results in the
     window (``MAX(results_count) = 0``): each search is logged as
-    separate product/blog/federated rows, so a per-row test would flag
+    separate product and blog rows, so a per-row test would flag
     queries whose other lane found plenty. Clicks are None until click
     tracking has recorded anything, so the card shows "—" instead of a
     zero nobody measured.

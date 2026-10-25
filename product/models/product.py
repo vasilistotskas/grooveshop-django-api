@@ -814,7 +814,8 @@ class ProductTranslation(
             "κινητό": ["τηλέφωνο"],
         }
         # Same thresholds as BlogPostTranslation — cross-index
-        # consistency matters because both feed the federated search.
+        # consistency matters because the storefront shows both result
+        # lists for one query side by side.
         # The looser historical {3, 5} setting gave 5-char words a
         # two-typo budget, which let first-character noise match
         # ("aroma" → "xroma"); transliteration-convention matching is

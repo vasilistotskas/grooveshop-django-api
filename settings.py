@@ -1731,7 +1731,7 @@ if _meili_master_key == "changeme" and PRODUCTION_PROFILE:
         "MEILI_MASTER_KEY must be set in production "
         "(current value is the insecure default 'changeme')."
     )
-# Read-only search key used for the public query paths (product/blog/federated
+# Read-only search key used for the public query paths (product and blog
 # search). The master key must never serve untrusted search traffic (it can
 # manage keys, indexes and documents). Set MEILI_SEARCH_KEY to Meilisearch's
 # "Default Search API Key" (or a custom search-only key). When unset, the

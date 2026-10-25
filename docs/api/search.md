@@ -12,11 +12,10 @@ attribution, trending queries and per-store analytics.
 - **Response bodies are camelCase.** `CamelCaseJSONRenderer` is the global
   default renderer, so a serializer field `estimated_total_hits` goes out as
   `estimatedTotalHits`. A leading underscore is mangled by the renderer
-  (`_federation` would go out as `Federation`), which is why the search
+  (`_formatted` would go out as `Formatted`), which is why the search
   serializers expose Meilisearch's `_formatted` / `_rankingScore` /
   `_matchesPosition` as plain `formatted` / `ranking_score` /
-  `matches_position` fields, and the federated view renames `_federation`
-  to `federation` explicitly.
+  `matches_position` fields.
 - **Query parameters accept either spelling.** `CamelCaseMiddleWare`
   underscoreizes `request.GET`, so `languageCode` and `language_code` both
   reach the view. The schema advertises the camelCase form.
@@ -28,7 +27,6 @@ attribution, trending queries and per-store analytics.
 
 | Endpoint | Method | Permission |
 |---|---|---|
-| `/api/v1/search/federated` | GET | `AllowAny` |
 | `/api/v1/search/product` | GET | `AllowAny` |
 | `/api/v1/search/blog/post` | GET | `IsBlogEnabled` (404 when the store has blog off) |
 | `/api/v1/search/click` | POST | `AllowAny` |
@@ -38,55 +36,6 @@ attribution, trending queries and per-store analytics.
 `/search/analytics` is **store staff**, not platform superuser: the data is
 per-store, and `is_superuser` read on a tenant host comes off a
 tenant-schema row (see `is_platform_superuser`).
-
----
-
-### Federated search
-
-`GET /api/v1/search/federated`
-
-| Parameter | Type | Required | Default |
-|---|---|---|---|
-| `query` | string | Yes | — |
-| `languageCode` | string | No | — |
-| `limit` | integer | No | 20 (capped by the `SEARCH_MAX_LIMIT` setting, default 100) |
-| `offset` | integer | No | 0 |
-
-Queries the product and blog indexes in one Meilisearch `multi_search` with
-federation weights **1.0 for products and 0.7 for blog posts**. Those are
-relevance multipliers applied when merging the two result sets — not a fixed
-share of the output. When the store's plan has blog off
-(`tenant_plan_allows("blog_enabled")`), the blog index is dropped from the
-federation rather than refusing the request, so product search keeps working.
-
-**Response** (`FederatedSearchResponse`):
-
-```json
-{
-  "queryId": "9a1e6f4c-...",
-  "relaxedQuery": null,
-  "limit": 20,
-  "offset": 0,
-  "estimatedTotalHits": 42,
-  "results": [ ... ]
-}
-```
-
-- `queryId` — mint per response; send it back on `/search/click` to attribute
-  a click to this query.
-- `relaxedQuery` — non-null when the original query returned nothing and the
-  view retried with the leading word dropped (see `_relaxed_query`). It tells
-  you the results belong to a broader query than the one asked.
-- `results` — each item is the serialized product or blog-post translation
-  **flattened**, not wrapped in an `object` key. Every item carries
-  `contentType`, `rankingScore`, `formatted` (every attribute, the matched
-  terms wrapped in `<mark>`, as the single-index endpoints do),
-  `matchesPosition`, and `federation` (`indexUid`, `queriesPosition`,
-  `weightedRankingScore`).
-
-There is **no `processingTimeMs`** on any search response. Meilisearch
-reports one, but the views hand it to the analytics middleware on the
-request (`_record_engine_time`) instead of returning it.
 
 ---
 
@@ -191,8 +140,8 @@ The same class reads the ids for every surface that filters by attribute
 value, so they cannot drift: this search (one `attribute_values IN [...]`
 clause per attribute; a Meilisearch filter list ANDs its elements) and the
 product list's `attributeValue_In` filter (`product/filters/product.py`, one
-subquery per attribute). The federated search has no attribute filter, and the
-agent gateway's catalogue calls reach this endpoint without one.
+subquery per attribute). The agent gateway's catalogue calls reach this
+endpoint without one.
 
 An id that belongs to no attribute (a deleted value in a stale link) is kept as
 a group of its own that matches no product: the request lists nothing instead
@@ -300,7 +249,7 @@ Most popular queries from the last 24 hours, cached 5 minutes per
 |---|---|---|---|
 | `startDate` | `YYYY-MM-DD` | No | all history |
 | `endDate` | `YYYY-MM-DD` | No | now |
-| `contentType` | string | No | — (`product`, `blog_post`, `federated`) |
+| `contentType` | string | No | — (`product`, `blog_post`, `federated`: the federated endpoint's searches until its removal on 2026-10-25) |
 
 Both dates are whole days in the server's `TIME_ZONE` (Europe/Athens by
 default; there is no per-store timezone), and both are included:
@@ -361,7 +310,7 @@ envelope.
 
 ### Rate limiting
 
-The search, product, blog, federated and trending endpoints carry
+The search, product, blog and trending endpoints carry
 `SearchThrottle` (scope `search`); `/search/click` carries
 `SearchClickThrottle` (scope `search_click`), a budget of its own so clicks
 cannot starve searches. Both are per user or IP

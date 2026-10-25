@@ -2,9 +2,10 @@
 Search analytics middleware for tracking search queries.
 
 Records every successful (HTTP 200) response from a search-query
-endpoint (``/api/v1/search/product``, ``/search/blog/post``,
-``/search/federated``) as a ``SearchQuery`` row, written by a Celery task
-so the response is never blocked.
+endpoint (``/api/v1/search/product``, ``/search/blog/post``) as a
+``SearchQuery`` row, written by a Celery task so the response is never
+blocked. Rows recorded as ``federated`` come from the federated
+endpoint, removed 2026-10-25; the content type stays for their history.
 
 Which requests count is decided by the ROUTE that served them, not by
 the path: a ``/search/`` substring also matched the admin's command
@@ -68,7 +69,6 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     _QUERY_ROUTES = {
         "search-product": "product",
         "search-blog-post": "blog_post",
-        "search-federated": "federated",
     }
 
     def _query_route(self, request: HttpRequest) -> str | None:

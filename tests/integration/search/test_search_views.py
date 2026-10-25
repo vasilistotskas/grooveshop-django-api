@@ -301,7 +301,7 @@ class TestAnalyticsMetricsCompleteness:
         assert row["clickThroughRate"] == 1.5  # 3 clicks / 2 searches
 
     def test_zero_result_list_immune_to_lane_split_rows(self, admin_client):
-        """One user search logs separate product/blog/federated rows.
+        """One user search logs separate product and blog rows.
         A query whose blog lane found results must not appear in the
         zero-result list because its product lane logged 0."""
         for content_type, results in (("product", 0), ("blog_post", 11)):
@@ -364,7 +364,6 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
         [
             ("/api/v1/search/product", ["product"]),
             ("/api/v1/search/blog/post", ["post"]),
-            ("/api/v1/search/federated", ["product", "post"]),
         ],
     )
     def test_search_succeeds_when_analytics_logging_fails(
@@ -402,55 +401,6 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
 
         assert response.status_code == status.HTTP_200_OK
         assert [r["id"] for r in response.data["results"]] == [ids["product"]]
-
-
-@pytest.mark.django_db
-class TestFederatedSearchSendsQueryVerbatim:
-    """The engine is mocked: this pins the request the view builds.
-
-    What the engine then returns for a real query is covered by the live
-    tests in ``test_federated_search_integration.py``.
-    """
-
-    def test_federated_search_sends_query_unmodified(self, api_client):
-        """
-        Greek and Greeklish queries must reach Meilisearch verbatim —
-        Greeklish matching happens against the indexed ``*_greeklish``
-        shadow fields, not through query rewriting.
-
-        Validates: Requirements 1.6
-        """
-        with patch(
-            "meili._client.client.search_client.multi_search"
-        ) as mock_multi_search:
-            mock_multi_search.return_value = {
-                "hits": [],
-                "estimatedTotalHits": 0,
-                "processingTimeMs": 30,
-            }
-
-            api_client.get(
-                "/api/v1/search/federated",
-                {
-                    "query": "anavathmisi se windows",
-                    "language_code": "el",
-                    "limit": 20,
-                },
-            )
-
-            assert mock_multi_search.called, "multi_search should be called"
-            # The zero-result relaxed fallback may issue a second call
-            # with the leading word dropped — the FIRST call must carry
-            # the raw query verbatim.
-            first_call = mock_multi_search.call_args_list[0]
-            queries = first_call.kwargs.get("queries") or (
-                first_call[1].get("queries") if len(first_call) > 1 else None
-            )
-
-            assert [query["q"] for query in queries] == [
-                "anavathmisi se windows",
-                "anavathmisi se windows",
-            ], "The raw query must reach both indexes unmodified"
 
 
 @pytest.mark.django_db

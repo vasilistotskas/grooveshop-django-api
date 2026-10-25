@@ -132,13 +132,13 @@ class Client:
             "stopWords": index_settings.stop_words or [],
             "synonyms": index_settings.synonyms or {},
             "distinctAttribute": index_settings.distinct_attribute,
-            # Fallback only — every model that takes part in the federated
-            # search MUST declare its own ``typo_tolerance`` in ``MeiliMeta``.
-            # ProductTranslation and BlogPostTranslation both pin
-            # ``{oneTypo: 4, twoTypos: 8}`` and have to stay identical,
-            # because a federated query is scored across both indexes and
-            # mismatched thresholds make the same word typo-tolerant in one
-            # and not the other. A new searchable model that omits the key
+            # Fallback only — every searchable model MUST declare its own
+            # ``typo_tolerance`` in ``MeiliMeta``. ProductTranslation and
+            # BlogPostTranslation both pin ``{oneTypo: 4, twoTypos: 8}`` and
+            # have to stay identical, because the storefront shows both
+            # result lists for one query side by side and mismatched
+            # thresholds make the same word typo-tolerant in one and not
+            # the other. A new searchable model that omits the key
             # silently lands on the 5/9 below and breaks that.
             "typoTolerance": (
                 index_settings.typo_tolerance

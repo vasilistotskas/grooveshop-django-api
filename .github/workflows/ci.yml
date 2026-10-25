@@ -41,6 +41,38 @@ env:
   OASDIFF_IMAGE: tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
 
 jobs:
+  tested-in-pr:
+    name: Already tested in its PR
+    # A push to main whose tree is exactly what a green pull_request run
+    # tested (the PR branch was up to date with main when it merged) skips
+    # quality, migrations and the test jobs, and goes straight to release.
+    # The rule and its proof: .github/scripts/tested_in_pr.sh. Any other
+    # push, a PR or a dispatch runs everything. The Trivy scan always runs:
+    # its database moves daily, not with the code.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      tested: ${{ steps.check.outputs.tested }}
+    steps:
+      - name: Checkout code
+        if: github.event_name == 'push'
+        uses: actions/checkout@v7
+
+      - name: Same tree as a green PR run
+        id: check
+        if: github.event_name == 'push'
+        # An API error leaves ``tested`` unset, which runs everything: the
+        # cost of a failed check is time, never an untested release.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: bash .github/scripts/tested_in_pr.sh "$GITHUB_SHA" "$BEFORE" >> "$GITHUB_OUTPUT"
+
   security-scan:
     name: Security Scan (Trivy)
     runs-on: ubuntu-latest
@@ -76,6 +108,8 @@ jobs:
 
   quality:
     name: Code Quality
+    needs: tested-in-pr
+    if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -165,6 +199,8 @@ jobs:
 
   migrations:
     name: Migration Check
+    needs: tested-in-pr
+    if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Replays a deploy: the database is migrated at the BASE commit (PR
@@ -297,6 +333,8 @@ jobs:
 
   testing:
     name: Testing
+    needs: tested-in-pr
+    if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -427,7 +465,7 @@ jobs:
         # with only the tests it ran, timed on this runner under this
         # coverage and xdist load; the next steps upload it. To refresh:
         # ``python .github/scripts/merge_test_durations.py`` merges the
-        # four shards of the latest green run on main, then commit the
+        # four shards of the latest green pull_request run, then commit the
         # file. A LOCAL ``--store-durations`` run records a developer
         # machine instead: the 2026-09-26 one estimated the groups
         # within 0.7% of each other and they ran 9-16 minutes on CI.
@@ -482,6 +520,8 @@ jobs:
 
   test-mt:
     name: Testing (multi-tenant lane)
+    needs: tested-in-pr
+    if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
     # Nearly all of the lane is building its two store schemas through
     # the full migration history: locally on 2026-10-22, 244 s for the
@@ -625,8 +665,14 @@ jobs:
           uv run coverage report
 
   release:
-    needs: [quality, migrations, testing, coverage, security-scan]
-    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: [quality, migrations, testing, test-mt, coverage, security-scan]
+    # Skipped needs are the tested-in-pr path; a failed or cancelled one
+    # still blocks. ``!cancelled()`` replaces the implicit ``success()``,
+    # which would treat a skipped need as a reason not to run.
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main'
+      && !contains(needs.*.result, 'failure')
+      && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency: release

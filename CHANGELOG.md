@@ -3,6 +3,66 @@
 
 
 
+## v3.152.1 (2026-10-25)
+
+### Bug fixes
+
+* fix(search): product and blog search read through the store's tenant token (#325) ([`a5cbf0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5cbf0bd7cf0bf9b1e950dad05e7d500dd07fb74))
+
+* fix(search): product and blog search read through the store's tenant token
+
+`search_client_for_schema` mints a Meilisearch tenant token whose search
+rules cover only the store's own `{schema}__*` indexes, so a wrong index
+name in query code cannot read another store's documents: the engine
+refuses. Only the federated search used it. The product search, the blog
+search and the facet-group multi-search all read through the unscoped
+search key, guarded by the index name alone.
+
+`Client.tenant_search_client()` is now the one read path: the index
+handle every public search uses (`get_search_index`) and the facet
+multi-search both take the token for the schema the request runs in.
+The fallbacks are unchanged (public schema, no dedicated search key,
+OFFLINE tests).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`a5cbf0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5cbf0bd7cf0bf9b1e950dad05e7d500dd07fb74))
+
+### Refactoring
+
+* refactor(search): remove the federated search endpoint (#324)
+
+GET /api/v1/search/federated had one caller, webside's search page,
+which since storefront v3.261.1 runs the product and blog searches every
+store uses. The view, its serializers, the URL and its analytics route
+go; the content type `federated` stays on SearchQuery and in the
+analytics filter for the rows recorded before the removal.
+
+Comments that justified a shape by the federated search now give the
+reason that still holds: the storefront shows product and blog results
+for one query side by side, so both indexes keep the same typo
+thresholds.
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e86d587`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e86d587e6d9162c5830e7bc867ba1d9d614e7928))
+
+### Testing
+
+* test(search): bind the schema through the fixture, not a proxy patch
+
+mock.patch(..., create=True) on django.db.connection.schema_name deleted
+the attribute from the connection proxy on exit, and every later test in
+the worker that read connection.schema_name failed (CI shard 4).
+bind_tenant_and_schema sets and restores it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a5cbf0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5cbf0bd7cf0bf9b1e950dad05e7d500dd07fb74))
+
 ## v3.152.0 (2026-10-25)
 
 ### Features

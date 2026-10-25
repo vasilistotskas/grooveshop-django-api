@@ -56,6 +56,13 @@ def test_names_the_window_and_who_pays_when_the_return_policy_is_saved():
     assert "RETURN_FEES" in message
 
 
+def test_says_one_day_in_the_singular():
+    (message,) = _save("return-policy", days=1, fees="free")
+
+    assert "return window 1 day " in message
+    assert "paid by the store" in message
+
+
 def test_says_not_stated_for_terms_the_store_has_not_set():
     (message,) = _save("return-policy", days=0, fees="")
 

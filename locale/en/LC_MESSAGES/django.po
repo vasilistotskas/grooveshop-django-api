@@ -229,11 +229,12 @@ msgid_plural "%(count)s scheduled tasks enabled"
 msgstr[0] "%(count)s scheduled task enabled"
 msgstr[1] "%(count)s scheduled tasks enabled"
 
-#, fuzzy, python-format
-#| msgid "%(days)sd"
+#, python-format
 msgctxt "return window"
-msgid "%(days)s days"
-msgstr "%(days)sd"
+msgid "%(days)s day"
+msgid_plural "%(days)s days"
+msgstr[0] "%(days)s day"
+msgstr[1] "%(days)s days"
 
 #, python-format
 msgid "%(days)sd"
@@ -5888,7 +5889,7 @@ msgstr "Google Search Console verification token (the content of the google-site
 
 #, python-format
 msgid "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
-msgstr ""
+msgstr "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
 
 msgid "Google site verification"
 msgstr "Google site verification"
@@ -14432,21 +14433,17 @@ msgstr "no expiry"
 msgid "none yet"
 msgstr "none yet"
 
-#, fuzzy
-#| msgid "Carts started"
 msgid "not stated"
-msgstr "Carts started"
+msgstr "not stated"
 
 msgid "order"
 msgstr "order"
 
-#, fuzzy
-#| msgid "Same customer"
 msgid "paid by the customer"
-msgstr "Same customer"
+msgstr "paid by the customer"
 
 msgid "paid by the store"
-msgstr ""
+msgstr "paid by the store"
 
 #, python-brace-format
 msgid "payment intent is in an invalid state: {status}"

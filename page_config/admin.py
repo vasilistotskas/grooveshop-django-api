@@ -6,7 +6,7 @@ from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import npgettext_lazy
 from unfold.admin import StackedInline
 from unfold.decorators import action
 from unfold.fields import UnfoldAdminJSONSchemaField
@@ -421,7 +421,9 @@ RETURN_TERMS_REMINDER = _(
 
 NOT_STATED = _("not stated")
 
-RETURN_WINDOW = pgettext_lazy("return window", "%(days)s days")
+RETURN_WINDOW = npgettext_lazy(
+    "return window", "%(days)s day", "%(days)s days", "days"
+)
 
 RETURN_FEES_LABELS = {
     "free": _("paid by the store"),

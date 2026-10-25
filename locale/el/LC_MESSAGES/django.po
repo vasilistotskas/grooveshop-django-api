@@ -236,8 +236,10 @@ msgstr[1] "%(count)s προγραμματισμένες εργασίες ενε�
 
 #, python-format
 msgctxt "return window"
-msgid "%(days)s days"
-msgstr "%(days)s ημέρες"
+msgid "%(days)s day"
+msgid_plural "%(days)s days"
+msgstr[0] "%(days)s ημέρα"
+msgstr[1] "%(days)s ημέρες"
 
 #, python-format
 msgid "%(days)sd"

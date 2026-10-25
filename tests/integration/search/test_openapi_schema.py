@@ -11,13 +11,6 @@ from __future__ import annotations
 import pytest
 
 SEARCH_ENDPOINTS = {
-    "/api/v1/search/federated": {
-        "params": {"query", "languageCode", "limit", "offset"},
-        "response": (
-            "FederatedSearchResponse",
-            {"results", "limit", "offset", "estimatedTotalHits", "queryId"},
-        ),
-    },
     "/api/v1/search/analytics": {
         "params": {"startDate", "endDate", "contentType"},
         "response": (

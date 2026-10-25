@@ -4100,9 +4100,6 @@ msgstr "Λειτουργίες"
 msgid "Features Grid"
 msgstr "Πλέγμα χαρακτηριστικών"
 
-msgid "Federated search across products and blog posts"
-msgstr "Ομοσπονδιακή αναζήτηση σε προϊόντα και άρθρα"
-
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Χρέωση από τη μέθοδο πληρωμής (π.χ. τέλος αντικαταβολής)"
 
@@ -7321,9 +7318,6 @@ msgstr "Φίλτρο μέγιστης τιμής (effective_price <= value): η 
 
 msgid "Maximum total hits for pagination (maxTotalHits)"
 msgstr "Μέγιστα συνολικά αποτελέσματα για σελιδοποίηση (maxTotalHits)"
-
-msgid "Maximum total number of results to return"
-msgstr "Μέγιστος συνολικός αριθμός αποτελεσμάτων προς επιστροφή"
 
 msgid "Maximum values per facet (maxValuesPerFacet)"
 msgstr "Μέγιστες τιμές ανά facet (maxValuesPerFacet)"
@@ -10830,14 +10824,8 @@ msgstr "Αναζήτηση με ID παραγγελίας, UUID, email/όνομ�
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Αναζήτηση με τίτλο, υπότιτλο, slug, κείμενο ή email/όνομα συντάκτη."
 
-msgid "Search failed. Please try again later."
-msgstr "Η αναζήτηση απέτυχε. Παρακαλούμε δοκιμάστε ξανά αργότερα."
-
 msgid "Search index"
 msgstr "Ευρετήριο αναζήτησης"
-
-msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
-msgstr "Ταυτόχρονη αναζήτηση σε πολλαπλούς τύπους περιεχομένου με χρήση του API multi_search του Meilisearch σε λειτουργία ομοσπονδίας. Τα αποτελέσματα σταθμίζονται και συγχωνεύονται, με τα προϊόντα να έχουν βάρος 1.0 και τα άρθρα βάρος 0.7."
 
 msgid "Search products using MeiliSearch with support for full-text search, price range, popularity, view count, and category filters. Returns facet distribution and statistics for dynamic filter UI."
 msgstr "Αναζήτηση προϊόντων με χρήση MeiliSearch, με υποστήριξη αναζήτησης πλήρους κειμένου, εύρους τιμής, δημοτικότητας, πλήθους προβολών και φίλτρων κατηγορίας. Επιστρέφει κατανομή facet και στατιστικά για δυναμικό UI φίλτρων."
@@ -14816,6 +14804,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Featured content image"
 #~ msgstr "Εικόνα προτεινόμενου περιεχομένου"
 
+#~ msgid "Federated search across products and blog posts"
+#~ msgstr "Ομοσπονδιακή αναζήτηση σε προϊόντα και άρθρα"
+
 #~ msgid "Filter abandoned carts (inactive for 30+ days)"
 #~ msgstr "Φίλτρο εγκαταλελειμμένων καλαθιών (αδρανή για 30+ ημέρες)"
 
@@ -14988,6 +14979,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Manage Preferences"
 #~ msgstr "Διαχείριση προτιμήσεων"
+
+#~ msgid "Maximum total number of results to return"
+#~ msgstr "Μέγιστος συνολικός αριθμός αποτελεσμάτων προς επιστροφή"
 
 #~ msgid "Message Analytics"
 #~ msgstr "Αναλυτικά μηνυμάτων"
@@ -15278,6 +15272,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Scheduled tasks"
 #~ msgstr "Προγραμματισμένες εργασίες"
+
+#~ msgid "Search failed. Please try again later."
+#~ msgstr "Η αναζήτηση απέτυχε. Παρακαλούμε δοκιμάστε ξανά αργότερα."
+
+#~ msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
+#~ msgstr "Ταυτόχρονη αναζήτηση σε πολλαπλούς τύπους περιεχομένου με χρήση του API multi_search του Meilisearch σε λειτουργία ομοσπονδίας. Τα αποτελέσματα σταθμίζονται και συγχωνεύονται, με τα προϊόντα να έχουν βάρος 1.0 και τα άρθρα βάρος 0.7."
 
 #~ msgid "Seasonal content"
 #~ msgstr "Εποχιακό περιεχόμενο"

@@ -117,25 +117,6 @@ class TestSearchAnalyticsMiddleware:
         assert search_query.language_code == "el"
         assert search_query.content_type == "blog_post"
 
-    def test_tracks_federated_search(self, request_factory, middleware):
-        """Test that federated search queries are tracked."""
-        request = request_factory.get(
-            "/api/v1/search/federated",
-            {"query": "test query", "language_code": "el"},
-        )
-        request.user = Mock(is_authenticated=False)
-        request.session = Mock(session_key="test-session-789")
-
-        initial_count = SearchQuery.objects.count()
-        middleware(request)
-
-        assert SearchQuery.objects.count() == initial_count + 1
-
-        search_query = SearchQuery.objects.latest("timestamp")
-        assert search_query.query == "test query"
-        assert search_query.language_code == "el"
-        assert search_query.content_type == "federated"
-
     def test_tracks_authenticated_user(
         self, request_factory, middleware, authenticated_user
     ):

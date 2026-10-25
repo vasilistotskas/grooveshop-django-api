@@ -330,13 +330,8 @@ class BlogPostTranslation(
         with `getattr` and falls back to the plain manager when a model
         does not define it. `ProductTranslation` had one; this did not,
         so every blog hit paid a query for `obj.master` in
-        `get_slug` and again in `get_main_image_path`.
-
-        `federated_search` had already worked around it by hand-rolling
-        `select_related("master")` at its own call site — which is why
-        only the standalone blog endpoint was still paying. Defining it
-        here fixes both, and puts the two indexed models on the same
-        footing.
+        `get_slug` and again in `get_main_image_path`. Defining it here
+        puts the two indexed models on the same footing.
         """
         return cls.objects.select_related("master")
 

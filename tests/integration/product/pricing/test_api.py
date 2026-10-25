@@ -215,8 +215,10 @@ class TestProductApi:
     ):
         schemas = openapi_schema["components"]["schemas"]
 
-        for name in ("ProductMeiliSearchResult", "FederatedSearchResult"):
-            assert "discountPercent" not in schemas[name]["properties"]
+        assert (
+            "discountPercent"
+            not in schemas["ProductMeiliSearchResult"]["properties"]
+        )
 
 
 @pytest.mark.django_db

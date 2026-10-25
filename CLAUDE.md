@@ -319,6 +319,7 @@ with a storefront it breaks.
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) jobs:
+0. **Already tested in its PR** — on a push to `main` whose tree is exactly what a green pull_request run tested (the PR branch was up to date with `main`), jobs 2-6 are skipped and release starts at once (`.github/scripts/tested_in_pr.sh` holds the rule). Any other push runs everything. Merging a branch that is behind `main` therefore costs a full second run; updating it first does not.
 1. **Security Scan** — Trivy filesystem scan (HIGH/CRITICAL fail the job).
 2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation, and the committed `schema.yml` matching the code (structurally, via oasdiff).
 3. **Migration Check** — replays a deploy: migrates at the base commit, then runs the head's `makemigrations --check` and `migration_preflight`, then both django-tenants migration paths on top.

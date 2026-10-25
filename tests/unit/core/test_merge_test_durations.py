@@ -71,18 +71,19 @@ def _run(run_id, **overrides):
     return {
         "databaseId": run_id,
         "workflowName": "CI",
-        "headBranch": "main",
-        "event": "push",
+        "event": "pull_request",
         "conclusion": "success",
         **overrides,
     }
 
 
-def test_the_newest_successful_main_push_run_is_picked():
+def test_the_newest_successful_pull_request_run_is_picked():
+    # A main push may have skipped its shards (tested_in_pr.sh), so it is
+    # never the source.
     runs = [
         _run(6, workflowName="Publish Docker image"),
-        _run(5, headBranch="fix/x"),
-        _run(4, event="pull_request"),
+        _run(5, event="push"),
+        _run(4, event="workflow_dispatch"),
         _run(3, conclusion="failure"),
         _run(2),
         _run(1),
@@ -91,7 +92,7 @@ def test_the_newest_successful_main_push_run_is_picked():
     assert merge_test_durations.latest_successful_run(runs) == "2"
 
 
-def test_no_successful_main_run_is_an_error_not_a_guess():
+def test_no_successful_pull_request_run_is_an_error_not_a_guess():
     with pytest.raises(LookupError):
         merge_test_durations.latest_successful_run(
             [_run(1, conclusion="failure")]

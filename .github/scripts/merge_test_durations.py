@@ -14,7 +14,10 @@ artifacts from one CI run and merges them into ``.test_durations``::
 
     python .github/scripts/merge_test_durations.py --run-id 123456789
 
-Without ``--run-id`` it takes the latest successful CI run on ``main``.
+Without ``--run-id`` it takes the latest successful pull_request CI run.
+Every PR run runs the four shards; a push to ``main`` skips them when the
+PR already tested its tree (``tested_in_pr.sh``), so a main run may hold
+no durations at all.
 Every shard must be present: a partial merge would silently drop a
 quarter of the suite back to the average weight, which is what caused
 the imbalance in the first place.
@@ -62,7 +65,7 @@ def _gh(*args: str) -> str:
 
 
 def latest_successful_run(runs: list[dict]) -> str:
-    """The newest successful CI run pushed to ``main``, from a listing.
+    """The newest successful pull_request CI run, from a listing.
 
     ``gh run list`` returns newest first. Raises ``LookupError`` when the
     listing holds none.
@@ -70,12 +73,11 @@ def latest_successful_run(runs: list[dict]) -> str:
     for run in runs:
         if (
             run.get("workflowName") == WORKFLOW_NAME
-            and run.get("headBranch") == "main"
-            and run.get("event") == "push"
+            and run.get("event") == "pull_request"
             and run.get("conclusion") == "success"
         ):
             return str(run["databaseId"])
-    raise LookupError(f"no successful {WORKFLOW_NAME} run on main")
+    raise LookupError(f"no successful pull_request {WORKFLOW_NAME} run")
 
 
 def _recent_runs() -> list[dict]:
@@ -92,7 +94,7 @@ def _recent_runs() -> list[dict]:
             "--limit",
             "100",
             "--json",
-            "databaseId,workflowName,headBranch,event,conclusion",
+            "databaseId,workflowName,event,conclusion",
         )
     )
 

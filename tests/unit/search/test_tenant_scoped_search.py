@@ -9,6 +9,7 @@ mocked — no live Meilisearch needed.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest import mock
 
 from meili._client import Client
@@ -85,3 +86,25 @@ def test_distinct_schemas_get_distinct_clients(settings):
         for call in client.client.generate_tenant_token.call_args_list
     ]
     assert rules == [{"tenant_a__*": {}}, {"tenant_b__*": {}}]
+
+
+def test_public_search_reads_through_the_tenant_scoped_client(
+    settings, bind_tenant_and_schema
+):
+    """Every public search path asks for the tenant's client: the index
+    handle the product and blog searches use is bound to the token for
+    the schema the request runs in, never to the unscoped search key."""
+    settings.MEILISEARCH = {**settings.MEILISEARCH, "OFFLINE": False}
+    client = _make_client(search_key="searchkey")
+    scoped = mock.Mock()
+
+    bind_tenant_and_schema(SimpleNamespace(schema_name="acme"))
+
+    with mock.patch.object(
+        client, "search_client_for_schema", return_value=scoped
+    ) as for_schema:
+        handle = client.get_search_index("acme__ProductTranslation")
+
+    for_schema.assert_called_once_with("acme")
+    scoped.index.assert_called_once_with("acme__ProductTranslation")
+    assert handle is scoped.index.return_value

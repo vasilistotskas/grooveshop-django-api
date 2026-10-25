@@ -43,9 +43,11 @@ def _order(*, paid: float | None = None, days_ago: int = 0, **fields):
         ),
         **fields,
     )
-    # created_at is auto_now_add; backdate through the queryset.
+    # created_at is auto_now_add; backdate through the queryset. In local
+    # wall-clock days, the way the dashboard buckets: on the 25-hour day a
+    # clock goes back, ``now - 24h`` is still today for an hour.
     Order.objects.filter(pk=order.pk).update(
-        created_at=timezone.now() - timedelta(days=days_ago)
+        created_at=timezone.localtime() - timedelta(days=days_ago)
     )
     return order
 

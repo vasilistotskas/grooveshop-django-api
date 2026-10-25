@@ -6,6 +6,7 @@ from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import npgettext_lazy
 from unfold.admin import StackedInline
 from unfold.decorators import action
 from unfold.fields import UnfoldAdminJSONSchemaField
@@ -16,6 +17,7 @@ from admin.base import (
     BaseTranslatableAdmin,
     BaseTranslatableTabularInline,
 )
+from core.store_settings import store_settings
 from page_config.defaults import (
     pending_legal_reviews,
     tenant_document_context,
@@ -23,6 +25,7 @@ from page_config.defaults import (
 from page_config.legal_documents import (
     LEGAL_TEXT_REVISION,
     LEGAL_TEXT_UPDATES,
+    RETURN_POLICY_SLUG,
     pending_legal_updates,
     render_legal_fragment,
 )
@@ -357,6 +360,31 @@ class ContentPageAdmin(BaseTranslatableAdmin):
             ),
         )
 
+    # --- Return terms ---------------------------------------------------
+    #
+    # The storefront gives Google the return window and who pays from the
+    # store settings, not from this page's text, so a save of the return
+    # policy says what Google is told and where to change it.
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.slug != RETURN_POLICY_SLUG:
+            return
+        terms = store_settings(("RETURN_WINDOW_DAYS", "RETURN_FEES"))
+        days = terms["RETURN_WINDOW_DAYS"]
+        fees = terms["RETURN_FEES"]
+        self.message_user(
+            request,
+            RETURN_TERMS_REMINDER
+            % {
+                "window": (
+                    RETURN_WINDOW % {"days": days} if days else NOT_STATED
+                ),
+                "fees": RETURN_FEES_LABELS.get(fees, NOT_STATED),
+            },
+            messages.INFO,
+        )
+
     def changelist_view(self, request, extra_context=None):
         pending = pending_legal_reviews()
         if pending and request.method == "GET":
@@ -383,6 +411,24 @@ class ContentPageAdmin(BaseTranslatableAdmin):
             messages.SUCCESS,
         )
 
+
+RETURN_TERMS_REMINDER = _(
+    "Google is told your return terms from Store Settings, not from this "
+    "page: return window %(window)s (RETURN_WINDOW_DAYS), return "
+    "shipping %(fees)s (RETURN_FEES). If you changed either here, change "
+    "the setting too."
+)
+
+NOT_STATED = _("not stated")
+
+RETURN_WINDOW = npgettext_lazy(
+    "return window", "%(days)s day", "%(days)s days", "days"
+)
+
+RETURN_FEES_LABELS = {
+    "free": _("paid by the store"),
+    "customer": _("paid by the customer"),
+}
 
 LEGAL_UPDATE_NOTICE = _(
     "The platform has updated its legal text, and these pages were not "

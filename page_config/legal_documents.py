@@ -33,11 +33,17 @@ merchant edits it like any other content.
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 
+RETURN_POLICY_SLUG = "return-policy"
+"""The return policy page. Its window and fees are also store settings
+(``RETURN_WINDOW_DAYS``, ``RETURN_FEES``), which is what the storefront
+gives Google, so the admin reminds whoever saves this page to keep the
+two in step."""
+
 LEGAL_ROUTE_BY_SLUG: dict[str, str] = {
     "terms": "/terms-of-use",
     "privacy": "/privacy-policy",
     "cookies": "/cookies-policy",
-    "return-policy": "/return-policy",
+    RETURN_POLICY_SLUG: "/return-policy",
 }
 """The canonical path a ContentPage slug is served at, when it has one.
 

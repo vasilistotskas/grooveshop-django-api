@@ -230,6 +230,13 @@ msgstr[0] "%(count)s scheduled task enabled"
 msgstr[1] "%(count)s scheduled tasks enabled"
 
 #, python-format
+msgctxt "return window"
+msgid "%(days)s day"
+msgid_plural "%(days)s days"
+msgstr[0] "%(days)s day"
+msgstr[1] "%(days)s days"
+
+#, python-format
 msgid "%(days)sd"
 msgstr "%(days)sd"
 
@@ -5879,6 +5886,10 @@ msgstr "Google Pay"
 
 msgid "Google Search Console verification token (the content of the google-site-verification meta tag). Empty → not emitted."
 msgstr "Google Search Console verification token (the content of the google-site-verification meta tag). Empty → not emitted."
+
+#, python-format
+msgid "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
+msgstr "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
 
 msgid "Google site verification"
 msgstr "Google site verification"
@@ -14422,8 +14433,17 @@ msgstr "no expiry"
 msgid "none yet"
 msgstr "none yet"
 
+msgid "not stated"
+msgstr "not stated"
+
 msgid "order"
 msgstr "order"
+
+msgid "paid by the customer"
+msgstr "paid by the customer"
+
+msgid "paid by the store"
+msgstr "paid by the store"
 
 #, python-brace-format
 msgid "payment intent is in an invalid state: {status}"

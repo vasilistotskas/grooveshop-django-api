@@ -3,6 +3,41 @@
 
 
 
+## v3.153.0 (2026-10-25)
+
+### Bug fixes
+
+* fix(admin): one return day reads in the singular; English catalogue entries are real
+
+The window uses npgettext_lazy (same "return window" context), so a
+1-day window reads "1 day" / "1 ημέρα". makemessages had left fuzzy
+guesses in the English catalogue ("Carts started", "Same customer"),
+which the English catalogue tests refuse; every new entry now carries its
+English text.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`68aef17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68aef173297e25a56efdfdf7957ea4cdbfec0b52))
+
+### Features
+
+* feat(admin): saving the return policy page says which return terms Google gets (#326) ([`68aef17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68aef173297e25a56efdfdf7957ea4cdbfec0b52))
+
+* feat(admin): saving the return policy page says which return terms Google gets
+
+The storefront gives Google the return window and who pays return
+shipping from RETURN_WINDOW_DAYS and RETURN_FEES, not from the return
+policy page's text, so editing only the page leaves Google with the old
+terms. Each save of the return-policy content page now shows the two
+values Google is given and where to change them (el/en). The page's slug
+is RETURN_POLICY_SLUG, next to the other legal routes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`68aef17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68aef173297e25a56efdfdf7957ea4cdbfec0b52))
+
 ## v3.152.1 (2026-10-25)
 
 ### Bug fixes

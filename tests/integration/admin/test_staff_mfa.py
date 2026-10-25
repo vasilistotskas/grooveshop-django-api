@@ -49,22 +49,38 @@ def _superuser():
     return _user(is_superuser=True)
 
 
-def _code(secret: str, offset: int = 0) -> str:
-    counter = int(time.time()) // 30 + offset
-    return format_hotp_value(hotp_value(secret, counter))
+# The TOTP step allauth validates against, held for the whole test. With
+# the real clock a code computed here and checked by allauth a moment
+# later fall in different 30-second steps whenever a boundary passes in
+# between (the tolerance is zero steps), and the enrolment fails at random.
+_clock = {"counter": 0}
+
+
+@pytest.fixture(autouse=True)
+def _frozen_totp_clock():
+    _clock["counter"] = int(time.time()) // 30
+    with patch(
+        "allauth.mfa.totp.internal.auth.yield_hotp_counters_from_time",
+        side_effect=lambda: iter([_clock["counter"]]),
+    ):
+        yield
+
+
+def _code(secret: str) -> str:
+    """The code for the step allauth currently validates against."""
+    return format_hotp_value(hotp_value(secret, _clock["counter"]))
 
 
 @contextmanager
 def _window(offset: int):
     """Move allauth's idea of "now" by *offset* 30-second steps, so a code
-    can be used after the one that enrolled (a code is spent once; the
-    tolerance is zero steps)."""
-    counter = int(time.time()) // 30 + offset
-    with patch(
-        "allauth.mfa.totp.internal.auth.yield_hotp_counters_from_time",
-        side_effect=lambda: iter([counter]),
-    ):
+    can be used after the one that enrolled (a code is spent once)."""
+    start = _clock["counter"]
+    _clock["counter"] = start + offset
+    try:
         yield
+    finally:
+        _clock["counter"] = start
 
 
 def _post(client, **data):
@@ -290,7 +306,7 @@ class TestPasswordThenCode:
         _password(client, user)
 
         with _window(1):
-            response = _answer(client, "code", _code(secret, offset=1))
+            response = _answer(client, "code", _code(secret))
 
         assert response.status_code == 302
         assert client.session[SESSION_KEY] == str(user.pk)
@@ -328,7 +344,7 @@ class TestPasswordThenCode:
     def test_a_code_cannot_be_used_twice(self):
         user, secret, _ = self._enrolled()
         with _window(-1):
-            code = _code(secret, offset=-1)
+            code = _code(secret)
             first, second = Client(), Client()
             _password(first, user)
             _password(second, user)
@@ -360,7 +376,7 @@ class TestPasswordThenCode:
             _answer(client, "code", "000000")
 
         with _window(1):
-            response = _answer(client, "code", _code(secret, offset=1))
+            response = _answer(client, "code", _code(secret))
 
         assert "Too many wrong codes" in str(response.context["form"].errors)
         assert not _signed_in(client)
@@ -373,7 +389,7 @@ class TestPasswordThenCode:
             _answer(client, "code", "000000")
 
         with _window(1):
-            _answer(client, "code", _code(secret, offset=1))
+            _answer(client, "code", _code(secret))
 
         assert not staff_mfa.is_locked(user)
 
@@ -389,7 +405,7 @@ class TestPasswordThenCode:
                 step="code",
                 username=other.email,
                 password=PASSWORD,
-                otp_code=_code(secret, offset=1),
+                otp_code=_code(secret),
             )
 
         assert client.session[SESSION_KEY] == str(user.pk)

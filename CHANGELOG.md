@@ -3,6 +3,42 @@
 
 
 
+## v3.152.0 (2026-10-25)
+
+### Features
+
+* feat(settings): the store's return window and return fees as store settings (#323) ([`5f3a5b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f3a5b11b5ff7650de4b87ad472b81f482494907))
+
+* feat(settings): the store's return window and return fees as store settings
+
+RETURN_WINDOW_DAYS (whole days, 0 = not stated) and RETURN_FEES ("free",
+"customer", empty = not stated), each with a validator, both public
+values. The storefront states them as the store's return policy on its
+schema.org Organization node, for the countries the store ships to;
+until a store sets them, only the link to its return-policy page is
+given, as today.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`5f3a5b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f3a5b11b5ff7650de4b87ad472b81f482494907))
+
+### Testing
+
+* test(admin): staff MFA tests validate codes against one frozen TOTP step
+
+Each test computed a code from the real clock and allauth validated it a
+moment later from the clock again, with a tolerance of zero steps, so a
+30-second boundary passing in between failed the enrolment and the test
+found the user unenrolled (CI 2026-10-25: Step.ENROL where CODE was
+expected). An autouse fixture now holds the step for the whole test;
+_code reads it and _window moves it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5f3a5b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f3a5b11b5ff7650de4b87ad472b81f482494907))
+
 ## v3.151.0 (2026-10-24)
 
 ### Features

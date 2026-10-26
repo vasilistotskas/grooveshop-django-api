@@ -5,6 +5,10 @@ repos:
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
+        # Generated files, written without a final newline by their
+        # generators (the Tailwind build; pytest-split and
+        # .github/scripts/merge_test_durations.py), never edited by hand.
+        exclude: ^(static/css/styles\.css|\.test_durations)$
       - id: trailing-whitespace
       - id: fix-byte-order-marker
   # Ruff runs from the project environment so the hook can never drift

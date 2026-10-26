@@ -111,9 +111,7 @@ class MetaCapiClient:
 
     def _ensure_configured(self) -> None:
         if not self.pixel_id:
-            raise MetaCapiConfigError(
-                "Tenant.meta_pixel_id is not set"
-            )
+            raise MetaCapiConfigError("Tenant.meta_pixel_id is not set")
         if not self.access_token:
             raise MetaCapiConfigError(
                 "Tenant.meta_capi_access_token is not set"

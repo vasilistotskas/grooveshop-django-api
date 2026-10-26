@@ -10,6 +10,7 @@ from order.services import OrderService
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -170,6 +171,7 @@ class TestPaymentConfirmationConvertsReservations:
         # Execute: Create order from cart (this simulates payment confirmation)
         # This should convert reservations to stock decrements
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=shipping_address,
             payment_intent_id=payment_intent_id,
@@ -290,6 +292,7 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=shipping_address,
             payment_intent_id="pi_test_dup_reservations",
@@ -365,6 +368,7 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=shipping_address,
             payment_intent_id="pi_expired_reservation",
@@ -452,6 +456,7 @@ class TestPaymentConfirmationConvertsReservations:
             pytest.raises(InsufficientStockError),
         ):
             OrderService.create_order_from_cart(
+                legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=shipping_address,
                 payment_intent_id="pi_test_atomic",
@@ -522,6 +527,7 @@ class TestPaymentConfirmationConvertsReservations:
         }
 
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=shipping_address,
             payment_intent_id="pi_test_audit_logs",

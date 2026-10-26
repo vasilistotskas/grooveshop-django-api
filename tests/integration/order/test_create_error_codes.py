@@ -31,6 +31,8 @@ from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 from user.factories.account import UserAccountFactory
 
+pytestmark = pytest.mark.usefixtures("checkout_legal_documents")
+
 
 @pytest.mark.django_db
 class TestOrderCreateErrorCodes(APITestCase):
@@ -52,6 +54,7 @@ class TestOrderCreateErrorCodes(APITestCase):
             self.url,
             {
                 "pay_way_id": self.pay_way.id,
+                "terms_accepted": True,
                 "first_name": "Alice",
                 "last_name": "Smith",
                 "email": "alice@example.com",

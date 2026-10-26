@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from django.conf import settings
 
+from order.enum.legal_acceptance import LegalAcceptanceSource
+from order.services import LegalAcceptance, OrderLegalAcceptanceService
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import ContentPage, ContentPageTranslation
 
@@ -37,3 +39,15 @@ def publish_checkout_legal_documents() -> dict[str, ContentPage]:
             )
         pages[slug] = page
     return pages
+
+
+def checkout_acceptance(language_code: str = "el") -> LegalAcceptance:
+    """A buyer's acceptance of the checkout legal texts, as order
+    creation takes it (``OrderLegalAcceptanceService.accept``), for a
+    test that calls the order service directly. Publishes the texts
+    first."""
+    publish_checkout_legal_documents()
+    return LegalAcceptance(
+        source=LegalAcceptanceSource.CHECKOUT_CONSENT,
+        documents=OrderLegalAcceptanceService.documents_in_force(language_code),
+    )

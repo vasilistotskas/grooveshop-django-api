@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
 from django.conf import settings
 from django.urls import reverse
 from djmoney.money import Money
@@ -19,6 +20,8 @@ from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
+
+pytestmark = pytest.mark.usefixtures("checkout_legal_documents")
 
 
 class CheckoutAPITestCase(APITestCase):
@@ -56,6 +59,7 @@ class CheckoutAPITestCase(APITestCase):
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
             "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
             "shipping_kind": "home_delivery",
         }
         data.update(overrides)

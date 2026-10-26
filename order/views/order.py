@@ -1179,11 +1179,7 @@ class OrderViewSet(BaseModelViewSet):
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show
         # refuses the checkout here (``LegalDocumentUnavailableError``).
-        legal_acceptance = (
-            OrderLegalAcceptanceService.accept(request)
-            if validated_data.get("terms_accepted")
-            else None
-        )
+        legal_acceptance = OrderLegalAcceptanceService.accept(request)
 
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
@@ -1268,11 +1264,7 @@ class OrderViewSet(BaseModelViewSet):
         # The legal texts the buyer accepts, resolved before anything is
         # created or a payment is looked up: a text the store cannot show
         # refuses the checkout here (``LegalDocumentUnavailableError``).
-        legal_acceptance = (
-            OrderLegalAcceptanceService.accept(request)
-            if validated_data.get("terms_accepted")
-            else None
-        )
+        legal_acceptance = OrderLegalAcceptanceService.accept(request)
 
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(

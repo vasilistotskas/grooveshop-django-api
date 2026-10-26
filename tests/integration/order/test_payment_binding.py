@@ -38,6 +38,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.fake_stripe import fake_stripe
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -124,6 +125,7 @@ def _cart_intent(stripe, cart, **overrides) -> str:
 def _create_order(checkout, intent_id: str) -> Order:
     cart, pay_way, country = checkout
     return OrderService.create_order_from_cart(
+        legal_acceptance=checkout_acceptance(),
         cart=cart,
         shipping_address=_address(country),
         payment_intent_id=intent_id,

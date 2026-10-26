@@ -14,6 +14,7 @@ from order.services import OrderService
 from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
@@ -129,6 +130,7 @@ class TestTransactionFailuresRollbackCompletely:
                 pytest.raises(expected_exception, match="Order save failed"),
             ):
                 OrderService.create_order_from_cart(
+                    legal_acceptance=checkout_acceptance(),
                     cart=cart,
                     shipping_address=self.shipping_address,
                     payment_intent_id=payment_intent_id,
@@ -148,6 +150,7 @@ class TestTransactionFailuresRollbackCompletely:
                 ),
             ):
                 OrderService.create_order_from_cart(
+                    legal_acceptance=checkout_acceptance(),
                     cart=cart,
                     shipping_address=self.shipping_address,
                     payment_intent_id=payment_intent_id,
@@ -165,6 +168,7 @@ class TestTransactionFailuresRollbackCompletely:
                 pytest.raises(expected_exception, match="StockLog save failed"),
             ):
                 OrderService.create_order_from_cart(
+                    legal_acceptance=checkout_acceptance(),
                     cart=cart,
                     shipping_address=self.shipping_address,
                     payment_intent_id=payment_intent_id,
@@ -543,6 +547,7 @@ class TestTransactionFailuresRollbackCompletely:
                     Exception, match="OrderItem save failed on 3rd item"
                 ):
                     OrderService.create_order_from_cart(
+                        legal_acceptance=checkout_acceptance(),
                         cart=cart,
                         shipping_address=self.shipping_address,
                         payment_intent_id=payment_intent_id,

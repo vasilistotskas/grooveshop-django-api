@@ -17,6 +17,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -82,6 +83,7 @@ def checkout():
 class TestInvoiceFieldsFlow:
     def test_billing_fields_snapshot_onto_order(self, checkout):
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -101,6 +103,7 @@ class TestInvoiceFieldsFlow:
 
     def test_read_serializer_exposes_billing_block(self, checkout):
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -120,6 +123,7 @@ class TestInvoiceFieldsFlow:
         customer's name and address, never the company requisites that
         staff read from the order when they issue the invoice in timologio."""
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],

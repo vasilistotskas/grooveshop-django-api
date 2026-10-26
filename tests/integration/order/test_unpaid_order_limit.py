@@ -25,6 +25,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -83,6 +84,7 @@ def _place(*, email="maria@example.com", user=None, pay_way=None):
     country = CountryFactory()
     enable_rate(country)
     return OrderService.create_order_from_cart_offline(
+        legal_acceptance=checkout_acceptance(),
         cart=cart,
         shipping_address={
             "first_name": "Maria",

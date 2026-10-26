@@ -556,9 +556,10 @@ the attribution, inside the creation transaction: one
   A store does not get there by an edit: `page_config/legal_guard.py`
   refuses, in the admin and the staff API, unpublishing, scheduling,
   renaming, emptying a served language or deleting a legal page.
-- **Rollout.** `terms_accepted` is optional until the storefront and the
-  agent gateway send it; an order without it records nothing. It then
-  becomes required, and every order has both rows.
+- **Every order.** `terms_accepted` is required, and both creation
+  paths take the resolved `LegalAcceptance` as a required argument, so
+  no order is created without both rows. Orders placed before the field
+  existed (`0092_legal_acceptance`, no backfill) have none.
 
 ## 4. Payment paths
 

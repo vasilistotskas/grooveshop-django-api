@@ -13,6 +13,7 @@ from order.factories.order import OrderFactory
 from order.serializers.order import OrderDetailSerializer
 from order.services import OrderService
 from shipping.models import ShippingProvider
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
 pytestmark = [
@@ -150,7 +151,10 @@ class TestSetAtCreation:
             "order.services.timezone.now", return_value=MONDAY_10_ATHENS
         ):
             return OrderService.create_order_from_cart_offline(
-                cart=cart, shipping_address=address, pay_way=pay_way
+                legal_acceptance=checkout_acceptance(),
+                cart=cart,
+                shipping_address=address,
+                pay_way=pay_way,
             )
 
     def test_order_stores_the_estimate(self):
@@ -201,6 +205,7 @@ def _create_online():
             {"payment_id": "pi_test_123", "status": "succeeded"},
         )
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address={
                 "first_name": "Maria",

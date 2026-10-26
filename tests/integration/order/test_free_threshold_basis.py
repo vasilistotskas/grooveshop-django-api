@@ -31,6 +31,7 @@ from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
 from tests.utils.fake_stripe import fake_stripe
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -148,6 +149,7 @@ def test_the_preview_and_both_creation_paths_agree(products, discount, free):
         # Payment-first creation refuses an intent whose amount is not the
         # total it computes, so accepting this one proves it agrees.
         order = OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=address,
             payment_intent_id=intent_id,
@@ -170,7 +172,11 @@ def test_offline_creation_charges_the_same(products, discount, free):
     )
 
     order = OrderService.create_order_from_cart_offline(
-        cart=cart, shipping_address=address, pay_way=pay_way, user=user
+        legal_acceptance=checkout_acceptance(),
+        cart=cart,
+        shipping_address=address,
+        pay_way=pay_way,
+        user=user,
     )
 
     assert order.shipping_price.amount == (Decimal(0) if free else SHIPPING)

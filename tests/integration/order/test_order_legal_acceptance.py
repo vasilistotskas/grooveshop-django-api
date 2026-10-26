@@ -1,6 +1,6 @@
 """An order records the legal texts its buyer accepted, on both paths.
 
-``POST /order`` takes ``termsAccepted``. With it, the creation
+``POST /order`` requires ``termsAccepted``, and the creation
 transaction stores one ``OrderLegalAcceptance`` per checkout legal
 document (terms of use, privacy policy): the version in force in the
 order's language and how it was accepted, the storefront's checkout
@@ -261,13 +261,14 @@ class TestOrderLegalAcceptanceOnCreate(APITestCase):
         mock_get_provider.assert_not_called()
         assert not Order.objects.exists()
 
-    def test_an_order_without_the_field_records_nothing(self, *_mocks):
-        # Until every client sends it: the field becomes required once
-        # the storefront and the agent gateway do.
+    def test_no_order_without_the_consent(self, *_mocks):
         response = self._post(self._cod())
 
-        assert response.status_code == status.HTTP_201_CREATED, response.json()
-        assert self._accepted(response) == {}
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["fields"]["termsAccepted"][0]["code"] == (
+            "required"
+        )
+        assert not Order.objects.exists()
 
 
 @pytest.mark.django_db

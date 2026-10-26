@@ -25,6 +25,7 @@ from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode, PromotionRedemption
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -86,6 +87,7 @@ def checkout():
 
 def _create_offline_order(checkout):
     return OrderService.create_order_from_cart_offline(
+        legal_acceptance=checkout_acceptance(),
         cart=checkout["cart"],
         shipping_address=checkout["shipping_address"],
         pay_way=checkout["pay_way"],
@@ -192,6 +194,7 @@ class TestOfflineCheckoutWithCoupon:
         cart.items.all().delete()
         CartItemFactory(cart=cart, product=checkout["product"], quantity=1)
         second = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address={
                 **checkout["shipping_address"],

@@ -26,7 +26,10 @@ from user.factories.account import UserAccountFactory
 PAYMENT_INTENT_ID = "pi_test_123abc"
 
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+pytestmark = [
+    pytest.mark.usefixtures("trust_intent_binding"),
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 
 class TestPaymentFirstOrderCreation(APITestCase):
@@ -82,6 +85,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         data = {
             "payment_intent_id": PAYMENT_INTENT_ID,
             "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
             "first_name": "John",
             "last_name": "Doe",
             "email": "john.doe@example.com",

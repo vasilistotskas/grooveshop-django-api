@@ -21,6 +21,7 @@ from country.factories import CountryFactory
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from vat.factories import VatFactory
 
@@ -85,6 +86,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(),
@@ -107,6 +109,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(),
@@ -124,6 +127,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(
@@ -141,6 +145,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(),
@@ -158,6 +163,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(),
@@ -184,6 +190,7 @@ class TestGroupPricingCheckout:
         # (Greek when the compiled .mo is present, English in CI).
         with pytest.raises(InvalidOrderDataError, match="500"):
             OrderService.create_order_from_cart_offline(
+                legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=_shipping_address(country),
                 pay_way=_pay_way(),
@@ -197,6 +204,7 @@ class TestGroupPricingCheckout:
         country = CountryFactory()
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=_shipping_address(country),
             pay_way=_pay_way(),

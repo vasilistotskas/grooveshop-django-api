@@ -39,6 +39,7 @@ from order.stock import StockManager
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
 
 pytestmark = [
@@ -192,6 +193,7 @@ class TestCheckoutLocksProductsInPkOrder:
         with patch("order.payment.get_payment_provider") as get_provider:
             get_provider.return_value = provider
             return OrderService.create_order_from_cart(
+                legal_acceptance=checkout_acceptance(),
                 cart=cart,
                 shipping_address=self.shipping_address,
                 payment_intent_id="pi_lock_order",
@@ -205,6 +207,7 @@ class TestCheckoutLocksProductsInPkOrder:
             settlement=PaySettlement.COURIER_CASH,
         )
         return OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=cart,
             shipping_address=self.shipping_address,
             pay_way=pay_way,

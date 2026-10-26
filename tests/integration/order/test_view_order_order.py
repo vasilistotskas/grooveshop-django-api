@@ -32,7 +32,10 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+pytestmark = [
+    pytest.mark.usefixtures("trust_intent_binding"),
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 
 class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
@@ -174,6 +177,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         payload = {
             "payment_intent_id": f"pi_test_{uuid.uuid4().hex[:8]}",
             "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
             "country_id": self.country.alpha_2,
             "region_id": self.region.alpha,
             "floor": FloorChoicesEnum.FIRST_FLOOR.value,

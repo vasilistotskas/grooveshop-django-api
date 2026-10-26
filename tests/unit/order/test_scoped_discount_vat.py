@@ -35,6 +35,7 @@ from product.factories import ProductCategoryFactory, ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
 from promotion.factories import PromotionFactory
 from promotion.services import PromotionEngine
+from tests.utils.legal import checkout_acceptance
 from tests.utils.mydata import issuable, mydata_enabled
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
@@ -114,6 +115,7 @@ def _checkout(cart, *, user=None, points=None):
     country = CountryFactory()
     enable_rate(country, price=SHIPPING, free_shipping_threshold=None)
     return OrderService.create_order_from_cart_offline(
+        legal_acceptance=checkout_acceptance(),
         cart=cart,
         shipping_address={
             "first_name": "Maria",
@@ -515,6 +517,7 @@ class TestPaymentFirstPath:
                 {"payment_id": "pi_scoped", "status": "succeeded"},
             )
             order = OrderService.create_order_from_cart(
+                legal_acceptance=checkout_acceptance(),
                 cart=_cart((food, 1), (other, 1), user=user),
                 shipping_address={
                     "first_name": "Maria",

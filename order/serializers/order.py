@@ -1288,7 +1288,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     # records the version of each it was placed under
     # (``OrderLegalAcceptanceService``).
     terms_accepted = serializers.BooleanField(
-        required=False,
         write_only=True,
         help_text=_(
             "The buyer accepts the store's terms of use and privacy "

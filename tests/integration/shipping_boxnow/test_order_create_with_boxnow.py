@@ -34,7 +34,10 @@ from shipping_boxnow.models import BoxNowShipment
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+pytestmark = [
+    pytest.mark.usefixtures("trust_intent_binding"),
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 
 @pytest.mark.django_db
@@ -110,6 +113,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
         payload = {
             "payment_intent_id": self.payment_intent_id,
             "pay_way_id": pay_way_id,
+            "terms_accepted": True,
             "first_name": "BoxNow",
             "last_name": "Tester",
             "email": "boxnow@test.com",

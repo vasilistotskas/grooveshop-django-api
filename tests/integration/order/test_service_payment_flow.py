@@ -21,6 +21,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from user.factories.account import UserAccountFactory
 
@@ -112,7 +113,9 @@ class TestCreateOrderFromCart:
             "user": self.user,
         }
         kwargs.update(overrides)
-        return OrderService.create_order_from_cart(**kwargs)
+        return OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(), **kwargs
+        )
 
     @patch("order.payment.get_payment_provider")
     def test_creates_a_pending_order_from_the_cart(self, mock_get_provider):

@@ -835,7 +835,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
-        legal_acceptance: LegalAcceptance | None = None,
+        legal_acceptance: LegalAcceptance,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -955,7 +955,7 @@ class OrderService:
         gift_card_codes: list[str] | None,
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
-        legal_acceptance: LegalAcceptance | None,
+        legal_acceptance: LegalAcceptance,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
@@ -1317,8 +1317,7 @@ class OrderService:
             OrderAttributionService.record(
                 order, attribution or AttributionInput(), cart=cart
             )
-            if legal_acceptance is not None:
-                OrderLegalAcceptanceService.record(order, legal_acceptance)
+            OrderLegalAcceptanceService.record(order, legal_acceptance)
 
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
@@ -1653,7 +1652,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
-        legal_acceptance: LegalAcceptance | None = None,
+        legal_acceptance: LegalAcceptance,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -1898,8 +1897,7 @@ class OrderService:
             OrderAttributionService.record(
                 order, attribution or AttributionInput(), cart=cart
             )
-            if legal_acceptance is not None:
-                OrderLegalAcceptanceService.record(order, legal_acceptance)
+            OrderLegalAcceptanceService.record(order, legal_acceptance)
 
             # Set payment_id for offline settlements only. Providers
             # that settle by hosted redirect get their payment_id from

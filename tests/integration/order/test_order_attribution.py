@@ -39,7 +39,10 @@ INSTAGRAM_UA = (
 )
 
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+pytestmark = [
+    pytest.mark.usefixtures("trust_intent_binding"),
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 
 @pytest.mark.django_db
@@ -87,6 +90,7 @@ class TestOrderAttributionOnCreate(APITestCase):
             self.url,
             {
                 "payWayId": pay_way.id,
+                "termsAccepted": True,
                 "firstName": "Maria",
                 "lastName": "Papadopoulou",
                 "email": "maria@example.com",

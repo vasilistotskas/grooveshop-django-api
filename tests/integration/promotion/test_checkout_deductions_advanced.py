@@ -23,6 +23,7 @@ from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from promotion.enum import BenefitType, PromotionTrigger
 from promotion.factories import PromotionFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
@@ -106,6 +107,7 @@ class TestZeroTotalSettlement:
         )
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -142,6 +144,7 @@ class TestGiftInjection:
         self._gift_promotion(gift_product)
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -182,6 +185,7 @@ class TestGiftInjection:
         )
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -206,6 +210,7 @@ class TestGiftInjection:
         promotion = self._gift_promotion(gift_product)
 
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=checkout["cart"],
             shipping_address=checkout["shipping_address"],
             pay_way=checkout["pay_way"],
@@ -267,6 +272,7 @@ class TestLoyaltyPaymentIntentParity:
             mock_provider.return_value = instance
 
             order = OrderService.create_order_from_cart(
+                legal_acceptance=checkout_acceptance(),
                 cart=checkout["cart"],
                 shipping_address=checkout["shipping_address"],
                 payment_intent_id="pi_loyalty",
@@ -325,6 +331,7 @@ class TestLoyaltyPaymentIntentParity:
 
             with pytest.raises(PaymentAmountMismatchError):
                 OrderService.create_order_from_cart(
+                    legal_acceptance=checkout_acceptance(),
                     cart=checkout["cart"],
                     shipping_address=checkout["shipping_address"],
                     payment_intent_id="pi_stale",

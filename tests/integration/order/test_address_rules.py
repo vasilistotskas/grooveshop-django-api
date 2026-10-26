@@ -46,6 +46,7 @@ def _create_payload(**overrides):
     region = RegionFactory(country_id="GR")
     data = {
         "pay_way_id": pay_way.id,
+        "terms_accepted": True,
         "first_name": "Jane",
         "last_name": "Doe",
         "email": "jane@example.com",

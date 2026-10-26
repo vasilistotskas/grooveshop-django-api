@@ -38,6 +38,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from user.factories.account import UserAccountFactory
 
 pytestmark = [
@@ -132,7 +133,9 @@ class _Checkout:
             "user": self.user,
         }
         kwargs.update(overrides)
-        return OrderService.create_order_from_cart(**kwargs)
+        return OrderService.create_order_from_cart(
+            legal_acceptance=checkout_acceptance(), **kwargs
+        )
 
     def _stock(self):
         self.product1.refresh_from_db()

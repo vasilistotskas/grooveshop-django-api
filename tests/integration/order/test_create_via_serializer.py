@@ -32,7 +32,10 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
-pytestmark = pytest.mark.usefixtures("trust_intent_binding")
+pytestmark = [
+    pytest.mark.usefixtures("trust_intent_binding"),
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 
 @pytest.mark.django_db
@@ -59,6 +62,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
     def _base_data(self, **overrides):
         data = {
             "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
             "payment_intent_id": "pi_test_abc123",
             "first_name": "John",
             "last_name": "Doe",
@@ -77,6 +81,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
     def _address_payload(self, **overrides):
         data = {
             "pay_way_id": self.pay_way.id,
+            "terms_accepted": True,
             "first_name": "Jane",
             "last_name": "Doe",
             "email": "jane@example.com",
@@ -299,6 +304,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
+            "terms_accepted": True,
             "payment_intent_id": "pi_stripe_test_xyz",
         }
 
@@ -332,6 +338,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
+            "terms_accepted": True,
         }
 
         self.client.force_authenticate(user=self.user)
@@ -376,7 +383,11 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
                 CartItemFactory(cart=cart, product=self.product, quantity=1)
                 response = self.client.post(
                     self.create_url,
-                    {**self._base_address(), "pay_way_id": pay_way.id},
+                    {
+                        **self._base_address(),
+                        "pay_way_id": pay_way.id,
+                        "terms_accepted": True,
+                    },
                     format="json",
                     HTTP_X_CART_ID=str(cart.uuid),
                     HTTP_X_LANGUAGE=language,
@@ -402,7 +413,11 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             settlement=PaySettlement.COURIER_CASH,
             active=False,
         )
-        data = {**self._base_address(), "pay_way_id": pay_way.id}
+        data = {
+            **self._base_address(),
+            "pay_way_id": pay_way.id,
+            "terms_accepted": True,
+        }
 
         self.client.force_authenticate(user=self.user)
         response = self.client.post(
@@ -434,7 +449,11 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             settlement=PaySettlement.ONLINE,
             active=True,
         )
-        data = {**self._base_address(), "pay_way_id": pay_way.id}
+        data = {
+            **self._base_address(),
+            "pay_way_id": pay_way.id,
+            "terms_accepted": True,
+        }
 
         self.client.force_authenticate(user=self.user)
         response = self.client.post(
@@ -475,6 +494,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
+            "terms_accepted": True,
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
             "boxnow_locker_id": "123",
@@ -521,6 +541,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
+            "terms_accepted": True,
             "floor": FloorChoicesEnum.SECOND_FLOOR,
             "location_type": LocationChoicesEnum.OFFICE,
         }

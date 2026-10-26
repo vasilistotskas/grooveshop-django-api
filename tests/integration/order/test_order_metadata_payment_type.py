@@ -25,6 +25,7 @@ from order.services import OrderService
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
+from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 
 pytestmark = pytest.mark.django_db
@@ -85,6 +86,7 @@ class TestPaymentTypeMetadataFollowsThePayWay:
         the 78 mislabelled production orders were written.
         """
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=_cart(),
             shipping_address=_shipping_address(CountryFactory()),
             pay_way=_pay_way(online=True, provider_code="viva_wallet"),
@@ -102,6 +104,7 @@ class TestPaymentTypeMetadataFollowsThePayWay:
         turns on, and the one an auditor reading this key most needs.
         """
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=_cart(),
             shipping_address=_shipping_address(CountryFactory()),
             pay_way=_pay_way(online=False),
@@ -123,6 +126,7 @@ class TestPaymentTypeMetadataFollowsThePayWay:
             free_threshold=Money(Decimal(0), "EUR"),
         )
         order = OrderService.create_order_from_cart_offline(
+            legal_acceptance=checkout_acceptance(),
             cart=_cart(),
             shipping_address=_shipping_address(CountryFactory()),
             pay_way=pay_way,

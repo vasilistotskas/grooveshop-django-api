@@ -15,6 +15,7 @@ from order.serializers.order import OrderCreateFromCartSerializer
 
 BASE_PAYLOAD = {
     "pay_way_id": 1,
+    "terms_accepted": True,
     "first_name": "Nikos",
     "last_name": "Papadopoulos",
     "email": "nikos@example.com",

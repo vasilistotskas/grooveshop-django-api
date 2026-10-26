@@ -24,14 +24,21 @@ from page_config.defaults import (
     tenant_document_context,
 )
 from page_config.legal_documents import (
+    LEGAL_DOCUMENT_SLUGS,
     LEGAL_TEXT_REVISION,
     LEGAL_TEXT_UPDATES,
     RETURN_POLICY_SLUG,
     pending_legal_updates,
     render_legal_fragment,
 )
+from page_config.legal_guard import (
+    NOT_DELETABLE,
+    is_legal_page,
+    translation_deletable,
+)
 from page_config.models import (
     ContentPage,
+    ContentPageTranslation,
     LegalDocumentVersion,
     NavigationColumn,
     NavigationLink,
@@ -345,6 +352,28 @@ class ContentPageAdmin(BaseTranslatableAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("translations")
+
+    def has_delete_permission(self, request, obj=None):
+        # A legal page, and its translation in a language the store
+        # serves, are never deleted (page_config.legal_guard). Parler's
+        # delete-translation view asks with the translation.
+        if isinstance(obj, ContentPage) and is_legal_page(obj.slug):
+            return False
+        if isinstance(obj, ContentPageTranslation) and not (
+            translation_deletable(obj.master.slug, obj.language_code)
+        ):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        # The bulk action asks no per-object permission: skip the legal
+        # pages and say so.
+        legal = queryset.filter(slug__in=LEGAL_DOCUMENT_SLUGS)
+        if legal.exists():
+            self.message_user(request, NOT_DELETABLE, messages.ERROR)
+        super().delete_queryset(
+            request, queryset.exclude(slug__in=LEGAL_DOCUMENT_SLUGS)
+        )
 
     @admin.display(description=_("Title"), ordering="translations__title")
     def title_display(self, obj):

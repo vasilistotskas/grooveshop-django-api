@@ -1358,6 +1358,12 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         except ValidationError as exc:
             raise ValidationError({"schema_name": exc.messages}) from exc
 
+    @property
+    def served_locales(self) -> list[str]:
+        """The languages the storefront serves this store in: the
+        ``available_locales``, or only the default one when none are set."""
+        return list(self.available_locales or [self.default_locale])
+
     def _validate_available_locales(self) -> None:
         # The cross-field rule the field's schema cannot see.
         locales = self.available_locales or []

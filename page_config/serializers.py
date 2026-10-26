@@ -8,6 +8,7 @@ from rest_framework import serializers
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import RequiredDefaultTranslationMixin
 from core.utils.serializers import TranslatedFieldExtended
+from page_config.legal_guard import body_error, publication_error, rename_error
 from page_config.models import (
     ContentPage,
     NavigationMenu,
@@ -324,3 +325,37 @@ class ContentPageWriteSerializer(
             )
 
         return value
+
+    def validate(self, attrs):
+        # A legal page stays published at its slug, with a body in every
+        # language the store serves (page_config.legal_guard), as in the
+        # admin.
+        attrs = super().validate(attrs)
+        page = self.instance
+        slug = attrs.get("slug", page.slug if page else "")
+        renamed = rename_error(page.slug if page else None, slug)
+        if renamed:
+            raise serializers.ValidationError(
+                {"slug": renamed.message}, code=renamed.code
+            )
+        refused = publication_error(
+            slug,
+            is_published=attrs.get(
+                "is_published", page.is_published if page else False
+            ),
+            published_at=page.published_at if page else None,
+        )
+        if refused:
+            raise serializers.ValidationError(
+                {"is_published": refused.message}, code=refused.code
+            )
+        for language, fields in (attrs.get("translations") or {}).items():
+            if "body" not in fields:
+                continue
+            empty = body_error(slug, language, fields["body"])
+            if empty:
+                raise serializers.ValidationError(
+                    {"translations": {language: {"body": empty.message}}},
+                    code=empty.code,
+                )
+        return attrs

@@ -563,6 +563,21 @@ msgstr "Υπάρχει ανοιχτή αμφισβήτηση για αυτή τ�
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
 
+msgid "A legal page cannot be deleted: the storefront serves it, and checkout records which version every order accepted. Edit its text instead."
+msgstr "Μια νομική σελίδα δεν διαγράφεται: το κατάστημα την εμφανίζει, και το ταμείο καταγράφει ποια έκδοσή της αποδέχτηκε κάθε παραγγελία. Επεξεργαστείτε το κείμενό της."
+
+msgid "A legal page keeps its slug: the storefront serves it at a fixed address, and checkout records it by that slug."
+msgstr "Μια νομική σελίδα κρατά το slug της: το κατάστημα την εμφανίζει σε σταθερή διεύθυνση, και το ταμείο την καταγράφει με αυτό."
+
+msgid "A legal page must be published now, not scheduled for later: the storefront hides it until then, and checkout refuses every order meanwhile."
+msgstr "Μια νομική σελίδα πρέπει να είναι δημοσιευμένη τώρα, όχι προγραμματισμένη για αργότερα: το κατάστημα την κρύβει ως τότε, και το ταμείο αρνείται κάθε παραγγελία στο μεταξύ."
+
+msgid "A legal page must stay published: the storefront hides it, and checkout refuses every order while the terms of use or privacy policy cannot be shown. Edit its text instead."
+msgstr "Μια νομική σελίδα πρέπει να μένει δημοσιευμένη: το κατάστημα την κρύβει, και το ταμείο αρνείται κάθε παραγγελία όσο οι όροι χρήσης ή η πολιτική απορρήτου δεν εμφανίζονται. Επεξεργαστείτε το κείμενό της."
+
+msgid "A legal page needs a body in every language the store serves: the storefront shows nothing in that language, and checkout refuses every order there."
+msgstr "Μια νομική σελίδα χρειάζεται κείμενο σε κάθε γλώσσα του καταστήματος: αλλιώς το κατάστημα δεν δείχνει τίποτα σε αυτή τη γλώσσα, και το ταμείο αρνείται κάθε παραγγελία σε αυτήν."
+
 msgid "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
 msgstr "Μια χαμένη αμφισβήτηση επέστρεψε χρήματα στον πελάτη· δηλώστε αν τα προϊόντα επέστρεψαν. Αν επιστράφηκαν ή δεν παραδόθηκαν, πιστώνεται η απόδειξη (πιστωτικό στοιχείο λιανικής), όπως σε μια επιστροφή χρημάτων. Αν ο πελάτης κράτησε τα προϊόντα, η πώληση μένει ως έχει."
 

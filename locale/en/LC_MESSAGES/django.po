@@ -558,6 +558,21 @@ msgstr "A dispute is open on this payment and the payment provider does not acce
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 
+msgid "A legal page cannot be deleted: the storefront serves it, and checkout records which version every order accepted. Edit its text instead."
+msgstr "A legal page cannot be deleted: the storefront serves it, and checkout records which version every order accepted. Edit its text instead."
+
+msgid "A legal page keeps its slug: the storefront serves it at a fixed address, and checkout records it by that slug."
+msgstr "A legal page keeps its slug: the storefront serves it at a fixed address, and checkout records it by that slug."
+
+msgid "A legal page must be published now, not scheduled for later: the storefront hides it until then, and checkout refuses every order meanwhile."
+msgstr "A legal page must be published now, not scheduled for later: the storefront hides it until then, and checkout refuses every order meanwhile."
+
+msgid "A legal page must stay published: the storefront hides it, and checkout refuses every order while the terms of use or privacy policy cannot be shown. Edit its text instead."
+msgstr "A legal page must stay published: the storefront hides it, and checkout refuses every order while the terms of use or privacy policy cannot be shown. Edit its text instead."
+
+msgid "A legal page needs a body in every language the store serves: the storefront shows nothing in that language, and checkout refuses every order there."
+msgstr "A legal page needs a body in every language the store serves: the storefront shows nothing in that language, and checkout refuses every order there."
+
 msgid "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
 msgstr "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
 

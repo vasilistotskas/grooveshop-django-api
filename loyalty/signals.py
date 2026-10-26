@@ -3,7 +3,7 @@ from typing import Any
 
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import Signal, receiver
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -26,8 +26,8 @@ from user.models.account import UserAccount
 # ``dispatch_tier_changed``.  Eliminated the original two per-save
 # ``LoyaltyTier.objects.only("required_level").get(pk=...)`` queries:
 # instead we keep a ``{tier_id: required_level}`` dict in the Django
-# cache (backed by Redis in production).  Any ``LoyaltyTier`` post_save
-# invalidates the entry so the next tier transition picks up the fresh
+# cache (backed by Redis in production).  Any ``LoyaltyTier`` save or
+# delete invalidates the entry so the next tier transition picks up the fresh
 # list within at most TIER_CACHE_TTL seconds.
 _TIER_LEVEL_CACHE_KEY = "loyalty:tier_level_map"
 _TIER_CACHE_TTL = 60  # seconds
@@ -227,17 +227,13 @@ def handle_order_status_refunded_loyalty(
 
 
 @receiver(
-    post_save,
+    [post_save, post_delete],
+    sender="loyalty.LoyaltyTier",
     dispatch_uid="loyalty.invalidate_tier_level_map",
 )
 def _invalidate_tier_level_map(sender: type, **kwargs: Any) -> None:
-    """Bust the tier-level cache whenever any LoyaltyTier row is saved.
-
-    Importing LoyaltyTier at module level causes circular imports so we
-    gate on a string comparison instead.
-    """
-    if sender.__name__ == "LoyaltyTier":
-        cache.delete(_TIER_LEVEL_CACHE_KEY)
+    """Bust the tier-level cache whenever a LoyaltyTier row changes."""
+    cache.delete(_TIER_LEVEL_CACHE_KEY)
 
 
 @receiver(

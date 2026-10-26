@@ -6,9 +6,10 @@ tiers gives every customer (including a brand-new level-1 shopper)
 ``tier=None``. ``loyalty/migrations/0005_seed_default_loyalty_tiers``
 closes that gap.
 
-The dangerous half is the other direction: a merchant may have already
-renamed, re-thresholded, or re-priced these tiers, so the seeder must
-use ``get_or_create`` and never touch an existing row.
+The dangerous half is the other direction: a store that already has
+tiers owns its ladder, so the seeder adds nothing to it — not even the
+default levels it lacks, which once put a second Gold and Platinum
+beside a store's own.
 """
 
 from __future__ import annotations
@@ -34,6 +35,8 @@ def seed():
         from django.apps import apps
 
         module.seed_loyalty_tiers(apps, _SchemaEditor)
+
+    LoyaltyTier.objects.all().delete()
 
     return _run
 
@@ -96,7 +99,6 @@ class TestFreshTenantSeeding:
 @pytest.mark.django_db
 class TestExistingTenantIsUntouched:
     def test_does_not_rewrite_a_merchant_customised_tier(self, seed):
-        LoyaltyTier.objects.all().delete()
         custom = LoyaltyTier.objects.create(
             required_level=1,
             points_multiplier="3.00",
@@ -109,19 +111,20 @@ class TestExistingTenantIsUntouched:
         seed()
 
         custom.refresh_from_db()
-        assert str(custom.points_multiplier) == "3.00", (
-            "seeding overwrote a merchant-customised tier — "
-            "use get_or_create, never update_or_create"
-        )
-        assert LoyaltyTier.objects.filter(required_level=1).count() == 1
+        assert str(custom.points_multiplier) == "3.00"
+        assert LoyaltyTier.objects.count() == 1
 
-    def test_backfills_only_what_is_missing(self, seed):
-        LoyaltyTier.objects.all().delete()
-        LoyaltyTier.objects.create(
-            required_level=1, points_multiplier="1.00", sort_order=0
-        )
+    def test_adds_no_default_level_beside_a_store_ladder(self, seed):
+        for level, sort_order in ((1, 0), (10, 1), (20, 2)):
+            LoyaltyTier.objects.create(
+                required_level=level,
+                points_multiplier="1.00",
+                sort_order=sort_order,
+            )
 
         seed()
 
-        assert LoyaltyTier.objects.count() == 4
-        assert LoyaltyTier.objects.filter(required_level=1).count() == 1
+        levels = set(
+            LoyaltyTier.objects.values_list("required_level", flat=True)
+        )
+        assert levels == {1, 10, 20}

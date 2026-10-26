@@ -8,6 +8,8 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("auth", "0012_alter_user_first_name_max_length"),
+        # The loyalty_tier FK below targets it.
+        ("loyalty", "0001_initial"),
         (
             "country",
             "0006_remove_country_country_cou_alpha_2_398383_idx_and_more",

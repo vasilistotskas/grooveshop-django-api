@@ -15,12 +15,11 @@ Seeded tiers mirror the four-tier shape already used as example data in
 (``LoyaltyService.get_user_level``), so a fresh tenant would otherwise
 have no tier covering its own new users even after this migration.
 
-IDEMPOTENT AND NON-DESTRUCTIVE. ``get_or_create`` keyed on
-``required_level`` (unique on the model), never ``update_or_create``:
-a live tenant may already have merchant-customised tiers (renamed,
-re-thresholded, or re-priced multipliers) and rewriting them would
-silently change what customers are told they need to reach the next
-tier. This migration only ever ADDS missing rows.
+ONLY AN EMPTY LADDER IS SEEDED. A store that already has tiers owns
+its ladder: rewriting or extending it would change what customers are
+told they need to reach the next tier, and adding the defaults at the
+levels it lacks put a second Gold and Platinum beside webside's own
+(removed by ``0011_drop_seeded_duplicate_tiers``).
 """
 
 from __future__ import annotations
@@ -69,25 +68,22 @@ def seed_loyalty_tiers(apps, schema_editor):
         "loyalty", "LoyaltyTierTranslation"
     )
     db_alias = schema_editor.connection.alias
+    if LoyaltyTier.objects.using(db_alias).exists():
+        return
 
     for required_level, multiplier, sort_order, key in DEFAULT_LOYALTY_TIERS:
-        tier, created = LoyaltyTier.objects.using(db_alias).get_or_create(
+        tier = LoyaltyTier.objects.using(db_alias).create(
             required_level=required_level,
-            defaults={
-                "points_multiplier": multiplier,
-                "sort_order": sort_order,
-            },
+            points_multiplier=multiplier,
+            sort_order=sort_order,
         )
-        if not created:
-            # A merchant already owns this row — leave every field alone.
-            continue
-
         for language_code, names in SEED_TRANSLATIONS.items():
             name, description = names[key]
-            LoyaltyTierTranslation.objects.using(db_alias).get_or_create(
+            LoyaltyTierTranslation.objects.using(db_alias).create(
                 master=tier,
                 language_code=language_code,
-                defaults={"name": name, "description": description},
+                name=name,
+                description=description,
             )
 
 

@@ -2,7 +2,7 @@
 
 Verifies that ``dispatch_tier_changed`` no longer issues per-save DB
 queries to resolve tier levels, and that the tier-level map cache is
-correctly invalidated when a LoyaltyTier row is saved.
+correctly invalidated when a LoyaltyTier row is saved or deleted.
 """
 
 from decimal import Decimal
@@ -82,6 +82,18 @@ class TestTierLevelMapCache(TestCase):
 
         # Trigger invalidation via post_save signal
         tier.save()
+
+        assert cache.get(_TIER_LEVEL_CACHE_KEY) is None
+
+    def test_tier_delete_invalidates_cache(self):
+        """A deleted tier must leave the map at once, not after the TTL."""
+        from django.core.cache import cache
+
+        tier = _create_tier(required_level=1, name="Bronze")
+        _get_tier_level_map()
+        assert cache.get(_TIER_LEVEL_CACHE_KEY) is not None
+
+        tier.delete()
 
         assert cache.get(_TIER_LEVEL_CACHE_KEY) is None
 

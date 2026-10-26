@@ -3,6 +3,57 @@
 
 
 
+## v3.155.1 (2026-10-26)
+
+### Bug fixes
+
+* fix(tenant): remove the unread Meta CAPI dataset field and unused code (#334) ([`07afbd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07afbd249e9f1a466fcd5a23f8537bea5e168b14))
+
+### Chores
+
+* chore(locale): drop the catalogue entries of the removed strings
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`07afbd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07afbd249e9f1a466fcd5a23f8537bea5e168b14))
+
+### Code style
+
+* style(meta_capi): format the shortened config error
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`07afbd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07afbd249e9f1a466fcd5a23f8537bea5e168b14))
+
+### Refactoring
+
+* refactor: remove unused code and the unread Meta CAPI dataset field
+
+Tenant.meta_capi_dataset_id was never read: the Conversions API posts to
+the store's meta_pixel_id, which is the dataset, while the admin told
+merchants that an empty dataset ID disabled Meta CAPI. The field leaves
+the admin, the tenant admin serializer, the role scopes and Django's
+state (0061: the columns get a database default for the release still
+serving; the next release drops them).
+
+Also removed, nothing calls or reads them:
+- RefundOrderRequestSerializer and RefundOrderResponseSerializer;
+- shipping.interfaces.all_payload_keys;
+- the ACS_PICKUP_LIST_TIMEZONE and META_CAPI_HTTP_TIMEOUT settings;
+- the invoice storage's legacy names (_private_media_root and the empty
+  TenantPrivateInvoiceStorage subclass; the field's storage callable
+  returns TenantPrivateFileSystemStorage itself);
+- undecided_chargebacks, _resolve_tenant_for_order_code (its tests now
+  exercise _resolve_tenant_candidates, which the webhook calls),
+  tenant_meta_capi_dataset_id, is_disclosure_complete;
+- delta_sigma's MARKER and FOUNDED, and an asgi conftest whose fixtures
+  no test requests.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`07afbd2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07afbd249e9f1a466fcd5a23f8537bea5e168b14))
+
 ## v3.155.0 (2026-10-26)
 
 ### Bug fixes

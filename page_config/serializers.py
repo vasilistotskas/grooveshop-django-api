@@ -8,7 +8,13 @@ from rest_framework import serializers
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import RequiredDefaultTranslationMixin
 from core.utils.serializers import TranslatedFieldExtended
-from page_config.legal_guard import body_error, publication_error, rename_error
+from page_config.legal_guard import (
+    body_error,
+    is_legal_page,
+    publication_error,
+    rename_error,
+    served_locales,
+)
 from page_config.models import (
     ContentPage,
     NavigationMenu,
@@ -292,6 +298,17 @@ class ContentPageDetailSerializer(ContentPageSerializer):
     other translated field, so it adds nothing to the list shape."""
 
 
+def _stored_body(page: ContentPage | None, language: str) -> str | None:
+    """The body *page* already has in *language*, None without one."""
+    if page is None:
+        return None
+    return (
+        page.translations.filter(language_code=language)
+        .values_list("body", flat=True)
+        .first()
+    )
+
+
 class ContentPageWriteSerializer(
     RequiredDefaultTranslationMixin,
     TranslatableModelSerializer,
@@ -349,10 +366,23 @@ class ContentPageWriteSerializer(
             raise serializers.ValidationError(
                 {"is_published": refused.message}, code=refused.code
             )
-        for language, fields in (attrs.get("translations") or {}).items():
-            if "body" not in fields:
-                continue
-            empty = body_error(slug, language, fields["body"])
+        translations = attrs.get("translations") or {}
+        # A new legal page is written in every served language at once;
+        # an existing one is checked in the languages the request writes.
+        languages = (
+            served_locales()
+            if page is None and is_legal_page(slug)
+            else translations.keys()
+        )
+        for language in languages:
+            fields = translations.get(language) or {}
+            # The body the row will have: the one sent, else the stored one.
+            body = (
+                fields["body"]
+                if "body" in fields
+                else _stored_body(page, language)
+            )
+            empty = body_error(slug, language, body)
             if empty:
                 raise serializers.ValidationError(
                     {"translations": {language: {"body": empty.message}}},

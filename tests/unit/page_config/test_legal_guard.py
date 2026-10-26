@@ -238,3 +238,54 @@ class TestStaffApi:
         response = client.delete("/api/v1/content-page/faq")
 
         assert response.status_code == 204
+
+    def test_a_new_served_translation_without_a_body_is_refused(self, client):
+        page = _page()
+        page.translations.filter(language_code="en").delete()
+
+        response = client.patch(
+            "/api/v1/content-page/terms",
+            {
+                "translations": {
+                    "el": {"title": "Όροι"},
+                    "en": {"title": "Terms"},
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert response.json()["code"] == "legal_page_empty"
+
+    def test_a_title_only_edit_keeps_the_stored_body(self, client):
+        _page()
+
+        response = client.patch(
+            "/api/v1/content-page/terms",
+            {
+                "translations": {
+                    "el": {"title": "Όροι"},
+                    "en": {"title": "Terms"},
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == 200, response.json()
+
+    def test_a_new_legal_page_is_written_in_every_served_language(self, client):
+        response = client.post(
+            "/api/v1/content-page",
+            {
+                "slug": "terms",
+                "isPublished": True,
+                "translations": {
+                    "el": {"title": "Όροι", "body": "<p>Όροι</p>"}
+                },
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert response.json()["code"] == "legal_page_empty"
+        assert not ContentPage.objects.filter(slug="terms").exists()

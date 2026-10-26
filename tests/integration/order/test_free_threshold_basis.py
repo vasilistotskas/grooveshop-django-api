@@ -34,7 +34,11 @@ from tests.utils.fake_stripe import fake_stripe
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
 
-pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.assert_english,
+    pytest.mark.usefixtures("checkout_legal_documents"),
+]
 
 THRESHOLD = Decimal("40.00")
 SHIPPING = Decimal("3.00")

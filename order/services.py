@@ -75,10 +75,7 @@ from order.payment_ledger import (
 from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
-from page_config.models import (
-    LegalDocumentUnavailableError,
-    LegalDocumentVersion,
-)
+from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
 from shipping.exceptions import CarrierError, CarrierUnavailableError
@@ -315,8 +312,52 @@ class OrderAttributionService:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class LegalAcceptance:
+    """What the buyer of an order accepted, resolved before it is placed:
+    how, and the version of each checkout legal document in force."""
+
+    source: LegalAcceptanceSource
+    documents: tuple[LegalDocumentVersion, ...]
+
+
+LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
+    "The store's terms of use or privacy policy cannot be shown right "
+    "now, so the order cannot be placed. Please contact the store."
+)
+"""Why a checkout is refused for ``LegalDocumentUnavailableError``: a
+store fault, not the buyer's, said the same before a payment is taken
+(the cart's payment intent) and at order creation."""
+
+
 class OrderLegalAcceptanceService:
     """Which legal texts an order was placed under."""
+
+    @staticmethod
+    def documents_in_force(
+        language_code: str,
+    ) -> tuple[LegalDocumentVersion, ...]:
+        """The version of each checkout legal document a buyer reads in
+        *language_code* now.
+
+        Raises ``LegalDocumentUnavailableError`` when one has no
+        published text in that language: the buyer was shown a broken
+        link, so nothing can be accepted. Checked before any payment is
+        taken (the cart's payment intent) and before an order is created.
+        """
+        return tuple(
+            LegalDocumentVersion.objects.in_force(slug, language_code)
+            for slug in CHECKOUT_CONSENT_SLUGS
+        )
+
+    @classmethod
+    def accept(cls, request) -> LegalAcceptance:
+        """The acceptance behind *request*, in the language its order is
+        placed in (``active_language_code``, as ``Order.language_code``)."""
+        return LegalAcceptance(
+            source=cls.source_for_request(request),
+            documents=cls.documents_in_force(active_language_code()),
+        )
 
     @staticmethod
     def source_for_request(request) -> LegalAcceptanceSource:
@@ -333,24 +374,14 @@ class OrderLegalAcceptanceService:
 
     @staticmethod
     def record(
-        order: Order, source: LegalAcceptanceSource
+        order: Order, acceptance: LegalAcceptance
     ) -> list[OrderLegalAcceptance]:
-        """Record the version of each checkout legal document in force
-        in the order's language.
-
-        Raises ``LegalDocumentUnavailableError`` when one has no
-        published text in that language: the buyer was shown a broken
-        link, so nothing was accepted, and the order must not exist.
-        """
+        """Store *acceptance* on *order*, in its creation transaction."""
         return [
             OrderLegalAcceptance.objects.create(
-                order=order,
-                document=LegalDocumentVersion.objects.in_force(
-                    slug, order.language_code
-                ),
-                source=source,
+                order=order, document=document, source=acceptance.source
             )
-            for slug in CHECKOUT_CONSENT_SLUGS
+            for document in acceptance.documents
         ]
 
 
@@ -804,7 +835,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
-        legal_acceptance: LegalAcceptanceSource | None = None,
+        legal_acceptance: LegalAcceptance | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -924,7 +955,7 @@ class OrderService:
         gift_card_codes: list[str] | None,
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
-        legal_acceptance: LegalAcceptanceSource | None,
+        legal_acceptance: LegalAcceptance | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
@@ -1536,7 +1567,6 @@ class OrderService:
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
-            LegalDocumentUnavailableError,
             PaymentNotFoundError,
             PaymentVerificationError,
             PaymentAmountMismatchError,
@@ -1623,7 +1653,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
-        legal_acceptance: LegalAcceptanceSource | None = None,
+        legal_acceptance: LegalAcceptance | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -2191,7 +2221,6 @@ class OrderService:
             InvalidCouponError,
             InvalidGiftCardError,
             InvalidOrderDataError,
-            LegalDocumentUnavailableError,
         ):
             raise
         except Exception as e:

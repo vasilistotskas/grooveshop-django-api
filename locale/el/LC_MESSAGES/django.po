@@ -870,6 +870,9 @@ msgstr "Αποδοχή στις"
 msgid "Accepted for return"
 msgstr "Αποδεκτό για επιστροφή"
 
+msgid "Accepted legal texts"
+msgstr "Αποδεκτά νομικά κείμενα"
+
 msgid "Accepted through"
 msgstr "Τρόπος αποδοχής"
 
@@ -12396,8 +12399,8 @@ msgstr "Η γραμμή του καταστήματος στις υπόλοιπ�
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "Το κατάστημα δημιουργήθηκε, αλλά οι παρακάτω προεπιλογές δεν αρχικοποιήθηκαν: %(steps)s. Είναι λειτουργικό, αλλά ελέγξτε το log του server — ένα ευρετήριο Meilisearch που λείπει κάνει ΚΑΘΕ αναζήτηση σε αυτό το κατάστημα να επιστρέφει σφάλμα μέχρι να το επιδιορθώσει ο νυχτερινός συγχρονισμός."
 
-msgid "The store's terms cannot be shown right now, so the order cannot be placed. Please contact the store."
-msgstr "Οι όροι του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
+msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
+msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."

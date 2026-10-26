@@ -377,6 +377,12 @@ def store_sidebar(request: Any) -> list[Item]:
         _("Content"),
         [
             page("page_config.ContentPage", _("Pages"), "description"),
+            # What orders were placed under: each text exactly as accepted.
+            page(
+                "page_config.LegalDocumentVersion",
+                _("Accepted legal texts"),
+                "gavel",
+            ),
             _menu(
                 _("Menus"),
                 "menu",

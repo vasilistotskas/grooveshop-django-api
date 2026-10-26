@@ -865,6 +865,9 @@ msgstr "Accepted at"
 msgid "Accepted for return"
 msgstr "Accepted for return"
 
+msgid "Accepted legal texts"
+msgstr "Accepted legal texts"
+
 msgid "Accepted through"
 msgstr "Accepted through"
 
@@ -12389,8 +12392,8 @@ msgstr "The store line in the storefront's other languages, keyed by locale, e.g
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 
-msgid "The store's terms cannot be shown right now, so the order cannot be placed. Please contact the store."
-msgstr "The store's terms cannot be shown right now, so the order cannot be placed. Please contact the store."
+msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
+msgstr "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

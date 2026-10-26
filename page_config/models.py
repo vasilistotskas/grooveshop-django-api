@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -892,21 +893,34 @@ class LegalDocumentUnavailableError(Exception):
         )
 
 
+def legal_text_hash(title: str, body: str) -> str:
+    """SHA-256 of a legal text's title and body.
+
+    Encoded as a JSON pair, so no other title and body produce the same
+    input (a separator character could move between the two).
+    """
+    payload = json.dumps([title, body], ensure_ascii=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 class LegalDocumentVersionManager(models.Manager["LegalDocumentVersion"]):
     def in_force(self, slug: str, language_code: str) -> LegalDocumentVersion:
         """The text of legal page *slug* a shopper reads in
         *language_code* now, as a version row.
 
         Exactly that language, as the storefront's legal routes render
-        it: no fallback to another one. The row is created the first time
-        a text is accepted and reused while the text stays the same; an
-        edit to the page makes the next acceptance a new version.
+        it: no fallback to another one, and only while the page is
+        published as the storefront shows it (``published()``: a page
+        scheduled for later is hidden). The row is created the first
+        time a text is accepted and reused while the text stays the
+        same; an edit to the page makes the next acceptance a new
+        version.
         """
         translation = (
             ContentPageTranslation.objects.select_related("master")
             .filter(
+                master__in=ContentPage.objects.published(),
                 master__slug=slug,
-                master__is_published=True,
                 language_code=language_code,
             )
             .first()
@@ -915,11 +929,10 @@ class LegalDocumentVersionManager(models.Manager["LegalDocumentVersion"]):
             raise LegalDocumentUnavailableError(slug, language_code)
         title = translation.title
         body = translation.body
-        digest = hashlib.sha256(f"{title}\n{body}".encode()).hexdigest()
         version, _created = self.get_or_create(
             page=translation.master,
             language_code=language_code,
-            content_hash=digest,
+            content_hash=legal_text_hash(title, body),
             defaults={"title": title, "body": body},
         )
         return version

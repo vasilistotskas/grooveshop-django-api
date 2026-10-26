@@ -12,6 +12,7 @@ from contextlib import ExitStack
 from typing import cast
 from unittest.mock import patch
 
+import pytest
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -165,6 +166,7 @@ class ExclusionCountryServiceTests(TestCase):
         self.assertIn(self.potg.id, set(gr.values_list("id", flat=True)))
 
 
+@pytest.mark.usefixtures("checkout_legal_documents")
 class ExclusionCountryCallerTests(APITestCase):
     def setUp(self):
         self.potg = PayWayFactory.create_carrier_terminal_payment()

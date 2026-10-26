@@ -10,15 +10,19 @@ legal routes render exactly the page's language and 404 an empty body.
 from __future__ import annotations
 
 import hashlib
+import json
+from datetime import timedelta
 
 import pytest
 from django.db.models import ProtectedError
+from django.utils import timezone
 
 from page_config.models import (
     ContentPage,
     ContentPageTranslation,
     LegalDocumentUnavailableError,
     LegalDocumentVersion,
+    legal_text_hash,
 )
 
 
@@ -46,7 +50,9 @@ class TestInForce:
             "<p>Οι όροι.</p>",
         )
         expected = hashlib.sha256(
-            "Όροι χρήσης\n<p>Οι όροι.</p>".encode()
+            json.dumps(
+                ["Όροι χρήσης", "<p>Οι όροι.</p>"], ensure_ascii=False
+            ).encode()
         ).hexdigest()
         assert version.content_hash == expected
 
@@ -108,6 +114,19 @@ class TestInForce:
         with pytest.raises(LegalDocumentUnavailableError):
             LegalDocumentVersion.objects.in_force("terms", "el")
 
+    def test_a_page_scheduled_for_later_cannot_be_accepted(self) -> None:
+        # The storefront hides it until then (``published()``), so the
+        # shopper could not read it.
+        page = ContentPage.objects.create(
+            slug="terms",
+            is_published=True,
+            published_at=timezone.now() + timedelta(days=1),
+        )
+        _text(page, "el", "Όροι", "<p>Α</p>")
+
+        with pytest.raises(LegalDocumentUnavailableError):
+            LegalDocumentVersion.objects.in_force("terms", "el")
+
     def test_a_missing_page_cannot_be_accepted(self) -> None:
         with pytest.raises(LegalDocumentUnavailableError):
             LegalDocumentVersion.objects.in_force("privacy", "el")
@@ -119,3 +138,12 @@ class TestInForce:
 
         with pytest.raises(ProtectedError):
             page.delete()
+
+
+class TestLegalTextHash:
+    def test_a_separator_moved_between_title_and_body_is_another_text(
+        self,
+    ) -> None:
+        assert legal_text_hash("Όροι\nΑ", "Β") != legal_text_hash(
+            "Όροι", "Α\nΒ"
+        )

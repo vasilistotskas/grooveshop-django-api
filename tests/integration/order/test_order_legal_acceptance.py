@@ -30,6 +30,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils.legal import publish_checkout_legal_documents
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
 
@@ -238,6 +239,28 @@ class TestOrderLegalAcceptanceOnCreate(APITestCase):
         assert not Order.objects.exists()
         assert not OrderLegalAcceptance.objects.exists()
 
+    @patch("order.payment.get_payment_provider")
+    def test_a_missing_text_refuses_before_the_payment_is_looked_up(
+        self, mock_get_provider, *_mocks
+    ):
+        ContentPageTranslation.objects.filter(
+            master=self.pages["terms"], language_code="el"
+        ).delete()
+        pay_way = PayWayFactory(
+            provider_code="stripe",
+            settlement=PaySettlement.ONLINE,
+            active=True,
+        )
+
+        response = self._post(
+            pay_way, paymentIntentId="pi_test_refused", termsAccepted=True
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json()["error"]["document"] == "terms"
+        mock_get_provider.assert_not_called()
+        assert not Order.objects.exists()
+
     def test_an_order_without_the_field_records_nothing(self, *_mocks):
         # Until every client sends it: the field becomes required once
         # the storefront and the agent gateway do.
@@ -245,3 +268,60 @@ class TestOrderLegalAcceptanceOnCreate(APITestCase):
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert self._accepted(response) == {}
+
+
+@pytest.mark.django_db
+class TestPaymentIntentNeedsTheLegalTexts(APITestCase):
+    """A card is confirmed against the cart's payment intent before the
+    order exists, so the intent is refused while a checkout legal text
+    cannot be shown: no money moves for an order Django would refuse."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = UserAccountFactory(num_addresses=0)
+        self.cart = CartFactory(user=self.user, num_cart_items=1)
+        self.client.force_authenticate(user=self.user)
+        self.country = CountryFactory()
+        enable_rate(self.country)
+        self.pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe", active=True
+        )
+
+    def _post(self, language="el"):
+        provider = MagicMock()
+        provider.process_payment.return_value = (
+            True,
+            {"client_secret": "cs_test_legal", "payment_id": "pi_test_legal"},
+        )
+        with patch(
+            "pay_way.services.PayWayService.get_provider_for_pay_way",
+            return_value=provider,
+        ):
+            response = self.client.post(
+                reverse("cart-create-payment-intent"),
+                {
+                    "pay_way_id": self.pay_way.id,
+                    "shipping_kind": "home_delivery",
+                    "country_id": self.country.alpha_2,
+                },
+                format="json",
+                HTTP_X_LANGUAGE=language,
+            )
+        return response, provider
+
+    def test_refused_without_a_text_in_the_language(self):
+        response, provider = self._post()
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json()["code"] == (
+            OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE
+        )
+        provider.process_payment.assert_not_called()
+
+    def test_minted_once_both_texts_are_published(self):
+        publish_checkout_legal_documents()
+
+        response, provider = self._post()
+
+        assert response.status_code == status.HTTP_200_OK, response.json()
+        provider.process_payment.assert_called_once()

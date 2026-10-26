@@ -105,6 +105,7 @@ from order.serializers.order import (
     VivaReturnLookupResponseSerializer,
 )
 from order.services import (
+    LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
     OrderAttributionService,
     OrderLegalAcceptanceService,
     OrderService,
@@ -996,11 +997,7 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(
                 {
-                    "detail": _(
-                        "The store's terms cannot be shown right now, so "
-                        "the order cannot be placed. Please contact the "
-                        "store."
-                    ),
+                    "detail": LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
                     "error": {
                         "type": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
                         "document": e.slug,
@@ -1176,6 +1173,15 @@ class OrderViewSet(BaseModelViewSet):
         # against an allow-list, so it's safe to forward as-is here.
         meta_context = validated_data.get("meta")
 
+        # The legal texts the buyer accepts, resolved before anything is
+        # created or a payment is looked up: a text the store cannot show
+        # refuses the checkout here (``LegalDocumentUnavailableError``).
+        legal_acceptance = (
+            OrderLegalAcceptanceService.accept(request)
+            if validated_data.get("terms_accepted")
+            else None
+        )
+
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
             cart=cart,
@@ -1189,11 +1195,7 @@ class OrderViewSet(BaseModelViewSet):
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
             ),
-            legal_acceptance=(
-                OrderLegalAcceptanceService.source_for_request(request)
-                if validated_data.get("terms_accepted")
-                else None
-            ),
+            legal_acceptance=legal_acceptance,
         )
 
         # Return order details
@@ -1260,6 +1262,15 @@ class OrderViewSet(BaseModelViewSet):
         # ``order_paid`` so the dispatcher needs the same fbp/fbc.
         meta_context = validated_data.get("meta")
 
+        # The legal texts the buyer accepts, resolved before anything is
+        # created or a payment is looked up: a text the store cannot show
+        # refuses the checkout here (``LegalDocumentUnavailableError``).
+        legal_acceptance = (
+            OrderLegalAcceptanceService.accept(request)
+            if validated_data.get("terms_accepted")
+            else None
+        )
+
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
             cart=cart,
@@ -1272,11 +1283,7 @@ class OrderViewSet(BaseModelViewSet):
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
             ),
-            legal_acceptance=(
-                OrderLegalAcceptanceService.source_for_request(request)
-                if validated_data.get("terms_accepted")
-                else None
-            ),
+            legal_acceptance=legal_acceptance,
         )
 
         # Return order details

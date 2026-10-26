@@ -858,6 +858,17 @@ def _retry_meili_connection_errors(attempts: int = 3) -> None:
 
 
 @pytest.fixture
+def checkout_legal_documents(db):
+    """The store's terms of use and privacy policy, published in every
+    language, as every store that takes orders has them. A checkout test
+    that creates a payment intent or an order needs them
+    (``tests/utils/legal.py``)."""
+    from tests.utils.legal import publish_checkout_legal_documents
+
+    return publish_checkout_legal_documents()
+
+
+@pytest.fixture
 def trust_intent_binding():
     """Let a test whose mocked provider returns a bare intent create an order.
 

@@ -161,7 +161,10 @@ serializers_config: SerializersConfig = {
     "create": ActionConfig(
         request=OrderCreateFromCartSerializer,
         response=OrderDetailSerializer,
-        responses={400: OrderCreateErrorSerializer},
+        responses={
+            400: OrderCreateErrorSerializer,
+            409: OrderCreateErrorSerializer,
+        },
     ),
     "update": ActionConfig(
         request=OrderWriteSerializer, response=OrderDetailSerializer

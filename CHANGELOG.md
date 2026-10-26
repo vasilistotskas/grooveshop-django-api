@@ -3,6 +3,43 @@
 
 
 
+## v3.154.1 (2026-10-26)
+
+### Bug fixes
+
+* fix(page_config): a legal page cannot be taken down by an edit (#331) ([`a6c32ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6c32abf45e664604bfa51b3e405e9a7e52db9bf))
+
+* fix(page_config): a legal page cannot be taken down by an edit
+
+The storefront 404s an unpublished or empty legal page, and since
+checkout records the terms and privacy texts each order accepts, it
+refuses every order and card payment while one cannot be shown. One
+edit could stop a store's sales. The admin and the staff API now refuse
+unpublishing, scheduling for later, renaming, emptying a language the
+store serves, or deleting a legal page (terms, privacy, cookies), with
+stable codes; rewriting the text stays free. Parler's delete-translation
+view and the bulk delete are covered too.
+
+Tenant.served_locales names the languages a store serves (the default
+one when none are set).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`a6c32ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6c32abf45e664604bfa51b3e405e9a7e52db9bf))
+
+* fix(page_config): judge the body a legal translation will have
+
+From review: the staff API skipped a translation sent without a body,
+so a new served-language row could be saved empty. It now checks the
+body the row will have (the one sent, else the stored one), and a new
+legal page must be written in every language the store serves.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a6c32ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6c32abf45e664604bfa51b3e405e9a7e52db9bf))
+
 ## v3.154.0 (2026-10-26)
 
 ### Bug fixes

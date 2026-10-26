@@ -306,17 +306,3 @@ def get_provider(code: str) -> ShippingCarrierInterface:
 def is_registered(code: str) -> bool:
     """Return True when an adapter is registered under ``code``."""
     return code in _REGISTRY
-
-
-def all_payload_keys() -> tuple[str, ...]:
-    """Return the union of every registered carrier's ``payload_keys``.
-
-    Used by the order-creation paths to pop carrier-specific keys off
-    the request body before calling ``Order.objects.create`` so adding
-    a new carrier doesn't require editing ``order/services.py`` to
-    extend a hardcoded ``_SHIPMENT_PAYLOAD_KEYS`` tuple.
-    """
-    keys: set[str] = set()
-    for adapter in _REGISTRY.values():
-        keys.update(adapter.payload_keys)
-    return tuple(sorted(keys))

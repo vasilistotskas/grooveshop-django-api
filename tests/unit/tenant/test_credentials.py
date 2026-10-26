@@ -30,7 +30,6 @@ from tenant.credentials import (
     tenant_from_email,
     tenant_logo_url,
     tenant_meta_capi_access_token,
-    tenant_meta_capi_dataset_id,
     tenant_meta_pixel_id,
     tenant_reply_to,
     tenant_site_name,
@@ -171,12 +170,6 @@ _TENANT_ONLY = [
         "meta_capi_access_token",
         "META_CAPI_ACCESS_TOKEN",
         "EAAshoptoken",
-    ),
-    _single(
-        tenant_meta_capi_dataset_id,
-        "meta_capi_dataset_id",
-        "META_PIXEL_ID",
-        "9999888877776666",
     ),
     _single(
         tenant_meta_pixel_id,

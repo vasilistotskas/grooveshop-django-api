@@ -395,15 +395,6 @@ def tenant_meta_capi_access_token() -> str:
     return _get_tenant_field("meta_capi_access_token")
 
 
-def tenant_meta_capi_dataset_id() -> str:
-    """Return the Meta CAPI dataset ID for the active tenant.
-
-    The dataset ID is the pixel ID used for server-side dedup.
-    Tenant-only — no platform fallback.
-    """
-    return _get_tenant_field("meta_capi_dataset_id")
-
-
 def tenant_meta_pixel_id() -> str:
     """Return the browser-side Meta Pixel ID for the active tenant.
 

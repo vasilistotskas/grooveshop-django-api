@@ -1818,59 +1818,6 @@ class ConfirmAgentPaymentResponseSerializer(serializers.Serializer):
     provider = serializers.CharField(help_text=_("Payment provider name"))
 
 
-class RefundOrderRequestSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        required=False,
-        allow_null=True,
-        help_text=_("Partial refund amount. Leave empty for full refund."),
-    )
-    currency = serializers.CharField(
-        max_length=3,
-        required=False,
-        allow_null=True,
-        help_text=_(
-            "Currency code (e.g., USD, EUR). Required if amount is provided."
-        ),
-    )
-    reason = serializers.CharField(
-        max_length=500,
-        required=False,
-        allow_blank=True,
-        help_text=_("Reason for the refund"),
-    )
-
-    def validate(self, attrs):
-        amount = attrs.get("amount")
-        currency = attrs.get("currency")
-
-        if amount is not None and not currency:
-            raise serializers.ValidationError(
-                {"currency": _("Currency is required when amount is provided")},
-                code="currency_required",
-            )
-
-        if amount is not None and amount <= 0:
-            raise serializers.ValidationError(
-                {"amount": _("Refund amount must be greater than 0")},
-                code="refund_amount_invalid",
-            )
-
-        return attrs
-
-
-class RefundOrderResponseSerializer(serializers.Serializer):
-    success = serializers.BooleanField()
-    refund_id = serializers.CharField(required=False)
-    status = serializers.CharField()
-    amount = serializers.CharField()
-    payment_id = serializers.CharField(required=False)
-    stripe_status = serializers.CharField(required=False)
-    error = serializers.CharField(required=False)
-    message = serializers.CharField(required=False)
-
-
 class PaymentStatusResponseSerializer(serializers.Serializer):
     payment_id = serializers.CharField()
     status = serializers.CharField()

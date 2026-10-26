@@ -414,7 +414,7 @@ class TenantConfigSerializer(serializers.Serializer):
     # Platform admins can read it via TenantAdminSerializer.
 
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
-    # ``meta_capi_dataset_id``, all Viva Wallet keys, all ACS credentials,
+    # all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
     # ``box_now_notify_phone``, ``stripe_secret_key``, and
     # ``chat_api_key`` are intentionally excluded — they are secrets or
@@ -533,7 +533,6 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "google_ads_add_payment_info_label",
             "google_ads_page_view_label",
             "meta_capi_access_token",
-            "meta_capi_dataset_id",
             # --- Authentication ---
             "totp_issuer",
             # --- Agentic Commerce ---

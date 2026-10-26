@@ -12,20 +12,17 @@ from unittest import mock
 
 from django.db import connection
 
-from order.models.invoice import (
-    Invoice,
-    TenantPrivateInvoiceStorage,
-    _private_media_root,
-)
+from order.models.invoice import Invoice
+from tenant.storage import TenantPrivateFileSystemStorage, private_media_root
 
 
 def _schema_segment(path: str) -> str:
     return path.rstrip("/").rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
 
 
-class TestTenantPrivateInvoiceStorage:
+class TestTenantPrivateStorage:
     def test_location_tracks_the_active_schema(self):
-        storage = TenantPrivateInvoiceStorage()
+        storage = TenantPrivateFileSystemStorage()
         with mock.patch.object(connection, "schema_name", "acme"):
             assert _schema_segment(storage.location) == "acme"
             assert _schema_segment(storage.base_location) == "acme"
@@ -33,7 +30,7 @@ class TestTenantPrivateInvoiceStorage:
             assert _schema_segment(storage.location) == "beta"
 
     def test_two_schemas_get_distinct_locations(self):
-        storage = TenantPrivateInvoiceStorage()
+        storage = TenantPrivateFileSystemStorage()
         with mock.patch.object(connection, "schema_name", "acme"):
             acme = storage.location
         with mock.patch.object(connection, "schema_name", "beta"):
@@ -41,9 +38,9 @@ class TestTenantPrivateInvoiceStorage:
         assert acme != beta
 
     def test_location_lives_under_the_private_root(self):
-        storage = TenantPrivateInvoiceStorage()
+        storage = TenantPrivateFileSystemStorage()
         with mock.patch.object(connection, "schema_name", "acme"):
-            assert storage.location.startswith(_private_media_root())
+            assert storage.location.startswith(private_media_root())
 
 
 class TestInvoiceFieldStorage:
@@ -51,7 +48,7 @@ class TestInvoiceFieldStorage:
         """The FileField resolved the callable to the per-tenant class,
         not a location-frozen FileSystemStorage."""
         storage = Invoice._meta.get_field("document_file").storage
-        assert isinstance(storage, TenantPrivateInvoiceStorage)
+        assert isinstance(storage, TenantPrivateFileSystemStorage)
 
     def test_field_storage_is_not_frozen_to_public(self):
         storage = Invoice._meta.get_field("document_file").storage

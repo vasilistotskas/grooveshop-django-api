@@ -76,7 +76,6 @@ def test_the_tenant_row_loses_every_integration_field():
         "acs_user_id",
         "box_now_client_id",
         "mydata_user_id",
-        "meta_capi_dataset_id",
         "meta_pixel_id",
         "ga_tracking_id",
         "chat_api_key",

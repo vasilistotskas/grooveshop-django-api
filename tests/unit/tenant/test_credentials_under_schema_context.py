@@ -140,13 +140,11 @@ def test_meta_capi_and_pixel_resolve_under_schema_context():
     tenant = store_tenant(
         "creds_meta",
         meta_capi_access_token="token",
-        meta_capi_dataset_id="dataset",
         meta_pixel_id="pixel",
     )
 
     with schema_context(tenant.schema_name):
         assert credentials.tenant_meta_capi_access_token() == "token"
-        assert credentials.tenant_meta_capi_dataset_id() == "dataset"
         assert credentials.tenant_meta_pixel_id() == "pixel"
 
 

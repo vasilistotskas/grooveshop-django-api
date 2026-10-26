@@ -36,7 +36,6 @@ from djmoney.models.fields import MoneyField
 from core.models import TimeStampMixinModel, UUIDModel
 from tenant.storage import (
     TenantPrivateFileSystemStorage,
-    private_media_root,
 )
 
 INVOICE_NUMBER_FORMAT = "INV-{year}-{number:06d}"
@@ -65,22 +64,6 @@ class MyDataStatus(models.TextChoices):
     CANCELED = "CANCELED", _("Canceled in myDATA")
 
 
-# The private tree and its per-tenant storage are shared with every
-# other private FileField (contact attachments today) — see
-# ``tenant.storage``. Both names are kept here because this module's
-# own tests and three migrations reference them.
-_private_media_root = private_media_root
-
-
-class TenantPrivateInvoiceStorage(TenantPrivateFileSystemStorage):
-    """The shared per-tenant private storage, under its old name.
-
-    Kept as a distinct class only so the migrations that named it, and
-    the tests that import it, keep resolving. Everything it does is in
-    ``tenant.storage.TenantPrivateFileSystemStorage``.
-    """
-
-
 def _private_invoice_storage() -> Any:
     """Return the per-tenant private storage backend for invoice files.
 
@@ -88,13 +71,13 @@ def _private_invoice_storage() -> Any:
     definition time (no tenant bound). Returning a storage whose
     location is resolved eagerly here would therefore partition every
     tenant's invoices under the public schema for the process lifetime;
-    returning ``TenantPrivateInvoiceStorage`` — whose location is a
+    returning ``TenantPrivateFileSystemStorage`` — whose location is a
     property — defers the per-tenant partitioning to each file
     operation instead. The private tree lives outside every public web
     root, so ``{PRIVATE_MEDIA_ROOT}/{schema}/`` is a defence-in-depth
     boundary on top of the authenticated ``invoice_download`` view.
     """
-    return TenantPrivateInvoiceStorage()
+    return TenantPrivateFileSystemStorage()
 
 
 def _invoice_upload_to(instance: Invoice, filename: str) -> str:

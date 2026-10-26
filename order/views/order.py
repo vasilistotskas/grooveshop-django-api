@@ -104,7 +104,13 @@ from order.serializers.order import (
     UpdateStatusSerializer,
     VivaReturnLookupResponseSerializer,
 )
-from order.services import OrderAttributionService, OrderService
+from order.services import (
+    LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
+    OrderAttributionService,
+    OrderLegalAcceptanceService,
+    OrderService,
+)
+from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
@@ -155,7 +161,10 @@ serializers_config: SerializersConfig = {
     "create": ActionConfig(
         request=OrderCreateFromCartSerializer,
         response=OrderDetailSerializer,
-        responses={400: OrderCreateErrorSerializer},
+        responses={
+            400: OrderCreateErrorSerializer,
+            409: OrderCreateErrorSerializer,
+        },
     ),
     "update": ActionConfig(
         request=OrderWriteSerializer, response=OrderDetailSerializer
@@ -980,6 +989,27 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except LegalDocumentUnavailableError as e:
+            # A store fault, not the buyer's: the checkout linked a page
+            # with no published text in this language, so nothing could
+            # be accepted. Logged as an error so the store gets fixed.
+            logger.error(
+                "Order refused: legal page %r has no published text in %r",
+                e.slug,
+                e.language_code,
+            )
+            return Response(
+                {
+                    "detail": LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
+                    "error": {
+                        "type": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
+                        "document": e.slug,
+                    },
+                    "code": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         except InvalidGiftCardError as e:
             logger.warning(
                 "Gift card refused at order creation: reason=%s", e.reason
@@ -1146,6 +1176,15 @@ class OrderViewSet(BaseModelViewSet):
         # against an allow-list, so it's safe to forward as-is here.
         meta_context = validated_data.get("meta")
 
+        # The legal texts the buyer accepts, resolved before anything is
+        # created or a payment is looked up: a text the store cannot show
+        # refuses the checkout here (``LegalDocumentUnavailableError``).
+        legal_acceptance = (
+            OrderLegalAcceptanceService.accept(request)
+            if validated_data.get("terms_accepted")
+            else None
+        )
+
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
             cart=cart,
@@ -1159,6 +1198,7 @@ class OrderViewSet(BaseModelViewSet):
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
             ),
+            legal_acceptance=legal_acceptance,
         )
 
         # Return order details
@@ -1225,6 +1265,15 @@ class OrderViewSet(BaseModelViewSet):
         # ``order_paid`` so the dispatcher needs the same fbp/fbc.
         meta_context = validated_data.get("meta")
 
+        # The legal texts the buyer accepts, resolved before anything is
+        # created or a payment is looked up: a text the store cannot show
+        # refuses the checkout here (``LegalDocumentUnavailableError``).
+        legal_acceptance = (
+            OrderLegalAcceptanceService.accept(request)
+            if validated_data.get("terms_accepted")
+            else None
+        )
+
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
             cart=cart,
@@ -1237,6 +1286,7 @@ class OrderViewSet(BaseModelViewSet):
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
             ),
+            legal_acceptance=legal_acceptance,
         )
 
         # Return order details

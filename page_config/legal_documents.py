@@ -61,6 +61,15 @@ Kept in step with the storefront's ``LEGAL_ROUTE_SLUGS``, which maps the
 same slugs to their dedicated routes.
 """
 
+CHECKOUT_CONSENT_SLUGS: tuple[str, ...] = ("terms", "privacy")
+"""The documents a shopper accepts by placing an order.
+
+The storefront's checkout consent names both ("I agree to the terms of
+use and have read the privacy policy"), and the agent checkouts link
+both. Every order records the version of each it was placed under
+(``order.OrderLegalAcceptance``).
+"""
+
 
 # The server-log disclosure, in every language the platform writes it
 # in. Kept apart from ``LEGAL_DOCUMENTS`` for two readers: the Greek

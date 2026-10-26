@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
@@ -873,3 +875,109 @@ class ContentPageTranslation(  # ty: ignore[invalid-method-override]
     def __str__(self) -> str:
         title = self.title or gettext("Untitled")
         return f"{title} ({self.language_code})"
+
+
+class LegalDocumentUnavailableError(Exception):
+    """A legal page cannot be accepted in a language: it is unpublished,
+    missing, or has no body there.
+
+    The storefront 404s such a page, so a shopper was shown a broken
+    link instead of the text. Nothing can record that as accepted.
+    """
+
+    def __init__(self, slug: str, language_code: str):
+        self.slug = slug
+        self.language_code = language_code
+        super().__init__(
+            f"Legal page {slug!r} has no published text in {language_code!r}"
+        )
+
+
+def legal_text_hash(title: str, body: str) -> str:
+    """SHA-256 of a legal text's title and body.
+
+    Encoded as a JSON pair, so no other title and body produce the same
+    input (a separator character could move between the two).
+    """
+    payload = json.dumps([title, body], ensure_ascii=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+class LegalDocumentVersionManager(models.Manager["LegalDocumentVersion"]):
+    def in_force(self, slug: str, language_code: str) -> LegalDocumentVersion:
+        """The text of legal page *slug* a shopper reads in
+        *language_code* now, as a version row.
+
+        Exactly that language, as the storefront's legal routes render
+        it: no fallback to another one, and only while the page is
+        published as the storefront shows it (``published()``: a page
+        scheduled for later is hidden). The row is created the first
+        time a text is accepted and reused while the text stays the
+        same; an edit to the page makes the next acceptance a new
+        version.
+        """
+        translation = (
+            ContentPageTranslation.objects.select_related("master")
+            .filter(
+                master__in=ContentPage.objects.published(),
+                master__slug=slug,
+                language_code=language_code,
+            )
+            .first()
+        )
+        if translation is None or not (translation.body or "").strip():
+            raise LegalDocumentUnavailableError(slug, language_code)
+        title = translation.title
+        body = translation.body
+        version, _created = self.get_or_create(
+            page=translation.master,
+            language_code=language_code,
+            content_hash=legal_text_hash(title, body),
+            defaults={"title": title, "body": body},
+        )
+        return version
+
+
+class LegalDocumentVersion(models.Model):
+    """The exact text of a legal page in one language, as it was accepted.
+
+    Never edited: a merchant may rewrite the page at any time, so what an
+    order was placed under is a snapshot of the title and body, keyed by
+    their SHA-256. One row per distinct text, shared by every acceptance
+    of it. The page is protected while versions of it exist, so the
+    record of what shoppers accepted cannot be deleted with it.
+    """
+
+    page = models.ForeignKey(
+        ContentPage,
+        on_delete=models.PROTECT,
+        related_name="versions",
+        verbose_name=_("Page"),
+    )
+    language_code = models.CharField(_("Language"), max_length=15)
+    title = models.CharField(_("Title"), max_length=255, blank=True)
+    body = models.TextField(_("Body"))
+    content_hash = models.CharField(
+        _("Content hash"),
+        max_length=64,
+        help_text=_("SHA-256 of the title and body, as accepted."),
+    )
+    created_at = models.DateTimeField(_("First accepted at"), auto_now_add=True)
+
+    objects: LegalDocumentVersionManager = LegalDocumentVersionManager()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Legal document version")
+        verbose_name_plural = _("Legal document versions")
+        ordering = ["page", "language_code", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "language_code", "content_hash"],
+                name="legal_document_version_unique_text",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.page.slug} ({self.language_code}) {self.content_hash[:12]}"
+        )

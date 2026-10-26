@@ -22,6 +22,7 @@ from order.attribution import (
 )
 from order.discounts import add_line_discounts, spread_by_remaining_value
 from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.legal_acceptance import LegalAcceptanceSource
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -50,6 +51,7 @@ from order.exceptions import (
 )
 from order.models.attribution import OrderAttribution
 from order.models.item import OrderItem
+from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
 from order.models.refund_attempt import (
     RefundAttempt,
@@ -72,6 +74,8 @@ from order.payment_ledger import (
 )
 from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
+from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
+from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
 from promotion.services import CouponService, PromotionEngine
 from shipping.exceptions import CarrierError, CarrierUnavailableError
@@ -306,6 +310,79 @@ class OrderAttributionService:
             referrer_host=classified.referrer_host,
             landing_path=classified.landing_path,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class LegalAcceptance:
+    """What the buyer of an order accepted, resolved before it is placed:
+    how, and the version of each checkout legal document in force."""
+
+    source: LegalAcceptanceSource
+    documents: tuple[LegalDocumentVersion, ...]
+
+
+LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
+    "The store's terms of use or privacy policy cannot be shown right "
+    "now, so the order cannot be placed. Please contact the store."
+)
+"""Why a checkout is refused for ``LegalDocumentUnavailableError``: a
+store fault, not the buyer's, said the same before a payment is taken
+(the cart's payment intent) and at order creation."""
+
+
+class OrderLegalAcceptanceService:
+    """Which legal texts an order was placed under."""
+
+    @staticmethod
+    def documents_in_force(
+        language_code: str,
+    ) -> tuple[LegalDocumentVersion, ...]:
+        """The version of each checkout legal document a buyer reads in
+        *language_code* now.
+
+        Raises ``LegalDocumentUnavailableError`` when one has no
+        published text in that language: the buyer was shown a broken
+        link, so nothing can be accepted. Checked before any payment is
+        taken (the cart's payment intent) and before an order is created.
+        """
+        return tuple(
+            LegalDocumentVersion.objects.in_force(slug, language_code)
+            for slug in CHECKOUT_CONSENT_SLUGS
+        )
+
+    @classmethod
+    def accept(cls, request) -> LegalAcceptance:
+        """The acceptance behind *request*, in the language its order is
+        placed in (``active_language_code``, as ``Order.language_code``)."""
+        return LegalAcceptance(
+            source=cls.source_for_request(request),
+            documents=cls.documents_in_force(active_language_code()),
+        )
+
+    @staticmethod
+    def source_for_request(request) -> LegalAcceptanceSource:
+        """How the buyer behind *request* accepted the documents.
+
+        The agent gateway proves itself with its shared secret
+        (``X-Internal-Gateway``), as for the agent attribution: its
+        checkouts link the documents for the agent to present. Every
+        other caller is the storefront's checkout consent.
+        """
+        if is_internal_caller(request.headers.get("X-Internal-Gateway", "")):
+            return LegalAcceptanceSource.AGENT_CHECKOUT
+        return LegalAcceptanceSource.CHECKOUT_CONSENT
+
+    @staticmethod
+    def record(
+        order: Order, acceptance: LegalAcceptance
+    ) -> list[OrderLegalAcceptance]:
+        """Store *acceptance* on *order*, in its creation transaction."""
+        return [
+            OrderLegalAcceptance.objects.create(
+                order=order, document=document, source=acceptance.source
+            )
+            for document in acceptance.documents
+        ]
 
 
 class OrderService:
@@ -758,6 +835,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
+        legal_acceptance: LegalAcceptance | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -858,6 +936,7 @@ class OrderService:
             gift_card_codes=gift_card_codes,
             meta_context=meta_context,
             attribution=attribution,
+            legal_acceptance=legal_acceptance,
         )
 
     @classmethod
@@ -876,6 +955,7 @@ class OrderService:
         gift_card_codes: list[str] | None,
         meta_context: dict[str, Any] | None,
         attribution: AttributionInput | None,
+        legal_acceptance: LegalAcceptance | None,
     ) -> Order:
         """The locked half of ``create_order_from_cart``.
 
@@ -1237,6 +1317,8 @@ class OrderService:
             OrderAttributionService.record(
                 order, attribution or AttributionInput(), cart=cart
             )
+            if legal_acceptance is not None:
+                OrderLegalAcceptanceService.record(order, legal_acceptance)
 
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
@@ -1571,6 +1653,7 @@ class OrderService:
         gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
         attribution: AttributionInput | None = None,
+        legal_acceptance: LegalAcceptance | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -1815,6 +1898,8 @@ class OrderService:
             OrderAttributionService.record(
                 order, attribution or AttributionInput(), cart=cart
             )
+            if legal_acceptance is not None:
+                OrderLegalAcceptanceService.record(order, legal_acceptance)
 
             # Set payment_id for offline settlements only. Providers
             # that settle by hosted redirect get their payment_id from

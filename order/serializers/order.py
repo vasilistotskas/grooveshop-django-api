@@ -1281,6 +1281,29 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         required=False, write_only=True
     )
 
+    # ---------- Legal acceptance ----------
+    # The buyer accepts the store's terms of use and privacy policy by
+    # ordering: the storefront sends its checkout consent, the agent
+    # gateway the completion of a checkout that linked both. Each order
+    # records the version of each it was placed under
+    # (``OrderLegalAcceptanceService``).
+    terms_accepted = serializers.BooleanField(
+        required=False,
+        write_only=True,
+        help_text=_(
+            "The buyer accepts the store's terms of use and privacy "
+            "policy. Must be true."
+        ),
+    )
+
+    def validate_terms_accepted(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(
+                _("Accept the terms of use to place your order."),
+                code="terms_not_accepted",
+            )
+        return value
+
     def validate_email(self, value: str) -> str:
         """Validate email is not from disposable domain."""
         if not value:
@@ -1967,7 +1990,10 @@ class OrderCreateErrorDetailSerializer(serializers.Serializer):
 
 
 class OrderCreateErrorSerializer(serializers.Serializer):
-    """The 400 body of ``POST /order``.
+    """The 400 or 409 body of ``POST /order``.
+
+    409 is ``legal_document_unavailable``: a checkout legal text the
+    store cannot show in the order's language.
 
     A refusal the order service understands carries ``error.type``; a
     malformed payload is DRF's field-error map instead (``{field:

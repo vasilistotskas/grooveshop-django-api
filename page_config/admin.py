@@ -18,6 +18,7 @@ from admin.base import (
     BaseTranslatableTabularInline,
 )
 from core.store_settings import store_settings
+from core.utils.sanitize import sanitize_html
 from page_config.defaults import (
     pending_legal_reviews,
     tenant_document_context,
@@ -31,6 +32,7 @@ from page_config.legal_documents import (
 )
 from page_config.models import (
     ContentPage,
+    LegalDocumentVersion,
     NavigationColumn,
     NavigationLink,
     NavigationMenu,
@@ -252,6 +254,48 @@ class NavigationMenuLinkInline(NavigationLinkInline):
     fk_name = "menu"
     verbose_name = _("Link")
     verbose_name_plural = _("Links")
+
+
+@admin.register(LegalDocumentVersion)
+class LegalDocumentVersionAdmin(BaseModelAdmin):
+    """The legal texts orders were placed under, exactly as accepted.
+
+    Read-only: a version is evidence. It is written when an order
+    accepts a text (``LegalDocumentVersion.objects.in_force``) and
+    never changed or deleted here.
+    """
+
+    list_display = ("page", "language_code", "short_hash", "created_at")
+    list_filter = ("page", "language_code")
+    search_fields = ("content_hash", "title")
+    readonly_fields = (
+        "page",
+        "language_code",
+        "title",
+        "body_display",
+        "content_hash",
+        "created_at",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("Hash"))
+    def short_hash(self, obj):
+        return obj.content_hash[:12]
+
+    @admin.display(description=_("Body"))
+    def body_display(self, obj):
+        # Sanitised again on the way out: the stored text is evidence,
+        # kept as it was accepted, and is shown, never trusted.
+        return mark_safe(sanitize_html(obj.body))
 
 
 @admin.register(ContentPage)

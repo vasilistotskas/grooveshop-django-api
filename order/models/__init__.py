@@ -3,6 +3,7 @@ from .chargeback_decision import ChargebackDecision
 from .history import OrderHistory, OrderItemHistory
 from .invoice import Invoice, InvoiceCounter
 from .item import OrderItem
+from .legal_acceptance import OrderLegalAcceptance
 from .order import Order
 from .payment_transaction import PaymentTransaction
 from .refund_attempt import RefundAttempt
@@ -22,6 +23,7 @@ __all__ = [
     "OrderHistory",
     "OrderItem",
     "OrderItemHistory",
+    "OrderLegalAcceptance",
     "PaymentTransaction",
     "RefundAttempt",
     "RefundNotification",

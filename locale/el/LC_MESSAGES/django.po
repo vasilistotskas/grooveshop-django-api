@@ -829,6 +829,10 @@ msgstr "Πράκτορας AI"
 msgid "AI agent (%(protocol)s)"
 msgstr "Πράκτορας AI (%(protocol)s)"
 
+msgctxt "legal acceptance source"
+msgid "AI agent checkout"
+msgstr "Αγορά μέσω πράκτορα AI"
+
 msgid "API Tokens"
 msgstr "Tokens API"
 
@@ -857,8 +861,20 @@ msgstr "Περιεχόμενο «Σχετικά με εμάς»"
 msgid "Accent Hex"
 msgstr "Χρώμα Accent (Hex)"
 
+msgid "Accept the terms of use to place your order."
+msgstr "Αποδεχτείτε τους όρους χρήσης για να ολοκληρώσετε την παραγγελία."
+
+msgid "Accepted at"
+msgstr "Αποδοχή στις"
+
 msgid "Accepted for return"
 msgstr "Αποδεκτό για επιστροφή"
+
+msgid "Accepted legal texts"
+msgstr "Αποδεκτά νομικά κείμενα"
+
+msgid "Accepted through"
+msgstr "Τρόπος αποδοχής"
 
 msgid "Accepted to locker"
 msgstr "Αποδεκτό σε locker"
@@ -2405,6 +2421,10 @@ msgstr "Ελέγχεται σε κάθε ολοκλήρωση αγοράς κα�
 msgid "Checkout"
 msgstr "Ολοκλήρωση αγοράς"
 
+msgctxt "legal acceptance source"
+msgid "Checkout consent"
+msgstr "Συναίνεση στο ταμείο"
+
 msgid "Checkout email — used for guest per-customer limits"
 msgstr "Email ολοκλήρωσης αγοράς — χρησιμοποιείται για τα όρια ανά πελάτη των επισκεπτών"
 
@@ -2784,6 +2804,9 @@ msgstr "Προεπισκόπηση περιεχομένου"
 
 msgid "Content Type"
 msgstr "Τύπος Περιεχομένου"
+
+msgid "Content hash"
+msgstr "Αποτύπωμα περιεχομένου"
 
 msgid "Content page"
 msgstr "Σελίδα περιεχομένου"
@@ -3547,6 +3570,9 @@ msgstr "Στοιχεία παραστατικού"
 
 msgid "Document number"
 msgstr "Αριθμός παραστατικού"
+
+msgid "Document version"
+msgstr "Έκδοση εγγράφου"
 
 msgid "Documents"
 msgstr "Έγγραφα"
@@ -5294,6 +5320,9 @@ msgstr "Όνομα"
 msgid "First Order Only"
 msgstr "Μόνο για την πρώτη παραγγελία"
 
+msgid "First accepted at"
+msgstr "Πρώτη αποδοχή στις"
+
 msgid "First name"
 msgstr "Όνομα"
 
@@ -6005,6 +6034,9 @@ msgstr "Έχει social media"
 
 msgid "Has Website"
 msgstr "Έχει ιστότοπο"
+
+msgid "Hash"
+msgstr "Αποτύπωμα"
 
 msgid "Header"
 msgstr "Κεφαλίδα"
@@ -6799,6 +6831,21 @@ msgstr "Αφήστε το κενό ώστε ένας σύνδεσμος σελί
 
 msgid "Ledger"
 msgstr "Καθολικό"
+
+msgid "Legal acceptance"
+msgstr "Αποδοχή νομικών όρων"
+
+msgid "Legal acceptances"
+msgstr "Αποδοχές νομικών όρων"
+
+msgid "Legal document unavailable"
+msgstr "Νομικό έγγραφο μη διαθέσιμο"
+
+msgid "Legal document version"
+msgstr "Έκδοση νομικού εγγράφου"
+
+msgid "Legal document versions"
+msgstr "Εκδόσεις νομικών εγγράφων"
 
 msgctxt "legal details alert"
 msgid "Legal form (e.g. sole trader, IKE, AE)"
@@ -10660,6 +10707,9 @@ msgstr "SHA-256 των πεδίων ACS που ταυτοποιούν τη γρ�
 msgid "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 msgstr "SHA-256 των bytes του 'data' με υπογραφή HMAC. Η υπογραφή καλύπτει μόνο το 'data', όχι το 'id' του φακέλου, οπότε ο εντοπισμός διπλότυπων επαναλήψεων (replay) βασίζεται και σε αυτό το hash περιεχομένου — ένα υποκλαπέν συμβάν που υποβάλλεται ξανά με νέο/πλαστό 'id' εξακολουθεί να συγκρούεται εδώ."
 
+msgid "SHA-256 of the title and body, as accepted."
+msgstr "SHA-256 του τίτλου και του κειμένου, όπως έγιναν αποδεκτά."
+
 msgid "SHIPPING ADDRESS"
 msgstr "ΔΙΕΥΘΥΝΣΗ ΑΠΟΣΤΟΛΗΣ"
 
@@ -12073,6 +12123,9 @@ msgstr "Οι εφαρμοσμένες εκπτώσεις και δωροκάρτ
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr "Ο κωδικός της τράπεζας για τη μεταφορά. Μία μεταφορά δεν μπορεί να πληρώσει δύο παραγγελίες."
 
+msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
+msgstr "Ο αγοραστής αποδέχεται τους όρους χρήσης και την πολιτική απορρήτου του καταστήματος. Πρέπει να είναι true."
+
 msgid "The carrier rejected the cancellation."
 msgstr "Ο μεταφορέας απέρριψε την ακύρωση."
 
@@ -12345,6 +12398,9 @@ msgstr "Η γραμμή του καταστήματος στις υπόλοιπ�
 #, python-format
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "Το κατάστημα δημιουργήθηκε, αλλά οι παρακάτω προεπιλογές δεν αρχικοποιήθηκαν: %(steps)s. Είναι λειτουργικό, αλλά ελέγξτε το log του server — ένα ευρετήριο Meilisearch που λείπει κάνει ΚΑΘΕ αναζήτηση σε αυτό το κατάστημα να επιστρέφει σφάλμα μέχρι να το επιδιορθώσει ο νυχτερινός συγχρονισμός."
+
+msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
+msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."

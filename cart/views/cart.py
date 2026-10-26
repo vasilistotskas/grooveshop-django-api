@@ -44,11 +44,13 @@ from core.api.throttling import (
     CouponApplyThrottle,
 )
 from core.api.views import BaseModelViewSet
+from core.utils.i18n import active_language_code
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
+from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
@@ -57,8 +59,13 @@ from order.exceptions import (
 from order.models import StockReservation
 from order.payment import provider_supports
 from order.payment_binding import PaymentPurpose
-from order.services import OrderService
+from order.services import (
+    LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
+    OrderLegalAcceptanceService,
+    OrderService,
+)
 from order.stock import StockManager
+from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from promotion.serializers import CartCouponSerializer
 from tenant.membership import is_store_staff
@@ -897,6 +904,29 @@ class CartViewSet(BaseModelViewSet):
                     "code": "wholesale_minimum_not_met",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The legal texts the order will record (terms of use, privacy
+        # policy) must be readable in this language. Order creation
+        # refuses without them, and here the card would be confirmed
+        # before it got the chance: refuse before any money moves.
+        try:
+            OrderLegalAcceptanceService.documents_in_force(
+                active_language_code()
+            )
+        except LegalDocumentUnavailableError as e:
+            logger.error(
+                "Payment intent refused: legal page %r has no published "
+                "text in %r",
+                e.slug,
+                e.language_code,
+            )
+            return Response(
+                {
+                    "detail": LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
+                    "code": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
+                },
+                status=status.HTTP_409_CONFLICT,
             )
 
         # Validate the request body so the PaymentIntent amount is

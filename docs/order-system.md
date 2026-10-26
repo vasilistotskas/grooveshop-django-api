@@ -517,6 +517,46 @@ catalogue can no longer change.
   `.payment_fee` are the gross amounts, printed as reference rows;
   net + VAT is the whole document.
 
+### 3.6 Legal acceptance (`OrderLegalAcceptance`, `LegalDocumentVersion`)
+
+The buyer accepts the store's terms of use and privacy policy by
+ordering (`CHECKOUT_CONSENT_SLUGS` in `page_config/legal_documents.py`).
+`OrderCreateFromCartSerializer.terms_accepted` (write-only boolean) says
+so; `false` is refused with `terms_not_accepted`. With it, the view
+resolves the acceptance (`OrderLegalAcceptanceService.accept`) before it
+creates anything or looks up a payment, and both creation paths store it
+(`OrderLegalAcceptanceService.record`, `order/services.py`) right after
+the attribution, inside the creation transaction: one
+`OrderLegalAcceptance` row per document.
+
+- **Which text.** `LegalDocumentVersion.objects.in_force(slug, language)`
+  (`page_config/models.py`) snapshots the `ContentPage` translation in the
+  order's language (`active_language_code`, what `Order.language_code`
+  stores), exactly that language and only while the page is `published()`
+  (a page scheduled for later is hidden), as the storefront's legal routes
+  render it. A version is the title and body keyed by `legal_text_hash`
+  (SHA-256 of the JSON pair, so no separator can move between them):
+  reused while the text stays the same, a new row once the merchant edits
+  the page, and never changed or deleted (`PROTECT` from both the
+  acceptance and the page). The admin shows the order's acceptances inline,
+  and every version read-only under Content → Accepted legal texts.
+- **How.** `source` is `agent_checkout` when the request carries the
+  agent gateway's shared secret (`X-Internal-Gateway`,
+  `is_internal_caller`), whose UCP/ACP checkouts link both documents for
+  the agent to present; any other caller is `checkout_consent`, the
+  storefront's ticked checkbox.
+- **No text, no order, no payment.** A document with no published,
+  non-empty text in the language raises `LegalDocumentUnavailableError`:
+  the buyer was shown a broken link, so nothing was accepted. Order
+  creation answers 409 `legal_document_unavailable` (`error.document`
+  names the slug), logs an error and creates nothing. The cart's
+  `create_payment_intent` refuses the same way, because on the
+  payment-first path (§3.1) the card is confirmed before the order is
+  created: no money moves for an order Django would refuse.
+- **Rollout.** `terms_accepted` is optional until the storefront and the
+  agent gateway send it; an order without it records nothing. It then
+  becomes required, and every order has both rows.
+
 ## 4. Payment paths
 
 **Per-tenant payment identity.** Every tenant runs its OWN payment

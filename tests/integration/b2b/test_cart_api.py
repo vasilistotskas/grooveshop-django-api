@@ -155,6 +155,7 @@ class TestCouponGateOnWire:
         assert not CartPromotionCode.objects.filter(cart__user=user).exists()
 
 
+@pytest.mark.usefixtures("checkout_legal_documents")
 class TestPaymentIntentBinding:
     def _intent_payload(self, pay_way):
         return {

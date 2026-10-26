@@ -1,5 +1,6 @@
 import datetime
 
+import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -18,6 +19,7 @@ from user.factories.account import UserAccountFactory
 User = get_user_model()
 
 
+@pytest.mark.usefixtures("checkout_legal_documents")
 class CartViewSetTest(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):

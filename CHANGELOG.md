@@ -3,6 +3,154 @@
 
 
 
+## v3.154.0 (2026-10-26)
+
+### Bug fixes
+
+* fix(order): resolve the legal texts before any payment, as the storefront shows them
+
+From review:
+- The cart's payment intent is refused while a checkout legal text
+  cannot be shown: on the payment-first path the card is confirmed
+  before the order exists, so order creation alone refused too late.
+  Order creation resolves the acceptance in the view, before anything
+  is created or a payment looked up; the service only stores it.
+- A page scheduled for later is not in force: the storefront hides it
+  (published()).
+- The version hash is SHA-256 of the JSON pair (legal_text_hash), so no
+  separator can move between title and body.
+- The refusal names the terms of use or privacy policy, whichever is
+  missing, in one message shared by both endpoints.
+
+The admin lists every version under Content, and checkout tests publish
+the store's terms and privacy (checkout_legal_documents), as every
+store that takes orders has them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`49f0d44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49f0d44966d29baa5b310ed861b7fd94635ebe91))
+
+* fix(order): document the 409 refusal of order creation
+
+POST /order answers legal_document_unavailable with 409 and the
+OrderCreateError body; the schema now says so beside the 400.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`49f0d44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49f0d44966d29baa5b310ed861b7fd94635ebe91))
+
+### Chores
+
+* chore(deps-dev): filelock 4.2.4, and no end-of-file fix on generated files (#329)
+
+filelock 3.32.5 carried three open Dependabot alerts (one high: the
+ReadWriteLock reopens its SQLite database by name; two low, Windows
+lock files), fixed in 4.2.1. It is dev-only, through pre-commit's
+virtualenv, so the image does not change. Every pre-commit hook runs on
+all files with 4.2.4.
+
+That run also showed end-of-file-fixer rewriting two generated files,
+static/css/styles.css (the Tailwind build) and .test_durations
+(pytest-split, merge_test_durations.py), whose generators write no final
+newline. Hooks do not edit generated output: both are excluded.
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fdc80b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdc80b7f5aff64fdd8764fffbabe162887825f34))
+
+### Continuous integration
+
+* ci: image build drops a cache no release could read (#328)
+
+docker.yml runs on a release tag, and GitHub never lets one tag restore
+another tag's cache, so the BuildKit layers each release exported were
+never read back. Measured: 0 CACHED steps in the v3.152.1 and v3.153.0
+builds, while exporting the cache took 49.6 s and 93.5 s.
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0358e6b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0358e6bd810b6224020359fc80d98adf108292de))
+
+* ci: a push to main that its PR already tested goes straight to release (#327) ([`e6ff3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6ff3c6f0150c79de37c74c7265be8408d0978a5))
+
+* ci: a push to main that its PR already tested goes straight to release
+
+A squash merge of a branch that is up to date with main commits the PR
+head's own tree, which the PR's green run already tested. The new first
+job, tested_in_pr.sh, proves that through the API (merge commit of the
+PR, previous tip an ancestor of the head, same tree, green pull_request
+run of this workflow) and the quality, migration and test jobs skip;
+the Trivy scan still runs. Anything else runs in full, and an API error
+in the check does too. Of the last four merges, three repeated ~15
+minutes of tests on code that had passed.
+
+The release now also waits for the multi-tenant lane, which it never
+did. Test durations are merged from the latest green pull_request run,
+since a main run may hold none.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`e6ff3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6ff3c6f0150c79de37c74c7265be8408d0978a5))
+
+* ci: release needs tested-in-pr to succeed before it accepts skipped gates
+
+If tested-in-pr failed before its check (a checkout error), its dependent
+gates skipped and the release saw no failure among its needs, so it
+could run with only Trivy behind it. It now needs tested-in-pr and Trivy
+to succeed, and accepts a skipped gate only when tested is true. The run
+match compares the workflow path before any @ref suffix.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e6ff3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6ff3c6f0150c79de37c74c7265be8408d0978a5))
+
+### Features
+
+* feat(order): record the terms and privacy texts each order was placed under (#330) ([`49f0d44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49f0d44966d29baa5b310ed861b7fd94635ebe91))
+
+* feat(order): record the terms and privacy texts each order was placed under
+
+POST /order takes termsAccepted. With it, both creation paths store, in
+the creation transaction, one OrderLegalAcceptance per checkout legal
+document (terms of use, privacy policy): the LegalDocumentVersion in
+force in the order's language, and how it was accepted. A version is the
+exact published title and body keyed by their SHA-256, reused while the
+text stays the same and kept unchanged after a merchant edit, so the
+record proves what the buyer saw. An agent gateway order (proven by its
+shared secret) is an agent checkout that linked both documents; any
+other is the storefront's checkout consent.
+
+termsAccepted false is refused (terms_not_accepted). A document with no
+published text in the order's language refuses the order with 409
+legal_document_unavailable: the buyer was shown a broken link. The
+field stays optional until the storefront and the gateway send it.
+
+The order admin shows the acceptances inline, and each version is
+readable, never editable.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`49f0d44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49f0d44966d29baa5b310ed861b7fd94635ebe91))
+
+### Testing
+
+* test(dashboard): backdate orders in local days, as the sales series buckets
+
+_order(days_ago=1) set created_at to now - 24h in UTC. On the 25-hour
+day Athens leaves summer time (2026-10-25), from 21:00 to 22:00 UTC that
+instant is still today locally, so test_one_bucket_per_local_day found
+yesterday empty: (0, 0) != (2, 1) in CI at 21:12 UTC, and locally at
+21:16. Wall-clock arithmetic on localtime() lands on the previous local
+day at any hour; the file's 27 tests pass at 21:18 UTC.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG ([`e6ff3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6ff3c6f0150c79de37c74c7265be8408d0978a5))
+
 ## v3.153.0 (2026-10-25)
 
 ### Bug fixes

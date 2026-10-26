@@ -8,6 +8,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -20,6 +21,7 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from page_config.legal_guard import NOT_DELETABLE, is_legal_page
 from page_config.localization import LOCALE_PARAM, requested_locale
 from page_config.models import (
     ContentPage,
@@ -255,6 +257,14 @@ class ContentPageViewSet(BaseModelViewSet):
         ):
             return [StoreStaffModelPermissions()]
         return [AllowAny()]
+
+    def perform_destroy(self, instance):
+        # A legal page is never deleted (page_config.legal_guard).
+        if is_legal_page(instance.slug):
+            raise ValidationError(
+                {"slug": NOT_DELETABLE}, code="legal_page_not_deletable"
+            )
+        super().perform_destroy(instance)
 
     def get_queryset(self):
         if self.action == "list":

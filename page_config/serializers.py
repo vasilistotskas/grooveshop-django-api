@@ -8,6 +8,13 @@ from rest_framework import serializers
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import RequiredDefaultTranslationMixin
 from core.utils.serializers import TranslatedFieldExtended
+from page_config.legal_guard import (
+    body_error,
+    is_legal_page,
+    publication_error,
+    rename_error,
+    served_locales,
+)
 from page_config.models import (
     ContentPage,
     NavigationMenu,
@@ -291,6 +298,17 @@ class ContentPageDetailSerializer(ContentPageSerializer):
     other translated field, so it adds nothing to the list shape."""
 
 
+def _stored_body(page: ContentPage | None, language: str) -> str | None:
+    """The body *page* already has in *language*, None without one."""
+    if page is None:
+        return None
+    return (
+        page.translations.filter(language_code=language)
+        .values_list("body", flat=True)
+        .first()
+    )
+
+
 class ContentPageWriteSerializer(
     RequiredDefaultTranslationMixin,
     TranslatableModelSerializer,
@@ -324,3 +342,50 @@ class ContentPageWriteSerializer(
             )
 
         return value
+
+    def validate(self, attrs):
+        # A legal page stays published at its slug, with a body in every
+        # language the store serves (page_config.legal_guard), as in the
+        # admin.
+        attrs = super().validate(attrs)
+        page = self.instance
+        slug = attrs.get("slug", page.slug if page else "")
+        renamed = rename_error(page.slug if page else None, slug)
+        if renamed:
+            raise serializers.ValidationError(
+                {"slug": renamed.message}, code=renamed.code
+            )
+        refused = publication_error(
+            slug,
+            is_published=attrs.get(
+                "is_published", page.is_published if page else False
+            ),
+            published_at=page.published_at if page else None,
+        )
+        if refused:
+            raise serializers.ValidationError(
+                {"is_published": refused.message}, code=refused.code
+            )
+        translations = attrs.get("translations") or {}
+        # A new legal page is written in every served language at once;
+        # an existing one is checked in the languages the request writes.
+        languages = (
+            served_locales()
+            if page is None and is_legal_page(slug)
+            else translations.keys()
+        )
+        for language in languages:
+            fields = translations.get(language) or {}
+            # The body the row will have: the one sent, else the stored one.
+            body = (
+                fields["body"]
+                if "body" in fields
+                else _stored_body(page, language)
+            )
+            empty = body_error(slug, language, body)
+            if empty:
+                raise serializers.ValidationError(
+                    {"translations": {language: {"body": empty.message}}},
+                    code=empty.code,
+                )
+        return attrs

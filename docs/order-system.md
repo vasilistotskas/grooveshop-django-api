@@ -553,6 +553,9 @@ the attribution, inside the creation transaction: one
   `create_payment_intent` refuses the same way, because on the
   payment-first path (§3.1) the card is confirmed before the order is
   created: no money moves for an order Django would refuse.
+  A store does not get there by an edit: `page_config/legal_guard.py`
+  refuses, in the admin and the staff API, unpublishing, scheduling,
+  renaming, emptying a served language or deleting a legal page.
 - **Rollout.** `terms_accepted` is optional until the storefront and the
   agent gateway send it; an order without it records nothing. It then
   becomes required, and every order has both rows.

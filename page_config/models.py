@@ -29,6 +29,7 @@ from core.models import (
     UUIDModel,
 )
 from page_config.legal_documents import LEGAL_ROUTE_BY_SLUG
+from page_config.legal_guard import body_error, publication_error, rename_error
 from page_config.schemas import (
     validate_icon_name,
     validate_section_i18n,
@@ -848,6 +849,36 @@ class ContentPage(
         title = self.safe_translation_getter("title", any_language=True)
         return title or self.slug
 
+    def clean(self) -> None:
+        # A legal page stays published at its slug (page_config.legal_guard).
+        super().clean()
+        saved_slug = (
+            ContentPage.objects.filter(pk=self.pk)
+            .values_list("slug", flat=True)
+            .first()
+            if self.pk
+            else None
+        )
+        renamed = rename_error(saved_slug, self.slug)
+        if renamed:
+            raise ValidationError(
+                {"slug": ValidationError(renamed.message, code=renamed.code)}
+            )
+        refused = publication_error(
+            self.slug,
+            is_published=self.is_published,
+            published_at=self.published_at,
+        )
+        if refused:
+            field = (
+                "is_published"
+                if refused.code == "legal_page_unpublished"
+                else "published_at"
+            )
+            raise ValidationError(
+                {field: ValidationError(refused.message, code=refused.code)}
+            )
+
 
 # Suppression is a stubs artefact, not a real override conflict: the two
 # bases declare ``save_base`` with signatures that django-stubs types
@@ -875,6 +906,18 @@ class ContentPageTranslation(  # ty: ignore[invalid-method-override]
     def __str__(self) -> str:
         title = self.title or gettext("Untitled")
         return f"{title} ({self.language_code})"
+
+    def clean(self) -> None:
+        # A legal page keeps a body in every served language
+        # (page_config.legal_guard).
+        super().clean()
+        if self.master_id is None:
+            return
+        refused = body_error(self.master.slug, self.language_code, self.body)
+        if refused:
+            raise ValidationError(
+                {"body": ValidationError(refused.message, code=refused.code)}
+            )
 
 
 class LegalDocumentUnavailableError(Exception):

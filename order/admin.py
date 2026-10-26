@@ -81,6 +81,7 @@ from order.models.attribution import OrderAttribution
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
+from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
 from order.models.retail_credit import CreditCounter, RetailCredit
@@ -628,6 +629,47 @@ class OrderHistoryInline(TabularInline):
         return _("System")
 
 
+class OrderLegalAcceptanceInline(TabularInline):
+    """The legal texts the buyer accepted by placing the order, read-only.
+
+    Each links to the exact version (title and body as accepted), which
+    a later edit to the page does not change.
+    """
+
+    model = OrderLegalAcceptance
+    extra = 0
+    max_num = 0
+    can_delete = False
+    tab = True
+    collapsible = True
+    fields = ("document_link", "language", "source", "accepted_at")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("document__page")
+
+    @admin.display(description=_("Document"))
+    def document_link(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="{url}">{title}</a> <code>{hash}</code>',
+            url=reverse(
+                "admin:page_config_legaldocumentversion_change",
+                args=[obj.document_id],
+            ),
+            title=obj.document.title or obj.document.page.slug,
+            hash=obj.document.content_hash[:12],
+        )
+
+    @admin.display(description=_("Language"))
+    def language(self, obj):
+        return obj.document.language_code if obj and obj.pk else "—"
+
+
 class PaymentTransactionInline(TabularInline):
     """The order's payment ledger, read-only.
 
@@ -1096,6 +1138,7 @@ class OrderAdmin(BaseModelAdmin):
         PaymentTransactionInline,
         InvoiceInline,
         RetailCreditInline,
+        OrderLegalAcceptanceInline,
         OrderHistoryInline,
     ]
     date_hierarchy = "created_at"

@@ -104,7 +104,12 @@ from order.serializers.order import (
     UpdateStatusSerializer,
     VivaReturnLookupResponseSerializer,
 )
-from order.services import OrderAttributionService, OrderService
+from order.services import (
+    OrderAttributionService,
+    OrderLegalAcceptanceService,
+    OrderService,
+)
+from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
@@ -980,6 +985,31 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except LegalDocumentUnavailableError as e:
+            # A store fault, not the buyer's: the checkout linked a page
+            # with no published text in this language, so nothing could
+            # be accepted. Logged as an error so the store gets fixed.
+            logger.error(
+                "Order refused: legal page %r has no published text in %r",
+                e.slug,
+                e.language_code,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "The store's terms cannot be shown right now, so "
+                        "the order cannot be placed. Please contact the "
+                        "store."
+                    ),
+                    "error": {
+                        "type": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
+                        "document": e.slug,
+                    },
+                    "code": OrderCreateErrorType.LEGAL_DOCUMENT_UNAVAILABLE,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         except InvalidGiftCardError as e:
             logger.warning(
                 "Gift card refused at order creation: reason=%s", e.reason
@@ -1159,6 +1189,11 @@ class OrderViewSet(BaseModelViewSet):
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
             ),
+            legal_acceptance=(
+                OrderLegalAcceptanceService.source_for_request(request)
+                if validated_data.get("terms_accepted")
+                else None
+            ),
         )
 
         # Return order details
@@ -1236,6 +1271,11 @@ class OrderViewSet(BaseModelViewSet):
             meta_context=meta_context,
             attribution=OrderAttributionService.input_from_request(
                 request, validated_data.get("attribution")
+            ),
+            legal_acceptance=(
+                OrderLegalAcceptanceService.source_for_request(request)
+                if validated_data.get("terms_accepted")
+                else None
             ),
         )
 

@@ -824,6 +824,10 @@ msgstr "AI agent"
 msgid "AI agent (%(protocol)s)"
 msgstr "AI agent (%(protocol)s)"
 
+msgctxt "legal acceptance source"
+msgid "AI agent checkout"
+msgstr "AI agent checkout"
+
 msgid "API Tokens"
 msgstr "API Tokens"
 
@@ -852,8 +856,17 @@ msgstr "About Content"
 msgid "Accent Hex"
 msgstr "Accent Hex"
 
+msgid "Accept the terms of use to place your order."
+msgstr "Accept the terms of use to place your order."
+
+msgid "Accepted at"
+msgstr "Accepted at"
+
 msgid "Accepted for return"
 msgstr "Accepted for return"
+
+msgid "Accepted through"
+msgstr "Accepted through"
 
 msgid "Accepted to locker"
 msgstr "Accepted to locker"
@@ -2398,6 +2411,10 @@ msgstr "Checked on every checkout and saved address. Seeded from Google's Addres
 msgid "Checkout"
 msgstr "Checkout"
 
+msgctxt "legal acceptance source"
+msgid "Checkout consent"
+msgstr "Checkout consent"
+
 msgid "Checkout email — used for guest per-customer limits"
 msgstr "Checkout email — used for guest per-customer limits"
 
@@ -2778,6 +2795,9 @@ msgstr "Content Preview"
 
 msgid "Content Type"
 msgstr "Content Type"
+
+msgid "Content hash"
+msgstr "Content hash"
 
 msgid "Content page"
 msgstr "Content page"
@@ -3540,6 +3560,9 @@ msgstr "Document details"
 
 msgid "Document number"
 msgstr "Document number"
+
+msgid "Document version"
+msgstr "Document version"
 
 msgid "Documents"
 msgstr "Documents"
@@ -5287,6 +5310,9 @@ msgstr "First Name"
 msgid "First Order Only"
 msgstr "First Order Only"
 
+msgid "First accepted at"
+msgstr "First accepted at"
+
 msgid "First name"
 msgstr "First name"
 
@@ -5996,6 +6022,9 @@ msgstr "Has Social Media"
 
 msgid "Has Website"
 msgstr "Has Website"
+
+msgid "Hash"
+msgstr "Hash"
 
 msgid "Header"
 msgstr "Header"
@@ -6789,6 +6818,21 @@ msgstr "Leave empty for a page link to use the page's own title, which is alread
 
 msgid "Ledger"
 msgstr "Ledger"
+
+msgid "Legal acceptance"
+msgstr "Legal acceptance"
+
+msgid "Legal acceptances"
+msgstr "Legal acceptances"
+
+msgid "Legal document unavailable"
+msgstr "Legal document unavailable"
+
+msgid "Legal document version"
+msgstr "Legal document version"
+
+msgid "Legal document versions"
+msgstr "Legal document versions"
 
 msgctxt "legal details alert"
 msgid "Legal form (e.g. sole trader, IKE, AE)"
@@ -10649,6 +10693,9 @@ msgstr "SHA-256 of the ACS fields that identify the row. Set only for a row with
 msgid "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 msgstr "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 
+msgid "SHA-256 of the title and body, as accepted."
+msgstr "SHA-256 of the title and body, as accepted."
+
 msgid "SHIPPING ADDRESS"
 msgstr "SHIPPING ADDRESS"
 
@@ -12066,6 +12113,9 @@ msgstr "The applied discounts and gift cards cover the full total; no payment in
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr "The bank's id for the transfer. One transfer cannot pay two orders."
 
+msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
+msgstr "The buyer accepts the store's terms of use and privacy policy. Must be true."
+
 msgid "The carrier rejected the cancellation."
 msgstr "The carrier rejected the cancellation."
 
@@ -12338,6 +12388,9 @@ msgstr "The store line in the storefront's other languages, keyed by locale, e.g
 #, python-format
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
+
+msgid "The store's terms cannot be shown right now, so the order cannot be placed. Please contact the store."
+msgstr "The store's terms cannot be shown right now, so the order cannot be placed. Please contact the store."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

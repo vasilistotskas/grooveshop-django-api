@@ -89,6 +89,22 @@ def _build_navigation_column():
     NavigationColumn.objects.create(menu=menu)
 
 
+def _build_legal_document_version():
+    from page_config.models import (
+        ContentPage,
+        ContentPageTranslation,
+        LegalDocumentVersion,
+    )
+
+    page = ContentPage.objects.create(
+        slug=f"growth-{_uid()}", is_published=True
+    )
+    ContentPageTranslation.objects.create(
+        master=page, language_code="el", title="Όροι", body="<p>κ</p>"
+    )
+    LegalDocumentVersion.objects.in_force(page.slug, "el")
+
+
 def _build_retail_credit():
     from order.factories.order import OrderFactory
     from order.models import Invoice, RetailCredit
@@ -261,6 +277,7 @@ BUILDERS: dict[str, Callable[[], object]] = {
         "page_config.models", fromlist=["PageLayout"]
     ).PageLayout.objects.create(page_type=f"growth-{_uid()}", title="Growth"),
     "page_config.NavigationColumn": _build_navigation_column,
+    "page_config.LegalDocumentVersion": _build_legal_document_version,
     "page_config.ContentPage": lambda: __import__(
         "page_config.models", fromlist=["ContentPage"]
     ).ContentPage.objects.create(slug=f"growth-{_uid()}"),

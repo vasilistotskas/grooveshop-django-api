@@ -19,6 +19,10 @@ class OrderCreateErrorType(models.TextChoices):
     INVALID_ORDER_DATA = "invalid_order_data", _("Invalid order data")
     INVALID_COUPON = "invalid_coupon", _("Invalid coupon")
     INVALID_GIFT_CARD = "invalid_gift_card", _("Invalid gift card")
+    LEGAL_DOCUMENT_UNAVAILABLE = (
+        "legal_document_unavailable",
+        _("Legal document unavailable"),
+    )
     PAYMENT_NOT_FOUND = "payment_not_found", _("Payment not found")
     PAYMENT_VERIFICATION = (
         "payment_verification",

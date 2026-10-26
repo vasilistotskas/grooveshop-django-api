@@ -3,6 +3,47 @@
 
 
 
+## v3.155.0 (2026-10-26)
+
+### Bug fixes
+
+* fix(loyalty): remove the default tiers seeded beside a store's own ladder (#333)
+
+0005 get-or-created the default ladder keyed on required_level, so a
+store with its own tiers at other levels got a second Gold and Platinum
+beside them (webside: Gold at 10 and 15, Platinum at 20 and 30).
+
+- 0005 now seeds only an empty ladder.
+- 0011 removes a higher, iconless tier that repeats a lower tier's name
+  at the same multiplier, moves accounts stamped with it to the lower
+  row, and re-sequences sort_order. The demo-store dedupe step it
+  replaces is removed.
+- user 0021 declares the loyalty dependency its loyalty_tier FK needs.
+- The tier-level cache is also cleared when a tier is deleted.
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`14aaffe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14aaffe3f5931d5cada0104b262574eabb4eb736))
+
+### Features
+
+* feat(order): every order records the legal texts it was placed under (#332)
+
+termsAccepted is now required on POST /order, and both creation paths
+take the resolved LegalAcceptance as a required argument: no order is
+created without its terms of use and privacy policy versions. The
+storefront and the agent gateway send it.
+
+Tests that create orders publish the store's legal pages
+(checkout_legal_documents) and send the consent; direct service calls
+pass checkout_acceptance().
+
+
+Claude-Session: https://claude.ai/code/session_013DF8YscbkbSn5SmBYxRdzG
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b006c32`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b006c32a999d4a8b83cc11be64eb48a316f3acb0))
+
 ## v3.154.1 (2026-10-26)
 
 ### Bug fixes

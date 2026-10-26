@@ -64,6 +64,10 @@ jobs:
       # push protected nothing — the old build-twice shape (local load
       # for scanning, then push) only duplicated the image export and
       # cost ~1 min per release.
+      # No BuildKit layer cache: this runs on a release tag, and GitHub
+      # never lets one tag restore another tag's cache, so what each
+      # release exported (50-94 s) was never read back: no layer
+      # was CACHED in a release build.
       - name: Build and push Docker images
         uses: docker/build-push-action@v7
         with:
@@ -72,8 +76,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           sbom: true
           provenance: mode=max
 

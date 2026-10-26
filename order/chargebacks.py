@@ -30,15 +30,6 @@ class ChargebackDecisionError(OrderServiceError):
     """The decision cannot be recorded, or cannot be changed."""
 
 
-def undecided_chargebacks(order: Order):
-    """The order's CHARGEBACK rows nobody has decided yet."""
-    return PaymentTransaction.objects.filter(
-        order=order,
-        kind=PaymentTransactionKind.CHARGEBACK,
-        decision__isnull=True,
-    )
-
-
 def decide_chargebacks(
     order_id: int, *, goods_returned: bool, user
 ) -> list[ChargebackDecision]:

@@ -141,7 +141,3 @@ def missing_tax_document_fields(
 ) -> list[str]:
     """Which fields a tax document needs that are still blank."""
     return _blank(REQUIRED_TAX_DOCUMENT_FIELDS, identity)
-
-
-def is_disclosure_complete() -> bool:
-    return not missing_disclosure_fields()

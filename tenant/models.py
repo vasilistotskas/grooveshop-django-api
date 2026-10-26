@@ -881,17 +881,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "No platform fallback — empty disables Meta CAPI."
         ),
     )
-    meta_capi_dataset_id = models.CharField(
-        _("Meta CAPI Dataset ID"),
-        max_length=64,
-        blank=True,
-        default="",
-        help_text=_(
-            "Meta Conversions API dataset (pixel) ID used for "
-            "server-side event deduplication. "
-            "No platform fallback — empty disables Meta CAPI."
-        ),
-    )
 
     # === Payments — Viva Wallet ===
 

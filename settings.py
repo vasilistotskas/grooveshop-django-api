@@ -2134,7 +2134,7 @@ EXTRA_SETTINGS_DEFAULTS = [
             "Master kill switch for the server-side Meta Conversions "
             "API dispatcher. Defaults False so a fresh deploy doesn't "
             "leak unintended events when the Tenant's "
-            "``meta_pixel_id``/``meta_capi_dataset_id`` and "
+            "``meta_pixel_id`` and "
             "``meta_capi_access_token`` are still unset. Flip to True "
             "in Django admin once Meta credentials are in place and "
             "the Test Events feed in Events Manager looks right. The "
@@ -4507,7 +4507,6 @@ ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
 ACS_COD_REMITTANCE_ALERT_DAYS = int(
     getenv("ACS_COD_REMITTANCE_ALERT_DAYS", "10")
 )
-ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
 # Pricing AND the countries ACS ships to live in ``shipping.ShippingRate``
 # rows now, not here or in ``extra_settings`` — an admin adds a rate to
 # add a country, and retunes price/threshold on the same row, no
@@ -4580,8 +4579,6 @@ META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
 META_CAPI_PARTNER_AGENT = getenv(
     "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
 )
-# Per-request timeout for the facebook_business SDK's HTTP client.
-META_CAPI_HTTP_TIMEOUT = int(getenv("META_CAPI_HTTP_TIMEOUT", "10"))
 
 # ---------- Agent gateway (grooveshop-agent-gateway) ----------
 # Cluster-internal base URL of the agent gateway service. Empty (the

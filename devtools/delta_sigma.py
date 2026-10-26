@@ -65,8 +65,6 @@ from functools import partial
 
 logger = logging.getLogger(__name__)
 
-MARKER = "delta-sigma"
-
 # ---------------------------------------------------------------------------
 # Theme
 # ---------------------------------------------------------------------------
@@ -238,7 +236,6 @@ SEAT = {
     "postal": "551 32",
     "city": "Θεσσαλονίκη",
 }
-FOUNDED = "26/08/2020"
 
 # Γ. Ρίτσου 7 resolves to 7 Γιάννη Ρίτσου, Δήμος Καλαμαριάς — geocoded
 # and reverse-verified against OpenStreetMap, whose postcode (551 32)

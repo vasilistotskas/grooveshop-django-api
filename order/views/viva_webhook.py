@@ -91,17 +91,6 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     return candidates
 
 
-def _resolve_tenant_for_order_code(order_code: str):
-    """First tenant owning ``order_code`` (or ``None``).
-
-    Thin wrapper over ``_resolve_tenant_candidates`` for callers/tests
-    that only need presence. The webhook handler itself uses the full
-    candidate list so it can verify-then-select across a code collision.
-    """
-    candidates = _resolve_tenant_candidates(order_code)
-    return candidates[0] if candidates else None
-
-
 def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
     """True when the order lives on a suspended/inactive tenant.
 

@@ -77,7 +77,7 @@ class TestMembershipIsolation:
 
 @pytest.mark.django_db
 class TestVivaWebhookTenantResolution:
-    """``_resolve_tenant_for_order_code`` iterates active tenants and
+    """``_resolve_tenant_candidates`` iterates active tenants and
     finds the schema whose Order table contains the matching
     ``metadata.viva_order_code``.
 
@@ -99,32 +99,32 @@ class TestVivaWebhookTenantResolution:
 
         return patch("order.views.viva_webhook.schema_context", _noop)
 
-    def test_no_match_returns_none_for_unknown_order_code(self) -> None:
-        from order.views.viva_webhook import _resolve_tenant_for_order_code
+    def test_no_match_returns_no_candidate_for_unknown_order_code(self) -> None:
+        from order.views.viva_webhook import _resolve_tenant_candidates
 
         with self._noop_schema_context():
-            result = _resolve_tenant_for_order_code("ORDER-NOT-IN-ANY-TENANT")
-        assert result is None
+            result = _resolve_tenant_candidates("ORDER-NOT-IN-ANY-TENANT")
+        assert result == []
 
     def test_empty_order_code_short_circuits(self) -> None:
-        from order.views.viva_webhook import _resolve_tenant_for_order_code
+        from order.views.viva_webhook import _resolve_tenant_candidates
 
-        assert _resolve_tenant_for_order_code("") is None
-        assert _resolve_tenant_for_order_code(None) is None  # type: ignore[arg-type]
+        assert _resolve_tenant_candidates("") == []
+        assert _resolve_tenant_candidates(None) == []  # type: ignore[arg-type]
 
     def test_inactive_tenant_skipped(self) -> None:
         """``is_active=False`` tenants must not be iterated."""
         from order.factories.order import OrderFactory
-        from order.views.viva_webhook import _resolve_tenant_for_order_code
+        from order.views.viva_webhook import _resolve_tenant_candidates
 
         OrderFactory(
             metadata={"viva_order_codes": ["INACTIVE-CODE"]},
             num_order_items=0,
         )
         with self._noop_schema_context():
-            assert _resolve_tenant_for_order_code("INACTIVE-CODE") is not None
+            assert _resolve_tenant_candidates("INACTIVE-CODE") != []
             Tenant.objects.update(is_active=False)
-            assert _resolve_tenant_for_order_code("INACTIVE-CODE") is None
+            assert _resolve_tenant_candidates("INACTIVE-CODE") == []
 
     def test_match_via_viva_order_codes_history_array(self) -> None:
         """A payment on an EARLIER checkout session (stale tab, back
@@ -135,7 +135,7 @@ class TestVivaWebhookTenantResolution:
         view acked 200, and Viva never retried (payment stranded).
         """
         from order.factories.order import OrderFactory
-        from order.views.viva_webhook import _resolve_tenant_for_order_code
+        from order.views.viva_webhook import _resolve_tenant_candidates
 
         OrderFactory(
             metadata={
@@ -149,9 +149,9 @@ class TestVivaWebhookTenantResolution:
         # matches — the regression under test is that the stale array
         # code resolves at all (the old narrow lookup returned None).
         with self._noop_schema_context():
-            assert _resolve_tenant_for_order_code("STALE-CODE-1") is not None
-            assert _resolve_tenant_for_order_code("NEWEST-CODE") is not None
-            assert _resolve_tenant_for_order_code("NEVER-ISSUED") is None
+            assert _resolve_tenant_candidates("STALE-CODE-1") != []
+            assert _resolve_tenant_candidates("NEWEST-CODE") != []
+            assert _resolve_tenant_candidates("NEVER-ISSUED") == []
 
 
 # ---------------------------------------------------------------------------

@@ -28,7 +28,6 @@ from tenant.legal_identity import (
     IN_LIQUIDATION_KEY,
     REQUIRED_DISCLOSURE_FIELDS,
     SELLER_SETTING_KEYS,
-    is_disclosure_complete,
     merchant_legal_identity,
     missing_disclosure_fields,
 )
@@ -93,7 +92,6 @@ class TestBlanksStayVisible:
     def test_unset_identity_reports_every_required_field_missing(self):
         missing = missing_disclosure_fields()
         assert set(missing) == set(REQUIRED_DISCLOSURE_FIELDS)
-        assert not is_disclosure_complete()
 
     def test_no_plausible_fallback_is_invented(self):
         """Invoicing falls back to the site name; disclosure must not.
@@ -111,7 +109,6 @@ class TestBlanksStayVisible:
         for field in REQUIRED_DISCLOSURE_FIELDS:
             seller_settings(SELLER_SETTING_KEYS[field], f"value-{field}")
         assert missing_disclosure_fields() == []
-        assert is_disclosure_complete()
 
     def test_whitespace_does_not_count_as_provided(self, seller_settings):
         for field in REQUIRED_DISCLOSURE_FIELDS:

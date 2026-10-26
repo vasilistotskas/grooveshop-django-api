@@ -31,7 +31,6 @@ from order.admin import (
 from order.chargebacks import (
     ChargebackDecisionError,
     decide_chargebacks,
-    undecided_chargebacks,
 )
 from order.credit_documents import create_pending_credits
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -356,11 +355,11 @@ class TestAwaitingADecision:
     def test_the_dashboard_counts_orders_until_each_is_decided(self, staff):
         order = _order(lines=(("24", "100.00"),))
         _chargeback(order)
-        other = _order(lines=(("24", "50.00"),), paid_online=False)
+        # Paid on delivery: no dispute to decide, so never counted.
+        _order(lines=(("24", "50.00"),), paid_online=False)
 
         assert queries.attention_counts.compute()["chargebacks_to_settle"] == 1
         assert list(Order.objects.awaiting_chargeback_decision()) == [order]
-        assert undecided_chargebacks(other).count() == 0
 
         decide_chargebacks(order.id, goods_returned=False, user=staff)
 

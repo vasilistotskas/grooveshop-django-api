@@ -222,7 +222,6 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "google_ads_add_payment_info_label",
         "google_ads_page_view_label",
         "meta_capi_access_token",
-        "meta_capi_dataset_id",
         # Merchant payment + carrier credentials
         "viva_wallet_client_id",
         "viva_wallet_client_secret",

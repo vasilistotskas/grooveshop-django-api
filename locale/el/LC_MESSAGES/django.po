@@ -3087,12 +3087,6 @@ msgstr "Κρυπτογραφικά τυχαίος, με κεφαλαία· το 
 msgid "Currency"
 msgstr "Νόμισμα"
 
-msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
-msgstr "Κωδικός νομίσματος (π.χ. USD, EUR). Υποχρεωτικό αν δοθεί ποσό."
-
-msgid "Currency is required when amount is provided"
-msgstr "Το νόμισμα είναι υποχρεωτικό όταν δίνεται ποσό"
-
 #, python-format
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr "Το νόμισμα πρέπει να είναι το νόμισμα του καταστήματος (%(currency)s)."
@@ -7476,9 +7470,6 @@ msgstr "Αναγνωριστικό Meta (Facebook) Pixel για το storefront.
 msgid "Meta CAPI Access Token"
 msgstr "Διακριτικό Πρόσβασης Meta CAPI"
 
-msgid "Meta CAPI Dataset ID"
-msgstr "Αναγνωριστικό Dataset Meta CAPI"
-
 msgid "Meta CAPI Event"
 msgstr "Συμβάν Meta CAPI"
 
@@ -7490,9 +7481,6 @@ msgstr "Συμβάντα Meta CAPI"
 
 msgid "Meta Conversions API"
 msgstr "Meta Conversions API"
-
-msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
-msgstr "Αναγνωριστικό dataset (pixel) του Meta Conversions API που χρησιμοποιείται για αποφυγή διπλότυπων συμβάντων server-side. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το Meta CAPI."
 
 msgid "Meta Conversions API system user access token. Secret — never expose to the browser. No platform fallback — empty disables Meta CAPI."
 msgstr "Διακριτικό πρόσβασης system user του Meta Conversions API. Μυστικό — δεν πρέπει ποτέ να εκτίθεται στον browser. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το Meta CAPI."
@@ -8790,9 +8778,6 @@ msgstr "Μέρος της έκπτωσης της παραγγελίας που 
 msgid "Partial"
 msgstr "Μερικό"
 
-msgid "Partial refund amount. Leave empty for full refund."
-msgstr "Ποσό μερικής επιστροφής. Αφήστε κενό για πλήρη επιστροφή."
-
 msgid "Partially Refunded"
 msgstr "Μερική επιστροφή"
 
@@ -9994,9 +9979,6 @@ msgstr "Αιτία"
 msgid "Reason Code"
 msgstr "Κωδικός αιτίας"
 
-msgid "Reason for the refund"
-msgstr "Αιτία της επιστροφής χρημάτων"
-
 msgid "Receipt"
 msgstr "Απόδειξη"
 
@@ -10211,9 +10193,6 @@ msgstr "Κατάσταση επιστροφής"
 #, python-brace-format
 msgid "Refund amount ({refund}) cannot exceed the refundable amount ({refundable})."
 msgstr "Το ποσό επιστροφής ({refund}) δεν μπορεί να υπερβαίνει το επιστρέψιμο ποσό ({refundable})."
-
-msgid "Refund amount must be greater than 0"
-msgstr "Το ποσό επιστροφής πρέπει να είναι μεγαλύτερο από 0"
 
 msgid "Refund attempt"
 msgstr "Απόπειρα επιστροφής"
@@ -14830,6 +14809,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Country Analytics"
 #~ msgstr "Αναλυτικά ανά χώρα"
 
+#~ msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
+#~ msgstr "Κωδικός νομίσματος (π.χ. USD, EUR). Υποχρεωτικό αν δοθεί ποσό."
+
+#~ msgid "Currency is required when amount is provided"
+#~ msgstr "Το νόμισμα είναι υποχρεωτικό όταν δίνεται ποσό"
+
 #~ msgid "Customer Summary"
 #~ msgstr "Σύνοψη Πελάτη"
 
@@ -15077,6 +15062,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Message Analytics"
 #~ msgstr "Αναλυτικά μηνυμάτων"
 
+#~ msgid "Meta CAPI Dataset ID"
+#~ msgstr "Αναγνωριστικό Dataset Meta CAPI"
+
+#~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
+#~ msgstr "Αναγνωριστικό dataset (pixel) του Meta Conversions API που χρησιμοποιείται για αποφυγή διπλότυπων συμβάντων server-side. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το Meta CAPI."
+
 #~ msgid "Move selected items down in sort order"
 #~ msgstr "Μετακίνηση επιλεγμένων ειδών κάτω στη σειρά ταξινόμησης"
 
@@ -15227,6 +15218,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Partial (%(refunded)s/%(qty)s)"
 #~ msgstr "Μερική (%(refunded)s/%(qty)s)"
 
+#~ msgid "Partial refund amount. Leave empty for full refund."
+#~ msgstr "Ποσό μερικής επιστροφής. Αφήστε κενό για πλήρη επιστροφή."
+
 #~ msgid "Payment Configuration"
 #~ msgstr "Διαμόρφωση Πληρωμής"
 
@@ -15317,6 +15311,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Real Order"
 #~ msgstr "Πραγματική παραγγελία"
 
+#~ msgid "Reason for the refund"
+#~ msgstr "Αιτία της επιστροφής χρημάτων"
+
 #~ msgid "Recent"
 #~ msgstr "Πρόσφατη"
 
@@ -15325,6 +15322,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Refund Information"
 #~ msgstr "Πληροφορίες επιστροφής"
+
+#~ msgid "Refund amount must be greater than 0"
+#~ msgstr "Το ποσό επιστροφής πρέπει να είναι μεγαλύτερο από 0"
 
 #~ msgid "Refund an order payment"
 #~ msgstr "Επιστροφή πληρωμής παραγγελίας"

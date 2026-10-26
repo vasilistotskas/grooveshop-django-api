@@ -3081,12 +3081,6 @@ msgstr "Crypto-random, uppercased; the bearer secret"
 msgid "Currency"
 msgstr "Currency"
 
-msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
-msgstr "Currency code (e.g., USD, EUR). Required if amount is provided."
-
-msgid "Currency is required when amount is provided"
-msgstr "Currency is required when amount is provided"
-
 #, python-format
 msgid "Currency must match the store's own currency (%(currency)s)."
 msgstr "Currency must match the store's own currency (%(currency)s)."
@@ -7465,9 +7459,6 @@ msgstr "Meta (Facebook) Pixel ID for the storefront. Digits only (e.g. '12345678
 msgid "Meta CAPI Access Token"
 msgstr "Meta CAPI Access Token"
 
-msgid "Meta CAPI Dataset ID"
-msgstr "Meta CAPI Dataset ID"
-
 msgid "Meta CAPI Event"
 msgstr "Meta CAPI Event"
 
@@ -7479,9 +7470,6 @@ msgstr "Meta CAPI Events"
 
 msgid "Meta Conversions API"
 msgstr "Meta Conversions API"
-
-msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
-msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 
 msgid "Meta Conversions API system user access token. Secret — never expose to the browser. No platform fallback — empty disables Meta CAPI."
 msgstr "Meta Conversions API system user access token. Secret — never expose to the browser. No platform fallback — empty disables Meta CAPI."
@@ -8779,9 +8767,6 @@ msgstr "Part of the order's discount this line carries, fixed when the order was
 msgid "Partial"
 msgstr "Partial"
 
-msgid "Partial refund amount. Leave empty for full refund."
-msgstr "Partial refund amount. Leave empty for full refund."
-
 msgid "Partially Refunded"
 msgstr "Partially Refunded"
 
@@ -9983,9 +9968,6 @@ msgstr "Reason"
 msgid "Reason Code"
 msgstr "Reason Code"
 
-msgid "Reason for the refund"
-msgstr "Reason for the refund"
-
 msgid "Receipt"
 msgstr "Receipt"
 
@@ -10200,9 +10182,6 @@ msgstr "Refund Status"
 #, python-brace-format
 msgid "Refund amount ({refund}) cannot exceed the refundable amount ({refundable})."
 msgstr "Refund amount ({refund}) cannot exceed the refundable amount ({refundable})."
-
-msgid "Refund amount must be greater than 0"
-msgstr "Refund amount must be greater than 0"
 
 msgid "Refund attempt"
 msgstr "Refund attempt"
@@ -14610,6 +14589,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"
 
+#~ msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
+#~ msgstr "Currency code (e.g., USD, EUR). Required if amount is provided."
+
+#~ msgid "Currency is required when amount is provided"
+#~ msgstr "Currency is required when amount is provided"
+
 #~ msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
 #~ msgstr "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
 
@@ -14652,6 +14637,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Maximum total number of results to return"
 #~ msgstr "Maximum total number of results to return"
 
+#~ msgid "Meta CAPI Dataset ID"
+#~ msgstr "Meta CAPI Dataset ID"
+
+#~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
+#~ msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
+
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
 
@@ -14671,8 +14662,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Partial (%(refunded)s/%(qty)s)"
 #~ msgstr "Partial (%(refunded)s/%(qty)s)"
 
+#~ msgid "Partial refund amount. Leave empty for full refund."
+#~ msgstr "Partial refund amount. Leave empty for full refund."
+
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
+
+#~ msgid "Reason for the refund"
+#~ msgstr "Reason for the refund"
 
 #~ msgid "Recent"
 #~ msgstr "Recent"
@@ -14683,6 +14680,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Refund Information"
 #~ msgstr "Refund Information"
+
+#~ msgid "Refund amount must be greater than 0"
+#~ msgstr "Refund amount must be greater than 0"
 
 #~ msgid "Reminder Count"
 #~ msgstr "Reminder Count"

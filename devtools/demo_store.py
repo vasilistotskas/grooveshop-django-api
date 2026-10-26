@@ -1352,65 +1352,6 @@ def seed_settings() -> dict[str, int]:
     return report
 
 
-def dedupe_loyalty_tiers() -> dict[str, int]:
-    """Remove tier rows that duplicate an existing tier's NAME.
-
-    Migration ``loyalty.0005_seed_default_loyalty_tiers`` get-or-creates
-    keyed on ``required_level``, so on a tenant that already had a
-    hand-curated ladder its canonical rows landed ALONGSIDE them rather
-    than matching. The result renders as "Gold, Gold, Platinum,
-    Platinum" in ``Loyalty/ProgressHero.vue``, with colliding
-    ``sort_order`` and no icon on the added rows.
-
-    Only deletes a row when all three hold, so a genuinely intentional
-    ladder is never touched:
-      * another tier shares its translated name,
-      * that other tier sits at a LOWER required_level,
-      * and the row being deleted carries no icon.
-
-    Safe by construction: nothing foreign-keys ``LoyaltyTier``. Tiers
-    are resolved dynamically by ``get_for_level`` (highest tier with
-    ``required_level <= level``), so deleting a higher duplicate moves
-    affected users onto the lower row of the SAME name and the SAME
-    points_multiplier — no user changes tier or earning rate.
-    """
-    from loyalty.models import LoyaltyTier
-
-    report: dict[str, int] = {}
-    seen: dict[str, LoyaltyTier] = {}
-    for tier in LoyaltyTier.objects.all().order_by("required_level"):
-        name = tier.safe_translation_getter("name", any_language=True) or ""
-        keeper = seen.get(name)
-        if keeper is None:
-            seen[name] = tier
-            continue
-        if tier.icon:
-            # A named duplicate WITH artwork is a deliberate ladder step.
-            _bump(report, "kept_duplicate_with_icon")
-            continue
-        if tier.points_multiplier != keeper.points_multiplier:
-            _bump(report, "kept_duplicate_different_multiplier")
-            continue
-        logger.info(
-            "Deleting duplicate loyalty tier %r at level %s",
-            name,
-            tier.required_level,
-        )
-        tier.delete()
-        _bump(report, "deleted")
-
-    # Re-sequence so the ladder has strictly increasing sort_order —
-    # the duplicates collided on it (two rows at 2, two at 3).
-    for index, tier in enumerate(
-        LoyaltyTier.objects.all().order_by("required_level")
-    ):
-        if tier.sort_order != index:
-            tier.sort_order = index
-            tier.save(update_fields=["sort_order"])
-            _bump(report, "resequenced")
-    return report
-
-
 def seed_brands() -> dict[str, int]:
     """Create the brand registry and assign a brand to every product.
 

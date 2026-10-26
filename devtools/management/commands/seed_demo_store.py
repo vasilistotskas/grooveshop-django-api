@@ -22,7 +22,7 @@ What it does NOT do, deliberately:
   buys nothing. ``viva_wallet_live_mode`` must stay false anywhere
   that is not production.
 * **Does not touch prod-cloned rows** beyond assigning a brand to
-  brand-less products and re-sequencing the loyalty ladder.
+  brand-less products.
 
 The tenant guard is deliberately conservative: a schema whose domains
 all look like staging/local hosts, or an explicit ``--force``. Demo
@@ -66,7 +66,6 @@ def is_non_production_domain(domain: str) -> bool:
 # (products reference them), products before reviews/tags/price lists.
 STEPS: tuple[tuple[str, str], ...] = (
     ("settings", "seed_settings"),
-    ("loyalty-tiers", "dedupe_loyalty_tiers"),
     ("brands", "seed_brands"),
     ("categories", "seed_categories"),
     ("products", "seed_products"),

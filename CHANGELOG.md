@@ -3,6 +3,56 @@
 
 
 
+## v3.157.0 (2026-10-27)
+
+### Features
+
+* feat(tenant): refuse the cart and catalogue routes when off, and fold the catalogue into its dependent features (#340) ([`a94747e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a94747edb63b40dfdec9ef331b7c0b26c3d22f6a))
+
+* feat(tenant): refuse the cart and catalogue routes when off, and fold the catalogue into its dependent features (step 4)
+
+The cart and the catalogue were stated in TenantConfig.features (#337)
+and read by the agent gateway and the storefront, but their routes still
+answered with the switch off. Now they 404 through the existing gates
+(IsCatalogueEnabled, IsCartEnabled), logged as feature_gate:refused.
+
+Catalogue off refuses the public product routes and their actions,
+categories, category and product images, brands, attributes, attribute
+values, search/product and the product search/trending. Cart off refuses
+every cart and cart-item action except the staff cart listing, and order
+create; reading and paying existing orders stays open. The staff-only
+actions (StoreStaffModelPermissions alone) carry no gate, so a store can
+prepare a catalogue before it publishes one.
+
+gift_cards, favourites, product_alerts and product_suggestions now list
+IsCatalogueEnabled in STORE_FEATURES, and their routes (and the
+recommendations_active path used by the order email and jobs) refuse with
+the catalogue off too.
+
+cart and catalogue leave STORE_PREFERENCES and StorePreferencesSerializer:
+a response-field removal, so deploy only after storefront v3.266.0 (#257),
+which no longer requires them, is in production.
+
+Closes #338
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`a94747e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a94747edb63b40dfdec9ef331b7c0b26c3d22f6a))
+
+### Testing
+
+* test(tenant): product search with the catalogue on reads a real index
+
+The generic catalogue table called product search with the catalogue on,
+which reaches Meilisearch: on CI's fresh engine that is index_not_found,
+a 500. The refusal needs no engine (the gate answers first) and stays a
+plain test; the served case is @requires_meilisearch, which provisions
+the indexes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a94747e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a94747edb63b40dfdec9ef331b7c0b26c3d22f6a))
+
 ## v3.156.1 (2026-10-27)
 
 ### Bug fixes

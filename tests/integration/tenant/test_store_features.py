@@ -50,6 +50,8 @@ EVERY_SWITCH = {
     "CONTACT_ATTACHMENTS_ENABLED": True,
     "AGENT_COMMERCE_ENABLED": True,
     "CHAT_WIDGET_ENABLED": True,
+    "CATALOGUE_ENABLED": True,
+    "CART_ENABLED": True,
 }
 
 
@@ -113,6 +115,8 @@ def test_a_plan_without_the_feature_turns_it_off_whatever_the_store_says(
         ("CONTACT_ATTACHMENTS_ENABLED", {"contact_attachments"}),
         ("AGENT_COMMERCE_ENABLED", {"chat_widget"}),
         ("CHAT_WIDGET_ENABLED", {"chat_widget"}),
+        ("CART_ENABLED", {"cart"}),
+        ("CATALOGUE_ENABLED", {"catalogue", "cart"}),
     ],
 )
 def test_a_store_switch_turns_off_exactly_what_needs_it(switch, off):

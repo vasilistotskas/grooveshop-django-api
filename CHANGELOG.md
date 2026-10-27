@@ -3,6 +3,34 @@
 
 
 
+## v3.155.3 (2026-10-27)
+
+### Bug fixes
+
+* fix(deps): make daphne a development dependency (#336)
+
+daphne is the development server (its runserver serves ASGI) and what
+channels.testing imports for the websocket tests. Production runs
+Gunicorn with Uvicorn workers, yet `channels[daphne]` installed it, and
+Twisted with it, in every image.
+
+`channels` no longer takes the daphne extra; daphne is pinned in the dev
+group, and settings list the daphne app only when DEBUG is on (every
+deployed environment runs DEBUG=False; the image is built --no-dev).
+
+Twisted now reaches only development installs. Trivy's filesystem scan
+leaves uv.lock development dependencies out by default, so the three
+accepted Twisted findings no longer apply: .trivyignore.yaml and the
+workflow input naming it are deleted, and with them the 2026-11-21
+expiry that would have failed every release.
+
+Verified: a --no-dev install has neither daphne nor Twisted, imports the
+ASGI application and passes `manage.py check` with DEBUG=False; with the
+dev group, runserver still comes from daphne; the websocket and
+notification consumer tests pass.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3a5406b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a5406bd446f53fcd3d8b4e5c16933608b90641c))
+
 ## v3.155.2 (2026-10-27)
 
 ### Bug fixes

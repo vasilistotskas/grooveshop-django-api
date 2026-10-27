@@ -250,6 +250,18 @@ class IsPriceHistoryEnabled(IsSettingEnabled):
     setting_key = "PRICE_HISTORY_ENABLED"
 
 
+class IsCatalogueEnabled(IsSettingEnabled):
+    """404 when the store does not publish its product catalogue."""
+
+    setting_key = "CATALOGUE_ENABLED"
+
+
+class IsCartEnabled(IsSettingEnabled):
+    """404 when the store does not take orders."""
+
+    setting_key = "CART_ENABLED"
+
+
 class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has turned agent commerce off at runtime."""
 

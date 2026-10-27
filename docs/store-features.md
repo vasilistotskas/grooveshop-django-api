@@ -73,8 +73,8 @@ consumed by tasks and integrations.
 | `PRICE_HISTORY_ENABLED` | (a) `price_history` | default on: it shows prices the store already published |
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
-| `CART_ENABLED` | (a), **not yet in the table** | `preferences.cart` until then; see "Not yet gated" |
-| `CATALOGUE_ENABLED` | (a), **not yet in the table** | `preferences.catalogue` until then; see "Not yet gated" |
+| `CART_ENABLED` | (a) `cart` | needs `catalogue`; also `preferences.cart` until the move ends, see "Cart and catalogue: the move" |
+| `CATALOGUE_ENABLED` | (a) `catalogue` | also `preferences.catalogue` until the move ends |
 | `B2B_INVOICING_ENABLED` | (a) `b2b_invoicing` | no plan flag; refused by order validation (400, `invoicing_disabled`), not a 404 gate |
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
 | `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
@@ -108,6 +108,8 @@ settings.
 | `price_history` | | `PRICE_HISTORY_ENABLED` | `product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
+| `catalogue` | | `CATALOGUE_ENABLED` | not yet: step 3 of the move |
+| `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | not yet: step 3 of the move |
 
 `chat_widget` is the one feature whose consumer endpoint is not Django's:
 the widget talks to the agent gateway, which refuses a store whose agent
@@ -125,18 +127,29 @@ serializer serves `reviewCount: 0` and `reviewAverage: null`. The fields
 keep their shape: making a field nullable is a loosening that the live
 storefront's schemas reject.
 
-## Not yet gated: `CART_ENABLED` and `CATALOGUE_ENABLED`
+## Cart and catalogue: the move
 
 Both have real API surface (`/cart*`, `/order`, `/product*`, category and
-brand listings, search) that nothing refuses today: the settings only hide
+brand listings, search) that nothing refuses yet: the settings only hide
 the storefront chrome and pages. The agent gateway calls those routes
 (`/cart`, `/cart/item`, `/cart/reserve-stock`, `/order`, `/product`,
-`/product/category/all`) and does not read a `cart` or `catalogue`
-feature, so gating them at the API would turn a store's agent checkout and
-catalogue feeds into 404s before the gateway knows to stop offering them.
-Until then they are served as preferences (`preferences.cart`,
-`preferences.catalogue`). They join the table after the gateway reads the
-feature, gateway first, and leave `STORE_PREFERENCES` in the same change.
+`/product/category/all`), so the routes may refuse only after the gateway
+stops offering what they serve, and the gateway can only read a feature
+Django already states: a field missing from `features` reads as off, which
+would switch every store's agent checkout off. So, in this order:
+
+1. `features.cart` and `features.catalogue` are stated (`STORE_FEATURES`),
+   while `preferences.cart` and `preferences.catalogue` stay. Additive.
+2. The gateway reads them and stops offering the cart, checkout and
+   catalogue tools, the feeds and the chat's product tools when off
+   (grooveshop-agent-gateway issue 27).
+3. The routes refuse: the non-staff cart and order-create actions, the
+   catalogue routes, and what needs the catalogue (gift cards,
+   recommendations, favourites, product alerts). Staff and admin lists stay
+   open.
+4. The storefront reads them from `features`.
+5. They leave `STORE_PREFERENCES`: a removal, so only after step 4 is in
+   production.
 
 ## Store languages
 

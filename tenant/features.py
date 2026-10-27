@@ -27,6 +27,8 @@ from tenant.permissions import (
     IsB2BWholesaleEnabled,
     IsBlogCommentsEnabled,
     IsBlogEnabled,
+    IsCartEnabled,
+    IsCatalogueEnabled,
     IsChatWidgetEnabled,
     IsContactAttachmentsEnabled,
     IsFavouritesEnabled,
@@ -88,14 +90,21 @@ STORE_FEATURES: dict[str, StoreFeature] = {
         IsAgentCommerceEnabled,
         (IsAgentCommerceRuntimeEnabled, IsChatWidgetEnabled),
     ),
+    # Stated before Django refuses on them: the agent gateway calls the
+    # cart, order and catalogue routes, so it reads these first and stops
+    # offering those tools, and only then do the routes 404
+    # (docs/store-features.md, "Cart and catalogue: the move").
+    "catalogue": StoreFeature(None, (IsCatalogueEnabled,)),
+    # Nothing can be put in a cart from a catalogue that is not served.
+    "cart": StoreFeature(None, (IsCatalogueEnabled, IsCartEnabled)),
 }
 
 
 #: Preference name (its key in ``TenantConfig.preferences``) → the store
 #: setting that holds it. Class (b) presentation preferences, plus the
-#: cart and the catalogue: features in every sense but that Django's API
-#: does not refuse on them yet, so they move to ``STORE_FEATURES`` once the
-#: agent gateway reads them (grooveshop-agent-gateway issue 27).
+#: cart and the catalogue while they move into ``STORE_FEATURES``: they
+#: leave here once the storefront reads them from ``features``
+#: (docs/store-features.md, "Cart and catalogue: the move").
 STORE_PREFERENCES: dict[str, str] = {
     "mobile_bottom_nav": "MOBILE_BOTTOM_NAV_ENABLED",
     "sticky_add_to_cart": "STICKY_ADD_TO_CART_ENABLED",

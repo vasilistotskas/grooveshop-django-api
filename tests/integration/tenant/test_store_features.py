@@ -17,6 +17,7 @@ from product.enum.review import RateEnum
 from tenant.features import STORE_FEATURES, effective_features
 from tenant.models import Tenant
 from tenant.serializers import StoreFeaturesSerializer, TenantConfigSerializer
+from tests.conftest import requires_meilisearch
 from tests.utils.staff import store_tenant
 from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
@@ -243,7 +244,8 @@ def test_hidden_reviews_hide_them_from_search_hits_too(on):
 
 # What the catalogue switch refuses: the public catalogue routes, and the
 # routes of every feature that only exists with it. (route, method,
-# signed in)
+# signed in) Product search is tested apart below: served, it reads a real
+# index.
 CATALOGUE_ROUTES = [
     ("product-list", "get", False),
     ("product-category-list", "get", False),
@@ -253,7 +255,6 @@ CATALOGUE_ROUTES = [
     ("product-brand-list", "get", False),
     ("product-attribute-list", "get", False),
     ("product-attribute-value-list", "get", False),
-    ("search-product", "get", False),
     ("search-trending", "get", False),
     ("product-favourite-list", "get", True),
     ("product-alert-list", "get", True),
@@ -297,6 +298,24 @@ def test_the_catalogue_switch_refuses_what_needs_the_catalogue(
     response = _call(route, method, signed_in)
 
     assert (response.status_code != status.HTTP_404_NOT_FOUND) is on
+
+
+def test_the_catalogue_switch_refuses_product_search():
+    # The gate answers before any engine is asked.
+    switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": False})
+
+    response = _call("search-product", "get", False)
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@requires_meilisearch
+def test_product_search_is_served_with_the_catalogue_on():
+    switch_store_settings(**EVERY_SWITCH)
+
+    response = _call("search-product", "get", False)
+
+    assert response.status_code != status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.parametrize(

@@ -61,20 +61,20 @@ consumed by tasks and integrations.
 | `PRODUCT_REVIEWS_ENABLED` | (a) `product_reviews` | |
 | `ACCOUNT_REVIEWS_ENABLED` | (a) `account_reviews` | needs `product_reviews` |
 | `BLOG_COMMENTS_ENABLED` | (a) `blog_comments` | needs the `blog` plan flag |
-| `FAVOURITES_ENABLED` | (a) `favourites` | |
+| `FAVOURITES_ENABLED` | (a) `favourites` | needs `catalogue` |
 | `NEWSLETTER_ENABLED` | (a) `newsletter` | |
 | `FEEDBACK_ENABLED` | (a) `feedback` | |
 | `LOYALTY_ENABLED` | (a) `loyalty` | needs the `loyalty` plan flag |
 | `PROMOTIONS_ENABLED` | (a) `promotions` | needs the `promotions` plan flag |
-| `GIFT_CARDS_ENABLED` | (a) `gift_cards` | needs the `gift_cards` plan flag |
+| `GIFT_CARDS_ENABLED` | (a) `gift_cards` | needs the `gift_cards` plan flag and `catalogue` |
 | `B2B_WHOLESALE_ENABLED` | (a) `wholesale` | needs the `b2b` plan flag |
-| `PRODUCT_SUGGESTIONS_ENABLED` | (a) `product_suggestions` | needs the `recommendations` plan flag |
-| `PRODUCT_ALERTS_ENABLED` | (a) `product_alerts` | |
+| `PRODUCT_SUGGESTIONS_ENABLED` | (a) `product_suggestions` | needs the `recommendations` plan flag and `catalogue` |
+| `PRODUCT_ALERTS_ENABLED` | (a) `product_alerts` | needs `catalogue` |
 | `PRICE_HISTORY_ENABLED` | (a) `price_history` | default on: it shows prices the store already published |
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
-| `CART_ENABLED` | (a) `cart` | needs `catalogue`; also `preferences.cart` until the move ends, see "Cart and catalogue: the move" |
-| `CATALOGUE_ENABLED` | (a) `catalogue` | also `preferences.catalogue` until the move ends |
+| `CART_ENABLED` | (a) `cart` | needs `catalogue` |
+| `CATALOGUE_ENABLED` | (a) `catalogue` | `favourites`, `gift_cards`, `product_alerts`, `product_suggestions` and `cart` need it |
 | `B2B_INVOICING_ENABLED` | (a) `b2b_invoicing` | no plan flag; refused by order validation (400, `invoicing_disabled`), not a 404 gate |
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
 | `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
@@ -95,21 +95,21 @@ settings.
 | `blog_comments` | `blog_enabled` | `BLOG_COMMENTS_ENABLED` | `blog/views/comment.py`, `blog/views/post.py` |
 | `product_reviews` | | `PRODUCT_REVIEWS_ENABLED` | `product/views/review.py`, `product/views/product.py` |
 | `account_reviews` | | `PRODUCT_REVIEWS_ENABLED`, `ACCOUNT_REVIEWS_ENABLED` | `user/views/account.py` |
-| `favourites` | | `FAVOURITES_ENABLED` | `product/views/favourite.py` |
+| `favourites` | | `CATALOGUE_ENABLED`, `FAVOURITES_ENABLED` | `product/views/favourite.py`, `user/views/account.py` (`favourite_products`), `agent/views.py` |
 | `newsletter` | | `NEWSLETTER_ENABLED` | `user/views/` subscription views (token links in sent emails stay open) |
 | `feedback` | | `FEEDBACK_ENABLED` | `contact/views.py` |
 | `loyalty` | `loyalty_enabled` | `LOYALTY_ENABLED` | `loyalty/views/loyalty.py` |
 | `promotions` | `promotions_enabled` | `PROMOTIONS_ENABLED` | `promotion/views.py`, cart coupon actions |
-| `gift_cards` | `gift_cards_enabled` | `GIFT_CARDS_ENABLED` | `giftcard/views.py` |
+| `gift_cards` | `gift_cards_enabled` | `CATALOGUE_ENABLED`, `GIFT_CARDS_ENABLED` | `giftcard/views.py` (a purchase's status stays open) |
 | `wholesale` | `b2b_enabled` | `B2B_WHOLESALE_ENABLED` | `b2b/views.py` |
 | `b2b_invoicing` | | `B2B_INVOICING_ENABLED` | `order/serializers/order.py` (`document_type=INVOICE` is a 400, through `feature_on`) |
-| `product_suggestions` | `recommendations_enabled` | `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
-| `product_alerts` | | `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
+| `product_suggestions` | `recommendations_enabled` | `CATALOGUE_ENABLED`, `PRODUCT_SUGGESTIONS_ENABLED` | `recommendation/views.py`, `search/views.py`; the order email, candidate rebuilds and weight learning through `recommendation.context.recommendations_active` |
+| `product_alerts` | | `CATALOGUE_ENABLED`, `PRODUCT_ALERTS_ENABLED` | `product/views/alert.py` |
 | `price_history` | | `PRICE_HISTORY_ENABLED` | `product/views/product.py` (`price_history`, `GET /product/{id}/price-history`) |
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
-| `catalogue` | | `CATALOGUE_ENABLED` | not yet: step 3 of the move |
-| `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | not yet: step 3 of the move |
+| `catalogue` | | `CATALOGUE_ENABLED` | `product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
+| `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `cart/views/` (every cart and cart-item action but the staff `cart/list`), `order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
 
 `chat_widget` is the one feature whose consumer endpoint is not Django's:
 the widget talks to the agent gateway, which refuses a store whose agent
@@ -127,29 +127,41 @@ serializer serves `reviewCount: 0` and `reviewAverage: null`. The fields
 keep their shape: making a field nullable is a loosening that the live
 storefront's schemas reject.
 
-## Cart and catalogue: the move
+## Cart and catalogue: the move (done)
 
-Both have real API surface (`/cart*`, `/order`, `/product*`, category and
-brand listings, search) that nothing refuses yet: the settings only hide
-the storefront chrome and pages. The agent gateway calls those routes
-(`/cart`, `/cart/item`, `/cart/reserve-stock`, `/order`, `/product`,
-`/product/category/all`), so the routes may refuse only after the gateway
-stops offering what they serve, and the gateway can only read a feature
-Django already states: a field missing from `features` reads as off, which
-would switch every store's agent checkout off. So, in this order:
+The cart and the catalogue started as two presentation preferences that
+hid the storefront's chrome while their routes kept answering, and the
+agent gateway calls those routes (`/cart`, `/cart/item`,
+`/cart/reserve-stock`, `/order`, `/product`, `/product/category/all`).
+They moved into `STORE_FEATURES` in four releases, in this order because a
+client reads a field that is missing from `features` as off:
 
-1. `features.cart` and `features.catalogue` are stated (`STORE_FEATURES`),
-   while `preferences.cart` and `preferences.catalogue` stay. Additive.
-2. The gateway reads them and stops offering the cart, checkout and
-   catalogue tools, the feeds and the chat's product tools when off
-   (grooveshop-agent-gateway issue 27).
-3. The routes refuse: the non-staff cart and order-create actions, the
-   catalogue routes, and what needs the catalogue (gift cards,
-   recommendations, favourites, product alerts). Staff and admin lists stay
-   open.
-4. The storefront reads them from `features`.
-5. They leave `STORE_PREFERENCES`: a removal, so only after step 4 is in
-   production.
+1. `features.cart` and `features.catalogue` were stated, beside the
+   preferences. Additive.
+2. The gateway read them and stopped offering the cart, checkout and
+   catalogue tools, the feeds and the chat's product tools when off.
+3. The storefront read them from `features`.
+4. The routes now refuse (404, `feature_gate:refused`), and
+   `preferences.cart` and `preferences.catalogue` left `STORE_PREFERENCES`,
+   a field removal that only shipped once step 3 was in production.
+
+What refuses when `catalogue` is off: the public product routes, their
+actions, categories, category images, product images, brands, attributes,
+attribute values, `search/product` and the product `search/trending`, plus
+what only exists with a catalogue (favourites, gift cards, product alerts,
+suggestions, each listing `IsCatalogueEnabled` first in its entry). What
+refuses when `cart` is off: the cart and cart-item actions and order
+create. A store without a catalogue has no cart either.
+
+Who stays served. The gate is on the shopper-facing action, and the store's
+own staff routes carry none: the staff cart listing (`cart/list`) and the
+create, update and delete of the catalogue records (all
+`StoreStaffModelPermissions`) answer whatever the switch says, so a store
+can prepare a catalogue before it publishes one. A route that shoppers and
+staff share (a product list, a cart-item list) refuses for everyone, the way
+the blog gates do. Orders a store already has stay readable and payable
+(list, detail, the payment and cancel actions, `viva_return`) with the cart
+off; `GET /order` is the customer's history either way.
 
 ## Store languages
 

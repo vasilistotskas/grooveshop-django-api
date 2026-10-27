@@ -116,7 +116,17 @@ def test_a_plan_without_the_feature_turns_it_off_whatever_the_store_says(
         ("AGENT_COMMERCE_ENABLED", {"chat_widget"}),
         ("CHAT_WIDGET_ENABLED", {"chat_widget"}),
         ("CART_ENABLED", {"cart"}),
-        ("CATALOGUE_ENABLED", {"catalogue", "cart"}),
+        (
+            "CATALOGUE_ENABLED",
+            {
+                "catalogue",
+                "cart",
+                "favourites",
+                "gift_cards",
+                "product_alerts",
+                "product_suggestions",
+            },
+        ),
     ],
 )
 def test_a_store_switch_turns_off_exactly_what_needs_it(switch, off):
@@ -159,6 +169,8 @@ SERVED_BY = [
     ("feedback", "feedback", "post", False),
     ("product_alerts", "product-alert-list", "get", True),
     ("contact_attachments", "contact-attachment", "post", False),
+    ("catalogue", "product-list", "get", False),
+    ("cart", "cart-item-list", "get", False),
 ]
 
 
@@ -227,3 +239,168 @@ def test_hidden_reviews_hide_them_from_search_hits_too(on):
 
     assert (serializer.get_review_count(hit) > 0) is on
     assert (serializer.get_review_average(hit) is not None) is on
+
+
+# What the catalogue switch refuses: the public catalogue routes, and the
+# routes of every feature that only exists with it. (route, method,
+# signed in)
+CATALOGUE_ROUTES = [
+    ("product-list", "get", False),
+    ("product-category-list", "get", False),
+    ("product-category-all", "get", False),
+    ("product-category-image-list", "get", False),
+    ("product-image-list", "get", False),
+    ("product-brand-list", "get", False),
+    ("product-attribute-list", "get", False),
+    ("product-attribute-value-list", "get", False),
+    ("search-product", "get", False),
+    ("search-trending", "get", False),
+    ("product-favourite-list", "get", True),
+    ("product-alert-list", "get", True),
+    ("recommendation-list", "get", False),
+    ("giftcard:giftcard-mine", "get", True),
+    ("giftcard:giftcard-check", "post", False),
+]
+
+# What the cart switch refuses: every shopper-facing cart action and the
+# creation of an order.
+CART_ROUTES = [
+    ("cart-detail", "get", False),
+    ("cart-reserve-stock", "post", False),
+    ("cart-release-reservations", "post", False),
+    ("cart-create-payment-intent", "post", False),
+    ("cart-coupons", "get", False),
+    ("cart-agent-token", "post", True),
+    ("cart-item-list", "get", False),
+    ("order-list", "post", False),
+]
+
+
+def _call(route, method, signed_in):
+    client = APIClient()
+    if signed_in:
+        client.force_authenticate(user=UserAccountFactory())
+    return getattr(client, method)(reverse(route))
+
+
+@pytest.mark.parametrize(
+    ("route", "method", "signed_in"),
+    CATALOGUE_ROUTES,
+    ids=[route.split(":")[-1] for route, *_ in CATALOGUE_ROUTES],
+)
+@pytest.mark.parametrize("on", [True, False])
+def test_the_catalogue_switch_refuses_what_needs_the_catalogue(
+    route, method, signed_in, on
+):
+    switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": on})
+
+    response = _call(route, method, signed_in)
+
+    assert (response.status_code != status.HTTP_404_NOT_FOUND) is on
+
+
+@pytest.mark.parametrize(
+    ("route", "method", "signed_in"),
+    CART_ROUTES,
+    ids=[route for route, *_ in CART_ROUTES],
+)
+@pytest.mark.parametrize("switch", ["CART_ENABLED", "CATALOGUE_ENABLED"])
+@pytest.mark.parametrize("on", [True, False])
+def test_a_store_without_a_cart_refuses_the_cart(
+    route, method, signed_in, switch, on
+):
+    switch_store_settings(**{**EVERY_SWITCH, switch: on})
+
+    response = _call(route, method, signed_in)
+
+    assert (response.status_code != status.HTTP_404_NOT_FOUND) is on
+
+
+@pytest.mark.parametrize("on", [True, False])
+def test_the_catalogue_switch_refuses_a_product_and_its_actions(on):
+    from product.factories.product import ProductFactory
+
+    switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": on})
+    product = ProductFactory(num_images=0, num_reviews=0)
+    client = APIClient()
+
+    for route in (
+        "product-detail",
+        "product-images",
+        "product-tags",
+        "product-variants",
+        "product-reviews",
+        "product-price-history",
+    ):
+        response = client.get(reverse(route, args=[product.pk]))
+        assert (response.status_code != status.HTTP_404_NOT_FOUND) is on, route
+
+    response = client.post(
+        reverse("product-update-view-count", args=[product.pk])
+    )
+    assert (response.status_code != status.HTTP_404_NOT_FOUND) is on
+
+
+def test_the_trending_searches_of_the_blog_outlive_the_catalogue():
+    switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": False})
+    client = APIClient()
+
+    blog = client.get(reverse("search-trending"), {"content_type": "blog"})
+    product = client.get(reverse("search-trending"))
+
+    assert blog.status_code == status.HTTP_200_OK
+    assert product.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.fixture
+def staff_api():
+    from tenant.models import TenantMembershipRole
+    from tests.utils.staff import (
+        bind_store_tenant,
+        store_staff,
+        unbind_store_tenant,
+    )
+
+    tenant = store_tenant("features_staff")
+    previous = bind_store_tenant(tenant)
+    try:
+        client = APIClient()
+        client.force_authenticate(
+            user=store_staff(tenant, role=TenantMembershipRole.OWNER)
+        )
+        yield client
+    finally:
+        unbind_store_tenant(previous)
+
+
+def test_the_staff_routes_outlive_the_catalogue_and_the_cart(staff_api):
+    switch_store_settings(
+        **{**EVERY_SWITCH, "CATALOGUE_ENABLED": False, "CART_ENABLED": False}
+    )
+
+    # The staff listing of every cart.
+    assert staff_api.get(reverse("cart-list")).status_code == status.HTTP_200_OK
+    # Managing the catalogue: validation answers, the route is there.
+    for route in (
+        "product-list",
+        "product-category-list",
+        "product-attribute-list",
+        "product-attribute-value-list",
+        "product-image-list",
+        "product-category-image-list",
+    ):
+        response = staff_api.post(reverse(route), {}, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST, route
+
+
+def test_the_orders_a_store_already_has_outlive_the_cart():
+    switch_store_settings(
+        **{**EVERY_SWITCH, "CATALOGUE_ENABLED": False, "CART_ENABLED": False}
+    )
+    client = APIClient()
+    client.force_authenticate(user=UserAccountFactory())
+
+    assert client.get(reverse("order-list")).status_code == status.HTTP_200_OK
+    assert (
+        client.get(reverse("order-my-orders")).status_code == status.HTTP_200_OK
+    )

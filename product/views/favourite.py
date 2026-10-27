@@ -81,10 +81,10 @@ class ProductFavouriteViewSet(BaseModelViewSet):
     filterset_class = ProductFavouriteFilter
 
     def get_permissions(self):
-        from tenant.permissions import IsFavouritesEnabled
+        from tenant.permissions import IsCatalogueEnabled, IsFavouritesEnabled
 
-        # Merchant feature gate always fires first (404 when disabled).
-        return [IsFavouritesEnabled(), IsAuthenticated()]
+        # Merchant feature gates always fire first (404 when disabled).
+        return [IsCatalogueEnabled(), IsFavouritesEnabled(), IsAuthenticated()]
 
     ordering_fields = [
         "id",

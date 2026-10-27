@@ -23,6 +23,7 @@ from order.serializers.order import OrderSerializer
 from order.services import OrderService
 from product.models.favourite import ProductFavourite
 from tenant.permissions import (
+    IsCatalogueEnabled,
     IsFavouritesEnabled,
     IsLoyaltyEnabled,
     IsLoyaltyRuntimeEnabled,
@@ -146,6 +147,7 @@ class AgentFavouritesView(AgentAPIView):
     # The store's own switch first: with favourites off an agent finds
     # none, as the storefront does.
     permission_classes = [
+        IsCatalogueEnabled,
         IsFavouritesEnabled,
         TokenPermission.has_scope(SCOPE_FAVOURITES_READ),
     ]

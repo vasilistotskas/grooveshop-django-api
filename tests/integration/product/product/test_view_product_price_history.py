@@ -135,7 +135,8 @@ def test_the_query_count_does_not_grow_with_the_spells(
     product = ProductFactory(active=True)
     _spells(product, *[(f"{10 + i}.00", 100 - i) for i in range(30)])
 
-    with django_assert_max_num_queries(4):
+    # Two store-setting reads per gate (catalogue, price history).
+    with django_assert_max_num_queries(6):
         response = APIClient().get(_url(product.pk))
 
     assert len(response.json()["spells"]) == 30

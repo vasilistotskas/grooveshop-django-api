@@ -102,14 +102,15 @@ class BrandViewSetTestCase(APITestCase):
 
     def test_query_count_does_not_grow_with_rows(self):
         # One SELECT for the rows; the active-product gate is a
-        # correlated EXISTS, not a query per brand.
+        # correlated EXISTS, not a query per brand. The catalogue gate
+        # reads the store setting in two more.
         for name in ("product-brand-list", "product-brand-all"):
-            with self.assertNumQueries(2 if name.endswith("list") else 1):
+            with self.assertNumQueries(4 if name.endswith("list") else 3):
                 self.client.get(reverse(name))
 
         for i in range(5):
             _product(BrandFactory(name=f"Extra {i}"), active=True)
 
         for name in ("product-brand-list", "product-brand-all"):
-            with self.assertNumQueries(2 if name.endswith("list") else 1):
+            with self.assertNumQueries(4 if name.endswith("list") else 3):
                 self.client.get(reverse(name))

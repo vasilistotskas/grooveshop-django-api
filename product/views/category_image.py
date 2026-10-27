@@ -28,6 +28,7 @@ from product.serializers.category_image import (
     ProductCategoryImageSerializer,
     ProductCategoryImageWriteSerializer,
 )
+from tenant.permissions import IsCatalogueEnabled
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -101,7 +102,7 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
             "bulk_update",
         ):
             return [StoreStaffModelPermissions()]
-        return [AllowAny()]
+        return [IsCatalogueEnabled(), AllowAny()]
 
     def get_queryset(self) -> QuerySet[ProductCategoryImage]:
         queryset = super().get_queryset()

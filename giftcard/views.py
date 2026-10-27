@@ -37,7 +37,11 @@ from giftcard.serializers import (
 from giftcard.services import GiftCardError, GiftCardService
 from order.payment import provider_supports
 from order.payment_binding import PaymentPurpose
-from tenant.permissions import IsGiftCardsEnabled, IsGiftCardsRuntimeEnabled
+from tenant.permissions import (
+    IsCatalogueEnabled,
+    IsGiftCardsEnabled,
+    IsGiftCardsRuntimeEnabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +107,7 @@ class GiftCardViewSet(BaseModelViewSet):
         else:
             caller = IsAuthenticated if self.action == "mine" else AllowAny
             self.permission_classes = [
+                IsCatalogueEnabled,
                 IsGiftCardsEnabled,
                 IsGiftCardsRuntimeEnabled,
                 caller,

@@ -115,6 +115,7 @@ from pay_way.enum.settlement import PaySettlement
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
 from tenant.membership import is_store_staff
+from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -563,6 +564,11 @@ class OrderViewSet(BaseModelViewSet):
             # what STAFF's role text grants, so these stay available to
             # the people who run the store day to day.
             self.permission_classes = [StoreStaffChangePermission]
+        elif self.action == "create":
+            # Placing an order is the cart: a store that takes none
+            # refuses it. Reading and paying the orders it already has
+            # (the branches above, and ``viva_return`` below) stays open.
+            self.permission_classes = [IsCatalogueEnabled, IsCartEnabled]
         elif self.action in public_actions:
             self.permission_classes = []
         else:

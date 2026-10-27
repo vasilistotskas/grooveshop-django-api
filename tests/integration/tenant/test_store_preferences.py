@@ -58,10 +58,12 @@ def test_the_platform_is_not_a_store():
 
 
 def test_resolve_serves_them_under_preferences():
-    switch_store_settings(CART_ENABLED=False, MOBILE_BOTTOM_NAV_ENABLED=True)
+    switch_store_settings(
+        STICKY_ADD_TO_CART_ENABLED=False, MOBILE_BOTTOM_NAV_ENABLED=True
+    )
 
     data = TenantConfigSerializer(store_tenant("preference_store")).data
 
-    assert data["preferences"]["cart"] is False
+    assert data["preferences"]["sticky_add_to_cart"] is False
     assert data["preferences"]["mobile_bottom_nav"] is True
     assert set(data["preferences"]) == set(STORE_PREFERENCES)

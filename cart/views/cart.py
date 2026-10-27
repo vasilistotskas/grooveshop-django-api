@@ -69,7 +69,11 @@ from page_config.models import LegalDocumentUnavailableError
 from pay_way.enum.settlement import PaySettlement
 from promotion.serializers import CartCouponSerializer
 from tenant.membership import is_store_staff
-from tenant.permissions import IsPromotionsEnabled
+from tenant.permissions import (
+    IsCartEnabled,
+    IsCatalogueEnabled,
+    IsPromotionsEnabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -307,8 +311,11 @@ class CartViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         if self.action == "list":
+            # The staff listing of every cart: the store's staff keep it
+            # whatever the shopper-facing cart does.
             self.permission_classes = [StoreStaffModelPermissions]
-        elif self.action == "agent_token":
+            return super().get_permissions()
+        if self.action == "agent_token":
             self.permission_classes = [IsAuthenticated]
         elif self.action in {
             "apply_coupon",
@@ -323,6 +330,13 @@ class CartViewSet(BaseModelViewSet):
             # release_reservations, create_payment_intent) support guest users
             # via X-Cart-Id header — anonymous requests must be permitted.
             self.permission_classes = [AllowAny]
+        # Every shopper-facing cart action answers 404 while the store
+        # does not take orders; the gates fire before the rest.
+        self.permission_classes = [
+            IsCatalogueEnabled,
+            IsCartEnabled,
+            *self.permission_classes,
+        ]
         return super().get_permissions()
 
     def get_throttles(self):

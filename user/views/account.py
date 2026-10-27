@@ -39,6 +39,7 @@ from tenant.permissions import (
     IsAccountReviewsEnabled,
     IsBlogCommentsEnabled,
     IsBlogEnabled,
+    IsCatalogueEnabled,
     IsFavouritesEnabled,
     IsProductReviewsEnabled,
 )
@@ -206,7 +207,7 @@ class UserAccountViewSet(BaseModelViewSet):
     # The sub-resources that belong to an optional store feature answer
     # 404 while it is off, exactly as the feature's own routes do.
     action_feature_gates: dict[str, tuple[type[BasePermission], ...]] = {
-        "favourite_products": (IsFavouritesEnabled,),
+        "favourite_products": (IsCatalogueEnabled, IsFavouritesEnabled),
         "product_reviews": (IsProductReviewsEnabled, IsAccountReviewsEnabled),
         "blog_post_comments": (IsBlogEnabled, IsBlogCommentsEnabled),
         "liked_blog_posts": (IsBlogEnabled,),

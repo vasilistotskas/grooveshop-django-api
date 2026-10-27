@@ -66,7 +66,9 @@ STORE_FEATURES: dict[str, StoreFeature] = {
     "account_reviews": StoreFeature(
         None, (IsProductReviewsEnabled, IsAccountReviewsEnabled)
     ),
-    "favourites": StoreFeature(None, (IsFavouritesEnabled,)),
+    # Saved products, alerts, gift cards and suggestions only exist with the
+    # catalogue they point at, so each lists it first.
+    "favourites": StoreFeature(None, (IsCatalogueEnabled, IsFavouritesEnabled)),
     "newsletter": StoreFeature(None, (IsNewsletterEnabled,)),
     "feedback": StoreFeature(None, (IsFeedbackEnabled,)),
     "loyalty": StoreFeature(IsLoyaltyEnabled, (IsLoyaltyRuntimeEnabled,)),
@@ -74,14 +76,17 @@ STORE_FEATURES: dict[str, StoreFeature] = {
         IsPromotionsEnabled, (IsPromotionsRuntimeEnabled,)
     ),
     "gift_cards": StoreFeature(
-        IsGiftCardsEnabled, (IsGiftCardsRuntimeEnabled,)
+        IsGiftCardsEnabled, (IsCatalogueEnabled, IsGiftCardsRuntimeEnabled)
     ),
     "wholesale": StoreFeature(IsB2BEnabled, (IsB2BWholesaleEnabled,)),
     "product_suggestions": StoreFeature(
-        IsRecommendationsEnabled, (IsRecommendationsRuntimeEnabled,)
+        IsRecommendationsEnabled,
+        (IsCatalogueEnabled, IsRecommendationsRuntimeEnabled),
     ),
     "b2b_invoicing": StoreFeature(None, (IsB2BInvoicingEnabled,)),
-    "product_alerts": StoreFeature(None, (IsProductAlertsEnabled,)),
+    "product_alerts": StoreFeature(
+        None, (IsCatalogueEnabled, IsProductAlertsEnabled)
+    ),
     "price_history": StoreFeature(None, (IsPriceHistoryEnabled,)),
     "contact_attachments": StoreFeature(None, (IsContactAttachmentsEnabled,)),
     # The widget talks to the agent gateway's chat, which only serves a
@@ -90,10 +95,6 @@ STORE_FEATURES: dict[str, StoreFeature] = {
         IsAgentCommerceEnabled,
         (IsAgentCommerceRuntimeEnabled, IsChatWidgetEnabled),
     ),
-    # Stated before Django refuses on them: the agent gateway calls the
-    # cart, order and catalogue routes, so it reads these first and stops
-    # offering those tools, and only then do the routes 404
-    # (docs/store-features.md, "Cart and catalogue: the move").
     "catalogue": StoreFeature(None, (IsCatalogueEnabled,)),
     # Nothing can be put in a cart from a catalogue that is not served.
     "cart": StoreFeature(None, (IsCatalogueEnabled, IsCartEnabled)),
@@ -101,17 +102,12 @@ STORE_FEATURES: dict[str, StoreFeature] = {
 
 
 #: Preference name (its key in ``TenantConfig.preferences``) → the store
-#: setting that holds it. Class (b) presentation preferences, plus the
-#: cart and the catalogue while they move into ``STORE_FEATURES``: they
-#: leave here once the storefront reads them from ``features``
-#: (docs/store-features.md, "Cart and catalogue: the move").
+#: setting that holds it. Class (b) presentation preferences.
 STORE_PREFERENCES: dict[str, str] = {
     "mobile_bottom_nav": "MOBILE_BOTTOM_NAV_ENABLED",
     "sticky_add_to_cart": "STICKY_ADD_TO_CART_ENABLED",
     "recently_viewed": "RECENTLY_VIEWED_ENABLED",
     "demo_account": "DEMO_ACCOUNT_ENABLED",
-    "cart": "CART_ENABLED",
-    "catalogue": "CATALOGUE_ENABLED",
 }
 
 

@@ -3,6 +3,21 @@
 
 
 
+## v3.156.1 (2026-10-27)
+
+### Bug fixes
+
+* fix(mydata): declare 0% VAT lines as "other VAT exemptions" (27), not EU OSS (30) (#339)
+
+AADE's category table (myDATA REST API documentation v1.0.11, section 8.3)
+has 27 as «Λοιπές Εξαιρέσεις ΦΠΑ» and 30 as article 57, the EU OSS scheme.
+The builder sent 30 under the label of 27, so every zero-rated line a
+store transmitted was declared an EU OSS sale. Only the demo store
+transmits today (to the AADE sandbox), so no real receipt carried it. The
+test pinned the wrong value and now pins the table's.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`daa06e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/daa06e6cd291875e320f5068f19b599070d3a0b2))
+
 ## v3.156.0 (2026-10-27)
 
 ### Features

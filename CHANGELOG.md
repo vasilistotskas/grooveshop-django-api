@@ -3,6 +3,19 @@
 
 
 
+## v3.155.2 (2026-10-27)
+
+### Bug fixes
+
+* fix(tenant): drop the meta_capi_dataset_id columns (#335)
+
+0061, in production since 2026-10-27, took the never-read field out of
+state with a database default for the release then serving; that release
+is gone, so the contract step drops the columns on the tenant and its
+history.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`53d423e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53d423ece38f3186855cf35a1b7fec086f966ed8))
+
 ## v3.155.1 (2026-10-26)
 
 ### Bug fixes

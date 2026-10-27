@@ -49,7 +49,9 @@ VAT_CATEGORY_3 = 9  # 3 % (law 5057/2023)
 # 217 otherwise). We default retail 0% lines to VAT-free general
 # category (no article 22-28 specifics). Extend as needed when new
 # exemption paths come online.
-VAT_EXEMPTION_NO_VAT_ARTICLES = 30  # Λοιπές εξαιρέσεις ΦΠΑ
+# Code 27 is «Λοιπές Εξαιρέσεις ΦΠΑ» in the category table (myDATA REST API
+# documentation v1.0.11, section 8.3); 30 is article 57, the EU OSS scheme.
+VAT_EXEMPTION_NO_VAT_ARTICLES = 27
 
 
 # ── Classification types for invoiceDetails + invoiceSummary ─────

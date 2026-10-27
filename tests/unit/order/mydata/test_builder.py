@@ -312,7 +312,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         for row in rows:
             self.assertEqual(row.find(f"{AADE_NS}vatCategory").text, "7")
             self.assertEqual(
-                row.find(f"{AADE_NS}vatExemptionCategory").text, "30"
+                row.find(f"{AADE_NS}vatExemptionCategory").text, "27"
             )
 
     # ── Retail only: no invoice type 1.1, no counterpart ─────────

@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-  "channels[daphne]==4.3.2",
+  "channels==4.3.2",
   "channels-redis==4.3.0",
   "django==6.0.9",
   "django-allauth[idp-oidc]==65.20.0",
@@ -76,6 +76,9 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 [dependency-groups]
 dev = [
     "coverage[toml]==7.16.2",
+    # The development server (settings.py) and `channels.testing`, which
+    # imports `daphne.testing`; production runs Gunicorn with Uvicorn workers.
+    "daphne==4.2.3",
     "djangorestframework-stubs==3.18.1",
     "django-debug-toolbar==8.0.0",
     "django-stubs==6.1.2",
@@ -276,7 +279,8 @@ override-dependencies = [
     # GHSA-chx6-46f5-w4vp, GHSA-c2m8-h5v5-343r (HIGH) — fixed in 6.5.9
     "tornado>=6.5.9",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
-    # pointer chains; fixed in 26.4.0 (stable since 2026-08).
+    # pointer chains; fixed in 26.4.0 (stable since 2026-08). Twisted
+    # comes only with daphne, a development dependency.
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
     "twisted[http2,tls]>=26.4.0",
     # CVE-2026-71491, CVE-2026-59893, CVE-2026-54284 (HIGH) — three

@@ -97,8 +97,6 @@ jobs:
           output: trivy-results.sarif
           skip-dirs: .venv,node_modules,dist,.output
           limit-severities-for-sarif: true
-          # Accepted findings, each with its reason and expiry.
-          trivyignores: .trivyignore.yaml
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4

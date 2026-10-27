@@ -19,6 +19,7 @@ from core.utils.views import cache_methods
 from product.models.brand import Brand
 from product.models.product import Product
 from product.serializers.brand import BrandSerializer
+from tenant.permissions import IsCatalogueEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(list=BrandSerializer, detail=BrandSerializer),
@@ -51,7 +52,7 @@ class BrandViewSet(BaseModelViewSet):
 
     queryset = Brand.objects.all()
     serializers_config = serializers_config
-    permission_classes = [AllowAny]
+    permission_classes = [IsCatalogueEnabled, AllowAny]
     ordering_fields = ["id", "name"]
     ordering = ["name"]
     search_fields = ["name"]

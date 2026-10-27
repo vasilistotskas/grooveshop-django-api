@@ -60,13 +60,15 @@ class ProductAlertViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         from tenant.permissions import (
+            IsCatalogueEnabled,
             IsProductAlertsEnabled,
         )
 
-        # Merchant feature gate always fires first (404 when disabled).
+        # Merchant feature gates always fire first (404 when disabled).
+        gates = [IsCatalogueEnabled(), IsProductAlertsEnabled()]
         if self.action == "create":
-            return [IsProductAlertsEnabled(), AllowAny()]
-        return [IsProductAlertsEnabled(), IsAuthenticated()]
+            return [*gates, AllowAny()]
+        return [*gates, IsAuthenticated()]
 
     def get_queryset(self):
         user = getattr(self.request, "user", None)

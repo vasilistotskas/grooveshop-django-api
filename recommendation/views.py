@@ -43,6 +43,7 @@ from recommendation.serializers import (
     RecommendationResponseSerializer,
 )
 from tenant.permissions import (
+    IsCatalogueEnabled,
     IsRecommendationsEnabled,
     IsRecommendationsRuntimeEnabled,
 )
@@ -76,7 +77,12 @@ def _user_id(request) -> int | None:
 )
 @api_view(["GET"])
 @permission_classes(
-    [AllowAny, IsRecommendationsEnabled, IsRecommendationsRuntimeEnabled]
+    [
+        AllowAny,
+        IsCatalogueEnabled,
+        IsRecommendationsEnabled,
+        IsRecommendationsRuntimeEnabled,
+    ]
 )
 @throttle_classes([AnonRateThrottle, UserRateThrottle])
 def recommendations(request):

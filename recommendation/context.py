@@ -19,6 +19,7 @@ from django.db.models import Count
 
 from recommendation.strategies.base import TenantContext
 from tenant.models import TenantPlan
+from tenant.permissions import IsCatalogueEnabled
 
 # The field names are part of the key: the value is rebuilt as
 # ``TenantContext(**cached)``, so a release that adds or drops a field
@@ -104,13 +105,16 @@ def recommendations_active() -> bool:
     The same two tiers the read endpoint enforces with
     ``IsRecommendationsEnabled`` and ``IsRecommendationsRuntimeEnabled``
     — the plan flag on the ``Tenant`` row and the merchant's
-    ``PRODUCT_SUGGESTIONS_ENABLED`` setting — for the paths that have no
-    request to run a permission on: the order email and the nightly
-    jobs.
+    ``PRODUCT_SUGGESTIONS_ENABLED`` setting, on top of the catalogue they
+    recommend from — for the paths that have no request to run a
+    permission on: the order email and the nightly jobs.
     """
     from core.store_settings import store_setting
     from tenant.membership import tenant_plan_allows
 
     if not tenant_plan_allows("recommendations_enabled"):
         return False
-    return bool(store_setting("PRODUCT_SUGGESTIONS_ENABLED"))
+    return bool(
+        store_setting(IsCatalogueEnabled.setting_key)
+        and store_setting("PRODUCT_SUGGESTIONS_ENABLED")
+    )

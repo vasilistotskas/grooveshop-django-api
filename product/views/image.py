@@ -19,6 +19,7 @@ from product.serializers.image import (
     ProductImageSerializer,
     ProductImageWriteSerializer,
 )
+from tenant.permissions import IsCatalogueEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -47,7 +48,7 @@ class ProductImageViewSet(BaseModelViewSet):
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
             return [StoreStaffModelPermissions()]
-        return [AllowAny()]
+        return [IsCatalogueEnabled(), AllowAny()]
 
     filterset_fields = [
         "id",

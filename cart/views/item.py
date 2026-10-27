@@ -34,6 +34,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from tenant.membership import is_store_staff
+from tenant.permissions import IsCartEnabled, IsCatalogueEnabled
 
 GUEST_CART_HEADERS = [
     OpenApiParameter(
@@ -154,7 +155,11 @@ class CartItemViewSet(BaseModelViewSet):
         # All cart item operations support guest users via X-Cart-Id header.
         # get_queryset() enforces ownership so non-admin users only see their
         # own cart's items.
-        self.permission_classes = [AllowAny]
+        self.permission_classes = [
+            IsCatalogueEnabled,
+            IsCartEnabled,
+            AllowAny,
+        ]
         return super().get_permissions()
 
     def get_throttles(self):

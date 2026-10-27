@@ -23,6 +23,7 @@ from product.serializers.category import (
     ProductCategorySerializer,
     ProductCategoryWriteSerializer,
 )
+from tenant.permissions import IsCatalogueEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -68,7 +69,7 @@ class ProductCategoryViewSet(BaseModelViewSet):
             "destroy",
         ):
             return [StoreStaffModelPermissions()]
-        return [AllowAny()]
+        return [IsCatalogueEnabled(), AllowAny()]
 
     ordering_fields = [
         "id",

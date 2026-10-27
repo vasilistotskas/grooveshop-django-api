@@ -86,8 +86,6 @@ class StorePreferencesSerializer(serializers.Serializer):
     sticky_add_to_cart = serializers.BooleanField(read_only=True)
     recently_viewed = serializers.BooleanField(read_only=True)
     demo_account = serializers.BooleanField(read_only=True)
-    cart = serializers.BooleanField(read_only=True)
-    catalogue = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:
         from tenant.features import effective_preferences

@@ -47,7 +47,7 @@ from search.serializers import (
     TrendingSearchResponseSerializer,
 )
 from tenant.features import feature_on
-from tenant.permissions import IsBlogEnabled
+from tenant.permissions import IsBlogEnabled, IsCatalogueEnabled
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
@@ -539,7 +539,7 @@ def blog_post_meili_search(request):
 @api_view(["GET"])
 # Explicit, per the project rule that an anonymous endpoint declares
 # itself rather than leaning on DEFAULT_PERMISSION_CLASSES.
-@permission_classes([AllowAny])
+@permission_classes([IsCatalogueEnabled, AllowAny])
 @throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def product_meili_search(request):
     """Search products with advanced filtering via Meilisearch."""
@@ -1032,6 +1032,10 @@ def search_trending(request):
     """Return top search queries over the last 24h (Redis-cached)."""
     language_code = request.query_params.get("language_code") or ""
     content_type = request.query_params.get("content_type") or "product"
+    if content_type == "product":
+        # The queries are product searches: with no catalogue there is
+        # nothing to suggest. Blog queries are the blog's own concern.
+        IsCatalogueEnabled().has_permission(request, None)
 
     try:
         limit = int(request.query_params.get("limit", _TRENDING_DEFAULT_LIMIT))

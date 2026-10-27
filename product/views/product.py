@@ -39,7 +39,11 @@ from product.serializers.variant import ProductVariantsResponseSerializer
 from product.views.review import PRODUCT_REVIEW_ORDERING
 from tag.serializers.tag import TagSerializer
 from tenant.membership import is_store_staff
-from tenant.permissions import IsPriceHistoryEnabled, IsProductReviewsEnabled
+from tenant.permissions import (
+    IsCatalogueEnabled,
+    IsPriceHistoryEnabled,
+    IsProductReviewsEnabled,
+)
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -219,10 +223,14 @@ class ProductViewSet(BaseModelViewSet):
         if self.action == "reviews":
             # The product's reviews are the reviews feature: with it off
             # they are gone here too, as on /product/review.
-            return [IsProductReviewsEnabled(), AllowAny()]
+            return [
+                IsCatalogueEnabled(),
+                IsProductReviewsEnabled(),
+                AllowAny(),
+            ]
         if self.action == "price_history":
-            return [IsPriceHistoryEnabled(), AllowAny()]
-        return [AllowAny()]
+            return [IsCatalogueEnabled(), IsPriceHistoryEnabled(), AllowAny()]
+        return [IsCatalogueEnabled(), AllowAny()]
 
     ordering_fields = [
         "price",

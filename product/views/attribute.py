@@ -15,6 +15,7 @@ from core.utils.views import cache_methods
 from product.filters.attribute import AttributeFilter
 from product.models.attribute import Attribute
 from product.serializers.attribute import AttributeSerializer
+from tenant.permissions import IsCatalogueEnabled
 
 serializers_config: SerializersConfig = {
     "list": ActionConfig(response=AttributeSerializer),
@@ -83,6 +84,6 @@ class AttributeViewSet(BaseModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             self.permission_classes = [StoreStaffModelPermissions]
         else:
-            self.permission_classes = []
+            self.permission_classes = [IsCatalogueEnabled]
 
         return super().get_permissions()

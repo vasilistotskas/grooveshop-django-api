@@ -3,6 +3,29 @@
 
 
 
+## v3.156.0 (2026-10-27)
+
+### Features
+
+* feat(tenant): state the cart and the catalogue as store features (#337)
+
+CART_ENABLED and CATALOGUE_ENABLED only hide storefront chrome: nothing
+refuses the cart, order or catalogue routes when they are off, because
+the agent gateway calls those routes and has no way to know a store
+switched them off. The gateway can only read a feature Django already
+states, and a field missing from `features` reads as off there, which
+would switch every store's agent checkout off. So Django states them
+first.
+
+TenantConfig.features gains `catalogue` and `cart`. `cart` also needs
+the catalogue, since nothing can be put in a cart from a catalogue that
+is not served. The preferences keep both until the storefront reads them
+from `features`. No route refuses yet. docs/store-features.md now lays
+out the five steps of the move in this order (it said "gateway first",
+which would have hit that missing-field read).
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8d7f08e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d7f08e6c36aa1e1d246b139babbb69ec225b6bc))
+
 ## v3.155.3 (2026-10-27)
 
 ### Bug fixes

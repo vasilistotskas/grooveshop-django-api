@@ -1392,11 +1392,18 @@ class TestDemoShipmentsAreNeverSwept:
         assert list(BoxNowShipment.objects.real()) == [real_box]
 
     def test_the_acs_poll_batch_skips_them(self):
+        from order.enum.status import OrderStatus
+        from order.factories import OrderFactory
         from shipping_acs import tasks
         from shipping_acs.factories import AcsShipmentFactory
         from shipping_acs.models import AcsShipment
 
-        real = AcsShipmentFactory(with_voucher=True)
+        # An open order: the batch also skips a finished one, and
+        # OrderFactory picks its status at random.
+        real = AcsShipmentFactory(
+            with_voucher=True,
+            order=OrderFactory(status=OrderStatus.PROCESSING),
+        )
         AcsShipment.objects.update(last_polled_at=None)
 
         with (

@@ -152,26 +152,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Store-editable texts (`texts/`)**: see [`docs/store-texts.md`](docs/store-texts.md) — the storefront owns the catalogue and the message syntax, Django asks it (`texts/storefront.py`) and refuses a save it cannot check; `texts/services.py` is the only writer; a save moves the cache generation and the `store_texts` surface. Read it before touching `texts/` or adding a text surface (emails).
 - **API error contract (`core/api/exception_handler.py`)**: see [`docs/error-contract.md`](docs/error-contract.md) — every raised error carries a stable `code` (and validation errors a per-field `fields`), codes are passed as `code=` and never through `_()`, and which modules are coded so far. Read it before adding a `ValidationError`/`APIException` a client has to react to.
 - **Platform-wide documentation** lives in the sibling `grooveshop-docs/` repository (published at `docs.grooveshop.space`): architecture, multi-tenancy, end-to-end flows and operations under `src/dev/`, the bilingual tenant-admin guide under `src/admin/`. The files in this repo's `docs/` folder are copied into that site at build time, so keep editing them here. A behaviour change that a docs page describes ships with the doc change.
-- **Client IP and throttle identity (`core/client_ip.py`)**: never read
-  `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` directly to identify a
-  caller. What Traefik can vouch for is its TCP peer — a Cloudflare edge
-  node for proxied traffic (and a `10.42.x.x` SNAT gateway before the
-  Service moved to `externalTrafficPolicy: Local`; a public request was
-  recorded as `10.42.1.0` on 2026-09-16). Keying anonymous throttles on it
-  makes a budget shared by everyone behind that address
-  (`order_create_anon` at 10/minute let one client lock out every guest
-  checkout). `X-Real-IP` on the SSR path is the caller's own
-  `CF-Connecting-IP`, relayed by Nuxt, so a caller hitting a node IP chooses
-  it. Use `trusted_client_ip(request)`, which believes Cloudflare's
-  `CF-Connecting-IP`/`X-Real-IP` **only** when the request carries the
-  `X-Origin-Verify` secret our Cloudflare Transform Rules stamp, else
-  returns `None`; DRF throttles then fall back to `get_ident()`, and
-  everything else uses `client_ip_or_peer(request)` (the proven visitor,
-  else the rightmost `X-Forwarded-For` hop Traefik appended, else
-  `REMOTE_ADDR`). `trusted_client_ip` itself never falls back to
-  `REMOTE_ADDR`. Operator-side detail, including the fact that the secret
-  lives in two separate Cloudflare accounts, is in the infrastructure
-  repo's `docs/edge-trust-boundary.md`.
+- **Client IP and throttle identity (`core/client_ip.py`)**: never read `REMOTE_ADDR`, `X-Forwarded-For` or `X-Real-IP` directly to identify a caller; use `trusted_client_ip(request)` or `client_ip_or_peer(request)`. Read [`docs/client-ip.md`](docs/client-ip.md) before touching throttles or anything keyed on an address.
 - **Transactional email rendering (`core/templates/emails/**`)**: admin-authored WYSIWYG/HTML model fields (e.g. `PayWay.instructions` — a dedicated `tinymce.models.HTMLField`, picked up by `BaseModelAdmin.formfield_overrides` rather than a blanket `TextField`→`WysiwygWidget` override, so it holds HTML) must render as `{{ field|safe }}` in `.html` templates and `{{ field_text|safe }}` in `.txt` templates, where `field_text` is pre-built in the email task via `unescape(strip_tags(field))`. Django **autoescapes `.txt` templates too**, so the stripped plain text must be marked `|safe` or it re-encodes `& < >` back into entities. Escaping such a field (e.g. `|linebreaksbr`) renders literal `<div>` tags to the customer.
 - **Translations**: django-parler `TranslatableModel` on Product, BlogPost, Category, LoyaltyTier, etc. Languages: el (default), en. Factories create translations for all languages.
 - **Audit history**: django-simple-history on models
@@ -180,7 +161,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Stock management**: `StockManager` with atomic `reserve_stock()`/`release_stock()` using `select_for_update()` to prevent overselling under concurrent requests. `StockReservation` model with TTL (the store's `STOCK_RESERVATION_TTL_MINUTES`). `StockLog` for audit trail.
 - **Computed properties**: Models check `__dict__` for annotation values before falling back to DB queries (e.g. `likes_count`, `review_average`)
 - **Meilisearch indexing**: Models inherit `IndexMixin` with `MeiliMeta` class defining filterable/searchable/sortable fields, ranking rules, synonyms, typo tolerance. `meili_filter()` controls indexing eligibility. `get_additional_meili_fields()` adds computed fields.
-- **Greeklish search**: Handled at *index time* (`search/transliteration.py`), queries reach Meilisearch verbatim. Three shadow layers: canonical `*_greeklish` on every searchable Greek field; `*_greeklish_alt` (word-initial μπ/ντ/γκ → b/d/g); and `*_greeklish_variants` bags on SHORT fields only (titles, names, attributes — never bodies) holding every common Latin rendering per word (η→h/i, υ→y/u/i, ω→w/o/v, χ→x/h/ch, …; GreekLatinGenerator lineage, capped at 20/word) so conventions match exactly without leaning on typo tolerance. Never rewrite queries into space-joined variants: the default `last` matching strategy only drops words from the end (first word effectively mandatory) and only the first 10 query words are considered; a typo on a word's FIRST character costs two typos. The search views retry zero-result multi-word queries once with the leading word dropped (`_relaxed_query`) — the one shape `last` can never relax. Keep `minWordSizeForTypos` identical across indexes ({4, 8}); the storefront shows product and blog results for one query side by side.
+- **Greeklish search**: handled at *index time* (`search/transliteration.py`); queries reach Meilisearch verbatim and are never rewritten into variants. Read [`docs/search/greeklish.md`](docs/search/greeklish.md) before touching transliteration, `MeiliMeta` search settings or `search/views.py`.
 
 ### WebSocket / Real-time
 
@@ -192,7 +173,7 @@ ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (3 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
+App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Retry policy is per task, never global: Celery has no setting for `autoretry_for`, backoff or `max_retries` (a `CELERY_TASK_AUTORETRY_FOR` in `settings.py` is read by nothing), so each decorator sets `autoretry_for`, `retry_backoff`, `retry_jitter` and its own `max_retries` (2 to 5; Celery defaults to 3). `autoretry_for` names a transient set from `core/retry.py` (`TRANSIENT_ERRORS`, `MAIL_TRANSIENT_ERRORS`, `SEARCH_TRANSIENT_ERRORS`, `TRANSIENT_HTTP_ERRORS`), never `Exception`: a deterministic failure retried only repeats itself. `MonitoredTask.retry` also stops at once on an SMTP 5xx or an HTTP 4xx, which no class can express. `tests/unit/core/test_celery_tasks_do_not_retry_everything.py` fails for any registered task whose `autoretry_for` contains `Exception`.
 
 Tasks are split by domain:
 - `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
@@ -209,22 +190,7 @@ left `CELERY_BEAT_SCHEDULE`, so `core/beat.py` deletes the rows named by
 `CELERY_BEAT_UNSCHEDULED_ENTRIES` on every beat start. See
 `docs/staging-anonymise.md`.
 
-**Only task FAILURES are stored.** `CELERY_TASK_IGNORE_RESULT` is on, so a
-successful task writes nothing; `CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED`
-keeps failures and retries, which land in `django_celery_results` in the
-**public schema only** (the app is in SHARED_APPS, deliberately not
-TENANT_APPS) and are surfaced by the platform dashboard and its Task
-Results page. The result backend is `core.result_backend.TenantDatabaseBackend`
-(not an environment setting — Celery prefers a `CELERY_RESULT_BACKEND` env var
-over the Django setting, so `tests/settings.py` pins it): it writes the
-`_schema_name` header a task was published with into `TaskResult.meta`, so
-every failure row says which store it ran for, hard time limits included. The
-Task Results admin (`core.admin.TaskResultAdmin`, platform-only) shows a Store
-column and a Store filter built on it. Consequences: adding a `chord()` or `group()` — which do
-need results — means setting `ignore_result=False` on that task, not
-flipping the global; and "did the nightly task run?" is answered by
-`PeriodicTask.last_run_at` or `MonitoredTask`'s log line, never by that
-table. The reasoning is spelled out where the settings are defined.
+**Only task FAILURES are stored** (`CELERY_TASK_IGNORE_RESULT`), in the public schema's `django_celery_results`, tagged with the store by `core.result_backend.TenantDatabaseBackend`. A `chord()`/`group()` needs `ignore_result=False` on that task; "did it run?" is `PeriodicTask.last_run_at`, never that table. Detail: [`docs/celery-results.md`](docs/celery-results.md).
 
 ### Factory / Test Data Pattern
 
@@ -237,25 +203,7 @@ All factories extend `CustomDjangoModelFactory` from `devtools/factories.py`. Ke
 
 ### Test Configuration
 
-Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories.
-
-Settings read while Django sets up live in `tests/settings.py`, selected with `--ds=tests.settings` in `addopts` (the option outranks a `DJANGO_SETTINGS_MODULE` env var, which every container gets from `env_file: .env`). It pins `DISABLE_CACHE`, `ENABLE_DEBUG_TOOLBAR`, `APPEND_SLASH`, `DEBUG` and `DATABASE_BACKUPS_ENABLED` in the environment before `settings.py` loads, so the developer's `.env` cannot make a local run differ from CI, and declares `CACHES` as `tests.cache.WorkerScopedCache` (Redis, `clear()` scoped to its own `KEY_PREFIX`). The cache prefix and the per-run `MEDIA_ROOT` both follow `TEST_NAMESPACE` — the test database name plus the xdist worker — so two sessions on one machine never touch each other's state **as long as they use different `DB_NAME`s**: a second `-n N` run beside a full run must set its own `DB_NAME=…` (or use `-n0`), or it truncates the full run's `test_<DB_NAME>_gwN` databases. pytest-django imports `conftest.py` only after `django.setup()`, so a value assigned there is too late for anything an `AppConfig.ready()` or the cache registry reads. Key `conftest.py` settings:
-- MD5 password hasher (faster than default)
-- `MEILISEARCH["OFFLINE"] = True`
-- `CELERY_TASK_ALWAYS_EAGER = True` with `EAGER_PROPAGATES` — a task body that fails raises into the test
-- `transaction.on_commit` runs callbacks at once in non-transactional tests, exactly like Django's autocommit branch: an exception propagates unless the callback was registered `robust=True`. A test that means "this failure does not reach the caller" must say so (`pytest.raises(Retry)` in the task, a patched `apply_async`), not rely on a swallowed error
-- **Migration seeds survive every flush** (`tests/migration_seed.py`): when `migrate` builds a test database, every non-empty table is snapshotted into the `test_migration_seed` schema; a `flush` (the end of any `transaction=True` / `TransactionTestCase` test) and a reused database at session start restore it. Every test therefore sees exactly the seeded rows — never a hand-maintained reseed. A test that needs a table without its seed deletes it inside its own transaction (`setUpTestData`, or the test body), never in a session fixture. A database built before this existed needs one `--create-db`. New migrations on a reused database first restore the old snapshot, so leftovers are never snapshotted. `available_apps`, `serialized_rollback` and `reset_sequences` bypass the restore and are refused at collection
-- **The test database has the public schema only**: `tests/conftest.py` runs django-tenants' `migrate` with `shared=True`, so the seeded `webside` tenant's schema is not migrated too (it halved the time to build a worker database). No test in `tests/` needs a physical tenant schema; `tests_mt/` provisions its own
-- `transaction=True` / `TransactionTestCase` only where real commits are the point (threads on other connections, `select_for_update` contention, `database_sync_to_async`); each one ends with a full-table flush
-- `bind_tenant` (connection.tenant; restores `schema_name`) and `bind_tenant_and_schema` (also points `schema_name` at the tenant) — no local copies; `tests.utils.staff.store_tenant` builds a `Tenant` row (no schema: `auto_create_schema` is off for the whole suite)
-- `openapi_schema` session fixture: the document `manage.py spectacular` writes, built once
-- `requires_meilisearch` marker for tests needing a live engine; `tests/utils/meilisearch.py` indexes real documents for them
-- Query counts: Django's `CaptureQueriesContext` and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
-- Coverage minimum: 70% (`fail_under = 70`, enforced on the combined CI shards), per-test timeout: 600s
-
-On Windows with Docker Desktop a fresh connection to `localhost` can stall 1-30 s (its IPv6 port relay); test durations that are exact multiples of ~30 s mean that, not slow code — run locally with `REDIS_HOST=127.0.0.1`.
-
-**MT (multi-tenant) lane** — `tests_mt/` is a SIBLING of `tests/`, not a subdirectory: `tests/conftest.py` strips multi-tenancy (`DATABASE_ROUTERS = []`, no `TenantMainMiddleware`) to keep the main suite fast, which makes schema-binding bugs (cross-schema FKs, cache-key leaks, seed migrations that stop reaching new tenants) invisible to it. `tests_mt/conftest.py` keeps the real `TenantSyncRouter` and `TenantMainMiddleware`, provisions one tenant schema per session, and runs a handful of high-leverage smoke tests on top. Not collected by a bare `uv run pytest` (`testpaths = ["tests"]` excludes it) — run it explicitly with `uv run pytest tests_mt -n 0` (serial; schema switching is process-global via `connection`).
+Tests in `tests/` (`unit/`, `integration/`, `utils/`) and the multi-tenant lane `tests_mt/` (run it with `uv run pytest tests_mt -n 0`). A second parallel run beside a full one needs its own `DB_NAME`. Read [`docs/testing.md`](docs/testing.md) before writing a test that commits, touches seeds, settings or the cache, or before changing `tests/settings.py` / a `conftest.py`.
 
 ### Infrastructure (Docker)
 

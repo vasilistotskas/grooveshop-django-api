@@ -301,6 +301,11 @@ REGISTRY: dict[str, Scrub | Delete] = {
         raw_payload=Kind.JSON,
         reconciliation_note=Kind.TEXT,
     ),
+    "shipping_acs.AcsApiCall": _scrub_all(
+        request_params=Kind.JSON,
+        response=Kind.JSON,
+        error_message=Kind.TEXT,
+    ),
     "shipping_boxnow.BoxNowShipment": Scrub(
         order_fk="order", fields={"metadata": Kind.JSON}
     ),
@@ -507,6 +512,7 @@ NOT_PERSONAL: dict[str, str] = {
         "shipping.HistoricalShippingRate",
         "shipping_acs.AcsStation",
         "shipping_acs.AcsPickupList",
+        "shipping_acs.AcsPickupListRun",
         "shipping_boxnow.BoxNowLocker",
         "promotion.Promotion",
         "promotion.PromotionTranslation",

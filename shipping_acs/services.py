@@ -38,10 +38,12 @@ from shipping_acs.exceptions import (
 )
 from shipping_acs.models import (
     AcsPickupList,
+    AcsPickupListRun,
     AcsShipment,
     AcsStation,
     AcsTrackingEvent,
 )
+from shipping_acs.models.pickup_list_run import AcsPickupListRunOutcome
 from tenant.credentials import tenant_site_name
 from tenant.staff_actors import staff_id
 
@@ -274,6 +276,52 @@ def _event_fingerprint(
     """
     blob = f"{shipment_id}|{event_time}|{action}|{location}|{notes}"
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+
+class _PickupRunTrace:
+    """What one pickup-list attempt saw, written out as an
+    :class:`AcsPickupListRun` whatever the attempt came to."""
+
+    def __init__(self, pickup_date: date, *, issued_by_id: int | None):
+        self.pickup_date = pickup_date
+        self.issued_by_id = issued_by_id
+        self.started_at = timezone.now()
+        self.candidate_vouchers: list[str] = []
+        self.unprinted_acs: list[str] = []
+        self.unprinted_local: list[str] = []
+        self.acs_message = ""
+        self.adopted = False
+        self.silent = False
+
+    def finish(
+        self,
+        outcome: str,
+        *,
+        error_message: str = "",
+        pickup_list: AcsPickupList | None = None,
+    ) -> None:
+        """Persist the run. A failed write is logged, never raised: the
+        attempt it describes has already happened at ACS."""
+        try:
+            with transaction.atomic():
+                AcsPickupListRun.objects.create(
+                    pickup_date=self.pickup_date,
+                    started_at=self.started_at,
+                    outcome=outcome,
+                    candidate_vouchers=self.candidate_vouchers,
+                    unprinted_vouchers_acs=self.unprinted_acs,
+                    unprinted_vouchers_local=self.unprinted_local,
+                    acs_message=self.acs_message,
+                    error_message=error_message,
+                    pickup_list=pickup_list,
+                    issued_by_id=self.issued_by_id,
+                )
+        except Exception:
+            logger.warning(
+                "Could not record the ACS pickup list run for %s",
+                self.pickup_date,
+                exc_info=True,
+            )
 
 
 class AcsService:
@@ -1045,6 +1093,52 @@ class AcsService:
         billing_code: str | None = None,
         issued_by_id: int | None = None,
     ) -> AcsPickupList | None:
+        """Run :meth:`_attempt_pickup_list` and record the attempt.
+
+        Every outcome leaves an :class:`AcsPickupListRun`, so "why was no
+        pickup list issued on date X" is answered by the database: the
+        beat task and the admin "issue now" action both land here.
+        """
+        the_date = pickup_date or timezone.localdate()
+        trace = _PickupRunTrace(the_date, issued_by_id=issued_by_id)
+        try:
+            result = cls._attempt_pickup_list(
+                pickup_date=the_date,
+                billing_code=billing_code,
+                issued_by_id=issued_by_id,
+                trace=trace,
+            )
+        except AcsUnprintedVouchersError as exc:
+            trace.finish(
+                AcsPickupListRunOutcome.BLOCKED_UNPRINTED_SILENT
+                if trace.silent
+                else AcsPickupListRunOutcome.BLOCKED_UNPRINTED,
+                error_message=exc.error_message,
+            )
+            raise
+        except Exception as exc:
+            trace.finish(AcsPickupListRunOutcome.ERROR, error_message=str(exc))
+            raise
+        if result is None:
+            trace.finish(AcsPickupListRunOutcome.NOTHING_TO_ISSUE)
+        else:
+            trace.finish(
+                AcsPickupListRunOutcome.ADOPTED
+                if trace.adopted
+                else AcsPickupListRunOutcome.ISSUED,
+                pickup_list=result,
+            )
+        return result
+
+    @classmethod
+    def _attempt_pickup_list(
+        cls,
+        *,
+        pickup_date: date,
+        billing_code: str | None,
+        issued_by_id: int | None,
+        trace: _PickupRunTrace,
+    ) -> AcsPickupList | None:
         """Finalise the day's vouchers via ``ACS_Issue_Pickup_List``.
 
         Three-phase design — same shape as ``create_voucher_for_order``
@@ -1065,7 +1159,7 @@ class AcsService:
         Returns the created :class:`AcsPickupList` or ``None`` when no
         candidate shipments are eligible (idempotent on re-run).
         """
-        the_date = pickup_date or timezone.localdate()
+        the_date = pickup_date
 
         # --- Phase 1: collect candidates, no lock ---
         candidate_rows = list(
@@ -1086,6 +1180,7 @@ class AcsService:
             )
         )
         candidates = [row[0] for row in candidate_rows]
+        trace.candidate_vouchers = [row[1] for row in candidate_rows]
         if not candidates:
             logger.info(
                 "issue_daily_pickup_list: no candidate shipments for %s",
@@ -1098,6 +1193,7 @@ class AcsService:
         # this never blocks the call — it just puts the likely reason for
         # a rejection in the log BEFORE ACS returns it.
         unprinted_locally = [row[1] for row in candidate_rows if row[2] is None]
+        trace.unprinted_local = unprinted_locally
         if unprinted_locally:
             logger.warning(
                 "issue_daily_pickup_list: %s of %s candidate voucher(s) have "
@@ -1114,6 +1210,8 @@ class AcsService:
         result = client.issue_pickup_list(pickup_date=the_date.isoformat())
 
         pickup_list_no = (result.get("PickupList_No") or "").strip()
+        trace.unprinted_acs = list(result.get("Unprinted_Vouchers") or [])
+        trace.acs_message = (result.get("Error_Message") or "").strip()
         if not pickup_list_no:
             # Past the candidate guard above there ARE vouchers waiting,
             # so ACS declining to return a PickupList_No is a FAILURE —
@@ -1144,6 +1242,7 @@ class AcsService:
                 issue_response=result,
             )
             if recovered is not None:
+                trace.adopted = True
                 return recovered
 
             unprinted_count = result.get("Unprinted_Found")
@@ -1246,6 +1345,7 @@ class AcsService:
                     raw=result,
                 )
             if len(unprinted_locally) == len(candidate_rows):
+                trace.silent = True
                 # The same refusal, answered silently. Observed in prod
                 # (voucher 9818420312 on 2026-10-22 / 10-23, voucher
                 # 9819787972 on 10-27 / 10-28): the first run named the

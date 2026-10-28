@@ -403,6 +403,22 @@ class PromotionEngine:
         return entry.promotion.pk in granted
 
     @classmethod
+    def teaser_cost(cls, entry: NearMissEntry, cart_items) -> Decimal | None:
+        """What following ``entry`` adds to the cart, in money.
+
+        The value of the lines :meth:`_items_after_teaser` adds — the
+        same simulation :meth:`_teaser_holds` checks the promise on — so
+        a units teaser ("2 more items") can be weighed against an amount
+        one. ``None`` when there is nothing to build on.
+        """
+        future_items = cls._items_after_teaser(entry, cart_items)
+        if future_items is None:
+            return None
+        return sum(
+            (item.total_price.amount for item in future_items), Decimal(0)
+        ) - sum((item.total_price.amount for item in cart_items), Decimal(0))
+
+    @classmethod
     def _items_after_teaser(
         cls, entry: NearMissEntry, cart_items
     ) -> list | None:

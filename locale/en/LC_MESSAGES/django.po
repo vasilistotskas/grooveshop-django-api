@@ -6256,6 +6256,9 @@ msgstr "Home page sections"
 msgid "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
 msgstr "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
 
+msgid "How far this cart is from free shipping, by its cheapest route: a carrier's free-shipping threshold or a free-shipping promotion, judged by the rules checkout prices shipping with. The one figure to show for free shipping; promotionNearMiss entries flagged freeShipping are routes it has already weighed. Null when the cart has no route to free shipping."
+msgstr "How far this cart is from free shipping, by its cheapest route: a carrier's free-shipping threshold or a free-shipping promotion, judged by the rules checkout prices shipping with. The one figure to show for free shipping; promotionNearMiss entries flagged freeShipping are routes it has already weighed. Null when the cart has no route to free shipping."
+
 msgid "How it was paid back"
 msgstr "How it was paid back"
 

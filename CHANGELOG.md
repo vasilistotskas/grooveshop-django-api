@@ -3,6 +3,52 @@
 
 
 
+## v3.160.0 (2026-10-28)
+
+### Features
+
+* feat(cart): one free-shipping progress on the cart payload (#350)
+
+A cart showed two contradictory free-shipping distances: the teaser of a
+free-shipping promotion from 39 EUR ("add 19,01 EUR") and the store's bar
+from the carrier's 50 EUR threshold ("add 30,01 EUR"), read from
+/shipping/free-shipping-info. Checkout honours the cheaper route.
+
+The cart now carries freeShippingProgress, decided by
+OrderService.free_shipping_progress with the two rules shipping_cost
+charges with: a live free-shipping promotion (the engine's own verdict,
+or a near-miss teaser it has already checked would be granted) and a
+carrier's threshold on threshold_value, over the rates that could carry
+this cart (ShippingService.free_threshold_rates: the active_rate gate,
+the weight cap and the parcel size). Rates are judged for the store's
+first shipping country, the one checkout preselects; the cheapest route
+wins, a promotion on a tie, and a units teaser is weighed by what the
+engine's simulation adds (PromotionEngine.teaser_cost).
+
+promotionNearMiss entries gain freeShipping, so a client shows the
+progress instead of a second free-shipping teaser. Both are additions;
+free_shipping_info now shares the threshold-rate gate, which adds the
+provider-supports-kind check checkout already applied.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c464a49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c464a491d9d5227d2082e57c87a98092e5393914))
+
+### Testing
+
+* test(devtools): give the ACS poll-batch demo test an open order (#351)
+
+OrderFactory picks a random status, and since #349 the poll batch also
+skips a shipment whose order is finished, so the test failed whenever the
+draw was a finished status (seen on #350 CI, shard 3). It now states the
+open order it relies on.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b9f72ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9f72ba61188449ac7a26aaf4a70acf27dfdb86b))
+
 ## v3.159.1 (2026-10-28)
 
 ### Bug fixes

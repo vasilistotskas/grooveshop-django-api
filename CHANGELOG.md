@@ -3,6 +3,85 @@
 
 
 
+## v3.159.1 (2026-10-28)
+
+### Bug fixes
+
+* fix(shipping_acs): stop polling ACS tracking once the order is finished (#349)
+
+poll_acs_tracking_batch excluded only terminal shipment states, so a
+shipment that never progressed past `new` was polled for ever even when
+its order was long finished. Production, 2026-10-28: webside order 56,
+COMPLETED since May 2026, voucher 9770932931, shipment_state `new`, zero
+tracking events. ACS answered every poll with business_error "Δεν
+βρέθηκε αποστολή ACS για την εταιρία σας με αριθμό: 9770932931", so two
+wasted ACS calls every 30 minutes, indefinitely.
+
+The batch now also excludes shipments whose order status is in
+TERMINAL_ORDER_STATUSES (DELIVERED, COMPLETED, CANCELED, RETURNED,
+REFUNDED), in the same single query. The set is made public in
+shipping_acs.services (it was private) so the task reuses it instead of
+duplicating the list. The shipment row's state is left untouched.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`12fb81e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/12fb81ef77a9636d73c490bd09ab8b9c30b4d8c1))
+
+### Chores
+
+* chore(deps): drop daphne and Twisted, run the dev server on Uvicorn (#348) ([`2bff197`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2bff19746691e48af56da6ea53b94ea4536d0d88))
+
+* chore(deps): drop daphne and Twisted, serve local dev with Uvicorn
+
+Production runs Gunicorn with Uvicorn workers and has neither daphne nor
+Twisted installed. Twisted's only path into the lockfile was daphne, which
+cost Dependabot alerts about code that never runs live.
+
+daphne was a dev dependency for two reasons, both removed:
+
+- Its `runserver` served ASGI, so the local storefront's websocket worked.
+  The dev server is now `uvicorn asgi:application --reload`, the same
+  application production serves. Static files (`staticfiles_urlpatterns()`)
+  and media (the `serve` view) already come from `core/urls.py` in DEBUG, so
+  they keep working. `manage.py runserver` never served ASGI without daphne
+  and the project has no wsgi module, so it is no longer a dev entry point.
+  `app.compose.yml` and `dev.Dockerfile` start Uvicorn. watchfiles is added
+  to the dev group: without it Uvicorn polls every `*.py` under the working
+  directory, `.venv` included.
+- `channels.testing` imports `daphne.testing`. The websocket stack tests now
+  drive `asgi.application` with `asgiref.testing.ApplicationCommunicator` and
+  raw ASGI websocket events, keeping every case and assertion.
+
+Also removed: the daphne app from INSTALLED_APPS, the daphne
+`filterwarnings`, and the twisted uv override. uv.lock has no daphne or
+twisted entries any more. Docs and stale comments updated.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU ([`2bff197`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2bff19746691e48af56da6ea53b94ea4536d0d88))
+
+* chore(settings): drop the WSGI and ASGI application settings nothing reads
+
+WSGI_APPLICATION named a wsgi module deleted in 0805226b; ASGI_APPLICATION is
+read only by channels' get_default_application, which nothing calls now that
+daphne is gone. Uvicorn and Gunicorn load asgi:application directly. Also
+drops the coverage omit and a comment that still named the wsgi package.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2bff197`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2bff19746691e48af56da6ea53b94ea4536d0d88))
+
+### Documentation
+
+* docs(claude): new English msgstrs need their msgid after makemessages (#347)
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`11f64f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11f64f09f2c7afe5c0d6fe84c822866ed9cd00c8))
+
 ## v3.159.0 (2026-10-28)
 
 ### Bug fixes

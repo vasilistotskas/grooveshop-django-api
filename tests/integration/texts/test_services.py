@@ -230,13 +230,9 @@ class TestPermission:
 
     @pytest.mark.parametrize(
         "role",
-        [
-            TenantMembershipRole.STAFF,
-            TenantMembershipRole.ADMIN,
-            TenantMembershipRole.OWNER,
-        ],
+        [TenantMembershipRole.ADMIN, TenantMembershipRole.OWNER],
     )
-    def test_the_store_roles_hold_it(self, tenant, role):
+    def test_the_roles_that_edit_hold_it(self, tenant, role):
         user = store_staff(tenant, role=role)
 
         assert user.has_perm(services.CHANGE_PERMISSION)

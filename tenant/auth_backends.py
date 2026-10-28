@@ -235,6 +235,7 @@ def _permissions_for_role(role: str) -> set[str]:
     from tenant.models import TenantMembershipRole
     from tenant.role_scopes import (
         REFERENCE_DATA_APP_LABELS,
+        STAFF_READ_ONLY_APP_LABELS,
         operational_app_labels,
         store_app_labels,
     )
@@ -249,8 +250,14 @@ def _permissions_for_role(role: str) -> set[str]:
         # (TenantMembershipRole). Delete is withheld as well: it is the
         # irreversible action, and nothing in that description implies
         # it.
-        return reference | _permissions_for_apps(
-            operational_app_labels(), actions=("view", "add", "change")
+        return (
+            reference
+            | _permissions_for_apps(
+                operational_app_labels(), actions=("view", "add", "change")
+            )
+            | _permissions_for_apps(
+                STAFF_READ_ONLY_APP_LABELS, actions=("view",)
+            )
         )
 
     if role in (TenantMembershipRole.ADMIN, TenantMembershipRole.OWNER):

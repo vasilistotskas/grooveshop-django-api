@@ -44,9 +44,13 @@ and the editor says so. There is no fallback.
 
 `texts/services.py` is the only writer (the admin has no add/change form):
 
-1. permission `texts.change_textoverride` (derived by the role system for
-   every store role: `tenant/auth_backends.py` grants a store app's model
-   permissions, STAFF without delete; reset is a change, not a delete);
+1. permission `texts.change_textoverride`, held by a store's **ADMIN and
+   OWNER**. STAFF only see the editor, read-only, with a notice. The rule
+   lives in the role system, `tenant/role_scopes.py`: `texts` is in
+   `STORE_SETTINGS_APP_LABELS` (so STAFF's operational grant leaves it out)
+   and in `STAFF_READ_ONLY_APP_LABELS` (which gives STAFF `view`, applied in
+   `tenant/auth_backends.py`). Reset is a delete, but it is gated by the
+   change permission, like restore;
 2. normalise (CRLF to LF, strip), blank refused (`value_blank`), length cap
    `TEXTS_MAX_VALUE_LENGTH` (`value_too_long`);
 3. the storefront's verdict: `unknown_key`, `locked_key`, `syntax_error`,

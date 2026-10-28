@@ -3,6 +3,66 @@
 
 
 
+## v3.159.0 (2026-10-28)
+
+### Bug fixes
+
+* fix(shipping_acs): give the new admin strings English msgstrs
+
+The English catalogue requires every message to carry an English msgstr
+and no fuzzy flag. makemessages had left the strings added for the ACS
+call history, pickup-list run and shipment timeline empty or fuzzy.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e01b890`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e01b8906e14bb191ce79b4c6d5206d8fb45f71bc))
+
+### Documentation
+
+* docs(shipping_acs): add the ACS debugging runbook
+
+docs/acs-debugging.md answers why no pickup list was issued, whether a
+voucher is printed and on a list, what ACS answered for a call, why
+tracking stopped, an ACS 406/auth storm and the COD reconcile, with the
+admin paths and LogsQL queries on the new log fields. Linked from
+CLAUDE.md and docs/order-system.md.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e01b890`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e01b8906e14bb191ce79b4c6d5206d8fb45f71bc))
+
+### Features
+
+* feat(shipping_acs): log and persist every ACS call and pickup-list run (#346) ([`e01b890`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e01b8906e14bb191ce79b4c6d5206d8fb45f71bc))
+
+* feat(shipping_acs): log and persist every ACS call and pickup-list run
+
+AcsClient._call is the one chokepoint for every ACS alias. It now emits
+one structured log line per call (acs_alias, outcome, duration_ms,
+http_status, error_message and the voucher/pickup identifiers present in
+the params, merged into the JSON log through extra={"fields": ...}) and
+writes an AcsApiCall row with the redacted, size-capped request and
+response. Credentials and the AcsApiKey never reach either; PDF/base64
+bodies become a length marker. Observing never changes the call: the
+write runs in a savepoint and any failure is logged and swallowed.
+
+AcsPickupList only exists when a manifest was issued, so "why was no
+list issued on date X" had no answer in the database. AcsPickupListRun
+is written by issue_daily_pickup_list on every outcome (issued, adopted,
+nothing_to_issue, blocked_unprinted, blocked_unprinted_silent, error),
+for the beat task and the admin "Issue ACS pickup list now" action.
+
+The ACS shipment admin gets a read-only Diagnostics timeline (label,
+pickup-list runs, pickup list, tracking events, last ACS calls) linked
+from the order's ACS panel. The new admins are read-only; the call
+history is superuser-only like the other ACS audit trails.
+
+A retention sweep (ACS_API_CALL_RETENTION_DAYS, default 90) runs per
+tenant through tenant.tasks.fanout_purge_expired_acs_api_calls. The
+anonymise rules scrub the payloads. The migration only adds tables.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e01b890`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e01b8906e14bb191ce79b4c6d5206d8fb45f71bc))
+
 ## v3.158.1 (2026-10-28)
 
 ### Bug fixes

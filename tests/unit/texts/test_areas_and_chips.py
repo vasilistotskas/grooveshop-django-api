@@ -131,6 +131,9 @@ def test_a_row_id_is_stable_and_distinguishes_texts():
     ],
 )
 def test_a_component_is_named_in_words(namespace, name):
+    from django.utils import translation
+
     from texts.areas import component_name
 
-    assert component_name(namespace) == name
+    with translation.override("en"):
+        assert component_name(namespace) == name

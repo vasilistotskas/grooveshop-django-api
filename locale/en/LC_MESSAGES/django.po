@@ -11252,6 +11252,9 @@ msgstr "Seven"
 msgid "Shared attributes, tags and brand"
 msgstr "Shared attributes, tags and brand"
 
+msgid "Shared text"
+msgstr "Shared text"
+
 msgid "Shipment"
 msgstr "Shipment"
 

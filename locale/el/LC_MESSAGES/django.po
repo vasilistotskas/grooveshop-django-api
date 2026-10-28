@@ -11262,6 +11262,9 @@ msgstr "Επτά"
 msgid "Shared attributes, tags and brand"
 msgstr "Κοινά χαρακτηριστικά, ετικέτες και μάρκα"
 
+msgid "Shared text"
+msgstr "Κοινό κείμενο"
+
 msgid "Shipment"
 msgstr "Αποστολή"
 

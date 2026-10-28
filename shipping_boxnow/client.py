@@ -43,7 +43,7 @@ class BoxNowClient:
     production hosts when it is on, the stage hosts when it is off.
 
     OAuth tokens are cached in Django's cache backend (Redis in production)
-    under ``boxnow:access_token:{environment}:{partner_id}`` so that Daphne
+    under ``boxnow:access_token:{environment}:{partner_id}`` so that web
     workers and Celery workers share a single token without racing to
     refresh it.
     """

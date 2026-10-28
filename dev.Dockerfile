@@ -71,8 +71,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --chown=appuser:appgroup --from=uv /uv /uvx /bin/
 
 # The virtualenv and uv's cache live OUTSIDE ${APP_PATH} because the dev
-# compose stack bind-mounts the host source over it so runserver's
-# autoreloader sees real edits. A venv at ${APP_PATH}/.venv would be
+# compose stack bind-mounts the host source over it so Uvicorn's
+# ``--reload`` sees real edits. A venv at ${APP_PATH}/.venv would be
 # shadowed by the host's — which on Windows is a win32 venv, i.e. the
 # wrong ABI entirely. Keeping it at /opt also avoids papering over the
 # bind with anonymous volumes, which compose REUSES across recreates and
@@ -107,4 +107,4 @@ FROM base AS default
 
 USER appuser
 
-CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["uv", "run", "uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000", "--reload"]

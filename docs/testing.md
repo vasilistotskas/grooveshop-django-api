@@ -18,6 +18,7 @@ Settings read while Django sets up live in `tests/settings.py`, selected with `-
 - `transaction=True` / `TransactionTestCase` only where real commits are the point (threads on other connections, `select_for_update` contention, `database_sync_to_async`); each one ends with a full-table flush
 - `bind_tenant` (connection.tenant; restores `schema_name`) and `bind_tenant_and_schema` (also points `schema_name` at the tenant) — no local copies; `tests.utils.staff.store_tenant` builds a `Tenant` row (no schema: `auto_create_schema` is off for the whole suite)
 - `openapi_schema` session fixture: the document `manage.py spectacular` writes, built once
+- WebSocket tests drive the ASGI application with `asgiref.testing.ApplicationCommunicator` and raw `websocket.*` events (`tests/unit/asgi/test_websocket_stack.py`). Do not import `channels.testing`: its `__init__` imports `daphne.testing`, and neither daphne nor Twisted is a dependency
 - `requires_meilisearch` marker for tests needing a live engine; `tests/utils/meilisearch.py` indexes real documents for them
 - Query counts: Django's `CaptureQueriesContext` and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
 - Coverage minimum: 70% (`fail_under = 70`, enforced on the combined CI shards), per-test timeout: 600s

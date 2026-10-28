@@ -5,7 +5,8 @@ x-common-envs: &common-envs
   CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672
 
 x-common-vols: &common-vols
-  # The dev containers run ``manage.py runserver``, whose autoreloader
+  # The dev containers run Uvicorn (``asgi:application``, the app
+  # production serves) with ``--reload``, whose file watcher
   # is the whole point of this stack — but with no source mount it
   # watched the copy baked in by ``dev.Dockerfile``'s ``COPY . .``, so
   # editing a file on the host changed nothing until a rebuild. This
@@ -79,7 +80,7 @@ services:
       dockerfile: ./dev.Dockerfile
       target: default
     command: >
-      uv --no-cache run python manage.py runserver 0.0.0.0:8000
+      uv --no-cache run uvicorn asgi:application --host 0.0.0.0 --port 8000 --reload
     env_file:
       - ./.env
     environment:

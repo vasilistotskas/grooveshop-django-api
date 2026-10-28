@@ -68,7 +68,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **Message Broker**: RabbitMQ
 - **Search**: Meilisearch
 - **Payments**: Viva Wallet (primary), Stripe (dj-stripe)
-- **Server**: Gunicorn process manager running Uvicorn ASGI workers (Daphne only serves `runserver`)
+- **Server**: Gunicorn process manager running Uvicorn ASGI workers (locally, `uvicorn --reload` serves the same ASGI application)
 - **Containerization**: Docker
 - **Package Management**: uv
 
@@ -208,7 +208,7 @@ uv run pre-commit run --all-files
 # Django management
 uv run python manage.py makemigrations
 uv run python manage.py migrate
-uv run python manage.py runserver
+uv run uvicorn asgi:application --reload
 uv run python manage.py createsuperuser
 uv run python manage.py seed_all
 

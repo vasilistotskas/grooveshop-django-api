@@ -76,9 +76,6 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 [dependency-groups]
 dev = [
     "coverage[toml]==7.16.2",
-    # The development server (settings.py) and `channels.testing`, which
-    # imports `daphne.testing`; production runs Gunicorn with Uvicorn workers.
-    "daphne==4.2.3",
     "djangorestframework-stubs==3.18.1",
     "django-debug-toolbar==8.0.0",
     "django-stubs==6.1.2",
@@ -98,6 +95,9 @@ dev = [
     "hypothesis==6.170.2",
     "ty==0.0.89",
     "pytest-split==0.11.0",
+    # Uvicorn's `--reload` (local dev server) uses it, and only with it
+    # do `.*` directories such as `.venv` stay out of the watch set.
+    "watchfiles==1.3.0",
 ]
 
 # ─────────────────────────────────────────────────────────
@@ -249,19 +249,6 @@ timeout = 600
 # ``env_file: .env`` exports ``DJANGO_SETTINGS_MODULE=settings``. That
 # module pins what must be right before ``django.setup()``; see its docstring.
 addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db"
-# Third-party deprecation noise we cannot fix here — each entry names the
-# offending package and the upstream state so it can be dropped on upgrade:
-# - daphne pins the Windows selector event-loop policy for Twisted compat
-#   (daphne/__init__.py); Python 3.14 deprecates both the policy class and
-#   set_event_loop_policy (removal slated for 3.16). Re-tested 2026-08-14
-#   on daphne 4.2.1: both still fire.
-#   (The former drf-spectacular _UnionGenericAlias filter was dropped
-#   2026-08-14 — 0.30.0 ships the tfranzel/drf-spectacular#1497 fix and
-#   the warning no longer fires under schema-generation tests.)
-filterwarnings = [
-    "ignore:'asyncio.WindowsSelectorEventLoopPolicy' is deprecated:DeprecationWarning:daphne",
-    "ignore:'asyncio.set_event_loop_policy' is deprecated:DeprecationWarning:daphne",
-]
 markers = [
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
 ]
@@ -278,11 +265,6 @@ override-dependencies = [
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
     # GHSA-chx6-46f5-w4vp, GHSA-c2m8-h5v5-343r (HIGH) — fixed in 6.5.9
     "tornado>=6.5.9",
-    # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
-    # pointer chains; fixed in 26.4.0 (stable since 2026-08). Twisted
-    # comes only with daphne, a development dependency.
-    # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
-    "twisted[http2,tls]>=26.4.0",
     # CVE-2026-71491, CVE-2026-59893, CVE-2026-54284 (HIGH) — three
     # quadratic-CPU paths in grouping/lexer/TokenList reachable from
     # sqlparse.parse/format/split; all fixed in 0.6.0. Transitive via

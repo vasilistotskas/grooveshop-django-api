@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers; Daphne only backs `runserver`) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
+GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers in production, Uvicorn `--reload` locally) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
 
 ## Common Commands
 
@@ -37,7 +37,8 @@ uv run pre-commit run --all-files
 # Django management
 uv run python manage.py makemigrations
 uv run python manage.py migrate
-uv run python manage.py runserver
+uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
+# `manage.py runserver` does not work: the project is ASGI-only and has no wsgi module
 uv run python manage.py seed_all
 
 # Generate OpenAPI schema (used by Nuxt frontend for types)
@@ -214,7 +215,7 @@ Tests in `tests/` (`unit/`, `integration/`, `utils/`) and the multi-tenant lane 
 - `dev.Dockerfile` — Debian slim with full dev environment
 
 **The dev stack bind-mounts your working tree.** `app.compose.yml` mounts `.`
-over `/home/app`, so `manage.py runserver`'s autoreloader sees your edits and
+over `/home/app`, so Uvicorn's `--reload` watcher sees your edits and
 restarts. Two consequences worth knowing:
 
 - **The virtualenv lives at `/opt/venv`, not `/home/app/.venv`**

@@ -127,6 +127,7 @@ class TestFeatures:
             "Pages",
             "Menus",
             "Page Layouts",
+            "Storefront Texts",
             "Wholesale",
             "Loyalty",
             "Promotions",

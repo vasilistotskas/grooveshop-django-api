@@ -288,6 +288,9 @@ TENANT_APPS = [
     "giftcard",
     "b2b",
     "page_config",
+    # Store-edited storefront texts (overrides of the storefront's locale
+    # defaults, validated through the storefront before they are saved)
+    "texts",
     # Agent surface (OIDC-bearer API over tenant-schema data; no models
     # of its own — placed here because everything it serves is per-store)
     "agent",
@@ -865,6 +868,30 @@ NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
 # re-render from the old copy and be cached with the old flag again.
 STOREFRONT_TENANT_CACHE_SECONDS = int(
     getenv("STOREFRONT_TENANT_CACHE_SECONDS", "300")
+)
+
+# Store-edited texts (``texts``). The catalogue of editable texts and the
+# check of a store-written one are the storefront's, asked over
+# ``NUXT_INTERNAL_BASE_URL`` (``texts.storefront``).
+#
+# The longest a store's replacement may be. The storefront's own bound is
+# 2000 and its longest default under 400, so this is tighter than the
+# first and leaves room over the second.
+TEXTS_MAX_VALUE_LENGTH = int(getenv("TEXTS_MAX_VALUE_LENGTH", "1000"))
+# Seconds a process trusts its copy of the catalogue before it asks the
+# storefront whether the build changed (a conditional request, so an
+# unchanged catalogue answers 304 with no body).
+TEXTS_CATALOGUE_REVALIDATE_SECONDS = int(
+    getenv("TEXTS_CATALOGUE_REVALIDATE_SECONDS", "60")
+)
+# Seconds to wait for the storefront when listing or validating texts.
+TEXTS_STOREFRONT_TIMEOUT_SECONDS = float(
+    getenv("TEXTS_STOREFRONT_TIMEOUT_SECONDS", "5")
+)
+# How long a store's overrides for one language are kept (they are also
+# keyed by the store's cache generation, so a save moves them at once).
+TEXTS_OVERRIDES_CACHE_SECONDS = int(
+    getenv("TEXTS_OVERRIDES_CACHE_SECONDS", "3600")
 )
 
 # The platform's own Cloudflare zone, which caches the storefront pages of

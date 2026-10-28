@@ -127,7 +127,17 @@ def selectable_roles(
 # explicitly excluded from these: "can view the tenant's operational
 # admin (orders, products) but cannot change tenant settings or invite
 # other staff" (TenantMembershipRole).
-STORE_SETTINGS_APP_LABELS: frozenset[str] = frozenset({"extra_settings"})
+#
+# ``texts``: the wording of the storefront is the store's presentation, so
+# ADMIN and OWNER edit it. STAFF only see it (``STAFF_READ_ONLY_APP_LABELS``).
+STORE_SETTINGS_APP_LABELS: frozenset[str] = frozenset(
+    {"extra_settings", "texts"}
+)
+
+# Store-settings apps STAFF may still LOOK at, never change: their pages
+# open read-only. Each must also be in ``STORE_SETTINGS_APP_LABELS``, which
+# is what withholds the change permission.
+STAFF_READ_ONLY_APP_LABELS: frozenset[str] = frozenset({"texts"})
 
 
 def store_app_labels() -> frozenset[str]:

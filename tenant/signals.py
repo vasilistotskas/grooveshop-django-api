@@ -163,6 +163,21 @@ def bump_generation_on_shipping_provider_change(sender, instance, **kwargs):
     _bump_generation_for_current_schema()
 
 
+@receiver(
+    [post_save, post_delete],
+    sender="texts.TextOverride",
+    dispatch_uid="tenant.bump_generation_on_text_override_change",
+)
+def bump_generation_on_text_override_change(sender, instance, **kwargs):
+    """Move the tenant's cached entries on when a store's text changes.
+
+    The public overrides read (``texts.views``) is keyed by the
+    generation, so a saved, reset or restored text is served at once
+    instead of after its TTL.
+    """
+    _bump_generation_for_current_schema()
+
+
 @receiver(post_save, sender=Tenant, dispatch_uid="tenant.reactivate_on_renewal")
 def reactivate_on_renewal(sender, instance, **kwargs):
     """Recording a payment lifts a BILLING suspension immediately.

@@ -1,0 +1,39 @@
+{% load i18n unfold %}
+<div data-history class="border-base-200 border-t flex flex-col gap-3 mt-4 pt-4 dark:border-base-800">
+    <div class="flex items-center justify-between">
+        {% component "unfold/components/title.html" with class="text-sm" %}{% trans "History" %}{% endcomponent %}
+        {% component "unfold/components/button.html" with type="button" size="sm" variant="ghost" icon="close" extra_attrs="x-on:click='$el.closest(`[data-history]`).remove()'" %}
+            {% trans "Close" %}
+        {% endcomponent %}
+    </div>
+    {% for item, restore_attrs in items %}
+        <div class="border border-base-200 flex flex-col gap-2 p-3 rounded-default dark:border-base-800">
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+                <p class="mb-0 text-sm">
+                    <strong class="text-important">{{ item.kind }}</strong>
+                    &middot; {{ item.language_name }}
+                    {% if item.who %}&middot; {{ item.who }}{% endif %}
+                    &middot; <time datetime="{{ item.when|date:'c' }}">{{ item.when|date:"DATETIME_FORMAT" }}</time>
+                    {% if item.reason and item.reason != item.kind %}<span class="text-subtle">({{ item.reason }})</span>{% endif %}
+                </p>
+                {% if item.restorable and can_edit %}
+                    {% component "unfold/components/button.html" with type="button" size="sm" variant="default" icon="restore" extra_attrs=restore_attrs %}
+                        {% trans "Restore this" %}
+                    {% endcomponent %}
+                {% endif %}
+            </div>
+            <div class="gap-3 grid md:grid-cols-2">
+                <div>
+                    <span class="font-semibold text-subtle text-xs uppercase">{% trans "Before" %}</span>
+                    <p class="mb-0 text-sm whitespace-pre-line break-words">{{ item.before }}</p>
+                </div>
+                <div>
+                    <span class="font-semibold text-subtle text-xs uppercase">{% trans "After" %}</span>
+                    <p class="mb-0 text-sm whitespace-pre-line break-words">{{ item.after }}</p>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        {% component "unfold/components/text.html" %}{% trans "Nothing has been changed yet." %}{% endcomponent %}
+    {% endfor %}
+</div>

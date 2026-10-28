@@ -290,6 +290,16 @@ msgid "%(minutes)s min"
 msgstr "%(minutes)s λεπτά"
 
 #, python-format
+msgid "%(n)s changed"
+msgstr "%(n)s με αλλαγές"
+
+#, python-format
+msgid "%(n)s changed by your store"
+msgid_plural "%(n)s changed by your store"
+msgstr[0] "%(n)s άλλαξε από το κατάστημά σας"
+msgstr[1] "%(n)s άλλαξαν από το κατάστημά σας"
+
+#, python-format
 msgid "%(name)s (%(minutes)s min remaining)"
 msgstr "%(name)s (απομένουν %(minutes)s λεπτά)"
 
@@ -466,6 +476,12 @@ msgstr "%(total)d είδη, %(unique)d μοναδικά"
 #, python-format
 msgid "%(total)s (-%(discount)s saved)"
 msgstr "%(total)s (-%(discount)s εξοικονόμηση)"
+
+#, python-format
+msgid "%(total)s text"
+msgid_plural "%(total)s texts"
+msgstr[0] "%(total)s κείμενο"
+msgstr[1] "%(total)s κείμενα"
 
 #, python-format
 msgid "%(type)s %(id)s at position %(position)s"
@@ -1130,6 +1146,9 @@ msgstr "Όλες"
 msgid "All %(err)d shipment(s) failed — see server logs."
 msgstr "Όλες οι %(err)d αποστολές απέτυχαν — δείτε τα logs του server."
 
+msgid "All areas"
+msgstr "Όλες οι ενότητες"
+
 msgid "All caught up: nothing is waiting for you."
 msgstr "Όλα έτοιμα: τίποτα δεν περιμένει."
 
@@ -1289,6 +1308,9 @@ msgstr "Εγκεκριμένο"
 
 msgid "Are you sure?"
 msgstr "Είστε σίγουροι;"
+
+msgid "Area"
+msgstr "Ενότητα"
 
 msgid "Arrival notified at"
 msgstr "Ειδοποίηση άφιξης στις"
@@ -1488,6 +1510,9 @@ msgstr "Πίσω στη σύνδεση"
 
 msgid "Back to product"
 msgstr "Επιστροφή στο προϊόν"
+
+msgid "Back to the default text."
+msgstr "Το κείμενο επανήλθε στο αρχικό."
 
 msgid "Background Image"
 msgstr "Εικόνα φόντου"
@@ -2347,11 +2372,20 @@ msgstr "Αλλαγή του κωδικού μου"
 msgid "Change the username for a specific user."
 msgstr "Αλλαγή του ονόματος χρήστη για συγκεκριμένο χρήστη."
 
+msgid "Change the wording of your storefront. Every text shows the original above your version, in each language. A text you do not change keeps the original, and you can go back to it at any time."
+msgstr "Αλλάξτε τη διατύπωση του καταστήματός σας. Κάθε κείμενο εμφανίζει το αρχικό πάνω από τη δική σας εκδοχή, σε κάθε γλώσσα. Ένα κείμενο που δεν αλλάζετε κρατά το αρχικό και μπορείτε να επιστρέψετε σε αυτό όποτε θέλετε."
+
 msgid "Change username"
 msgstr "Αλλαγή ονόματος χρήστη"
 
+msgid "Changed"
+msgstr "Με αλλαγές"
+
 msgid "Changed By"
 msgstr "Άλλαξε από"
+
+msgid "Changed only"
+msgstr "Μόνο όσα άλλαξαν"
 
 msgid "Charge"
 msgstr "Χρέωση"
@@ -2531,6 +2565,9 @@ msgstr "Προγραμματισμοί με Ώρα"
 msgid "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activate when ready."
 msgstr "Κλωνοποιήθηκε το προϊόν #%(orig)s → πρόχειρο #%(clone)s. Επεξεργαστείτε το αντίγραφο και επανενεργοποιήστε όταν είναι έτοιμο."
 
+msgid "Close"
+msgstr "Κλείσιμο"
+
 msgid "CloudEvents 'id' field — idempotency key"
 msgstr "Πεδίο 'id' του CloudEvents — κλειδί ιδεμποτεντίας"
 
@@ -2614,6 +2651,9 @@ msgstr "Σχόλια"
 
 msgid "Commerce"
 msgstr "Εμπόριο"
+
+msgid "Common"
+msgstr "Κοινά"
 
 msgid "Common reasons for failed payments:"
 msgstr "Συνήθεις λόγοι αποτυχημένων πληρωμών:"
@@ -2785,6 +2825,9 @@ msgstr "Περίοδος Επικοινωνίας"
 
 msgid "Contact Person"
 msgstr "Άτομο Επικοινωνίας"
+
+msgid "Contact and forms"
+msgstr "Επικοινωνία και φόρμες"
 
 msgctxt "legal details alert"
 msgid "Contact email"
@@ -3686,6 +3729,9 @@ msgstr "Στείλτε το ξανά στα συμβάντα κλικ, ώστε 
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Επεξεργαστείτε απευθείας το «Locker External ID» για να παρακάμψετε το locker σε δοκιμές stage (π.χ. ορίστε το σε «4» σύμφωνα με τις οδηγίες stage της BoxNow)."
 
+msgid "Edited"
+msgstr "Επεξεργασία"
+
 msgid "Effective Cost"
 msgstr "Πραγματικό κόστος"
 
@@ -3806,6 +3852,9 @@ msgstr "Εισαγάγετε αριθμό τηλεφώνου, χρησιμοπο
 
 msgid "Enter a storefront path starting with a single '/'."
 msgstr "Εισαγάγετε μια διαδρομή του καταστήματος που ξεκινά με ένα μόνο '/'."
+
+msgid "Enter a text, or reset it to the default."
+msgstr "Γράψτε ένα κείμενο ή επαναφέρετέ το στο αρχικό."
 
 msgid "Enter a valid 2-letter country code."
 msgstr "Εισαγάγετε έναν έγκυρο διψήφιο κωδικό χώρας (2 γράμματα)."
@@ -6133,6 +6182,9 @@ msgstr "Το υψηλότερο στάδιο ειδοποίησης που έχ�
 msgid "Highest threshold across active providers — the subtotal at which every carrier ships free. Null when no active provider advertises a threshold."
 msgstr "Υψηλότερο όριο μεταξύ των ενεργών παρόχων — το υποσύνολο στο οποίο κάθε μεταφορέας αποστέλλει δωρεάν. Null όταν κανένας ενεργός πάροχος δεν δηλώνει όριο."
 
+msgid "History"
+msgstr "Ιστορικό"
+
 msgid "Home"
 msgstr "Σπίτι"
 
@@ -6142,6 +6194,9 @@ msgstr "Αρχική"
 
 msgid "Home delivery"
 msgstr "Κατ' οίκον παράδοση"
+
+msgid "Home page sections"
+msgstr "Ενότητες αρχικής σελίδας"
 
 msgid "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
 msgstr "Πώς και πότε εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, χειροκίνητη παράδοση, ...), όπως τα έγραψε ο χειριστής."
@@ -6262,6 +6317,9 @@ msgstr "Εικονίδιο"
 
 msgid "Icon Image"
 msgstr "Εικόνα εικονιδίου"
+
+msgid "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που αποθήκευσε τελευταίο αυτό το κείμενο (public schema, όχι χρήστης του καταστήματος)."
 
 msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που έκανε την αλλαγή (public schema, όχι χρήστης του καταστήματος)."
@@ -6465,6 +6523,9 @@ msgstr "Μόνο πληροφοριακό — οι αξίες των γραμμ�
 
 msgid "Initial Value"
 msgstr "Αρχική αξία"
+
+msgid "Insert"
+msgstr "Εισαγωγή"
 
 msgid "Inspect Meilisearch index settings, statistics, and configuration"
 msgstr "Επιθεώρηση ρυθμίσεων, στατιστικών και διαμόρφωσης index Meilisearch"
@@ -6847,6 +6908,9 @@ msgstr "Αποδοχή νομικών όρων"
 msgid "Legal acceptances"
 msgstr "Αποδοχές νομικών όρων"
 
+msgid "Legal and cookies"
+msgstr "Νομικά και cookies"
+
 msgid "Legal document unavailable"
 msgstr "Νομικό έγγραφο μη διαθέσιμο"
 
@@ -7057,6 +7121,9 @@ msgstr "Πλαίσιο τοποθεσίας συμβάντος"
 msgid "Location, as a LocationChoicesEnum member (e.g. HOME)"
 msgstr "Τοποθεσία, ως μέλος του LocationChoicesEnum (π.χ. HOME)"
 
+msgid "Locked"
+msgstr "Κλειδωμένο"
+
 msgid "Locker"
 msgstr "Locker"
 
@@ -7190,6 +7257,9 @@ msgstr "Βαθμίδα Πιστότητας"
 
 msgid "Loyalty Tiers"
 msgstr "Βαθμίδες Πιστότητας"
+
+msgid "Loyalty and gift cards"
+msgstr "Πιστότητα και δωροκάρτες"
 
 msgid "Loyalty discount"
 msgstr "Έκπτωση πόντων"
@@ -7557,6 +7627,9 @@ msgstr "Εκδίδει ένα βραχύβιο διακριτικό που επ�
 msgid "Missing"
 msgstr "Λείπει"
 
+msgid "Missing a translation"
+msgstr "Λείπει μετάφραση"
+
 msgid "Missing transaction id (t) or order code (s)."
 msgstr "Λείπει το αναγνωριστικό συναλλαγής (t) ή ο κωδικός παραγγελίας (s)."
 
@@ -7630,6 +7703,9 @@ msgstr "Όνομα τύπου περιεχομένου"
 
 msgid "Names of the ad click-id parameters the landing URL carried. Their values are never sent."
 msgstr "Τα ονόματα των παραμέτρων click-id διαφημίσεων που είχε η διεύθυνση προσγείωσης. Οι τιμές τους δεν αποστέλλονται ποτέ."
+
+msgid "Namespace"
+msgstr "Χώρος ονομάτων"
 
 msgid "Navigation Column"
 msgstr "Στήλη πλοήγησης"
@@ -7747,6 +7823,9 @@ msgstr "Εγγραφή στο newsletter"
 msgid "Newsletter form"
 msgstr "Φόρμα newsletter"
 
+msgid "Next"
+msgstr "Επόμενη"
+
 msgid "Next Number"
 msgstr "Επόμενος αριθμός"
 
@@ -7804,6 +7883,9 @@ msgstr "Δεν βρέθηκε αποστολή μεταφορέα για αυτ�
 
 msgid "No carts or orders in this period"
 msgstr "Κανένα καλάθι ή παραγγελία σε αυτή την περίοδο"
+
+msgid "No changes to save."
+msgstr "Δεν υπάρχουν αλλαγές για αποθήκευση."
 
 msgid "No comment"
 msgstr "Χωρίς σχόλιο"
@@ -7907,6 +7989,12 @@ msgstr "Δεν υπάρχουν καταστήματα ακόμα."
 msgid "No term recorded"
 msgstr "Χωρίς καταχωρημένη περίοδο"
 
+msgid "No text"
+msgstr "Χωρίς κείμενο"
+
+msgid "No text matches. Try fewer words, or clear the filters."
+msgstr "Κανένα κείμενο δεν ταιριάζει. Δοκιμάστε λιγότερες λέξεις ή καθαρίστε τα φίλτρα."
+
 msgid "No threshold"
 msgstr "Χωρίς όριο"
 
@@ -7983,11 +8071,17 @@ msgstr "⚠️ Σημείωση: Βεβαιωθείτε ότι όλα τα χρ�
 msgid "Notes"
 msgstr "Σημειώσεις"
 
+msgid "Nothing has been changed yet."
+msgstr "Δεν έχει γίνει καμία αλλαγή ακόμη."
+
 msgid "Nothing has been deleted — your products, orders, and settings are all intact."
 msgstr "Τίποτα δεν έχει διαγραφεί — τα προϊόντα, οι παραγγελίες και οι ρυθμίσεις σας είναι όλα ανέπαφα."
 
 msgid "Nothing retained"
 msgstr "Δεν διατηρήθηκε τίποτα"
+
+msgid "Nothing was saved. Fix the marked texts."
+msgstr "Δεν αποθηκεύτηκε τίποτα. Διορθώστε τα κείμενα που επισημαίνονται."
 
 msgid "Notification"
 msgstr "Ειδοποίηση"
@@ -8588,6 +8682,9 @@ msgstr "Οργάνωση"
 msgid "Origin URL of the event source"
 msgstr "URL προέλευσης πηγής συμβάντος"
 
+msgid "Original"
+msgstr "Αρχικό"
+
 msgid "Original Quantity"
 msgstr "Αρχική ποσότητα"
 
@@ -8635,6 +8732,10 @@ msgstr "ΕΛΕΓΧΟΣ INDEX ΠΡΟΪΟΝΤΩΝ"
 
 msgid "Page"
 msgstr "Σελίδα"
+
+#, python-format
+msgid "Page %(number)s of %(total)s"
+msgstr "Σελίδα %(number)s από %(total)s"
 
 msgid "Page Configuration"
 msgstr "Διαμόρφωση σελίδων"
@@ -9405,6 +9506,9 @@ msgstr "Υπάρχει όταν στις τιμές γραμμών αυτού τ
 msgid "Preview"
 msgstr "Προεπισκόπηση"
 
+msgid "Previous"
+msgstr "Προηγούμενη"
+
 msgid "Previous Value"
 msgstr "Προηγούμενη τιμή"
 
@@ -9633,6 +9737,9 @@ msgstr "Το προϊόν δεν βρέθηκε."
 
 msgid "Product page"
 msgstr "Σελίδα προϊόντος"
+
+msgid "Product pages"
+msgstr "Σελίδες προϊόντων"
 
 msgid "Product price spell"
 msgstr "Περίοδος τιμής προϊόντος"
@@ -10360,6 +10467,9 @@ msgstr "Αφαίρεση από καλάθι"
 msgid "Remove the applied coupon code from the cart"
 msgstr "Αφαίρεση του εφαρμοσμένου κωδικού κουπονιού από το καλάθι"
 
+msgid "Remove this store's wording and go back to the default?"
+msgstr "Να αφαιρεθεί η διατύπωση του καταστήματος και να επανέλθει το αρχικό κείμενο;"
+
 msgid "Rendered"
 msgstr "Δημιουργήθηκε"
 
@@ -10436,6 +10546,9 @@ msgstr "Δέσμευση αποθέματος για αντικείμενα κα
 msgid "Reserved By"
 msgstr "Δεσμεύτηκε από"
 
+msgid "Reset"
+msgstr "Επαναφορά"
+
 msgid "Reset all slots to the store's preset"
 msgstr "Επαναφορά όλων των θέσεων στις προκαθορισμένες ρυθμίσεις του καταστήματος"
 
@@ -10447,6 +10560,9 @@ msgstr "Επαναφορά του κωδικού πρόσβασής μου"
 
 msgid "Reset this slot to the preset?"
 msgstr "Επαναφορά αυτής της θέσης στις προκαθορισμένες ρυθμίσεις;"
+
+msgid "Reset to default"
+msgstr "Επαναφορά στο αρχικό"
 
 msgid "Reset to the store's preset"
 msgstr "Επαναφορά στις προκαθορισμένες ρυθμίσεις του καταστήματος"
@@ -10472,6 +10588,15 @@ msgstr "Επιστροφή στο απόθεμα"
 
 msgid "Restock returned units of an order item"
 msgstr "Επαναφορά στο απόθεμα επιστρεφόμενων τεμαχίων προϊόντος παραγγελίας"
+
+msgid "Restore this"
+msgstr "Επαναφορά αυτού"
+
+msgid "Restored"
+msgstr "Επαναφέρθηκε"
+
+msgid "Restored."
+msgstr "Επαναφέρθηκε."
 
 msgid "Result ID"
 msgstr "ID αποτελέσματος"
@@ -10762,11 +10887,17 @@ msgstr "Δείγμα δεδομένων"
 msgid "Sanitised request body (PII fields are hashed by the facebook_business SDK before serialisation). Stored for replay during incident debugging."
 msgstr "Καθαρισμένο σώμα αιτήματος (τα πεδία PII γίνονται hash από το SDK facebook_business πριν τη σειριοποίηση). Αποθηκεύεται για επανάληψη (replay) κατά τον εντοπισμό σφαλμάτων σε περιστατικά."
 
+msgid "Save"
+msgstr "Αποθήκευση"
+
 msgid "Save your recovery codes"
 msgstr "Αποθηκεύστε τους κωδικούς ανάκτησης"
 
 msgid "Saved"
 msgstr "Αποθηκεύτηκε"
+
+msgid "Saved."
+msgstr "Αποθηκεύτηκε."
 
 msgid "Savings"
 msgstr "Εξοικονόμηση"
@@ -10875,6 +11006,9 @@ msgstr "Αναζήτηση με email, όνομα χρήστη, όνομα, τη
 
 msgid "Search by order ID, UUID, customer email/name/phone, city, tracking number, payment ID, or BoxNow voucher / locker ID."
 msgstr "Αναζήτηση με ID παραγγελίας, UUID, email/όνομα/τηλέφωνο πελάτη, πόλη, αριθμό αποστολής (tracking), ID πληρωμής ή voucher / locker ID της BoxNow."
+
+msgid "Search by text, key or page, in any language"
+msgstr "Αναζήτηση με κείμενο, κλειδί ή σελίδα, σε οποιαδήποτε γλώσσα"
 
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Αναζήτηση με τίτλο, υπότιτλο, slug, κείμενο ή email/όνομα συντάκτη."
@@ -11128,6 +11262,9 @@ msgstr "Επτά"
 msgid "Shared attributes, tags and brand"
 msgstr "Κοινά χαρακτηριστικά, ετικέτες και μάρκα"
 
+msgid "Shared text"
+msgstr "Κοινό κείμενο"
+
 msgid "Shipment"
 msgstr "Αποστολή"
 
@@ -11217,6 +11354,9 @@ msgstr "Αγοραστής στον οποίο ανήκε η κράτηση (κ�
 
 msgid "Shoppers still waiting for their parcel"
 msgstr "Πελάτες που περιμένουν ακόμη το δέμα τους"
+
+msgid "Shopping assistant"
+msgstr "Βοηθός αγορών"
 
 msgid "Short (<100 chars)"
 msgstr "Σύντομο (<100 χαρακτήρες)"
@@ -11622,6 +11762,12 @@ msgstr "Αποθηκεύεται στο ΙΔΙΩΤΙΚΟ δέντρο του κ�
 msgid "Stored normalised: 9 digits, no EL/GR prefix"
 msgstr "Αποθηκεύεται κανονικοποιημένο: 9 ψηφία, χωρίς πρόθεμα EL/GR"
 
+msgid "Storefront"
+msgstr "Κατάστημα"
+
+msgid "Storefront Texts"
+msgstr "Κείμενα καταστήματος"
+
 msgid "Storefront UI"
 msgstr "Διεπαφή καταστήματος"
 
@@ -11630,6 +11776,9 @@ msgstr "Σελίδες καταστήματος"
 
 msgid "Storefront path, e.g. /account/orders/42. No host and no language prefix: it opens in the reader's language."
 msgstr "Διαδρομή του καταστήματος, π.χ. /account/orders/42. Χωρίς διεύθυνση τομέα και χωρίς πρόθεμα γλώσσας: ανοίγει στη γλώσσα του αναγνώστη."
+
+msgid "Storefront texts"
+msgstr "Κείμενα καταστήματος"
 
 msgid "Stores"
 msgstr "Καταστήματα"
@@ -12016,6 +12165,12 @@ msgstr "Μαρτυρίες πελατών"
 msgid "Text"
 msgstr "Κείμενο"
 
+msgid "Text override"
+msgstr "Αντικατάσταση κειμένου"
+
+msgid "Text overrides"
+msgstr "Αντικαταστάσεις κειμένων"
+
 msgid "Text to add"
 msgstr "Κείμενο προς προσθήκη"
 
@@ -12280,6 +12435,9 @@ msgstr "Η πλατφόρμα πρόσθεσε νέο κείμενο στα νο
 msgid "The platform has updated its legal text, and these pages were not changed automatically because their text is yours:"
 msgstr "Η πλατφόρμα ενημέρωσε τα νομικά της κείμενα. Οι παρακάτω σελίδες δεν άλλαξαν αυτόματα, επειδή το κείμενό τους είναι δικό σας:"
 
+msgid "The platform manages this text (legal, consent, cookie or error wording), so it cannot be changed here."
+msgstr "Αυτό το κείμενο διαχειρίζεται η πλατφόρμα (νομική διατύπωση, συναίνεση, cookies ή μηνύματα σφάλματος), οπότε δεν αλλάζει από εδώ."
+
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "Η πλατφόρμα μπορεί να εκδίδει αποδείξεις λιανικής μόνο για επιχείρηση που απαλλάσσεται από τον φορολογικό ηλεκτρονικό μηχανισμό (ΦΗΜ). Καταχωρίστε τη νομική βάση στο MYDATA_FHM_EXEMPTION_GROUND ή απενεργοποιήστε το MYDATA_ENABLED και εκδίδετε τις αποδείξεις από τον ΦΗΜ ή τον πάροχο ηλεκτρονικής τιμολόγησής σας."
 
@@ -12396,6 +12554,19 @@ msgstr "Το κατάστημα δημιουργήθηκε, αλλά οι παρ
 msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
 
+msgid "The storefront could not be reached to check this text, so nothing was saved. Try again in a moment."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα για τον έλεγχο του κειμένου, γι' αυτό δεν αποθηκεύτηκε τίποτα. Δοκιμάστε ξανά σε λίγο."
+
+msgid "The storefront could not be reached, so the list of texts is not available right now. Nothing has been lost. Try again in a moment."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα, οπότε η λίστα κειμένων δεν είναι διαθέσιμη αυτή τη στιγμή. Δεν χάθηκε τίποτα. Δοκιμάστε ξανά σε λίγο."
+
+#, python-format
+msgid "The storefront has no language %(language)s."
+msgstr "Το κατάστημα δεν έχει τη γλώσσα %(language)s."
+
+msgid "The storefront has no text in this language."
+msgstr "Το κατάστημα δεν έχει κείμενο σε αυτή τη γλώσσα."
+
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."
 
@@ -12404,6 +12575,16 @@ msgstr "Τα καταστήματα της πλατφόρμας, τα πλάνα
 
 msgid "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 msgstr "Το ΔΙΚΟ του καταστήματος μυστικό κλειδί Stripe (sk_live_*, sk_test_* ή περιορισμένο κλειδί rk_*). Μυστικό — δεν πρέπει ποτέ να εκτίθεται στον browser. Κενό σημαίνει ότι το Stripe δεν είναι διαθέσιμο για αυτό το κατάστημα — δεν υπάρχει εναλλακτική τιμή σε επίπεδο πλατφόρμας."
+
+msgid "The text is not valid. Check the braces { }, the | separators and the @ references."
+msgstr "Το κείμενο δεν είναι έγκυρο. Ελέγξτε τις αγκύλες { }, τους διαχωριστές | και τις αναφορές @."
+
+#, python-format
+msgid "The text is too long: %(length)s of %(max)s characters."
+msgstr "Το κείμενο είναι πολύ μεγάλο: %(length)s από %(max)s χαρακτήρες."
+
+msgid "The text must keep the same placeholders as the original."
+msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημεία αντικατάστασης με το αρχικό."
 
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
@@ -12422,6 +12603,9 @@ msgstr "Η ομάδα χονδρικής που τιμολόγησε αυτή τ
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει αυτή η επιχείρηση"
+
+msgid "The wording a store replaced in its storefront, and every page rendered with it. Purges itself when a text is saved, reset or restored in the text editor."
+msgstr "Η διατύπωση που άλλαξε ένα κατάστημα και όλες οι σελίδες που εμφανίζονται με αυτήν. Καθαρίζει μόνη της όταν ένα κείμενο αποθηκεύεται, επαναφέρεται ή ανακτάται στον επεξεργαστή κειμένων."
 
 msgid "The zone of the store's own domain, from the Cloudflare dashboard's domain overview. Empty when the store uses a platform hostname."
 msgstr "Η ζώνη του δικού σας domain, από την επισκόπηση του domain στο Cloudflare. Κενό όταν το κατάστημα χρησιμοποιεί διεύθυνση της πλατφόρμας."
@@ -12613,6 +12797,22 @@ msgstr "Αυτό το κατάστημα δεν μπορεί να διαγραφ
 
 msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
 msgstr "Αυτό το κατάστημα είναι αναλώσιμο δείγμα επίδειξης, όχι πραγματικός έμπορος. Επιτρέπει στο manage.py seed_demo_store να αντικαθιστά τον κατάλογο, τις διατάξεις και την πλοήγησή του χωρίς --force. Μην το ενεργοποιείτε ποτέ σε κατάστημα που δέχεται πραγματικές παραγγελίες."
+
+#, python-format
+msgid "This text has %(n)s forms, separated by |."
+msgstr "Αυτό το κείμενο έχει %(n)s μορφές, χωρισμένες με |."
+
+msgid "This text is fine."
+msgstr "Το κείμενο είναι εντάξει."
+
+msgid "This text is managed by the platform and cannot be changed."
+msgstr "Αυτό το κείμενο διαχειρίζεται η πλατφόρμα και δεν μπορεί να αλλάξει."
+
+msgid "This text no longer exists in the storefront, so it cannot be edited."
+msgstr "Αυτό το κείμενο δεν υπάρχει πια στο κατάστημα, οπότε δεν μπορεί να επεξεργαστεί."
+
+msgid "This text no longer exists in the storefront."
+msgstr "Αυτό το κείμενο δεν υπάρχει πια στο κατάστημα."
 
 msgid "This topic is not available for subscription."
 msgstr "Αυτό το θέμα δεν είναι διαθέσιμο για εγγραφή."
@@ -13147,6 +13347,9 @@ msgstr "Ενημέρωση κατάστασης παραγγελίας"
 msgid "Updated At"
 msgstr "Ενημερώθηκε στις"
 
+msgid "Updated by (staff)"
+msgstr "Ενημερώθηκε από (προσωπικό)"
+
 msgid "Upload a contact-form attachment"
 msgstr "Ανέβασμα συνημμένου φόρμας επικοινωνίας"
 
@@ -13198,6 +13401,9 @@ msgstr "Χρησιμοποιήστε το μόνο όταν ο έμπορος ε
 
 msgid "Use the code at checkout before it expires — any unused balance is lost after the expiry date."
 msgstr "Χρησιμοποιήστε τον κωδικό κατά την ολοκλήρωση της αγοράς πριν λήξει — τυχόν αχρησιμοποίητο υπόλοιπο χάνεται μετά την ημερομηνία λήξης."
+
+msgid "Use the original"
+msgstr "Χρήση του αρχικού"
 
 msgid "Used Tags"
 msgstr "Χρησιμοποιημένες ετικέτες"
@@ -13476,6 +13682,9 @@ msgstr "Προβολή όλων"
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr "Ο μετρητής προβολών μηδενίστηκε για %(count)d άρθρα."
+
+msgid "View on the storefront"
+msgstr "Προβολή στο κατάστημα"
 
 msgid "View store"
 msgstr "Προβολή καταστήματος"
@@ -13999,6 +14208,9 @@ msgstr "Μπορείτε να παρακολουθήσετε το δέμα σα�
 msgid "You can update your details from your account page and submit the application again — it will be reviewed anew."
 msgstr "Μπορείτε να ενημερώσετε τα στοιχεία σας από τη σελίδα του λογαριασμού σας και να υποβάλετε ξανά την αίτηση — θα εξεταστεί εκ νέου."
 
+msgid "You can view these texts but you do not have permission to change them."
+msgstr "Μπορείτε να δείτε αυτά τα κείμενα αλλά δεν έχετε δικαίωμα να τα αλλάξετε."
+
 msgid "You do not have permission to access this cart item."
 msgstr "Δεν έχετε δικαίωμα πρόσβασης σε αυτό το είδος καλαθιού."
 
@@ -14290,6 +14502,9 @@ msgstr "Η δοκιμαστική σας περίοδος έληξε"
 
 msgid "Your trial is ending"
 msgstr "Η δοκιμαστική σας περίοδος λήγει"
+
+msgid "Your wording"
+msgstr "Η δική σας διατύπωση"
 
 msgid "Youtube Profile"
 msgstr "Προφίλ Youtube"
@@ -15344,9 +15559,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"
-
-#~ msgid "Reset sort order to default"
-#~ msgstr "Επαναφορά σειράς στα προεπιλεγμένα"
 
 #~ msgid "Revenue (€)"
 #~ msgstr "Έσοδα (€)"

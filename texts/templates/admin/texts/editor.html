@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6">
+        {% component "unfold/components/text.html" %}
+            {% blocktrans trimmed %}
+                Change the wording of your storefront. Every text shows the
+                original above your version, in each language. A text you do
+                not change keeps the original, and you can go back to it at
+                any time.
+            {% endblocktrans %}
+        {% endcomponent %}
+
+        <div id="texts-alert" role="alert"></div>
+
+        {% if not can_edit %}
+            {% blocktrans trimmed asvar read_only_message %}
+                You can view these texts but you do not have permission to
+                change them.
+            {% endblocktrans %}
+            {% include "unfold/helpers/messages/info.html" with message=read_only_message %}
+        {% endif %}
+
+        {% if unavailable %}
+            {% blocktrans trimmed asvar unavailable_message %}
+                The storefront could not be reached, so the list of texts is
+                not available right now. Nothing has been lost. Try again in a
+                moment.
+            {% endblocktrans %}
+            {% include "unfold/helpers/messages/warning.html" with message=unavailable_message %}
+        {% else %}
+            <form method="get"
+                  action="{% url 'admin:texts_textoverride_changelist' %}"
+                  hx-get="{% url 'admin:texts_textoverride_changelist' %}"
+                  hx-target="#results"
+                  hx-push-url="true"
+                  hx-sync="this:replace"
+                  hx-trigger="input delay:300ms from:find input[type=search], change from:find select, change from:find input[type=checkbox], submit">
+                {% component "unfold/components/card.html" with size="md" %}
+                    <div class="gap-4 grid items-end lg:grid-cols-4 md:grid-cols-2">
+                        <div class="lg:col-span-2 *:mb-0">
+                            {% include "unfold/helpers/field.html" with field=form.q %}
+                        </div>
+                        <div class="*:mb-0">
+                            {% include "unfold/helpers/field.html" with field=form.area %}
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <div class="*:mb-0">{% include "unfold/helpers/field.html" with field=form.changed %}</div>
+                            <div class="*:mb-0">{% include "unfold/helpers/field.html" with field=form.missing %}</div>
+                        </div>
+                    </div>
+                {% endcomponent %}
+            </form>
+
+            <div id="results" class="flex flex-col gap-4">
+                {% include "admin/texts/_results.html" %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

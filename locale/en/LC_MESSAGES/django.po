@@ -694,23 +694,17 @@ msgstr "AADE-returned URL for the PDF QR code. NEVER synthesise — AADE changes
 msgid "ACP Bearer Token"
 msgstr "ACP Bearer Token"
 
-#, fuzzy
-#| msgid "ACS API Key"
 msgid "ACS API Calls"
-msgstr "ACS API Key"
+msgstr "ACS API Calls"
 
 msgid "ACS API Key"
 msgstr "ACS API Key"
 
-#, fuzzy
-#| msgid "ACS API Key"
 msgid "ACS API call"
-msgstr "ACS API Key"
+msgstr "ACS API call"
 
-#, fuzzy
-#| msgid "ACS API Key"
 msgid "ACS API calls"
-msgstr "ACS API Key"
+msgstr "ACS API calls"
 
 msgid "ACS API user identifier. No platform fallback — empty disables ACS."
 msgstr "ACS API user identifier. No platform fallback — empty disables ACS."
@@ -751,10 +745,8 @@ msgstr "ACS Company ID"
 msgid "ACS Company Password"
 msgstr "ACS Company Password"
 
-#, fuzzy
-#| msgid "ACS Pickup Lists"
 msgid "ACS Pickup List Runs"
-msgstr "ACS Pickup Lists"
+msgstr "ACS Pickup List Runs"
 
 msgid "ACS Pickup Lists"
 msgstr "ACS Pickup Lists"
@@ -786,10 +778,8 @@ msgstr "ACS User ID"
 msgid "ACS User Password"
 msgstr "ACS User Password"
 
-#, fuzzy
-#| msgid "ACS Stations"
 msgid "ACS alias"
-msgstr "ACS Stations"
+msgstr "ACS alias"
 
 msgid "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr "ACS already reported a payout for this voucher; there is nothing to settle."
@@ -799,7 +789,7 @@ msgstr "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty d
 
 #, python-format
 msgid "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
-msgstr ""
+msgstr "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
 
 msgid "ACS company identifier. No platform fallback — empty disables ACS."
 msgstr "ACS company identifier. No platform fallback — empty disables ACS."
@@ -817,18 +807,14 @@ msgstr "ACS customer code"
 msgid "ACS did not issue the pickup list: %(err)s"
 msgstr "ACS did not issue the pickup list: %(err)s"
 
-#, fuzzy
-#| msgid "Error message"
 msgid "ACS error message"
-msgstr "Error message"
+msgstr "ACS error message"
 
-#, fuzzy
-#| msgid "No message"
 msgid "ACS message"
-msgstr "No message"
+msgstr "ACS message"
 
 msgid "ACS named this voucher as unprinted"
-msgstr ""
+msgstr "ACS named this voucher as unprinted"
 
 msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
 msgstr "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
@@ -842,23 +828,17 @@ msgstr "ACS payouts matching no shipment"
 msgid "ACS pickup list"
 msgstr "ACS pickup list"
 
-#, fuzzy
-#| msgid "ACS pickup list"
 msgid "ACS pickup list run"
-msgstr "ACS pickup list"
+msgstr "ACS pickup list run"
 
-#, fuzzy
-#| msgid "ACS pickup lists"
 msgid "ACS pickup list runs"
-msgstr "ACS pickup lists"
+msgstr "ACS pickup list runs"
 
 msgid "ACS pickup lists"
 msgstr "ACS pickup lists"
 
-#, fuzzy
-#| msgid "Amount refunded"
 msgid "ACS refused"
-msgstr "Amount refunded"
+msgstr "ACS refused"
 
 msgid "ACS rejected the cancellation."
 msgstr "ACS rejected the cancellation."
@@ -893,7 +873,7 @@ msgid "ACS voucher number — links back to AcsShipment.voucher_no without a har
 msgstr "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
 
 msgid "ACSExecutionErrorMessage, or the Error_Message of the value row."
-msgstr ""
+msgstr "ACSExecutionErrorMessage, or the Error_Message of the value row."
 
 msgid "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination). Distinguishes individual lockers within a station area."
 msgstr "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination). Distinguishes individual lockers within a station area."
@@ -1158,10 +1138,8 @@ msgstr "Admin who created this adjustment. Id of a platform staff account (publi
 msgid "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
-#, fuzzy
-#| msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgid "Admin who pressed the button; empty for the daily beat task. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
-msgstr "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Admin who pressed the button; empty for the daily beat task. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
 msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
@@ -1460,7 +1438,7 @@ msgid "Audit & Logs"
 msgstr "Audit & Logs"
 
 msgid "Auth-layer rejection"
-msgstr ""
+msgstr "Auth-layer rejection"
 
 msgid "Authenticated Users"
 msgstr "Authenticated Users"
@@ -2191,16 +2169,14 @@ msgstr "Cancels only the voucher at ACS; the order stays as it is. Use it when t
 msgid "Candidate"
 msgstr "Candidate"
 
-#, fuzzy
-#| msgid "Candidates"
 msgid "Candidate vouchers"
-msgstr "Candidates"
+msgstr "Candidate vouchers"
 
 msgid "Candidates"
 msgstr "Candidates"
 
 msgid "Candidates with no local label_printed_at"
-msgstr ""
+msgstr "Candidates with no local label_printed_at"
 
 msgid "Cannot assign inactive attribute value."
 msgstr "Cannot assign inactive attribute value."
@@ -2845,10 +2821,8 @@ msgstr "Confirmed At"
 msgid "Confirmed From IP"
 msgstr "Confirmed From IP"
 
-#, fuzzy
-#| msgid "Conditions & Limits"
 msgid "Connection or timeout"
-msgstr "Conditions & Limits"
+msgstr "Connection or timeout"
 
 msgid "Consent"
 msgstr "Consent"
@@ -3785,10 +3759,8 @@ msgstr "Duplicate attachment."
 msgid "Duplicate category IDs are not allowed."
 msgstr "Duplicate category IDs are not allowed."
 
-#, fuzzy
-#| msgid "Value (Duration)"
 msgid "Duration (ms)"
-msgstr "Value (Duration)"
+msgstr "Duration (ms)"
 
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
@@ -3888,7 +3860,7 @@ msgid "Empty means deliver right after payment"
 msgstr "Empty means deliver right after payment"
 
 msgid "Empty when no HTTP response arrived."
-msgstr ""
+msgstr "Empty when no HTTP response arrived."
 
 msgid "Empty while this is the current price."
 msgstr "Empty while this is the current price."
@@ -6146,10 +6118,8 @@ msgstr "HMAC-SHA256 hex digest of the raw 'data' JSON object; used for signature
 msgid "HOW TO COMPLETE YOUR PAYMENT"
 msgstr "HOW TO COMPLETE YOUR PAYMENT"
 
-#, fuzzy
-#| msgid "Tag Status"
 msgid "HTTP status"
-msgstr "Tag Status"
+msgstr "HTTP status"
 
 msgid "Handling non-payment"
 msgstr "Handling non-payment"
@@ -6863,7 +6833,7 @@ msgstr "Label URL"
 
 #, python-format
 msgid "Label printed (voucher %(voucher)s)"
-msgstr ""
+msgstr "Label printed (voucher %(voucher)s)"
 
 msgid "Label printed at"
 msgstr "Label printed at"
@@ -8168,10 +8138,8 @@ msgstr "Nothing has been deleted — your products, orders, and settings are all
 msgid "Nothing retained"
 msgstr "Nothing retained"
 
-#, fuzzy
-#| msgid "Nothing retained"
 msgid "Nothing to issue"
-msgstr "Nothing retained"
+msgstr "Nothing to issue"
 
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Nothing was saved. Fix the marked texts."
@@ -8270,7 +8238,7 @@ msgid "OAuth Tokens"
 msgstr "OAuth Tokens"
 
 msgid "OK"
-msgstr ""
+msgstr "OK"
 
 msgid "ORDER DETAILS"
 msgstr "ORDER DETAILS"
@@ -8303,10 +8271,9 @@ msgstr "Office"
 msgid "On Sale (>0%)"
 msgstr "On Sale (>0%)"
 
-#, fuzzy, python-format
-#| msgid "ACS pickup lists"
+#, python-format
 msgid "On pickup list %(no)s"
-msgstr "ACS pickup lists"
+msgstr "On pickup list %(no)s"
 
 msgid "One"
 msgstr "One"
@@ -8369,10 +8336,8 @@ msgstr "Open the myDATA settings"
 msgid "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 msgstr "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 
-#, fuzzy
-#| msgid "Open the myDATA settings"
 msgid "Open the shipment timeline"
-msgstr "Open the myDATA settings"
+msgstr "Open the shipment timeline"
 
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
@@ -9355,10 +9320,8 @@ msgstr "Phone-number validation shape for this country, derived from Django's ow
 msgid "Pickup Points"
 msgstr "Pickup Points"
 
-#, fuzzy
-#| msgid "Parcel pickup date"
 msgid "Pickup date"
-msgstr "Parcel pickup date"
+msgstr "Pickup date"
 
 msgid "Pickup list"
 msgstr "Pickup list"
@@ -9367,22 +9330,18 @@ msgstr "Pickup list"
 msgid "Pickup list %(no)s issued for %(n)s voucher(s)."
 msgstr "Pickup list %(no)s issued for %(n)s voucher(s)."
 
-#, fuzzy
-#| msgid "Pickup list number"
 msgid "Pickup list adopted from ACS"
-msgstr "Pickup list number"
+msgstr "Pickup list adopted from ACS"
 
-#, fuzzy
-#| msgid "Pickup list number"
 msgid "Pickup list issued"
-msgstr "Pickup list number"
+msgstr "Pickup list issued"
 
 msgid "Pickup list number"
 msgstr "Pickup list number"
 
 #, python-format
 msgid "Pickup list run for %(date)s: %(detail)s"
-msgstr ""
+msgstr "Pickup list run for %(date)s: %(detail)s"
 
 msgid "Pickup point / locker"
 msgstr "Pickup point / locker"
@@ -10380,10 +10339,8 @@ msgstr "Reference Cards"
 msgid "Reference Order"
 msgstr "Reference Order"
 
-#, fuzzy
-#| msgid "Reference Order"
 msgid "Reference number"
-msgstr "Reference Order"
+msgstr "Reference number"
 
 msgid "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
 msgstr "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
@@ -10476,10 +10433,10 @@ msgid "Refunds"
 msgstr "Refunds"
 
 msgid "Refused silently: unprinted labels"
-msgstr ""
+msgstr "Refused silently: unprinted labels"
 
 msgid "Refused: unprinted labels"
-msgstr ""
+msgstr "Refused: unprinted labels"
 
 msgid "Reg. No."
 msgstr "Reg. No."
@@ -10641,10 +10598,8 @@ msgstr "Request Headers"
 msgid "Request Meta"
 msgstr "Request Meta"
 
-#, fuzzy
-#| msgid "Request Headers"
 msgid "Request parameters"
-msgstr "Request Headers"
+msgstr "Request parameters"
 
 msgid "Requested On"
 msgstr "Requested On"
@@ -10717,7 +10672,7 @@ msgid "Resolved at upsert time when the matching AcsShipment row exists. Null fo
 msgstr "Resolved at upsert time when the matching AcsShipment row exists. Null for orphan rows (parcels paid via ACS before they were minted through this system, or rows where the shipment has been hard-deleted)."
 
 msgid "Response"
-msgstr ""
+msgstr "Response"
 
 #, python-format
 msgid "Response time %(response)s · Notification %(status)s · %(priority)s / %(category)s"
@@ -10836,7 +10791,7 @@ msgid "Retry payment for a failed or pending order"
 msgstr "Retry payment for a failed or pending order"
 
 msgid "Retryable server error"
-msgstr ""
+msgstr "Retryable server error"
 
 msgid "Return Label"
 msgstr "Return Label"
@@ -11424,10 +11379,8 @@ msgstr "Shipment dispatched"
 msgid "Shipment not found."
 msgstr "Shipment not found."
 
-#, fuzzy
-#| msgid "Shipment state"
 msgid "Shipment row created"
-msgstr "Shipment state"
+msgstr "Shipment row created"
 
 msgid "Shipment state"
 msgstr "Shipment state"
@@ -11759,10 +11712,8 @@ msgstr "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided
 msgid "Started At"
 msgstr "Started At"
 
-#, fuzzy
-#| msgid "Started At"
 msgid "Started at"
-msgstr "Started At"
+msgstr "Started at"
 
 msgid "Starts At"
 msgstr "Starts At"
@@ -13018,10 +12969,8 @@ msgstr "TikTok URL"
 msgid "TikTok profile URL. Must use https://. Empty → link hidden in storefront footer."
 msgstr "TikTok profile URL. Must use https://. Empty → link hidden in storefront footer."
 
-#, fuzzy
-#| msgid "Story Timeline"
 msgid "Timeline"
-msgstr "Story Timeline"
+msgstr "Timeline"
 
 msgid "Timestamp"
 msgstr "Timestamp"
@@ -13229,10 +13178,8 @@ msgstr "Trials"
 msgid "Trigger"
 msgstr "Trigger"
 
-#, fuzzy
-#| msgid "Trigger"
 msgid "Triggered by"
-msgstr "Trigger"
+msgstr "Triggered by"
 
 msgid "True if reservation was converted to actual stock decrement"
 msgstr "True if reservation was converted to actual stock decrement"
@@ -13316,7 +13263,7 @@ msgid "Unapprove selected comments"
 msgstr "Unapprove selected comments"
 
 msgid "Unexpected failure"
-msgstr ""
+msgstr "Unexpected failure"
 
 #, python-format
 msgid "Unfortunately, we could not approve the business account for %(company)s at this time."
@@ -13410,7 +13357,7 @@ msgid "Unnamed topic"
 msgstr "Unnamed topic"
 
 msgid "Unprinted vouchers named by ACS"
-msgstr ""
+msgstr "Unprinted vouchers named by ACS"
 
 msgid "Unpublish selected posts"
 msgstr "Unpublish selected posts"
@@ -14930,7 +14877,7 @@ msgid "unknown"
 msgstr "unknown"
 
 msgid "unprinted locally"
-msgstr ""
+msgstr "unprinted locally"
 
 msgid "updated"
 msgstr "updated"

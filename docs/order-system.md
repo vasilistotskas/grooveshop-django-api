@@ -1184,7 +1184,22 @@ accepting Cyprus orders at the Greek flat rate.
   were daily noise the merchant asked to stop. To issue a list anyway:
   "Print labels for selected shipments", then "Issue ACS pickup list
   now". Every other refusal is a plain `AcsAPIError` and still fails the
-  task. The retired `warn-unprinted-acs-vouchers` beat row is deleted by
+  task.
+- The **silent** form of the same refusal is classified as the same
+  `blocked_unprinted`. Once a voucher stays unprinted into a later day ACS
+  stops naming it and answers `PickupList_No: null`, `Unprinted_Found: 0`,
+  `Error_Message: null`, `Unprinted_Vouchers: []` (voucher 9818420312: named
+  2026-10-22, silent 10-23; voucher 9819787972, order #448: named 10-27,
+  silent 10-28; `ACS_Get_Pickup_Lists` was empty, so reconciliation adopted
+  nothing). When the issue returns no `PickupList_No`, reconciliation
+  adopts nothing, the day is not all dead vouchers, and EVERY candidate has
+  `label_printed_at` NULL, `issue_daily_pickup_list` logs a WARNING ("did
+  not name the unprinted voucher(s)") and raises
+  `AcsUnprintedVouchersError` with the local unprinted vouchers in
+  `raw["Unprinted_Vouchers"]`, so the task takes the one path above: status,
+  order notes, no email. If ANY candidate is locally printed the silence is
+  unexplained and stays an ERROR log plus `AcsAPIError`; that case failed
+  the infrastructure's production smoke gate when it was misclassified. The retired `warn-unprinted-acs-vouchers` beat row is deleted by
   `tenant/migrations/0049`, because `DatabaseScheduler` never removes a
   row whose entry left `CELERY_BEAT_SCHEDULE`.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)

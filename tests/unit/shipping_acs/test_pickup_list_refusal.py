@@ -184,6 +184,64 @@ class TestRefusalWithNothingUnprinted:
         assert [m.subject for m in mailoutbox] == []
 
 
+class TestSilentRefusalEndToEnd:
+    """ACS stops naming an unprinted voucher on a later day (prod 10-23,
+    10-28) and answers the empty shape; the task still reports the status
+    and an order note, with no email and no failure.
+    """
+
+    @staticmethod
+    def _silent_client(monkeypatch):
+        from shipping_acs import services
+
+        class _Client:
+            billing_code = "TEST_BILLING"
+
+            def issue_pickup_list(self, *, pickup_date):
+                return {
+                    "PickupList_No": None,
+                    "Unprinted_Found": 0,
+                    "Error_Message": None,
+                    "Unprinted_Vouchers": [],
+                }
+
+            def get_pickup_lists(self, *, pickup_date):
+                return []
+
+        monkeypatch.setattr(services, "AcsClient", _Client)
+
+    def test_reports_blocked_notes_the_order_and_emails_nobody(
+        self, acs_configured_tenant, mailoutbox, monkeypatch
+    ):
+        blocking = _candidate("9800000001")
+        mailoutbox.clear()
+        self._silent_client(monkeypatch)
+
+        result = issue_daily_acs_pickup_list.run()
+
+        assert result == {
+            "status": "blocked_unprinted",
+            "unprinted": ["9800000001"],
+            "order_ids": [blocking.order_id],
+            "acs_message": "",
+        }
+        [note] = _pickup_list_notes(blocking.order_id)
+        assert "9800000001" in note
+        assert [m.subject for m in mailoutbox] == []
+
+    def test_a_printed_candidate_still_fails_the_task(
+        self, acs_configured_tenant, monkeypatch
+    ):
+        _candidate("9800000001")
+        _candidate("9800000002", printed=True)
+        self._silent_client(monkeypatch)
+
+        with pytest.raises(AcsAPIError) as exc_info:
+            issue_daily_acs_pickup_list.run()
+
+        assert not isinstance(exc_info.value, AcsUnprintedVouchersError)
+
+
 class TestRetiredWarningBeatRow:
     """The 15:45 warning task is gone, and so must be its beat row.
 

@@ -1045,7 +1045,7 @@ class TestIssueDailyPickupList:
     def test_raises_when_acs_issues_no_list_despite_candidates(
         self, monkeypatch
     ):
-        self._candidate("7227891111")
+        self._candidate("7227891111", printed_at=timezone.now())
         self._client_returning(
             monkeypatch,
             {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
@@ -1073,7 +1073,7 @@ class TestIssueDailyPickupList:
         """
         import logging
 
-        shipment = self._candidate("7227891111")
+        shipment = self._candidate("7227891111", printed_at=timezone.now())
         self._client_returning(
             monkeypatch,
             {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
@@ -1095,6 +1095,90 @@ class TestIssueDailyPickupList:
             "manifest — the count alone cannot be acted on"
         )
         assert f"order #{shipment.order_id}" in logged
+
+    # -- The silent form of the unprinted refusal --------------------------
+    #
+    # Production: voucher 9818420312 (2026-10-22 named, 10-23 silent) and
+    # 9819787972 (10-27 named, 10-28 silent). Once a voucher stays
+    # unprinted into a later day ACS stops naming it and answers with the
+    # empty shape. It is still the unprinted refusal.
+
+    _SILENT = {
+        "PickupList_No": None,
+        "Unprinted_Found": 0,
+        "Error_Message": None,
+        "Unprinted_Vouchers": [],
+    }
+
+    def test_silent_shape_with_every_candidate_unprinted_is_the_refusal(
+        self, monkeypatch, caplog
+    ):
+        import logging
+
+        a = self._candidate("7227891111")
+        b = self._candidate("7227892222")
+        self._client_returning(monkeypatch, dict(self._SILENT))
+
+        with (
+            caplog.at_level(logging.INFO, logger="shipping_acs.services"),
+            pytest.raises(AcsUnprintedVouchersError) as exc_info,
+        ):
+            AcsService.issue_daily_pickup_list()
+
+        assert sorted(exc_info.value.raw["Unprinted_Vouchers"]) == [
+            a.voucher_no,
+            b.voucher_no,
+        ]
+        levels = {
+            r.levelno
+            for r in caplog.records
+            if r.name == "shipping_acs.services"
+            and "did not name" in r.getMessage()
+        }
+        assert levels == {logging.WARNING}
+        assert not [
+            r
+            for r in caplog.records
+            if r.name == "shipping_acs.services" and r.levelno >= logging.ERROR
+        ]
+
+    def test_silent_shape_with_one_printed_candidate_stays_loud(
+        self, monkeypatch, caplog
+    ):
+        import logging
+
+        self._candidate("7227891111")
+        self._candidate("7227892222", printed_at=timezone.now())
+        self._client_returning(monkeypatch, dict(self._SILENT))
+
+        with (
+            caplog.at_level(logging.WARNING, logger="shipping_acs.services"),
+            pytest.raises(AcsAPIError) as exc_info,
+        ):
+            AcsService.issue_daily_pickup_list()
+
+        assert not isinstance(exc_info.value, AcsUnprintedVouchersError)
+        assert any(
+            r.levelno == logging.ERROR and r.name == "shipping_acs.services"
+            for r in caplog.records
+        )
+
+    def test_documented_refusal_still_names_acs_vouchers(self, monkeypatch):
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {
+                "PickupList_No": None,
+                "Unprinted_Found": 1,
+                "Unprinted_Vouchers": ["9800000009"],
+                "Error_Message": "ACS refused",
+            },
+        )
+
+        with pytest.raises(AcsUnprintedVouchersError) as exc_info:
+            AcsService.issue_daily_pickup_list()
+
+        assert exc_info.value.raw["Unprinted_Vouchers"] == ["9800000009"]
 
     def test_a_day_of_only_dead_vouchers_is_a_noop_not_a_failure(
         self, monkeypatch, caplog
@@ -1239,7 +1323,7 @@ class TestIssueDailyPickupList:
         """Only the documented unprinted refusal gets its own type — the
         daily task reports it as a status. Anything else must still be
         an ordinary ``AcsAPIError`` so the task keeps failing on it."""
-        self._candidate("7227891111")
+        self._candidate("7227891111", printed_at=timezone.now())
         self._client_returning(
             monkeypatch,
             {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},

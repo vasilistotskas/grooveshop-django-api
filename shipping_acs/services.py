@@ -1245,6 +1245,33 @@ class AcsService:
                     or f"ACS rejected {unprinted_count} unprinted voucher(s).",
                     raw=result,
                 )
+            if len(unprinted_locally) == len(candidate_rows):
+                # The same refusal, answered silently. Observed in prod
+                # (voucher 9818420312 on 2026-10-22 / 10-23, voucher
+                # 9819787972 on 10-27 / 10-28): the first run named the
+                # unprinted voucher (the documented shape above); when it
+                # stayed unprinted into a later day ACS stopped naming it
+                # and answered ``PickupList_No: null``, ``Unprinted_Found:
+                # 0``, no message, no table. Reconciliation above found no
+                # manifest, and every candidate is unprinted on our side,
+                # so the cause is known and has the same single fix. Name
+                # our own unprinted vouchers in the response the task
+                # reads. One locally printed candidate would make the
+                # silence unexplained, so that case falls through to the
+                # ERROR below.
+                logger.warning(
+                    "ACS_Issue_Pickup_List issued no list for date=%s and "
+                    "did not name the unprinted voucher(s); every candidate "
+                    "is unprinted locally, treating it as the unprinted "
+                    "refusal: %s",
+                    the_date,
+                    unprinted_locally,
+                )
+                raise AcsUnprintedVouchersError(
+                    alias="ACS_Issue_Pickup_List",
+                    error_message=acs_message,
+                    raw={**result, "Unprinted_Vouchers": unprinted_locally},
+                )
             logger.error(
                 "ACS_Issue_Pickup_List issued no list for date=%s with %s "
                 "candidate voucher(s) %s: unprinted_found=%s "

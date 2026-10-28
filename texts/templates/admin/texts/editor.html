@@ -18,6 +18,14 @@
 
         <div id="texts-alert" role="alert"></div>
 
+        {% if not can_edit %}
+            {% blocktrans trimmed asvar read_only_message %}
+                You can view these texts but you do not have permission to
+                change them.
+            {% endblocktrans %}
+            {% include "unfold/helpers/messages/info.html" with message=read_only_message %}
+        {% endif %}
+
         {% if unavailable %}
             {% blocktrans trimmed asvar unavailable_message %}
                 The storefront could not be reached, so the list of texts is

@@ -292,7 +292,11 @@ class TestHistoryAndRestore:
         assert [h.history_type for h in history] == ["+", "~", "-"]
         assert [h.value for h in history] == ["One", "Two", "Two"]
         assert {h.history_user_id for h in history} == {admin_user.pk}
-        assert history[2].history_change_reason == "Reset to default"
+        assert [h.history_change_reason for h in history] == [
+            "Created",
+            "Edited",
+            "Reset to default",
+        ]
 
     def test_restoring_an_earlier_value(self, stub, admin_user):
         _save(admin_user, en="One")

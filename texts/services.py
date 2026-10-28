@@ -136,7 +136,12 @@ def save_texts(
                 key=key,
                 language=language,
             )
-            _write(user, row, value, gettext("Edited"))
+            _write(
+                user,
+                row,
+                value,
+                gettext("Edited") if row.pk else gettext("Created"),
+            )
         for language in to_reset:
             _delete(user, existing[language], gettext("Reset to default"))
     return SaveResult(errors={}, saved=tuple(to_store), reset=tuple(to_reset))

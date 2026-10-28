@@ -14199,6 +14199,9 @@ msgstr "You can track your package using the tracking number above on the carrie
 msgid "You can update your details from your account page and submit the application again — it will be reviewed anew."
 msgstr "You can update your details from your account page and submit the application again — it will be reviewed anew."
 
+msgid "You can view these texts but you do not have permission to change them."
+msgstr "You can view these texts but you do not have permission to change them."
+
 msgid "You do not have permission to access this cart item."
 msgstr "You do not have permission to access this cart item."
 

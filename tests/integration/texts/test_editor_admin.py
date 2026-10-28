@@ -514,6 +514,7 @@ def test_a_user_who_may_only_view_gets_no_way_to_save(stub, client_and_user):
         html = page(client, q="tagline").content.decode()
 
     article = html.split("<article")[1].split("</article>")[0]
+    assert "do not have permission to change them" in html
     assert "disabled" in article
     assert ">save</span>" not in article
 

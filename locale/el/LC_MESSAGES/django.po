@@ -14205,6 +14205,9 @@ msgstr "Μπορείτε να παρακολουθήσετε το δέμα σα�
 msgid "You can update your details from your account page and submit the application again — it will be reviewed anew."
 msgstr "Μπορείτε να ενημερώσετε τα στοιχεία σας από τη σελίδα του λογαριασμού σας και να υποβάλετε ξανά την αίτηση — θα εξεταστεί εκ νέου."
 
+msgid "You can view these texts but you do not have permission to change them."
+msgstr "Μπορείτε να δείτε αυτά τα κείμενα αλλά δεν έχετε δικαίωμα να τα αλλάξετε."
+
 msgid "You do not have permission to access this cart item."
 msgstr "Δεν έχετε δικαίωμα πρόσβασης σε αυτό το είδος καλαθιού."
 

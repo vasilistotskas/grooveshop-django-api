@@ -244,3 +244,17 @@ def area_of(namespace: str, key: str) -> Area:
         ),
         COMMON_AREA,
     )
+
+
+_CAMEL_BREAK = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def component_name(namespace: str) -> str:
+    """The component a text belongs to, as words a store owner can read:
+    ``components/Account/2Fa/AuthenticateCode`` is "Authenticate code".
+    The shared locale files are "Shared text"."""
+    if namespace == GLOBAL_NAMESPACE:
+        return str(_("Shared text"))
+    last = normalise_namespace(namespace).rsplit("/", 1)[-1]
+    words = _CAMEL_BREAK.sub(" ", last).replace("-", " ").replace("_", " ")
+    return words.lower().capitalize() or last

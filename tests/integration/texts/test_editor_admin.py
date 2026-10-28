@@ -136,14 +136,55 @@ class TestThePage:
         )
 
 
+class TestTheCardHeading:
+    def article(self, client, **query):
+        html = page(client, **query).content.decode()
+        return html.split("<article")[1].split("</article>")[0]
+
+    def test_it_leads_with_the_wording_not_the_key(self, stub, client):
+        article = self.article(client, q="greeting")
+        heading = article.split("<h3")[1].split("</h3>")[0]
+
+        assert "Hello {name}" in heading
+        assert "greeting" not in heading
+
+    def test_the_stores_own_wording_heads_the_card(self, stub, client):
+        TextOverrideFactory(
+            namespace=FOOTER, key="tagline", language="en", value="Ours now"
+        )
+
+        article = self.article(client, q="tagline")
+
+        assert "Ours now" in article.split("<h3")[1].split("</h3>")[0]
+
+    def test_the_key_and_where_it_lives_are_one_small_line(self, stub, client):
+        article = self.article(client, q="greeting")
+
+        assert "Footer &middot; greeting</span>" in article
+        assert f'title="{FOOTER} &middot; greeting"' in article
+
+    def test_a_long_wording_is_truncated_by_css_not_cut(self, stub, client):
+        stub.catalogue["entries"].append(entry(FOOTER, "long", en="word " * 60))
+
+        article = self.article(client, q="long")
+
+        assert "truncate" in article.split("<h3")[1].split(">")[0]
+
+    def test_a_text_with_no_wording_falls_back_to_its_key(self, stub, client):
+        stub.catalogue["entries"].append(entry(FOOTER, "empty_one"))
+
+        article = self.article(client, q="empty_one")
+
+        assert "empty_one" in article.split("<h3")[1].split("</h3>")[0]
+
+
 class TestFindingTexts:
     def _keys(self, response) -> set[str]:
         html = response.content.decode()
         return {
             key
             for key in ("tagline", "greeting", "menu", "only_greek", "banner")
-            if f'class="font-semibold text-important text-sm break-all">{key}<'
-            in html
+            if f"&middot; {key}</span>" in html
         }
 
     def test_search_matches_the_key(self, stub, client):

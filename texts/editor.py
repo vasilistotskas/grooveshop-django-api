@@ -18,7 +18,7 @@ from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 
 from tenant.staff_actors import resolve_staff
-from texts.areas import Area, area_by_code, area_of
+from texts.areas import Area, area_by_code, area_of, component_name
 from texts.models import TextOverride, TextSurface
 from texts.storefront import Catalogue, CatalogueEntry, MessageShape
 
@@ -101,6 +101,13 @@ class Row:
     #: them: it knows the URLs).
     reset_attrs: str = ""
     history_attrs: str = ""
+    #: The text's current wording, which is what the owner recognises.
+    heading: str = ""
+
+    @property
+    def where(self) -> str:
+        """Where it lives, in words: the component's name."""
+        return component_name(self.entry.namespace)
 
     @property
     def vals(self) -> str:
@@ -128,6 +135,18 @@ def load_overrides() -> dict[tuple[str, str], dict[str, TextOverride]]:
     return grouped
 
 
+def heading_of(cells: list[Cell]) -> str:
+    """The wording to head a card with: the admin's language when the text
+    has one (the store's own, else the original), else any language that
+    does, else nothing (the card then shows its key)."""
+    preferred = preview_language(cell.language for cell in cells)
+    ordered = sorted(cells, key=lambda cell: cell.language != preferred)
+    for cell in ordered:
+        if cell.value.strip():
+            return " ".join(cell.value.split())
+    return ""
+
+
 def build_row(
     entry: CatalogueEntry,
     locales: Iterable[str],
@@ -153,6 +172,7 @@ def build_row(
         area=area_of(entry.namespace, entry.key),
         dom_id=row_id(entry.namespace, entry.key),
         cells=tuple(cells),
+        heading=heading_of(cells),
     )
 
 

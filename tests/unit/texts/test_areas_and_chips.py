@@ -118,3 +118,19 @@ def test_a_row_id_is_stable_and_distinguishes_texts():
     assert row_id("a", "b") != row_id("a", "c")
     assert row_id("ab", "") != row_id("a", "b")
     assert row_id("a", "b").startswith("text-")
+
+
+@pytest.mark.parametrize(
+    ("namespace", "name"),
+    [
+        ("components/Account/2Fa/AuthenticateCode", "Authenticate code"),
+        ("components/variants/webside/Chrome/Footer", "Footer"),
+        ("components/Chrome/MegaMenu", "Mega menu"),
+        ("layouts/auth-split", "Auth split"),
+        ("global", "Shared text"),
+    ],
+)
+def test_a_component_is_named_in_words(namespace, name):
+    from texts.areas import component_name
+
+    assert component_name(namespace) == name

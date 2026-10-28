@@ -340,7 +340,9 @@ def test_the_catalogue_switch_refuses_a_product_and_its_actions(on):
     from product.factories.product import ProductFactory
 
     switch_store_settings(**{**EVERY_SWITCH, "CATALOGUE_ENABLED": on})
-    product = ProductFactory(num_images=0, num_reviews=0)
+    # Active: the factory makes 15% of products inactive, and the public
+    # detail routes answer an inactive product 404, catalogue on or off.
+    product = ProductFactory(active=True, num_images=0, num_reviews=0)
     client = APIClient()
 
     for route in (

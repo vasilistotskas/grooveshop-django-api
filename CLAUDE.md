@@ -49,6 +49,9 @@ uv run python manage.py spectacular --color --file schema.yml
 # adding different messages merge cleanly. Never hand-append to a .po, and
 # rerun this after saving in Rosetta (it rewrites the file unsorted).
 uv run python manage.py makemessages -l el -l en
+# It leaves each NEW English entry empty or fuzzy: give it msgstr = msgid and
+# drop the fuzzy flag, or tests/unit/test_english_catalogue.py fails (shard 4).
+# Run that file with test_locale_catalogue.py after every makemessages.
 
 # Meilisearch index management
 uv run python manage.py meilisearch_sync_all_indexes

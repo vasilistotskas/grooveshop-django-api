@@ -396,6 +396,9 @@ def store_sidebar(request: Any) -> list[Item]:
                 _("Page Layouts"),
                 "dashboard_customize",
             ),
+            # The wording of the storefront itself (buttons, labels, notices),
+            # one editor page rather than a model list.
+            page("texts.TextOverride", _("Storefront Texts"), "translate"),
             _menu(
                 _("Blog"),
                 "article",

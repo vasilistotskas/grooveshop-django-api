@@ -1,0 +1,124 @@
+{% load i18n unfold %}
+<article id="{{ row.dom_id }}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    {% component "unfold/components/card.html" with size="md" %}
+        <header class="flex flex-wrap gap-2 items-center justify-between mb-3">
+            <div class="flex flex-col min-w-0">
+                <h3 class="font-semibold text-important text-sm break-all">{{ row.entry.key }}</h3>
+                <span class="text-subtle text-xs break-all">{{ row.entry.namespace }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                {% include "unfold/helpers/label.html" with text=row.area.title variant="info" %}
+                {% if row.changed %}
+                    {% trans "Changed" as changed_label %}
+                    {% include "unfold/helpers/label.html" with text=changed_label variant="primary" %}
+                {% endif %}
+                {% if row.locked %}
+                    {% trans "Locked" as locked_label %}
+                    {% include "unfold/helpers/label.html" with text=locked_label variant="warning" icon="lock" %}
+                {% endif %}
+            </div>
+        </header>
+
+        {% if row.locked %}
+            {% component "unfold/components/text.html" with class="mb-3 text-subtle" %}
+                {% trans "The platform manages this text (legal, consent, cookie or error wording), so it cannot be changed here." %}
+            {% endcomponent %}
+        {% endif %}
+
+        <form hx-post="{% url 'admin:texts_textoverride_save' %}"
+              hx-target="closest article"
+              hx-swap="outerHTML"
+              class="flex flex-col gap-4">
+            <input type="hidden" name="namespace" value="{{ row.entry.namespace }}">
+            <input type="hidden" name="key" value="{{ row.entry.key }}">
+
+            <div class="gap-4 grid md:grid-cols-2">
+                {% for cell in row.cells %}
+                    <div class="flex flex-col gap-2 min-w-0"
+                         role="group"
+                         aria-labelledby="{{ row.dom_id }}-{{ cell.language }}-label"
+                         x-data="{ n: {{ cell.value|length }}, max: {{ max_length }}, insert(token) { const el = this.$refs.field.querySelector('textarea'); el.setRangeText(token, el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input', { bubbles: true })); el.focus(); } }">
+                        <div class="flex gap-2 items-center justify-between">
+                            <label id="{{ row.dom_id }}-{{ cell.language }}-label"
+                                   for="{{ row.dom_id }}-{{ cell.language }}"
+                                   class="font-semibold text-important text-sm">
+                                {{ cell.language_name }}
+                            </label>
+                            {% if cell.overridden %}
+                                {% trans "Your wording" as own_label %}
+                                {% include "unfold/helpers/label.html" with text=own_label variant="primary" size="md" %}
+                            {% elif cell.missing %}
+                                {% trans "No text" as none_label %}
+                                {% include "unfold/helpers/label.html" with text=none_label variant="warning" size="md" %}
+                            {% endif %}
+                        </div>
+
+                        <div class="bg-base-50 border border-base-200 px-3 py-2 rounded-default dark:bg-base-800/50 dark:border-base-800">
+                            <span class="font-semibold text-subtle text-xs uppercase">{% trans "Original" %}</span>
+                            {% if cell.default is not None %}
+                                <p class="mb-0 text-sm whitespace-pre-line break-words" lang="{{ cell.language }}">{{ cell.default }}</p>
+                            {% else %}
+                                <p class="mb-0 text-sm text-subtle">{% trans "The storefront has no text in this language." %}</p>
+                            {% endif %}
+                        </div>
+
+                        <div x-ref="field">{{ cell.control }}</div>
+
+                        <div id="check-{{ row.dom_id }}-{{ cell.language }}" aria-live="polite">
+                            {% if cell.error %}
+                                {% include "admin/texts/_check.html" with error=cell.error %}
+                            {% endif %}
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 items-center justify-between">
+                            <div class="flex flex-wrap gap-1 items-center">
+                                {% if can_edit and not row.locked %}
+                                    {% for chip in cell.chips %}
+                                        {% if forloop.first %}<span class="text-subtle text-xs">{% trans "Insert" %}</span>{% endif %}
+                                        {% component "unfold/components/button.html" with type="button" size="xs" variant="secondary" title=chip.label extra_attrs="x-on:click='insert($el.textContent.trim())'" %}{{ chip.token }}{% endcomponent %}
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <span class="text-subtle text-xs" x-bind:class="n > max && 'text-red-600 dark:text-red-400'">
+                                <span x-text="n">{{ cell.value|length }}</span> / {{ max_length }}
+                            </span>
+                        </div>
+                        {% if cell.plural_cases > 1 %}
+                            <p class="mb-0 text-subtle text-xs">
+                                {% blocktrans trimmed with n=cell.plural_cases %}
+                                    This text has {{ n }} forms, separated by |.
+                                {% endblocktrans %}
+                            </p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <footer class="flex flex-wrap gap-2 items-center justify-between">
+                <p class="mb-0 text-sm text-subtle" role="status">{{ notice }}</p>
+                <div class="flex flex-wrap gap-2">
+                    {% if row.preview_url %}
+                        {% component "unfold/components/button.html" with href=row.preview_url variant="ghost" icon="open_in_new" extra_attrs="target='_blank' rel='noopener'" %}
+                            {% trans "View on the storefront" %}
+                        {% endcomponent %}
+                    {% endif %}
+                    {% component "unfold/components/button.html" with type="button" variant="ghost" icon="history" extra_attrs=row.history_attrs %}
+                        {% trans "History" %}
+                    {% endcomponent %}
+                    {% if can_edit and not row.locked %}
+                        {% if row.changed %}
+                            {% component "unfold/components/button.html" with type="button" variant="default" icon="undo" extra_attrs=row.reset_attrs %}
+                                {% trans "Use the original" %}
+                            {% endcomponent %}
+                        {% endif %}
+                        {% component "unfold/components/button.html" with submit=1 icon="save" %}
+                            {% trans "Save" %}
+                        {% endcomponent %}
+                    {% endif %}
+                </div>
+            </footer>
+        </form>
+
+        <div id="history-{{ row.dom_id }}"></div>
+    {% endcomponent %}
+</article>

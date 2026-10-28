@@ -28,6 +28,7 @@ ADMIN_FILES = (
     # never from hand-rolled markup that drifts from the theme.
     + sorted((BASE_DIR / "core/templates/admin").rglob("*.html"))
     + sorted((BASE_DIR / "core/templates/unfold").rglob("*.html"))
+    + sorted((BASE_DIR / "texts/templates/admin").rglob("*.html"))
 )
 
 # Pictographs, dingbats, transport, supplemental symbols — the emoji

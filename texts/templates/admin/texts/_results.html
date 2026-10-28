@@ -1,0 +1,51 @@
+{% load i18n unfold %}
+
+{% component "unfold/components/text.html" with class="text-subtle" %}
+    {% blocktrans trimmed count total=page.paginator.count %}
+        {{ total }} text
+    {% plural %}
+        {{ total }} texts
+    {% endblocktrans %}
+    {% if changed_total %}
+        &middot;
+        {% blocktrans trimmed count n=changed_total %}
+            {{ n }} changed by your store
+        {% plural %}
+            {{ n }} changed by your store
+        {% endblocktrans %}
+    {% endif %}
+{% endcomponent %}
+
+{% for row in rows %}
+    {% include "admin/texts/_row.html" %}
+{% empty %}
+    {% component "unfold/components/card.html" with size="md" %}
+        {% component "unfold/components/text.html" %}
+            {% trans "No text matches. Try fewer words, or clear the filters." %}
+        {% endcomponent %}
+    {% endcomponent %}
+{% endfor %}
+
+{% if page.paginator.num_pages > 1 %}
+    <nav class="flex gap-3 items-center justify-between" aria-label="{% trans 'Pages' %}">
+        <div>
+            {% if previous_url %}
+                {% component "unfold/components/button.html" with href=previous_url variant="default" icon="chevron_left" %}
+                    {% trans "Previous" %}
+                {% endcomponent %}
+            {% endif %}
+        </div>
+        {% component "unfold/components/text.html" %}
+            {% blocktrans trimmed with number=page.number total=page.paginator.num_pages %}
+                Page {{ number }} of {{ total }}
+            {% endblocktrans %}
+        {% endcomponent %}
+        <div>
+            {% if next_url %}
+                {% component "unfold/components/button.html" with href=next_url variant="default" icon="chevron_right" %}
+                    {% trans "Next" %}
+                {% endcomponent %}
+            {% endif %}
+        </div>
+    </nav>
+{% endif %}

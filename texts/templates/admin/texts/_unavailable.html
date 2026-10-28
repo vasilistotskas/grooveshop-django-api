@@ -1,0 +1,6 @@
+{% load i18n unfold %}
+{% blocktrans trimmed asvar message %}
+    The storefront could not be reached to check this text, so nothing was
+    saved. Try again in a moment.
+{% endblocktrans %}
+{% include "unfold/helpers/messages/warning.html" with message=message %}

@@ -1185,6 +1185,8 @@ accepting Cyprus orders at the Greek flat rate.
   "Print labels for selected shipments", then "Issue ACS pickup list
   now". Every other refusal is a plain `AcsAPIError` and still fails the
   task.
+- Debugging ACS (call history, pickup-list run records, the shipment
+  timeline, LogsQL queries): `docs/acs-debugging.md`.
 - The **silent** form of the same refusal is classified as the same
   `blocked_unprinted`. Once a voucher stays unprinted into a later day ACS
   stops naming it and answers `PickupList_No: null`, `Unprinted_Found: 0`,

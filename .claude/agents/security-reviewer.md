@@ -29,7 +29,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 
 ### 3. Stock & Payment Atomicity
 - `StockManager.reserve_stock()` / `release_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
-- `StockReservation` TTL (15 min default) — verify expired reservations are cleaned up
+- `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `settings.py`, validated by `order.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
 - Viva Wallet webhooks (`order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
 - Order status transitions: verify they follow the expected lifecycle (no skipping states)
@@ -37,7 +37,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 ### 4. Celery Task Security
 - Tasks accepting model IDs must re-fetch from DB (never trust serialized model instances)
 - `MonitoredTask` base class: verify error handling doesn't leak stack traces to external services
-- Tasks with `autoretry_for` and `retry_backoff`: verify max_retries is bounded (should be 5)
+- Tasks with `autoretry_for` and `retry_backoff`: `max_retries` is set explicitly and bounded (2 to 5 in the codebase); `autoretry_for` names a transient-error tuple from `core/retry.py` (or one specific domain exception), never `Exception`
 - Verify task arguments are serializable primitives (no user objects, no request objects)
 
 ### 5. File Upload & Image Processing

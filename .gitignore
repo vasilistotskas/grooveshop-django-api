@@ -149,7 +149,7 @@ NOTES.MD
 /mediafiles_private/
 
 # Per-user Claude agent memory (not shared)
-.claude/agent-memory/
+.claude/agent-memory*/
 # Claude Code subagent worktrees (local git worktrees of this repo)
 .claude/worktrees/
 

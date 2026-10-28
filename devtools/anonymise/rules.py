@@ -514,6 +514,8 @@ NOT_PERSONAL: dict[str, str] = {
         "loyalty.LoyaltyPause",
         "giftcard.GiftCardPause",
         "extra_settings.Setting",
+        "texts.TextOverride",
+        "texts.HistoricalTextOverride",
         "allauth_idp_oidc.Client",
     ),
     **_exempt(

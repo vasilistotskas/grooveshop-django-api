@@ -3,6 +3,24 @@
 
 
 
+## v3.157.1 (2026-10-28)
+
+### Bug fixes
+
+* fix(deps): msgpack 1.2.4, out of the C-extension memory leak advisory (#342)
+
+CVE-2026-114613 / GHSA-j586-36cw-2gc2 (high): the msgpack C extension
+leaks memory without bound when strict_map_key validation or a container
+hook fails, fixed in 1.2.3. msgpack is a runtime dependency through
+channels-redis (the WebSocket notification layer), and Trivy now fails
+every CI run on it. Locked with the pinned uv (0.12.5); only msgpack
+moves (1.2.2 -> 1.2.4; 1.2.4 adds pure-Python fallback fixes only).
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ea03ca1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ea03ca1838ec7f6c2093c09078758234f1736fa3))
+
 ## v3.157.0 (2026-10-27)
 
 ### Features

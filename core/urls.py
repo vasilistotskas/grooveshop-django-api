@@ -205,6 +205,7 @@ _storefront_i18n_patterns = [
     path("api/v1/", include("giftcard.urls")),
     path("api/v1/", include("b2b.urls")),
     path("api/v1/", include("page_config.urls")),
+    path("api/v1/", include("texts.urls")),
     path("api/v1/", include("promotion.urls")),
 ]
 

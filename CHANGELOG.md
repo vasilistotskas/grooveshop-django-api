@@ -3,6 +3,167 @@
 
 
 
+## v3.158.0 (2026-10-28)
+
+### Bug fixes
+
+* fix(texts): the public overrides read never calls the storefront
+
+Every storefront render will read GET /api/v1/texts/overrides, so it must not
+call the storefront back: a slow or restarting storefront pod would fail text
+delivery for every store, and a cold Django pod would add a round trip to the
+render path. It now answers from the database and the cache alone, keyed
+texts:overrides:<cache_generation>:<language>, with no 503 path.
+
+Every override was validated by the storefront when it was saved, and the lock
+list is shared storefront code (isLockedText), so the storefront ignores a
+locked key and a key its build no longer has when it merges. The contract is in
+the OpenAPI description and docs/store-texts.md.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* fix(texts): tell a read-only user why they cannot edit, and name a first save "Created"
+
+Reviewed at phone, tablet and desktop widths in light and dark: the two
+languages stack at 390 px, nothing scrolls horizontally, and the icon font
+loads. Two things were off.
+
+- A user who may view but not change texts saw disabled fields and no
+  explanation; the page now says so.
+- The first save of a text recorded "Edited" as its change reason, which the
+  history then showed beside "Created"; a new override is now "Created".
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* fix(texts): add the Greek for "Shared text"
+
+The component name of a shared locale text is translated, so the catalogue
+must carry it (test_the_project_catalogue_covers_the_source).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+### Features
+
+* feat(texts): let each store's admins edit the storefront's wording (#341) ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* feat(texts): store text overrides, checked by the storefront before they are saved
+
+A store can replace the wording of its storefront per language. The
+storefront owns the catalogue of editable texts and the message syntax
+(its locale files and its message compiler), so Django keeps neither: it
+asks the storefront for the catalogue and for a verdict on a value, over
+the same internal base URL the cache purge already uses.
+
+- TextOverride lives in each store's own schema (texts is a tenant app),
+  sparse, unique per (surface, namespace, key, language), with history.
+  The staff member is a plain id read through StaffActor, like every other
+  row a platform staff identity acts on in a store schema.
+- texts.storefront holds the catalogue per process and revalidates it by
+  ETag; every failure to get an answer raises StorefrontUnavailable.
+- texts.validation maps each storefront code (unknown_key, locked_key,
+  syntax_error, placeholder_mismatch) and Django's own checks (blank, too
+  long, unavailable) to a ValidationError with a stable code and a
+  translated message. An unreachable storefront refuses the save: an
+  unchecked text is never stored.
+- texts.services is the only writer: permission, validation, then the
+  write; reset and restore (which validates again) go through it too.
+
+The model is added only (new tables), so the release still serving reads
+the schema unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* feat(texts): serve a store's overrides, and move its caches when one changes
+
+GET /api/v1/texts/overrides?language=<code> returns {namespace: {key:
+text}} for the current store and language, for the storefront to merge
+over its defaults. It never includes a locked text or a key the build no
+longer has, so it reads the storefront's catalogue and answers 503 when it
+cannot: serving a text the platform has since locked is worse than serving
+the defaults for a moment. The body skips the camelCase renderer, because
+the keys are the storefront's own ids. The answer is cached under the
+store's cache generation and the catalogue hash.
+
+A save, reset or restore now moves what caches the store's wording: the
+tenant cache generation (the read above is keyed by it) and the new
+store_texts surface, which purges the storefront's copy and rendered pages
+with tenantConfig and queues the same Cloudflare edge purge a content page
+edit does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* feat(texts): a store admin editor for the storefront's wording
+
+One dedicated page in the store admin (Content, "Storefront Texts"), not a
+model changelist: a changelist would offer a form that bypasses the
+storefront's validation.
+
+- Find: search across key, defaults and the store's own wording in every
+  language; filter by area (one table maps namespaces onto human names),
+  "changed only" and "missing a translation".
+- Edit: languages side by side, the original above the store's version,
+  placeholders as insertable chips, a character count, and the storefront's
+  verdict while typing (debounced) in the admin's language.
+- Safety: reset to the original, a change history with who, when,
+  before/after and one-click restore, locked texts listed but disabled with
+  the reason, and a link to the storefront page where the text shows.
+
+Built from Unfold components with htmx fragments. Greek and English
+messages are added, the admin UI guard now covers the new templates, and
+docs/store-texts.md describes the whole feature.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* feat(texts): head each card with the wording, not the developer key
+
+A shop owner recognises the wording, not `code_label` or a component path.
+The card heading is now the text's current wording in the admin's language
+(the store's own if changed, else the original), cut to one line by CSS. The
+key sits beneath as one small muted line with the component named in words
+("Authenticate code"), and the raw namespace and key stay in a tooltip for
+support. A text with no wording in any language falls back to its key.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+* feat(texts): only a store's ADMIN and OWNER edit the wording; STAFF see it read-only
+
+The storefront's wording is the store's presentation, not day-to-day
+operations, so STAFF no longer hold texts.change_textoverride. The rule is
+the role system's own: texts joins STORE_SETTINGS_APP_LABELS (which STAFF's
+operational grant already leaves out, like extra_settings) and a new
+STAFF_READ_ONLY_APP_LABELS gives STAFF `view` on it, so the editor opens for
+them read-only with the notice that already exists. Nothing is special-cased
+in the editor.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
+### Testing
+
+* test(features): create an active product for the catalogue switch routes (#343)
+
+ProductFactory makes a product active with 85% probability, and the
+public product routes answer an inactive product 404 whatever the
+catalogue switch says, so the switch-on case failed about one run in
+seven (main CI on #341, its PR before it). Forcing active=False
+reproduces the CI failure exactly; the test now asks for an active one.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b551a4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b551a4b315bc501182f82714a06c578de033007b))
+
+* test(texts): read the service messages in English
+
+The admin default language is Greek and the Greek catalogue now holds these
+messages, so the service tests pin English instead of relying on an
+untranslated fallback.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`707c3c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/707c3c21522d80c17802eefad6bfc60d23008356))
+
 ## v3.157.1 (2026-10-28)
 
 ### Bug fixes

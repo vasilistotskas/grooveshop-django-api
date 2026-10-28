@@ -3,6 +3,56 @@
 
 
 
+## v3.158.1 (2026-10-28)
+
+### Bug fixes
+
+* fix(shipping_acs): treat ACS's silent answer for unprinted vouchers as the unprinted refusal (#344)
+
+ACS refuses a pickup list while a voucher is unprinted and, on the first
+day, names it (PickupList_No null, Unprinted_Found 1, Unprinted_Vouchers
+[...]). Production 2026-10-22 (voucher 9818420312) and 10-27 (voucher
+9819787972, order #448) were classified correctly as blocked_unprinted.
+
+When the voucher stayed unprinted into the next day (10-23, 10-28), ACS
+stopped naming it and answered PickupList_No null, Unprinted_Found 0,
+Error_Message null, Unprinted_Vouchers []. ACS_Get_Pickup_Lists was empty,
+so reconciliation adopted nothing, and the service logged ERROR and raised
+AcsAPIError, which fails the infrastructure's production smoke gate.
+
+When no PickupList_No comes back, reconciliation adopts nothing and every
+candidate is unprinted locally, the service now logs a WARNING and raises
+AcsUnprintedVouchersError carrying the local unprinted vouchers, so the
+task takes the existing blocked_unprinted path (status, order notes, no
+email). One locally printed candidate keeps the ERROR plus AcsAPIError.
+The documented-refusal and success paths are unchanged.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ca1d1c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca1d1c7b4434f927b700c7c8bb98f43b103b76ef))
+
+### Chores
+
+* chore(claude): correct agent and hook docs, slim CLAUDE.md (#345)
+
+- security-reviewer: the stock reservation TTL is the store setting
+  STOCK_RESERVATION_TTL_MINUTES (declared in EXTRA_SETTINGS_DEFAULTS),
+  not a fixed 15 minutes; Celery retries are an explicit, bounded
+  max_retries (2 to 5 in the codebase) with autoretry_for naming a
+  transient set from core/retry.py, never Exception.
+- auto-lint hook: the header says ty findings reach the model through
+  hookSpecificOutput.additionalContext, not stderr; malformed or empty
+  stdin now exits 0 instead of throwing.
+- .gitignore: .claude/agent-memory*/ also covers agent-memory-local.
+- CLAUDE.md: the client IP, Greeklish search, Celery result storage and
+test configuration detail move verbatim to docs/client-ip.md,
+docs/search/greeklish.md, docs/celery-results.md and docs/testing.md,
+  leaving one-line pointers; the Celery max_retries range reads 2 to 5,
+  matching the tasks.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxKinom5D1RvQyJRYvU
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`706e934`](https://github.com/vasilistotskas/grooveshop-django-api/commit/706e9342e648a88008c6dae96d74b472c26ac676))
+
 ## v3.158.0 (2026-10-28)
 
 ### Bug fixes

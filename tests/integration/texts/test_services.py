@@ -12,6 +12,7 @@ import pytest
 import requests
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404
+from django.utils import translation
 
 from tenant.models import TenantMembershipRole
 from tests.utils.staff import store_staff
@@ -22,6 +23,14 @@ from texts.models import TextOverride
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _english():
+    """The admin's default language is Greek; these tests read English."""
+    with translation.override("en"):
+        yield
+
 
 TAGLINE = {"namespace": FOOTER, "key": "tagline"}
 

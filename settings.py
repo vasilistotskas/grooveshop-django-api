@@ -429,8 +429,6 @@ AUTHENTICATION_BACKENDS = [
     "tenant.auth_backends.TenantRolePermissionBackend",
 ]
 
-WSGI_APPLICATION = "wsgi.application"
-ASGI_APPLICATION = "asgi.application"
 
 AUTH_USER_MODEL = "user.UserAccount"
 

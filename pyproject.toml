@@ -125,7 +125,6 @@ omit = [
     "*/manage.py",
     "*/factories.py",
     "gunicorn_worker.py",
-    "*/wsgi/*",
 ]
 source = ["."]
 relative_files = true

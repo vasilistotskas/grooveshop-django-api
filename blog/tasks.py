@@ -35,7 +35,7 @@ def notify_comment_liked_task(
     """Create in-app notifications for users who liked a blog comment.
 
     Runs in a Celery worker to avoid async_to_sync deadlocks under ASGI
-    (Daphne). Called from the m2m_changed signal in blog.signals.
+    (Uvicorn). Called from the m2m_changed signal in blog.signals.
     """
     try:
         comment_owner = User.objects.get(id=comment_owner_id)

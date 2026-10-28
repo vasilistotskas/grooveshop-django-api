@@ -3,12 +3,20 @@
 ``asgi.application`` wraps the consumer in the origin validator, the
 tenant gate and the ticket auth, so these connect exactly as a browser
 does rather than calling one layer in isolation.
+
+The tests drive the application with ``asgiref``'s
+``ApplicationCommunicator`` and the raw ASGI websocket events. Channels'
+``WebsocketCommunicator`` is a thin wrapper over it, but importing
+``channels.testing`` pulls in ``daphne.testing``, and daphne (with
+Twisted) is not a dependency of this project.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
+from asgiref.testing import ApplicationCommunicator
 from channels.db import database_sync_to_async
-from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
 
 from asgi import application
@@ -19,12 +27,27 @@ HOST = b"shop.example"
 ORIGIN = b"https://shop.example"
 
 
-def _communicator(host: bytes) -> WebsocketCommunicator:
-    return WebsocketCommunicator(
+def _communicator(host: bytes) -> ApplicationCommunicator:
+    return ApplicationCommunicator(
         application,
-        "/ws/notifications/",
-        headers=[(b"host", host), (b"origin", ORIGIN)],
+        {
+            "type": "websocket",
+            "path": "/ws/notifications/",
+            "query_string": b"",
+            "headers": [(b"host", host), (b"origin", ORIGIN)],
+            "subprotocols": [],
+        },
     )
+
+
+async def _connect(
+    communicator: ApplicationCommunicator,
+) -> tuple[bool, dict[str, Any]]:
+    """Send ``websocket.connect`` and report whether the handshake was
+    accepted, with the first event the application answered."""
+    await communicator.send_input({"type": "websocket.connect"})
+    event = await communicator.receive_output(timeout=1)
+    return event["type"] == "websocket.accept", event
 
 
 class WebsocketStackRefusalTestCase(TransactionTestCase):
@@ -45,10 +68,10 @@ class WebsocketStackRefusalTestCase(TransactionTestCase):
         await self._store()
         communicator = _communicator(HOST)
 
-        connected, _ = await communicator.connect()
+        connected, _ = await _connect(communicator)
 
         assert connected is True
-        assert await communicator.receive_output() == {
+        assert await communicator.receive_output(timeout=1) == {
             "type": "websocket.close",
             "code": 4003,
         }
@@ -56,7 +79,8 @@ class WebsocketStackRefusalTestCase(TransactionTestCase):
     async def test_unknown_host_is_refused_before_the_handshake(self):
         communicator = _communicator(b"other.example")
 
-        connected, code = await communicator.connect()
+        connected, event = await _connect(communicator)
 
         assert connected is False
-        assert code == 4004
+        assert event["type"] == "websocket.close"
+        assert event["code"] == 4004

@@ -1,6 +1,6 @@
 """
 ASGI compatibility middleware for packages that expect WSGI request attributes.
-Specifically fixes Rosetta's access to request.environ under ASGI/Daphne.
+Specifically fixes Rosetta's access to request.environ under ASGI.
 """
 
 

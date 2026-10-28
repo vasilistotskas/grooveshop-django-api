@@ -154,11 +154,6 @@ SHARED_APPS = [
     "django_tenants",
     "tenant",
     # Django core (platform admin in public schema)
-    # daphne's `runserver` serves ASGI, so the development server speaks
-    # WebSocket; it must come before staticfiles' `runserver`. daphne is a
-    # development dependency: the image is built without it and runs
-    # Gunicorn with Uvicorn workers (Dockerfile, gunicorn.conf.py).
-    *(["daphne"] if DEBUG else []),
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -434,8 +429,6 @@ AUTHENTICATION_BACKENDS = [
     "tenant.auth_backends.TenantRolePermissionBackend",
 ]
 
-WSGI_APPLICATION = "wsgi.application"
-ASGI_APPLICATION = "asgi.application"
 
 AUTH_USER_MODEL = "user.UserAccount"
 

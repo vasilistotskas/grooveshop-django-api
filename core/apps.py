@@ -45,7 +45,7 @@ class CoreConfig(AppConfig):
 
         # Intentionally no apply_db_overlay() here: ready() runs during
         # Django setup, which can be triggered at import time by
-        # wsgi/__init__.py's application(...) warmup call. In pytest
+        # asgi/__init__.py's get_asgi_application() call. In pytest
         # collection the DB is blocked for tests without the django_db
         # mark (RuntimeError), and even with try/except guards the
         # error was surfacing through the import chain. The overlay now

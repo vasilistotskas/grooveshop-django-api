@@ -27,7 +27,7 @@ def _resolve_tenant_from_request(request):
     """Return the Tenant for ``request.get_host()`` or ``None``.
 
     Resolves from the request host rather than ``connection.tenant``.
-    Under Daphne/Channels ``database_sync_to_async`` reuses threads
+    Under ASGI/Channels ``database_sync_to_async`` reuses threads
     across requests, so a pooled worker can hold a stale
     ``connection.tenant`` from an earlier request and hand back another
     tenant's OAuth app config. Reading the
@@ -251,7 +251,7 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         - No per-tenant ``SocialApp`` is configured (single-tenant deployments).
 
         Resolves the tenant from ``request.get_host()`` rather than
-        ``connection.tenant``. Under Daphne/Channels with
+        ``connection.tenant``. Under ASGI/Channels with
         ``database_sync_to_async`` thread pooling, ``connection.tenant``
         can be stale and would return a different tenant's OAuth app
         config (same fix pattern as
@@ -337,7 +337,7 @@ class TenantHeadlessAdapter(DefaultHeadlessAdapter):
     Resolves the tenant from ``self.request.get_host()`` (via
     ``_resolve_tenant_from_request``), NOT ``connection.tenant`` — same
     H7 rationale as ``TenantAccountAdapter.pre_login`` /
-    ``TenantSocialAccountAdapter.get_app``: under Daphne/Channels,
+    ``TenantSocialAccountAdapter.get_app``: under ASGI/Channels,
     ``database_sync_to_async`` thread pooling can leave a stale
     ``connection.tenant`` from an earlier request on the same thread.
     """

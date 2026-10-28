@@ -253,7 +253,7 @@ def process_boxnow_webhook_event(
     dispatches the actual state-machine work here so the request
     returns 200 to BoxNow within milliseconds even if the apply path
     needs to chase Celery sub-tasks (arrival emails, order-status
-    transitions, etc.). This eliminates Daphne worker saturation
+    transitions, etc.). This eliminates web worker saturation
     during BoxNow retry storms.
     """
     from shipping_boxnow.services import BoxNowService

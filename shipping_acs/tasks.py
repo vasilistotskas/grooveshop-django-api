@@ -489,9 +489,11 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
         return {"dispatched": 0, "skipped": True}
 
     from django.core.cache import cache
+    from django.db.models import Q
 
     from shipping_acs.enum.shipment_state import AcsShipmentState
     from shipping_acs.models import AcsShipment
+    from shipping_acs.services import TERMINAL_ORDER_STATUSES
 
     # ``cache.add`` is atomic on Redis (SET NX with TTL) — only one
     # worker per cluster wins the lock per beat tick.
@@ -508,13 +510,19 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
             AcsShipment.objects.real()
             .filter(voucher_no__isnull=False)
             .exclude(
-                shipment_state__in=[
-                    AcsShipmentState.PENDING_CREATION,
-                    AcsShipmentState.DELIVERED,
-                    AcsShipmentState.RETURNED,
-                    AcsShipmentState.CANCELED,
-                    AcsShipmentState.LOST,
-                ]
+                Q(
+                    shipment_state__in=[
+                        AcsShipmentState.PENDING_CREATION,
+                        AcsShipmentState.DELIVERED,
+                        AcsShipmentState.RETURNED,
+                        AcsShipmentState.CANCELED,
+                        AcsShipmentState.LOST,
+                    ]
+                )
+                # A finished order has nothing left to track; a shipment
+                # that never progressed past NEW would otherwise be
+                # polled forever (prod order 56, COMPLETED since May).
+                | Q(order__status__in=TERMINAL_ORDER_STATUSES)
             )
             .filter(models_or_null(cutoff))
             .order_by("last_polled_at")

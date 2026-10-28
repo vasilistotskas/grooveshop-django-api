@@ -58,3 +58,45 @@ def test_batch_releases_lock_after_success(acs_configured_tenant):
     assert mock_delete.called
     assert mock_delete.call_args.args[0] == "acs:poll_batch:lock"
     assert result.get("skipped") is not True
+
+
+def _dispatched_ids():
+    with (
+        patch("django.core.cache.cache.add", return_value=True),
+        patch("django.core.cache.cache.delete"),
+        patch(
+            "shipping_acs.tasks.poll_acs_tracking_one.apply_async",
+            return_value=None,
+        ) as mock_dispatch,
+    ):
+        poll_acs_tracking_batch.run()
+    return {call.kwargs["args"][0] for call in mock_dispatch.call_args_list}
+
+
+def test_batch_skips_never_progressed_shipment_of_finished_order(
+    acs_configured_tenant,
+):
+    """Prod order 56 (2026-10-28): COMPLETED since May, shipment still
+    ``new`` with no tracking events, polled every 30 minutes for ever.
+    A finished order has nothing left to track."""
+    from order.enum.status import OrderStatus
+    from order.factories.order import OrderFactory
+    from shipping_acs.factories import AcsShipmentFactory
+
+    open_shipment = AcsShipmentFactory(
+        with_voucher=True,
+        order=OrderFactory(status=OrderStatus.PROCESSING),
+    )
+    finished = [
+        AcsShipmentFactory(with_voucher=True, order=OrderFactory(status=status))
+        for status in (
+            OrderStatus.COMPLETED,
+            OrderStatus.CANCELED,
+            OrderStatus.REFUNDED,
+        )
+    ]
+
+    dispatched = _dispatched_ids()
+
+    assert open_shipment.id in dispatched
+    assert not dispatched & {s.id for s in finished}

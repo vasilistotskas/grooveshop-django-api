@@ -101,7 +101,8 @@ LogsQL: `acs_alias:ACS_Create_Voucher outcome:business_error`
 1. Shipment Timeline: the last tracking event and the last
    `ACS_Trackingsummary` / `ACS_TrackingDetails` calls. Failing calls show
    their outcome; no calls at all means the poller skipped it (terminal
-   state, or `poll_acs_tracking_batch` not running).
+   shipment state, an order already DELIVERED, COMPLETED, CANCELED,
+   RETURNED or REFUNDED, or `poll_acs_tracking_batch` not running).
 2. `Stale alert sent` and `Last event at` on the Tracking tab: no event for
    `ACS_STALE_SHIPMENT_DAYS` days is reported by `check_stale_acs_shipments`;
    a voucher ACS never scanned looks like this.

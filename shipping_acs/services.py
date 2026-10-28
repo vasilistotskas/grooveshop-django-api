@@ -93,7 +93,7 @@ _PRE_DISPATCH_CHECKPOINT_PREFIXES: tuple[str, ...] = ("ΕΚΤΥΠΩΣΗ",)
 _PRE_SHIPPED_ORDER_STATUSES: frozenset[str] = frozenset(
     {"PENDING", "PROCESSING"}
 )
-_TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
+TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
     {"DELIVERED", "COMPLETED", "CANCELED", "RETURNED", "REFUNDED"}
 )
 
@@ -2576,7 +2576,7 @@ class AcsService:
         the replay re-derive "returned means RETURNED" for itself is
         exactly how the two would drift apart.
         """
-        if current_status in _TERMINAL_ORDER_STATUSES:
+        if current_status in TERMINAL_ORDER_STATUSES:
             return None
 
         new_status: str | None = None

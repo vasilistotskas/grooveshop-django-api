@@ -16,6 +16,7 @@ from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
     PromotionProductRefSerializer,
 )
+from shipping.enum import FreeShippingSource
 
 
 class CartWriteSerializer(serializers.ModelSerializer[Cart]):
@@ -83,6 +84,17 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     )
     promotion_free_shipping = serializers.SerializerMethodField(
         help_text=_("Whether a live promotion waives the shipping cost"),
+    )
+    free_shipping_progress = serializers.SerializerMethodField(
+        help_text=_(
+            "How far this cart is from free shipping, by its cheapest "
+            "route: a carrier's free-shipping threshold or a "
+            "free-shipping promotion, judged by the rules checkout "
+            "prices shipping with. The one figure to show for free "
+            "shipping; promotionNearMiss entries flagged freeShipping "
+            "are routes it has already weighed. Null when the cart has "
+            "no route to free shipping."
+        ),
     )
     applied_coupon_codes = serializers.SerializerMethodField(
         help_text=_("Coupon codes currently attached to this cart"),
@@ -197,6 +209,91 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_promotion_free_shipping(self, obj: Cart) -> bool:
         return self._promotion_result(obj).free_shipping
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "free": {
+                    "type": "boolean",
+                    "description": (
+                        "Checkout charges nothing for shipping: a "
+                        "promotion waives it, or the cart reached a "
+                        "carrier's threshold"
+                    ),
+                },
+                "source": {
+                    "type": "string",
+                    "enum": [source.value for source in FreeShippingSource],
+                    "description": (
+                        "threshold: a carrier's free-shipping threshold, "
+                        "for that carrier only; promotion: a "
+                        "free-shipping promotion, for every carrier"
+                    ),
+                },
+                "remainingAmount": {
+                    "type": "number",
+                    "nullable": True,
+                    "description": (
+                        "Products still missing; null once free, or "
+                        "when what is missing is units"
+                    ),
+                },
+                "remainingQuantity": {
+                    "type": "integer",
+                    "nullable": True,
+                    "description": (
+                        "Units of the promotion's products still "
+                        "missing; null once free, or when what is "
+                        "missing is an amount"
+                    ),
+                },
+                "threshold": {
+                    "type": "number",
+                    "nullable": True,
+                    "description": (
+                        "The value the route is reached at, for a "
+                        "meter; null for a units route or a promotion "
+                        "that waives shipping outright"
+                    ),
+                },
+                "countryCode": {
+                    "type": "string",
+                    "nullable": True,
+                    "description": (
+                        "The country the carriers' thresholds were "
+                        "judged for: the store's first shipping country, "
+                        "the one checkout preselects"
+                    ),
+                },
+            },
+            "required": [
+                "free",
+                "source",
+                "remainingAmount",
+                "remainingQuantity",
+                "threshold",
+                "countryCode",
+            ],
+        }
+    )
+    def get_free_shipping_progress(self, obj: Cart) -> dict | None:
+        from order.services import OrderService
+
+        progress = OrderService.free_shipping_progress(
+            obj, self._promotion_result(obj)
+        )
+        if progress is None:
+            return None
+        return {
+            "free": progress.free,
+            "source": progress.source.value,
+            "remainingAmount": progress.remaining_amount,
+            "remainingQuantity": progress.remaining_quantity,
+            "threshold": progress.threshold,
+            "countryCode": progress.country_code,
+        }
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_applied_coupon_codes(self, obj: Cart) -> list[str]:
@@ -415,6 +512,14 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                             "protector at -50% not yet); empty otherwise"
                         ),
                     },
+                    "freeShipping": {
+                        "type": "boolean",
+                        "description": (
+                            "The offer waives shipping, so it is one of "
+                            "the routes freeShippingProgress already "
+                            "weighed; show that, not this teaser"
+                        ),
+                    },
                 },
                 "required": [
                     "promotionId",
@@ -422,6 +527,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "remainingAmount",
                     "remainingQuantity",
                     "rewardProducts",
+                    "freeShipping",
                 ],
             },
             "description": (
@@ -454,6 +560,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     many=True,
                     context=self.context,
                 ).data,
+                "freeShipping": entry.promotion.benefit_type
+                == BenefitType.FREE_SHIPPING,
             }
             for entry in near_miss
         ]
@@ -500,6 +608,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "free_threshold_value",
             "applied_promotions",
             "promotion_free_shipping",
+            "free_shipping_progress",
             "applied_coupon_codes",
             "applied_coupons",
             "promotion_gift_items",
@@ -522,6 +631,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "free_threshold_value",
             "applied_promotions",
             "promotion_free_shipping",
+            "free_shipping_progress",
             "applied_coupon_codes",
             "applied_coupons",
             "promotion_gift_items",

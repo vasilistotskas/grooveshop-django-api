@@ -986,9 +986,44 @@ accepting Cyprus orders at the Greek flat rate.
   Orthodox-Easter-relative ones) are not business days. The Greek
   calendar governs the dispatch day because every parcel leaves from
   Greece, whatever the destination country.
-- **`/shipping/free-shipping-info`** defaults to the first
-  `ShippingService.shippable_country_codes()` entry when no
-  `country_code` is given, echoing whichever it used.
+- **`/shipping/free-shipping-info`** is the store's standing "free from
+  X" promise, for a page with no cart to judge (a product page, a
+  visitor who has added nothing). It defaults to
+  `ShippingService.initial_country_code()` (the first
+  `shippable_country_codes()` entry) when no `country_code` is given,
+  echoing whichever it used, and lists `free_threshold_rates(country)`.
+- **One distance to free shipping: the cart's `freeShippingProgress`.**
+  `OrderService.free_shipping_progress(cart, promotion_result)` decides it
+  with the two rules `shipping_cost` charges with, so the cart can never
+  promise what checkout will not give:
+  - a live free-shipping promotion waives every carrier
+    (`promotion_result.free_shipping`); one the cart is short of is a
+    `near_miss` teaser the engine has already checked would be granted
+    (scope, first order, usage limits, the wholesale gate), and its
+    distance is the teaser's, measured on the products before discounts as
+    the engine judges a minimum;
+  - a carrier's `free_shipping_threshold` zeroes that carrier once
+    `threshold_value` reaches it; only
+    `ShippingService.free_threshold_rates(country, weight_grams, items)`
+    count: the `active_rate` gate, the weight cap and the parcel size,
+    so a carrier that cannot take the parcel is no route.
+
+  The rates are judged for the store's first shipping country, the one
+  checkout preselects (the cart knows no address; the payload echoes
+  `countryCode`); a promotion holds in every country. The cheapest route
+  wins, a promotion on a tie; a units teaser ("2 more items") costs what
+  the engine's own simulation adds (`PromotionEngine.teaser_cost`).
+  `free` once checkout charges 0, else exactly one of `remainingAmount`
+  and `remainingQuantity`; `threshold` is the value a meter fills to.
+  `null` when the cart has no route at all. `promotionNearMiss` entries
+  carry `freeShipping`: those offers are routes the progress has already
+  weighed, so a client shows the progress and not them. (Staging webside,
+  2026-10-28: a 19,99 € cart showed "add 19,01 € to unlock «free shipping
+  from 39 €»" next to "add 30,01 € for free shipping", the carrier's
+  50 € threshold read from `/shipping/free-shipping-info`.) Known
+  limit: a threshold's distance is the shortfall in `threshold_value`;
+  with a percentage promotion running, adding exactly that much in goods
+  falls a little short, since the promotion grows with the cart.
 - **`ShippingService.offered_rates(country_code)`** is the one definition
   of "the store ships this (provider, kind) to this country": an active
   provider that supports the kind, a registered adapter, the adapter's

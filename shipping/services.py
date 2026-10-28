@@ -523,10 +523,14 @@ class ShippingService:
     ) -> dict[str, Any]:
         """Aggregate per-(active rate) free-shipping thresholds.
 
-        Powers ``GET /api/v1/shipping/free-shipping-info`` which the
-        storefront reads to render "Δωρεάν μεταφορικά άνω των X €" on
-        the product detail page and the cart summary. The semantics
-        keep marketing honest:
+        Powers ``GET /api/v1/shipping/free-shipping-info``, the store's
+        standing "Δωρεάν μεταφορικά άνω των X €" promise, which the
+        storefront shows where there is no cart to judge (a product
+        page, a visitor who has not added anything). How far a CART is
+        from free shipping is the cart's own ``free_shipping_progress``
+        (``OrderService.free_shipping_progress``), never this: it also
+        weighs the free-shipping promotions and what the cart weighs.
+        The semantics keep marketing honest:
 
         * ``min_threshold`` is the earliest cart subtotal at which at
           least one carrier+kind ships free — i.e. the headline number
@@ -545,23 +549,14 @@ class ShippingService:
         actually used in ``country_code``, which is ``None`` only when
         the store ships nowhere at all yet.
 
-        Filters mirror :meth:`available_options`:
-        * ``ShippingProvider.is_active`` and ``ShippingRate.is_active``
-          must both be True.
-        * The provider's adapter must be registered (so a deploy
-          missing a provider app doesn't surface stale rows).
-        * The carrier's ``is_kind_enabled(kind, country_code=...)`` hook
-          lets a provider gate a kind independently (e.g. ACS lockers
-          hidden until the country's stations have been synced).
-        * Rows whose rate has no ``free_shipping_threshold`` are
-          skipped — a missing threshold is NOT the same as "free at
-          €0".
+        The rows are :meth:`free_threshold_rates`, the rates checkout
+        could actually price for free.
         """
         active_currency = currency or settings.DEFAULT_CURRENCY
 
-        resolved_country = (country_code or "").upper() or next(
-            iter(cls.shippable_country_codes()), None
-        )
+        resolved_country = (
+            country_code or ""
+        ).upper() or cls.initial_country_code()
         if resolved_country is None:
             return {
                 "providers": [],
@@ -571,39 +566,16 @@ class ShippingService:
                 "country_code": None,
             }
 
-        rates = ShippingRate.objects.filter(
-            provider__is_active=True,
-            country_id=resolved_country,
-            is_active=True,
-            free_shipping_threshold__isnull=False,
-        ).select_related("provider")
-
-        providers: list[dict[str, Any]] = []
-        for rate in rates:
-            if not is_registered(rate.provider.code):
-                logger.warning(
-                    "Active ShippingRate for '%s' has no registered adapter"
-                    " — skipping in free_shipping_info()",
-                    rate.provider.code,
-                )
-                continue
-
-            kind_enum = ShippingKind(rate.kind)
-            adapter = get_provider(rate.provider.code)
-            if not adapter.is_kind_enabled(
-                kind_enum, country_code=resolved_country
-            ):
-                continue
-
-            providers.append(
-                {
-                    "provider_code": rate.provider.code,
-                    "provider_name": rate.provider.name,
-                    "kind": rate.kind,
-                    "threshold": rate.free_shipping_threshold.amount,
-                    "priority": rate.provider.priority,
-                }
-            )
+        providers: list[dict[str, Any]] = [
+            {
+                "provider_code": rate.provider.code,
+                "provider_name": rate.provider.name,
+                "kind": rate.kind,
+                "threshold": rate.free_shipping_threshold.amount,
+                "priority": rate.provider.priority,
+            }
+            for rate in cls.free_threshold_rates(resolved_country)
+        ]
 
         providers.sort(key=lambda row: (row["priority"], row["provider_code"]))
 
@@ -616,9 +588,79 @@ class ShippingService:
             "country_code": resolved_country,
         }
 
+    @classmethod
+    def free_threshold_rates(
+        cls,
+        country_code: str,
+        *,
+        weight_grams: int | None = None,
+        items: Iterable[tuple[Any, int]] | None = None,
+    ) -> list[ShippingRate]:
+        """The rates to ``country_code`` that ship free above a threshold.
+
+        Each passes the gate :meth:`active_rate` puts on a quote (an
+        active provider with a registered adapter, supporting the kind,
+        the kind enabled for the country, an active rate), and has a
+        ``free_shipping_threshold``: a missing threshold is NOT "free at
+        €0". With ``weight_grams`` / ``items`` (a cart's ``(product,
+        quantity)`` pairs) a rate must also carry that cart, by the
+        weight cap and parcel rule :meth:`assert_available` enforces: a
+        carrier that cannot take the parcel cannot ship it free either.
+        Sorted by threshold, lowest first.
+        """
+        country_code = country_code.upper()
+        items = None if items is None else list(items)
+        rates = ShippingRate.objects.filter(
+            provider__is_active=True,
+            country_id=country_code,
+            is_active=True,
+            free_shipping_threshold__isnull=False,
+        ).select_related("provider")
+
+        usable: list[ShippingRate] = []
+        for rate in rates:
+            if not is_registered(rate.provider.code):
+                logger.warning(
+                    "Active ShippingRate for '%s' has no registered adapter"
+                    " — skipping in free_threshold_rates()",
+                    rate.provider.code,
+                )
+                continue
+            if not rate.provider.supports(rate.kind):
+                continue
+            kind = ShippingKind(rate.kind)
+            adapter = get_provider(rate.provider.code)
+            if not adapter.is_kind_enabled(kind, country_code=country_code):
+                continue
+            if (
+                weight_grams is not None
+                and rate.max_weight_grams is not None
+                and weight_grams > rate.max_weight_grams
+            ):
+                continue
+            if items is not None:
+                try:
+                    adapter.assert_parcel_fits(kind=kind, items=items)
+                except ShippingParcelTooLargeError:
+                    continue
+            usable.append(rate)
+
+        usable.sort(key=lambda rate: rate.free_shipping_threshold.amount)
+        return usable
+
     # ------------------------------------------------------------------
     # Rate resolution + pricing
     # ------------------------------------------------------------------
+
+    @classmethod
+    def initial_country_code(cls) -> str | None:
+        """The country a caller with no address yet is judged for.
+
+        The first :meth:`shippable_country_codes` entry, the same one
+        the storefront's checkout preselects; ``None`` when the store
+        ships nowhere yet.
+        """
+        return next(iter(cls.shippable_country_codes()), None)
 
     @classmethod
     def shippable_country_codes(cls) -> list[str]:

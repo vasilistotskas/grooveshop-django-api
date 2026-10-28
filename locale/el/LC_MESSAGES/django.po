@@ -6265,6 +6265,9 @@ msgstr "Ενότητες αρχικής σελίδας"
 msgid "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
 msgstr "Πώς και πότε εισπράχθηκαν τα χρήματα (αριθμός τραπεζικής μεταφοράς, χειροκίνητη παράδοση, ...), όπως τα έγραψε ο χειριστής."
 
+msgid "How far this cart is from free shipping, by its cheapest route: a carrier's free-shipping threshold or a free-shipping promotion, judged by the rules checkout prices shipping with. The one figure to show for free shipping; promotionNearMiss entries flagged freeShipping are routes it has already weighed. Null when the cart has no route to free shipping."
+msgstr "Πόσο απέχει αυτό το καλάθι από τα δωρεάν μεταφορικά, με τον φθηνότερο δρόμο: το όριο δωρεάν μεταφορικών μιας μεταφορικής ή μια προσφορά δωρεάν μεταφορικών, κρινόμενο με τους κανόνες με τους οποίους το checkout τιμολογεί τα μεταφορικά. Το ένα ποσό που δείχνεται για τα δωρεάν μεταφορικά· οι εγγραφές του promotionNearMiss με freeShipping είναι δρόμοι που έχει ήδη σταθμίσει. Null όταν το καλάθι δεν έχει κανέναν δρόμο προς δωρεάν μεταφορικά."
+
 msgid "How it was paid back"
 msgstr "Πώς επιστράφηκαν τα χρήματα"
 

@@ -77,7 +77,9 @@ from order.stock import StockManager
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
+from promotion.enum import BenefitType
 from promotion.services import CouponService, PromotionEngine
+from shipping.enum import FreeShippingSource
 from shipping.exceptions import CarrierError, CarrierUnavailableError
 from tenant.internal import is_internal_caller
 from tenant.membership import bound_tenant
@@ -85,6 +87,7 @@ from tenant.middleware import tenant_domain_set
 
 if TYPE_CHECKING:
     from cart.models import Cart
+    from promotion.services import CartDiscountResult
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +135,28 @@ class PaymentEventOutcome:
     order: Order
     previous_payment_status: str
     applied: bool
+
+
+@dataclass(frozen=True, slots=True)
+class FreeShippingProgress:
+    """How far a cart is from free shipping, by its cheapest route.
+
+    ``free`` once checkout would charge 0 for shipping; otherwise
+    exactly one of ``remaining_amount`` (products still missing, in the
+    store's currency) and ``remaining_quantity`` (units of the
+    promotion's products still missing) is set. ``threshold`` is the
+    value the route is reached at — the rate's threshold, or the
+    promotion's minimum subtotal — and ``None`` for a units route or a
+    promotion that waives shipping outright. ``country_code`` is the
+    country the rates were judged for.
+    """
+
+    source: FreeShippingSource
+    country_code: str | None
+    free: bool = False
+    remaining_amount: Decimal | None = None
+    remaining_quantity: int | None = None
+    threshold: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -4787,6 +4812,134 @@ class OrderService:
             max(cart_total.amount - discount_total.amount, Decimal(0)),
             cart_total.currency,
         )
+
+    @classmethod
+    def free_shipping_progress(
+        cls,
+        cart: Cart,
+        promotion_result: CartDiscountResult,
+        *,
+        country_code: str | None = None,
+    ) -> FreeShippingProgress | None:
+        """How far ``cart`` is from free shipping, by its cheapest route.
+
+        Decided by the two rules :meth:`shipping_cost` charges with, so
+        the line the cart shows cannot promise what checkout will not
+        give:
+
+        * a live free-shipping promotion (``promotion_result.
+          free_shipping``) waives every carrier's price, and one the
+          cart is short of is a teaser in ``promotion_result.near_miss``
+          that the engine has already checked would really be granted
+          (``PromotionEngine._teaser_holds``: scope, first order, usage
+          limits, the wholesale gate). Its distance is the teaser's;
+        * a rate's ``free_shipping_threshold`` zeroes that carrier and
+          kind once :meth:`threshold_value` reaches it. Only rates that
+          could take this cart count
+          (``ShippingService.free_threshold_rates``: the checkout gate,
+          the weight cap, the parcel size).
+
+        The rates are judged for ``country_code``, or for the store's
+        first shipping country, the one checkout preselects; a promotion
+        holds in every country. Of the routes left, the one that costs
+        the shopper least wins, a promotion on a tie since it does not
+        depend on the carrier; a units teaser costs what the engine's
+        own simulation adds (``PromotionEngine.teaser_cost``).
+
+        A threshold's distance is measured on :meth:`threshold_value`,
+        the products after discounts, as checkout judges it; a
+        promotion's on the products before them, as the engine judges
+        its minimum. ``None`` when the cart has no route to free
+        shipping at all.
+        """
+        from shipping.services import ShippingService
+        from shipping.utils import compute_total_weight_grams
+
+        country = (country_code or "").upper() or (
+            ShippingService.initial_country_code()
+        )
+        if promotion_result.free_shipping:
+            return FreeShippingProgress(
+                source=FreeShippingSource.PROMOTION,
+                country_code=country,
+                free=True,
+            )
+
+        cart_items = list(cart.items.all())
+        pairs = [
+            (item.product, item.quantity) for item in cart_items
+        ] + PromotionEngine.gift_pairs(promotion_result)
+        value = cls.threshold_value(
+            cart.total_price, promotion_result.discount_total
+        ).amount
+
+        # (cost to the shopper, promotion first on a tie, the route)
+        routes: list[tuple[Decimal, int, FreeShippingProgress]] = []
+        if country is not None:
+            rates = ShippingService.free_threshold_rates(
+                country,
+                weight_grams=compute_total_weight_grams(pairs),
+                items=pairs,
+            )
+            for rate in rates:
+                threshold = rate.free_shipping_threshold.amount
+                if value >= threshold:
+                    return FreeShippingProgress(
+                        source=FreeShippingSource.THRESHOLD,
+                        country_code=country,
+                        free=True,
+                        threshold=threshold,
+                    )
+                remaining = threshold - value
+                routes.append(
+                    (
+                        remaining,
+                        1,
+                        FreeShippingProgress(
+                            source=FreeShippingSource.THRESHOLD,
+                            country_code=country,
+                            remaining_amount=remaining,
+                            threshold=threshold,
+                        ),
+                    )
+                )
+
+        for entry in promotion_result.near_miss:
+            promotion = entry.promotion
+            if promotion.benefit_type != BenefitType.FREE_SHIPPING:
+                continue
+            if entry.remaining_amount is not None:
+                routes.append(
+                    (
+                        entry.remaining_amount,
+                        0,
+                        FreeShippingProgress(
+                            source=FreeShippingSource.PROMOTION,
+                            country_code=country,
+                            remaining_amount=entry.remaining_amount,
+                            threshold=promotion.min_subtotal.amount,
+                        ),
+                    )
+                )
+                continue
+            cost = PromotionEngine.teaser_cost(entry, cart_items)
+            if cost is None:
+                continue
+            routes.append(
+                (
+                    cost,
+                    0,
+                    FreeShippingProgress(
+                        source=FreeShippingSource.PROMOTION,
+                        country_code=country,
+                        remaining_quantity=entry.remaining_quantity,
+                    ),
+                )
+            )
+
+        if not routes:
+            return None
+        return min(routes, key=lambda route: (route[0], route[1]))[2]
 
     @classmethod
     def shipping_cost(

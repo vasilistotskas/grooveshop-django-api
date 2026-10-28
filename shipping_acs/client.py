@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import time
 from typing import Any
 
 import requests
@@ -29,6 +30,7 @@ from shipping_acs.exceptions import (
     AcsConfigError,
     AcsRetryableError,
 )
+from shipping_acs.observability import Exchange, observe_call
 
 logger = logging.getLogger("shipping_acs.client")
 
@@ -167,7 +169,7 @@ class AcsClient:
         *,
         background: bool = False,
     ) -> dict[str, Any]:
-        """Perform an ACS RPC call.
+        """Perform an ACS RPC call and record what happened.
 
         ``background`` marks the tracking polls, which may not take the
         slots reserved for interactive calls (``acs_request_slot``).
@@ -175,7 +177,38 @@ class AcsClient:
         Returns the unwrapped ``ACSOutputResponce`` payload (note the
         misspelling — keep it on the wire side).  Raises typed
         exceptions on transport or business errors.
+
+        Every alias passes through here, so this is the one place a call
+        is logged and written to ``AcsApiCall`` (see
+        ``shipping_acs.observability``); observing never alters the
+        result or the exception.
         """
+        started = time.monotonic()
+        exchange = Exchange()
+        try:
+            envelope = self._exchange(alias, params, background, exchange)
+        except Exception as exc:
+            observe_call(
+                alias=alias,
+                params=params,
+                started=started,
+                exchange=exchange,
+                exc=exc,
+            )
+            raise
+        observe_call(
+            alias=alias, params=params, started=started, exchange=exchange
+        )
+        return envelope
+
+    def _exchange(
+        self,
+        alias: str,
+        params: dict[str, Any] | None,
+        background: bool,
+        exchange: Exchange,
+    ) -> dict[str, Any]:
+        """The wire exchange; ``exchange`` collects status and body."""
         body = {
             "ACSAlias": alias,
             "ACSInputParameters": {**self._creds(), **(params or {})},
@@ -215,6 +248,10 @@ class AcsClient:
                 alias=alias,
                 error_message=f"ACS timeout after {self.timeout}s: {exc}",
             ) from exc
+
+        exchange.http_status = response.status_code
+        if response.status_code >= 400:
+            exchange.body = response.text[:500]
 
         # Auth failures bypass the JSON envelope. ACS answers 406 to
         # overlapping calls from one account, which ``acs_request_slot``
@@ -263,6 +300,8 @@ class AcsClient:
                 error_message=f"ACS returned non-JSON body: {exc}",
                 http_status=response.status_code,
             ) from exc
+
+        exchange.body = payload
 
         if payload.get("ACSExecution_HasError"):
             error_message = payload.get("ACSExecutionErrorMessage") or (

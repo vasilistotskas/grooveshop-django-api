@@ -699,8 +699,17 @@ msgstr "URL που επιστρέφει η ΑΑΔΕ για τον κωδικό Q
 msgid "ACP Bearer Token"
 msgstr "Bearer Token ACP"
 
+msgid "ACS API Calls"
+msgstr "Κλήσεις API ACS"
+
 msgid "ACS API Key"
 msgstr "Κλειδί API ACS"
+
+msgid "ACS API call"
+msgstr "Κλήση API ACS"
+
+msgid "ACS API calls"
+msgstr "Κλήσεις API ACS"
 
 msgid "ACS API user identifier. No platform fallback — empty disables ACS."
 msgstr "Αναγνωριστικό χρήστη API της ACS. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
@@ -741,6 +750,9 @@ msgstr "Αναγνωριστικό Εταιρείας ACS"
 msgid "ACS Company Password"
 msgstr "Κωδικός Εταιρείας ACS"
 
+msgid "ACS Pickup List Runs"
+msgstr "Εκτελέσεις Λίστας Παραλαβής ACS"
+
 msgid "ACS Pickup Lists"
 msgstr "Λίστες Παραλαβής ACS"
 
@@ -771,11 +783,18 @@ msgstr "Αναγνωριστικό Χρήστη ACS"
 msgid "ACS User Password"
 msgstr "Κωδικός Χρήστη ACS"
 
+msgid "ACS alias"
+msgstr "Alias ACS"
+
 msgid "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr "Η ACS έχει ήδη αναφέρει απόδοση για αυτό το voucher· δεν υπάρχει κάτι να εκκαθαριστεί."
 
 msgid "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty disables ACS."
 msgstr "Κωδικός χρέωσης ACS (π.χ. 'ΑΚ12345678'). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
+
+#, python-format
+msgid "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
+msgstr "Κλήση ACS %(alias)s: %(outcome)s (%(ms)s ms)"
 
 msgid "ACS company identifier. No platform fallback — empty disables ACS."
 msgstr "Αναγνωριστικό εταιρείας ACS. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
@@ -793,6 +812,15 @@ msgstr "Κωδικός πελάτη ACS"
 msgid "ACS did not issue the pickup list: %(err)s"
 msgstr "Η ACS δεν εξέδωσε τη λίστα παραλαβής: %(err)s"
 
+msgid "ACS error message"
+msgstr "Μήνυμα σφάλματος ACS"
+
+msgid "ACS message"
+msgstr "Μήνυμα ACS"
+
+msgid "ACS named this voucher as unprinted"
+msgstr "η ACS ανέφερε αυτό το voucher ως ανεκτύπωτο"
+
 msgid "ACS origin station code (up to 8 chars), used to quote shipping. Optional: when empty it is taken from the billing code. No platform fallback."
 msgstr "Κωδικός σταθμού αφετηρίας ACS (έως 8 χαρακτήρες), για τον υπολογισμό μεταφορικών. Προαιρετικό: όταν είναι κενός, προκύπτει από τον κωδικό χρέωσης. Χωρίς εναλλακτική τιμή πλατφόρμας."
 
@@ -805,8 +833,17 @@ msgstr "Αποδόσεις ACS χωρίς αντίστοιχη αποστολή"
 msgid "ACS pickup list"
 msgstr "Λίστα παραλαβής ACS"
 
+msgid "ACS pickup list run"
+msgstr "Εκτέλεση λίστας παραλαβής ACS"
+
+msgid "ACS pickup list runs"
+msgstr "Εκτελέσεις λίστας παραλαβής ACS"
+
 msgid "ACS pickup lists"
 msgstr "Λίστες παραλαβής ACS"
+
+msgid "ACS refused"
+msgstr "Απόρριψη από την ACS"
 
 msgid "ACS rejected the cancellation."
 msgstr "Η ACS απέρριψε την ακύρωση."
@@ -839,6 +876,9 @@ msgstr "Συμβάντα παρακολούθησης ACS"
 
 msgid "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
 msgstr "Αριθμός voucher ACS — συνδέεται με το AcsShipment.voucher_no χωρίς αυστηρό FK ώστε οι ιστορικές εγγραφές να επιβιώνουν από διαγραφές αποστολών. Κενό όταν η ACS δήλωσε τη γραμμή χωρίς αναγνώσιμο voucher."
+
+msgid "ACSExecutionErrorMessage, or the Error_Message of the value row."
+msgstr "Το ACSExecutionErrorMessage ή το Error_Message της γραμμής τιμών."
 
 msgid "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination). Distinguishes individual lockers within a station area."
 msgstr "ACS_SHOP_BRANCH_ID — συνδυάζεται με το external_id κατά τη δημιουργία vouchers (Acs_Station_Branch_Destination). Διακρίνει τα επιμέρους lockers μιας περιοχής σταθμού."
@@ -1102,6 +1142,9 @@ msgstr "Διαχειριστής που δημιούργησε αυτή την �
 
 msgid "Admin who made a manual adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που έκανε χειροκίνητη προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
+
+msgid "Admin who pressed the button; empty for the daily beat task. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Ο διαχειριστής που πάτησε το κουμπί· κενό για την ημερήσια προγραμματισμένη εργασία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (δημόσιο σχήμα), όχι χρήστη καταστήματος. Διαβάστε το μέσω του αντίστοιχου accessor."
 
 msgid "Admin who triggered the manual issue; empty when the daily Celery beat task issued the list. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που ενεργοποίησε την χειροκίνητη έκδοση· κενό όταν τη λίστα εξέδωσε η ημερήσια προγραμματισμένη εργασία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
@@ -1398,6 +1441,9 @@ msgstr "Χαρακτηριστικά"
 
 msgid "Audit & Logs"
 msgstr "Καταχωρήσεις & Logs"
+
+msgid "Auth-layer rejection"
+msgstr "Απόρριψη στο επίπεδο ταυτοποίησης"
 
 msgid "Authenticated Users"
 msgstr "Πιστοποιημένοι χρήστες"
@@ -2129,8 +2175,14 @@ msgstr "Ακυρώνει μόνο το voucher στην ACS· η παραγγε�
 msgid "Candidate"
 msgstr "Υποψήφιο"
 
+msgid "Candidate vouchers"
+msgstr "Υποψήφια voucher"
+
 msgid "Candidates"
 msgstr "Υποψήφια"
+
+msgid "Candidates with no local label_printed_at"
+msgstr "Υποψήφια χωρίς τοπικό label_printed_at"
 
 msgid "Cannot assign inactive attribute value."
 msgstr "Δεν είναι δυνατή η ανάθεση ανενεργής τιμής χαρακτηριστικού."
@@ -2774,6 +2826,9 @@ msgstr "Επιβεβαιώθηκε"
 
 msgid "Confirmed From IP"
 msgstr "IP επιβεβαίωσης"
+
+msgid "Connection or timeout"
+msgstr "Σύνδεση ή χρονικό όριο"
 
 msgid "Consent"
 msgstr "Συγκατάθεση"
@@ -3711,6 +3766,9 @@ msgstr "Διπλότυπο συνημμένο."
 msgid "Duplicate category IDs are not allowed."
 msgstr "Δεν επιτρέπονται διπλότυπα ID κατηγοριών."
 
+msgid "Duration (ms)"
+msgstr "Διάρκεια (ms)"
+
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη τιμή με ΦΠΑ των 30 ημερών πριν από την έναρξη της τρέχουσας μείωσης, σταθερή από την έναρξή της. Κενή όταν δεν επιτρέπεται να ανακοινωθεί μείωση."
 
@@ -3807,6 +3865,9 @@ msgstr "Κενό σημαίνει παράδοση αμέσως μετά την 
 
 msgid "Empty means deliver right after payment"
 msgstr "Κενό σημαίνει παράδοση αμέσως μετά την πληρωμή"
+
+msgid "Empty when no HTTP response arrived."
+msgstr "Κενό όταν δεν ήρθε απάντηση HTTP."
 
 msgid "Empty while this is the current price."
 msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
@@ -6066,6 +6127,9 @@ msgstr "Δεκαεξαδικό digest HMAC-SHA256 του ακατέργαστο�
 msgid "HOW TO COMPLETE YOUR PAYMENT"
 msgstr "ΠΩΣ ΝΑ ΟΛΟΚΛΗΡΩΣΕΤΕ ΤΗΝ ΠΛΗΡΩΜΗ ΣΑΣ"
 
+msgid "HTTP status"
+msgstr "Κατάσταση HTTP"
+
 msgid "Handling non-payment"
 msgstr "Διαχείριση μη πληρωμής"
 
@@ -6776,6 +6840,10 @@ msgstr "Ετικέτα"
 
 msgid "Label URL"
 msgstr "URL ετικέτας"
+
+#, python-format
+msgid "Label printed (voucher %(voucher)s)"
+msgstr "Εκτυπώθηκε η ετικέτα (voucher %(voucher)s)"
 
 msgid "Label printed at"
 msgstr "Εκτύπωση ετικέτας στις"
@@ -8080,6 +8148,9 @@ msgstr "Τίποτα δεν έχει διαγραφεί — τα προϊόντ�
 msgid "Nothing retained"
 msgstr "Δεν διατηρήθηκε τίποτα"
 
+msgid "Nothing to issue"
+msgstr "Τίποτα προς έκδοση"
+
 msgid "Nothing was saved. Fix the marked texts."
 msgstr "Δεν αποθηκεύτηκε τίποτα. Διορθώστε τα κείμενα που επισημαίνονται."
 
@@ -8176,6 +8247,9 @@ msgstr "Πελάτες OAuth"
 msgid "OAuth Tokens"
 msgstr "Tokens OAuth"
 
+msgid "OK"
+msgstr "OK"
+
 msgid "ORDER DETAILS"
 msgstr "ΛΕΠΤΟΜΕΡΕΙΕΣ ΠΑΡΑΓΓΕΛΙΑΣ"
 
@@ -8206,6 +8280,10 @@ msgstr "Γραφείο"
 
 msgid "On Sale (>0%)"
 msgstr "Σε προσφορά (>0%)"
+
+#, python-format
+msgid "On pickup list %(no)s"
+msgstr "Στη λίστα παραλαβής %(no)s"
 
 msgid "One"
 msgstr "Ένα"
@@ -8267,6 +8345,9 @@ msgstr "Άνοιγμα ρυθμίσεων myDATA"
 
 msgid "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 msgstr "Ανοίξτε την παραγγελία και επιλέξτε «Διευθέτηση chargeback (προϊόντα)» για να δηλώσετε αν τα προϊόντα επέστρεψαν ή δεν παραδόθηκαν: αν ναι, πιστώνεται η απόδειξη. Η παραγγελία παραμένει στον πίνακα ελέγχου μέχρι να αποφασίσετε."
+
+msgid "Open the shipment timeline"
+msgstr "Άνοιγμα χρονολογίου της αποστολής"
 
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "Αναγνωριστικό pixel μετατροπών OpenAI / ChatGPT Ads (π.χ. '8MktrqpXN1MRdD2NUfkXmU'). Μόνο αλφαριθμητικοί χαρακτήρες. Κενό → το pixel ChatGPT Ads απενεργοποιείται για αυτό το κατάστημα και το origin του εξαιρείται από το CSP."
@@ -9250,6 +9331,9 @@ msgstr "Η μορφή επικύρωσης τηλεφώνου για αυτή τ
 msgid "Pickup Points"
 msgstr "Σημεία παραλαβής"
 
+msgid "Pickup date"
+msgstr "Ημερομηνία παραλαβής"
+
 msgid "Pickup list"
 msgstr "Λίστα παραλαβής"
 
@@ -9257,8 +9341,18 @@ msgstr "Λίστα παραλαβής"
 msgid "Pickup list %(no)s issued for %(n)s voucher(s)."
 msgstr "Η λίστα παραλαβής %(no)s εκδόθηκε για %(n)s vouchers."
 
+msgid "Pickup list adopted from ACS"
+msgstr "Λίστα παραλαβής που υιοθετήθηκε από την ACS"
+
+msgid "Pickup list issued"
+msgstr "Εκδόθηκε λίστα παραλαβής"
+
 msgid "Pickup list number"
 msgstr "Αριθμός λίστας παραλαβής"
+
+#, python-format
+msgid "Pickup list run for %(date)s: %(detail)s"
+msgstr "Εκτέλεση λίστας παραλαβής για %(date)s: %(detail)s"
 
 msgid "Pickup point / locker"
 msgstr "Σημείο παραλαβής / locker"
@@ -10256,6 +10350,9 @@ msgstr "Κάρτες αναφοράς"
 msgid "Reference Order"
 msgstr "Σχετική παραγγελία"
 
+msgid "Reference number"
+msgstr "Αριθμός αναφοράς"
+
 msgid "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
 msgstr "Reference_Key1 από τη δημιουργία voucher — αντιστοιχεί στο Order.id για τη συμφωνία στοιχείων με τον συνεργάτη."
 
@@ -10345,6 +10442,12 @@ msgstr "Η ποσότητα επιστροφής δεν μπορεί να υπε
 
 msgid "Refunds"
 msgstr "Επιστροφές χρημάτων"
+
+msgid "Refused silently: unprinted labels"
+msgstr "Σιωπηλή απόρριψη: ανεκτύπωτες ετικέτες"
+
+msgid "Refused: unprinted labels"
+msgstr "Απόρριψη: ανεκτύπωτες ετικέτες"
 
 msgid "Reg. No."
 msgstr "Αρ. Γ.Ε.ΜΗ."
@@ -10506,6 +10609,9 @@ msgstr "Headers αιτήματος"
 msgid "Request Meta"
 msgstr "Request meta"
 
+msgid "Request parameters"
+msgstr "Παράμετροι αιτήματος"
+
 msgid "Requested On"
 msgstr "Ημερομηνία αιτήματος"
 
@@ -10575,6 +10681,9 @@ msgstr "Επαναφέρετε τον κωδικό πρόσβασής σας"
 
 msgid "Resolved at upsert time when the matching AcsShipment row exists. Null for orphan rows (parcels paid via ACS before they were minted through this system, or rows where the shipment has been hard-deleted)."
 msgstr "Επιλύεται κατά τη στιγμή του upsert όταν υπάρχει η αντίστοιχη εγγραφή AcsShipment. Null για ορφανές εγγραφές (δέματα που πληρώθηκαν μέσω ACS πριν εκδοθούν μέσω αυτού του συστήματος, ή εγγραφές όπου η αποστολή έχει διαγραφεί οριστικά)."
+
+msgid "Response"
+msgstr "Απάντηση"
 
 #, python-format
 msgid "Response time %(response)s · Notification %(status)s · %(priority)s / %(category)s"
@@ -10690,6 +10799,9 @@ msgstr "Η επανάληψη υποστηρίζεται μόνο για πλη�
 
 msgid "Retry payment for a failed or pending order"
 msgstr "Επανάληψη πληρωμής για αποτυχημένη ή εκκρεμή παραγγελία"
+
+msgid "Retryable server error"
+msgstr "Σφάλμα διακομιστή με δυνατότητα επανάληψης"
 
 msgid "Return Label"
 msgstr "Ετικέτα επιστροφής"
@@ -11277,6 +11389,9 @@ msgstr "Αποστολή απεστάλη"
 msgid "Shipment not found."
 msgstr "Η αποστολή δεν βρέθηκε."
 
+msgid "Shipment row created"
+msgstr "Δημιουργήθηκε η εγγραφή αποστολής"
+
 msgid "Shipment state"
 msgstr "Κατάσταση αποστολής"
 
@@ -11606,6 +11721,9 @@ msgstr "Ημερομηνία έναρξης για το εύρος αναλυτ�
 
 msgid "Started At"
 msgstr "Ξεκίνησε στις"
+
+msgid "Started at"
+msgstr "Έναρξη"
 
 msgid "Starts At"
 msgstr "Έναρξη"
@@ -12857,6 +12975,9 @@ msgstr "URL TikTok"
 msgid "TikTok profile URL. Must use https://. Empty → link hidden in storefront footer."
 msgstr "URL προφίλ TikTok. Πρέπει να χρησιμοποιεί https://. Κενό → ο σύνδεσμος κρύβεται στο footer του storefront."
 
+msgid "Timeline"
+msgstr "Χρονολόγιο"
+
 msgid "Timestamp"
 msgstr "Ημερομηνία και ώρα"
 
@@ -13063,6 +13184,9 @@ msgstr "Δοκιμαστικά"
 msgid "Trigger"
 msgstr "Τρόπος ενεργοποίησης"
 
+msgid "Triggered by"
+msgstr "Ενεργοποιήθηκε από"
+
 msgid "True if reservation was converted to actual stock decrement"
 msgstr "True αν η δέσμευση μετατράπηκε σε πραγματική μείωση αποθέματος"
 
@@ -13143,6 +13267,9 @@ msgstr "Δεν είναι δυνατή η ενημέρωση αυτής της �
 
 msgid "Unapprove selected comments"
 msgstr "Ανάκληση έγκρισης επιλεγμένων σχολίων"
+
+msgid "Unexpected failure"
+msgstr "Μη αναμενόμενη αποτυχία"
 
 #, python-format
 msgid "Unfortunately, we could not approve the business account for %(company)s at this time."
@@ -13234,6 +13361,9 @@ msgstr "Ετικέτα χωρίς όνομα"
 
 msgid "Unnamed topic"
 msgstr "Θέμα χωρίς όνομα"
+
+msgid "Unprinted vouchers named by ACS"
+msgstr "Ανεκτύπωτα voucher που ανέφερε η ACS"
 
 msgid "Unpublish selected posts"
 msgstr "Απόσυρση επιλεγμένων άρθρων"
@@ -14752,6 +14882,9 @@ msgstr "σύνολο %(qty)s, επιστράφηκε %(refunded)s, καθαρό 
 msgid "unknown"
 msgstr "άγνωστο"
 
+msgid "unprinted locally"
+msgstr "ανεκτύπωτο τοπικά"
+
 msgid "updated"
 msgstr "ενημερώθηκε"
 
@@ -15342,9 +15475,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Number of pending-order reminder emails sent."
 #~ msgstr "Αριθμός emails υπενθύμισης εκκρεμούς παραγγελίας που εστάλησαν."
-
-#~ msgid "OK"
-#~ msgstr "OK"
 
 #~ msgid "Oceania Countries"
 #~ msgstr "Χώρες Ωκεανίας"

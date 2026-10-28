@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -36,10 +37,13 @@ from shipping_acs.attention import (
     unattributed_payout_q,
     unremitted_cod_shipments,
 )
+from shipping_acs.diagnostics import shipment_timeline
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
+    AcsApiCall,
     AcsCodPayout,
     AcsPickupList,
+    AcsPickupListRun,
     AcsShipment,
     AcsStation,
     AcsTrackingEvent,
@@ -148,6 +152,7 @@ class AcsShipmentOrderInline(StackedInline):
                     "delivery_date",
                     "last_event_at",
                     "last_polled_at",
+                    "diagnostics_link",
                 ),
             },
         ),
@@ -183,7 +188,21 @@ class AcsShipmentOrderInline(StackedInline):
         "delivery_date",
         "last_event_at",
         "last_polled_at",
+        "diagnostics_link",
     )
+
+    @admin.display(description=_("Diagnostics"))
+    def diagnostics_link(self, obj: AcsShipment) -> str:
+        """The shipment's own page, whose Diagnostics tab holds the
+        timeline (label, pickup-list runs, tracking, ACS calls)."""
+        if not obj.pk:
+            return "-"
+        return change_link(
+            self.admin_site,
+            AcsShipment,
+            obj.pk,
+            _("Open the shipment timeline"),
+        )
 
     def has_add_permission(self, request, obj=None):
         # Created at order-creation time by OrderService — never spawn
@@ -315,6 +334,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "cod_received_outside_acs_by",
         "cod_received_outside_acs_note",
         "metadata",
+        "diagnostics_timeline",
         "created_at",
         "updated_at",
     )
@@ -383,6 +403,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
             {
                 "classes": ("tab",),
                 "fields": (
+                    "diagnostics_timeline",
                     "metadata",
                     "created_at",
                     "updated_at",
@@ -541,6 +562,29 @@ class AcsShipmentAdmin(BaseModelAdmin):
             _("Retired %(count)d shipment(s) — polling stops for them.")
             % {"count": retired},
             messages.WARNING,
+        )
+
+    @admin.display(description=_("Timeline"))
+    def diagnostics_timeline(self, obj: AcsShipment) -> str:
+        """Voucher, label, pickup-list runs, tracking and the last ACS
+        calls for this voucher, oldest first."""
+        if not obj.pk:
+            return "-"
+        entries = shipment_timeline(obj)
+        return format_html(
+            '<ul class="space-y-1">{}</ul>',
+            format_html_join(
+                "",
+                "<li><time>{}</time> — <strong>{}</strong>: {}</li>",
+                (
+                    (
+                        timezone.localtime(entry.at).strftime("%Y-%m-%d %H:%M"),
+                        entry.kind,
+                        entry.text,
+                    )
+                    for entry in entries
+                ),
+            ),
         )
 
     @admin.display(description=_("Order"))
@@ -807,6 +851,112 @@ class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     )
     # Shown read-only as ``issued_by``.
     exclude = ("issued_by_id",)
+
+
+@admin.register(AcsPickupListRun)
+class AcsPickupListRunAdmin(BaseModelAdmin):
+    """Every attempt to issue a pickup list and how it ended.
+
+    Readable by the store staff who press "Issue ACS pickup list now":
+    the rows hold voucher numbers and ACS's message, nothing personal.
+    """
+
+    staff_actor_fields = ("issued_by",)
+    list_display = (
+        "pickup_date",
+        "started_at",
+        "outcome",
+        "candidate_count",
+        "pickup_list",
+        "issued_by",
+    )
+    date_hierarchy = "pickup_date"
+    list_filter = ("outcome", ("pickup_date", RangeDateFilter))
+    search_fields = (
+        "pickup_list__pickup_list_no",
+        "acs_message",
+        "error_message",
+    )
+    list_select_related = ("pickup_list",)
+    readonly_fields = (
+        "pickup_date",
+        "started_at",
+        "outcome",
+        "candidate_vouchers",
+        "unprinted_vouchers_acs",
+        "unprinted_vouchers_local",
+        "acs_message",
+        "error_message",
+        "pickup_list",
+        "issued_by",
+        "created_at",
+        "updated_at",
+    )
+    exclude = ("issued_by_id",)
+
+    @admin.display(description=_("Candidates"))
+    def candidate_count(self, obj: AcsPickupListRun) -> int:
+        return len(obj.candidate_vouchers or [])
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AcsApiCall)
+class AcsApiCallAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
+    """Read-only history of every ACS call.
+
+    Superuser only, like the other ACS audit trails: the redacted request
+    and response still carry the recipient's name, address and phone.
+    """
+
+    list_display = (
+        "created_at",
+        "alias",
+        "outcome",
+        "http_status",
+        "duration_ms",
+        "voucher_no",
+        "order_id",
+    )
+    date_hierarchy = "created_at"
+    list_filter = (
+        "alias",
+        "outcome",
+        ("created_at", RangeDateTimeFilter),
+    )
+    search_fields = ("voucher_no", "reference_no", "error_message")
+    readonly_fields = (
+        "alias",
+        "outcome",
+        "http_status",
+        "duration_ms",
+        "error_message",
+        "request_params",
+        "response",
+        "voucher_no",
+        "order_id",
+        "pickup_date",
+        "reference_no",
+        "created_at",
+        "updated_at",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AcsCodPayout)

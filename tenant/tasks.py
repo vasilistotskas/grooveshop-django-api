@@ -243,6 +243,16 @@ def fanout_purge_expired_contact_records():
     )
 
 
+# A retention sweep like the ones above: the ACS call history holds
+# recipient details, so it reaches SUSPENDED tenants too.
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_acs_api_calls():
+    return run_for_all_tenants(
+        "shipping_acs.tasks.purge_expired_acs_api_calls",
+        include_suspended=True,
+    )
+
+
 # A retention sweep like the ones above, so it reaches SUSPENDED tenants
 # too: an unconfirmed signup past its window is personal data kept
 # without consent, whatever the store's billing state.

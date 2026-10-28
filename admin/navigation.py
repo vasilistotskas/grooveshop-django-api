@@ -517,6 +517,7 @@ def store_sidebar(request: Any) -> list[Item]:
                             "shipping_acs.AcsTrackingEvent",
                             _("ACS Tracking Events"),
                         ),
+                        page("shipping_acs.AcsApiCall", _("ACS API Calls")),
                         page(
                             "order.VivaWebhookEvent", _("Viva Webhook Events")
                         ),
@@ -533,6 +534,10 @@ def store_sidebar(request: Any) -> list[Item]:
                     [
                         page(
                             "shipping_acs.AcsPickupList", _("ACS Pickup Lists")
+                        ),
+                        page(
+                            "shipping_acs.AcsPickupListRun",
+                            _("ACS Pickup List Runs"),
                         ),
                         page("shipping_acs.AcsCodPayout", _("ACS COD Payouts")),
                         page("order.InvoiceCounter", _("Receipt Counter")),

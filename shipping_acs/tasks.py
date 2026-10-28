@@ -590,6 +590,35 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
     }
 
 
+# Rows per DELETE, so a large backlog never holds one long lock.
+_API_CALL_PURGE_BATCH = 1000
+
+
+@shared_task(base=TenantTask)
+def purge_expired_acs_api_calls() -> dict[str, int]:
+    """Delete ``AcsApiCall`` rows older than ``ACS_API_CALL_RETENTION_DAYS``.
+
+    Runs per tenant through ``tenant.tasks.fanout_purge_expired_acs_api_calls``;
+    the history holds recipient details, so it is not kept indefinitely.
+    """
+    from shipping_acs.models import AcsApiCall
+
+    cutoff = timezone.now() - timedelta(
+        days=settings.ACS_API_CALL_RETENTION_DAYS
+    )
+    stale = AcsApiCall.objects.filter(created_at__lt=cutoff)
+    deleted = 0
+    while pks := list(
+        stale.values_list("pk", flat=True)[:_API_CALL_PURGE_BATCH]
+    ):
+        deleted += AcsApiCall.objects.filter(pk__in=pks).delete()[0]
+    if deleted:
+        logger.info(
+            "Purged %s ACS API call rows older than the cutoff", deleted
+        )
+    return {"deleted": deleted}
+
+
 @shared_task(bind=True, base=TenantTask)
 def check_stale_acs_shipments(self) -> dict[str, Any]:
     """Alert admins about non-terminal shipments with no tracking movement.

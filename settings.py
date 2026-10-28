@@ -1244,6 +1244,14 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "purge-expired-acs-api-calls": {
+            # Fanout: AcsApiCall is per-tenant. Deletes the ACS call
+            # history older than ACS_API_CALL_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_acs_api_calls",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "purge-expired-contact-records": {
             # Fanout: Contact and Feedback are per-tenant. Deletes the
             # rows (and, through the attachment signal, their files)
@@ -3805,8 +3813,10 @@ UNFOLD = {
                 "shipping_acs.acsshipment",
                 "shipping_acs.acsstation",
                 "shipping_acs.acspickuplist",
+                "shipping_acs.acspickuplistrun",
                 "shipping_acs.acscodpayout",
                 "shipping_acs.acstrackingevent",
+                "shipping_acs.acsapicall",
             ],
             "items": [
                 {
@@ -3832,6 +3842,13 @@ UNFOLD = {
                     "permission": "admin.permissions.is_superuser",
                 },
                 {
+                    "title": _("ACS Pickup List Runs"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acspickuplistrun_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
+                },
+                {
                     "title": _("ACS COD Payouts"),
                     "link": reverse_lazy(
                         "admin:shipping_acs_acscodpayout_changelist",
@@ -3843,6 +3860,14 @@ UNFOLD = {
                     "title": _("ACS Tracking Events"),
                     "link": reverse_lazy(
                         "admin:shipping_acs_acstrackingevent_changelist",
+                        urlconf=ROOT_URLCONF,
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("ACS API Calls"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acsapicall_changelist",
                         urlconf=ROOT_URLCONF,
                     ),
                     "permission": "admin.permissions.is_superuser",
@@ -4530,6 +4555,10 @@ ACS_POLL_DISPATCH_SPACING_SECONDS = (
 # reported by check_stale_acs_shipments to the store's operators
 # (platform ADMINS only as a fallback).
 ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
+# Days an ``AcsApiCall`` history row is kept (request/response of every
+# ACS call, recipient details included) before the retention sweep
+# deletes it.
+ACS_API_CALL_RETENTION_DAYS = int(getenv("ACS_API_CALL_RETENTION_DAYS", "90"))
 # Days after a COD parcel is DELIVERED before an absent ACS payout is
 # reported as overdue. The measured remittance lag is ~4 days, so 10
 # leaves headroom and fires only on genuinely stuck money. Nothing else

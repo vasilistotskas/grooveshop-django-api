@@ -284,6 +284,18 @@ BUILDERS: dict[str, Callable[[], object]] = {
     "shipping_acs.AcsCodPayout": lambda: __import__(
         "shipping_acs.models", fromlist=["AcsCodPayout"]
     ).AcsCodPayout.objects.create(voucher_no=_uid()),
+    "shipping_acs.AcsApiCall": lambda: __import__(
+        "shipping_acs.models", fromlist=["AcsApiCall"]
+    ).AcsApiCall.objects.create(
+        alias="ACS_Test", duration_ms=1, outcome="ok", voucher_no=_uid()
+    ),
+    "shipping_acs.AcsPickupListRun": lambda: __import__(
+        "shipping_acs.models", fromlist=["AcsPickupListRun"]
+    ).AcsPickupListRun.objects.create(
+        pickup_date=__import__("datetime").date.today(),
+        started_at=__import__("django.utils.timezone", fromlist=["now"]).now(),
+        outcome="issued",
+    ),
     "meta_capi.MetaCapiEventLog": lambda: __import__(
         "meta_capi.models", fromlist=["MetaCapiEventLog"]
     ).MetaCapiEventLog.objects.create(event_name="Purchase", event_id=_uid()),

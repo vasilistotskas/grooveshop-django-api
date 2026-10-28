@@ -1,60 +1,49 @@
 """The public read of a store's text overrides.
 
-The storefront merges what this returns over its own defaults (a
-separate release). It is the store's data only: the language asked for,
-the texts the store replaced, and never a locked one.
+The storefront merges what this returns over its own defaults. It reads
+the database and the cache and nothing else: every storefront render
+asks for it, so it must never call the storefront back (a slow storefront
+pod would then fail text delivery for every store).
+
+Locked texts and keys the storefront's build no longer has are the
+storefront's to ignore when it merges (``isLockedText`` is its own shared
+code). Every override was checked by the storefront when it was saved, so
+only a lock added since then can matter, and the storefront knows its own
+locks.
 """
 
 from __future__ import annotations
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connection
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.decorators import (
     api_view,
     permission_classes,
     renderer_classes,
 )
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
+from core.utils.tenant_urls import STOREFRONT_LOCALES
 from tenant.membership import bound_tenant
-from texts import storefront
 from texts.models import TextOverride, TextSurface
 
 LANGUAGE_PARAM = "language"
 
 
-class TextsUnavailable(APIException):
-    """The catalogue that says which texts are locked is not reachable.
-
-    Failing closed: serving an override of a text the platform has since
-    locked is worse than serving the defaults for a moment.
-    """
-
-    status_code = 503
-    default_detail = "The texts are not available right now."
-    default_code = "texts_unavailable"
+def overrides_cache_key(generation: int, language: str) -> str:
+    return f"texts:overrides:{generation}:{language}"
 
 
-def overrides_cache_key(generation: int, catalogue_hash: str, language: str):
-    return f"texts:overrides:{generation}:{catalogue_hash}:{language}"
-
-
-def _collect(
-    catalogue: storefront.Catalogue, language: str
-) -> dict[str, dict[str, str]]:
+def _collect(language: str) -> dict[str, dict[str, str]]:
     grouped: dict[str, dict[str, str]] = {}
     rows = TextOverride.objects.filter(
         surface=TextSurface.STOREFRONT, language=language
     ).values_list("namespace", "key", "value")
     for namespace, key, value in rows:
-        entry = catalogue.get(namespace, key)
-        if entry is None or entry.locked:
-            continue
         grouped.setdefault(namespace, {})[key] = value
     return grouped
 
@@ -81,8 +70,11 @@ def _collect(
             },
             "description": (
                 "The store's replacement texts for the language, "
-                "{namespace: {key: text}}. Locked texts are never included; "
-                "keys are the storefront's own ids and are not camelCased."
+                "{namespace: {key: text}}, as stored: from the database and "
+                "the cache only, never by asking the storefront. The "
+                "storefront ignores a locked text (isLockedText) and a key "
+                "its build no longer has when it merges. Keys are the "
+                "storefront's own ids and are not camelCased."
             ),
         }
     },
@@ -93,21 +85,17 @@ def _collect(
 @renderer_classes([JSONRenderer])
 def public_text_overrides(request):
     language = (request.query_params.get(LANGUAGE_PARAM) or "").strip()
-    try:
-        catalogue = storefront.fetch_catalogue(connection.schema_name)
-    except storefront.StorefrontUnavailable as exc:
-        raise TextsUnavailable from exc
-    if language not in catalogue.locales:
+    if language not in STOREFRONT_LOCALES:
         raise ValidationError(
             {LANGUAGE_PARAM: ["Unknown language."]}, code="invalid_language"
         )
 
     tenant = bound_tenant()
     if tenant is None:
-        return Response(_collect(catalogue, language))
-    key = overrides_cache_key(tenant.cache_generation, catalogue.hash, language)
+        return Response(_collect(language))
+    key = overrides_cache_key(tenant.cache_generation, language)
     data = cache.get(key)
     if data is None:
-        data = _collect(catalogue, language)
+        data = _collect(language)
         cache.set(key, data, settings.TEXTS_OVERRIDES_CACHE_SECONDS)
     return Response(data)

@@ -1,6 +1,12 @@
-"""``GET /api/v1/texts/overrides?language=``: what the storefront merges."""
+"""``GET /api/v1/texts/overrides?language=``: what the storefront merges.
+
+The endpoint reads the database and the cache only. Locked texts and keys
+the build no longer has are the storefront's to ignore when it merges.
+"""
 
 from __future__ import annotations
+
+from unittest import mock
 
 import pytest
 from django.core.cache import cache
@@ -12,8 +18,8 @@ from rest_framework.test import APIClient
 
 from tenant.models import Tenant
 from tests.utils.staff import bind_store_tenant, store_tenant
-from tests.utils.texts import COOKIES, FOOTER, entry
-from texts import services, storefront
+from tests.utils.texts import FOOTER
+from texts import services
 from texts.factories import TextOverrideFactory
 from texts.views import overrides_cache_key
 
@@ -31,7 +37,7 @@ def _fresh_cache(tenant):
     cache.clear()
 
 
-def test_the_shape_is_namespace_then_key_then_text(stub, tenant):
+def test_the_shape_is_namespace_then_key_then_text(tenant):
     TextOverrideFactory(
         namespace=FOOTER, key="tagline", language="en", value="Hi"
     )
@@ -54,10 +60,7 @@ def test_the_shape_is_namespace_then_key_then_text(stub, tenant):
     }
 
 
-def test_keys_are_not_camel_cased(stub, tenant):
-    stub.catalogue["entries"].append(
-        entry("global", "code_label.long_text", en="x")
-    )
+def test_keys_are_not_camel_cased(tenant):
     TextOverrideFactory(
         namespace="global",
         key="code_label.long_text",
@@ -68,7 +71,7 @@ def test_keys_are_not_camel_cased(stub, tenant):
     assert get("en").json() == {"global": {"code_label.long_text": "Code"}}
 
 
-def test_only_the_language_asked_for(stub, tenant):
+def test_only_the_language_asked_for(tenant):
     TextOverrideFactory(
         namespace=FOOTER, key="tagline", language="en", value="Hi"
     )
@@ -79,47 +82,15 @@ def test_only_the_language_asked_for(stub, tenant):
     assert get("el").json() == {FOOTER: {"tagline": "Γεια"}}
 
 
-def test_a_locked_text_is_never_served(stub, tenant):
-    TextOverrideFactory(
-        namespace=COOKIES, key="banner", language="en", value="Ours"
-    )
-    TextOverrideFactory(
-        namespace=FOOTER, key="tagline", language="en", value="Hi"
-    )
-
-    assert get("en").json() == {FOOTER: {"tagline": "Hi"}}
-
-
-def test_a_text_the_build_no_longer_has_is_not_served(stub, tenant):
-    TextOverrideFactory(
-        namespace="components/Gone", key="k", language="en", value="Old"
-    )
-
+def test_nothing_overridden_is_an_empty_object(tenant):
     assert get("en").json() == {}
 
 
-def test_a_text_locked_after_it_was_saved_stops_being_served(stub, tenant):
-    TextOverrideFactory(
-        namespace=FOOTER, key="tagline", language="en", value="Hi"
-    )
-    assert get("en").json() == {FOOTER: {"tagline": "Hi"}}
-
-    stub.catalogue["entries"][0]["locked"] = True
-    stub.catalogue["hash"] = "h2"
-    storefront.clear_catalogue_cache()
-
-    assert get("en").json() == {}
-
-
-def test_nothing_overridden_is_an_empty_object(stub, tenant):
-    assert get("en").json() == {}
-
-
-def test_anyone_may_read_it(stub, tenant):
+def test_anyone_may_read_it(tenant):
     assert get("en", APIClient()).status_code == status.HTTP_200_OK
 
 
-def test_a_missing_or_unknown_language_is_a_coded_400(stub, tenant):
+def test_a_missing_or_unknown_language_is_a_coded_400(tenant):
     for language in (None, "de", ""):
         response = get(language)
 
@@ -127,30 +98,34 @@ def test_a_missing_or_unknown_language_is_a_coded_400(stub, tenant):
         assert response.json()["code"] == "invalid_language"
 
 
-def test_an_unreachable_storefront_is_a_503_not_unlocked_texts(stub, tenant):
+def test_it_never_calls_the_storefront(tenant, admin_user, stub):
+    """A render of every store's page reads this endpoint: it must not
+    depend on the storefront being up, cold or warm."""
     TextOverrideFactory(
         namespace=FOOTER, key="tagline", language="en", value="Hi"
     )
     stub.down = True
 
-    response = get("en")
+    with (
+        mock.patch("texts.storefront.requests.get") as http_get,
+        mock.patch("texts.storefront.requests.post") as http_post,
+        mock.patch("texts.storefront.fetch_catalogue") as catalogue,
+        mock.patch("texts.storefront.validate_text") as validate,
+    ):
+        cold = get("en")
+        warm = get("en")
 
-    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert response.json()["code"] == "texts_unavailable"
+    assert cold.status_code == warm.status_code == status.HTTP_200_OK
+    assert cold.json() == {FOOTER: {"tagline": "Hi"}}
+    for spy in (http_get, http_post, catalogue, validate):
+        spy.assert_not_called()
+    assert stub.gets == [] and stub.posts == []
 
 
-def test_the_store_asked_for_its_own_schema(stub, tenant):
-    get("en")
-
-    assert stub.gets[0]["params"] == {"schema": "texts_store"}
-
-
-def test_a_cold_read_is_one_query_and_a_warm_read_none(stub, tenant):
+def test_a_cold_read_is_one_query_and_a_warm_read_none(tenant):
     TextOverrideFactory(
         namespace=FOOTER, key="tagline", language="en", value="Hi"
     )
-    get("en")  # warms the catalogue copy; the answer is cached too
-    cache.clear()
 
     with CaptureQueriesContext(connection) as cold:
         get("en")
@@ -159,6 +134,18 @@ def test_a_cold_read_is_one_query_and_a_warm_read_none(stub, tenant):
 
     assert len(cold) == 1
     assert len(warm) == 0
+
+
+def test_the_cache_key_is_the_generation_and_the_language(tenant):
+    TextOverrideFactory(
+        namespace=FOOTER, key="tagline", language="en", value="Hi"
+    )
+    get("en")
+
+    key = overrides_cache_key(tenant.cache_generation, "en")
+
+    assert key == f"texts:overrides:{tenant.cache_generation}:en"
+    assert cache.get(key) == {FOOTER: {"tagline": "Hi"}}
 
 
 def test_a_save_is_served_at_once_through_the_cache_generation(
@@ -181,12 +168,12 @@ def test_a_save_is_served_at_once_through_the_cache_generation(
     assert get("en").json() == {FOOTER: {"tagline": "New"}}
 
 
-def test_stores_do_not_share_an_answer(stub, tenant):
+def test_stores_do_not_share_an_answer(tenant):
     TextOverrideFactory(
         namespace=FOOTER, key="tagline", language="en", value="Hi"
     )
     get("en")
-    key = overrides_cache_key(tenant.cache_generation, "h1", "en")
+    key = overrides_cache_key(tenant.cache_generation, "en")
     assert cache.get(key) is not None
 
     bind_store_tenant(None)

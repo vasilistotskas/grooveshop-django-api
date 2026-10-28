@@ -69,13 +69,21 @@ Restore re-validates the old value, since the storefront may have changed.
 ## Public read
 
 `GET /api/v1/texts/overrides?language=<code>` (AllowAny) returns
-`{namespace: {key: text}}` for the current store and that language, never a
-locked text and never a key the build no longer has. The body is not
-camelCased (the keys are the storefront's ids). Cached under
-`generation + catalogue hash + language`. 400 `invalid_language` for a
-language the storefront does not serve; 503 `texts_unavailable` when the
-catalogue that says which texts are locked cannot be read (failing closed
-beats serving a text the platform has since locked).
+`{namespace: {key: text}}` for the current store and that language, as
+stored. The body is not camelCased (the keys are the storefront's ids).
+400 `invalid_language` for a language the storefront does not serve.
+
+It reads the database and the cache only, and **never calls the
+storefront**: every storefront render asks for it, so a slow or restarting
+storefront pod must not be able to fail text delivery. Cached under
+`texts:overrides:<cache_generation>:<language>`; a save bumps the
+generation, so it is served at once. A cold read is one query, a warm read
+none.
+
+The contract with the storefront: every override was checked by the
+storefront when it was saved, so when it merges the storefront ignores a key
+it locks (`isLockedText`, shared code) and a key its build no longer has.
+Django does not filter either.
 
 ## The editor
 

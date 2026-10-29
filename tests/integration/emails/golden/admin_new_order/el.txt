@@ -7,7 +7,7 @@ ORDER
   Placed:          14/03/2026 12:30 μμ.
   Status:          PROCESSING
   Payment status:  PENDING
-  Payment method:  Google Pay
+  Payment method:  Τραπεζική μεταφορά
   Total:           87,90 €
 
 CUSTOMER

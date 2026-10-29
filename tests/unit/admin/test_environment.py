@@ -102,6 +102,7 @@ _PRODUCTION_SECRETS = {
     "MEILI_MASTER_KEY": "not-the-default",
     "MEILI_SEARCH_KEY": "not-the-default",
     "FIELD_ENCRYPTION_KEYS": _VALID_FERNET_KEY,
+    "EMAIL_HASH_KEY": "not-the-default",
     "EMAIL_HOST_PASSWORD": "not-the-default",
     "USE_X_FORWARDED_HOST": "True",
 }
@@ -153,6 +154,13 @@ def test_the_production_profile_refuses_a_missing_encryption_key():
     assert "FIELD_ENCRYPTION_KEYS environment variable is required" in (
         result.stderr
     )
+
+
+def test_the_production_profile_refuses_a_missing_email_hash_key():
+    result = _import_settings(SYSTEM_ENV="staging", EMAIL_HASH_KEY="")
+
+    assert result.returncode != 0
+    assert "EMAIL_HASH_KEY environment variable is required" in result.stderr
 
 
 @pytest.mark.parametrize(

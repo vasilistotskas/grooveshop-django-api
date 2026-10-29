@@ -54,6 +54,7 @@ from order.tasks import (
     send_refund_confirmation_email,
     send_shipping_notification_email,
 )
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.models import Region
@@ -113,10 +114,13 @@ def language(request):
 
 
 def pay_way(kind: str = "offline"):
+    # The factory hands out ``key`` from an iterator, so an unpinned key,
+    # and the method name the store's alert prints from it, depends on
+    # how many pay ways the shard created before this test.
     created = (
-        PayWayFactory.create_online_payment()
+        PayWayFactory.create_online_payment(key=PayWayEnum.STRIPE)
         if kind == "online"
-        else PayWayFactory.create_offline_payment()
+        else PayWayFactory.create_offline_payment(key=PayWayEnum.BANK_TRANSFER)
     )
     for code, texts in PAY_WAY_TEXTS.items():
         created.set_current_language(code)

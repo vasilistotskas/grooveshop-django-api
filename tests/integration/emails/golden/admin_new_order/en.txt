@@ -7,7 +7,7 @@ ORDER
   Placed:          03/14/2026 12:30 p.m.
   Status:          PROCESSING
   Payment status:  PENDING
-  Payment method:  Viva Wallet
+  Payment method:  Bank Transfer
   Total:           €87.90
 
 CUSTOMER

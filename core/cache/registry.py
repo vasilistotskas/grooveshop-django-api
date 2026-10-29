@@ -115,7 +115,7 @@ def expand_with_related(codes: Iterable[str]) -> list[str]:
     ``danger=True`` surfaces are NEVER included via the related cascade
     — they may only be purged when the operator explicitly selects
     them. This prevents an accidental wipe of a heavyweight cache
-    (e.g. parler translations) when an admin clears a small surface
+    (e.g. the whole response cache) when an admin clears a small surface
     that happens to reference it.
     """
 

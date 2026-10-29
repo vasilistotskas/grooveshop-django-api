@@ -12,11 +12,10 @@ from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 
 from admin.base import BaseModelAdmin, unfold_filter_for
-from admin.filters import LikesCountFilter
+from admin.filters import LikesCountFilter, RelatedDropdownFilter
 from admin.platform_site import platform_admin_site
 from order.models.order import Order
 from product.admin import ProductAdmin

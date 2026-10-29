@@ -666,20 +666,3 @@ def register_default_surfaces() -> None:
             group="content",
         )
     )
-
-    register_surface(
-        CacheSurface(
-            code="translations",
-            label=_("Translations (parler)"),
-            description=_(
-                "Per-row parler translation cache. Purging this"
-                " forces a re-fetch from Postgres on the next request"
-                " for every translatable row touched. Use sparingly."
-            ),
-            django_patterns=("*parler.*",),
-            nuxt_patterns=(),
-            icon="translate",
-            group="config",
-            danger=True,
-        )
-    )

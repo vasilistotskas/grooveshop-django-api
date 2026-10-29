@@ -12,7 +12,6 @@ from unfold.admin import GenericTabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.decorators import action
 from unfold.enums import ActionVariant
@@ -20,6 +19,7 @@ from unfold.enums import ActionVariant
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.bulk import update_each
 from admin.displays import format_dt
+from admin.filters import RelatedDropdownFilter
 from tag.models.tag import Tag
 from tag.models.tagged_item import TaggedItem
 

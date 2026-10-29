@@ -3102,7 +3102,15 @@ PARLER_LANGUAGES = {
         "hide_untranslated": False,
     },
 }
-PARLER_ENABLE_CACHING = True
+# Off: parler's Redis copy of a translation was slower than the row it
+# copies. A prefetched translation is written to the cache once per object
+# on every request (a 12-product listing made 153 SETs, ~245 ms at the
+# 1.6 ms a Redis round trip costs in production, against 0.3 ms for the
+# Postgres read it saves) and a queryset .update() bypassed the
+# invalidation, which left a stale label behind once (pay_way 0023).
+# Anything that lists translated rows must prefetch them
+# (`with_translations()`, or `prefetch_translations` on an admin).
+PARLER_ENABLE_CACHING = False
 
 LANGUAGE_COUNTRY_MAPPING = {
     "el": {

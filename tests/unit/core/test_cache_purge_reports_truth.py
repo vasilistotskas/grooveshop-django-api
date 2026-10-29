@@ -122,7 +122,15 @@ def test_a_real_run_still_reports_what_it_deleted(a_surface):
     ):
         report = CacheService.purge([a_surface], include_related=False)
 
-    assert report.django_headline == 2
+    from core.cache.registry import iter_surfaces
+
+    patterns = next(
+        len(surface.django_patterns)
+        for surface in iter_surfaces()
+        if surface.code == a_surface
+    )
+    # Each pattern of the surface deletes the two keys it matched.
+    assert report.django_headline == 2 * patterns
     assert report.django_headline == report.total_django
     assert not report.failed_surfaces
 

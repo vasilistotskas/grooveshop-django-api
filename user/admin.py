@@ -18,7 +18,6 @@ from unfold.contrib.filters.admin import (
     RangeDateFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
-    RelatedDropdownFilter,
 )
 from unfold.dataclasses import ActionDialog
 from unfold.datasets import BaseDataset
@@ -45,6 +44,7 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.filters import RelatedDropdownFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
@@ -813,6 +813,7 @@ class PlatformUserAdmin(PublicSchemaDeletionMixin, UserAdmin):
 
 @admin.register(UserAddress)
 class UserAddressAdmin(BaseModelAdmin):
+    prefetch_translations = ("country__translations",)
     list_display = [
         "address_display",
         "contact_person",
@@ -998,6 +999,7 @@ class SubscriptionTopicAdmin(BaseTranslatableAdmin):
 
 @admin.register(UserSubscription)
 class UserSubscriptionAdmin(BaseModelAdmin):
+    prefetch_translations = ("topic__translations",)
     list_display = [
         "subscription_info",
         "user_info",

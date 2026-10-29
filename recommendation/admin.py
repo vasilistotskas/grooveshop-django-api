@@ -201,6 +201,10 @@ class _ReadOnlyAdmin(BaseModelAdmin):
 
 @admin.register(RecommendationCandidate)
 class RecommendationCandidateAdmin(_ReadOnlyAdmin):
+    prefetch_translations = (
+        "product__translations",
+        "candidate__translations",
+    )
     list_display = (
         "product",
         "candidate",
@@ -225,6 +229,10 @@ class RecommendationCandidateAdmin(_ReadOnlyAdmin):
 
 @admin.register(RecommendationEvent)
 class RecommendationEventAdmin(_ReadOnlyAdmin):
+    prefetch_translations = (
+        "seed__translations",
+        "product__translations",
+    )
     list_display = (
         "created_at",
         "kind_label",

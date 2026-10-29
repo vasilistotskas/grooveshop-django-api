@@ -7,12 +7,12 @@ from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.decorators import display
 
 from admin.base import BaseTranslatableAdmin, BaseTranslatableTabularInline
 from admin.displays import format_dt
+from admin.filters import RelatedDropdownFilter
 from region.models import Region
 from tenant.deletion import PublicReferenceDataDeletionMixin
 

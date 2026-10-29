@@ -22,6 +22,7 @@ from functools import wraps
 from django.contrib.admin.utils import get_fields_from_path
 from django.db import models
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
+from parler.models import TranslatableModel
 from tinymce.models import HTMLField
 from tinymce.widgets import AdminTinyMCE
 from unfold.admin import BaseInlineMixin, ModelAdmin
@@ -31,12 +32,12 @@ from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.fields import UnfoldAdminJSONSchemaField
 from unfold.mixins import FormFieldModelAdminMixin
 from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
+from admin.filters import RelatedDropdownFilter
 from admin.mixins import WithheldOnTenantHostModelAdmin
 from core.json_schema import schema_validator
 
@@ -170,10 +171,21 @@ class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
     # datasets show: resolved for the whole page in one public query.
     staff_actor_fields: tuple[str, ...] = ()
 
+    # Translations of RELATED rows that a column or ``__str__`` reads
+    # (``"product__translations"``). The model's own translations are
+    # always prefetched. parler's Redis cache is off, so an unfetched
+    # translation is one query per row.
+    prefetch_translations: tuple[str, ...] = ()
+
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         if self.staff_actor_fields:
             queryset = queryset.prefetch_related(*self.staff_actor_fields)
+        lookups = list(self.prefetch_translations)
+        if issubclass(self.model, TranslatableModel):
+            lookups.append("translations")
+        if lookups:
+            queryset = queryset.prefetch_related(*lookups)
         return queryset
 
     compressed_fields = True

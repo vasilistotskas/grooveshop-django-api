@@ -9392,9 +9392,6 @@ msgstr "Παρακάμψεις ανά γλώσσα, π.χ. {\"en\": {\"title\": 
 msgid "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
 msgstr "Ανάλυση του promotion_discount ανά προσφορά: μία εγγραφή για κάθε προσφορά που πράγματι μείωσε το ποσό, με τον κωδικό κουπονιού που την ενεργοποίησε, όταν υπήρχε. Το storefront τη χρειάζεται για να δείξει στον αγοραστή ΠΟΙΕΣ προσφορές εφαρμόστηκαν και να εμφανίσει σε κάθε κουπόνι το ΔΙΚΟ του ποσό αντί για το σύνολο του καλαθιού."
 
-msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
-msgstr "Cache μεταφράσεων parler ανά γραμμή. Η εκκαθάρισή της αναγκάζει επανάκτηση από την Postgres στο επόμενο αίτημα για κάθε μεταφράσιμη γραμμή που επηρεάζεται. Χρησιμοποιήστε το φειδωλά."
-
 msgid "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). This value is public by design and is safe to expose to unauthenticated callers. Leave blank if Stripe is not configured for this tenant."
 msgstr "Δημόσιο κλειδί Stripe ανά κατάστημα (pk_live_* ή pk_test_*). Η τιμή αυτή είναι σχεδιασμένη να είναι δημόσια και είναι ασφαλές να εκτίθεται σε μη πιστοποιημένους χρήστες. Αφήστε το κενό αν το Stripe δεν έχει ρυθμιστεί για αυτό το κατάστημα."
 
@@ -13414,9 +13411,6 @@ msgstr "Μετάφραση"
 msgid "Translations"
 msgstr "Μεταφράσεις"
 
-msgid "Translations (parler)"
-msgstr "Μεταφράσεις (parler)"
-
 msgid "Trending (High Views)"
 msgstr "Δημοφιλή (Υψηλές προβολές)"
 
@@ -15838,6 +15832,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Pending Reviews"
 #~ msgstr "Κριτικές προς Έγκριση"
 
+#~ msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
+#~ msgstr "Cache μεταφράσεων parler ανά γραμμή. Η εκκαθάρισή της αναγκάζει επανάκτηση από την Postgres στο επόμενο αίτημα για κάθε μεταφράσιμη γραμμή που επηρεάζεται. Χρησιμοποιήστε το φειδωλά."
+
 #~ msgid "Performance Summary"
 #~ msgstr "Σύνοψη απόδοσης"
 
@@ -16119,6 +16116,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-brace-format
 #~ msgid "Tracking available for order #{order_id}"
 #~ msgstr "Διαθέσιμη παρακολούθηση για την παραγγελία #{order_id}"
+
+#~ msgid "Translations (parler)"
+#~ msgstr "Μεταφράσεις (parler)"
 
 #~ msgid "True"
 #~ msgstr "Ναι"

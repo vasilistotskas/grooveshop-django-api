@@ -23,7 +23,6 @@ from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericFilter,
-    RelatedDropdownFilter,
     SliderNumericFilter,
 )
 from unfold.datasets import BaseDataset
@@ -43,7 +42,11 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
-from admin.filters import AnnotatedRangeFilter, LikesCountFilter
+from admin.filters import (
+    AnnotatedRangeFilter,
+    LikesCountFilter,
+    RelatedDropdownFilter,
+)
 from core.forms.measurement import MeasurementWidget
 from core.units import DistanceUnits, WeightUnits
 from order.models.order import Order
@@ -828,6 +831,7 @@ class ProductAdmin(
     the bases itself.
     """
 
+    prefetch_translations = ("category__translations",)
     list_display = (
         "product_info",
         "category_display",
@@ -2086,6 +2090,7 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 
 @admin.register(ProductCategoryImage)
 class ProductCategoryImageAdmin(BaseTranslatableAdmin):
+    prefetch_translations = ("category__translations",)
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = (

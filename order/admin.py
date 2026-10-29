@@ -23,7 +23,6 @@ from unfold.contrib.filters.admin import (
     MultipleChoicesDropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
     SliderNumericFilter,
 )
 from unfold.dataclasses import ActionDialog
@@ -52,7 +51,7 @@ from admin.displays import (
     relative_time,
     source_badge,
 )
-from admin.filters import AcquisitionSourceFilter
+from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.chargebacks import (
@@ -2856,6 +2855,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
 @admin.register(StockLog)
 class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
+    prefetch_translations = ("product__translations",)
     list_display = (
         "product",
         "operation_type",

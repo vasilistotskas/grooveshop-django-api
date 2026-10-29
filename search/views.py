@@ -89,6 +89,16 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
         ATTRIBUTE_VALUES_FIELD,
     }
 )
+# The facets whose ``facetStats`` a filter sidebar reads as the range of the
+# catalogue: with ``sidebarFacets`` they come from a query that ignores the
+# shopper's filters. Price follows the scope category, the popularity ranges
+# are store-wide.
+_PRICE_STATS_FACETS: tuple[str, ...] = ("effective_price",)
+_POPULARITY_STATS_FACETS: tuple[str, ...] = ("likes_count", "view_count")
+_CATALOGUE_RANGE_FACETS = (*_PRICE_STATS_FACETS, *_POPULARITY_STATS_FACETS)
+# A request for at most this many products that asks for facets reads
+# counts, not results (see ``_mark_count_only``).
+_COUNT_ONLY_MAX_LIMIT = 1
 
 
 def _get_max_search_limit() -> int:
@@ -189,6 +199,46 @@ def _category_subtree_ids(category_ids: list[int]) -> list[int]:
     return sorted(subtree | set(category_ids))
 
 
+def _visible_products(language_code: str | None):
+    """The products a shopper can see at all: what every facet shares.
+
+    Always the active, non-deleted ones, in the requested language when one
+    is asked for.
+    """
+    visible = ProductTranslation.meilisearch.filter(
+        active=True, is_deleted=False
+    )
+    if language_code:
+        visible = visible.filter(language_code=language_code).locales(
+            language_code
+        )
+    return visible
+
+
+def _with_catalogue_ranges(
+    search_qs, facets: list[str], language_code: str | None, scope_category
+):
+    """Take the requested price and popularity stats over the catalogue.
+
+    The same ranges the storefront asked for in requests of their own:
+    ``effective_price`` over the scope category's subtree (the whole
+    catalogue without one), ``likes_count`` and ``view_count`` over the
+    whole catalogue, none of them narrowed by the query or the filters.
+    """
+    if prices := [f for f in facets if f in _PRICE_STATS_FACETS]:
+        priced = _visible_products(language_code)
+        if scope_category is not None:
+            priced = priced.filter(
+                category__in=_category_subtree_ids([scope_category])
+            )
+        search_qs = search_qs.stats_over(priced, *prices)
+    if popularities := [f for f in facets if f in _POPULARITY_STATS_FACETS]:
+        search_qs = search_qs.stats_over(
+            _visible_products(language_code), *popularities
+        )
+    return search_qs
+
+
 def _record_engine_time(request, milliseconds) -> None:
     """Accumulate Meilisearch's own processing time for this request.
 
@@ -225,6 +275,26 @@ def _record_engine_time(request, milliseconds) -> None:
     target.search_processing_time_ms = (
         getattr(target, "search_processing_time_ms", 0) or 0
     ) + total
+
+
+def _mark_count_only(request) -> None:
+    """Say that this request is a facet read, not a customer's search.
+
+    The sidebar's counts and ranges used to be asked for as searches of
+    their own: ``facets=...`` with ``limit`` 0 or 1, because the response
+    needs a page of results and the caller wants none. Such a request
+    shows the shopper nothing to click, so ``SearchAnalyticsMiddleware``
+    must not store it as a query they made, or one page view would count
+    as several searches (and a facet read repeating the shopper's text
+    would double that search). The rule is "asks for facets and for at
+    most ``_COUNT_ONLY_MAX_LIMIT`` product"; a request for results, with
+    or without facets, is a search.
+
+    Written to the underlying ``HttpRequest`` for the reason given on
+    ``_record_engine_time``.
+    """
+    target = getattr(request, "_request", request)
+    target.search_is_count_only = True
 
 
 def _validate_language_code(language_code: str | None) -> str | None:
@@ -515,7 +585,39 @@ def blog_post_meili_search(request):
             name="facets",
             type=str,
             location=OpenApiParameter.QUERY,
-            description=_("Comma-separated facet fields for counts and stats"),
+            description=_(
+                "Comma-separated facet fields for counts and stats. A "
+                "request for facets with limit 0 or 1 is a facet read and "
+                "is not recorded as a search."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="sidebarFacets",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "When true, the facets answer a filter sidebar in this one "
+                "request. The category and brand counts leave out their own "
+                "selection (the attribute_values counts always do), so "
+                "picking one does not hide its alternatives. The "
+                "effective_price stats are those of the whole catalogue, or "
+                "of scopeCategory's subtree, and the likes_count and "
+                "view_count stats those of the whole catalogue: none follows "
+                "the query or the other filters, so a slider's range does "
+                "not move as filters change."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="scopeCategory",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "The category a listing page is about, which scopes the "
+                "effective_price stats of sidebarFacets to its subtree. "
+                "Unlike categories, it is not a filter of the results."
+            ),
             required=False,
         ),
         OpenApiParameter(
@@ -582,6 +684,12 @@ def product_meili_search(request):
     brand_ids = _parse_int_csv(request.query_params.get("brands"), "brands")
     in_stock = _parse_bool_flag(request.query_params.get("in_stock"), "inStock")
     on_offer = _parse_bool_flag(request.query_params.get("on_offer"), "onOffer")
+    sidebar_facets = _parse_bool_flag(
+        request.query_params.get("sidebar_facets"), "sidebarFacets"
+    )
+    scope_category = _parse_optional_int(
+        request.query_params.get("scope_category"), "scopeCategory"
+    )
     sort_param = request.query_params.get("sort")
 
     # Parse facets parameter — restrict to known-safe facet fields.
@@ -591,21 +699,16 @@ def product_meili_search(request):
         for f in (fs.strip() for fs in facets_param.split(","))
         if f and f in _ALLOWED_PRODUCT_FACETS
     ]
+    if facets and limit <= _COUNT_ONLY_MAX_LIMIT:
+        _mark_count_only(request)
 
     # Greeklish queries match the indexed ``*_greeklish`` shadow fields
     # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
 
-    search_qs = ProductTranslation.meilisearch.paginate(
+    search_qs = _visible_products(language_code).paginate(
         limit=limit, offset=offset
     )
-
-    # Always filter for active, non-deleted products
-    search_qs = search_qs.filter(active=True, is_deleted=False)
-
-    if language_code:
-        search_qs = search_qs.filter(language_code=language_code)
-        search_qs = search_qs.locales(language_code)
 
     # Apply price range filters
     if price_min is not None:
@@ -620,11 +723,16 @@ def product_meili_search(request):
         search_qs = search_qs.filter(view_count__gte=views_min)
 
     # Apply category filter (multi-select with IN operator), each
-    # requested category standing for its whole subtree.
+    # requested category standing for its whole subtree. With sidebarFacets
+    # the category counts leave this clause out.
     if category_ids:
-        search_qs = search_qs.filter(
-            category__in=_category_subtree_ids(category_ids)
-        )
+        category_filter = _category_subtree_ids(category_ids)
+        if sidebar_facets and "category" in facets:
+            search_qs = search_qs.filter_facet_group(
+                "category", category_filter, members=None
+            )
+        else:
+            search_qs = search_qs.filter(category__in=category_filter)
 
     # Apply the attribute value selection: alternatives within one
     # attribute, every attribute narrowing the result (AttributeSelection).
@@ -636,7 +744,12 @@ def product_meili_search(request):
         ).filter_search(search_qs, with_counts=ATTRIBUTE_VALUES_FIELD in facets)
 
     if brand_ids:
-        search_qs = search_qs.filter(brand__in=brand_ids)
+        if sidebar_facets and "brand" in facets:
+            search_qs = search_qs.filter_facet_group(
+                "brand", brand_ids, members=None
+            )
+        else:
+            search_qs = search_qs.filter(brand__in=brand_ids)
     if in_stock:
         search_qs = search_qs.filter(in_stock=True)
     if on_offer:
@@ -646,6 +759,12 @@ def product_meili_search(request):
     # exposes; unknown fields are dropped to prevent DSL injection.
     if sort_param and sort_param in _PRODUCT_SORT_FIELD_MAP:
         search_qs = search_qs.order_by(_PRODUCT_SORT_FIELD_MAP[sort_param])
+
+    if sidebar_facets:
+        search_qs = _with_catalogue_ranges(
+            search_qs, facets, language_code, scope_category
+        )
+        facets = [f for f in facets if f not in _CATALOGUE_RANGE_FACETS]
 
     # Add facets for dynamic filter counts and stats
     if facets:

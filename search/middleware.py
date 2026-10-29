@@ -103,6 +103,11 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             if response.status_code != 200:
                 return
 
+            # A facet read (see ``search.views._mark_count_only``) is not
+            # a search the shopper made.
+            if getattr(request, "search_is_count_only", False):
+                return
+
             # Extract query parameters
             query = request.GET.get("query", "")
             language_code = request.GET.get("language_code", "")

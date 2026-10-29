@@ -169,6 +169,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Computed properties**: Models check `__dict__` for annotation values before falling back to DB queries (e.g. `likes_count`, `review_average`)
 - **Meilisearch indexing**: Models inherit `IndexMixin` with `MeiliMeta` class defining filterable/searchable/sortable fields, ranking rules, synonyms, typo tolerance. `meili_filter()` controls indexing eligibility. `get_additional_meili_fields()` adds computed fields.
 - **Greeklish search**: handled at *index time* (`search/transliteration.py`); queries reach Meilisearch verbatim and are never rewritten into variants. Read [`docs/search/greeklish.md`](docs/search/greeklish.md) before touching transliteration, `MeiliMeta` search settings or `search/views.py`.
+- **Product search facets**: [`docs/search/facets.md`](docs/search/facets.md) — disjunctive counts (`FacetGroup`), the `sidebarFacets` ranges (`StatsBaseline`) and what counts as a search for analytics. Read it before changing how `search/views.py` builds facets.
 
 ### WebSocket / Real-time
 

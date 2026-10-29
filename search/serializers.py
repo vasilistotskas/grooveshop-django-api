@@ -183,9 +183,9 @@ class ProductTranslationSerializer(
     # ``is not None``, not truthiness: ``Money(0)`` is falsy, and a free
     # or fully discounted product costs 0, which is not "no price".
     def get_final_price(self, obj):
-        if obj.master is not None and obj.master.final_price is not None:
-            return float(obj.master.final_price.amount)
-        return None
+        # Computed once: the property recomputes on every read.
+        final_price = obj.master.final_price if obj.master else None
+        return float(final_price.amount) if final_price is not None else None
 
     def get_price(self, obj):
         if obj.master is not None and obj.master.price is not None:

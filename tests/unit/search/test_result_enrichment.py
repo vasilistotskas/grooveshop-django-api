@@ -10,13 +10,16 @@ exercises the DB hydration path directly, so it needs no live Meilisearch.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import PropertyMock, patch
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+from djmoney.money import Money
+from parler.cache import _cache_translation
 
 from product.factories.product import ProductFactory
-from product.models.product import ProductTranslation
+from product.models.product import Product, ProductTranslation
 from search.serializers import ProductTranslationSerializer
 from tenant.features import feature_on
 
@@ -147,3 +150,84 @@ def test_indexed_document_stores_the_category_name_per_language():
 
     assert names["en"] == "Chargers"
     assert names["el"] == "Φορτιστές"
+
+
+@pytest.mark.django_db
+def test_hits_of_one_category_write_its_translation_to_the_cache_once():
+    """parler caches a translation it reads from a prefetch once per
+    category OBJECT, so hits that each held their own copy of the same
+    category wrote the same cache key once per hit."""
+    from product.factories.category import ProductCategoryFactory
+
+    category = ProductCategoryFactory()
+    products = ProductFactory.create_batch(
+        5, category=category, num_images=0, num_reviews=0
+    )
+
+    with patch(
+        "parler.models._cache_translation", wraps=_cache_translation
+    ) as cache_write:
+        _serialize_hits(_en_translation_pks(products))
+
+    written = [
+        call.args[0]
+        for call in cache_write.call_args_list
+        if call.args[0].master_id == category.pk
+    ]
+    assert len(written) == 1
+
+
+@pytest.mark.django_db
+def test_the_final_price_is_computed_once_per_hit():
+    products = ProductFactory.create_batch(3, num_images=0, num_reviews=0)
+
+    with patch.object(
+        Product,
+        "final_price",
+        new_callable=PropertyMock,
+        return_value=Money(5, "EUR"),
+    ) as final_price:
+        rows = _serialize_hits(_en_translation_pks(products))
+
+    assert {row["final_price"] for row in rows} == {5.0}
+    assert final_price.call_count == len(products)
+
+
+@pytest.mark.django_db
+def test_hits_are_returned_in_ranking_order_each_with_its_own_data():
+    products = ProductFactory.create_batch(4, num_images=0, num_reviews=0)
+    pks = _en_translation_pks(products)
+    ranked = [pks[2], pks[0], pks[3], pks[1]]
+    hits = [
+        {"id": pk, "_formatted": {"rank": position}}
+        for position, pk in enumerate(ranked)
+    ]
+
+    with CaptureQueriesContext(connection) as ctx:
+        results = ProductTranslation.meilisearch._enrich_results({"hits": hits})
+
+    assert [row["object"].pk for row in results] == ranked
+    assert [row["_formatted"]["rank"] for row in results] == [0, 1, 2, 3]
+    # The order is applied in Python, not by a CASE over every pk.
+    assert not any(
+        '"product_product_translation"."id" =' in q["sql"]
+        for q in ctx.captured_queries
+    )
+
+
+@pytest.mark.django_db
+def test_a_hit_whose_row_is_gone_is_skipped():
+    (product,) = ProductFactory.create_batch(1, num_images=0, num_reviews=0)
+    (pk,) = _en_translation_pks([product])
+    gone = (
+        ProductTranslation.objects.order_by("-pk").values_list("pk", flat=True)[
+            0
+        ]
+        + 1000
+    )
+
+    results = ProductTranslation.meilisearch._enrich_results(
+        {"hits": [{"id": gone}, {"id": pk}]}
+    )
+
+    assert [row["object"].pk for row in results] == [pk]

@@ -72,12 +72,13 @@ only), `createdAt` and `lowStockThreshold`, read from the database like
 indexed field, run `meilisearch_sync_all_indexes --all-tenants --app product`
 (it applies the new filterable attribute and re-sends every document).
 
-Hits and the product list/detail carry `offerKind` too; see below.
+Hits, the product feed (`/product/feed`) and the product page carry
+`offerKind` too; the product list (a card) does not. See below.
 
 ### On offer
 
 One definition, `promotion/offers.py`, answers "is this product on offer"
-for the search index, the product list/detail API and the search cards, so the
+for the search index, the product feed/detail API and the search cards, so the
 `onOffer` filter and the badge cannot disagree. `offerKind` is
 `"MARKDOWN" | "PROMOTION" | null` (optional in the schema):
 

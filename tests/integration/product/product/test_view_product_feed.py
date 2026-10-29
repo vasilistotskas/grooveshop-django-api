@@ -20,8 +20,9 @@ from vat.factories import VatFactory
 class ProductFeedTestCase(APITestCase):
     """``/product/feed`` is the product list for catalogue feeds.
 
-    Until the list slims down to what a product card reads, the two
-    answer one query with the same rows in the same shape.
+    The two answer one query with the same rows in the same order. A
+    list row is a product card: the feed row cut down to the card's
+    fields, its translations to the name and description.
     """
 
     @classmethod
@@ -66,14 +67,34 @@ class ProductFeedTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return json.loads(response.content)
 
+    @staticmethod
+    def as_card(row, card_fields):
+        card = {field: row[field] for field in card_fields}
+        card["translations"] = {
+            language: {
+                field: translation[field] for field in ("name", "description")
+            }
+            for language, translation in row["translations"].items()
+        }
+        return card
+
     def assert_same_answer(self, **query):
         listed = self.get("product-list", **query)
         fed = self.get("product-feed", **query)
         # ``links`` name the route itself; everything else is one answer.
         listed.pop("links")
         fed.pop("links")
+        card_fields = listed["results"][0].keys()
+        self.assertLess(len(card_fields), len(fed["results"][0]))
+        expected = {
+            **fed,
+            "results": [
+                self.as_card(row, card_fields) for row in fed["results"]
+            ],
+        }
         self.assertEqual(
-            json.dumps(fed, sort_keys=True), json.dumps(listed, sort_keys=True)
+            json.dumps(listed, sort_keys=True),
+            json.dumps(expected, sort_keys=True),
         )
         return fed
 
@@ -101,10 +122,25 @@ class ProductFeedTestCase(APITestCase):
         self.assertEqual(len(row["imagePaths"]), 2)
         self.assertEqual(len(row["attributes"]), 1)
 
+    def test_list_carries_none_of_the_feed_only_fields(self):
+        row = self.get("product-list", pageSize=1)["results"][0]
+        for field in (
+            "attributes",
+            "imagePaths",
+            "variantGroupTitle",
+            "offerKind",
+        ):
+            self.assertNotIn(field, row)
+
     def test_query_count_does_not_grow_with_the_page(self):
-        def queries(page_size):
+        def queries(route, page_size):
             with CaptureQueriesContext(connection) as captured:
-                self.get("product-feed", pageSize=page_size)
+                self.get(route, pageSize=page_size)
             return len(captured)
 
-        self.assertEqual(queries(5), queries(1))
+        for route in ("product-list", "product-feed"):
+            with self.subTest(route=route):
+                self.assertEqual(queries(route, 5), queries(route, 1))
+        # The card skips the gallery, variant group and attribute
+        # prefetches.
+        self.assertLess(queries("product-list", 5), queries("product-feed", 5))

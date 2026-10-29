@@ -10,6 +10,7 @@ from drf_spectacular.utils import (
 )
 from measurement.measures import Weight
 from parler_rest.serializers import TranslatableModelSerializer
+from parler_rest.utils import create_translated_fields_serializer
 from rest_framework import serializers
 from rest_framework.fields import get_attribute
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -29,6 +30,18 @@ from vat.models import Vat
 
 @extend_schema_field(generate_schema_multi_lang(Product))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
+    pass
+
+
+# What a product card, the sitemap and the RSS feed read of a
+# translation; the SEO copy belongs to the product page.
+LIST_TRANSLATED_FIELDS = ("name", "description")
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(Product, fields=LIST_TRANSLATED_FIELDS)
+)
+class ListTranslatedFieldsField(TranslatedFieldExtended):
     pass
 
 
@@ -86,12 +99,88 @@ _STOCK_RANGE = connection.ops.integer_field_range(
 )
 
 
+# Zeroes the star average and review count of a store whose reviews are
+# hidden: zero is what a product with no reviews serves, so the fields
+# keep their shape. A comment, not a docstring: drf-spectacular would
+# publish a docstring as the description of every serializer below it.
+class HiddenReviewsMixin(serializers.Serializer):
+    @cached_property
+    def reviews_visible(self) -> bool:
+        # One read per response: a list renders every row through the
+        # same child serializer.
+        return feature_on("product_reviews")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.reviews_visible:
+            data["review_average"] = 0.0
+            data["review_count"] = 0
+        return data
+
+
+class ProductCardSerializer(
+    HiddenReviewsMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[Product],
+    EffectivePriceFieldsSerializer,
+):
+    """The product list's row: what a product card, the sitemap and the
+    RSS feed read.
+
+    A product's attributes, gallery and variant group are the product
+    page's (``ProductRetrieveSerializer``) and the catalogue feed's
+    (``/product/feed``, ``ProductSerializer``). Built from
+    ``Product.objects.for_list()``.
+    """
+
+    translations = ListTranslatedFieldsField(
+        shared_model=Product,
+        serializer_class=create_translated_fields_serializer(
+            Product,
+            related_name="translations",
+            meta={"fields": list(LIST_TRANSLATED_FIELDS)},
+        ),
+    )
+    brand_name = serializers.CharField(
+        source="brand.name", read_only=True, allow_null=True
+    )
+    final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    # The card announces a reduction by its prior price and percentage;
+    # when it began is the product page's to say.
+    reduction_started_at = None
+
+    class Meta:
+        model = Product
+        fields = (
+            "id",
+            "translations",
+            "slug",
+            "category",
+            "brand_name",
+            "stock",
+            "low_stock_threshold",
+            "active",
+            "final_price",
+            "effective_price",
+            "prior_price",
+            "announced_discount_percent",
+            "main_image_path",
+            "review_average",
+            "review_count",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = fields
+
+
 # The merchant's markdown (``Product.discount_percent``) is an input, not an
 # announcement: a "was" price struck through and a "-N%" badge built from it
 # carry no prior price, which the EU Omnibus rule requires. The read payload
 # shows ``prior_price`` and ``announced_discount_percent``; the markdown is
 # written through ``ProductWriteSerializer``.
 class ProductSerializer(
+    HiddenReviewsMixin,
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
     EffectivePriceFieldsSerializer,
@@ -137,7 +226,7 @@ class ProductSerializer(
     # product nested in a cart, order or favourite line comes from a
     # queryset without it, and resolving it per row would add a query to
     # every line of surfaces that show no offer badge. Those payloads
-    # carry ``null``; the catalogue list and detail annotate.
+    # carry ``null``; the catalogue feed and detail annotate.
     # ``required=False``, NOT ``read_only=True``: drf-spectacular marks
     # every read-only field as always present, and a storefront that
     # deploys before the API would then reject the old payload.
@@ -219,22 +308,6 @@ class ProductSerializer(
         if group is None:
             return None
         return group.safe_translation_getter("name") or None
-
-    @cached_property
-    def reviews_visible(self) -> bool:
-        # One read per response: a list renders every row through the
-        # same child serializer.
-        return feature_on("product_reviews")
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        # A store whose reviews are hidden hides the star average and
-        # the review count with them. Zero is what a product with no
-        # reviews serves, so the field keeps its shape.
-        if not self.reviews_visible:
-            data["review_average"] = 0.0
-            data["review_count"] = 0
-        return data
 
 
 class RatingDistributionSerializer(serializers.Serializer):

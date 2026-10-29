@@ -283,10 +283,30 @@ class ProductQuerySet(
 
     def for_list(self) -> Self:
         """
-        Optimized queryset for list views.
+        Optimized queryset for ``ProductCardSerializer``: a product card.
 
-        Includes translations, category, counts, and product attributes.
-        Only returns active, non-deleted products.
+        Translations, category/VAT/brand, the counts and the main image.
+        The counts stay although the card shows only the review ones:
+        the list sorts on ``likes_count`` too. Only returns active,
+        non-deleted products.
+        """
+        return (
+            self.active()
+            .with_translations()
+            .with_category()
+            .with_counts()
+            .with_announced_discount_percent()
+            .with_main_image()
+        )
+
+    def for_full_list(self) -> Self:
+        """
+        Optimized queryset for a list rendered by ``ProductSerializer``.
+
+        ``for_list()`` plus every image, the variant group's translations
+        and the attributes: what the catalogue feed (``/product/feed``) and
+        the hydrated recommendations render. Only returns active,
+        non-deleted products.
         """
         return (
             self.active()
@@ -338,6 +358,10 @@ class ProductManager(TranslatableOptimizedManager):
     def for_list(self) -> ProductQuerySet:
         """Return optimized queryset for list views."""
         return cast(ProductQuerySet, self.get_queryset().for_list())
+
+    def for_full_list(self) -> ProductQuerySet:
+        """Return optimized queryset for lists of full product rows."""
+        return cast(ProductQuerySet, self.get_queryset().for_full_list())
 
     def for_detail(self) -> ProductQuerySet:
         """Return optimized queryset for detail views."""

@@ -30,6 +30,7 @@ from product.models.review import ProductReview
 from product.serializers.image import ProductImageSerializer
 from product.serializers.price_history import ProductPriceHistorySerializer
 from product.serializers.product import (
+    ProductCardSerializer,
     ProductDetailSerializer,
     ProductRetrieveSerializer,
     ProductSerializer,
@@ -48,7 +49,7 @@ from tenant.permissions import (
 
 serializers_config: SerializersConfig = {
     **crud_config(
-        list=ProductSerializer,
+        list=ProductCardSerializer,
         detail=ProductRetrieveSerializer,
         write=ProductWriteSerializer,
     ),
@@ -312,8 +313,11 @@ class ProductViewSet(BaseModelViewSet):
         if self.action == "reviews":
             return self._reviews_queryset()
 
-        if self.action in ("list", "feed"):
+        if self.action == "list":
+            # A product card: no attributes, no gallery, no offer kind.
             queryset = Product.objects.for_list()
+        elif self.action == "feed":
+            queryset = Product.objects.for_full_list().with_offer_kind()
         else:
             # ``for_detail()`` deliberately does not filter on ``active``
             # — its docstring says so, because staff must be able to open
@@ -322,11 +326,9 @@ class ProductViewSet(BaseModelViewSet):
             # readable: name, price and SEO copy, at a sequential id.
             # ``for_list()`` has always applied ``.active()``; only the
             # detail path was open.
-            queryset = Product.objects.for_detail()
+            queryset = Product.objects.for_detail().with_offer_kind()
             if not is_store_staff(self.request.user):
                 queryset = queryset.active()
-
-        queryset = queryset.with_offer_kind()
 
         # Add availability priority annotation for ordering
         queryset = queryset.annotate(

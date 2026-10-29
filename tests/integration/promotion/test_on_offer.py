@@ -392,7 +392,7 @@ class TestApi:
     def _client(self):
         return APIClient()
 
-    def test_list_and_detail_carry_offer_kind(self, product):
+    def test_feed_and_detail_carry_offer_kind(self, product):
         _on_product(product)
         marked_down = ProductFactory(
             category=product.category, discount_percent=Decimal(10), active=True
@@ -402,7 +402,9 @@ class TestApi:
         )
         # The factory-built product may already carry a markdown; the
         # promotion product is the one under test.
-        listing = self._client().get(reverse("product-list"))
+        # The product list is a card and carries no offer kind (no
+        # storefront reads it there); the feed and the product page do.
+        listing = self._client().get(reverse("product-feed"))
         assert listing.status_code == status.HTTP_200_OK
         kinds = {
             row["id"]: row["offerKind"] for row in listing.json()["results"]

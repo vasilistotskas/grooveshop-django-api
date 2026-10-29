@@ -69,9 +69,9 @@ class ProductFeedFieldsTestCase(APITestCase):
             product=cls.product, attribute_value=cls.material_value
         )
 
-    def list_row(self, product=None, **headers):
+    def feed_row(self, product=None, **headers):
         response = self.client.get(
-            reverse("product-list"), **headers, format="json"
+            reverse("product-feed"), **headers, format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         pk = (product or self.product).pk
@@ -86,7 +86,7 @@ class ProductFeedFieldsTestCase(APITestCase):
         return response.data
 
     def test_attributes_expose_is_variant_per_attribute(self):
-        for payload in (self.list_row(), self.detail()):
+        for payload in (self.feed_row(), self.detail()):
             flags = {
                 a["attribute_id"]: a["is_variant"]
                 for a in payload["attributes"]
@@ -101,24 +101,24 @@ class ProductFeedFieldsTestCase(APITestCase):
             self.first.main_image_path,
             self.second.main_image_path,
         ]
-        self.assertEqual(self.list_row()["image_paths"], expected)
+        self.assertEqual(self.feed_row()["image_paths"], expected)
         self.assertEqual(self.detail()["image_paths"], expected)
 
     def test_image_paths_share_the_main_image_path_format(self):
-        row = self.list_row()
+        row = self.feed_row()
         self.assertEqual(row["image_paths"][0], row["main_image_path"])
         self.assertTrue(row["image_paths"][0].startswith("media/"))
 
     def test_image_paths_empty_without_images(self):
         bare = _product(self.category, self.vat)
-        self.assertEqual(self.list_row(bare)["image_paths"], [])
+        self.assertEqual(self.feed_row(bare)["image_paths"], [])
         self.assertEqual(self.detail(bare)["image_paths"], [])
 
     def test_variant_group_title_follows_the_request_language(self):
         for language, title in (("el", "Ομάδα"), ("en", "Group")):
             headers = {"headers": {"Accept-Language": language}}
             self.assertEqual(
-                self.list_row(**headers)["variant_group_title"], title
+                self.feed_row(**headers)["variant_group_title"], title
             )
             self.assertEqual(
                 self.detail(**headers)["variant_group_title"], title
@@ -128,24 +128,24 @@ class ProductFeedFieldsTestCase(APITestCase):
         only_greek = _product(
             self.category, self.vat, variant_group=_group(el="Μόνο ελληνικά")
         )
-        row = self.list_row(only_greek, headers={"Accept-Language": "en"})
+        row = self.feed_row(only_greek, headers={"Accept-Language": "en"})
         self.assertEqual(row["variant_group_title"], "Μόνο ελληνικά")
 
     def test_variant_group_title_is_null_without_a_group(self):
         ungrouped = _product(self.category, self.vat)
-        self.assertIsNone(self.list_row(ungrouped)["variant_group_title"])
+        self.assertIsNone(self.feed_row(ungrouped)["variant_group_title"])
         self.assertIsNone(self.detail(ungrouped)["variant_group_title"])
 
     def test_variant_group_title_is_null_when_the_group_has_no_name(self):
         nameless = _product(
             self.category, self.vat, variant_group=_group(el="")
         )
-        self.assertIsNone(self.list_row(nameless)["variant_group_title"])
+        self.assertIsNone(self.feed_row(nameless)["variant_group_title"])
 
-    def test_list_query_count_does_not_grow_with_rows(self):
+    def test_feed_query_count_does_not_grow_with_rows(self):
         def queries():
             with CaptureQueriesContext(connection) as ctx:
-                self.client.get(reverse("product-list"))
+                self.client.get(reverse("product-feed"))
             return len(ctx)
 
         queries()  # warm per-process caches

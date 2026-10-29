@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 
 from django.conf import settings
@@ -35,8 +36,16 @@ class AutoSchema(SpectacularAutoSchema):
         return super()._get_paginator()
 
 
-def generate_schema_multi_lang(model_instance) -> dict[str, Any]:
-    translated_fields = model_instance._parler_meta.get_all_fields()
+def generate_schema_multi_lang(
+    model_instance, fields: Sequence[str] | None = None
+) -> dict[str, Any]:
+    """The ``translations`` object: per language, every translated field,
+    or only ``fields`` when a serializer emits a subset."""
+    translated_fields = (
+        list(fields)
+        if fields is not None
+        else model_instance._parler_meta.get_all_fields()
+    )
     languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
 
     if not translated_fields or not languages:

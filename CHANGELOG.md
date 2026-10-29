@@ -3,6 +3,32 @@
 
 
 
+## v3.163.2 (2026-10-29)
+
+### Performance improvements
+
+* perf(product): list products as cards and move the full shape to the feed (#365)
+
+The product list built every product's attributes, all its images, its
+variant group and a promotion offer subquery, which no storefront list
+draws: its callers are the home rails, the sitemap and RSS, all product
+cards. ProductCardSerializer carries only what they read (names and
+descriptions, prices, the main image, stock, reviews, dates), and
+for_list() prefetches only that; the offer subquery goes with offerKind,
+which nothing reads. Locally, a 31-product page goes from 81,660 to
+34,142 bytes, 8 to 4 queries and about 80 to 27 ms.
+
+The full shape stays at /product/feed (for_full_list), which the agent
+gateway's feeds read, and recommendations hydrate through it too. The
+product nested in carts, orders and reviews is unchanged. The card's
+category is nullable, as the model is (SET_NULL).
+
+GET /api/v1/product now returns PaginatedProductCardList
+instead of PaginatedProductList. Ship after the gateway reads
+/product/feed and the storefront parses ProductCard in production.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c56a465`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c56a4650d0bc1ef35e8085d433ac2ada7d7e828d))
+
 ## v3.163.1 (2026-10-29)
 
 ### Bug fixes

@@ -9,6 +9,7 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import Any, TypedDict
 
+from django.conf import settings
 from django.db import models
 from django.db.models.fields import Field
 from meilisearch.models.task import Task, TaskInfo
@@ -78,7 +79,13 @@ class IndexMixin(models.Model):
         Attributes:
             displayed_fields: Fields returned in search results
             searchable_fields: Fields searched for query matches
-            filterable_fields: Fields available for filtering
+            filterable_fields: Fields available for filtering (equality,
+                ``IN``, ``EXISTS`` and facet counts). Name only the fields
+                a query really filters or facets on: each one is indexed
+            range_fields: The subset of ``filterable_fields`` that is also
+                compared (``<``, ``>=``, ``TO``) or asked for ``facetStats``
+            facet_search: Build the facet-search database (the
+                ``facet-search`` endpoint). Off unless that endpoint is used
             sortable_fields: Fields available for sorting
             ranking_rules: Custom ranking rules
             stop_words: Words to ignore in search
@@ -97,6 +104,8 @@ class IndexMixin(models.Model):
         displayed_fields: Iterable[str] | None = None
         searchable_fields: Iterable[str] | None = None
         filterable_fields: Iterable[str] | None = None
+        range_fields: Iterable[str] | None = None
+        facet_search: bool = False
         sortable_fields: Iterable[str] | None = None
         ranking_rules: Iterable[str] | None = None
         stop_words: Iterable[str] | None = None
@@ -134,6 +143,8 @@ class IndexMixin(models.Model):
         displayed_fields = getattr(meta, "displayed_fields", None)
         searchable_fields = getattr(meta, "searchable_fields", None)
         filterable_fields = getattr(meta, "filterable_fields", None)
+        range_fields = getattr(meta, "range_fields", None)
+        facet_search = getattr(meta, "facet_search", False)
         sortable_fields = getattr(meta, "sortable_fields", None)
         ranking_rules = getattr(meta, "ranking_rules", None)
         stop_words = getattr(meta, "stop_words", None)
@@ -160,6 +171,8 @@ class IndexMixin(models.Model):
             filterable_fields=list(filterable_fields)
             if filterable_fields
             else None,
+            range_fields=list(range_fields) if range_fields else None,
+            facet_search=facet_search,
             sortable_fields=list(sortable_fields) if sortable_fields else None,
             ranking_rules=list(ranking_rules) if ranking_rules else None,
             stop_words=list(stop_words) if stop_words else None,
@@ -193,12 +206,17 @@ class IndexMixin(models.Model):
         )
 
         if _client.tasks:
+            # A filterable or sortable change reindexes the whole index,
+            # which outlasts the SDK's 5 s default on a real catalogue.
+            timeout_ms = settings.MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]
             for task in _client.tasks:
                 task_uid = getattr(task, "task_uid", None) or getattr(
                     task, "uid", None
                 )
                 if task_uid:
-                    finished = _client.wait_for_task(task_uid)
+                    finished = _client.wait_for_task(
+                        task_uid, timeout_in_ms=timeout_ms
+                    )
                     if finished.status == "failed":
                         raise MeiliSettingsError(
                             f"Failed to update settings: {finished.error}"

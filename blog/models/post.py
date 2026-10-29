@@ -195,15 +195,15 @@ class BlogPostTranslation(
         )
 
     class MeiliMeta:
+        # Exactly the fields ``search.views`` filters on (equality only;
+        # the blog search has no facets and no range filter). Everything
+        # else stays a document field through its searchable or
+        # displayed entry.
         filterable_fields = (
-            "title",
             "language_code",
-            "likes_count",
-            "category",
-            "category_name",
             "is_published",
-            "master_id",
         )
+        facet_search = False
         # ``*_greeklish_variants`` bags exist only for the SHORT fields
         # (title/subtitle) — expanding every body word would bloat the
         # index and pollute ranking for no realistic recall gain.
@@ -280,7 +280,10 @@ class BlogPostTranslation(
             "disableOnAttributes": ["id"],
         }
         faceting = {"maxValuesPerFacet": 100}
-        pagination = {"maxTotalHits": 50000}
+        # Same ceiling as the product index (see its comment): the blog
+        # search pages with limit/offset like the product search, and no
+        # store has anywhere near 20000 posts.
+        pagination = {"maxTotalHits": 20_000}
         search_cutoff_ms = 1500
 
     @classmethod

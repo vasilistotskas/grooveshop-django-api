@@ -98,11 +98,14 @@ regardless of which field it's filtered against. Only a non-string value
 
 Meilisearch itself only accepts a filter on an attribute listed in the
 index's `filterableAttributes`, i.e. the model's `MeiliMeta.filterable_fields`.
-For `ProductTranslation` the string ones are `name`, `language_code` and
-`category_name` (`category` and `brand` are integer ids; `description` is
-searchable but **not** filterable, and `sku` is not indexed at all). For
-`BlogPostTranslation` they are `title`, `language_code` and `category_name`
-(`body` is not filterable).
+The index filters only on what the search views use (see
+[index settings](index-settings.md)), so the only string field either
+index can filter is `language_code`: `CONTAINS` on `name`, `title` or
+`category_name` is rejected by the engine until that field is added to
+`MeiliMeta.filterable_fields`. (`category` and `brand` are integer ids;
+`description` and `body` are searchable but **not** filterable, and `sku`
+is not indexed at all.) The examples on this page use `name` and `title` to show the
+syntax; they need that field added first.
 
 ### ✅ Valid Usage
 
@@ -163,7 +166,8 @@ tutorials = BlogPostTranslation.meilisearch.filter(
     title__contains="tutorial", is_published=True
 )
 
-# Find posts with "Python" in the title (`body` is not filterable)
+# Find posts with "Python" in the title (needs `title` in
+# `MeiliMeta.filterable_fields`; `body` is not filterable)
 python_posts = BlogPostTranslation.meilisearch.filter(
     title__contains="Python", language_code="en"
 )

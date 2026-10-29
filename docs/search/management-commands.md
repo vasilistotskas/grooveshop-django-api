@@ -56,9 +56,13 @@ Prints index settings, statistics and configuration.
 ## `meilisearch_apply_settings`
 
 Re-applies each model's `MeiliMeta` settings (filterable / searchable / sortable
-attributes, ranking rules, synonyms, typo tolerance) without reindexing. The Argo CD
+attributes, ranking rules, synonyms, typo tolerance, facet search, faceting,
+pagination) without re-sending documents. The Argo CD
 PreSync hook runs it with `--all-tenants` on every deploy; it attempts every tenant and
-exits non-zero if any failed.
+exits non-zero if any failed. Each settings task is awaited for
+`MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]` (`MEILI_SETTINGS_TASK_TIMEOUT_MS`, 10 minutes by
+default), because a changed filterable or sortable attribute makes the engine rebuild
+that index. See [index settings](index-settings.md) for what is applied and why.
 
 | Option | Description |
 |---|---|

@@ -1805,6 +1805,11 @@ MEILISEARCH = {
     "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "True") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
     "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
+    # How long applying index settings waits for the engine. A filterable
+    # or sortable change reindexes every document of the index.
+    "SETTINGS_TASK_TIMEOUT_MS": int(
+        getenv("MEILI_SETTINGS_TASK_TIMEOUT_MS", "600000")
+    ),
 }
 
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "10"))

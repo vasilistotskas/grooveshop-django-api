@@ -116,7 +116,10 @@ class Client:
         settings_payload = {
             "displayedAttributes": index_settings.displayed_fields or ["*"],
             "searchableAttributes": index_settings.searchable_fields or ["*"],
-            "filterableAttributes": index_settings.filterable_fields or [],
+            "filterableAttributes": (
+                index_settings.filterable_attributes_payload()
+            ),
+            "facetSearch": index_settings.facet_search,
             "sortableAttributes": index_settings.sortable_fields or [],
             "rankingRules": (
                 index_settings.ranking_rules

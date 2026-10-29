@@ -1,5 +1,6 @@
 from functools import cached_property
 
+from django.db import connection
 from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
@@ -78,6 +79,13 @@ class EffectivePriceFieldsSerializer(serializers.Serializer):
     reduction_started_at = AnnouncedReductionStartField()
 
 
+#: The database range of ``Product.stock``, the bounds its column enforces.
+_STOCK_FIELD = Product._meta.get_field("stock")
+_STOCK_RANGE = connection.ops.integer_field_range(
+    _STOCK_FIELD.get_internal_type()
+)
+
+
 # The merchant's markdown (``Product.discount_percent``) is an input, not an
 # announcement: a "was" price struck through and a "-N%" badge built from it
 # carry no prior price, which the EU Omnibus rule requires. The read payload
@@ -89,6 +97,15 @@ class ProductSerializer(
     EffectivePriceFieldsSerializer,
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
+    # Read-only (every row carries it), declared with the column's own
+    # range: a read-only ModelSerializer field drops its validators, and
+    # with them the schema's minimum and maximum.
+    stock = serializers.IntegerField(
+        read_only=True,
+        label=_STOCK_FIELD.verbose_name,
+        min_value=_STOCK_RANGE[0],
+        max_value=_STOCK_RANGE[1],
+    )
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     # Mirrors Product.vat (null=True, blank=True, SET_NULL). An
     # explicitly-declared relation does NOT inherit the model's
@@ -186,6 +203,10 @@ class ProductSerializer(
             "review_count",
             "likes_count",
             "view_count",
+            # Responses only (writes go through ProductWriteSerializer), so
+            # the schema states what every row carries: a non-null model
+            # field. ``stock`` is declared above to keep its range.
+            "active",
             "low_stock_threshold",
             "created_at",
             "updated_at",

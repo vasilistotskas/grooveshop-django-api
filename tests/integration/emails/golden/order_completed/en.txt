@@ -1,0 +1,30 @@
+
+========================================
+THANK YOU FOR YOUR PURCHASE!
+========================================
+
+Your order #900001 has been successfully completed.
+
+Order Completed
+
+Dear Maria Papadopoulou,
+
+We're delighted to confirm that your order has been completed successfully!
+
+Order Details
+----------------------------------------
+Order Date: 03/14/2026 12:30 p.m.
+Order Total: €87.90
+Status: Completed
+
+What's Next?
+----------------------------------------
+Your order has been delivered and completed. We hope you're enjoying your purchase!
+
+If you have any questions or concerns about your order, please don't hesitate to contact our customer service team.
+
+Thank you for shopping with Acme Gadgets! We look forward to serving you again.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

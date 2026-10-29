@@ -232,14 +232,22 @@ def tenant_admin_recipients() -> list[str]:
     keep a mail failure from masking the carrier error it was reporting,
     so the alert was swallowed rather than surfaced.
     """
+    return tenant_operator_addresses() or [
+        str(address) for address in getattr(settings, "ADMINS", [])
+    ]
+
+
+def tenant_operator_addresses() -> list[str]:
+    """The bound tenant's own operator addresses: ``Tenant.contact_email``
+    then ``Tenant.owner_email``, deduped, and ``[]`` for a tenant with
+    neither. No platform fallback: ``tenant_admin_recipients`` adds one for
+    its callers, ``emails.recipients.store_operators`` never does."""
     recipients: list[str] = []
     for field in ("contact_email", "owner_email"):
         value = _get_tenant_field(field)
         if value and value not in recipients:
             recipients.append(value)
-    if recipients:
-        return recipients
-    return [str(address) for address in getattr(settings, "ADMINS", [])]
+    return recipients
 
 
 def tenant_site_name() -> str:

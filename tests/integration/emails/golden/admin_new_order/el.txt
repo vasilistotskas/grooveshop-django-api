@@ -1,0 +1,30 @@
+New order placed — #900001
+
+A new order has just been placed on Acme Gadgets.
+
+ORDER
+  Order ID:        #900001
+  Placed:          14/03/2026 12:30 μμ.
+  Status:          PROCESSING
+  Payment status:  PENDING
+  Payment method:  Google Pay
+  Total:           87,90 €
+
+CUSTOMER
+  Maria Papadopoulou <customer@example.test>
+  Phone:           +302101234567
+
+SHIPPING ADDRESS
+  Ermou 12
+  Athens, 10563
+  Ελλάδα
+
+ITEMS
+  Ασύρματα ακουστικά — 1 x 20,00 € = 20,00 €
+  Φορτιστής επαφής — 2 x 31,50 € = 63,00 €
+
+  Subtotal: 83,00 €
+  Shipping: 4,90 €
+  Total:    87,90 €
+
+This email is operational; staff only.

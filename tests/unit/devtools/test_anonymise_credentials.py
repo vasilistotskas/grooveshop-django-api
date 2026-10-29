@@ -29,6 +29,12 @@ _KEPT = {
         "stored hashed (make_password) by allauth, so a copy opens nothing"
     ),
     "tenant.Tenant.cache_generation": "a counter, not a credential",
+    "emails.EmailSwitch.type_key": (
+        "the name of an email type a store switched off, not a credential"
+    ),
+    "emails.HistoricalEmailSwitch.type_key": (
+        "the history copy of EmailSwitch.type_key, not a credential"
+    ),
     "django_celery_beat.PeriodicTask.routing_key": (
         "an AMQP routing key (a queue name), not a credential"
     ),

@@ -86,6 +86,20 @@ for _key in FIELD_ENCRYPTION_KEYS:
             "bytes (Fernet.generate_key())."
         ) from None
 
+# Key of the HMAC that turns an e-mail address into the hash the opt-out
+# list stores (``emails.optout.address_hash``), so no row holds an address.
+# Separate from SECRET_KEY on purpose: rotating SECRET_KEY must not orphan
+# every opt-out, and changing THIS key forgets them all. Generate one with
+# ``secrets.token_urlsafe(48)``; the runbook is ``docs/emails.md``.
+EMAIL_HASH_KEY = getenv("EMAIL_HASH_KEY", "")
+if not EMAIL_HASH_KEY:
+    if PRODUCTION_PROFILE:
+        raise ImproperlyConfigured(
+            "EMAIL_HASH_KEY environment variable is required in production."
+        )
+    # Dev and CI only: lets a checkout boot without setup.
+    EMAIL_HASH_KEY = "insecure-dev-email-hash-key-do-not-use-in-production"
+
 _fallback = getenv("SECRET_KEY_FALLBACK", "")
 SECRET_KEY_FALLBACKS = [_fallback] if _fallback else []
 
@@ -202,6 +216,9 @@ SHARED_APPS = [
     # User model must be in SHARED for AUTH_USER_MODEL FK resolution
     # in public-schema auth migrations. Tenant schemas have their own copy.
     "user",
+    # Email platform: a store's switches and opt-outs live in its schema,
+    # the platform's own in public (one model, ``docs/emails.md``).
+    "emails",
     # Session tracking rows must exist where the session's USER row
     # lives: platform staff are public-schema identities, so their
     # UserSession rows are written to the public schema (see
@@ -235,6 +252,7 @@ TENANT_APPS = [
     # staff.
     "django.contrib.sessions",
     "user",
+    "emails",
     "allauth",
     "allauth.account",
     "allauth.headless",

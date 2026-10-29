@@ -1,0 +1,28 @@
+PAYMENT CONFIRMED
+
+Thank you! Your payment has been received and your order is now being processed.
+
+Order #900001
+Date: 03/14/2026
+Payment Status: Paid
+Order Status: Processing
+
+SHIPPING ADDRESS
+Maria Papadopoulou
+Ermou 12
+Athens, 10563
+Ελλάδα
+
+ORDER ITEMS
+Wireless earbuds - 1 x €20.00 = €20.00
+Charging pad - 2 x €31.50 = €63.00
+
+Subtotal: €83.00
+Shipping: €4.90
+Total Paid: €0.00
+
+We will notify you again once your order ships.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

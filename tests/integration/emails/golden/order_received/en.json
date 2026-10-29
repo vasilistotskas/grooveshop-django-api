@@ -1,0 +1,15 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<order_confirmation.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Order Received - #900001",
+  "to": [
+    "customer@example.test"
+  ]
+}

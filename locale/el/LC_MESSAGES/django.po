@@ -997,6 +997,9 @@ msgstr "Θέματα λογαριασμού και συστήματος: οι ν
 msgid "Account email"
 msgstr "Email λογαριασμού"
 
+msgid "Account preferences"
+msgstr "Προτιμήσεις λογαριασμού"
+
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
 
@@ -1129,6 +1132,9 @@ msgstr "Κάτοχος Διεύθυνσης"
 
 msgid "Address Update"
 msgstr "Ενημέρωση Διεύθυνσης"
+
+msgid "Address hash"
+msgstr "Κατακερματισμός διεύθυνσης"
 
 msgid "Address line 1"
 msgstr "Διεύθυνση γραμμή 1"
@@ -1292,6 +1298,9 @@ msgstr "Απόλυτο https URL σε άλλον ιστότοπο."
 
 msgid "An email address is required for guest alerts."
 msgstr "Απαιτείται διεύθυνση email για ειδοποιήσεις επισκεπτών."
+
+msgid "An email type, or * for every marketing type."
+msgstr "Ένας τύπος email ή * για κάθε τύπο διαφημιστικού email."
 
 msgid "An error occurred while fetching payment status."
 msgstr "Παρουσιάστηκε σφάλμα κατά την ανάκτηση της κατάστασης πληρωμής."
@@ -2470,6 +2479,9 @@ msgstr "Με αλλαγές"
 
 msgid "Changed By"
 msgstr "Άλλαξε από"
+
+msgid "Changed by (staff)"
+msgstr "Άλλαξε από (προσωπικό)"
 
 msgid "Changed only"
 msgstr "Μόνο όσα άλλαξαν"
@@ -3874,14 +3886,32 @@ msgstr "Το email άλλαξε"
 msgid "Email is required."
 msgstr "Το email είναι υποχρεωτικό."
 
+msgid "Email opt-out"
+msgstr "Εξαίρεση από email"
+
+msgid "Email opt-outs"
+msgstr "Εξαιρέσεις από email"
+
 msgid "Email preview"
 msgstr "Προεπισκόπηση email"
 
 msgid "Email removed"
 msgstr "Το email αφαιρέθηκε"
 
+msgid "Email switch"
+msgstr "Διακόπτης email"
+
+msgid "Email switches"
+msgstr "Διακόπτες email"
+
 msgid "Email template"
 msgstr "Πρότυπο email"
+
+msgid "Email type"
+msgstr "Τύπος email"
+
+msgid "Emails"
+msgstr "Email"
 
 msgid "Emails & Engagement"
 msgstr "Email & Δέσμευση πελατών"
@@ -6430,6 +6460,9 @@ msgstr "Αναγνωριστικό του μέλους του προσωπικο
 msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που έκανε την αλλαγή (public schema, όχι χρήστης του καταστήματος)."
 
+msgid "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που απενεργοποίησε αυτόν τον τύπο (public schema, όχι χρήστης του καταστήματος)."
+
 msgid "Idempotency key"
 msgstr "Κλειδί μοναδικότητας αιτήματος"
 
@@ -8355,6 +8388,9 @@ msgstr "Ένα από τα αρχεία δεν είναι πλέον διαθέ�
 
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "Ένα προϊόν ανά γραμμή: sku;καθαρή τιμή (προ ΦΠΑ). Το κόμμα λειτουργεί επίσης ως διαχωριστικό και ως υποδιαστολή. Οι υπάρχουσες γραμμές αυτής της ομάδας ενημερώνονται."
+
+msgid "One-click unsubscribe"
+msgstr "Απεγγραφή με ένα κλικ"
 
 msgid "Online payment methods must have a provider code."
 msgstr "Οι online μέθοδοι πληρωμής πρέπει να έχουν κωδικό παρόχου."
@@ -11713,6 +11749,9 @@ msgstr "Τύπος πηγής"
 msgid "Spacer"
 msgstr "Κενό διάστημα"
 
+msgid "Spam complaint"
+msgstr "Καταγγελία ως ανεπιθύμητο"
+
 msgid "Specific categories"
 msgstr "Συγκεκριμένες κατηγορίες"
 
@@ -12869,6 +12908,12 @@ msgstr "Ο σύνδεσμος λήψης έχει λήξει."
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "Αυτό διαγράφει οριστικά το schema της PostgreSQL και κάθε εγγραφή μέσα σε αυτό. Η ενέργεια δεν μπορεί να αναιρεθεί."
 
+msgid "This email is required and cannot be switched off."
+msgstr "Αυτό το email είναι υποχρεωτικό και δεν μπορεί να απενεργοποιηθεί."
+
+msgid "This email type does not exist."
+msgstr "Αυτός ο τύπος email δεν υπάρχει."
+
 msgid "This field is required"
 msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
 
@@ -13492,6 +13537,9 @@ msgstr "Απεγγραφή από όλα τα θέματα μέσω συνδέσ
 
 msgid "Unsubscribe here"
 msgstr "Απεγγραφή εδώ"
+
+msgid "Unsubscribe link"
+msgstr "Σύνδεσμος απεγγραφής"
 
 msgid "Unsubscribe the current user from a specific subscription topic."
 msgstr "Απεγγραφή του τρέχοντος χρήστη από συγκεκριμένο θέμα εγγραφής."
@@ -15126,9 +15174,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
-
-#~ msgid "Account Credentials"
-#~ msgstr "Διαπιστευτήρια λογαριασμού"
 
 #~ msgid "Activate selected subscriptions"
 #~ msgstr "Ενεργοποίηση επιλεγμένων συνδρομών"

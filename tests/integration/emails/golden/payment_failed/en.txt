@@ -1,0 +1,24 @@
+PAYMENT FAILED
+
+We were unable to complete the payment for your order. Don't worry — your items are still reserved for you.
+
+Order #900001
+Date: 03/14/2026
+Payment Status: Failed
+Total: €87.90
+
+TRY AGAIN
+Click the link below to retry your payment:
+https://shop.example/en/account/orders/900001
+
+Common reasons for failed payments:
+- Insufficient funds
+- Incorrect card details
+- Card not authorized for online payments
+- 3D Secure verification was not completed
+
+If the problem persists, please contact our customer service.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

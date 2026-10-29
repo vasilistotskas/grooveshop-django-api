@@ -178,6 +178,18 @@ def bump_generation_on_text_override_change(sender, instance, **kwargs):
     _bump_generation_for_current_schema()
 
 
+@receiver(
+    [post_save, post_delete],
+    sender="emails.EmailSwitch",
+    dispatch_uid="tenant.bump_generation_on_email_switch_change",
+)
+def bump_generation_on_email_switch_change(sender, instance, **kwargs):
+    """Move the tenant's cached entries on when a store switches an email
+    type on or off, so the send path (``emails.send.switched_off_keys``,
+    cached per generation) follows at once instead of after its TTL."""
+    _bump_generation_for_current_schema()
+
+
 @receiver(post_save, sender=Tenant, dispatch_uid="tenant.reactivate_on_renewal")
 def reactivate_on_renewal(sender, instance, **kwargs):
     """Recording a payment lifts a BILLING suspension immediately.

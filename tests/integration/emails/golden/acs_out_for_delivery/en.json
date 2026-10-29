@@ -1,0 +1,12 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Your ACS parcel is out for delivery",
+  "to": [
+    "customer@example.test"
+  ]
+}

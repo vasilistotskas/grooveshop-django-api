@@ -1,0 +1,21 @@
+Stripe dispute opened — Order #900001
+
+A Stripe dispute has been opened against this order. The order
+status has NOT been changed automatically — please review the dispute
+in the Stripe dashboard and decide whether to accept or contest it.
+
+DISPUTE
+  Dispute ID:        dp_0001
+  Reason:            unknown
+  Order:             #900001
+  Customer:          Maria Papadopoulou <customer@example.test>
+  Order placed:      03/14/2026 12:30 p.m.
+  Order total:       €87.90
+
+NEXT STEPS
+  - Open the Stripe dashboard, find dispute dp_0001.
+  - Decide whether to submit evidence (contest) or accept the dispute.
+  - Respond before the provider's deadline — defaults to 7 calendar days for chargebacks.
+  - Update order metadata or status manually if you accept the dispute.
+
+This email is operational; staff only.

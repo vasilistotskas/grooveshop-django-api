@@ -568,8 +568,8 @@ class TestDeriveApiDomain:
         [
             ("demo.grooveshop.space", "api-demo.grooveshop.space"),
             (
-                "Delta-Sigma.GrooveShop.space",
-                "api-delta-sigma.grooveshop.space",
+                "Acme-Shop.GrooveShop.space",
+                "api-acme-shop.grooveshop.space",
             ),
             ("a.b.grooveshop.space", "api-a-b.grooveshop.space"),
             ("webside.gr", "api.webside.gr"),

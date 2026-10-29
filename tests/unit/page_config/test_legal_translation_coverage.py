@@ -5,8 +5,8 @@ locale and throw a hard 404 on an empty body. Unlike parler on this
 side, the storefront's ``extractTranslated`` does not fall back, so
 enabling ``en`` on a store whose documents are Greek-only publishes a
 storefront where the terms, privacy policy and cookie policy are
-unreachable in English. delta-sigma is in exactly that state, and its
-sitemap advertised three such URLs until they were gated out.
+unreachable in English. A store can already be in exactly that state, and
+its sitemap advertised such URLs until they were gated out.
 
 ``missing_legal_translations`` is the rule, kept pure so it can be
 tested without provisioning a schema; ``legal_translation_coverage``

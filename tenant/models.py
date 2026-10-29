@@ -773,7 +773,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
     # LinkedIn was the conspicuous omission in a set of eight consumer
     # networks: it is the ONLY social presence a B2B engineering
-    # practice keeps, and Δelta Σigma's own site links nothing else.
+    # practice keeps.
     socials_linkedin = models.URLField(
         _("LinkedIn URL"),
         blank=True,
@@ -1386,8 +1386,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         """Locales this save ADDS to the ones already stored.
 
         Only the delta is validated. A tenant whose stored set is
-        already inconsistent — delta-sigma serves ``en`` with Greek-only
-        legal documents — must stay editable for every unrelated field,
+        already inconsistent — ``en`` served with Greek-only legal
+        documents — must stay editable for every unrelated field,
         so the rule guards the transition rather than the state.
         """
         if self.pk is None:

@@ -6,7 +6,7 @@ falsy result in its ValidationError.
 This setting exists because the platform previously modelled only ONE
 address per store, the ``INVOICE_SELLER_*`` registered seat, and that is
 not what a storefront publishes: a merchant's public offices are often
-neither the same place as the seat nor a single place. Δelta Σigma has
+neither the same place as the seat nor a single place. A store can have
 two (Thessaloniki and Attica) and a registered seat at a third address.
 """
 

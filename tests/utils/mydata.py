@@ -43,7 +43,8 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
     """The integration as a store with credentials sees it.
 
     ``auto_submit=False`` is a store that issues by hand; ``ready=False``
-    is one that has not enabled myDATA at all.
+    is one that has not enabled myDATA at all. The store's ``MYDATA_ENABLED``
+    switch, which gates the receipt and credit emails, reads as ``ready``.
     """
     config = dataclasses.replace(
         READY_CONFIG,
@@ -58,9 +59,22 @@ def mydata_enabled(*, auto_submit: bool = True, ready: bool = True):
         "order.signals.handlers.load_mydata_config",
         "order.invoicing.load_mydata_config",
     )
+    from emails import gates
+
+    store_setting = gates.store_setting
+
+    def setting_as_configured(name: str):
+        # The receipt and credit emails are gated on the store's switch.
+        return (
+            config.enabled if name == "MYDATA_ENABLED" else store_setting(name)
+        )
+
     with ExitStack() as stack:
         for target in targets:
             stack.enter_context(mock.patch(target, return_value=config))
+        stack.enter_context(
+            mock.patch.object(gates, "store_setting", setting_as_configured)
+        )
         stack.enter_context(
             mock.patch(
                 "order.mydata.service._resolve_issuer_vat",

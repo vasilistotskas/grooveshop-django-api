@@ -1,53 +1,53 @@
-"""The order emails, built in ONE place.
+"""The order emails: their types, their builders and their samples.
 
-Every email about an order is two things before it is a message: a
-subject and a template context. They used to be assembled inline in the
-Celery task that sends the mail, and again, by hand and slightly
-differently, in the admin's email preview, so the preview showed an email
-that was never sent (a reduced context, an English subject made up for it).
+Each email about an order is an :class:`~emails.types.EmailType`, declared
+here next to the code that reads the order for it (``emails.EmailsConfig``
+imports this module at boot and then freezes the catalogue). A type's
+``build_context`` is the ONE reader of the order for that email: the
+sending task (``emails.send.send_email``) and the admin preview
+(``core.email.preview_service``) both go through ``emails.render.render``,
+so what the preview shows is what the order is sent. A change to what an
+email says is made once.
 
-Each builder here takes the objects its email is about and returns an
-:class:`OrderEmail`: the template, the translated subject, the context and
-the language, with no side effect. The sending task calls it and sends;
-the preview calls the same function with a real order and renders the same
-thing (``core.email.preview_service``). A change to what an email says is
-made once.
+Every builder runs under ``_email_language(order, language)``: the
+recipient's language is active, so every lazy label in the context
+resolves in it, and the order's translated rows (pay way, country, region)
+are switched to it whatever language they were loaded in. The subject is a
+msgid with plain named fields, filled from the context by the pipeline
+(``emails.render.format_subject``).
 
-Each builder runs under ``_email_language(order, language)``: the
-recipient's language is active, so the subject and every lazy label in the
-context resolve in it, and the order's translated rows (pay way, country,
-region) are switched to it whatever language they were loaded in;
-:meth:`OrderEmail.render` renders under the same language.
+What stays with the tasks (``order.tasks``, ``shipping_acs.tasks``,
+``shipping_boxnow.tasks``): choosing WHEN to send (idempotency claims,
+status gates) and the bookkeeping after a send.
 
-What stays with the tasks: choosing WHEN to send (idempotency claims,
-status gates), the recipient, ``Reply-To`` and list headers, attachments,
-and the bookkeeping after a send.
-
-Not here yet: the emails that are not about an order (cart reminders, gift
-cards, product alerts, B2B, billing, account). They belong to the planned
-email-type catalogue, which will give every type one entry holding its
-builder; ``ORDER_EMAIL_KINDS`` below is that entry for the order emails.
+Each type has a ``sample``: an unsaved object graph the preview renders
+when no order is chosen. A sample carries its own lines and totals, so
+nothing reads the database for it (``_is_sample``).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import timedelta
+from decimal import Decimal
 from html import unescape
 from typing import TYPE_CHECKING, Any
 
-from django.template.exceptions import TemplateDoesNotExist
-from django.template.loader import get_template, render_to_string
-from django.utils import translation
+from django.conf import settings
+from django.utils import timezone, translation
 from django.utils.html import strip_tags
-from django.utils.translation import gettext as _
-from django_stubs_ext import StrOrPromise
+from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
-from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import get_tenant_frontend_url
+from emails.gates import CarrierGate, FeatureGate, StoreSwitchGate
+from emails.recipients import Recipient, customer_of, store_operators
+from emails.registry import registry
+from emails.types import Audience, EmailType, Kind, RenderEnv
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.payment import payment_provider_label
@@ -62,28 +62,21 @@ logger = logging.getLogger(__name__)
 
 TEMPLATE_DIR = "emails/order"
 
+#: The attribute a confirmation's builder leaves on the order: the strip
+#: its mail shows, which the sending task records as an impression once the
+#: mail has gone (``suggestion_strip_of``).
+_STRIP_ATTRIBUTE = "email_suggestion_strip"
 
-@dataclass(frozen=True)
-class OrderEmail:
-    """One order email, ready to render and send."""
-
-    #: Template path without extension: ``<template>.txt`` and
-    #: ``<template>.html`` exist side by side.
-    template: str
-    subject: str
-    context: dict[str, Any]
-    language: str
-    #: The suggestions the confirmation shows, kept so the sender can
-    #: record their impression once the mail has gone.
-    suggestion_strip: EmailStrip | None = None
-
-    def render(self) -> tuple[str, str]:
-        """``(text, html)`` bodies, rendered in the email's language."""
-        with translation.override(self.language):
-            return (
-                render_to_string(f"{self.template}.txt", self.context),
-                render_to_string(f"{self.template}.html", self.context),
-            )
+#: The key of the email each status change sends. PENDING, PROCESSING and
+#: SHIPPED have none: the confirmation and the shipping notification own
+#: those moments (``order.tasks.send_order_status_update_email``).
+STATUS_EMAIL_KEYS: Mapping[str, str] = {
+    OrderStatus.DELIVERED: "order.delivered",
+    OrderStatus.COMPLETED: "order.completed",
+    OrderStatus.CANCELED: "order.canceled",
+    OrderStatus.RETURNED: "order.returned",
+    OrderStatus.REFUNDED: "order.status_refunded",
+}
 
 
 class NothingToPreview(Exception):
@@ -91,79 +84,18 @@ class NothingToPreview(Exception):
     receipt, no shipment ...), so there is nothing real to render."""
 
 
-# ---------------------------------------------------------------------------
-# Subjects. Module-level so the preview can show the real subject of an
-# email it renders from sample data, where there is an order NUMBER but no
-# order to build from.
-# ---------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class OrderDispute:
+    """What a dispute email is about: the order, the provider's dispute
+    and the provider that raised it."""
 
-
-def order_received_subject(order_id: int) -> str:
-    return _("Order Received - #{order_id}").format(order_id=order_id)
-
-
-def order_payment_confirmed_subject(order_id: int) -> str:
-    return _("Payment Confirmed - Order #{order_id}").format(order_id=order_id)
-
-
-def order_status_update_subject(order_id: int, status: str) -> str:
-    return _("Order #{order_id} Status Update - {status}").format(
-        order_id=order_id, status=OrderStatus(status).label
-    )
-
-
-def order_shipped_subject(order_id: int) -> str:
-    return _("Your Order #{order_id} Has Shipped").format(order_id=order_id)
-
-
-def payment_failed_subject(order_id: int) -> str:
-    return _("Payment Failed - Order #{order_id}").format(order_id=order_id)
-
-
-def refund_confirmation_subject(order_id: int) -> str:
-    return _("Refund Processed - Order #{order_id}").format(order_id=order_id)
-
-
-def admin_new_order_subject(order_id: int) -> str:
-    return _("New order — #{order_id}").format(order_id=order_id)
-
-
-def document_issued_subject(
-    order_id: int, *, document_number: str, is_credit: bool
-) -> str:
-    template = (
-        _("Credit receipt {document_number} for your order #{order_id}")
-        if is_credit
-        else _("Receipt {document_number} for your order #{order_id}")
-    )
-    return template.format(document_number=document_number, order_id=order_id)
-
-
-def dispute_subject(
-    order_id: int, *, provider_name: StrOrPromise, lost: bool, site_name: str
-) -> str:
-    template = (
-        _("[%(site)s] %(provider)s dispute lost — Order #%(order)s")
-        if lost
-        else _("[%(site)s] %(provider)s dispute opened — Order #%(order)s")
-    )
-    return template % {
-        "site": site_name,
-        "provider": provider_name,
-        "order": order_id,
-    }
-
-
-def acs_out_for_delivery_subject() -> str:
-    return _("Your ACS parcel is out for delivery")
-
-
-def boxnow_parcel_at_locker_subject() -> str:
-    return _("Your BOX NOW parcel arrived at the locker")
+    order: Order
+    dispute_id: str
+    provider_code: str
 
 
 # ---------------------------------------------------------------------------
-# Customer emails
+# Building blocks
 # ---------------------------------------------------------------------------
 
 
@@ -203,6 +135,12 @@ def _email_language(order: Order, language: str) -> Generator[None]:
         yield
 
 
+def _is_sample(order: Order) -> bool:
+    """Whether *order* is a preview sample: never saved, so there is
+    nothing to query for it."""
+    return order._state.adding
+
+
 def _lines(order: Order):
     """The order's lines, read NOW, in the active language.
 
@@ -211,16 +149,23 @@ def _lines(order: Order):
     products) a task loaded before the override named every product in the
     worker's language, whatever language the customer's email is in. A
     query made here is created in the email's language; the translations
-    are prefetched, so it costs two queries, not one per line.
+    are prefetched, so it costs two queries, not one per line. A sample
+    carries its own lines.
     """
+    if _is_sample(order):
+        return vars(order)["sample_items"]
     return order.items.select_related("product").prefetch_related(
         "product__translations"
     )
 
 
-def _confirmation_context(order: Order, language: str) -> tuple[dict, Any]:
-    """The context shared by the two confirmation emails, and the
-    suggestion strip it carries (None when there is none)."""
+def suggestion_strip_of(order: Order) -> EmailStrip | None:
+    """The suggestions the confirmation mail built for *order* showed."""
+    return getattr(order, _STRIP_ATTRIBUTE, None)
+
+
+def _confirmation_context(order: Order, language: str) -> dict[str, Any]:
+    """The context shared by the two confirmation emails."""
     pay_way = order.pay_way
 
     payment_instructions = ""
@@ -284,483 +229,710 @@ def _confirmation_context(order: Order, language: str) -> tuple[dict, Any]:
             extra={"order_id": order.id},
         )
         suggestion_strip = None
+    setattr(order, _STRIP_ATTRIBUTE, suggestion_strip)
 
-    context = build_email_context(
-        language=language,
-        order=order,
-        items=_lines(order),
-        suggested_products=suggestion_strip.items if suggestion_strip else [],
-        pay_way=pay_way,
-        payment_instructions=payment_instructions,
-        payment_instructions_text=payment_instructions_text,
-        is_paid=is_paid_online(order),
-        expects_payment_confirmation=expects_payment_confirmation,
-        collected_on_delivery=bool(
+    return {
+        "order_id": order.id,
+        "order": order,
+        "items": _lines(order),
+        "suggested_products": (
+            suggestion_strip.items if suggestion_strip else []
+        ),
+        "pay_way": pay_way,
+        "payment_instructions": payment_instructions,
+        "payment_instructions_text": payment_instructions_text,
+        "is_paid": is_paid_online(order),
+        "expects_payment_confirmation": expects_payment_confirmation,
+        "collected_on_delivery": bool(
             pay_way and pay_way.is_collected_on_delivery
         ),
-        payment_reference_needed=payment_reference_needed,
-    )
-    return context, suggestion_strip
+        "payment_reference_needed": payment_reference_needed,
+    }
 
 
-def _confirmation(
-    order: Order, *, language: str, template: str, subject: Callable[[int], str]
-) -> OrderEmail:
-    with _email_language(order, language):
-        context, strip = _confirmation_context(order, language)
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/{template}",
-            subject=subject(order.id),
-            context=context,
-            language=language,
-            suggestion_strip=strip,
-        )
+# ---------------------------------------------------------------------------
+# Builders: ``build_context(obj, env)`` of each type
+# ---------------------------------------------------------------------------
 
 
-def order_received_email(order: Order, *, language: str) -> OrderEmail:
-    return _confirmation(
-        order,
-        language=language,
-        template="order_received",
-        subject=order_received_subject,
-    )
+def _confirmation(order: Order, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return _confirmation_context(order, env.language)
 
 
-def order_payment_confirmed_email(order: Order, *, language: str) -> OrderEmail:
-    return _confirmation(
-        order,
-        language=language,
-        template="order_payment_confirmed",
-        subject=order_payment_confirmed_subject,
-    )
+def _status_update(order: Order, env: RenderEnv, status: str) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "items": _lines(order),
+            "status": status,
+            "status_display": OrderStatus(status).label,
+        }
 
 
-def order_confirmation_email(order: Order, *, language: str) -> OrderEmail:
-    """The email an order gets when it is placed: the payment
-    confirmation once an online payment has been captured, the "received"
-    email otherwise."""
-    build = (
-        order_payment_confirmed_email
-        if is_paid_online(order)
-        else order_received_email
-    )
-    return build(order, language=language)
+def _order_shipped(order: Order, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "tracking_number": order.tracking_number,
+            "carrier": order.shipping_carrier,
+        }
 
 
-def _template_exists(base: str) -> bool:
-    try:
-        get_template(f"{base}.txt")
-        get_template(f"{base}.html")
-    except TemplateDoesNotExist:
-        return False
-    return True
-
-
-def order_status_update_email(
-    order: Order, status: str, *, language: str
-) -> OrderEmail:
-    """The status-change email: the status's own template when there is
-    one, the generic one otherwise. Only a MISSING template falls back; a
-    template that exists and fails to render is a bug that must surface."""
-    template = f"{TEMPLATE_DIR}/order_{status.lower()}"
-    if not _template_exists(template):
-        logger.warning(
-            "Template %s not found, using generic template",
-            template,
-            extra={"order_id": order.id, "status": status},
-        )
-        template = f"{TEMPLATE_DIR}/order_status_generic"
-    with _email_language(order, language):
-        return OrderEmail(
-            template=template,
-            subject=order_status_update_subject(order.id, status),
-            context=build_email_context(
-                language=language,
-                order=order,
-                items=_lines(order),
-                status=status,
-                status_display=OrderStatus(status).label,
+def _payment_failed(order: Order, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "retry_url": get_tenant_frontend_url(
+                f"/account/orders/{order.id}", language=env.language
             ),
-            language=language,
-        )
+        }
 
 
-def order_shipped_email(order: Order, *, language: str) -> OrderEmail:
-    with _email_language(order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/order_shipped",
-            subject=order_shipped_subject(order.id),
-            context=build_email_context(
-                language=language,
-                order=order,
-                tracking_number=order.tracking_number,
-                carrier=order.shipping_carrier,
-            ),
-            language=language,
-        )
-
-
-def payment_failed_email(order: Order, *, language: str) -> OrderEmail:
-    with _email_language(order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/payment_failed",
-            subject=payment_failed_subject(order.id),
-            context=build_email_context(
-                language=language,
-                order=order,
-                retry_url=get_tenant_frontend_url(
-                    f"/account/orders/{order.id}", language=language
-                ),
-            ),
-            language=language,
-        )
-
-
-def refund_confirmation_email(
-    refund: PaymentTransaction, *, language: str
-) -> OrderEmail:
+def _refund_confirmation(
+    refund: PaymentTransaction, env: RenderEnv
+) -> dict[str, Any]:
     """The email about ONE refund (a ``PaymentTransaction`` REFUND)."""
     order = refund.order
-    with _email_language(order, language):
+    with _email_language(order, env.language):
         # What THIS refund paid back and what is still held, so a partial
         # refund does not read as the whole order refunded.
         currency = refund.amount.currency
         still_held = (
-            PaymentLedger.captured(order)
-            - PaymentLedger.refunded(order)
-            - PaymentLedger.charged_back(order)
+            Decimal(0)
+            if _is_sample(order)
+            else (
+                PaymentLedger.captured(order)
+                - PaymentLedger.refunded(order)
+                - PaymentLedger.charged_back(order)
+            )
         )
-        context = build_email_context(
-            language=language,
-            order=order,
-            status="REFUNDED",
+        return {
+            "order_id": order.id,
+            "order": order,
+            "status": "REFUNDED",
             # A lazy label, resolved by the render under the email's own
             # language: ``get_FOO_display()`` would resolve it at once,
             # under whatever locale the worker last left active, and a
             # customer got the status word in the wrong language.
-            status_display=(
+            "status_display": (
                 PaymentStatus(order.payment_status).label
                 if order.payment_status
                 else PaymentStatus.REFUNDED.label
             ),
-            items=_lines(order),
-            refund_amount=refund.amount,
-            payment_remaining=(
+            "items": _lines(order),
+            "refund_amount": refund.amount,
+            "payment_remaining": (
                 Money(still_held, currency) if still_held > 0 else None
             ),
-        )
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/order_refunded",
-            subject=refund_confirmation_subject(order.id),
-            context=context,
-            language=language,
-        )
+        }
 
 
-def document_issued_email(
-    order: Order, document: Any, *, is_credit: bool, language: str
-) -> OrderEmail:
+def _document_issued(
+    document: Any, env: RenderEnv, *, is_credit: bool
+) -> dict[str, Any]:
     """The email that carries a registered receipt (or credit) PDF."""
-    with _email_language(order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/retail_document_issued",
-            subject=document_issued_subject(
-                order.id,
-                document_number=document.document_number,
-                is_credit=is_credit,
-            ),
-            context=build_email_context(
-                language=language,
-                order=order,
-                document_number=document.document_number,
-                issue_date=document.issue_date,
-                mydata_mark=document.mydata_mark,
-                is_credit=is_credit,
-            ),
-            language=language,
-        )
+    order = document.order
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "document_number": document.document_number,
+            "issue_date": document.issue_date,
+            "mydata_mark": document.mydata_mark,
+            "is_credit": is_credit,
+        }
 
 
-def acs_out_for_delivery_email(shipment: Any, *, language: str) -> OrderEmail:
-    with _email_language(shipment.order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/acs_out_for_delivery",
-            subject=acs_out_for_delivery_subject(),
-            context=build_email_context(
-                language=language,
-                order=shipment.order,
-                shipment=shipment,
-                voucher_no=shipment.voucher_no,
-            ),
-            language=language,
-        )
+def _acs_out_for_delivery(shipment: Any, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(shipment.order, env.language):
+        return {
+            "order": shipment.order,
+            "shipment": shipment,
+            "voucher_no": shipment.voucher_no,
+        }
 
 
-def boxnow_parcel_at_locker_email(
-    shipment: Any, *, language: str
-) -> OrderEmail:
+def _boxnow_parcel_at_locker(shipment: Any, env: RenderEnv) -> dict[str, Any]:
     locker = shipment.locker
-    with _email_language(shipment.order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/boxnow_parcel_at_locker",
-            subject=boxnow_parcel_at_locker_subject(),
-            context=build_email_context(
-                language=language,
-                order=shipment.order,
-                shipment=shipment,
-                locker=locker,
-                locker_address=(
-                    locker.address_line_1
-                    if locker is not None
-                    else shipment.locker_external_id
-                ),
-                parcel_id=shipment.parcel_id,
+    with _email_language(shipment.order, env.language):
+        return {
+            "order": shipment.order,
+            "shipment": shipment,
+            "locker": locker,
+            "locker_address": (
+                locker.address_line_1
+                if locker is not None
+                else shipment.locker_external_id
             ),
-            language=language,
-        )
+            "parcel_id": shipment.parcel_id,
+        }
 
 
-# ---------------------------------------------------------------------------
-# Store-facing emails
-# ---------------------------------------------------------------------------
+def _new_order_alert(order: Order, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "items": _lines(order),
+            "pay_way": order.pay_way,
+        }
 
 
-def admin_new_order_email(
-    order: Order, *, language: str, staff_email: str
-) -> OrderEmail:
-    """The store's "new order" alert; ``INFO_EMAIL`` is the staff address
-    the template shows, not the public contact one."""
-    with _email_language(order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/admin_new_order",
-            subject=admin_new_order_subject(order.id),
-            context=build_email_context(
-                language=language,
-                order=order,
-                items=_lines(order),
-                pay_way=order.pay_way,
-                INFO_EMAIL=staff_email,
-            ),
-            language=language,
-        )
-
-
-def dispute_notification_email(
-    order: Order,
-    *,
-    dispute_id: str,
-    provider_code: str,
-    lost: bool,
-    language: str,
-) -> OrderEmail:
+def _dispute_notification(
+    dispute: OrderDispute, env: RenderEnv, *, lost: bool
+) -> dict[str, Any]:
     """The store's alert that a provider dispute opened, or (``lost``)
     closed against the store and was recorded as a chargeback."""
     from tenant.credentials import tenant_site_name
 
+    order = dispute.order
     reason = (order.metadata or {}).get("dispute_reason", "unknown")
     chargeback = (
         order.payment_transactions.filter(
             kind=PaymentTransactionKind.CHARGEBACK,
-            provider_reference=dispute_id,
+            provider_reference=dispute.dispute_id,
         ).first()
-        if lost
+        if lost and not _is_sample(order)
         else None
     )
-    provider_name = payment_provider_label(provider_code) or provider_code
-    with _email_language(order, language):
-        return OrderEmail(
-            template=f"{TEMPLATE_DIR}/dispute_notification",
-            subject=dispute_subject(
-                order.id,
-                provider_name=provider_name,
-                lost=lost,
-                site_name=tenant_site_name(),
-            ),
-            context=build_email_context(
-                language=language,
-                order=order,
-                dispute_id=dispute_id,
-                reason=reason,
-                chargeback=chargeback,
-                lost=lost,
-                provider_name=provider_name,
-            ),
-            language=language,
+    provider_name = (
+        payment_provider_label(dispute.provider_code) or dispute.provider_code
+    )
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "site": tenant_site_name(),
+            "provider": provider_name,
+            "dispute_id": dispute.dispute_id,
+            "reason": reason,
+            "chargeback": chargeback,
+            "lost": lost,
+            "provider_name": provider_name,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Samples: ``sample(env)`` of each type, an unsaved object graph
+# ---------------------------------------------------------------------------
+
+SAMPLE_ORDER_ID = 12345
+
+
+def _sample_order(
+    env: RenderEnv,
+    *,
+    status: str = OrderStatus.PENDING,
+    payment_status: str = PaymentStatus.PENDING,
+    settlement: str = PaySettlement.ONLINE,
+) -> Order:
+    """A made-up order that was never saved, with two lines and the totals
+    the queries would have annotated."""
+    from country.models import Country
+    from order.models import Order, OrderItem
+    from pay_way.models import PayWay
+    from product.models import Product
+
+    codes = [code for code, _name in settings.LANGUAGES]
+
+    pay_way = PayWay(key="STRIPE", settlement=settlement)
+    country = Country(alpha_2="GR")
+    for code in codes:
+        pay_way.set_current_language(code)
+        pay_way.description = "Sample payment method"
+        pay_way.instructions = "<div>Sample payment instructions.</div>"
+        country.set_current_language(code)
+        country.name = "Greece"
+    pay_way.set_current_language(env.language)
+    country.set_current_language(env.language)
+
+    lines = []
+    for name, price, quantity in (
+        ("Wireless headphones", Decimal("89.99"), 1),
+        ("USB-C cable", Decimal("12.99"), 2),
+    ):
+        product = Product()
+        for code in codes:
+            product.set_current_language(code)
+            product.name = name
+        product.set_current_language(env.language)
+        lines.append(
+            OrderItem(
+                product=product,
+                price=Money(price, "EUR"),
+                quantity=quantity,
+            )
         )
 
+    order = Order(
+        id=SAMPLE_ORDER_ID,
+        status=status,
+        payment_status=payment_status,
+        first_name="Maria",
+        last_name="Papadopoulou",
+        email=env.recipient.address,
+        phone="+302101234567",
+        street="Ermou",
+        street_number="12",
+        city="Athens",
+        zipcode="10563",
+        country=country,
+        pay_way=pay_way,
+        language_code=env.language,
+        shipping_price=Money(Decimal("4.90"), "EUR"),
+        tracking_number="SAMPLE-TRACKING-0001",
+        shipping_carrier="ACS",
+        created_at=timezone.now() - timedelta(days=1),
+        status_updated_at=timezone.now(),
+    )
+    items_total = sum(line.total_price.amount for line in lines)
+    # What ``Order.total_price_items`` reads instead of a query.
+    vars(order).update(
+        sample_items=lines, items_total=items_total, items_currencies=["EUR"]
+    )
+    return order
 
-# ---------------------------------------------------------------------------
-# The preview's view of the same emails
-# ---------------------------------------------------------------------------
 
+def _sample_refund(env: RenderEnv) -> PaymentTransaction:
+    from order.models import PaymentTransaction
 
-@dataclass(frozen=True)
-class OrderEmailKind:
-    """How the admin preview reaches one order email from an order."""
-
-    #: The subject for an order NUMBER alone, for previews on sample data.
-    sample_subject: Callable[[int], str]
-    #: The email a real order would produce, built by the same function
-    #: the sending task calls. Raises :class:`NothingToPreview` when the
-    #: order has nothing this email is about.
-    from_order: Callable[[Order, str], OrderEmail]
-
-
-def _staff_email() -> str:
-    from tenant.credentials import tenant_contact_email
-
-    return tenant_contact_email()
-
-
-def _status_kind(status: OrderStatus) -> OrderEmailKind:
-    return OrderEmailKind(
-        sample_subject=lambda order_id: order_status_update_subject(
-            order_id, status
-        ),
-        from_order=lambda order, language: order_status_update_email(
-            order, status, language=language
-        ),
+    order = _sample_order(env, payment_status=PaymentStatus.COMPLETED)
+    return PaymentTransaction(
+        order=order,
+        kind=PaymentTransactionKind.REFUND,
+        amount=Money(Decimal("10.00"), "EUR"),
+        provider="stripe",
     )
 
 
-def _refund_from_order(order: Order, language: str) -> OrderEmail:
-    refund = (
-        order.payment_transactions.filter(kind=PaymentTransactionKind.REFUND)
-        .order_by("-pk")
-        .first()
+def _sample_invoice(env: RenderEnv) -> Any:
+    from order.models import Invoice
+
+    return Invoice(
+        order=_sample_order(env),
+        invoice_number="A-00001",
+        issue_date=timezone.localdate(),
+        mydata_mark=400000000000001,
     )
+
+
+def _sample_credit(env: RenderEnv) -> Any:
+    from order.models import RetailCredit
+
+    return RetailCredit(
+        order=_sample_order(env),
+        credit_number="CRD-00001",
+        issue_date=timezone.localdate(),
+        mydata_mark=400000000000002,
+    )
+
+
+def _sample_dispute(env: RenderEnv) -> OrderDispute:
+    return OrderDispute(
+        order=_sample_order(env, payment_status=PaymentStatus.COMPLETED),
+        dispute_id="dp_sample",
+        provider_code="stripe",
+    )
+
+
+def _sample_acs_shipment(env: RenderEnv) -> Any:
+    from shipping_acs.models import AcsShipment
+
+    return AcsShipment(order=_sample_order(env), voucher_no="7000000001")
+
+
+def _sample_boxnow_shipment(env: RenderEnv) -> Any:
+    from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
+
+    return BoxNowShipment(
+        order=_sample_order(env),
+        locker=BoxNowLocker(
+            external_id="apm-sample",
+            name="Locker Stadiou",
+            title="Locker Stadiou",
+            address_line_1="Stadiou 5",
+        ),
+        parcel_id="9200000001",
+    )
+
+
+# ---------------------------------------------------------------------------
+# The preview's real object for each type
+# ---------------------------------------------------------------------------
+
+
+def _latest_transaction(order: Order, kind: str) -> PaymentTransaction | None:
+    return order.payment_transactions.filter(kind=kind).order_by("-pk").first()
+
+
+def _refund_of(order: Order) -> PaymentTransaction:
+    refund = _latest_transaction(order, PaymentTransactionKind.REFUND)
     if refund is None:
         raise NothingToPreview(_("This order has no refund to describe."))
-    return refund_confirmation_email(refund, language=language)
+    return refund
 
 
-def _document_from_order(order: Order, language: str) -> OrderEmail:
-    credit = order.credit_documents.order_by("-pk").first()
+def _invoice_of(order: Order) -> Any:
     invoice = getattr(order, "invoice", None)
-    document, is_credit = (
-        (credit, True) if credit is not None else (invoice, False)
-    )
-    if document is None:
+    if invoice is None:
         raise NothingToPreview(_("This order has no receipt to send."))
-    return document_issued_email(
-        order, document, is_credit=is_credit, language=language
-    )
+    return invoice
 
 
-def _dispute_from_order(order: Order, language: str) -> OrderEmail:
-    chargeback = (
-        order.payment_transactions.filter(
-            kind=PaymentTransactionKind.CHARGEBACK
-        )
-        .order_by("-pk")
-        .first()
-    )
+def _credit_of(order: Order) -> Any:
+    credit = order.credit_documents.order_by("-pk").first()
+    if credit is None:
+        raise NothingToPreview(_("This order has no credit receipt to send."))
+    return credit
+
+
+def _dispute_of(order: Order) -> OrderDispute:
+    chargeback = _latest_transaction(order, PaymentTransactionKind.CHARGEBACK)
     if chargeback is None:
         raise NothingToPreview(_("This order has no dispute to report."))
-    return dispute_notification_email(
-        order,
+    return OrderDispute(
+        order=order,
         dispute_id=chargeback.provider_reference,
         provider_code=chargeback.provider,
-        lost=True,
-        language=language,
     )
 
 
-def _shipment_from_order(related_name: str, build) -> Callable:
-    def from_order(order: Order, language: str) -> OrderEmail:
+def _shipment_of(related_name: str) -> Callable[[Order], Any]:
+    def shipment_of(order: Order) -> Any:
         shipment = getattr(order, related_name, None)
         if shipment is None:
             raise NothingToPreview(_("This order has no such shipment."))
-        return build(shipment, language=language)
+        return shipment
 
-    return from_order
-
-
-def _sample_document_subject(order_id: int) -> str:
-    return document_issued_subject(
-        order_id, document_number="A-00001", is_credit=False
-    )
+    return shipment_of
 
 
-def _sample_dispute_subject(order_id: int) -> str:
-    from tenant.credentials import tenant_site_name
-
-    return dispute_subject(
-        order_id,
-        provider_name=payment_provider_label("stripe") or "stripe",
-        lost=False,
-        site_name=tenant_site_name(),
-    )
-
-
-#: Keyed by template name (``core/templates/emails/order/<name>``).
-ORDER_EMAIL_KINDS: dict[str, OrderEmailKind] = {
-    "order_received": OrderEmailKind(
-        sample_subject=order_received_subject,
-        from_order=lambda order, language: order_received_email(
-            order, language=language
-        ),
-    ),
-    "order_payment_confirmed": OrderEmailKind(
-        sample_subject=order_payment_confirmed_subject,
-        from_order=lambda order, language: order_payment_confirmed_email(
-            order, language=language
-        ),
-    ),
-    "order_shipped": OrderEmailKind(
-        sample_subject=order_shipped_subject,
-        from_order=lambda order, language: order_shipped_email(
-            order, language=language
-        ),
-    ),
-    "order_delivered": _status_kind(OrderStatus.DELIVERED),
-    "order_completed": _status_kind(OrderStatus.COMPLETED),
-    "order_canceled": _status_kind(OrderStatus.CANCELED),
-    "order_returned": _status_kind(OrderStatus.RETURNED),
-    "order_status_generic": OrderEmailKind(
-        sample_subject=lambda order_id: order_status_update_subject(
-            order_id, OrderStatus.PROCESSING
-        ),
-        from_order=lambda order, language: order_status_update_email(
-            order, order.status, language=language
-        ),
-    ),
-    "order_refunded": OrderEmailKind(
-        sample_subject=refund_confirmation_subject,
-        from_order=_refund_from_order,
-    ),
-    "payment_failed": OrderEmailKind(
-        sample_subject=payment_failed_subject,
-        from_order=lambda order, language: payment_failed_email(
-            order, language=language
-        ),
-    ),
-    "admin_new_order": OrderEmailKind(
-        sample_subject=admin_new_order_subject,
-        from_order=lambda order, language: admin_new_order_email(
-            order,
-            language=language,
-            staff_email=_staff_email(),
-        ),
-    ),
-    "retail_document_issued": OrderEmailKind(
-        sample_subject=_sample_document_subject,
-        from_order=_document_from_order,
-    ),
-    "dispute_notification": OrderEmailKind(
-        sample_subject=_sample_dispute_subject,
-        from_order=_dispute_from_order,
-    ),
-    "acs_out_for_delivery": OrderEmailKind(
-        sample_subject=lambda order_id: acs_out_for_delivery_subject(),
-        from_order=_shipment_from_order(
-            "acs_shipment", acs_out_for_delivery_email
-        ),
-    ),
-    "boxnow_parcel_at_locker": OrderEmailKind(
-        sample_subject=lambda order_id: boxnow_parcel_at_locker_subject(),
-        from_order=_shipment_from_order(
-            "boxnow_shipment", boxnow_parcel_at_locker_email
-        ),
-    ),
+#: The object each type is about, found from an order, for the admin
+#: preview of a real order. A type absent here is about the order itself.
+_PREVIEW_OBJECTS: Mapping[str, Callable[[Order], Any]] = {
+    "order.refunded": _refund_of,
+    "order.receipt_issued": _invoice_of,
+    "order.credit_issued": _credit_of,
+    "team.dispute_opened": _dispute_of,
+    "team.dispute_lost": _dispute_of,
+    "shipping.acs_out_for_delivery": _shipment_of("acs_shipment"),
+    "shipping.boxnow_at_locker": _shipment_of("boxnow_shipment"),
 }
+
+
+def preview_object(key: str, order: Order) -> Any:
+    """What the email of type *key* would be about for *order*.
+
+    Raises :class:`NothingToPreview` when the order has no such record.
+    """
+    find = _PREVIEW_OBJECTS.get(key)
+    return order if find is None else find(order)
+
+
+# ---------------------------------------------------------------------------
+# The types
+# ---------------------------------------------------------------------------
+
+
+def _customer_of_order(order: Order) -> list[Recipient]:
+    return [customer_of(order)]
+
+
+def _customer_of_related_order(obj: Any) -> list[Recipient]:
+    """For an object that is about an order (a refund, a document, a
+    shipment): the order's customer."""
+    return [customer_of(obj.order)]
+
+
+def _customer_email(
+    key: str,
+    *,
+    title: Any,
+    description: Any,
+    templates: str,
+    subject: str,
+    build_context: Callable[[Any, RenderEnv], Mapping[str, object]],
+    sample: Callable[[RenderEnv], Any],
+    list_id: str,
+    recipients: Callable[[Any], list[Recipient]] = _customer_of_order,
+    required: bool = True,
+    area: str = "orders",
+    gates: tuple[Any, ...] = (),
+) -> EmailType:
+    return registry.register(
+        EmailType(
+            key=key,
+            title=title,
+            description=description,
+            area=area,
+            audience=Audience.CUSTOMER,
+            kind=Kind.TRANSACTIONAL,
+            required=required,
+            templates=f"{TEMPLATE_DIR}/{templates}",
+            subject=subject,
+            build_context=build_context,
+            sample=sample,
+            recipients=recipients,
+            gates=gates,
+            list_id=list_id,
+        )
+    )
+
+
+def _staff_email(
+    key: str,
+    *,
+    title: Any,
+    description: Any,
+    templates: str,
+    subject: str,
+    build_context: Callable[[Any, RenderEnv], Mapping[str, object]],
+    sample: Callable[[RenderEnv], Any],
+) -> EmailType:
+    return registry.register(
+        EmailType(
+            key=key,
+            title=title,
+            description=description,
+            area="team",
+            audience=Audience.STORE_STAFF,
+            kind=Kind.TRANSACTIONAL,
+            templates=f"{TEMPLATE_DIR}/{templates}",
+            subject=subject,
+            build_context=build_context,
+            sample=sample,
+            recipients=lambda obj: store_operators(),
+        )
+    )
+
+
+_cart = FeatureGate(feature="cart", label=_("Cart feature"))
+
+_customer_email(
+    "order.received",
+    title=_("Order received"),
+    description=_("Sent when an order is placed and its payment is still due."),
+    templates="order_received",
+    subject=gettext_noop("Order Received - #{order_id}"),
+    build_context=_confirmation,
+    sample=lambda env: _sample_order(
+        env, settlement=PaySettlement.OFFLINE_TRANSFER
+    ),
+    list_id="order_confirmation",
+    gates=(_cart,),
+)
+_customer_email(
+    "order.payment_confirmed",
+    title=_("Payment confirmed"),
+    description=_("Sent when an order is placed with its payment captured."),
+    templates="order_payment_confirmed",
+    subject=gettext_noop("Payment Confirmed - Order #{order_id}"),
+    build_context=_confirmation,
+    sample=lambda env: _sample_order(
+        env, payment_status=PaymentStatus.COMPLETED
+    ),
+    list_id="order_confirmation",
+    gates=(_cart,),
+)
+_customer_email(
+    "order.payment_failed",
+    title=_("Payment failed"),
+    description=_("Sent when an order's payment fails, with a link to retry."),
+    templates="payment_failed",
+    subject=gettext_noop("Payment Failed - Order #{order_id}"),
+    build_context=_payment_failed,
+    sample=lambda env: _sample_order(env, payment_status=PaymentStatus.FAILED),
+    list_id="payment_failed",
+)
+_customer_email(
+    "order.shipped",
+    title=_("Order shipped"),
+    description=_("Sent when the parcel is in transit, with its tracking."),
+    templates="order_shipped",
+    subject=gettext_noop("Your Order #{order_id} Has Shipped"),
+    build_context=_order_shipped,
+    sample=lambda env: _sample_order(env, status=OrderStatus.SHIPPED),
+    list_id="shipping_notification",
+)
+
+# Declared before the status emails that share ``order_refunded``: the admin
+# preview of a template renders the first type that sends it.
+_customer_email(
+    "order.refunded",
+    title=_("Refund processed"),
+    description=_("Sent once for every refund paid back to the customer."),
+    templates="order_refunded",
+    subject=gettext_noop("Refund Processed - Order #{order_id}"),
+    build_context=_refund_confirmation,
+    sample=_sample_refund,
+    list_id="refund_confirmation",
+    recipients=_customer_of_related_order,
+)
+
+_STATUS_SUBJECT = gettext_noop(
+    "Order #{order_id} Status Update - {status_display}"
+)
+
+
+def _status_email(
+    status: OrderStatus,
+    *,
+    title: Any,
+    description: Any,
+    templates: str,
+    required: bool,
+) -> None:
+    _customer_email(
+        STATUS_EMAIL_KEYS[status],
+        title=title,
+        description=description,
+        templates=templates,
+        subject=_STATUS_SUBJECT,
+        build_context=lambda order, env: _status_update(order, env, status),
+        sample=lambda env: _sample_order(env, status=status),
+        list_id="order_status",
+        required=required,
+    )
+
+
+_status_email(
+    OrderStatus.DELIVERED,
+    title=_("Order delivered"),
+    description=_("Sent when the carrier reports the parcel delivered."),
+    templates="order_delivered",
+    required=False,
+)
+_status_email(
+    OrderStatus.COMPLETED,
+    title=_("Order completed"),
+    description=_("Sent when a delivered, paid order is completed."),
+    templates="order_completed",
+    required=False,
+)
+_status_email(
+    OrderStatus.CANCELED,
+    title=_("Order canceled"),
+    description=_("Sent when an order is canceled."),
+    templates="order_canceled",
+    required=True,
+)
+_status_email(
+    OrderStatus.RETURNED,
+    title=_("Order returned"),
+    description=_("Sent when an order is returned to the store."),
+    templates="order_returned",
+    required=True,
+)
+_status_email(
+    OrderStatus.REFUNDED,
+    title=_("Order marked refunded"),
+    description=_("Sent when an order is closed as refunded."),
+    templates="order_refunded",
+    required=True,
+)
+
+_mydata = StoreSwitchGate(
+    setting="MYDATA_ENABLED", label=_("Issuing receipts through myDATA")
+)
+_customer_email(
+    "order.receipt_issued",
+    title=_("Receipt issued"),
+    description=_("Sent with the PDF of a registered retail receipt."),
+    templates="retail_document_issued",
+    subject=gettext_noop(
+        "Receipt {document_number} for your order #{order_id}"
+    ),
+    build_context=lambda document, env: _document_issued(
+        document, env, is_credit=False
+    ),
+    sample=_sample_invoice,
+    list_id="order_invoice",
+    recipients=_customer_of_related_order,
+    gates=(_mydata,),
+)
+_customer_email(
+    "order.credit_issued",
+    title=_("Credit receipt issued"),
+    description=_("Sent with the PDF of a registered retail credit receipt."),
+    templates="retail_document_issued",
+    subject=gettext_noop(
+        "Credit receipt {document_number} for your order #{order_id}"
+    ),
+    build_context=lambda document, env: _document_issued(
+        document, env, is_credit=True
+    ),
+    sample=_sample_credit,
+    list_id="order_credit",
+    recipients=_customer_of_related_order,
+    gates=(_mydata,),
+)
+
+_customer_email(
+    "shipping.acs_out_for_delivery",
+    title=_("ACS parcel out for delivery"),
+    description=_("Sent when ACS has the parcel out for delivery."),
+    templates="acs_out_for_delivery",
+    subject=gettext_noop("Your ACS parcel is out for delivery"),
+    build_context=_acs_out_for_delivery,
+    sample=_sample_acs_shipment,
+    list_id="acs_out_for_delivery",
+    recipients=_customer_of_related_order,
+    required=False,
+    area="shipping",
+    gates=(CarrierGate(carrier="acs", label=_("ACS carrier")),),
+)
+_customer_email(
+    "shipping.boxnow_at_locker",
+    title=_("BOX NOW parcel at the locker"),
+    description=_(
+        "Sent when the parcel arrives at the locker to be collected."
+    ),
+    templates="boxnow_parcel_at_locker",
+    subject=gettext_noop("Your BOX NOW parcel arrived at the locker"),
+    build_context=_boxnow_parcel_at_locker,
+    sample=_sample_boxnow_shipment,
+    list_id="boxnow_at_locker",
+    recipients=_customer_of_related_order,
+    area="shipping",
+    gates=(CarrierGate(carrier="boxnow", label=_("BOX NOW carrier")),),
+)
+
+_staff_email(
+    "team.new_order",
+    title=_("New order alert"),
+    description=_("Tells the store's staff that an order was placed."),
+    templates="admin_new_order",
+    subject=gettext_noop("New order — #{order_id}"),
+    build_context=_new_order_alert,
+    sample=_sample_order,
+)
+_staff_email(
+    "team.dispute_opened",
+    title=_("Dispute opened"),
+    description=_("Tells the store's staff that a payment was disputed."),
+    templates="dispute_notification",
+    subject=gettext_noop(
+        "[{site}] {provider} dispute opened — Order #{order_id}"
+    ),
+    build_context=lambda dispute, env: _dispute_notification(
+        dispute, env, lost=False
+    ),
+    sample=_sample_dispute,
+)
+_staff_email(
+    "team.dispute_lost",
+    title=_("Dispute lost"),
+    description=_("Tells the store's staff that a dispute closed against it."),
+    templates="dispute_notification",
+    subject=gettext_noop(
+        "[{site}] {provider} dispute lost — Order #{order_id}"
+    ),
+    build_context=lambda dispute, env: _dispute_notification(
+        dispute, env, lost=True
+    ),
+    sample=_sample_dispute,
+)

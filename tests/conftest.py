@@ -575,6 +575,39 @@ def _reset_payment_events_redis_client():
     payment_events_module._redis_client = None
 
 
+@pytest.fixture(autouse=True)
+def _a_store_for_store_mail(request, monkeypatch):
+    """Lend ``send_email`` a store when the test bound none.
+
+    A store email needs a store (``emails.send.StoreRequired``), and almost
+    every test that creates an order runs unbound, in the public schema,
+    while the order's signals send its mails eagerly. Only the pipeline's
+    own question, "which store is this?", is answered here, with a stand-in
+    that has no row, so no tenant lookup elsewhere can find it. The schema,
+    the credentials and every other reader of ``connection.tenant`` stay
+    exactly what the test made them, so no existing assertion about a
+    sender or a recipient moves. A test that binds a store row
+    (``tests.utils.staff.bind_store_tenant``) keeps it, and one that proves
+    the refusal opts out with ``@pytest.mark.unbound_store``.
+    """
+    if request.node.get_closest_marker("unbound_store"):
+        return
+
+    from emails import send
+    from tenant.models import Tenant
+
+    bound = send.bound_tenant
+    default_store = SimpleNamespace(
+        schema_name="default_test_store", cache_generation=0
+    )
+
+    def bound_or_default():
+        tenant = bound()
+        return tenant if isinstance(tenant, Tenant) else default_store
+
+    monkeypatch.setattr(send, "bound_tenant", bound_or_default)
+
+
 @pytest.fixture
 def bind_tenant(monkeypatch):
     """Attach a tenant (or a lightweight stand-in) to ``connection.tenant``

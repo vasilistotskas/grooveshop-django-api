@@ -9,7 +9,7 @@ the platform's sender there.
 
 from __future__ import annotations
 
-from emails.types import Owner
+from emails.types import Audience, EmailType, Owner
 from tenant.credentials import tenant_from_email, tenant_reply_to
 
 
@@ -19,7 +19,13 @@ def from_address() -> str:
     return tenant_from_email()
 
 
-def reply_to(owner: Owner) -> list[str]:
-    """Where replies go: the store's contact address for a store's mail,
-    nobody for the platform's (its mail is not answered in a store's name)."""
-    return tenant_reply_to() if owner is Owner.STORE else []
+def reply_to(email_type: EmailType) -> list[str]:
+    """Where replies go: the store's contact address for a store's mail to
+    its customers, nobody otherwise. The platform's mail is not answered in
+    a store's name, and an alert to the store's own staff has no one to
+    reply to (it would come back to the staff's own inbox)."""
+    if email_type.owner is Owner.STORE and (
+        email_type.audience is Audience.CUSTOMER
+    ):
+        return tenant_reply_to()
+    return []

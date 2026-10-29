@@ -69,7 +69,7 @@ class TestReservationSurvivesOnlyASuccessfulSend:
         )
 
         with patch(
-            "order.tasks.EmailMultiAlternatives.send",
+            "emails.transport.EmailMultiAlternatives.send",
             side_effect=OSError("relay down"),
         ):
             result = send_shipping_notification_email.apply(
@@ -96,7 +96,7 @@ class TestReservationSurvivesOnlyASuccessfulSend:
 
         with (
             patch(
-                "order.tasks.EmailMultiAlternatives.send",
+                "emails.transport.EmailMultiAlternatives.send",
                 side_effect=OSError("relay down"),
             ),
             pytest.raises(Retry),
@@ -130,7 +130,7 @@ class TestFailureAfterTheMessageIsSent:
                 "order.tasks.OrderHistory.log_note",
                 side_effect=RuntimeError("db blip"),
             ),
-            patch("order.tasks.EmailMultiAlternatives.send") as send,
+            patch("emails.transport.EmailMultiAlternatives.send") as send,
         ):
             result = send_shipping_notification_email.apply(
                 args=[order.id]

@@ -9,6 +9,7 @@ keeps its own idempotency claim and its bookkeeping after the send.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import StrEnum
@@ -23,6 +24,7 @@ from emails.models import EmailSwitch
 from emails.recipients import Recipient
 from emails.registry import registry
 from emails.render import render
+from emails.transport import Attachment
 from emails.types import EmailType, Owner, RenderEnv
 from tenant.membership import bound_tenant
 
@@ -55,6 +57,14 @@ class Delivery:
     #: The closed gate's label for ``SKIPPED_FEATURE_OFF``, else empty.
     reason: str = ""
     recipient: Recipient | None = None
+    #: The subject that went out, for ``SENT``: the one thing a customer
+    #: quotes back, so a caller's log and order note can carry it.
+    subject: str = ""
+
+
+def was_sent(deliveries: Sequence[Delivery]) -> bool:
+    """Whether at least one recipient was sent the mail."""
+    return any(each.status is Status.SENT for each in deliveries)
 
 
 def switched_off_keys() -> frozenset[str]:
@@ -73,14 +83,18 @@ def switched_off_keys() -> frozenset[str]:
 
 
 def send_email(
-    type_key: str, obj: Any, *, recipient: Recipient | None = None
+    type_key: str,
+    obj: Any,
+    *,
+    recipient: Recipient | None = None,
+    attachments: Sequence[Attachment] = (),
 ) -> list[Delivery]:
     """Send the email of type *type_key* about *obj*.
 
     *recipient* overrides the type's own resolver (allauth names its
-    address itself). Returns one :class:`Delivery` per recipient, or a
-    single skip when the type is off or has nobody to write to. A transport
-    failure is logged and re-raised.
+    address itself). *attachments* go to every recipient. Returns one
+    :class:`Delivery` per recipient, or a single skip when the type is off
+    or has nobody to write to. A transport failure is logged and re-raised.
     """
     email_type = registry.get(type_key)
     if email_type.owner is Owner.PLATFORM:
@@ -90,11 +104,14 @@ def send_email(
     else:
         schema = nullcontext()
     with schema:
-        return _send(email_type, obj, recipient)
+        return _send(email_type, obj, recipient, attachments)
 
 
 def _send(
-    email_type: EmailType, obj: Any, recipient: Recipient | None
+    email_type: EmailType,
+    obj: Any,
+    recipient: Recipient | None,
+    attachments: Sequence[Attachment],
 ) -> list[Delivery]:
     closed = next((g for g in email_type.gates if not g.is_open()), None)
     if closed is not None:
@@ -106,10 +123,15 @@ def _send(
     recipients = [recipient] if recipient else email_type.recipients(obj)
     if not recipients:
         return [_skip(email_type, Status.SKIPPED_NO_RECIPIENT)]
-    return [_send_to(email_type, obj, each) for each in recipients]
+    return [_send_to(email_type, obj, each, attachments) for each in recipients]
 
 
-def _send_to(email_type: EmailType, obj: Any, recipient: Recipient) -> Delivery:
+def _send_to(
+    email_type: EmailType,
+    obj: Any,
+    recipient: Recipient,
+    attachments: Sequence[Attachment],
+) -> Delivery:
     if optout.is_opted_out(recipient.address, email_type):
         return _skip(email_type, Status.SKIPPED_OPTED_OUT, recipient=recipient)
     rendered = render(
@@ -122,8 +144,9 @@ def _send_to(email_type: EmailType, obj: Any, recipient: Recipient) -> Delivery:
             rendered,
             from_email=sender.from_address(),
             to=[recipient.address],
-            reply_to=sender.reply_to(email_type.owner),
+            reply_to=sender.reply_to(email_type),
             headers=build_headers(email_type, recipient),
+            attachments=attachments,
         )
     except Exception:
         logger.warning(
@@ -138,7 +161,12 @@ def _send_to(email_type: EmailType, obj: Any, recipient: Recipient) -> Delivery:
         email_type.key,
         extra={"email_type": email_type.key, "language": rendered.language},
     )
-    return Delivery(email_type.key, Status.SENT, recipient=recipient)
+    return Delivery(
+        email_type.key,
+        Status.SENT,
+        recipient=recipient,
+        subject=rendered.subject,
+    )
 
 
 def _skip(

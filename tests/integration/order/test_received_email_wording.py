@@ -56,12 +56,15 @@ def _send(
             payment_status=payment_status,
         )
 
-    with patch("order.tasks.EmailMultiAlternatives") as mail:
+    with patch("emails.transport.EmailMultiAlternatives") as mail:
         message = MagicMock()
         mail.return_value = message
         assert send_order_confirmation_email(order.id)
 
-    subject, text = mail.call_args.args[0], mail.call_args.args[1]
+    subject, text = (
+        mail.call_args.kwargs["subject"],
+        mail.call_args.kwargs["body"],
+    )
     html = message.attach_alternative.call_args.args[0]
     assert subject == f"Λάβαμε την Παραγγελία σας! — #{order.id}"
     return subject, text, html

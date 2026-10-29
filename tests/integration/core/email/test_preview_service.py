@@ -127,7 +127,11 @@ class TestEmailTemplatePreviewService:
         assert isinstance(result, str)
 
     def test_error_handling_for_template_rendering(self, service):
-        """Test error handling during template rendering."""
+        """Test error handling during template rendering.
+
+        A template no registered email type sends is rendered by the service
+        itself; the registered ones go through ``emails.render``.
+        """
         # Try to render with invalid context - patch at the module level where it's used
         with patch(
             "core.email.preview_service.render_to_string"
@@ -135,7 +139,7 @@ class TestEmailTemplatePreviewService:
             mock_render.side_effect = Exception("Template error")
 
             preview = service.generate_preview(
-                template_name="order_completed", order_id=None
+                template_name="confirmation", order_id=None
             )
 
             # When rendering fails, error message should be in the content

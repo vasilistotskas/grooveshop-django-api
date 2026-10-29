@@ -70,8 +70,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -107,8 +107,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     # across xdist workers on the shared Redis.
 
     @patch("order.tasks.cache")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string", return_value="content")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string", return_value="content")
     def test_confirmation_send_failure_schedules_a_retry(
         self, mock_render, mock_email, mock_cache
     ):
@@ -132,8 +132,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("order.tasks.cache")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string", return_value="content")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string", return_value="content")
     def test_confirmation_send_gives_up_after_its_retries(
         self, mock_render, mock_email, mock_cache
     ):
@@ -161,7 +161,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("order.tasks.cache")
-    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("emails.transport.EmailMultiAlternatives")
     def test_order_deleted_while_taking_the_lock_sends_nothing(
         self, mock_email, mock_cache
     ):
@@ -214,13 +214,13 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             pay_way=pay_way,
         )
 
-        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+        with patch("emails.transport.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
             mock_email.return_value = instance
             result = send_order_confirmation_email(order.id)
 
         self.assertTrue(result)
-        text_body = mock_email.call_args.args[1]
+        text_body = mock_email.call_args.kwargs["body"]
         html_body = instance.attach_alternative.call_args.args[0]
 
         # Plain-text email: tags stripped, entities unescaped — no markup.
@@ -273,7 +273,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             payment_status=PaymentStatus.PENDING,
         )
 
-        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+        with patch("emails.transport.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
             mock_email.return_value = instance
             result = send_order_confirmation_email(order.id)
@@ -308,7 +308,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             payment_status=PaymentStatus.PENDING,
         )
 
-        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+        with patch("emails.transport.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
             mock_email.return_value = instance
             result = send_order_confirmation_email(order.id)
@@ -330,7 +330,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             payment_status=PaymentStatus.PENDING,
         )
 
-        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+        with patch("emails.transport.EmailMultiAlternatives") as mock_email:
             instance = MagicMock()
             mock_email.return_value = instance
             result = send_order_confirmation_email(order.id)
@@ -339,8 +339,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         html_body = instance.attach_alternative.call_args.args[0]
         self.assertIn("logo-dark.svg", html_body)
 
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -375,8 +375,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             "permanent sent_at timestamp must be set after a successful send",
         )
 
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -455,8 +455,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(_confirmation_already_sent(None))
 
     @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -492,7 +492,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         self.assertTrue(result)
 
-    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("emails.transport.EmailMultiAlternatives")
     def test_send_order_status_update_email_skip_internal_statuses(
         self, mock_email
     ):
@@ -512,52 +512,60 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
-    @patch("order.emails.logger.warning")
-    @patch("order.emails._template_exists", return_value=False)
-    @override_settings(
-        SITE_NAME="GrooveShop",
-        INFO_EMAIL="support@example.com",
-        NUXT_BASE_URL="http://example.com",
-        STATIC_BASE_URL="http://example.com",
-        DEFAULT_FROM_EMAIL="no-reply@example.com",
-    )
-    def test_send_order_status_update_email_template_fallback(
-        self,
-        _mock_template_exists,
-        mock_logger_warning,
-        mock_render,
-        mock_email,
-        mock_log_note,
+    @patch("emails.transport.EmailMultiAlternatives")
+    def test_a_status_mail_the_store_switched_off_is_a_handled_no_op(
+        self, mock_email
     ):
-        """A status without a template of its own is sent with the generic
-        one, and says so in the log. Only a MISSING template falls back: a
-        template that exists and fails to render raises."""
-        mock_email_instance = Mock()
-        mock_email.return_value = mock_email_instance
-        mock_render.return_value = "Generic email content"
+        """The task is done (``True``), nothing is sent, and the
+        reservation stays, so a re-fired signal does not ask again."""
+        from emails.models import EmailSwitch
+        from order.tasks import _status_update_reservation_key
+
+        EmailSwitch.objects.create(type_key="order.delivered")
 
         result = send_order_status_update_email(
             self.order.id, OrderStatus.DELIVERED
         )
 
         self.assertTrue(result)
-        mock_logger_warning.assert_called_once()
-        rendered = [call.args[0] for call in mock_render.call_args_list]
-        self.assertEqual(
-            rendered,
-            [
-                "emails/order/order_status_generic.txt",
-                "emails/order/order_status_generic.html",
-            ],
+        mock_email.assert_not_called()
+        self.order.refresh_from_db()
+        self.assertTrue(
+            self.order.metadata[
+                _status_update_reservation_key(
+                    self.order.id, OrderStatus.DELIVERED
+                )
+            ]
         )
-        mock_email_instance.send.assert_called_once()
+
+    def test_every_status_that_emails_has_a_type_with_its_own_template(self):
+        """No status falls back to a generic template: the ones that email
+        are mapped to a type, and the three that never do are PENDING and
+        PROCESSING (the confirmation covers them) and SHIPPED (the shipping
+        notification does)."""
+        from emails.registry import registry
+        from order.emails import STATUS_EMAIL_KEYS
+
+        silent = {
+            OrderStatus.PENDING,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+        }
+
+        self.assertEqual(set(STATUS_EMAIL_KEYS), set(OrderStatus) - silent)
+        for key in STATUS_EMAIL_KEYS.values():
+            self.assertIn(
+                registry.get(key).templates.rpartition("/")[2],
+                {
+                    f"order_{status.lower()}"
+                    for status in OrderStatus
+                    if status not in silent
+                },
+            )
 
     @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -723,7 +731,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         # only assert on the invoice email below.
         mail.outbox = []
 
-        result = send_invoice_email(self.order.id)
+        with mydata_enabled(auto_submit=False):
+            result = send_invoice_email(self.order.id)
         self.assertTrue(result)
         self.assertEqual(len(mail.outbox), 1)
         msg = mail.outbox[0]
@@ -736,7 +745,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertTrue(content.startswith(b"%PDF-"))
 
         # Second call is a no-op — flag reservation wins.
-        result2 = send_invoice_email(self.order.id)
+        with mydata_enabled(auto_submit=False):
+            result2 = send_invoice_email(self.order.id)
         self.assertTrue(result2)
         self.assertEqual(len(mail.outbox), 1)
 
@@ -794,8 +804,8 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
             shipping_carrier="FedEx",
         )
 
-    @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.emails.render_to_string")
+    @patch("emails.transport.EmailMultiAlternatives")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -858,18 +868,19 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         )
 
     @patch(
-        "order.tasks.tenant_contact_email", return_value="merchant@store.test"
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["merchant@store.test"],
     )
-    @patch("order.tasks.tenant_from_email", return_value="orders@store.test")
-    @patch("order.emails.render_to_string")
+    @patch("emails.sender.tenant_from_email", return_value="orders@store.test")
+    @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
     )
     def test_send_admin_new_order_email_sends_to_merchant(
         self, mock_render, _mock_from, _mock_contact
     ):
-        # New-order alerts are MERCHANT-facing: they go to the tenant's
-        # contact email FROM the tenant's address, not platform ADMINS.
+        # New-order alerts are MERCHANT-facing: they go to the store's
+        # operators FROM the tenant's address, not platform ADMINS.
         from django.core import mail
 
         mock_render.side_effect = ["Text body", "<p>HTML body</p>"]
@@ -888,11 +899,11 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         self.assertEqual(sent.from_email, "orders@store.test")
         self.assertEqual(sent.body, "Text body")
 
-    @patch("order.tasks.tenant_contact_email", return_value="")
+    @patch("emails.recipients.tenant_operator_addresses", return_value=[])
     def test_send_admin_new_order_email_skips_when_unconfigured(
         self, _mock_contact
     ):
-        # No tenant contact email configured → skip silently.
+        # A store with no contact or owner address → skip, no ADMINS fallback.
         from django.core import mail
 
         mail.outbox.clear()
@@ -900,6 +911,40 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
 
         self.assertFalse(result)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_a_switched_off_alert_sends_nothing_and_reports_it(self):
+        from django.core import mail
+
+        from emails.models import EmailSwitch
+
+        EmailSwitch.objects.create(type_key="team.new_order")
+        mail.outbox.clear()
+
+        with patch(
+            "emails.recipients.tenant_operator_addresses",
+            return_value=["merchant@store.test"],
+        ):
+            result = send_admin_new_order_email(self.order.id)
+
+        self.assertFalse(result)
+        self.assertEqual(mail.outbox, [])
+
+    def test_every_operator_address_gets_its_own_alert(self):
+        from django.core import mail
+
+        mail.outbox.clear()
+
+        with patch(
+            "emails.recipients.tenant_operator_addresses",
+            return_value=["contact@store.test", "owner@store.test"],
+        ):
+            result = send_admin_new_order_email(self.order.id)
+
+        self.assertTrue(result)
+        self.assertEqual(
+            [message.to for message in mail.outbox],
+            [["contact@store.test"], ["owner@store.test"]],
+        )
 
     @patch("order.tasks.logger.error")
     def test_send_admin_new_order_email_order_not_found(self, mock_logger):

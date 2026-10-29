@@ -1,11 +1,11 @@
 """Email template preview service for admin interface.
 
-An order email previewed from a real order is the email that order would
-be sent: ``order.emails`` builds the subject and the context for the
-sending task and for this preview alike. Everything else, and every email
-previewed on sample data, renders its template against made-up values and
-shows no subject, because no real sender builds one for it yet (the
-email-type catalogue will).
+A template an email type (``emails.registry``) names is previewed through
+``emails.render.render``, the function the sending pipeline calls: from a
+real order it is the email that order would be sent, subject included, and
+without one it renders the type's own ``sample``. Every other template
+renders against made-up values and shows no subject, because no type
+builds one for it yet.
 """
 
 import logging
@@ -19,7 +19,11 @@ from core.email.config import EmailTemplateConfig
 from core.email.sample_data import SampleOrderDataGenerator
 from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import get_tenant_base_url
-from order.emails import ORDER_EMAIL_KINDS, NothingToPreview
+from emails.recipients import Recipient
+from emails.registry import registry
+from emails.render import render
+from emails.types import EmailType, RenderEnv
+from order.emails import NothingToPreview, preview_object
 from order.models import Order
 
 logger = logging.getLogger(__name__)
@@ -66,41 +70,22 @@ class EmailTemplatePreviewService:
             # Determine category from configuration
             category = self._extract_category(template_name)
 
+            email_type = self._email_type(template_name)
+            if email_type is not None:
+                return self._preview_type(
+                    email_type, template_name, order_id, language
+                )
+
             html_template, txt_template = self._template_paths(
                 template_name, category
             )
-            kind = ORDER_EMAIL_KINDS.get(template_name)
-
-            if kind is not None and order_id:
-                order = Order.objects.filter(pk=order_id).first()
-                if order is None:
-                    raise NothingToPreview(f"Order {order_id} not found.")
-                email = kind.from_order(order, language)
-                return EmailPreview(
-                    template_name=template_name,
-                    subject=email.subject,
-                    html_content=self._render_template(
-                        f"{email.template}.html", email.context
-                    ),
-                    text_content=self._render_template(
-                        f"{email.template}.txt", email.context
-                    ),
-                    context_data=email.context,
-                    order_id=order_id,
-                    is_sample_data=False,
-                )
-
             context = build_email_context(
                 language=language,
                 **self._get_sample_context(template_name),
             )
             return EmailPreview(
                 template_name=template_name,
-                subject=(
-                    kind.sample_subject(context["order"]["id"])
-                    if kind is not None
-                    else ""
-                ),
+                subject="",
                 html_content=self._render_template(html_template, context),
                 text_content=self._render_template(txt_template, context),
                 context_data=context,
@@ -140,6 +125,60 @@ class EmailTemplatePreviewService:
             # Restore the original language
             translation.activate(current_language)
 
+    def _email_type(self, template_name: str) -> EmailType | None:
+        """The first registered type that sends *template_name*."""
+        return next(
+            (
+                email_type
+                for email_type in registry.all_types()
+                if email_type.templates.rpartition("/")[2] == template_name
+            ),
+            None,
+        )
+
+    def _preview_type(
+        self,
+        email_type: EmailType,
+        template_name: str,
+        order_id: int | None,
+        language: str,
+    ) -> EmailPreview:
+        """*email_type* rendered by the pipeline's own ``render``: for the
+        chosen order's record, else for the type's sample."""
+        real = None
+        if order_id:
+            order = Order.objects.filter(pk=order_id).first()
+            if order is None:
+                raise NothingToPreview(f"Order {order_id} not found.")
+            real = preview_object(email_type.key, order)
+        env = self._env(email_type, real, language)
+        rendered = render(
+            email_type,
+            real if real is not None else email_type.sample(env),
+            env,
+        )
+        return EmailPreview(
+            template_name=template_name,
+            subject=rendered.subject,
+            html_content=rendered.html,
+            text_content=rendered.text,
+            context_data=dict(rendered.context),
+            order_id=order_id,
+            is_sample_data=real is None,
+        )
+
+    @staticmethod
+    def _env(email_type: EmailType, real: object, language: str) -> RenderEnv:
+        """Who the previewed mail is for: its real recipient when there is
+        a record, the address of a made-up one otherwise."""
+        found = email_type.recipients(real) if real is not None else []
+        address = found[0].address if found else "customer@example.com"
+        return RenderEnv(
+            language=language,
+            recipient=Recipient(address=address, language=language),
+            is_preview=True,
+        )
+
     def _template_paths(
         self, template_name: str, category: str | None
     ) -> tuple[str, str]:
@@ -176,14 +215,11 @@ class EmailTemplatePreviewService:
             return self._get_sample_subscription_context()
         if generator_name == "generate_user_context":
             return self._get_sample_user_context()
-        return self._get_sample_order_context(template_name)
+        return self._get_sample_order_context()
 
-    def _get_sample_order_context(self, template_name: str = "") -> dict:
+    def _get_sample_order_context(self) -> dict:
         """Generate sample order data for preview."""
-        # Determine status based on template name
-        status = self._get_status_from_template_name(template_name)
-
-        sample_data = self.sample_generator.generate_order(status=status)
+        sample_data = self.sample_generator.generate_order(status="PENDING")
 
         # Add get_status_display method result
         sample_data["order"]["get_status_display"] = (
@@ -193,19 +229,6 @@ class EmailTemplatePreviewService:
         )
 
         return sample_data
-
-    def _get_status_from_template_name(self, template_name: str) -> str:
-        """Extract order status from template name."""
-        status_map = {
-            "order_shipped": "SHIPPED",
-            "order_delivered": "DELIVERED",
-            "order_completed": "COMPLETED",
-            "order_canceled": "CANCELED",
-            "order_returned": "RETURNED",
-            "order_refunded": "REFUNDED",
-            "order_status_generic": "PROCESSING",
-        }
-        return status_map.get(template_name, "PENDING")
 
     def _render_template(self, template_path: str, context: dict) -> str:
         """Render a template with a COMPLETE context (one from

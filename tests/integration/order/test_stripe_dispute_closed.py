@@ -482,7 +482,8 @@ class TestStaffEmail:
         from order.tasks import send_dispute_notification_email
 
         with patch(
-            "order.tasks.tenant_contact_email", return_value="staff@example.com"
+            "emails.recipients.tenant_operator_addresses",
+            return_value=["staff@example.com"],
         ):
             return send_dispute_notification_email.run(
                 order.id, DISPUTE, provider, **kwargs

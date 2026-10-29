@@ -819,6 +819,9 @@ msgstr "Κωδικός χρέωσης ACS (π.χ. 'ΑΚ12345678'). Χωρίς ε
 msgid "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
 msgstr "Κλήση ACS %(alias)s: %(outcome)s (%(ms)s ms)"
 
+msgid "ACS carrier"
+msgstr "Μεταφορέας ACS"
+
 msgid "ACS company identifier. No platform fallback — empty disables ACS."
 msgstr "Αναγνωριστικό εταιρείας ACS. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
@@ -1566,6 +1569,12 @@ msgstr "ΕΛΕΓΧΟΣ INDEX ΑΡΘΡΩΝ BLOG"
 
 msgid "BOX NOW PAY ON THE GO!"
 msgstr "BOX NOW PAY ON THE GO!"
+
+msgid "BOX NOW carrier"
+msgstr "Μεταφορέας BOX NOW"
+
+msgid "BOX NOW parcel at the locker"
+msgstr "Δέμα BOX NOW στο locker"
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "Οι προσφορές BXGY απαιτούν τόσο ποσότητα αγοράς όσο και ποσότητα λήψης."
@@ -2339,6 +2348,9 @@ msgstr "Προελεύσεις καλαθιών"
 
 msgid "Cart creation is not allowed via API."
 msgstr "Η δημιουργία καλαθιού δεν επιτρέπεται μέσω API."
+
+msgid "Cart feature"
+msgstr "Λειτουργία καλαθιού"
 
 #, python-format
 msgid "Cart for %(user)s - %(count)s item - Total: %(total)s"
@@ -3202,6 +3214,9 @@ msgstr "Αριθμός πιστωτικού τιμολογίου (timologio)"
 msgid "Credit receipt %(document_number)s for order #%(order_id)s is attached."
 msgstr "Επισυνάπτεται η πιστωτική απόδειξη %(document_number)s για την παραγγελία #%(order_id)s."
 
+msgid "Credit receipt issued"
+msgstr "Εκδόθηκε πιστωτική απόδειξη"
+
 #, python-brace-format
 msgid "Credit receipt {document_number} for your order #{order_id}"
 msgstr "Πιστωτική απόδειξη {document_number} για την παραγγελία σου #{order_id}"
@@ -3690,6 +3705,12 @@ msgstr "Δεν επιτρέπονται προσωρινές/αναλώσιμε�
 
 msgid "Dispute ID"
 msgstr "Αναγνωριστικό αμφισβήτησης"
+
+msgid "Dispute lost"
+msgstr "Χαμένη αμφισβήτηση"
+
+msgid "Dispute opened"
+msgstr "Ανοιχτή αμφισβήτηση"
 
 msgid "Distance from the supplied address in kilometres"
 msgstr "Απόσταση από τη δεδομένη διεύθυνση σε χιλιόμετρα"
@@ -5667,9 +5688,6 @@ msgstr "Λίστα/λεπτομέρειες γενικών ετικετών κα
 msgid "Generic fulfilment kind, independent of provider."
 msgstr "Γενικός τύπος εκπλήρωσης, ανεξάρτητος από τον πάροχο."
 
-msgid "Generic template for any status update"
-msgstr "Γενικό πρότυπο για οποιαδήποτε ενημέρωση κατάστασης"
-
 msgid "Get Discount Percent"
 msgstr "Ποσοστό έκπτωσης λήψης"
 
@@ -6868,6 +6886,9 @@ msgstr "Εκδόθηκε από τη διαχείριση"
 msgid "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 msgstr "Όνομα εκδότη που εμφανίζεται στις εφαρμογές authenticator όταν ο χρήστης σαρώνει τον κωδικό QR του TOTP (π.χ. 'MyShop'). Αν μείνει κενό, χρησιμοποιείται το όνομα του καταστήματος."
 
+msgid "Issuing receipts through myDATA"
+msgstr "Έκδοση αποδείξεων μέσω myDATA"
+
 msgid "It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart."
 msgstr "Φαίνεται ότι ξεκινήσατε ολοκλήρωση αγοράς αλλά δεν την τελειώσατε. Τα προϊόντα δεν είναι πλέον δεσμευμένα, αλλά σας περιμένουν στο καλάθι σας."
 
@@ -7955,6 +7976,9 @@ msgstr "Νέα υποβολή σχολίων ({rating}★ {category})"
 msgid "New messages"
 msgstr "Νέα μηνύματα"
 
+msgid "New order alert"
+msgstr "Ειδοποίηση νέας παραγγελίας"
+
 #, python-brace-format
 msgid "New order — #{order_id}"
 msgstr "Νέα παραγγελία — #{order_id}"
@@ -8566,8 +8590,8 @@ msgid "Order #%(order_id)s was refunded in full before its receipt was issued, s
 msgstr "Η παραγγελία #%(order_id)s επιστράφηκε πλήρως πριν εκδοθεί η απόδειξή της, άρα δεν υπάρχει πώληση που να τεκμηριωθεί."
 
 #, python-brace-format
-msgid "Order #{order_id} Status Update - {status}"
-msgstr "Παραγγελία #{order_id} — Ενημέρωση κατάστασης: {status}"
+msgid "Order #{order_id} Status Update - {status_display}"
+msgstr "Παραγγελία #{order_id} — Ενημέρωση κατάστασης: {status_display}"
 
 #, python-brace-format
 msgid "Order #{order_id} canceled"
@@ -8801,6 +8825,9 @@ msgstr "Είδος παραγγελίας %(item)s - %(change)s - %(date)s"
 msgid "Order item is required for restock operation"
 msgstr "Απαιτείται προϊόν παραγγελίας για την επαναφορά στο απόθεμα"
 
+msgid "Order marked refunded"
+msgstr "Παραγγελία κλεισμένη ως επιστραφείσα"
+
 msgid "Order not found or does not belong to you."
 msgstr "Η παραγγελία δεν βρέθηκε ή δεν σας ανήκει."
 
@@ -8810,8 +8837,14 @@ msgstr "Η παραγγελία δεν βρέθηκε."
 msgid "Order processing"
 msgstr "Επεξεργασία παραγγελίας"
 
+msgid "Order received"
+msgstr "Παραγγελία ελήφθη"
+
 msgid "Order refunded"
 msgstr "Επιστράφηκαν τα χρήματα της παραγγελίας"
+
+msgid "Order returned"
+msgstr "Παραγγελία επιστράφηκε"
 
 msgid "Order shipped"
 msgstr "Η παραγγελία απεστάλη"
@@ -10294,6 +10327,9 @@ msgstr "Μετρητές αποδείξεων"
 msgid "Receipt PDF has not been generated yet."
 msgstr "Το PDF της απόδειξης δεν έχει δημιουργηθεί ακόμη."
 
+msgid "Receipt issued"
+msgstr "Εκδόθηκε απόδειξη"
+
 msgid "Receipt not found."
 msgstr "Η απόδειξη δεν βρέθηκε."
 
@@ -10508,6 +10544,9 @@ msgstr "Πίστωση επιστροφής"
 
 msgid "Refund order"
 msgstr "Επιστροφή χρημάτων παραγγελίας"
+
+msgid "Refund processed"
+msgstr "Η επιστροφή χρημάτων ολοκληρώθηκε"
 
 #, python-brace-format
 msgid "Refund processed for order #{order_id}"
@@ -11355,8 +11394,35 @@ msgstr "Όνομα αποστολέα"
 msgid "Sent"
 msgstr "Απεστάλη"
 
+msgid "Sent once for every refund paid back to the customer."
+msgstr "Αποστέλλεται μία φορά για κάθε επιστροφή χρημάτων στον πελάτη."
+
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Αποστέλλεται στον πάροχο ώστε μια επανάληψη να μην αποτελεί δεύτερη επιστροφή."
+
+msgid "Sent when ACS has the parcel out for delivery."
+msgstr "Αποστέλλεται όταν η ACS έχει το δέμα προς παράδοση."
+
+msgid "Sent when a delivered, paid order is completed."
+msgstr "Αποστέλλεται όταν μια παραδομένη, εξοφλημένη παραγγελία ολοκληρώνεται."
+
+msgid "Sent when an order is canceled."
+msgstr "Αποστέλλεται όταν μια παραγγελία ακυρώνεται."
+
+msgid "Sent when an order is closed as refunded."
+msgstr "Αποστέλλεται όταν μια παραγγελία κλείνει ως επιστραφείσα."
+
+msgid "Sent when an order is placed and its payment is still due."
+msgstr "Αποστέλλεται όταν καταχωρίζεται μια παραγγελία της οποίας η πληρωμή εκκρεμεί."
+
+msgid "Sent when an order is placed with its payment captured."
+msgstr "Αποστέλλεται όταν καταχωρίζεται μια παραγγελία με ήδη εισπραγμένη πληρωμή."
+
+msgid "Sent when an order is returned to the store."
+msgstr "Αποστέλλεται όταν μια παραγγελία επιστρέφεται στο κατάστημα."
+
+msgid "Sent when an order's payment fails, with a link to retry."
+msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο για νέα προσπάθεια."
 
 msgid "Sent when order is canceled"
 msgstr "Αποστέλλεται όταν η παραγγελία ακυρωθεί"
@@ -11366,6 +11432,21 @@ msgstr "Αποστέλλεται όταν η παραγγελία παραδοθ
 
 msgid "Sent when order is shipped"
 msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
+
+msgid "Sent when the carrier reports the parcel delivered."
+msgstr "Αποστέλλεται όταν ο μεταφορέας δηλώνει το δέμα παραδομένο."
+
+msgid "Sent when the parcel arrives at the locker to be collected."
+msgstr "Αποστέλλεται όταν το δέμα φτάνει στο locker για παραλαβή."
+
+msgid "Sent when the parcel is in transit, with its tracking."
+msgstr "Αποστέλλεται όταν το δέμα βρίσκεται καθ' οδόν, με τον αριθμό αποστολής."
+
+msgid "Sent with the PDF of a registered retail credit receipt."
+msgstr "Αποστέλλεται με το PDF μιας καταχωρισμένης πιστωτικής απόδειξης λιανικής."
+
+msgid "Sent with the PDF of a registered retail receipt."
+msgstr "Αποστέλλεται με το PDF μιας καταχωρισμένης απόδειξης λιανικής."
 
 msgid "Seo Description"
 msgstr "Περιγραφή SEO"
@@ -12354,6 +12435,15 @@ msgstr "Η ΔΟΥ είναι υποχρεωτική."
 msgid "Team"
 msgstr "Ομάδα"
 
+msgid "Tells the store's staff that a dispute closed against it."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια αμφισβήτηση έκλεισε εις βάρος του."
+
+msgid "Tells the store's staff that a payment was disputed."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια πληρωμή αμφισβητήθηκε."
+
+msgid "Tells the store's staff that an order was placed."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι έγινε μια παραγγελία."
+
 msgid "Templates"
 msgstr "Πρότυπα"
 
@@ -12950,6 +13040,9 @@ msgstr "Αυτή η παραγγελία έχει ήδη πληρωθεί."
 
 msgid "This order has already been refunded."
 msgstr "Αυτή η παραγγελία έχει ήδη επιστραφεί."
+
+msgid "This order has no credit receipt to send."
+msgstr "Η παραγγελία δεν έχει πιστωτική απόδειξη προς αποστολή."
 
 msgid "This order has no dispute to report."
 msgstr "Η παραγγελία δεν έχει αμφισβήτηση πληρωμής προς αναφορά."
@@ -14810,14 +14903,6 @@ msgstr "Τ.Κ."
 msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
 
-#, python-format
-msgid "[%(site)s] %(provider)s dispute lost — Order #%(order)s"
-msgstr "[%(site)s] Χαμένη αμφισβήτηση %(provider)s — Παραγγελία #%(order)s"
-
-#, python-format
-msgid "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
-msgstr "[%(site)s] Ανοιχτή αμφισβήτηση %(provider)s — Παραγγελία #%(order)s"
-
 #, python-brace-format
 msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Ειδοποίηση χαμηλού αποθέματος — {n} προϊόν(τα)"
@@ -14849,6 +14934,14 @@ msgstr "[{site}] Η αγορά της δωροκάρτας σας"
 #, python-brace-format
 msgid "[{site}] {name} is back in stock"
 msgstr "[{site}] Το {name} είναι ξανά διαθέσιμο"
+
+#, python-brace-format
+msgid "[{site}] {provider} dispute lost — Order #{order_id}"
+msgstr "[{site}] Χαμένη αμφισβήτηση {provider} — Παραγγελία #{order_id}"
+
+#, python-brace-format
+msgid "[{site}] {provider} dispute opened — Order #{order_id}"
+msgstr "[{site}] Ανοιχτή αμφισβήτηση {provider} — Παραγγελία #{order_id}"
 
 msgid "``insufficient_stock`` / ``cart_invalid`` from the cart check: one message per problem, for display."
 msgstr "``insufficient_stock`` / ``cart_invalid`` από τον έλεγχο καλαθιού: ένα μήνυμα ανά πρόβλημα, για εμφάνιση."
@@ -15437,6 +15530,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Generating preview..."
 #~ msgstr "Δημιουργία προεπισκόπησης..."
+
+#~ msgid "Generic template for any status update"
+#~ msgstr "Γενικό πρότυπο για οποιαδήποτε ενημέρωση κατάστασης"
 
 #~ msgid "Get a summary of subscriptions for a specific user."
 #~ msgstr "Λήψη σύνοψης εγγραφών για συγκεκριμένο χρήστη."

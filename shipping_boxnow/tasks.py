@@ -6,7 +6,6 @@ from typing import Any
 from celery import shared_task
 
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_boxnow.exceptions import (
@@ -15,7 +14,6 @@ from shipping_boxnow.exceptions import (
     BoxNowRetryableError,
 )
 from tenant.celery import TenantTask
-from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -317,8 +315,7 @@ def boxnow_send_arrival_notification(
     # All heavy imports are deferred so the task module can be imported
     # cleanly at worker startup without pulling in the full Django ORM
     # graph for shipping_boxnow, order, and notification apps.
-    from django.core.mail import EmailMultiAlternatives
-
+    from emails.send import send_email, was_sent
     from notification.enum import (
         NotificationCategoryEnum,
         NotificationKindEnum,
@@ -326,7 +323,6 @@ def boxnow_send_arrival_notification(
         NotificationTypeEnum,
     )
     from notification.services import create_user_notification
-    from order.emails import boxnow_parcel_at_locker_email
     from shipping_boxnow.models import BoxNowParcelEvent
 
     try:
@@ -356,27 +352,14 @@ def boxnow_send_arrival_notification(
     )
 
     # --- Email -----------------------------------------------------------
-    email = boxnow_parcel_at_locker_email(
-        shipment, language=get_order_language(order)
-    )
-    text_body, html_body = email.render()
-
-    msg = EmailMultiAlternatives(
-        subject=email.subject,
-        body=text_body,
-        from_email=tenant_from_email(),
-        to=[order.email],
-        reply_to=[tenant_contact_email() or tenant_from_email()],
-    )
-    msg.attach_alternative(html_body, "text/html")
-    msg.send(fail_silently=False)
-
-    logger.info(
-        "BoxNow arrival notification email sent for order %s (parcel=%s)",
-        order.id,
-        shipment.parcel_id,
-        extra={"order_id": order.id, "parcel_id": shipment.parcel_id},
-    )
+    email_sent = was_sent(send_email("shipping.boxnow_at_locker", shipment))
+    if email_sent:
+        logger.info(
+            "BoxNow arrival notification email sent for order %s (parcel=%s)",
+            order.id,
+            shipment.parcel_id,
+            extra={"order_id": order.id, "parcel_id": shipment.parcel_id},
+        )
 
     # --- In-app notification (WebSocket fan-out) -------------------------
     # Only possible when the order is linked to a registered user.
@@ -400,7 +383,7 @@ def boxnow_send_arrival_notification(
         )
 
     return {
-        "status": "sent",
+        "status": "sent" if email_sent else "email_not_sent",
         "order_id": order.id,
         "parcel_id": shipment.parcel_id,
     }

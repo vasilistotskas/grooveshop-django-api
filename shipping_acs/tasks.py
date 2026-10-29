@@ -32,7 +32,6 @@ from django.utils.translation import gettext
 
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.email_context import build_email_context
-from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_acs.exceptions import (
@@ -42,7 +41,6 @@ from shipping_acs.exceptions import (
     AcsUnprintedVouchersError,
 )
 from tenant.celery import TenantTask
-from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -835,8 +833,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
     # Heavy imports are deferred so the task module imports cleanly at
     # worker start without pulling in the full ORM graph for
     # shipping_acs, order and notification apps.
-    from django.core.mail import EmailMultiAlternatives
-
+    from emails.send import send_email, was_sent
     from notification.enum import (
         NotificationCategoryEnum,
         NotificationKindEnum,
@@ -844,7 +841,6 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         NotificationTypeEnum,
     )
     from notification.services import create_user_notification
-    from order.emails import acs_out_for_delivery_email
     from shipping_acs.models import AcsShipment
 
     try:
@@ -859,20 +855,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         return {"status": "not_found", "shipment_id": shipment_id}
 
     order = shipment.order
-    email = acs_out_for_delivery_email(
-        shipment, language=get_order_language(order)
-    )
-    text_body, html_body = email.render()
-
-    msg = EmailMultiAlternatives(
-        subject=email.subject,
-        body=text_body,
-        from_email=tenant_from_email(),
-        to=[order.email],
-        reply_to=[tenant_contact_email() or tenant_from_email()],
-    )
-    msg.attach_alternative(html_body, "text/html")
-    msg.send(fail_silently=False)
+    email_sent = was_sent(send_email("shipping.acs_out_for_delivery", shipment))
 
     if order.user_id:
         translations: dict[str, dict[str, str]] = {
@@ -905,7 +888,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
             )
 
     return {
-        "status": "sent",
+        "status": "sent" if email_sent else "email_not_sent",
         "order_id": order.id,
         "voucher_no": shipment.voucher_no,
     }

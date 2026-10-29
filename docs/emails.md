@@ -7,13 +7,11 @@ Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `transport.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
-**State.** The pipeline exists and is tested, but no production type is
-registered yet: every email the platform sends today still goes through its
-own task (`order/tasks.py`, `shipping_acs/tasks.py`, ...) and
-`core/email/` (the admin preview). They move onto the pipeline one domain
-at a time, each move keeping the recorded golden files equal (see Tests).
-Until then `emails.registry.registry` is empty and `EmailsConfig.ready`
-freezes it empty.
+**State.** The order emails are on the pipeline (see Registered types).
+Every other email the platform sends still goes through its own task
+(`product/tasks.py`, `giftcard/tasks.py`, ...) and `core/email/` (the
+admin preview of those). They move onto the pipeline one domain at a time,
+each move keeping the recorded golden files equal (see Tests).
 
 ## The pieces
 
@@ -27,7 +25,7 @@ freezes it empty.
 | `headers.py` | `build_headers`: the list headers by kind. Reuses `user.utils.subscription`. |
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`. |
-| `transport.py` | Builds the `EmailMultiAlternatives` and sends it; the pipeline's only sender. |
+| `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it; the pipeline's only sender. |
 | `send.py` | `send_email`: the whole envelope. |
 | `models.py`, `services.py` | `EmailSwitch`, `EmailOptOut`; `set_switch`, the only writer of switches. |
 
@@ -73,10 +71,49 @@ directory some type uses while no type names it. Only directories the
 catalogue already uses are scanned, so the templates of mail that has not
 moved onto the pipeline are none of its business.
 
-## `send_email(type_key, obj, *, recipient=None)`
+## Registered types
 
-Returns one `Delivery(type_key, status, reason, recipient)` per recipient,
-or a single skip. In order:
+Declared in `order/emails.py`, next to the builders that read the order:
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `order.received`, `order.payment_confirmed` | the `Order` | required; `FeatureGate("cart")` |
+| `order.payment_failed`, `order.shipped` | the `Order` | required |
+| `order.delivered`, `order.completed` | the `Order` | switchable |
+| `order.canceled`, `order.returned` | the `Order` | required |
+| `order.status_refunded` | the `Order`, closed as REFUNDED | required |
+| `order.refunded` | one refund `PaymentTransaction` | required |
+| `order.receipt_issued`, `order.credit_issued` | the `Invoice` / `RetailCredit` (PDF attached) | required; `StoreSwitchGate("MYDATA_ENABLED")` |
+| `shipping.acs_out_for_delivery` | the `AcsShipment` | switchable; `CarrierGate("acs")` |
+| `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
+| `team.new_order` | the `Order` | switchable, store staff |
+| `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
+
+Customer types are transactional with the `List-ID` the old send sites
+used (`order_confirmation`, `order_status`, `order_invoice`, ...), set as
+`list_id` so the recorded headers stay equal. The two carrier
+arrival mails (`shipping.acs_out_for_delivery`, `shipping.boxnow_at_locker`)
+sent no list headers before they moved; like every customer transactional
+mail they now carry them (re-recorded in the goldens):
+
+```
+-  "headers": {},
++  "headers": {
++    "List-ID": "<acs_out_for_delivery.shop.example>",
++    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
++  },
+```
+
+Their Reply-To was `[contact or From]` and is now `[contact]`, or none for a
+store without a contact address (replies then go to From). The status template that
+`order_returned` and `order_refunded` build on is `emails/base/order_status`,
+not an email.
+
+## `send_email(type_key, obj, *, recipient=None, attachments=())`
+
+Returns one `Delivery(type_key, status, reason, recipient, subject)` per
+recipient (`subject` is the one that went out, for `SENT`), or a single
+skip. `was_sent(deliveries)` says whether any recipient was sent. In order:
 
 1. The type is looked up (`UnknownEmailType` if absent).
 2. **Owner.** A `platform` type runs under `schema_context(public)`. A
@@ -95,7 +132,17 @@ or a single skip. In order:
 A transport failure is logged (no address in the line) and re-raised, so the
 calling task's own `autoretry_for=MAIL_TRANSIENT_ERRORS` applies. The
 caller keeps its idempotency claim and its bookkeeping: the pipeline does
-not take over business de-duplication.
+not take over business de-duplication. A task that reports sent or not
+maps the `Delivery` list itself (`was_sent`): a skip is a deliberate no-op,
+not a failure.
+
+### Attachments
+
+`attachments` is a sequence of `emails.transport.Attachment(filename,
+content, mimetype)`, attached to the message of every recipient after the
+HTML alternative. The `content` bytes are `repr=False` and nothing logs them.
+The caller reads the file (a receipt PDF) before calling, so a send that is
+skipped still reads it.
 
 The skips are logged as a structured line (`email_type`, `status`,
 `reason`). There is no log table yet.
@@ -107,15 +154,20 @@ The language is the recipient's. The resolvers state it: `customer_of`
 else the store's), `store_operators` (the store's), `platform_operators`
 (`settings.LANGUAGE_CODE`). `store_operators` is the bound tenant's
 `contact_email` then `owner_email` and nothing else: a store with neither
-has nobody to write to, and `settings.ADMINS` is never used for it.
+has nobody to write to, and `settings.ADMINS` is never used for it. When
+both exist and differ, each gets its own mail. `team.new_order` and the
+dispute mails changed to this from `tenant_admin_recipients()` (contact
+address only, in practice); other callers of `tenant_admin_recipients()`
+are unchanged.
 
 ### Sender
 
 `From` is `tenant.credentials.tenant_from_email()` read in the schema the
 send runs under, so a platform type is sent as `"{SITE_NAME}"
 <DEFAULT_FROM_EMAIL>` and a store type as the store (its own verified domain,
-else its name on the platform's sender). `Reply-To` is the store's contact
-address for a store type and empty for a platform type.
+else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type)`) is the store's contact
+address for a store type sent to customers, and empty for a platform type
+and for mail to the store's own staff.
 
 ## Gates (`gates.py`)
 
@@ -211,8 +263,6 @@ concatenation at a call site.
 
 ## Not built yet
 
-- Attachments: `send_email` and `transport` cannot attach a file (the
-  receipt and credit PDFs need it).
 - The unsubscribe endpoints behind `UNSUBSCRIBE_PATH`; marketing headers
   already point at them.
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
@@ -220,16 +270,19 @@ concatenation at a call site.
 - The import move: `sender.py` and `headers.py` reuse
   `tenant.credentials` and `user.utils.subscription`, whose code moves here
   with the send sites (the header import will then need its cycle broken).
-- Every production email type, the admin page and the preview.
+- The other domains' email types (shipping alerts, product, giftcard, b2b,
+  contact, user, core, tenant, allauth) and the admin page. The preview of
+  the order emails already goes through `render`.
 
 ## Tests
 
 - `tests/unit/emails/`, `tests/integration/emails/`, `tests_mt/test_email_isolation.py`:
   the registry, gates, switch, opt-out, headers, header safety and the
-  per-schema isolation. The registry is empty in production, so the
-  contract is proven over probe types (`tests/utils/emails.py`): the
-  `catalogue` fixture swaps the registry's contents for the test and
-  restores them. Never register a probe type in production code.
+  per-schema isolation. The contract is proven over probe types
+  (`tests/utils/emails.py`): the `catalogue` fixture swaps the registry's
+  contents for the test and restores them. Never register a probe type in
+  production code. A test that runs a store email (an order task) needs a
+  store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
 - `tests/integration/emails/test_golden_render.py` records every order
   email as it is sent today (subject, recipients, From, Reply-To, headers,
   attachment names, HTML and text, in Greek and English) under

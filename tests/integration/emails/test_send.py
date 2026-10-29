@@ -1,7 +1,7 @@
 """``send_email``: what reaches the outbox, and why something does not.
 
-The registry holds no production type yet, so the contract is proven over
-probe types (``tests/utils/emails.py``). Each case states the one rule it
+The contract is proven over probe types (``tests/utils/emails.py``), in a
+catalogue of their own, so it does not depend on the production types. Each case states the one rule it
 checks, and the closed-gate, switch and opt-out cases would fail if the
 check they exercise were deleted from the pipeline.
 """
@@ -23,7 +23,14 @@ from emails.models import EVERY_MARKETING_TYPE, EmailOptOut, EmailSwitch
 from emails.recipients import Recipient
 from emails.registry import UnknownEmailType
 from emails.render import render
-from emails.send import Status, StoreRequired, send_email, switched_off_keys
+from emails.send import (
+    Status,
+    StoreRequired,
+    send_email,
+    switched_off_keys,
+    was_sent,
+)
+from emails.transport import Attachment
 from emails.types import Audience, Kind, Owner, RenderEnv
 from tests.integration.emails.conftest import STORE_INBOX
 from tests.utils.emails import probe, probe_object
@@ -110,6 +117,94 @@ class TestSending:
 
         assert statuses(deliveries) == [Status.SKIPPED_NO_RECIPIENT]
         assert mail.outbox == []
+
+
+class TestSubjectAndReplyTo:
+    def test_a_sent_delivery_carries_the_subject_that_went_out(self, catalogue):
+        catalogue(probe("order.shipped"))
+
+        [delivery] = send_email("order.shipped", probe_object())
+
+        assert delivery.subject == mail.outbox[0].subject
+        assert was_sent([delivery]) is True
+
+    def test_a_skip_is_not_sent_and_has_no_subject(self, catalogue):
+        catalogue(probe(recipients=lambda obj: []))
+
+        deliveries = send_email("probe.notice", probe_object())
+
+        assert was_sent(deliveries) is False
+        assert [each.subject for each in deliveries] == [""]
+
+    def test_mail_to_the_stores_own_staff_has_no_reply_to(self, catalogue):
+        catalogue(
+            probe(
+                audience=Audience.STORE_STAFF,
+                recipients=lambda obj: [Recipient(STORE_INBOX, "en")],
+            )
+        )
+
+        send_email("probe.notice", probe_object())
+
+        [message] = mail.outbox
+        assert message.to == [STORE_INBOX]
+        assert message.reply_to == []
+        assert "List-ID" not in message.extra_headers
+
+
+class TestAttachments:
+    PDF = Attachment("receipt.pdf", b"%PDF-1.4 SECRET-BYTES", "application/pdf")
+
+    def test_an_attachment_travels_with_the_message(self, catalogue):
+        catalogue(probe())
+
+        send_email("probe.notice", probe_object(), attachments=[self.PDF])
+
+        [message] = mail.outbox
+        [(name, content, mimetype)] = message.attachments
+        assert (name, mimetype) == ("receipt.pdf", "application/pdf")
+        assert content == b"%PDF-1.4 SECRET-BYTES"
+        [(_html, html_type)] = message.alternatives
+        assert html_type == "text/html"
+
+    def test_every_recipient_gets_the_attachment(self, catalogue):
+        catalogue(probe())
+        other = Recipient("other@example.test", "el")
+
+        send_email(
+            "probe.notice",
+            probe_object(),
+            recipient=other,
+            attachments=[self.PDF],
+        )
+        send_email(
+            "probe.notice", probe_object(), attachments=[self.PDF, self.PDF]
+        )
+
+        assert [len(message.attachments) for message in mail.outbox] == [1, 2]
+
+    def test_a_skipped_send_attaches_nothing_anywhere(self, catalogue):
+        catalogue(
+            probe(gates=(StoreSwitchGate(setting="MYDATA_ENABLED", label="x"),))
+        )
+
+        deliveries = send_email(
+            "probe.notice", probe_object(), attachments=[self.PDF]
+        )
+
+        assert statuses(deliveries) == [Status.SKIPPED_FEATURE_OFF]
+        assert mail.outbox == []
+
+    def test_the_bytes_are_not_in_the_repr_nor_in_the_log(
+        self, catalogue, caplog
+    ):
+        catalogue(probe())
+
+        with caplog.at_level(logging.DEBUG, logger="emails"):
+            send_email("probe.notice", probe_object(), attachments=[self.PDF])
+
+        assert "SECRET-BYTES" not in repr(self.PDF)
+        assert "SECRET-BYTES" not in caplog.text
 
 
 class TestPreviewEqualsSend:
@@ -332,6 +427,7 @@ class TestHeaders:
 
 
 class TestOwner:
+    @pytest.mark.unbound_store
     def test_a_store_type_needs_a_bound_store(self, catalogue, tenant):
         catalogue(probe())
         from tests.utils.staff import bind_store_tenant

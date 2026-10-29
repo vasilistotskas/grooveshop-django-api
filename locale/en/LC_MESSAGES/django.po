@@ -814,6 +814,9 @@ msgstr "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty d
 msgid "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
 msgstr "ACS call %(alias)s: %(outcome)s (%(ms)s ms)"
 
+msgid "ACS carrier"
+msgstr "ACS carrier"
+
 msgid "ACS company identifier. No platform fallback — empty disables ACS."
 msgstr "ACS company identifier. No platform fallback — empty disables ACS."
 
@@ -1561,6 +1564,12 @@ msgstr "BLOG POST INDEX INSPECTION"
 
 msgid "BOX NOW PAY ON THE GO!"
 msgstr "BOX NOW PAY ON THE GO!"
+
+msgid "BOX NOW carrier"
+msgstr "BOX NOW carrier"
+
+msgid "BOX NOW parcel at the locker"
+msgstr "BOX NOW parcel at the locker"
 
 msgid "BXGY promotions need both a buy quantity and a get quantity."
 msgstr "BXGY promotions need both a buy quantity and a get quantity."
@@ -2332,6 +2341,9 @@ msgstr "Cart attributions"
 
 msgid "Cart creation is not allowed via API."
 msgstr "Cart creation is not allowed via API."
+
+msgid "Cart feature"
+msgstr "Cart feature"
 
 #, python-format
 msgid "Cart for %(user)s - %(count)s item - Total: %(total)s"
@@ -3196,6 +3208,9 @@ msgstr "Credit invoice number (timologio)"
 msgid "Credit receipt %(document_number)s for order #%(order_id)s is attached."
 msgstr "Credit receipt %(document_number)s for order #%(order_id)s is attached."
 
+msgid "Credit receipt issued"
+msgstr "Credit receipt issued"
+
 #, python-brace-format
 msgid "Credit receipt {document_number} for your order #{order_id}"
 msgstr "Credit receipt {document_number} for your order #{order_id}"
@@ -3683,6 +3698,12 @@ msgstr "Disposable / temporary email addresses are not allowed"
 
 msgid "Dispute ID"
 msgstr "Dispute ID"
+
+msgid "Dispute lost"
+msgstr "Dispute lost"
+
+msgid "Dispute opened"
+msgstr "Dispute opened"
 
 msgid "Distance from the supplied address in kilometres"
 msgstr "Distance from the supplied address in kilometres"
@@ -5659,9 +5680,6 @@ msgstr "Generic Tag list/detail and the M2M-through TaggedItem cache. Tags are s
 msgid "Generic fulfilment kind, independent of provider."
 msgstr "Generic fulfilment kind, independent of provider."
 
-msgid "Generic template for any status update"
-msgstr "Generic template for any status update"
-
 msgid "Get Discount Percent"
 msgstr "Get Discount Percent"
 
@@ -6859,6 +6877,9 @@ msgstr "Issued via admin"
 msgid "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 msgstr "Issuer name shown in authenticator apps when the user scans the TOTP QR code (e.g. 'MyShop'). Empty uses the store name."
 
+msgid "Issuing receipts through myDATA"
+msgstr "Issuing receipts through myDATA"
+
 msgid "It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart."
 msgstr "It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart."
 
@@ -7944,6 +7965,9 @@ msgstr "New feedback ({rating}★ {category}) submission"
 msgid "New messages"
 msgstr "New messages"
 
+msgid "New order alert"
+msgstr "New order alert"
+
 #, python-brace-format
 msgid "New order — #{order_id}"
 msgstr "New order — #{order_id}"
@@ -8555,8 +8579,8 @@ msgid "Order #%(order_id)s was refunded in full before its receipt was issued, s
 msgstr "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
 
 #, python-brace-format
-msgid "Order #{order_id} Status Update - {status}"
-msgstr "Order #{order_id} Status Update - {status}"
+msgid "Order #{order_id} Status Update - {status_display}"
+msgstr "Order #{order_id} Status Update - {status_display}"
 
 #, python-brace-format
 msgid "Order #{order_id} canceled"
@@ -8790,6 +8814,9 @@ msgstr "Order item %(item)s - %(change)s - %(date)s"
 msgid "Order item is required for restock operation"
 msgstr "Order item is required for restock operation"
 
+msgid "Order marked refunded"
+msgstr "Order marked refunded"
+
 msgid "Order not found or does not belong to you."
 msgstr "Order not found or does not belong to you."
 
@@ -8799,8 +8826,14 @@ msgstr "Order not found."
 msgid "Order processing"
 msgstr "Order processing"
 
+msgid "Order received"
+msgstr "Order received"
+
 msgid "Order refunded"
 msgstr "Order refunded"
+
+msgid "Order returned"
+msgstr "Order returned"
 
 msgid "Order shipped"
 msgstr "Order shipped"
@@ -10283,6 +10316,9 @@ msgstr "Receipt Counters"
 msgid "Receipt PDF has not been generated yet."
 msgstr "Receipt PDF has not been generated yet."
 
+msgid "Receipt issued"
+msgstr "Receipt issued"
+
 msgid "Receipt not found."
 msgstr "Receipt not found."
 
@@ -10497,6 +10533,9 @@ msgstr "Refund credit"
 
 msgid "Refund order"
 msgstr "Refund order"
+
+msgid "Refund processed"
+msgstr "Refund processed"
 
 #, python-brace-format
 msgid "Refund processed for order #{order_id}"
@@ -11345,8 +11384,35 @@ msgstr "Sender Name"
 msgid "Sent"
 msgstr "Sent"
 
+msgid "Sent once for every refund paid back to the customer."
+msgstr "Sent once for every refund paid back to the customer."
+
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Sent to the provider so a repeat is not a second refund."
+
+msgid "Sent when ACS has the parcel out for delivery."
+msgstr "Sent when ACS has the parcel out for delivery."
+
+msgid "Sent when a delivered, paid order is completed."
+msgstr "Sent when a delivered, paid order is completed."
+
+msgid "Sent when an order is canceled."
+msgstr "Sent when an order is canceled."
+
+msgid "Sent when an order is closed as refunded."
+msgstr "Sent when an order is closed as refunded."
+
+msgid "Sent when an order is placed and its payment is still due."
+msgstr "Sent when an order is placed and its payment is still due."
+
+msgid "Sent when an order is placed with its payment captured."
+msgstr "Sent when an order is placed with its payment captured."
+
+msgid "Sent when an order is returned to the store."
+msgstr "Sent when an order is returned to the store."
+
+msgid "Sent when an order's payment fails, with a link to retry."
+msgstr "Sent when an order's payment fails, with a link to retry."
 
 msgid "Sent when order is canceled"
 msgstr "Sent when order is canceled"
@@ -11356,6 +11422,21 @@ msgstr "Sent when order is delivered"
 
 msgid "Sent when order is shipped"
 msgstr "Sent when order is shipped"
+
+msgid "Sent when the carrier reports the parcel delivered."
+msgstr "Sent when the carrier reports the parcel delivered."
+
+msgid "Sent when the parcel arrives at the locker to be collected."
+msgstr "Sent when the parcel arrives at the locker to be collected."
+
+msgid "Sent when the parcel is in transit, with its tracking."
+msgstr "Sent when the parcel is in transit, with its tracking."
+
+msgid "Sent with the PDF of a registered retail credit receipt."
+msgstr "Sent with the PDF of a registered retail credit receipt."
+
+msgid "Sent with the PDF of a registered retail receipt."
+msgstr "Sent with the PDF of a registered retail receipt."
 
 msgid "Seo Description"
 msgstr "Seo Description"
@@ -12348,6 +12429,15 @@ msgstr "Tax office (ΔΟΥ) is required."
 msgid "Team"
 msgstr "Team"
 
+msgid "Tells the store's staff that a dispute closed against it."
+msgstr "Tells the store's staff that a dispute closed against it."
+
+msgid "Tells the store's staff that a payment was disputed."
+msgstr "Tells the store's staff that a payment was disputed."
+
+msgid "Tells the store's staff that an order was placed."
+msgstr "Tells the store's staff that an order was placed."
+
 msgid "Templates"
 msgstr "Templates"
 
@@ -12944,6 +13034,9 @@ msgstr "This order has already been paid."
 
 msgid "This order has already been refunded."
 msgstr "This order has already been refunded."
+
+msgid "This order has no credit receipt to send."
+msgstr "This order has no credit receipt to send."
 
 msgid "This order has no dispute to report."
 msgstr "This order has no dispute to report."
@@ -14804,14 +14897,6 @@ msgstr "Zipcode"
 msgid "Zipcode is required."
 msgstr "Zipcode is required."
 
-#, python-format
-msgid "[%(site)s] %(provider)s dispute lost — Order #%(order)s"
-msgstr "[%(site)s] %(provider)s dispute lost — Order #%(order)s"
-
-#, python-format
-msgid "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
-msgstr "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
-
 #, python-brace-format
 msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Low stock alert — {n} product(s)"
@@ -14843,6 +14928,14 @@ msgstr "[{site}] Your gift card purchase"
 #, python-brace-format
 msgid "[{site}] {name} is back in stock"
 msgstr "[{site}] {name} is back in stock"
+
+#, python-brace-format
+msgid "[{site}] {provider} dispute lost — Order #{order_id}"
+msgstr "[{site}] {provider} dispute lost — Order #{order_id}"
+
+#, python-brace-format
+msgid "[{site}] {provider} dispute opened — Order #{order_id}"
+msgstr "[{site}] {provider} dispute opened — Order #{order_id}"
 
 msgid "``insufficient_stock`` / ``cart_invalid`` from the cart check: one message per problem, for display."
 msgstr "``insufficient_stock`` / ``cart_invalid`` from the cart check: one message per problem, for display."
@@ -15126,6 +15219,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Fully Refunded"
 #~ msgstr "Fully Refunded"
+
+#~ msgid "Generic template for any status update"
+#~ msgstr "Generic template for any status update"
 
 #~ msgid "Go to Your Account"
 #~ msgstr "Go to Your Account"

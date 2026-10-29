@@ -160,7 +160,7 @@ class TestAFailedSend:
 
         with (
             patch(
-                "order.tasks.EmailMultiAlternatives.send",
+                "emails.transport.EmailMultiAlternatives.send",
                 side_effect=OSError("relay down"),
             ),
             # Called directly, a task's retry re-raises the failure.
@@ -178,7 +178,7 @@ class TestAFailedSend:
 
         with (
             patch(
-                "order.tasks.EmailMultiAlternatives.send",
+                "emails.transport.EmailMultiAlternatives.send",
                 side_effect=OSError("relay down"),
             ),
             patch.object(send_refund_confirmation_email, "max_retries", 0),
@@ -361,7 +361,7 @@ class TestTheEmailStatesTheAmount:
 
         order = _order(language_code="en")
         body = render_to_string(
-            "emails/order/order_status_generic.txt",
+            "emails/base/order_status.txt",
             {"order": order, "status": "REFUNDED", "status_display": "R"},
         )
 

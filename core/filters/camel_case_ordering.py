@@ -131,12 +131,23 @@ class CamelCaseOrderingFilter(OrderingFilter):
         ordering = self.get_ordering(request, queryset, view)
         if not ordering:
             return queryset
-        return queryset.order_by(
-            *(
-                self._order_expression(key, request, queryset.model)
-                for key in ordering
-            )
-        )
+        terms = [
+            self._order_expression(key, request, queryset.model)
+            for key in ordering
+        ]
+        if not self._ends_unique(ordering, queryset.model):
+            # Rows that tie on every requested key come back in whatever
+            # order the plan produces, which can differ between two pages
+            # of one listing: a product then repeats on page 2 or never
+            # appears. The primary key makes the order total.
+            terms.append("pk")
+        return queryset.order_by(*terms)
+
+    @staticmethod
+    def _ends_unique(ordering: Sequence[str], model) -> bool:
+        """Whether some key of ``ordering`` is the model's primary key."""
+        unique = {"pk", model._meta.pk.name, model._meta.pk.attname}
+        return any(key.lstrip("-") in unique for key in ordering)
 
     @staticmethod
     def _order_expression(key: str, request: Request, model):

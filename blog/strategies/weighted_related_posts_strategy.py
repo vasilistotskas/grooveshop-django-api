@@ -26,7 +26,7 @@ class WeightedRelatedPostsStrategy(RelatedPostsStrategy):
                 pk__in=collected_post_ids
             )[:num_posts]
             collected_posts.extend(posts)
-            collected_post_ids.update(posts.values_list("pk", flat=True))
+            collected_post_ids.update(post.pk for post in posts)
             remaining_limit -= len(posts)
             if remaining_limit <= 0:
                 break
@@ -46,6 +46,11 @@ class WeightedRelatedPostsStrategy(RelatedPostsStrategy):
                 if remaining_limit <= 0:
                     break
 
-        return BlogPost.objects.filter(
-            pk__in=[p.pk for p in collected_posts]
-        ).order_by("-published_at")
+        # ``for_list``, because the serializer reads each post's author,
+        # translations, tags and the three counts: a bare queryset made
+        # that six queries per post.
+        return (
+            BlogPost.objects.for_list()
+            .filter(pk__in=[p.pk for p in collected_posts])
+            .order_by("-published_at")
+        )

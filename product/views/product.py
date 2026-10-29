@@ -323,14 +323,16 @@ class ProductViewSet(BaseModelViewSet):
         rows. Schema generation instantiates the view without URL
         kwargs, hence the empty queryset then.
 
-        The product is scoped like the detail route (``for_detail`` plus
+        The product is scoped like the detail route (not deleted, plus
         ``active`` for non-staff), so the reviews of soft-deleted and
-        unreleased products stay unreachable.
+        unreleased products stay unreachable. Only its existence is
+        checked, so it is loaded bare: ``for_detail`` would prefetch
+        its translations, images, attributes and tags for nothing.
         """
         pk = self.kwargs.get("pk")
         if pk is None:
             return ProductReview.objects.none()
-        products = Product.objects.for_detail()
+        products = Product.objects.exclude_deleted()
         if not is_store_staff(self.request.user):
             products = products.active()
         product = get_object_or_404(products, pk=pk)

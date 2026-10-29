@@ -509,3 +509,38 @@ class TestSellableRefs:
         rows = client.get(url).json()
 
         assert rows[0]["rewardProducts"] == []
+
+
+@pytest.mark.django_db
+class TestQueryCost:
+    def test_product_cards_cost_no_query_per_product(
+        self, client, url, promotions_on
+    ):
+        """Each card shows its product's main image: without the image
+        prefetch that was one query per product."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        promotion = _automatic(target_scope=TargetScope.PRODUCTS)
+
+        def queries() -> int:
+            client.get(url)
+            with CaptureQueriesContext(connection) as captured:
+                assert client.get(url).status_code == status.HTTP_200_OK
+            return len(captured)
+
+        promotion.products.add(
+            *[
+                ProductFactory(stock=1, active=True, num_images=1)
+                for _ in range(2)
+            ]
+        )
+        small = queries()
+        promotion.products.add(
+            *[
+                ProductFactory(stock=1, active=True, num_images=1)
+                for _ in range(4)
+            ]
+        )
+
+        assert queries() == small

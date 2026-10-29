@@ -656,8 +656,7 @@ class ProductTranslation(
     @classmethod
     def get_meilisearch_queryset(cls):
         """Return optimized queryset for bulk indexing."""
-        from django.db.models import Count
-
+        from product.managers.product import likes_count_expression
         from promotion.offers import offer_kind_expression
 
         return (
@@ -669,9 +668,7 @@ class ProductTranslation(
                 "master__product_attributes__attribute_value__translations",
             )
             .annotate(
-                _likes_count=Count("master__favourited_by", distinct=True),
-                _review_average=Avg("master__reviews__rate"),
-                _reviews_count=Count("master__reviews", distinct=True),
+                _likes_count=likes_count_expression("master_id"),
                 _offer_kind=offer_kind_expression("master__"),
             )
         )

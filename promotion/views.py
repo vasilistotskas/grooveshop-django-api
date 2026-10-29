@@ -114,8 +114,16 @@ class PublicPromotionListView(APIView):
             .for_list()
             .prefetch_related(
                 _publishable_codes_prefetch(),
-                "products__translations",
-                "get_products__translations",
+                # With the main image: each product card shows it, and
+                # without it that is one query per product.
+                Prefetch(
+                    "products",
+                    queryset=Product.objects.with_translations().with_main_image(),
+                ),
+                Prefetch(
+                    "get_products",
+                    queryset=Product.objects.with_translations().with_main_image(),
+                ),
                 "categories__translations",
             )
             # Same order the engine applies them in, so the page reads

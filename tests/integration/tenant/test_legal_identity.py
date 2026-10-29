@@ -177,3 +177,28 @@ class TestEndpoint:
             == "123456789000"
         )
         assert body.get("vatId", body.get("vat_id")) == "EL999999999"
+
+
+@pytest.mark.django_db
+def test_endpoint_reads_the_identity_once(client):
+    """``missing_disclosure_fields()`` re-read all 14 settings when the
+    view did not hand it the identity it had just read."""
+    from unittest.mock import patch
+
+    from tenant import views
+
+    with (
+        patch.object(
+            views,
+            "merchant_legal_identity",
+            wraps=views.merchant_legal_identity,
+        ) as read,
+        patch(
+            "tenant.legal_identity.merchant_legal_identity",
+            wraps=merchant_legal_identity,
+        ) as read_again,
+    ):
+        client.get(reverse("tenant:tenant-legal-identity"))
+
+    assert read.call_count == 1
+    assert read_again.call_count == 0

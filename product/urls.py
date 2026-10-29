@@ -19,6 +19,11 @@ urlpatterns = [
         name="product-list",
     ),
     path(
+        "product/feed",
+        ProductViewSet.as_view({"get": "feed"}),
+        name="product-feed",
+    ),
+    path(
         "product/<int:pk>",
         ProductViewSet.as_view(
             {

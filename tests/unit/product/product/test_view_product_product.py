@@ -5,6 +5,7 @@ from django.test import TestCase
 from product.filters.product import ProductFilter
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
+    ProductCardSerializer,
     ProductDetailSerializer,
     ProductRetrieveSerializer,
     ProductSerializer,
@@ -31,7 +32,7 @@ class ProductViewSetTestCase(TestCase):
     def test_list_action_serializer(self):
         self.viewset.action = "list"
         serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductSerializer)
+        self.assertEqual(serializer_class, ProductCardSerializer)
 
     def test_retrieve_action_serializer(self):
         self.viewset.action = "retrieve"
@@ -76,8 +77,8 @@ class ProductViewSetTestCase(TestCase):
         self.assertEqual(schema_info["response"], ProductRetrieveSerializer)
 
         schema_info = self.viewset.get_serializer_for_schema("list")
-        self.assertEqual(schema_info["request"], ProductSerializer)
-        self.assertEqual(schema_info["response"], ProductSerializer)
+        self.assertEqual(schema_info["request"], ProductCardSerializer)
+        self.assertEqual(schema_info["response"], ProductCardSerializer)
 
         original_action = self.viewset.action
         self.viewset.get_serializer_for_schema("create")
@@ -124,7 +125,8 @@ class ProductViewSetTestCase(TestCase):
     def test_response_serializers_configuration(self):
         expected_responses = {
             "create": ProductRetrieveSerializer,
-            "list": ProductSerializer,
+            "list": ProductCardSerializer,
+            "feed": ProductSerializer,
             "retrieve": ProductRetrieveSerializer,
             "update": ProductRetrieveSerializer,
             "partial_update": ProductRetrieveSerializer,

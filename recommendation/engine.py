@@ -13,7 +13,7 @@ store-wide answer (``RecommendationStrategy.seedless``).
 
 It returns product IDs plus a ``reason`` per item, never serialized
 products: hydration happens in the view with ``Product.objects
-.for_list()`` so pricing context (B2B customer group) and locale are
+.for_full_list()`` so pricing context (B2B customer group) and locale are
 applied per request while everything here stays cacheable per product.
 
 Query cost is bounded by the number of strategies in the chain, never

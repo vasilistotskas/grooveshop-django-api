@@ -14,6 +14,7 @@ from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
 from product.models.product import Product
 from product.serializers.product import (
+    ProductCardSerializer,
     ProductDetailSerializer,
 )
 from user.factories.account import UserAccountFactory
@@ -82,32 +83,25 @@ class ProductViewSetTestCase(APITestCase):
         return reverse("product-list")
 
     def test_list_uses_correct_serializer(self):
+        # The factory draws ``active`` at random; the list shows active
+        # products only.
+        Product.objects.filter(pk=self.product.pk).update(active=True)
         url = self.get_product_list_url()
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
 
-        if response.data["results"]:
-            product_data = response.data["results"][0]
-            expected_fields = {
-                "id",
-                "slug",
-                "category",
-                "brand",
-                "brand_name",
-                "price",
-                "vat",
-                "view_count",
-                "stock",
-                "active",
-                "translations",
-                "final_price",
-                "review_average",
-                "review_count",
-                "likes_count",
-            }
-            self.assertTrue(expected_fields.issubset(set(product_data.keys())))
+        self.assertTrue(response.data["results"])
+        product_data = response.data["results"][0]
+        # Exactly a product card: what the storefront's cards, sitemap
+        # and RSS read. The feed and the product page carry the rest.
+        self.assertEqual(
+            set(product_data.keys()),
+            set(ProductCardSerializer.Meta.fields),
+        )
+        for translation in product_data["translations"].values():
+            self.assertEqual(set(translation), {"name", "description"})
 
     def test_retrieve_uses_correct_serializer(self):
         url = self.get_product_detail_url(self.product.pk)

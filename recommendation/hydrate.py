@@ -4,7 +4,7 @@ cached.
 The engine returns product IDs plus a reason. Serializing here, with
 the request in ``context``, is what applies the viewer's pricing
 context and locale; caching the serialized form would hand a B2B
-price to a retail shopper. ``Product.objects.for_list()`` carries the
+price to a retail shopper. ``Product.objects.for_full_list()`` carries the
 prefetches ``ProductSerializer`` needs, so the cost is constant in the
 number of items rather than a query per product (the same lesson the
 cart recommenders learned in ``cart/serializers/item.py``).
@@ -34,7 +34,9 @@ def hydrate_pairs(
     from product.serializers.product import ProductSerializer
 
     ids = [s.product_id for s in suggestions]
-    by_id = {p.id: p for p in Product.objects.for_list().filter(id__in=ids)}
+    by_id = {
+        p.id: p for p in Product.objects.for_full_list().filter(id__in=ids)
+    }
     ordered = [
         (s, by_id[s.product_id]) for s in suggestions if s.product_id in by_id
     ]

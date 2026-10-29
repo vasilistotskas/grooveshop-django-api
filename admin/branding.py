@@ -54,6 +54,21 @@ def site_icon(request: Any) -> dict[str, str] | None:
     return None
 
 
+def store_mark_url(tenant: Any) -> str | None:
+    """The store's square mark, for a square slot (an avatar, an icon).
+
+    Its own favicon, which is a square app icon, never its logo, which is
+    a wordmark that a square slot crops to a sliver. Then the platform's
+    bundled icon for the platform's own storefront, and nothing otherwise,
+    so the slot falls back to the store's initials.
+    """
+    if tenant.favicon_url:
+        return tenant.favicon_url
+    if tenant.is_platform_storefront:
+        return static("icon-light.svg")
+    return None
+
+
 def site_favicons(request: Any) -> list[dict[str, str]]:
     tenant = get_current_tenant()
     if tenant is None:

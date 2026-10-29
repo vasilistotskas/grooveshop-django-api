@@ -3,6 +3,35 @@
 
 
 
+## v3.162.2 (2026-10-29)
+
+### Performance improvements
+
+* perf(api): stop the product, blog and settings endpoints repeating work per row (#357)
+
+The like, review-count and review-average annotations were aggregates
+over joins, so a product list grouped by every column, and the promotion
+offer CASE above them ran its correlated subquery once per joined review
+and favourite row rather than once per product: 1,171 loops for 61
+products. They are now Subquery annotations. Locally, with promotions on,
+a product list goes from 1,903 to 176 ms and a search from 990 to 65 ms.
+The Meilisearch bulk-index queryset had the same shape and is fixed with
+it.
+
+Related posts and an author's recent and top posts are read through
+for_list, so a post's author, translation and tags no longer cost queries
+per post (related posts 65 -> 21, a post page 58 -> 34). store_settings
+reads every key in one get_many instead of one round trip each, and the
+legal identity view reads the identity once (28 cache reads -> 1). The
+promotion list prefetches each product's main image, and the reviews
+action loads its product without the detail relations it never uses.
+
+Every ordering the API accepts now ends in the primary key, so products
+that tie on the chosen key keep one order and a page never repeats or
+skips one.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f3735e5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f3735e58cd6adbbbea97072f735a188cc846bbe8))
+
 ## v3.162.1 (2026-10-29)
 
 ### Performance improvements

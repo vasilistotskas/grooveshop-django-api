@@ -10,8 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, NamedTuple, Self
 
-from django.db.models import Case, When
-
 from meili._client import client
 
 if TYPE_CHECKING:
@@ -60,13 +58,29 @@ class FacetGroup:
     ``clause`` is the filter the group contributed, ``selected`` the facet
     keys that clause asks for and ``members`` every facet key the group
     governs, selected or not (all as strings, the way the engine reports
-    them).
+    them). ``members`` is ``None`` when the group governs the whole facet
+    field, as the category and brand filters do: every key of the count
+    query is then the group's own.
     """
 
     facet: str
     clause: str
     selected: frozenset[str]
-    members: frozenset[str]
+    members: frozenset[str] | None
+
+
+@dataclass(frozen=True, slots=True)
+class StatsBaseline:
+    """Facet statistics taken over a fixed set of documents.
+
+    A price slider or a popularity range describes the catalogue, not the
+    shopper's current filters, so its ``facetStats`` come from a query of
+    its own: no search text and only the ``filters`` of the baseline.
+    """
+
+    facets: tuple[str, ...]
+    filters: tuple[str, ...]
+    locales: tuple[str, ...]
 
 
 @dataclass(slots=True)
@@ -83,6 +97,7 @@ class QueryState:
     filters: list[str] = field(default_factory=list)
     facets: list[str] = field(default_factory=list)
     facet_groups: list[FacetGroup] = field(default_factory=list)
+    stats_baselines: list[StatsBaseline] = field(default_factory=list)
     attributes_to_retrieve: list[str] = field(default_factory=lambda: ["*"])
     attributes_to_crop: list[str] = field(default_factory=list)
     crop_length: int = 10
@@ -223,7 +238,7 @@ class IndexQuerySet[T: IndexMixin]:
         self,
         facet: str,
         selected: Iterable[int | str],
-        members: Iterable[int | str],
+        members: Iterable[int | str] | None,
     ) -> Self:
         """
         Keep documents whose ``facet`` holds ANY of ``selected``, as one
@@ -233,7 +248,8 @@ class IndexQuerySet[T: IndexMixin]:
         two groups on the same facet are "any of these AND any of those".
         When ``facet`` is also requested through ``set_facets``, ``search``
         counts each group's ``members`` without that group's own clause
-        (see ``FacetGroup``).
+        (see ``FacetGroup``); ``members=None`` makes the group the whole
+        facet field.
 
         Example:
             .filter_facet_group("attribute_values", [10, 11], members=[10, 11, 12])
@@ -246,7 +262,31 @@ class IndexQuerySet[T: IndexMixin]:
                 facet=facet,
                 clause=self._state.filters[-1],
                 selected=frozenset(str(key) for key in selected),
-                members=frozenset(str(member) for member in members),
+                members=(
+                    None
+                    if members is None
+                    else frozenset(str(member) for member in members)
+                ),
+            )
+        )
+        return self
+
+    def stats_over(self, baseline: IndexQuerySet, *facet_fields: str) -> Self:
+        """
+        Take the ``facetStats`` of ``facet_fields`` over the documents
+        ``baseline`` filters to, with no search text, instead of over this
+        queryset's own matches (see ``StatsBaseline``). The fields must
+        not also be in ``set_facets``, or the baseline's stats replace the
+        search's own.
+
+        Example:
+            .stats_over(Model.meilisearch.filter(active=True), "price")
+        """
+        self._state.stats_baselines.append(
+            StatsBaseline(
+                facets=facet_fields,
+                filters=tuple(baseline.filters),
+                locales=tuple(baseline._state.locales),
             )
         )
         return self
@@ -434,7 +474,7 @@ class IndexQuerySet[T: IndexMixin]:
             for group in self._state.facet_groups
             if group.facet in self._state.facets
         ]
-        if counted_groups:
+        if counted_groups or self._state.stats_baselines:
             results = self._search_with_group_counts(
                 q, search_params, counted_groups
             )
@@ -467,9 +507,9 @@ class IndexQuerySet[T: IndexMixin]:
         self, q: str, params: dict, groups: list[FacetGroup]
     ) -> dict:
         """
-        Run the search plus one count-only query per facet group, in one
-        ``multi-search`` request (Meilisearch's documented recipe for
-        disjunctive facets).
+        Run the search plus one count-only query per facet group and one
+        per stats baseline, in one ``multi-search`` request (Meilisearch's
+        documented recipe for disjunctive facets).
 
         Each group query repeats ``params`` (the same ``q``, matching
         strategy and locales, so it matches the same documents) with the
@@ -482,7 +522,13 @@ class IndexQuerySet[T: IndexMixin]:
         clause either way), and taking it from there keeps it listed when
         the count query, which matches more documents, pushes it past the
         engine's ``maxValuesPerFacet`` cap. A sibling the cap omits is
-        simply not listed, the truncation every facet has.
+        simply not listed, the truncation every facet has. A group that
+        governs the whole facet field (``members`` is ``None``) lists what
+        its count query reports, which is what a request without the group's
+        clause would have returned.
+
+        A baseline query repeats neither ``q`` nor the search's filters: it
+        contributes only ``facetStats``.
         """
         index_uid = self._model.get_meili_index_name()
         queries = [{"indexUid": index_uid, "q": q, **params}]
@@ -502,14 +548,30 @@ class IndexQuerySet[T: IndexMixin]:
             }
             for group in groups
         )
-        main, *counts = client.tenant_search_client().multi_search(queries)[
+        queries.extend(
+            {
+                "indexUid": index_uid,
+                "q": "",
+                "filter": list(baseline.filters),
+                "facets": list(baseline.facets),
+                "offset": 0,
+                "limit": 0,
+                "locales": list(baseline.locales),
+            }
+            for baseline in self._state.stats_baselines
+        )
+        main, *rest = client.tenant_search_client().multi_search(queries)[
             "results"
         ]
+        counts, baselines = rest[: len(groups)], rest[len(groups) :]
 
         distribution = main.setdefault("facetDistribution", {})
         for group, counted in zip(groups, counts, strict=True):
-            siblings = group.members - group.selected
             own = counted.get("facetDistribution", {}).get(group.facet, {})
+            if group.members is None:
+                distribution[group.facet] = dict(own)
+                continue
+            siblings = group.members - group.selected
             distribution[group.facet] = {
                 **{
                     key: count
@@ -518,8 +580,12 @@ class IndexQuerySet[T: IndexMixin]:
                 },
                 **{key: count for key, count in own.items() if key in siblings},
             }
+        for baseline in baselines:
+            main.setdefault("facetStats", {}).update(
+                baseline.get("facetStats", {})
+            )
         main["processingTimeMs"] = sum(
-            result.get("processingTimeMs", 0) for result in (main, *counts)
+            result.get("processingTimeMs", 0) for result in (main, *rest)
         )
         return main
 
@@ -555,10 +621,10 @@ class IndexQuerySet[T: IndexMixin]:
 
         pk_list = [hit[id_field] for hit in hits]
 
-        # Preserve Meilisearch ranking order
-        preserved_order = Case(
-            *[When(pk=pk, then=pos) for pos, pk in enumerate(pk_list)]
-        )
+        # Meilisearch's ranking order, and each hit by the pk of its object:
+        # both looked up per result, so keyed once instead of scanned.
+        ranking = {str(pk): position for position, pk in enumerate(pk_list)}
+        hits_by_pk = {str(hit["id"]): hit for hit in hits}
 
         # Hydrate via the model's optimized search queryset when it provides
         # one, so the result serializer doesn't N+1 per hit (e.g. product
@@ -568,14 +634,16 @@ class IndexQuerySet[T: IndexMixin]:
             get_search_qs() if callable(get_search_qs) else self.model.objects
         )
 
-        # Fetch Django objects
-        filtered_objects = base_qs.filter(pk__in=pk_list).order_by(
-            preserved_order
+        # Fetch Django objects, then put them in ranking order here: the
+        # database would need a CASE over every pk to do it.
+        filtered_objects = sorted(
+            base_qs.filter(pk__in=pk_list).order_by(),
+            key=lambda obj: ranking[str(obj.pk)],
         )
 
         enriched_results = []
         for obj in filtered_objects:
-            hit = next(hit for hit in hits if str(hit["id"]) == str(obj.pk))
+            hit = hits_by_pk[str(obj.pk)]
             enriched_results.append(
                 {
                     "object": obj,

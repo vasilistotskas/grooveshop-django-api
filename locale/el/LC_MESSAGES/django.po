@@ -2732,8 +2732,8 @@ msgstr "Αναγνωριστικά μάρκας χωρισμένα με κόμμ
 msgid "Comma-separated category IDs; each matches its whole subtree (the category and every descendant)"
 msgstr "ID κατηγοριών χωρισμένα με κόμμα· το καθένα περιλαμβάνει και όλες τις υποκατηγορίες του"
 
-msgid "Comma-separated facet fields for counts and stats"
-msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά"
+msgid "Comma-separated facet fields for counts and stats. A request for facets with limit 0 or 1 is a facet read and is not recorded as a search."
+msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά. Ένα αίτημα για facets με limit 0 ή 1 είναι ανάγνωση facet και δεν καταγράφεται ως αναζήτηση."
 
 msgid "Comma-separated product ids for multi-seed surfaces (cart lines, recently viewed)."
 msgstr "ID προϊόντων διαχωρισμένα με κόμμα για επιφάνειες με πολλά προϊόντα αναφοράς (γραμμές καλαθιού, πρόσφατα προβεβλημένα)."
@@ -12628,6 +12628,9 @@ msgstr "Αυτό το σημείο πρόσβασης δεν δέχεται δι
 msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα μετά τις εκπτώσεις, χωρίς τα μεταφορικά. Τα όρια δωρεάν αποστολής ελέγχονται με αυτό."
 
+msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
+
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
 
@@ -14366,6 +14369,9 @@ msgstr "Όταν είναι true, μόνο προϊόντα σε προσφορ�
 msgid "When true, only products with stock above zero"
 msgstr "Όταν είναι true, μόνο προϊόντα με απόθεμα μεγαλύτερο από μηδέν"
 
+msgid "When true, the facets answer a filter sidebar in this one request. The category and brand counts leave out their own selection (the attribute_values counts always do), so picking one does not hide its alternatives. The effective_price stats are those of the whole catalogue, or of scopeCategory's subtree, and the likes_count and view_count stats those of the whole catalogue: none follows the query or the other filters, so a slider's range does not move as filters change."
+msgstr "Όταν είναι true, τα facets απαντούν σε ένα πλαϊνό φίλτρων μέσα στο ίδιο αίτημα. Τα πλήθη κατηγορίας και μάρκας αφήνουν έξω τη δική τους επιλογή (τα πλήθη attribute_values το κάνουν πάντα), ώστε η επιλογή ενός να μην κρύβει τα υπόλοιπα. Τα στατιστικά effective_price αφορούν όλο τον κατάλογο ή τις υποκατηγορίες του scopeCategory, και τα στατιστικά likes_count και view_count όλο τον κατάλογο: κανένα δεν ακολουθεί το ερώτημα ή τα άλλα φίλτρα, ώστε το εύρος ενός slider να μην μετακινείται όταν αλλάζουν τα φίλτρα."
+
 msgid "Where orders come from"
 msgstr "Από πού έρχονται οι παραγγελίες"
 
@@ -15373,6 +15379,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Collapse/Expand"
 #~ msgstr "Σύμπτυξη/Επέκταση"
+
+#~ msgid "Comma-separated facet fields for counts and stats"
+#~ msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά"
 
 #~ msgid "Complete Your Order"
 #~ msgstr "Ολοκληρώστε την Παραγγελία σας"

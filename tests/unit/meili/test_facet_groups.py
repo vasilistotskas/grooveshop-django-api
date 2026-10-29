@@ -238,3 +238,145 @@ class TestSearchWithGroupCounts:
 
         assert results["processing_time_ms"] == 12
         assert results["estimated_total_hits"] == 9
+
+
+class TestWholeFieldGroup:
+    """A group with ``members=None`` is the whole facet field, as the
+    category and brand filters are."""
+
+    def _queryset(self):
+        return (
+            IndexQuerySet(FacetModel)
+            .filter(active=True)
+            .filter_facet_group("brand", [1, 2], members=None)
+            .filter(in_stock=True)
+            .set_facets("brand")
+        )
+
+    def test_the_group_records_no_members(self):
+        (group,) = self._queryset()._state.facet_groups
+
+        assert group.members is None
+        assert group.clause == "brand IN [1, 2]"
+        assert group.selected == frozenset({"1", "2"})
+
+    def test_the_count_query_leaves_out_the_clause_and_keeps_the_rest(
+        self, engine
+    ):
+        _multi_search(engine, {}, {})
+
+        self._queryset().search("q")
+
+        (queries,) = (
+            engine.tenant_search_client.return_value.multi_search.call_args.args
+        )
+        _, counts = queries
+        assert counts["filter"] == ["active = True", "in_stock = True"]
+        assert (counts["facets"], counts["limit"]) == (["brand"], 0)
+
+    def test_every_key_of_the_count_query_is_listed_selected_or_not(
+        self, engine
+    ):
+        _multi_search(
+            engine,
+            {"facetDistribution": {"brand": {"1": 1}}},
+            {"facetDistribution": {"brand": {"1": 1, "2": 4, "3": 6}}},
+        )
+
+        results = self._queryset().search("q")
+
+        assert results["facetDistribution"] == {
+            "brand": {"1": 1, "2": 4, "3": 6}
+        }
+
+    def test_a_count_query_with_no_distribution_lists_nothing(self, engine):
+        _multi_search(engine, {"facetDistribution": {"brand": {"1": 1}}}, {})
+
+        results = self._queryset().search("q")
+
+        assert results["facetDistribution"] == {"brand": {}}
+
+
+class TestStatsBaselines:
+    def _queryset(self):
+        everything = IndexQuerySet(FacetModel).filter(active=True)
+        return (
+            IndexQuerySet(FacetModel)
+            .filter(active=True, brand__in=[1])
+            .set_facets("category")
+            .stats_over(everything.locales("el"), "price")
+            .stats_over(IndexQuerySet(FacetModel), "views", "likes")
+        )
+
+    def test_a_baseline_alone_makes_the_search_a_multi_search(self, engine):
+        _multi_search(engine, {}, {}, {})
+
+        self._queryset().search("blue")
+
+        engine.get_search_index.return_value.search.assert_not_called()
+        (queries,) = (
+            engine.tenant_search_client.return_value.multi_search.call_args.args
+        )
+        assert len(queries) == 3
+
+    def test_a_baseline_query_has_no_text_and_only_its_own_filters(
+        self, engine
+    ):
+        _multi_search(engine, {}, {}, {})
+
+        self._queryset().search("blue")
+
+        (queries,) = (
+            engine.tenant_search_client.return_value.multi_search.call_args.args
+        )
+        main, price, popularity = queries
+        assert main["q"] == "blue"
+        assert main["filter"] == ["active = True", "brand IN [1]"]
+        assert main["facets"] == ["category"]
+        assert price["q"] == ""
+        assert price["filter"] == ["active = True"]
+        assert price["facets"] == ["price"]
+        assert price["locales"] == ["el"]
+        assert (price["offset"], price["limit"]) == (0, 0)
+        assert popularity["q"] == ""
+        assert popularity["filter"] == []
+        assert popularity["facets"] == ["views", "likes"]
+        assert popularity["locales"] == []
+
+    def test_the_stats_are_taken_from_the_baselines_not_the_search(
+        self, engine
+    ):
+        _multi_search(
+            engine,
+            {
+                "facetDistribution": {"category": {"7": 1}},
+                "facetStats": {"price": {"min": 5.0, "max": 6.0}},
+            },
+            {"facetStats": {"price": {"min": 1.0, "max": 9.0}}},
+            {"facetStats": {"views": {"min": 0, "max": 3}}},
+        )
+
+        results = self._queryset().search("blue")
+
+        assert results["facetStats"] == {
+            "price": {"min": 1.0, "max": 9.0},
+            "views": {"min": 0, "max": 3},
+        }
+        assert results["facetDistribution"] == {"category": {"7": 1}}
+
+    def test_an_empty_baseline_adds_no_stats(self, engine):
+        _multi_search(engine, {}, {}, {})
+
+        results = self._queryset().search("blue")
+
+        assert results.get("facetStats", {}) == {}
+
+    def test_baseline_time_counts_toward_the_engine_time(self, engine):
+        _multi_search(
+            engine,
+            {"processingTimeMs": 1},
+            {"processingTimeMs": 2},
+            {"processingTimeMs": 3},
+        )
+
+        assert self._queryset().search("q")["processing_time_ms"] == 6

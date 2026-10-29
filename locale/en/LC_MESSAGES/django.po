@@ -2724,8 +2724,8 @@ msgstr "Comma-separated brand IDs (brand IN [ids])"
 msgid "Comma-separated category IDs; each matches its whole subtree (the category and every descendant)"
 msgstr "Comma-separated category IDs; each matches its whole subtree (the category and every descendant)"
 
-msgid "Comma-separated facet fields for counts and stats"
-msgstr "Comma-separated facet fields for counts and stats"
+msgid "Comma-separated facet fields for counts and stats. A request for facets with limit 0 or 1 is a facet read and is not recorded as a search."
+msgstr "Comma-separated facet fields for counts and stats. A request for facets with limit 0 or 1 is a facet read and is not recorded as a search."
 
 msgid "Comma-separated product ids for multi-seed surfaces (cart lines, recently viewed)."
 msgstr "Comma-separated product ids for multi-seed surfaces (cart lines, recently viewed)."
@@ -12622,6 +12622,9 @@ msgstr "The cart token is not accepted by this endpoint."
 msgid "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 msgstr "The cart's free_threshold_value: the products after discounts, excluding shipping. Free-shipping thresholds are checked against it."
 
+msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 
@@ -14360,6 +14363,9 @@ msgstr "When true, only products on offer: carrying a markdown (discount_percent
 msgid "When true, only products with stock above zero"
 msgstr "When true, only products with stock above zero"
 
+msgid "When true, the facets answer a filter sidebar in this one request. The category and brand counts leave out their own selection (the attribute_values counts always do), so picking one does not hide its alternatives. The effective_price stats are those of the whole catalogue, or of scopeCategory's subtree, and the likes_count and view_count stats those of the whole catalogue: none follows the query or the other filters, so a slider's range does not move as filters change."
+msgstr "When true, the facets answer a filter sidebar in this one request. The category and brand counts leave out their own selection (the attribute_values counts always do), so picking one does not hide its alternatives. The effective_price stats are those of the whole catalogue, or of scopeCategory's subtree, and the likes_count and view_count stats those of the whole catalogue: none follows the query or the other filters, so a slider's range does not move as filters change."
+
 msgid "Where orders come from"
 msgstr "Where orders come from"
 
@@ -15189,6 +15195,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
+
+#~ msgid "Comma-separated facet fields for counts and stats"
+#~ msgstr "Comma-separated facet fields for counts and stats"
 
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"

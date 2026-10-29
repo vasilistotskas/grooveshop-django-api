@@ -44757,6 +44757,8 @@ components:
           title: Προβολές
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
           readOnly: true
           title: Απόθεμα
         lowStockThreshold:
@@ -45564,6 +45566,8 @@ components:
           title: Προβολές
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
           readOnly: true
           title: Απόθεμα
         lowStockThreshold:
@@ -45798,6 +45802,8 @@ components:
           title: Προβολές
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
           readOnly: true
           title: Απόθεμα
         lowStockThreshold:
@@ -46763,6 +46769,8 @@ components:
           title: Προβολές
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
           readOnly: true
           title: Απόθεμα
         lowStockThreshold:

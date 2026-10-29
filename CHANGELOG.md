@@ -3,6 +3,35 @@
 
 
 
+## v3.162.5 (2026-10-29)
+
+### Performance improvements
+
+* perf(search): index only the filters the search uses, per the Meilisearch docs (#361)
+
+Every filterable attribute had every filter feature, facet search was
+built although nothing calls the facet-search endpoint, and the
+pagination cap was 5,000,000 hits, where the docs warn that past 20,000
+a query can take seconds.
+
+MeiliMeta now declares range_fields and facet_search, and the settings
+payload uses granular filterableAttributes: equality and comparison for
+effective_price, likes_count and view_count, equality only for the
+product filters and facets, and only is_published and language_code for
+the blog. Facet search is off, the sortable list is the four sorts the
+search offers, and maxTotalHits is 20,000 on both indexes.
+
+maxValuesPerFacet goes UP to 500: attribute_values holds every
+attribute's value ids in one facet, cut at the cap, and demo already has
+95 against the previous 100.
+
+Applying settings waits MEILI_SETTINGS_TASK_TIMEOUT_MS (600 s by
+default) instead of the SDK's 5 s, so a reindex during the deploy hook
+is no longer reported as drift. The sidebar-facets test reads its own
+private index, since its store-wide ranges raced other workers' writes.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3f3d1c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f3d1c73b985821c804002c45ec2c0ca46557d92))
+
 ## v3.162.4 (2026-10-29)
 
 ### Bug fixes

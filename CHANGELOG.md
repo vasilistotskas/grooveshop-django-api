@@ -3,6 +3,34 @@
 
 
 
+## v3.162.1 (2026-10-29)
+
+### Performance improvements
+
+* perf(search): answer a listing's results and every sidebar count in one search (#356)
+
+A products page asked Django for six searches per render (the listing,
+its SEO list, the price bounds and the category, attribute-value and
+brand counts), and webside's design two more for the likes and view
+stats. Meilisearch answered each in 2-9 ms; Django took 166-256 ms per
+request and the render 1.6 s.
+
+With sidebarFacets=true, the listing's own request now returns them all
+from one multi-search. The category and brand filters become facet
+groups like attribute values, so each count leaves out its own clause,
+as the separate calls did. The price, likes and view ranges are baseline
+queries over the store's visible products (the price ones within
+scopeCategory's subtree). A live-engine test asserts every count and
+range equals what the separate calls return, over 14 filter combinations
+and two scopes. Without the new parameters every response is unchanged.
+
+A facet read (facets with a limit of 0 or 1) is no longer recorded as a
+customer search. Enrichment writes the category cache once per category
+instead of once per hit, computes final_price once per hit, and orders
+hits in Python instead of a CASE over primary keys.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`edbbf59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edbbf595e648a011948bb5abbed922585bee87e4))
+
 ## v3.162.0 (2026-10-29)
 
 ### Chores

@@ -17,6 +17,7 @@ from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import ViewCountThrottle
 from core.api.views import BaseModelViewSet
+from core.filters.camel_case_ordering import ActionOrdering
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -50,6 +51,22 @@ serializers_config: SerializersConfig = {
         list=ProductSerializer,
         detail=ProductRetrieveSerializer,
         write=ProductWriteSerializer,
+    ),
+    # The whole catalogue for machine consumers (the agent gateway's
+    # product feeds): every attribute, image and the variant group's
+    # name, which the storefront's product cards never read. Filtered,
+    # sorted and paginated exactly like ``list``.
+    "feed": ActionConfig(
+        response=ProductSerializer,
+        many=True,
+        operation_id="listProductFeed",
+        summary=_("Product feed"),
+        description=_(
+            "Active products with all their attributes and images, for "
+            "catalogue feeds. Filtered, sorted and paginated like the "
+            "product list."
+        ),
+        tags=["Products"],
     ),
     "update_view_count": ActionConfig(
         response=ProductDetailSerializer,
@@ -257,7 +274,14 @@ class ProductViewSet(BaseModelViewSet):
     ordering = ["-availability_priority", "id"]
     # ``reviews`` lists ProductReview rows, so it sorts by the review
     # contract — the product fields above would be wrong columns there.
-    action_ordering = {"reviews": PRODUCT_REVIEW_ORDERING}
+    # ``feed`` lists products, so it opts into the list's own contract:
+    # an extra action is otherwise left unsorted.
+    action_ordering = {
+        "reviews": PRODUCT_REVIEW_ORDERING,
+        "feed": ActionOrdering(
+            fields=tuple(ordering_fields), default=tuple(ordering)
+        ),
+    }
     search_fields = ["translations__name", "translations__description", "slug"]
 
     def get_filterset_class(self):
@@ -288,7 +312,7 @@ class ProductViewSet(BaseModelViewSet):
         if self.action == "reviews":
             return self._reviews_queryset()
 
-        if self.action == "list":
+        if self.action in ("list", "feed"):
             queryset = Product.objects.for_list()
         else:
             # ``for_detail()`` deliberately does not filter on ``active``
@@ -374,6 +398,10 @@ class ProductViewSet(BaseModelViewSet):
             product, context=self.get_serializer_context()
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"])
+    def feed(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
     @action(
         detail=True,

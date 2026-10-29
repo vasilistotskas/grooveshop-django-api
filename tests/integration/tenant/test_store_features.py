@@ -248,6 +248,7 @@ def test_hidden_reviews_hide_them_from_search_hits_too(on):
 # index.
 CATALOGUE_ROUTES = [
     ("product-list", "get", False),
+    ("product-feed", "get", False),
     ("product-category-list", "get", False),
     ("product-category-all", "get", False),
     ("product-category-image-list", "get", False),

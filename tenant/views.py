@@ -453,7 +453,7 @@ def merchant_legal_identity_view(request: Request) -> Response:
     setting, which is rare, and this is fetched on page renders.
     """
     identity = merchant_legal_identity()
-    missing = missing_disclosure_fields()
+    missing = missing_disclosure_fields(identity)
     payload = {
         **identity,
         "missing_fields": missing,

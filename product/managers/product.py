@@ -3,15 +3,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from django.db.models import (
-    Avg,
     Case,
-    Count,
     DecimalField,
     F,
     FloatField,
+    Func,
     IntegerField,
+    OuterRef,
     Prefetch,
-    Q,
+    Subquery,
     Value,
     When,
 )
@@ -29,7 +29,64 @@ if TYPE_CHECKING:
     from typing import Self
 
 
-_APPROVED_REVIEW = Q(reviews__status=ReviewStatus.TRUE)
+def likes_count_expression(product: str = "pk") -> Coalesce:
+    """The number of favourites of a product, as a correlated subquery.
+
+    ``product`` names the outer column holding the product id (``"pk"`` on
+    ``Product``, ``"master_id"`` on ``ProductTranslation``).
+
+    A subquery rather than ``Count("favourited_by")``: a join plus
+    aggregate puts every other annotation into the GROUP BY, so the
+    promotion subplan of ``with_offer_kind`` ran once per joined
+    favourite x review row instead of once per product (a listing of 12
+    products took 1.9 s against 0.15 s without the offer).
+    """
+    from product.models.favourite import ProductFavourite
+
+    return Coalesce(
+        Subquery(
+            ProductFavourite._base_manager.filter(product=OuterRef(product))
+            .order_by()
+            .annotate(n=Func(F("pk"), function="COUNT"))
+            .values("n"),
+            output_field=IntegerField(),
+        ),
+        0,
+    )
+
+
+def _approved_reviews(product: str):
+    from product.models.review import ProductReview
+
+    return ProductReview._base_manager.filter(
+        product=OuterRef(product), status=ReviewStatus.TRUE
+    ).order_by()
+
+
+def reviews_count_expression(product: str = "pk") -> Coalesce:
+    """The number of approved reviews of a product (see ``likes_count_expression``)."""
+    return Coalesce(
+        Subquery(
+            _approved_reviews(product)
+            .annotate(n=Func(F("pk"), function="COUNT"))
+            .values("n"),
+            output_field=IntegerField(),
+        ),
+        0,
+    )
+
+
+def review_average_expression(product: str = "pk") -> Coalesce:
+    """The average rate of approved reviews, 0.0 without any."""
+    return Coalesce(
+        Subquery(
+            _approved_reviews(product)
+            .annotate(avg=Func(F("rate"), function="AVG"))
+            .values("avg"),
+            output_field=FloatField(),
+        ),
+        Value(0.0, output_field=FloatField()),
+    )
 
 
 class ProductQuerySet(
@@ -45,7 +102,7 @@ class ProductQuerySet(
 
     def with_likes_count(self) -> Self:
         """Annotate with likes count from favourited_by relationship."""
-        return self.annotate(likes_count=Count("favourited_by", distinct=True))
+        return self.annotate(likes_count=likes_count_expression())
 
     def with_reviews_count(self) -> Self:
         """Annotate with the count of approved reviews.
@@ -54,20 +111,11 @@ class ProductQuerySet(
         (``ProductReviewQuerySet.visible_to``): a pending or rejected
         review must not move the number a shopper sees.
         """
-        return self.annotate(
-            reviews_count=Count(
-                "reviews", filter=_APPROVED_REVIEW, distinct=True
-            )
-        )
+        return self.annotate(reviews_count=reviews_count_expression())
 
     def with_review_average(self) -> Self:
         """Annotate with the average rating of approved reviews."""
-        return self.annotate(
-            review_average=Coalesce(
-                Avg("reviews__rate", filter=_APPROVED_REVIEW),
-                Value(0.0, output_field=FloatField()),
-            )
-        )
+        return self.annotate(review_average=review_average_expression())
 
     def active(self) -> Self:
         return self.filter(active=True).exclude_deleted()

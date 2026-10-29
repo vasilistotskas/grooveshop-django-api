@@ -9,6 +9,7 @@ a declared 30, and one missing a payment-hold row crashed on ``None``.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -77,3 +78,24 @@ def test_several_settings_resolve_like_one(django_assert_max_num_queries):
     assert values["GIFT_CARD_MAX_AMOUNT"] == declared_default(
         "GIFT_CARD_MAX_AMOUNT"
     )
+
+
+def test_several_settings_are_read_from_the_cache_in_one_round_trip():
+    """A Redis round trip costs ~1.6 ms in production: 28 single reads
+    were ~45 ms of ``settings/public``."""
+    from core.caches import CustomCache
+
+    names = ("GIFT_CARD_MIN_AMOUNT", "GIFT_CARD_MAX_AMOUNT", "RETURN_FEES")
+    store_settings(names)  # warm every key
+
+    with (
+        patch.object(CustomCache, "get", autospec=True) as single,
+        patch.object(
+            CustomCache, "get_many", autospec=True, wraps=None
+        ) as many,
+    ):
+        many.side_effect = lambda self, keys, version=None: {}
+        store_settings(names)
+
+    assert single.call_count == 0
+    assert many.call_count == 1

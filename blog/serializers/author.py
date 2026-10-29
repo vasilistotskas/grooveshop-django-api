@@ -1,4 +1,3 @@
-from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
@@ -85,7 +84,9 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
         every published post leaked its author's drafts too.
         """
         request = self.context.get("request")
-        return obj.blog_posts.visible_to(getattr(request, "user", None))
+        return obj.blog_posts.for_list().visible_to(
+            getattr(request, "user", None)
+        )
 
     @extend_schema_field(
         lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
@@ -104,11 +105,9 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
     def get_top_posts(self, obj: BlogAuthor):
         from blog.serializers.post import BlogPostSerializer
 
-        top_posts = (
-            self._visible_posts(obj)
-            .annotate(likes_count_field=models.Count("likes"))
-            .order_by("-view_count", "-likes_count_field")[:3]
-        )
+        top_posts = self._visible_posts(obj).order_by(
+            "-view_count", "-likes_count"
+        )[:3]
         return BlogPostSerializer(
             top_posts, many=True, context=self.context
         ).data

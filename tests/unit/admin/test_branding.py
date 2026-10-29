@@ -104,3 +104,46 @@ def test_the_store_admin_renders_the_store_logo(bind_tenant):
         "dark": "https://cdn.example/light.svg",
     }
     assert context["site_header"] == "Branding Store"
+
+
+class TestStoreMarkUrl:
+    """The square mark a square slot shows: the store's favicon, never its
+    logo, whose wordmark the slot crops to a sliver."""
+
+    def test_own_favicon(self):
+        tenant = _tenant(
+            favicon_url="https://cdn.example/icon-512.png",
+            logo_light_url="https://cdn.example/wordmark.png",
+        )
+        assert branding.store_mark_url(tenant) == (
+            "https://cdn.example/icon-512.png"
+        )
+
+    def test_a_logo_alone_is_not_a_mark(self):
+        tenant = _tenant(logo_light_url="https://cdn.example/wordmark.png")
+        assert branding.store_mark_url(tenant) is None
+
+    def test_platform_storefront_gets_the_bundled_icon(self):
+        tenant = _tenant(is_platform_storefront=True)
+        assert branding.store_mark_url(tenant).endswith("icon-light.svg")
+
+    def test_unbranded_store_has_none(self):
+        assert branding.store_mark_url(_tenant()) is None
+
+
+class TestTenantListShowsTheMark:
+    def test_the_store_column_shows_the_square_mark(self):
+        from tenant.admin import TenantAdmin
+        from tenant.models import Tenant
+
+        domain = SimpleNamespace(domain="shop.example", is_primary=True)
+        tenant = _tenant(
+            favicon_url="https://cdn.example/icon-512.png",
+            logo_light_url="https://cdn.example/wordmark.png",
+            domains=SimpleNamespace(all=lambda: [domain]),
+        )
+
+        row = TenantAdmin(Tenant, admin_site).display_store(tenant)
+
+        assert row[3]["path"] == "https://cdn.example/icon-512.png"
+        assert row[3]["squared"] is True

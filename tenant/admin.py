@@ -47,6 +47,7 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
+from admin.branding import store_mark_url
 from admin.displays import format_dt, header_two_line
 from core.db.encrypted_fields import EncryptedCharField
 from tenant.admin_labels import billing_badge, label, plan_badge, status_badge
@@ -186,10 +187,11 @@ class TenantAdmin(BaseModelAdmin):
     def display_store(self, obj):
         """Store name over its primary domain, with the store's own mark.
 
-        ``header=True`` renders two lines plus a leading avatar — the
-        store's logo when it has one, otherwise its initials. On a
-        control plane listing every merchant, the logo is the fastest
-        way to identify a row. Domains are prefetched (``get_queryset``).
+        ``header=True`` renders two lines plus a leading square avatar:
+        the store's square mark (``admin.branding.store_mark_url``),
+        otherwise its initials. On a control plane listing every
+        merchant, the mark is the fastest way to identify a row. Domains
+        are prefetched (``get_queryset``).
         """
         primary = next(
             (domain for domain in obj.domains.all() if domain.is_primary),
@@ -199,7 +201,7 @@ class TenantAdmin(BaseModelAdmin):
         return header_two_line(
             name,
             primary.domain if primary else obj.schema_name,
-            image_path=obj.logo_light_url or None,
+            image_path=store_mark_url(obj),
             squared=True,
         )
 

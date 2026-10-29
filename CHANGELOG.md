@@ -3,6 +3,38 @@
 
 
 
+## v3.163.0 (2026-10-29)
+
+### Bug fixes
+
+* fix(i18n): translate the product feed's OpenAPI strings
+
+The feed action's summary and description are gettext strings, and
+makemessages had not been run for them, so the catalogue test failed.
+The Meilisearch inspect command's "Facet Search" label from #361 was
+missing too. All three now have their Greek and English translations.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`27b298f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27b298f92698bf7804ddc21ecf07f836a5ffaa7c))
+
+### Features
+
+* feat(product): serve the full product shape for feeds at /product/feed (#362) ([`27b298f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27b298f92698bf7804ddc21ecf07f836a5ffaa7c))
+
+* feat(product): serve the full product shape for feeds at /product/feed
+
+The product list carries everything any caller of it has ever needed:
+every attribute, every image path and the variant group, which only the
+agent gateway's catalogue feeds read. GET /api/v1/product/feed serves
+that full shape, with the list's filters, ordering, pagination, throttles
+and catalogue gate, so the feeds can move to it and the list can then
+carry only what a product card draws.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`27b298f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27b298f92698bf7804ddc21ecf07f836a5ffaa7c))
+
 ## v3.162.5 (2026-10-29)
 
 ### Performance improvements

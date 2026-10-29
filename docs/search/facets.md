@@ -66,6 +66,9 @@ The relaxed-query retry (a multi-word query that finds nothing is retried
 without its first word) re-runs the whole `multi-search`, so the counts
 always describe the query the listing shows.
 
+The engine settings these queries depend on (which fields filter, which
+compare, the facet value cap) are in [index settings](index-settings.md).
+
 The equality of each count with the separate request the storefront used to
 make is pinned by `tests/integration/search/test_product_search_sidebar_facets.py`
 (live engine, 14 filter combinations times two scopes).

@@ -28,7 +28,8 @@ class TestProductTranslationMeilisearchAttributes:
     """Test Meilisearch integration for product attributes."""
 
     def test_meili_meta_includes_attribute_fields(self):
-        assert "attributes" in ProductTranslation.MeiliMeta.filterable_fields
+        # ``attributes`` (the attribute ids) is a document field the
+        # storefront reads, but nothing filters by it.
         assert (
             "attribute_values" in ProductTranslation.MeiliMeta.filterable_fields
         )

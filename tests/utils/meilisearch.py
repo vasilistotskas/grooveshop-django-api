@@ -47,7 +47,9 @@ import secrets
 import string
 import warnings
 from collections import defaultdict
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Self
+from unittest.mock import patch
 
 from django.db import connection
 
@@ -56,6 +58,7 @@ from meili.models import IndexMixin
 from meili.tasks import _get_document_pk
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from types import TracebackType
 
 # The SDK waits 5 s by default. On a developer engine whose public
@@ -185,3 +188,29 @@ class LiveSearchIndex:
                     f"Meilisearch task {task_uid} {finished.status}: "
                     f"{finished.error}"
                 )
+
+
+@contextmanager
+def private_index(model: type[IndexMixin]) -> Generator[str]:
+    """Point ``model`` at an index of its own for one test.
+
+    Some assertions read the WHOLE index: a store-wide price or
+    popularity range has no query or filter a test's own documents could
+    be told apart by. On the shared engine another worker's documents
+    arrive between two requests and move such a range, so the comparison
+    fails with nothing wrong in the code. A uid no other test knows holds
+    only this test's documents.
+
+    The index is created with the model's real settings (the same call
+    the deploy hook makes) and dropped afterwards without waiting. Enter
+    it BEFORE ``LiveSearchIndex`` so the documents are deleted first.
+    """
+    uid = f"{model.get_meili_index_name()}_{unique_marker()}"
+    with patch.object(
+        model, "get_meili_index_name", classmethod(lambda cls: uid)
+    ):
+        model.update_meili_settings()
+        try:
+            yield uid
+        finally:
+            meili_client.client.delete_index(uid)

@@ -120,6 +120,7 @@ class TestMeiliClient:
             },
             "faceting": {"maxValuesPerFacet": 100},
             "pagination": {"maxTotalHits": 1000},
+            "facetSearch": False,
         }
 
         assert call_args == expected_settings
@@ -156,7 +157,16 @@ class TestMeiliClient:
 
         assert call_args["displayedAttributes"] == ["id", "title"]
         assert call_args["searchableAttributes"] == ["title", "content"]
-        assert call_args["filterableAttributes"] == ["category", "status"]
+        assert call_args["filterableAttributes"] == [
+            {
+                "attributePatterns": ["category", "status"],
+                "features": {
+                    "facetSearch": False,
+                    "filter": {"equality": True, "comparison": False},
+                },
+            }
+        ]
+        assert call_args["facetSearch"] is False
         assert call_args["sortableAttributes"] == ["created_at", "updated_at"]
         assert call_args["rankingRules"] == ["words", "typo", "custom"]
         assert call_args["stopWords"] == ["the", "and", "or"]

@@ -229,13 +229,14 @@ class TestSearch:
         meili = ProductTranslation.MeiliMeta
 
         # ``final_price`` is still displayed (the storefront falls back to
-        # it) but nothing sorts on it; ``discount_percent`` stays sortable
-        # for the ranking rule and is no longer displayed.
+        # it) but nothing sorts on it; ``discount_percent`` is not
+        # displayed and no longer sortable: it only feeds the ranking rule,
+        # which needs no sortable entry.
         assert "final_price" in meili.displayed_fields
         assert "final_price" not in meili.sortable_fields
         assert "effective_price" in meili.sortable_fields
         assert "discount_percent" not in meili.displayed_fields
-        assert "discount_percent" in meili.sortable_fields
+        assert "discount_percent" not in meili.sortable_fields
 
     def test_the_document_carries_the_two_announcement_fields(
         self, category, vat

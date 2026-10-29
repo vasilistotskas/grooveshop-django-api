@@ -36,6 +36,7 @@ from tests.utils.attributes import assign_values, create_values
 from tests.utils.meilisearch import (
     LiveSearchIndex,
     build_document,
+    private_index,
     unique_marker,
 )
 from vat.models import Vat
@@ -158,9 +159,11 @@ class Shop:
 
 @pytest.fixture
 def shop(db):
+    # Its own index: the price and popularity ranges are store-wide, so
+    # other workers' documents must not be in them (``private_index``).
     marker = unique_marker()
     vat = Vat.objects.get_or_create(value=Decimal("24.0"))[0]
-    with LiveSearchIndex() as index:
+    with private_index(ProductTranslation), LiveSearchIndex() as index:
         root = ProductCategoryFactory(parent=None)
         categories = {
             "root": root,

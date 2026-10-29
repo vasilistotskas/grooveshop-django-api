@@ -90,6 +90,21 @@ class Command(TenantCommandMixin, BaseCommand):
 
         self._failures.append(f"{connection.schema_name}/{index_name}: {exc!s}")
 
+    def _describe(self, model) -> None:
+        """Print what was applied, read from the model, never retyped."""
+        applied = model.get_meili_settings()
+        self.stdout.write(
+            "  - filterable: "
+            + ", ".join(applied.filterable_fields or [])
+            + f" (range: {', '.join(applied.range_fields or []) or 'none'})"
+        )
+        self.stdout.write(
+            "  - sortable: " + ", ".join(applied.sortable_fields or [])
+        )
+        self.stdout.write(f"  - facetSearch: {applied.facet_search}")
+        self.stdout.write(f"  - faceting: {applied.faceting}")
+        self.stdout.write(f"  - pagination: {applied.pagination}")
+
     def _update_product_index(self):
         """Update ProductTranslation index settings."""
         self.stdout.write("\nUpdating ProductTranslation index settings...")
@@ -101,16 +116,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     "✓ ProductTranslation settings updated successfully"
                 )
             )
-            self.stdout.write("  - Added searchCutoffMs: 1500ms")
-            self.stdout.write(
-                "  - Added stock to filterable/sortable/displayed fields"
-            )
-            self.stdout.write(
-                "  - Added active and is_deleted to filterable/displayed fields"
-            )
-            self.stdout.write(
-                "  - Added stock:desc and discount_percent:desc to ranking rules"
-            )
+            self._describe(ProductTranslation)
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(
@@ -130,15 +136,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     "✓ BlogPostTranslation settings updated successfully"
                 )
             )
-            self.stdout.write("  - Added searchCutoffMs: 1500ms")
-            self.stdout.write("  - Updated maxTotalHits: 50000 (from 1000)")
-            self.stdout.write("  - Updated maxValuesPerFacet: 100 (from 50)")
-            self.stdout.write(
-                "  - Added view_count and created_at to sortable fields"
-            )
-            self.stdout.write(
-                "  - Added category and is_published to filterable fields"
-            )
+            self._describe(BlogPostTranslation)
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(

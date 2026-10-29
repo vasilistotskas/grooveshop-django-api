@@ -717,25 +717,36 @@ class ProductTranslation(
             return False
 
     class MeiliMeta:
+        # Exactly the fields ``search.views`` filters or facets on. Each
+        # one is indexed for filtering, so a field nothing filters by
+        # (``name``, ``stock``, ``discount_percent``, ``master_id``,
+        # ``attributes``, ``category_name``) stays out; it is still
+        # indexed as a document field through its searchable, displayed
+        # or additional-field entry. ``attribute_values`` carries every
+        # attribute's value ids in ONE facet, see ``faceting`` below.
         filterable_fields = (
-            "name",
             "language_code",
-            "likes_count",
-            "effective_price",
-            "view_count",
             "category",
-            "category_name",
-            "stock",
-            "in_stock",
-            "discount_percent",
-            "on_offer",
             "brand",
+            "attribute_values",
             "active",
             "is_deleted",
-            "master_id",
-            "attributes",
-            "attribute_values",
+            "in_stock",
+            "on_offer",
+            "effective_price",
+            "likes_count",
+            "view_count",
         )
+        # Compared with ``<`` / ``>=`` (price and popularity minimums and
+        # maximums) and read as ``facetStats`` (the sidebar ranges).
+        range_fields = (
+            "effective_price",
+            "likes_count",
+            "view_count",
+        )
+        # Nothing calls the facet-search endpoint, so its database is not
+        # built.
+        facet_search = False
         # ``*_greeklish_variants`` bags exist only for the SHORT fields
         # (name/attributes) — expanding every description word would
         # bloat the index and pollute ranking for no realistic recall
@@ -778,13 +789,14 @@ class ProductTranslation(
             "attributes",
             "attribute_data",
         )
+        # The four ``sort`` values of ``search.views``. ``discount_percent``
+        # ranks through ``ranking_rules`` below, which needs no sortable
+        # entry.
         sortable_fields = (
             "likes_count",
             "effective_price",
             "view_count",
-            "discount_percent",
             "created_at",
-            "stock",
         )
         # Custom rule tail, in business-priority order: availability
         # dominates (a binary signal - stock QUANTITY is not relevance),
@@ -827,8 +839,17 @@ class ProductTranslation(
             "disableOnWords": [],
             "disableOnAttributes": [],
         }
-        faceting = {"maxValuesPerFacet": 100}
-        pagination = {"maxTotalHits": 5_000_000}
+        # ``attribute_values`` is one facet holding every attribute's
+        # value ids, returned in lexicographic order and cut at this cap:
+        # a cap below the number of distinct values silently drops ids
+        # (20 did, on the demo store). 500 leaves headroom over the
+        # ~100 values a store has today.
+        faceting = {"maxValuesPerFacet": 500}
+        # Past ~20000 hits the engine spends seconds per query counting
+        # them (https://www.meilisearch.com/docs/learn/indexing/indexing_best_practices);
+        # no listing pages that deep, and a count above the cap is
+        # reported as the cap.
+        pagination = {"maxTotalHits": 20_000}
         search_cutoff_ms = 1500
 
     @classmethod

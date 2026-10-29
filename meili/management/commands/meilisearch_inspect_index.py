@@ -12,6 +12,29 @@ from meili._client import client
 from product.models.product import ProductTranslation
 
 
+def _filterable_lines(filterable_attributes: list) -> list[str]:
+    """One line per granular ``filterableAttributes`` entry.
+
+    The engine returns a granular entry as ``attributePatterns`` plus the
+    operators it supports; a bare name (how the engine returns a plain entry)
+    is shown as supporting everything.
+    """
+    lines = []
+    for entry in filterable_attributes:
+        if isinstance(entry, str):
+            lines.append(f"{entry} [equality, comparison]")
+            continue
+        operators = [
+            name
+            for name, enabled in entry["features"]["filter"].items()
+            if enabled
+        ]
+        lines.append(
+            f"{', '.join(entry['attributePatterns'])} [{', '.join(operators)}]"
+        )
+    return lines
+
+
 class Command(TenantCommandMixin, BaseCommand):
     """Inspect Meilisearch index settings, statistics, and configuration."""
 
@@ -81,11 +104,16 @@ class Command(TenantCommandMixin, BaseCommand):
             self.stdout.write(
                 f"  {_('Searchable Fields')}: {', '.join(settings['searchableAttributes'])}"
             )
-            self.stdout.write(
-                f"  {_('Filterable Fields')}: {', '.join(settings['filterableAttributes'])}"
-            )
+            self.stdout.write(f"  {_('Filterable Fields')}:")
+            for line in _filterable_lines(settings["filterableAttributes"]):
+                self.stdout.write(f"    {line}")
             self.stdout.write(
                 f"  {_('Sortable Fields')}: {', '.join(settings['sortableAttributes'])}"
+            )
+            self.stdout.write(
+                f"  {_('Facet Search')}: {settings['facetSearch']}"
+                f", maxValuesPerFacet {settings['faceting']['maxValuesPerFacet']}"
+                f", maxTotalHits {settings['pagination']['maxTotalHits']}"
             )
 
             if show_synonyms and settings.get("synonyms"):
@@ -140,11 +168,16 @@ class Command(TenantCommandMixin, BaseCommand):
             self.stdout.write(
                 f"  {_('Searchable Fields')}: {', '.join(settings['searchableAttributes'])}"
             )
-            self.stdout.write(
-                f"  {_('Filterable Fields')}: {', '.join(settings['filterableAttributes'])}"
-            )
+            self.stdout.write(f"  {_('Filterable Fields')}:")
+            for line in _filterable_lines(settings["filterableAttributes"]):
+                self.stdout.write(f"    {line}")
             self.stdout.write(
                 f"  {_('Sortable Fields')}: {', '.join(settings['sortableAttributes'])}"
+            )
+            self.stdout.write(
+                f"  {_('Facet Search')}: {settings['facetSearch']}"
+                f", maxValuesPerFacet {settings['faceting']['maxValuesPerFacet']}"
+                f", maxTotalHits {settings['pagination']['maxTotalHits']}"
             )
 
             if show_synonyms and settings.get("synonyms"):

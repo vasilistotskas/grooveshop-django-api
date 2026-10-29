@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from django.conf import settings
 from django.db import connection
 
 from meili.exceptions import MeiliSettingsError
@@ -91,7 +92,11 @@ class TestUpdateMeiliSettings:
                 index_settings=ProductTranslation.get_meili_settings(),
             ),
         ]
-        assert client.wait_for_task.call_args_list == [call(11), call(12)]
+        timeout_ms = settings.MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]
+        assert client.wait_for_task.call_args_list == [
+            call(11, timeout_in_ms=timeout_ms),
+            call(12, timeout_in_ms=timeout_ms),
+        ]
         client.flush_tasks.assert_called_once_with()
 
     def test_task_without_uid_is_not_waited_on(self):

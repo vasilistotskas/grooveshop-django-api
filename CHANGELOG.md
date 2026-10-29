@@ -3,6 +3,62 @@
 
 
 
+## v3.162.0 (2026-10-29)
+
+### Chores
+
+* chore(devtools): remove the delta_sigma store's seed content (#354)
+
+delta_sigma was a test store and is retired. Its content pack, its
+seed_delta_sigma command and their tests go, and the tests and comments
+that used the store as an example name a neutral one.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2e65e24`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2e65e24c40eb7408c9ec99103589ba5a26409a1a))
+
+### Features
+
+* feat(emails): send every order email through the email pipeline (#355) ([`7c0247a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c0247aa7b4a2f771d26234ed2c06f9911d74fc2))
+
+* feat(emails): send every order email through the email pipeline
+
+Each order email is an EmailType in order/emails.py, with the builder the
+sender and the preview share and a sample for the preview: the customer's
+received, payment confirmed and failed, shipped, delivered, completed,
+canceled, returned, refunded and status-refunded mails, the receipt and
+credit receipt (myDATA gated, with their PDFs), the store's new-order and
+dispute alerts, and the ACS out-for-delivery and BoxNow at-locker mails
+(each gated on its carrier). The tasks call send_email and keep their
+reservations, bookkeeping and retries exactly as before.
+
+send_email takes attachments (emails.transport.Attachment), and the admin
+preview renders a type through emails.render, so ORDER_EMAIL_KINDS and the
+preview's own copies go. The generic status template becomes the base the
+refunded and returned mails extend.
+
+The goldens of every order email are unchanged except the two carrier
+mails, which now carry the List-ID and mailto unsubscribe every other
+customer mail has. Their Reply-To is the store's contact address, or none,
+which mail clients answer at From. Store-staff mail carries no Reply-To,
+as before, and the store's alerts go to its contact and owner addresses
+only: a store with neither is skipped, never mailed to the platform.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`7c0247a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c0247aa7b4a2f771d26234ed2c06f9911d74fc2))
+
+### Testing
+
+* test(emails): name the product in both languages in the language test
+
+ProductFactory draws each translation's name from one word list, so the
+English and Greek names could come out equal and the test's own
+precondition failed (CI shard 1: 'Wool Socks' in both). The test now
+names the product itself.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7c0247a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c0247aa7b4a2f771d26234ed2c06f9911d74fc2))
+
 ## v3.161.0 (2026-10-29)
 
 ### Features

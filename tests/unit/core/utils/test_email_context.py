@@ -46,6 +46,7 @@ class TestBuildEmailContext:
         context = build_email_context(language="el")
 
         assert set(context) == {
+            "LANGUAGE_CODE",
             "SITE_NAME",
             "SITE_URL",
             "INFO_EMAIL",

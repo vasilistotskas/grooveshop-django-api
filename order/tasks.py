@@ -1,6 +1,5 @@
 import logging
 from datetime import timedelta
-from html import unescape
 
 import requests
 from django.conf import settings
@@ -8,12 +7,9 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
-from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
-from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
-from djmoney.money import Money
 
 from core import celery_app
 from core.retry import (
@@ -31,6 +27,16 @@ from core.utils.i18n import (
 )
 from core.utils.tenant_urls import get_tenant_frontend_url
 from order import payment_hold
+from order.emails import (
+    admin_new_order_email,
+    dispute_notification_email,
+    document_issued_email,
+    order_confirmation_email,
+    order_shipped_email,
+    order_status_update_email,
+    payment_failed_email,
+    refund_confirmation_email,
+)
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import (
@@ -40,11 +46,9 @@ from order.models import (
     RefundNotification,
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
-from order.payment import get_payment_provider_class, payment_provider_label
-from order.payment_ledger import PaymentLedger
+from order.payment import get_payment_provider_class
 from order.services import OrderService
-from pay_way.enum.settlement import PaySettlement
-from recommendation.order_email import order_email_strip, record_impression
+from recommendation.order_email import record_impression
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -172,9 +176,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         # We hold the lock. Fetch the full order for rendering.
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
-            .prefetch_related(
-                "items__product__translations", "pay_way__translations"
-            )
+            .prefetch_related("pay_way__translations")
             .get(id=order_id)
         )
 
@@ -189,114 +191,13 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             )
             return True
 
-        pay_way = order.pay_way
-        is_paid = bool(
-            pay_way
-            and PaySettlement(pay_way.settlement) == PaySettlement.ONLINE
-            and order.payment_status == PaymentStatus.COMPLETED
+        email = order_confirmation_email(
+            order, language=get_order_language(order)
         )
-
-        language = get_order_language(order)
-        with translation.override(language):
-            if is_paid:
-                template_base = "emails/order/order_payment_confirmed"
-                subject = _("Payment Confirmed - Order #{order_id}").format(
-                    order_id=order.id
-                )
-            else:
-                template_base = "emails/order/order_received"
-                subject = _("Order Received - #{order_id}").format(
-                    order_id=order.id
-                )
-
-            payment_instructions = ""
-            payment_instructions_text = ""
-            # Instructions only where the shopper has to act to pay: a
-            # transfer made off the platform, or BOX NOW's pay-on-the-go,
-            # paid through the link the carrier sends before the locker
-            # opens. Cash handed to the courier needs nothing from the
-            # shopper (owner review 2026-10-16, webside order 413). The
-            # "include the order number in the payment reference" line
-            # belongs to the transfer alone: nobody writes a reference
-            # for the others. All of it only while the shopper still
-            # owes the payment: a transfer the store already marked
-            # received (``order.is_paid``) gets neither, nor a promise of
-            # a confirmation that has happened.
-            settled = order.is_paid
-            settlement = PaySettlement(pay_way.settlement) if pay_way else None
-            payment_reference_needed = (
-                not settled and settlement == PaySettlement.OFFLINE_TRANSFER
-            )
-            if (
-                pay_way
-                and not settled
-                and settlement
-                in (
-                    PaySettlement.OFFLINE_TRANSFER,
-                    PaySettlement.CARRIER_TERMINAL,
-                )
-            ):
-                payment_instructions = (
-                    pay_way.safe_translation_getter(
-                        "instructions", any_language=True
-                    )
-                    or ""
-                )
-                # ``PayWay.instructions`` is authored in the admin WYSIWYG
-                # editor, so it carries HTML (e.g. ``<div>…</div>``). The
-                # HTML email renders it with ``|safe``; the plain-text email
-                # needs the tags stripped and entities unescaped, otherwise
-                # the customer sees raw ``<div>`` markup.
-                payment_instructions_text = unescape(
-                    strip_tags(payment_instructions)
-                ).strip()
-
-            # Does a SECOND email actually follow this one? Only when
-            # the shopper still owes us a payment we will confirm
-            # ourselves — an online payment that has not completed, or a
-            # bank transfer we mark as received. Money the carrier
-            # collects at the door or at the locker is never confirmed
-            # by us (COD sits PENDING until the courier pays out, ~4
-            # days later), so promising a confirmation email there
-            # promises something that never arrives.
-            expects_payment_confirmation = bool(
-                pay_way and not settled and not pay_way.is_collected_on_delivery
-            )
-
-            # Suggestions are an extra in this email, never a reason to
-            # lose it: a failure building them is logged and the
-            # confirmation goes out without the strip.
-            try:
-                suggestion_strip = order_email_strip(order, language=language)
-            except Exception:
-                logger.exception(
-                    "Order #%s confirmation: suggestions failed, sending "
-                    "without them",
-                    order.id,
-                    extra={"order_id": order.id},
-                )
-                suggestion_strip = None
-
-            context = build_email_context(
-                language=language,
-                order=order,
-                items=order.items.all(),
-                suggested_products=(
-                    suggestion_strip.items if suggestion_strip else []
-                ),
-                pay_way=pay_way,
-                payment_instructions=payment_instructions,
-                payment_instructions_text=payment_instructions_text,
-                is_paid=is_paid,
-                expects_payment_confirmation=expects_payment_confirmation,
-                collected_on_delivery=bool(
-                    pay_way and pay_way.is_collected_on_delivery
-                ),
-                payment_reference_needed=payment_reference_needed,
-            )
-
-            text_content = render_to_string(f"{template_base}.txt", context)
-            html_content = render_to_string(f"{template_base}.html", context)
+        text_content, html_content = email.render()
+        subject = email.subject
+        template_base = email.template
+        suggestion_strip = email.suggestion_strip
 
         msg = EmailMultiAlternatives(
             subject,
@@ -447,70 +348,16 @@ def send_dispute_notification_email(
     try:
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        reason = (order.metadata or {}).get("dispute_reason", "unknown")
-        chargeback = (
-            PaymentTransaction.objects.filter(
-                order=order,
-                kind=PaymentTransactionKind.CHARGEBACK,
-                provider_reference=dispute_id,
-            ).first()
-            if lost
-            else None
-        )
-
-        provider_name = payment_provider_label(provider_code) or provider_code
-
         # Staff-facing: the store's own language, not the worker's.
-        language = store_language()
-        with translation.override(language):
-            context = build_email_context(
-                language=language,
-                order=order,
-                dispute_id=dispute_id,
-                reason=reason,
-                chargeback=chargeback,
-                lost=lost,
-                provider_name=provider_name,
-            )
-
-            subject = (
-                _("[%(site)s] %(provider)s dispute lost — Order #%(order)s")
-                if lost
-                else _(
-                    "[%(site)s] %(provider)s dispute opened — Order #%(order)s"
-                )
-            ) % {
-                "site": tenant_site_name(),
-                "provider": provider_name,
-                "order": order_id,
-            }
-
-            try:
-                text_content = render_to_string(
-                    "emails/order/dispute_notification.txt", context
-                )
-                html_content = render_to_string(
-                    "emails/order/dispute_notification.html", context
-                )
-            except TemplateDoesNotExist:
-                # ONLY a missing template. Both dispute templates exist, so
-                # catching every exception here could only mask a real render
-                # bug behind an inline plain-text body nobody would notice.
-                text_content = (
-                    f"A {provider_name} dispute has been opened for Order #{order_id}.\n"
-                    f"Dispute ID: {dispute_id}\n"
-                    f"Reason: {reason}\n\n"
-                    f"Please review this dispute in the {provider_name} dashboard and take action."
-                )
-                html_content = (
-                    f"<p>A {provider_name} dispute has been opened for "
-                    f"<strong>Order #{order_id}</strong>.</p>"
-                    f"<ul>"
-                    f"<li>Dispute ID: {dispute_id}</li>"
-                    f"<li>Reason: {reason}</li>"
-                    f"</ul>"
-                    f"<p>Please review this dispute in the {provider_name} dashboard.</p>"
-                )
+        email = dispute_notification_email(
+            order,
+            dispute_id=dispute_id,
+            provider_code=provider_code,
+            lost=lost,
+            language=store_language(),
+        )
+        text_content, html_content = email.render()
+        subject = email.subject
 
         staff_email = tenant_contact_email()
         if not staff_email:
@@ -566,9 +413,7 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
     try:
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
-            .prefetch_related(
-                "items__product__translations", "pay_way__translations"
-            )
+            .prefetch_related("pay_way__translations")
             .get(id=order_id)
         )
 
@@ -581,22 +426,11 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             return False
 
         # Merchant-facing: the store's own language, not the worker's.
-        language = store_language()
-        with translation.override(language):
-            context = build_email_context(
-                language=language,
-                order=order,
-                items=order.items.all(),
-                pay_way=order.pay_way,
-                INFO_EMAIL=staff_email,
-            )
-            subject = _("New order — #{order_id}").format(order_id=order_id)
-            text_content = render_to_string(
-                "emails/order/admin_new_order.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/admin_new_order.html", context
-            )
+        email = admin_new_order_email(
+            order, language=store_language(), staff_email=staff_email
+        )
+        text_content, html_content = email.render()
+        subject = email.subject
 
         msg = EmailMultiAlternatives(
             subject,
@@ -683,27 +517,9 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         # context nor renders a line table.
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        language = get_order_language(order)
-        retry_url = get_tenant_frontend_url(
-            f"/account/orders/{order.id}", language=language
-        )
-
-        context = build_email_context(
-            language=language,
-            order=order,
-            retry_url=retry_url,
-        )
-
-        with translation.override(language):
-            subject = _("Payment Failed - Order #{order_id}").format(
-                order_id=order.id
-            )
-            text_content = render_to_string(
-                "emails/order/payment_failed.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/payment_failed.html", context
-            )
+        email = payment_failed_email(order, language=get_order_language(order))
+        text_content, html_content = email.render()
+        subject = email.subject
 
         msg = EmailMultiAlternatives(
             subject,
@@ -834,51 +650,11 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
             )
             return True
 
-        # The label must resolve INSIDE the override below.
-        # get_FOO_display() calls force_str(..., strings_only=True) on the
-        # choice label, and a gettext_lazy proxy is not a protected type —
-        # so it resolved eagerly here, under whatever locale the worker
-        # last left active, and a German customer got a German email with
-        # a Greek status word. PaymentStatus labels are lazy, so passing
-        # the proxy through lets the render resolve it. Its sibling
-        # send_order_status_update_email already does exactly this with
-        # OrderStatus(status).label.
-        status_label = (
-            PaymentStatus(order.payment_status).label
-            if order.payment_status
-            else PaymentStatus.REFUNDED.label
+        email = refund_confirmation_email(
+            refund, language=get_order_language(order)
         )
-        language = get_order_language(order)
-        context = build_email_context(
-            language=language,
-            order=order,
-            status="REFUNDED",
-            status_display=status_label,
-            items=order.items.all(),
-        )
-        # What THIS refund paid back and what is still held, so a partial
-        # refund does not read as the whole order refunded.
-        currency = refund.amount.currency
-        still_held = (
-            PaymentLedger.captured(order)
-            - PaymentLedger.refunded(order)
-            - PaymentLedger.charged_back(order)
-        )
-        context["refund_amount"] = refund.amount
-        context["payment_remaining"] = (
-            Money(still_held, currency) if still_held > 0 else None
-        )
-
-        with translation.override(language):
-            subject = _("Refund Processed - Order #{order_id}").format(
-                order_id=order.id
-            )
-            text_content = render_to_string(
-                "emails/order/order_refunded.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/order_refunded.html", context
-            )
+        text_content, html_content = email.render()
+        subject = email.subject
 
         msg = EmailMultiAlternatives(
             subject,
@@ -980,11 +756,9 @@ def send_order_status_update_email(
             )
             return True
 
-        order = (
-            Order.objects.select_related("user", "country", "region", "pay_way")
-            .prefetch_related("items__product__translations")
-            .get(id=order_id)
-        )
+        order = Order.objects.select_related(
+            "user", "country", "region", "pay_way"
+        ).get(id=order_id)
 
         # Internal-only milestones never get their own customer email:
         #   • PENDING — covered by the order-received confirmation.
@@ -1007,43 +781,12 @@ def send_order_status_update_email(
         ):
             return True
 
-        language = get_order_language(order)
-        context = build_email_context(
-            language=language,
-            order=order,
-            items=order.items.select_related("product").all(),
-            status=status,
-            status_display=OrderStatus(status).label,
+        email = order_status_update_email(
+            order, status, language=get_order_language(order)
         )
-
-        template_base = f"emails/order/order_{status.lower()}"
-
-        with translation.override(language):
-            subject = _("Order #{order_id} Status Update - {status}").format(
-                order_id=order.id, status=OrderStatus(status).label
-            )
-
-            try:
-                text_content = render_to_string(f"{template_base}.txt", context)
-                html_content = render_to_string(
-                    f"{template_base}.html", context
-                )
-            except TemplateDoesNotExist:
-                # ONLY a missing template. Catching everything meant a
-                # real render bug in a status template — a bad tag, a
-                # missing context key — silently downgraded the customer
-                # to the generic copy, and nothing ever surfaced that the
-                # specific template was broken.
-                logger.warning(
-                    f"Template {template_base} not found, using generic template",
-                    extra={"order_id": order_id, "status": status},
-                )
-                text_content = render_to_string(
-                    "emails/order/order_status_generic.txt", context
-                )
-                html_content = render_to_string(
-                    "emails/order/order_status_generic.html", context
-                )
+        text_content, html_content = email.render()
+        subject = email.subject
+        template_base = email.template
 
         msg = EmailMultiAlternatives(
             subject,
@@ -1231,24 +974,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             )
             return True
 
-        language = get_order_language(order)
-        context = build_email_context(
-            language=language,
-            order=order,
-            tracking_number=order.tracking_number,
-            carrier=order.shipping_carrier,
-        )
-
-        with translation.override(language):
-            subject = _("Your Order #{order_id} Has Shipped").format(
-                order_id=order.id
-            )
-            text_content = render_to_string(
-                "emails/order/order_shipped.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/order_shipped.html", context
-            )
+        email = order_shipped_email(order, language=get_order_language(order))
+        text_content, html_content = email.render()
+        subject = email.subject
 
         msg = EmailMultiAlternatives(
             subject,
@@ -1424,31 +1152,14 @@ def _release_document_email(order_id: int, flag: str) -> None:
 
 def _send_document_email(order: Order, document, *, is_credit: bool) -> None:
     """Email the document's PDF to the buyer."""
-    language = get_order_language(order)
-    with translation.override(language):
-        if is_credit:
-            subject = _(
-                "Credit receipt {document_number} for your order #{order_id}"
-            )
-        else:
-            subject = _("Receipt {document_number} for your order #{order_id}")
-        subject = subject.format(
-            document_number=document.document_number, order_id=order.id
-        )
-        context = build_email_context(
-            language=language,
-            order=order,
-            document_number=document.document_number,
-            issue_date=document.issue_date,
-            mydata_mark=document.mydata_mark,
-            is_credit=is_credit,
-        )
-        text_content = render_to_string(
-            "emails/order/retail_document_issued.txt", context
-        )
-        html_content = render_to_string(
-            "emails/order/retail_document_issued.html", context
-        )
+    email = document_issued_email(
+        order,
+        document,
+        is_credit=is_credit,
+        language=get_order_language(order),
+    )
+    text_content, html_content = email.render()
+    subject = email.subject
 
     msg = EmailMultiAlternatives(
         subject,
@@ -2271,9 +1982,29 @@ def send_checkout_abandonment_emails() -> int:
     if not abandoned_session_ids:
         return 0
 
+    # A cart reminder is marketing: an account that used the one-click
+    # unsubscribe link in any marketing email is not written to. Its
+    # reservations are settled, not left for tomorrow's run to find again
+    # (and to send a months-old reminder if the opt-out is ever lifted).
+    opted_out_sessions = [
+        str(uuid)
+        for uuid in Cart.objects.filter(
+            uuid__in=abandoned_session_ids,
+            user__marketing_opted_out_at__isnull=False,
+        ).values_list("uuid", flat=True)
+    ]
+    if opted_out_sessions:
+        StockReservation.objects.filter(
+            session_id__in=opted_out_sessions
+        ).update(abandonment_notified=True)
+
     carts = (
         Cart.objects.select_related("user")
-        .filter(uuid__in=abandoned_session_ids, user__isnull=False)
+        .filter(
+            uuid__in=abandoned_session_ids,
+            user__isnull=False,
+            user__marketing_opted_out_at__isnull=True,
+        )
         .prefetch_related("items__product__translations")
     )
 

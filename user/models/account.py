@@ -135,6 +135,19 @@ class UserAccount(
         blank=True,
         help_text=_("Timestamp of the most recent re-engagement email."),
     )
+    # Nullable, not a boolean with a default: the column is additive (an
+    # old pod's INSERT does not name it) and the timestamp is the proof of
+    # WHEN the customer asked to stop (GDPR art. 7(1) accountability).
+    marketing_opted_out_at = models.DateTimeField(
+        _("Marketing Opted Out At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Set when the customer unsubscribed from all marketing email "
+            "(the one-click link in a marketing email). Every marketing "
+            "send skips the account while this is set."
+        ),
+    )
     loyalty_tier = models.ForeignKey(
         "loyalty.LoyaltyTier",
         related_name="users",

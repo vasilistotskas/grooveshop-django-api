@@ -44,6 +44,15 @@ class UserAccountManager(BaseUserManager["UserAccount"]):
     def inactive(self):
         return self.filter(is_active=False)
 
+    def accepting_marketing(self):
+        """Accounts that have not opted out of marketing email.
+
+        Every marketing send (re-engagement, abandoned cart, ...) starts
+        from this, or filters ``marketing_opted_out_at__isnull=True``
+        through its own relation to the account.
+        """
+        return self.filter(marketing_opted_out_at__isnull=True)
+
     def staff(self):
         return self.filter(is_staff=True)
 

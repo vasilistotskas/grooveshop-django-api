@@ -1,0 +1,15 @@
+{% load i18n %}{% trans "New contact form submission" %}
+{{ SITE_NAME }}
+================================================================================
+
+{% trans "Name" %}: {{ contact.name|safe }}
+{% trans "Email" %}: {{ contact.email|safe }}
+{% if contact.phone %}{% trans "Phone" %}: {{ contact.phone|safe }}
+{% endif %}{% if contact.company %}{% trans "Company" %}: {{ contact.company|safe }}
+{% endif %}{% if contact.subject %}{% trans "Subject" %}: {{ contact.subject|safe }}
+{% endif %}{% trans "Message" %}: {{ contact.message|safe }}
+{% if attachments %}
+{% blocktrans count counter=attachments|length %}{{ counter }} attachment, download it in the admin:{% plural %}{{ counter }} attachments, download them in the admin:{% endblocktrans %}
+{% for file in attachments %}  - {{ file.original_name|safe }} ({{ file.size }} B, {{ file.get_scan_status_display }})
+{% endfor %}{% endif %}
+{% trans "Reply to this email to answer the customer." %}

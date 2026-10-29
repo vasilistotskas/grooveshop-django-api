@@ -3,9 +3,9 @@
 Read by ``registry.py`` and ``preview_service.py`` and by nothing else — no
 sending path imports this module. Templates are discovered from disk, so an
 entry here is never required for a template to exist, be listed, or be sent;
-it only replaces the fallback description and category with better ones and
-supplies the subject the PREVIEW renders. The subject a customer actually
-receives is built by the task that sends the mail.
+it only replaces the fallback description and category with better ones.
+A subject is never kept here: the preview shows the one the sender builds
+(``order.emails``).
 """
 
 from dataclasses import dataclass
@@ -32,7 +32,6 @@ class TemplateConfig:
     name: str  # Template file name (without extension)
     category_name: StrOrPromise  # Display category
     description: StrOrPromise  # Template description
-    subject_template: str  # Subject line template with {variables}
     is_used: bool  # Whether template is actively used
     order_statuses: list[OrderStatus] | None = (
         None  # Associated order statuses (optional, only for order templates)
@@ -47,8 +46,8 @@ class TemplateConfig:
 class EmailTemplateConfig:
     """Metadata for the subset of templates worth describing by hand.
 
-    Covers 10 of the templates on disk; the rest fall back to their
-    directory and a placeholder description in ``registry.py``.
+    Describes only some of the templates on disk; the rest fall back to
+    their directory and a placeholder description in ``registry.py``.
     """
 
     # Category configurations
@@ -63,6 +62,7 @@ class EmailTemplateConfig:
         "b2b": _("B2B"),
         "billing": _("Billing"),
         "cart": _("Cart"),
+        "contact": _("Contact"),
         "giftcard": _("Gift Cards"),
         "product": _("Product"),
         "shipping_acs": _("ACS Shipping"),
@@ -93,7 +93,6 @@ class EmailTemplateConfig:
             name="order_shipped",
             category_name=_("Order Lifecycle"),
             description=_("Sent when order is shipped"),
-            subject_template="Your Order #{order[id]} Has Shipped",
             order_statuses=[OrderStatus.SHIPPED],
             is_used=True,
         ),
@@ -101,7 +100,6 @@ class EmailTemplateConfig:
             name="order_delivered",
             category_name=_("Order Lifecycle"),
             description=_("Sent when order is delivered"),
-            subject_template="Your Order #{order[id]} Has Been Delivered",
             order_statuses=[OrderStatus.DELIVERED],
             is_used=True,
         ),
@@ -109,7 +107,6 @@ class EmailTemplateConfig:
             name="order_canceled",
             category_name=_("Order Lifecycle"),
             description=_("Sent when order is canceled"),
-            subject_template="Your Order #{order[id]} Has Been Canceled",
             order_statuses=[OrderStatus.CANCELED],
             is_used=True,
         ),
@@ -117,7 +114,6 @@ class EmailTemplateConfig:
             name="order_status_generic",
             category_name=_("Order Lifecycle"),
             description=_("Generic template for any status update"),
-            subject_template="Order #{order[id]} Status Update",
             order_statuses=[],
             is_used=True,
         ),
@@ -125,7 +121,6 @@ class EmailTemplateConfig:
             name="order_completed",
             category_name=_("Order Lifecycle"),
             description=_("Status update for completed orders"),
-            subject_template="Order #{order[id]} - Completed",
             order_statuses=[OrderStatus.COMPLETED],
             is_used=True,
         ),
@@ -133,7 +128,6 @@ class EmailTemplateConfig:
             name="order_refunded",
             category_name=_("Order Lifecycle"),
             description=_("Status update for refunded orders"),
-            subject_template="Order #{order[id]} - Refunded",
             order_statuses=[OrderStatus.REFUNDED],
             is_used=True,
         ),
@@ -141,7 +135,6 @@ class EmailTemplateConfig:
             name="order_returned",
             category_name=_("Order Lifecycle"),
             description=_("Status update for returned orders"),
-            subject_template="Order #{order[id]} - Returned",
             order_statuses=[OrderStatus.RETURNED],
             is_used=True,
         ),
@@ -150,7 +143,6 @@ class EmailTemplateConfig:
             name="confirmation",
             category_name=_("Subscription"),
             description=_("Subscription confirmation email"),
-            subject_template="Subscription Confirmed",
             is_used=True,
         ),
         # User management templates
@@ -158,7 +150,6 @@ class EmailTemplateConfig:
             name="inactive_user_email_template",
             category_name=_("User Management"),
             description=_("Inactive user notification"),
-            subject_template="We Miss You, {user[first_name]}!",
             is_used=True,
         ),
     }

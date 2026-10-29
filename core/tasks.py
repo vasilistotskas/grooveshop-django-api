@@ -613,8 +613,11 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     cutoff_date = now - timedelta(days=inactive_days)
     cooldown_cutoff = now - timedelta(days=cooldown_days)
 
+    # Re-engagement is marketing: an account that used the one-click
+    # unsubscribe link in any marketing email is not written to again.
     inactive_users_qs = (
-        User.objects.filter(
+        User.objects.accepting_marketing()
+        .filter(
             last_login__lt=cutoff_date,
             is_active=True,
             email__isnull=False,

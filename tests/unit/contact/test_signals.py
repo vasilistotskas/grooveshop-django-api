@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from celery.exceptions import Retry
 from django.core import mail
+from django.core.mail import EmailMultiAlternatives
 from django.db import connection
 from django.test import TestCase, override_settings
 
@@ -18,6 +19,14 @@ from contact.signals import send_email_notification
 # the legacy ``ADMINS`` list so the recipient list is deterministic
 # under the new contract.
 _INFO_EMAIL = "admin@example.com"
+
+
+@pytest.fixture(autouse=True)
+def _english_store():
+    """These tests read the English copy; ``tests/integration/contact/``
+    covers the store's language."""
+    with patch("contact.tasks.store_language", return_value="en"):
+        yield
 
 
 class TestContactSignals(TestCase):
@@ -40,8 +49,8 @@ class TestContactSignals(TestCase):
         assert len(mail.outbox) == 1
 
         email = mail.outbox[0]
-        assert (
-            email.subject == f"New Contact Form Submission from {contact.name}"
+        assert email.subject == (
+            f"New contact form submission from {contact.name}"
         )
         assert contact.name in email.body
         assert contact.email in email.body
@@ -111,7 +120,7 @@ class TestContactSignals(TestCase):
         INFO_EMAIL=_INFO_EMAIL,
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
-    @patch("contact.tasks.send_mail")
+    @patch.object(EmailMultiAlternatives, "send")
     def test_a_failed_send_is_retried(self, mock_send_mail):
         # Eager Celery runs the task inline, so its ``autoretry_for``
         # surfaces here as the ``Retry`` a worker would schedule.
@@ -128,7 +137,7 @@ class TestContactSignals(TestCase):
         INFO_EMAIL=_INFO_EMAIL,
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
-    @patch("contact.tasks.send_mail")
+    @patch.object(EmailMultiAlternatives, "send")
     def test_a_rejected_send_is_not_retried(self, mock_send_mail):
         mock_send_mail.side_effect = smtplib.SMTPSenderRefused(
             550, b"5.1.8 bad sender", "noreply@example.com"
@@ -153,7 +162,7 @@ class TestContactSignals(TestCase):
         assert len(mail.outbox) == 1
         email = mail.outbox[0]
 
-        assert email.subject == "New Contact Form Submission from Jane Smith"
+        assert email.subject == "New contact form submission from Jane Smith"
 
         assert "Name: Jane Smith" in email.body
         assert "Email: jane@example.com" in email.body
@@ -252,26 +261,24 @@ class TestContactSignals(TestCase):
         INFO_EMAIL=_INFO_EMAIL,
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
-    @patch("contact.tasks.send_mail")
-    def test_send_mail_parameters(self, mock_send_mail):
+    def test_message_parameters(self):
+        mail.outbox = []
+
         contact = Contact.objects.create(**self.contact_data)
 
-        # Celery task (running eagerly in tests) invokes send_mail with the
-        # rendered subject/body using the contact's own name/email/message.
-        # From is the DMARC-safe display-name form (tenant_from_email).
-        mock_send_mail.assert_called_once()
-        kwargs = mock_send_mail.call_args.kwargs
-        assert (
-            kwargs["subject"]
-            == f"New Contact Form Submission from {contact.name}"
+        # Celery task (running eagerly in tests) sends one message built
+        # from the contact's own name/email/message. From is the DMARC-safe
+        # display-name form (tenant_from_email); Reply-To is the submitter.
+        [email] = mail.outbox
+        assert email.subject == (
+            f"New contact form submission from {contact.name}"
         )
-        assert kwargs["message"] == (
-            f"Name: {contact.name}\nEmail: {contact.email}"
-            f"\nMessage: {contact.message}"
-        )
-        assert kwargs["from_email"].endswith("<noreply@example.com>")
-        assert kwargs["recipient_list"] == [_INFO_EMAIL]
-        assert kwargs["fail_silently"] is False
+        assert f"Name: {contact.name}" in email.body
+        assert f"Email: {contact.email}" in email.body
+        assert f"Message: {contact.message}" in email.body
+        assert email.from_email.endswith("<noreply@example.com>")
+        assert email.to == [_INFO_EMAIL]
+        assert email.reply_to == [contact.email]
 
     @override_settings(
         INFO_EMAIL=_INFO_EMAIL,

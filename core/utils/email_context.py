@@ -46,6 +46,9 @@ def build_email_context(*, language: str, **extra: Any) -> dict[str, Any]:
     admin-facing notifications.
     """
     return {
+        # ``<html lang>`` of the shared layout, and the language a
+        # template can branch on.
+        "LANGUAGE_CODE": language,
         "SITE_NAME": tenant_site_name(),
         "SITE_URL": get_tenant_frontend_url("", language=language),
         "INFO_EMAIL": tenant_contact_email(),

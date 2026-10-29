@@ -54,6 +54,27 @@ class SubscribeResult:
     created: bool
 
 
+def opt_out_of_marketing(account_pk: int) -> bool:
+    """Record that an account no longer wants marketing email.
+
+    The account-level half of "unsubscribe from everything". Marketing
+    that belongs to no topic (re-engagement, abandoned cart) has no
+    subscription row to end, so the customer's refusal is kept on the
+    account, and every such send reads it
+    (``UserAccount.objects.accepting_marketing``).
+
+    Returns True when this call recorded it, False when the account had
+    already opted out (the first time stands) or does not exist.
+    """
+    from user.models.account import UserAccount
+
+    return bool(
+        UserAccount.objects.filter(
+            pk=account_pk, marketing_opted_out_at__isnull=True
+        ).update(marketing_opted_out_at=timezone.now())
+    )
+
+
 def dispatch_confirmation(subscription: UserSubscription) -> None:
     """Queue the confirmation email for an armed row, after commit, in
     the row's own schema (``dispatch_on_commit`` pins it now)."""

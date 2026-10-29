@@ -303,6 +303,11 @@ class TestPurgeExpiredAttachmentFiles:
 class TestTheNotificationEmail:
     """Files are never mailed; staff are told they exist."""
 
+    @pytest.fixture(autouse=True)
+    def _english_store(self):
+        with mock.patch("contact.tasks.store_language", return_value="en"):
+            yield
+
     def test_the_attachments_are_listed_with_their_scan_state(
         self, private_tree
     ):
@@ -326,8 +331,7 @@ class TestTheNotificationEmail:
         assert send_contact_notification_email_task(contact.pk) is True
 
         body = mail.outbox[-1].body
-        assert "Attachments (2)" in body
-        assert "download in the admin" in body
+        assert "2 attachments, download them in the admin" in body
         assert "Σχέδιο Α1.pdf" in body
         assert "Not scanned" in body
         assert "Infected" in body
@@ -346,4 +350,4 @@ class TestTheNotificationEmail:
 
         send_contact_notification_email_task(contact.pk)
 
-        assert "Attachments" not in mail.outbox[-1].body
+        assert "attachment" not in mail.outbox[-1].body

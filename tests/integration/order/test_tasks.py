@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from django.db.models.signals import post_save
-from django.template import TemplateDoesNotExist
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from factory.django import mute_signals
@@ -72,7 +71,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -109,7 +108,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string", return_value="content")
+    @patch("order.emails.render_to_string", return_value="content")
     def test_confirmation_send_failure_schedules_a_retry(
         self, mock_render, mock_email, mock_cache
     ):
@@ -134,7 +133,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.cache")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string", return_value="content")
+    @patch("order.emails.render_to_string", return_value="content")
     def test_confirmation_send_gives_up_after_its_retries(
         self, mock_render, mock_email, mock_cache
     ):
@@ -341,7 +340,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertIn("logo-dark.svg", html_body)
 
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -377,7 +376,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -457,7 +456,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -515,8 +514,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
-    @patch("order.tasks.logger.warning")
+    @patch("order.emails.render_to_string")
+    @patch("order.emails.logger.warning")
+    @patch("order.emails._template_exists", return_value=False)
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -525,21 +525,19 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_send_order_status_update_email_template_fallback(
-        self, mock_logger_warning, mock_render, mock_email, mock_log_note
+        self,
+        _mock_template_exists,
+        mock_logger_warning,
+        mock_render,
+        mock_email,
+        mock_log_note,
     ):
+        """A status without a template of its own is sent with the generic
+        one, and says so in the log. Only a MISSING template falls back: a
+        template that exists and fails to render raises."""
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
-
-        def render_side_effect(template_name, context):
-            if "order_delivered" in template_name:
-                # What a missing template actually raises. Raising a bare
-                # Exception here used to pass because the handler caught
-                # everything — which is exactly how a real render bug got
-                # downgraded to the generic copy in silence.
-                raise TemplateDoesNotExist(template_name)
-            return "Generic email content"
-
-        mock_render.side_effect = render_side_effect
+        mock_render.return_value = "Generic email content"
 
         result = send_order_status_update_email(
             self.order.id, OrderStatus.DELIVERED
@@ -547,11 +545,19 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         self.assertTrue(result)
         mock_logger_warning.assert_called_once()
+        rendered = [call.args[0] for call in mock_render.call_args_list]
+        self.assertEqual(
+            rendered,
+            [
+                "emails/order/order_status_generic.txt",
+                "emails/order/order_status_generic.html",
+            ],
+        )
         mock_email_instance.send.assert_called_once()
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -789,7 +795,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         )
 
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
@@ -855,7 +861,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         "order.tasks.tenant_contact_email", return_value="merchant@store.test"
     )
     @patch("order.tasks.tenant_from_email", return_value="orders@store.test")
-    @patch("order.tasks.render_to_string")
+    @patch("order.emails.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
     )

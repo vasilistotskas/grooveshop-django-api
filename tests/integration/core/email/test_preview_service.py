@@ -1,11 +1,11 @@
 """Unit tests for email template preview service."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from core.email.preview_service import EmailPreview, EmailTemplatePreviewService
-from order.models import Order
+from order.factories.order import OrderFactory
 
 
 class TestEmailTemplatePreviewService:
@@ -35,24 +35,18 @@ class TestEmailTemplatePreviewService:
 
     @pytest.mark.django_db
     def test_generate_preview_with_real_order(self, service):
-        """Test generating preview with real order data."""
-        # This test requires a real order in the database
-        # We'll mock it for now
-        with patch.object(
-            service, "_get_real_order_context"
-        ) as mock_get_context:
-            mock_get_context.return_value = {
-                "order": Mock(id=1, status="pending"),
-                "site_name": "Test Site",
-                "site_url": "http://test.com",
-            }
+        """A real order renders the email that order would be sent."""
+        order = OrderFactory(num_order_items=1)
 
-            preview = service.generate_preview(
-                template_name="order_completed", order_id=1
-            )
+        preview = service.generate_preview(
+            template_name="order_completed", order_id=order.id
+        )
 
-            assert isinstance(preview, EmailPreview)
-            assert preview.error is None
+        assert isinstance(preview, EmailPreview)
+        assert preview.error is None
+        assert preview.is_sample_data is False
+        assert preview.order_id == order.id
+        assert f"#{order.id}" in preview.subject
 
     def test_generate_preview_with_invalid_template(self, service):
         """Test generating preview with invalid template name."""
@@ -67,19 +61,16 @@ class TestEmailTemplatePreviewService:
             or "not found" in preview.text_content.lower()
         )
 
+    @pytest.mark.django_db
     def test_generate_preview_with_invalid_order_id(self, service):
-        """Test generating preview with invalid order ID."""
-        with patch.object(Order.objects, "get") as mock_get:
-            mock_get.side_effect = Order.DoesNotExist()
+        """An order that does not exist is reported, not replaced by
+        sample data that would pass for the order's email."""
+        preview = service.generate_preview(
+            template_name="order_completed", order_id=99999
+        )
 
-            preview = service.generate_preview(
-                template_name="order_completed", order_id=99999
-            )
-
-            # Should fall back to sample data
-            assert isinstance(preview, EmailPreview)
-            # Should still generate preview with sample data
-            assert preview.html_content is not None or preview.error is not None
+        assert preview.error is not None
+        assert preview.html_content == ""
 
     def test_preview_contains_html_content(self, service):
         """Test that preview contains HTML content."""

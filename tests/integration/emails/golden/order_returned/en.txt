@@ -1,0 +1,36 @@
+Dear Maria Papadopoulou,
+
+Your order #900001 has been updated.
+
+Order Details:
+- Order Number: #900001
+- Order Date: 03/14/2026 12:30 p.m.
+- New Status: Returned
+
+This status means:
+
+Your return has been received and is being processed.
+
+
+
+
+Order Items:
+
+- Wireless earbuds x 1 @ €20.00 = €20.00
+
+- Charging pad x 2 @ €31.50 = €63.00
+
+
+Subtotal: €83.00
+Shipping: €4.90
+Order Total: €87.90
+
+
+If you have any questions about your order, please contact our customer service team.
+
+Thank you for shopping with Acme Gadgets!
+
+Best regards,
+Acme Gadgets Team
+owner@store.test
+

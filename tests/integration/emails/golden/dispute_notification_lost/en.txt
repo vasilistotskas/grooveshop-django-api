@@ -1,0 +1,19 @@
+Stripe dispute lost — Order #900001
+
+The dispute closed against you and the money was taken back. It is recorded as a chargeback on the order's payment ledger, so it can no longer be refunded. The order status and payment status have NOT been changed.
+
+Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide.
+
+
+DISPUTE
+  Dispute ID:        dp_0001
+  Reason:            unknown
+  Chargeback:        €50.00
+  Order:             #900001
+  Customer:          Maria Papadopoulou <customer@example.test>
+  Order placed:      03/14/2026 12:30 p.m.
+  Order total:       €87.90
+
+
+
+This email is operational; staff only.

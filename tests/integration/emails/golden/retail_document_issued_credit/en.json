@@ -1,0 +1,20 @@
+{
+  "attachments": [
+    [
+      "CRD-2026-000001.pdf",
+      "application/pdf"
+    ]
+  ],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<order_credit.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Credit receipt CRD-2026-000001 for your order #900001",
+  "to": [
+    "customer@example.test"
+  ]
+}

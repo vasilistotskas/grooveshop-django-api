@@ -1,0 +1,15 @@
+Your BOX NOW parcel has arrived!
+
+Hello Maria,
+
+Your parcel for order #900001 has arrived at the BOX NOW locker and is ready for pickup.
+
+Voucher number: 9200000001
+Locker address: Stadiou 5
+Locker name: Locker Stadiou
+
+Your parcel is available for pickup 24 hours a day, 7 days a week.
+
+View your order: https://shop.example/en/account/orders/900001
+
+This is an automated message from Acme Gadgets.

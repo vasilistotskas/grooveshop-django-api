@@ -1,0 +1,20 @@
+YOUR ORDER HAS BEEN DELIVERED
+
+Great news! Your order #900001 has been delivered.
+
+DELIVERY INFORMATION
+Date: 
+
+DELIVERY ADDRESS
+Maria Papadopoulou
+Ermou 12
+Athens, 10563
+Ελλάδα
+
+We hope you are satisfied with your purchase. If you have any issues with your order, please contact our customer service.
+
+Thank you for shopping with us!
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

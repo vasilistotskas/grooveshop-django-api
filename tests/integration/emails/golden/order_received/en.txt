@@ -1,0 +1,32 @@
+ORDER RECEIVED
+
+Thank you — we have received your order. It is waiting for payment.
+
+Order #900001
+Date: 03/14/2026
+
+HOW TO COMPLETE YOUR PAYMENT
+
+Deposit to our bank account.
+Please include your order number #900001 in the payment reference.
+
+SHIPPING ADDRESS
+Maria Papadopoulou
+Ermou 12
+Athens, 10563
+Ελλάδα
+
+ORDER ITEMS
+Wireless earbuds - 1 x €20.00 = €20.00
+Charging pad - 2 x €31.50 = €63.00
+
+Subtotal: €83.00
+Shipping: €4.90
+Total: €87.90
+
+You will receive a second email as soon as we confirm your payment.
+We will email you as your order progresses.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

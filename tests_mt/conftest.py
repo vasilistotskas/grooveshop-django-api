@@ -27,6 +27,8 @@ from __future__ import annotations
 import pytest
 from django.conf import settings
 
+from tests.utils.emails import catalogue, probe_templates  # noqa: F401
+
 # ── its own test DATABASE, not just its own settings ────────────────
 # Both lanes defaulted to ``test_<DB_NAME>``, and they build INCOMPATIBLE
 # layouts in it: ``tests/`` runs with DATABASE_ROUTERS = [] so every

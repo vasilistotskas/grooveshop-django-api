@@ -992,6 +992,9 @@ msgstr "Account and system topics: new users are subscribed automatically. Newsl
 msgid "Account email"
 msgstr "Account email"
 
+msgid "Account preferences"
+msgstr "Account preferences"
+
 msgid "Account security notice"
 msgstr "Account security notice"
 
@@ -1124,6 +1127,9 @@ msgstr "Address Owner"
 
 msgid "Address Update"
 msgstr "Address Update"
+
+msgid "Address hash"
+msgstr "Address hash"
 
 msgid "Address line 1"
 msgstr "Address line 1"
@@ -1287,6 +1293,9 @@ msgstr "An absolute https URL on another site."
 
 msgid "An email address is required for guest alerts."
 msgstr "An email address is required for guest alerts."
+
+msgid "An email type, or * for every marketing type."
+msgstr "An email type, or * for every marketing type."
 
 msgid "An error occurred while fetching payment status."
 msgstr "An error occurred while fetching payment status."
@@ -2463,6 +2472,9 @@ msgstr "Changed"
 
 msgid "Changed By"
 msgstr "Changed By"
+
+msgid "Changed by (staff)"
+msgstr "Changed by (staff)"
 
 msgid "Changed only"
 msgstr "Changed only"
@@ -3867,14 +3879,32 @@ msgstr "Email changed"
 msgid "Email is required."
 msgstr "Email is required."
 
+msgid "Email opt-out"
+msgstr "Email opt-out"
+
+msgid "Email opt-outs"
+msgstr "Email opt-outs"
+
 msgid "Email preview"
 msgstr "Email preview"
 
 msgid "Email removed"
 msgstr "Email removed"
 
+msgid "Email switch"
+msgstr "Email switch"
+
+msgid "Email switches"
+msgstr "Email switches"
+
 msgid "Email template"
 msgstr "Email template"
+
+msgid "Email type"
+msgstr "Email type"
+
+msgid "Emails"
+msgstr "Emails"
 
 msgid "Emails & Engagement"
 msgstr "Emails & Engagement"
@@ -6421,6 +6451,9 @@ msgstr "Id of the platform staff member who last saved this text (public schema,
 msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 msgstr "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 
+msgid "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
+msgstr "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
+
 msgid "Idempotency key"
 msgstr "Idempotency key"
 
@@ -8345,6 +8378,9 @@ msgstr "One of the files is no longer available. Please re-attach it."
 
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
+
+msgid "One-click unsubscribe"
+msgstr "One-click unsubscribe"
 
 msgid "Online payment methods must have a provider code."
 msgstr "Online payment methods must have a provider code."
@@ -11703,6 +11739,9 @@ msgstr "Source type"
 msgid "Spacer"
 msgstr "Spacer"
 
+msgid "Spam complaint"
+msgstr "Spam complaint"
+
 msgid "Specific categories"
 msgstr "Specific categories"
 
@@ -12863,6 +12902,12 @@ msgstr "This download link has expired."
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 
+msgid "This email is required and cannot be switched off."
+msgstr "This email is required and cannot be switched off."
+
+msgid "This email type does not exist."
+msgstr "This email type does not exist."
+
 msgid "This field is required"
 msgstr "This field is required"
 
@@ -13486,6 +13531,9 @@ msgstr "Unsubscribe from all topics via email link (GET)"
 
 msgid "Unsubscribe here"
 msgstr "Unsubscribe here"
+
+msgid "Unsubscribe link"
+msgstr "Unsubscribe link"
 
 msgid "Unsubscribe the current user from a specific subscription topic."
 msgstr "Unsubscribe the current user from a specific subscription topic."

@@ -404,6 +404,7 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "notification.Notification": Delete(),
     "notification.NotificationTranslation": Delete(),
     "order.StockReservation": Delete(),
+    "emails.EmailOptOut": Delete(),
     "admin.LogEntry": Delete(),
 }
 
@@ -522,6 +523,8 @@ NOT_PERSONAL: dict[str, str] = {
         "extra_settings.Setting",
         "texts.TextOverride",
         "texts.HistoricalTextOverride",
+        "emails.EmailSwitch",
+        "emails.HistoricalEmailSwitch",
         "allauth_idp_oidc.Client",
     ),
     **_exempt(

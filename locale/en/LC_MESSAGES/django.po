@@ -9381,9 +9381,6 @@ msgstr "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"
 msgid "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
 msgstr "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
 
-msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
-msgstr "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
-
 msgid "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). This value is public by design and is safe to expose to unauthenticated callers. Leave blank if Stripe is not configured for this tenant."
 msgstr "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). This value is public by design and is safe to expose to unauthenticated callers. Leave blank if Stripe is not configured for this tenant."
 
@@ -13408,9 +13405,6 @@ msgstr "Translation"
 msgid "Translations"
 msgstr "Translations"
 
-msgid "Translations (parler)"
-msgstr "Translations (parler)"
-
 msgid "Trending (High Views)"
 msgstr "Trending (High Views)"
 
@@ -15281,6 +15275,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Partial refund amount. Leave empty for full refund."
 #~ msgstr "Partial refund amount. Leave empty for full refund."
 
+#~ msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
+#~ msgstr "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
+
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 
@@ -15342,6 +15339,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Total Posts"
 #~ msgstr "Total"
+
+#~ msgid "Translations (parler)"
+#~ msgstr "Translations (parler)"
 
 #~ msgid "True"
 #~ msgstr "True"

@@ -13,7 +13,6 @@ from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
-    RelatedDropdownFilter,
     SliderNumericFilter,
 )
 from unfold.decorators import action, display
@@ -23,7 +22,11 @@ from admin.base import BaseTranslatableAdmin
 from admin.bulk import update_each
 from admin.displays import change_link, header_two_line
 from admin.export import ExportActionMixin
-from admin.filters import AnnotatedRangeFilter, LikesCountFilter
+from admin.filters import (
+    AnnotatedRangeFilter,
+    LikesCountFilter,
+    RelatedDropdownFilter,
+)
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
@@ -362,6 +365,7 @@ class BlogCategoryAdmin(BaseTranslatableAdmin):
 class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     list_horizontal_scrollbar_top = False
 
+    prefetch_translations = ("category__translations",)
     list_display = (
         "title_display",
         "category_display",

@@ -20,7 +20,11 @@ from django.db.models import (
     When,
 )
 from django.utils.translation import gettext_lazy as _
+from parler.models import TranslatableModel
 from unfold.contrib.filters.admin import DropdownFilter, RangeNumericListFilter
+from unfold.contrib.filters.admin import (
+    RelatedDropdownFilter as UnfoldRelatedDropdownFilter,
+)
 
 from order.attribution import KNOWN_SOURCES, source_label
 
@@ -28,6 +32,33 @@ ACQUISITION_SOURCE_MAX_CHOICES = 30
 """How many sources an acquisition filter offers: an unrecognised
 ``utm_source`` is stored as the shopper typed it, so the distinct values
 are unbounded and the dropdown must not follow them."""
+
+
+class RelatedDropdownFilter(UnfoldRelatedDropdownFilter):
+    """Unfold's related dropdown, with the options' translations prefetched.
+
+    Django builds the choices as ``str(row)`` for every row of the related
+    model, and a translated row's ``__str__`` reads its translation: one
+    query per option once parler's cache is off. Every admin imports this
+    one instead of Unfold's, so none of them pays it.
+    """
+
+    def field_choices(self, field, request, model_admin):
+        related = field.remote_field.model
+        queryset = related._default_manager.complex_filter(
+            field.get_limit_choices_to()
+        )
+        if issubclass(related, TranslatableModel):
+            queryset = queryset.prefetch_related("translations")
+        ordering = self.field_admin_ordering(field, request, model_admin)
+        if ordering:
+            queryset = queryset.order_by(*ordering)
+        attname = (
+            field.remote_field.get_related_field().attname
+            if hasattr(field.remote_field, "get_related_field")
+            else "pk"
+        )
+        return [(getattr(row, attname), str(row)) for row in queryset]
 
 
 class AnnotatedRangeFilter(RangeNumericListFilter):

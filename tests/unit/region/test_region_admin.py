@@ -244,8 +244,9 @@ class TestRegionAdmin(TestCase):
     def test_list_filter(self):
         from unfold.contrib.filters.admin import (
             RangeDateTimeFilter,
-            RelatedDropdownFilter,
         )
+
+        from admin.filters import RelatedDropdownFilter
 
         expected_filters = [
             RegionStatusFilter,

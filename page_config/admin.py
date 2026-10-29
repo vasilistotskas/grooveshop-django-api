@@ -272,6 +272,7 @@ class LegalDocumentVersionAdmin(BaseModelAdmin):
     never changed or deleted here.
     """
 
+    prefetch_translations = ("page__translations",)
     list_display = ("page", "language_code", "short_hash", "created_at")
     list_filter = ("page", "language_code")
     search_fields = ("content_hash", "title")

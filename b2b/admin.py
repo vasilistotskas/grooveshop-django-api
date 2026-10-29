@@ -7,7 +7,6 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
@@ -17,6 +16,7 @@ from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextareaWidget
 
 from admin.base import BaseModelAdmin
 from admin.export import ExportActionMixin
+from admin.filters import RelatedDropdownFilter
 from b2b.enum import BusinessProfileStatus, ViesStatus
 from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
 from b2b.services import B2BService
@@ -348,6 +348,7 @@ class CustomerGroupAdmin(BaseModelAdmin):
 class PriceListItemAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
 
+    prefetch_translations = ("product__translations",)
     list_display = ("group", "product", "net_price", "updated_at")
     list_filter = (
         ("group", RelatedDropdownFilter),

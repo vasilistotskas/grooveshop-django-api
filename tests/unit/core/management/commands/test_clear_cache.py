@@ -44,8 +44,6 @@ class TestClearCacheCommand:
         output = out.getvalue()
         assert "Available cache surfaces" in output
         assert "pay_way" in output
-        # Heavy surface gets a marker.
-        assert "[Heavy]" in output
 
     @patch("core.management.commands.clear_cache.CacheService")
     def test_purge_specific_surface(self, cache_service):

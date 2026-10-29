@@ -10,7 +10,6 @@ from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
-    RelatedDropdownFilter,
 )
 from unfold.dataclasses import ActionDialog
 from unfold.decorators import action, display
@@ -25,6 +24,7 @@ from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.bulk import update_each
 from admin.displays import money
 from admin.export import ExportActionMixin
+from admin.filters import RelatedDropdownFilter
 from core.cache.invalidation import mark_surface_stale
 from promotion.enum import BenefitType, TargetScope
 from promotion.models import (
@@ -421,6 +421,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
 class PromotionCodeAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
 
+    prefetch_translations = ("promotion__translations",)
     list_display = (
         "code",
         "promotion",
@@ -446,6 +447,7 @@ class PromotionCodeAdmin(ExportActionMixin, BaseModelAdmin):
 class PromotionRedemptionAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
 
+    prefetch_translations = ("promotion__translations",)
     list_display = (
         "promotion",
         "code",

@@ -3,6 +3,66 @@
 
 
 
+## v3.161.0 (2026-10-29)
+
+### Features
+
+* feat(emails): add the email type registry and one send pipeline (#353) ([`d85a2d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85a2d8cd3522adf468cef5433b59ce0909e3e03))
+
+* feat(emails): add the email type registry and one send pipeline
+
+A new emails app (shared and tenant) that every email will move onto. A
+domain app declares its types in <app>/emails.py, and EmailsConfig.ready
+collects and freezes the catalogue, which refuses duplicate keys, missing
+template pairs and orphan templates in the directories it owns.
+
+send_email(type_key, obj) decides the whole envelope: a platform type runs
+in the public schema and a store type requires a bound store; then gates
+(store feature, server-side store setting, active carrier, enabled beat
+entry), the store's EmailSwitch, the recipients and the marketing opt-out;
+then one render for send and preview, the list headers (customer mail
+only), and emails.transport, the one place a message is sent.
+
+Subjects take bare named fields only: the msgid is checked at boot and a
+translation that names anything else renders the msgid, so an edited
+translation can never read attributes off the context.
+
+EmailOptOut keys a recipient by an HMAC of the address under the new
+EMAIL_HASH_KEY, required under the production profile, and its
+unsubscribe token is signed per schema.
+
+No send site uses the pipeline yet. Golden files record every order email
+as it is sent today, in el and en, and the migration PRs must keep them
+equal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d85a2d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85a2d8cd3522adf468cef5433b59ce0909e3e03))
+
+### Testing
+
+* test(emails): pin the golden pay way and require EMAIL_HASH_KEY in the profile tests
+
+PayWayFactory hands out its key from an iterator, so the method name the
+store's new-order alert prints depended on how many pay ways a CI shard
+created before it. The golden fixture now names the key for each kind.
+
+The settings tests that boot the production profile now pass
+EMAIL_HASH_KEY with the other required secrets, and one checks that a
+missing key is refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d85a2d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85a2d8cd3522adf468cef5433b59ce0909e3e03))
+
+* test(emails): assert the one-click unsubscribe URL's host and path exactly
+
+The test checked that the API origin appeared somewhere in the header. It
+now parses the https entry out of List-Unsubscribe and compares its host
+and the unsubscribe path.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d85a2d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85a2d8cd3522adf468cef5433b59ce0909e3e03))
+
 ## v3.160.1 (2026-10-29)
 
 ### Bug fixes

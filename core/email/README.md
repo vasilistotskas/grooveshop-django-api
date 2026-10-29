@@ -7,10 +7,10 @@ any of the configured languages, against sample data or a real order.
 owns the event — `order/notifications.py`, `order/tasks.py`, `b2b/tasks.py`,
 `giftcard/tasks.py`, `product/tasks.py`, `tenant/billing.py`,
 `shipping/alerts.py`, `shipping_acs/tasks.py`, `shipping_boxnow/tasks.py`,
-`contact/tasks.py`, `user/tasks.py`, `core/tasks.py`. The order emails
-build their subject and context in `order/emails.py`, which the sending
-task and this preview both call; the others still build their own inside
-the task. This package is read-only tooling for humans.
+`contact/tasks.py`, `user/tasks.py`, `core/tasks.py`. The order emails are
+`EmailType`s declared in `order/emails.py` and sent by `emails.send`, and this
+preview renders them through `emails.render.render`; the others still build
+their own inside the task. This package is read-only tooling for humans.
 
 Mounted at `admin/email-templates/` (locale-prefixed) on a **store** admin
 host only; the views query `Order`, which lives in TENANT_APPS. Every view is
@@ -60,18 +60,18 @@ admin page and nothing about the mail that goes out.
 ## What the preview shows
 
 - **An order email, from one of the store's recent orders**: the email that
-  order would be sent. `ORDER_EMAIL_KINDS` in `order/emails.py` maps each
-  template in `emails/order/` to the builder its sending task also calls, so
-  the subject (in the chosen language) and the context are the real ones. An
+  order would be sent. The registered type that sends the template is
+  rendered by `emails.render.render`, the function the pipeline calls, from
+  the record `order.emails.preview_object` finds for the order, so the
+  subject (in the chosen language) and the context are the real ones. An
   order with nothing the email is about (no refund for `order_refunded`, no
   receipt for `retail_document_issued`, no shipment for the carrier emails,
   no chargeback for `dispute_notification`) gets a message saying so.
-- **Any email, from sample data**: the template rendered against made-up
-  values (`sample_data.py`). An order email shows its real subject for the
-  sample order number; every other template shows **no subject**, because no
-  builder owns one for it yet. Subjects for those arrive with the email-type
-  catalogue (one entry per type, holding its builder), which will also let the
-  other directories preview from a real record.
+- **Any email, from sample data**: a registered type renders its own
+  `sample` (an unsaved object graph) with its real subject; every other
+  template renders against made-up values (`sample_data.py`) and shows **no
+  subject**, because no type owns one for it yet. They get one, and a real
+  record to preview, as their domain moves onto the email-type catalogue.
 
 ## Adding a template
 

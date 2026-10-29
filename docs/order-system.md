@@ -1372,7 +1372,10 @@ accepting Cyprus orders at the Greek flat rate.
 
 Merchant-operations mail goes to the store's operators
 (`tenant_admin_recipients()`; platform `ADMINS` only as the fallback) and
-is **per store, per kind**. `OpsAlertKind` is the whole list:
+is **per store, per kind**. (The store-staff mails about an order,
+`team.new_order` and the two dispute mails, are not ops alerts: they go
+through `send_email` to `store_operators()` with no `ADMINS` fallback, §6.2.)
+`OpsAlertKind` is the whole list:
 
 | Kind | Sender | Where the work shows when the email is off |
 |---|---|---|
@@ -1443,29 +1446,53 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
 | Dispute lost (staff) | `send_dispute_notification_email(lost=True)` | `charge.dispute.closed` webhook, once per CHARGEBACK row (§4.2.1) | the ledger row (a repeat records nothing) |
 
-All transactional emails carry `List-Unsubscribe: mailto:` headers
-via `build_transactional_list_headers` (PR #4).
+Every customer email is sent through `emails.send.send_email` and carries
+the transactional `List-ID` and `List-Unsubscribe: mailto:` headers
+(`emails.headers.build_headers`); store-staff mail carries no list headers.
 
-**Subject and context are built once, in `order/emails.py`.** Each
-order email has a builder (`order_received_email`,
-`order_payment_confirmed_email`, `order_status_update_email`,
-`order_shipped_email`, `payment_failed_email`,
-`refund_confirmation_email`, `document_issued_email`,
-`acs_out_for_delivery_email`, `boxnow_parcel_at_locker_email`, and the
-store-facing `admin_new_order_email` / `dispute_notification_email`)
-that takes the objects the email is about and returns an `OrderEmail`:
-the template, the translated subject, the context and the language, with
-no side effect. The task calls it, calls `email.render()` and sends;
-choosing *when* to send (the idempotency claims above), the recipient,
-`Reply-To`, list headers and attachments stay in the task. The admin
-email preview (`core/email/preview_service.py`) calls the same function
-for a real order through `ORDER_EMAIL_KINDS`, so what it shows is what
-that order is sent, subject included
+**Each order email is an `EmailType`, declared in `order/emails.py`.**
+`order.received`, `order.payment_confirmed`, `order.payment_failed`,
+`order.shipped`, `order.delivered`, `order.completed`, `order.canceled`,
+`order.returned`, `order.status_refunded`, `order.refunded`,
+`order.receipt_issued`, `order.credit_issued`,
+`shipping.acs_out_for_delivery`, `shipping.boxnow_at_locker` and the
+store-facing `team.new_order`, `team.dispute_opened`, `team.dispute_lost`.
+A type holds the template pair, the subject (a msgid with plain named
+fields, e.g. `Order #{order_id} Status Update - {status_display}`), the
+`build_context(obj, env)` that reads the order for it, a `sample(env)` (an
+unsaved object graph the preview renders), the recipient resolver, the
+gates and whether the store may switch it off (`delivered`, `completed` and
+`shipping.acs_out_for_delivery` can be; the rest are required). The task
+calls `send_email(type_key, obj)`; choosing *when* to send (the idempotency
+claims above) and the bookkeeping after a send stay in the task. A task
+that returned `True`/`False` still does: it maps the `Delivery` explicitly
+(`emails.send.was_sent`). A mail the pipeline did not send because the store
+switched it off or a gate is closed is a deliberate no-op: the task returns
+`True`, keeps its reservation and writes no "email sent" note, except the
+store-staff tasks, which return `False` as they did for a store without a
+contact address.
+
+`order.status_refunded` is the email the REFUNDED status change sends
+through `send_order_status_update_email`; `order.refunded` is the one per
+refund (`send_refund_confirmation_email`). They share `order_refunded`. The
+status template they and `order_returned` build on lives at
+`emails/base/order_status` and is no email of its own: no status reaches
+a generic fallback (every status that emails has its own type and
+template; PENDING, PROCESSING and SHIPPED return before building one).
+
+The admin email preview (`core/email/preview_service.py`) renders the
+type through `emails.render.render`, the function the task's `send_email`
+calls: for a real order through `order.emails.preview_object`, which finds
+the refund, receipt, dispute or shipment the email is about, so what it
+shows is what that order is sent, subject included
 (`tests/integration/core/email/test_preview_matches_send.py` sends each
-email and compares). The preview of an order that has no record the email
-is about (no refund, no receipt, no shipment) says so instead of
-rendering something else. A subject lives in its builder module and
-nowhere else: never in `core/email/config.py`.
+email and compares). An order that has no record the email is about (no
+refund, no receipt, no shipment) is reported instead of rendering something
+else. Without an order it renders the type's `sample`. A subject lives on
+its type and nowhere else: never in `core/email/config.py`.
+
+A receipt or credit mail carries its PDF as an `emails.transport.Attachment`
+passed to `send_email`; the bytes are never logged.
 
 The builders read the order's lines (`_lines`) **inside**
 `translation.override`: parler fixes a model's language when the instance
@@ -1508,7 +1535,13 @@ premature "shipped"); now it sends only the confirmation.
 - Merchant-facing mail (`send_admin_new_order_email`, the dispute,
   low-stock, stale-ACS and B2B-application alerts, the review alert)
   renders, subject included, under `translation.override(store_language())`:
-  the worker's active language says nothing about the store.
+  the worker's active language says nothing about the store. The three
+  order-domain ones (`team.new_order`, `team.dispute_opened`,
+  `team.dispute_lost`) get their recipients and that language from
+  `emails.recipients.store_operators()`: the store's contact and owner
+  addresses, one mail each, and **no `settings.ADMINS` fallback**. A store
+  with neither address sends nothing (`SKIPPED_NO_RECIPIENT`) and the task
+  returns `False`.
 - There is no pending-order reminder email. An unpaid online order is
   cancelled by `auto_cancel_stuck_pending_orders` (every 15 minutes), so a
   "complete your order" mail a day later reached an order that was already
@@ -1522,9 +1555,11 @@ premature "shipped"); now it sends only the confirmation.
   or `cart_invalid` (`CartNotReadyError`), and a hold that lapsed between
   the cart check and its conversion is `reservation_unavailable`.
 - Every order-email builder (`order/emails.py`) runs under
-  `translation.override(language)` and `OrderEmail.render()` renders under
-  the same override; the task passes `get_order_language(order)` (or
-  `store_language()` for store-facing mail).
+  `translation.override(language)`, and `emails.render.render` renders the
+  subject and both bodies under the same override. The language is the
+  recipient's, stated by the resolver (`customer_of` uses
+  `get_order_language`, `store_operators` the store's language); a task
+  passes none.
 
 ### 6.3 Customer-notification suppression on chained transitions (PR #7)
 
@@ -1861,20 +1896,25 @@ the linked memory note or the originating PR's commit message.
 ### 9.1 Adding a new order email
 
 1. Create the `.html` + `.txt` pair under `core/templates/emails/order/`.
-2. Add its subject function and builder to `order/emails.py` (the builder
-   returns an `OrderEmail` and runs under `translation.override`) and an
-   `ORDER_EMAIL_KINDS` entry, so the admin preview renders it from a real
-   order. `test_every_order_email_template_has_a_builder_entry` fails
-   until you do.
+   `Registry.freeze` refuses a template in that directory no type names.
+2. In `order/emails.py` add its `build_context(obj, env)` (runs under
+   `_email_language`, returns only the keys the templates read plus the
+   subject's named fields, never calls `build_email_context`), its
+   `sample(env)` and a `_customer_email(...)` / `_staff_email(...)`
+   declaration with the subject msgid, the kind of requirement
+   (`required`), the gates and the `list_id`. Run `makemessages` and
+   translate the new msgids (title, description, subject).
 3. Add a Celery task in `order/tasks.py` mirroring `send_payment_failed_email`:
    - Idempotency reservation helper (`_reserve_<task>_email`).
-   - The builder, then `email.render()`: no subject, context or
+   - `send_email("<type key>", obj)`, mapping the returned `Delivery` list
+     with `was_sent`: no subject, context, recipient, headers or
      `translation.override` of its own.
-   - `EmailMultiAlternatives(...)` with `headers=build_transactional_list_headers(list_id="<kind>")`.
    - Catch exceptions; on permanent failure, release the reservation.
 4. Wire from a signal handler in `order/signals/handlers.py` via `transaction.on_commit`.
-5. Add a regression test in `tests/integration/order/test_signals.py` and a
-   case in `tests/integration/core/email/test_preview_matches_send.py`.
+5. Add a case in `tests/integration/emails/test_golden_render.py` (and its
+   golden files) and one in
+   `tests/integration/core/email/test_preview_matches_send.py`; a
+   regression test in `tests/integration/order/test_signals.py`.
 
 ### 9.2 Adding a new order status
 

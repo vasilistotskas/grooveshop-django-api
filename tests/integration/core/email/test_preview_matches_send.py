@@ -5,8 +5,9 @@ typed into ``core/email/config.py`` for nine templates and "Email from
 {store}" for the rest, and a reduced context rebuilt by hand from the
 order (prices pre-formatted into strings, no pay way, no items queryset,
 no tracking context), so it showed a message nobody received. The subject
-and the context are now built by ``order.emails``, the one function the
-sending task and the preview both call.
+and the context are now built by the registered email type
+(``order.emails``) and rendered by ``emails.render.render``, the function
+the sending pipeline and the preview both call.
 
 Each test sends the real email through its real task, previews the same
 order, and compares what a customer would read.
@@ -14,13 +15,11 @@ order, and compares what a customer would read.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 from django.core import mail
 
 from core.email.preview_service import EmailTemplatePreviewService
-from order.emails import ORDER_EMAIL_KINDS
+from emails.registry import registry
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.order import OrderFactory
@@ -34,6 +33,11 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -41,17 +45,20 @@ STORE_INBOX = "owner@store.test"
 
 
 @pytest.fixture(autouse=True)
-def _store(bind_tenant, settings):
+def _store(settings):
     settings.NUXT_BASE_URL = "https://shop.example"
-    bind_tenant(
-        SimpleNamespace(
-            schema_name="acme",
+    previous = bind_store_tenant(
+        store_tenant(
+            "acme",
             default_locale="en",
             store_name="Acme Gadgets",
             contact_email=STORE_INBOX,
+            owner_email=STORE_INBOX,
         )
     )
     mail.outbox.clear()
+    yield
+    unbind_store_tenant(previous)
 
 
 def _html(message) -> str:
@@ -194,8 +201,8 @@ class TestThePreviewRendersTheRealContext:
         assert english == f"Your Order #{order.id} Has Shipped"
         assert greek == f"Η παραγγελία σας #{order.id} έχει αποσταλεί"
 
-    def test_no_subject_is_made_up_for_an_email_without_a_sender_builder(self):
-        """A template no ``order.emails`` builder owns shows NO subject,
+    def test_no_subject_is_made_up_for_an_email_without_a_type(self):
+        """A template no registered email type sends shows NO subject,
         not "Email from {store}"."""
         preview = EmailTemplatePreviewService().generate_preview(
             "confirmation", language="en"
@@ -223,9 +230,9 @@ class TestThePreviewRendersTheRealContext:
         assert preview.error == "This order has no refund to describe."
         assert preview.html_content == ""
 
-    def test_every_order_email_template_has_a_builder_entry(self):
-        """A template added to ``emails/order/`` is previewable from a real
-        order only through ``ORDER_EMAIL_KINDS``: keep them in step."""
+    def test_every_order_email_template_is_sent_by_a_registered_type(self):
+        """A template added to ``emails/order/`` is previewable only through
+        the type that sends it (the registry refuses one no type names)."""
         from pathlib import Path
 
         from django.conf import settings
@@ -237,7 +244,11 @@ class TestThePreviewRendersTheRealContext:
             ).glob("*.html")
         }
 
-        assert on_disk == set(ORDER_EMAIL_KINDS)
+        assert on_disk == {
+            email_type.templates.rpartition("/")[2]
+            for email_type in registry.all_types()
+            if email_type.templates.startswith("emails/order/")
+        }
 
 
 class TestProductNamesFollowTheEmailsLanguage:
@@ -264,3 +275,30 @@ class TestProductNamesFollowTheEmailsLanguage:
         body = mail.outbox[-1].body
         assert english in body
         assert greek not in body
+
+
+class TestEveryRegisteredTypePreviewsFromItsSample:
+    """Without an order the preview renders the type's own ``sample``, an
+    unsaved object graph, through the same ``render`` the pipeline calls."""
+
+    @pytest.mark.parametrize("language", ["en", "el"])
+    @pytest.mark.parametrize(
+        "email_type",
+        registry.all_types(),
+        ids=lambda email_type: email_type.key,
+    )
+    def test_the_sample_renders_with_its_real_subject(
+        self, email_type, language
+    ):
+        template = email_type.templates.rpartition("/")[2]
+
+        preview = EmailTemplatePreviewService().generate_preview(
+            template, language=language
+        )
+
+        assert preview.error is None
+        assert preview.is_sample_data is True
+        assert preview.subject
+        assert "{" not in preview.subject
+        assert preview.html_content
+        assert preview.text_content

@@ -53,6 +53,7 @@ from product.tasks import (
     send_product_alert_price_drop,
     send_product_alert_restock,
 )
+from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.tasks import acs_send_arrival_notification
 from shipping_boxnow.factories import (
@@ -226,6 +227,7 @@ class TestShippingEmail:
     def test_acs_out_for_delivery_order_link(self, language, prefix):
         order = OrderFactory(num_order_items=0, language_code=language)
         shipment = AcsShipmentFactory(order=order, with_voucher=True)
+        ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
         acs_send_arrival_notification(shipment.id)
 
@@ -385,7 +387,8 @@ class TestMoreOrderEmails:
             generate_invoice(issuable(order))
         mail.outbox = []
 
-        assert send_invoice_email(order.id) is True
+        with mydata_enabled(auto_submit=False):
+            assert send_invoice_email(order.id) is True
 
         _assert_links(_body(mail.outbox[-1]), f"{BASE}{prefix}", language)
 
@@ -395,6 +398,7 @@ class TestMoreOrderEmails:
         event = BoxNowParcelEventFactory(
             shipment=BoxNowShipmentFactory(order=order, with_parcel=True)
         )
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         boxnow_send_arrival_notification(event.id)
 

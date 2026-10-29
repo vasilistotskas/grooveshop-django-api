@@ -20,22 +20,16 @@ from core.retry import (
 from core.store_settings import store_setting
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
-from core.utils.i18n import (
-    get_order_language,
-    get_user_language,
-    store_language,
-)
+from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from emails.send import send_email, was_sent
+from emails.transport import Attachment
 from order import payment_hold
 from order.emails import (
-    admin_new_order_email,
-    dispute_notification_email,
-    document_issued_email,
-    order_confirmation_email,
-    order_shipped_email,
-    order_status_update_email,
-    payment_failed_email,
-    refund_confirmation_email,
+    STATUS_EMAIL_KEYS,
+    OrderDispute,
+    is_paid_online,
+    suggestion_strip_of,
 )
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
@@ -50,7 +44,6 @@ from order.payment import get_payment_provider_class
 from order.services import OrderService
 from recommendation.order_email import record_impression
 from tenant.credentials import (
-    tenant_contact_email,
     tenant_from_email,
     tenant_reply_to,
     tenant_site_name,
@@ -191,33 +184,34 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             )
             return True
 
-        email = order_confirmation_email(
-            order, language=get_order_language(order)
+        email_type = (
+            "order.payment_confirmed"
+            if is_paid_online(order)
+            else "order.received"
         )
-        text_content, html_content = email.render()
-        subject = email.subject
-        template_base = email.template
-        suggestion_strip = email.suggestion_strip
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(
-                list_id="order_confirmation"
-            ),
-        )
-        msg.attach_alternative(html_content, "text/html")
-
-        msg.send()
+        deliveries = send_email(email_type, order)
+        if not was_sent(deliveries):
+            # The store's switch or a gate turned the mail off: nothing
+            # went out, so no flag is written (a later call may send) and
+            # the lock is given back.
+            cache.delete(lock_key)
+            logger.info(
+                "Order #%s confirmation email (%s) not sent: %s",
+                order_id,
+                email_type,
+                deliveries[0].status,
+                extra={"order_id": order_id, "email_type": email_type},
+            )
+            return True
+        [delivery] = deliveries
+        subject = delivery.subject
 
         # Write permanent flag + release lock atomically (DB commit, then
         # cache.delete). From this point on every future call to this task
         # will short-circuit on the DB flag.
         _mark_confirmation_sent(order_id)
 
+        suggestion_strip = suggestion_strip_of(order)
         if suggestion_strip is not None:
             record_impression(order, suggestion_strip)
 
@@ -228,12 +222,12 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         logger.info(
             "Order confirmation email sent for order #%s (%s): %r",
             order.id,
-            template_base,
+            email_type,
             subject,
             extra={
                 "order_id": order.id,
                 "email": order.email,
-                "template": template_base,
+                "email_type": email_type,
                 "subject": subject,
             },
         )
@@ -348,33 +342,20 @@ def send_dispute_notification_email(
     try:
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        # Staff-facing: the store's own language, not the worker's.
-        email = dispute_notification_email(
-            order,
-            dispute_id=dispute_id,
-            provider_code=provider_code,
-            lost=lost,
-            language=store_language(),
+        # Staff-facing: the pipeline renders in the store's own language.
+        deliveries = send_email(
+            "team.dispute_lost" if lost else "team.dispute_opened",
+            OrderDispute(
+                order=order, dispute_id=dispute_id, provider_code=provider_code
+            ),
         )
-        text_content, html_content = email.render()
-        subject = email.subject
-
-        staff_email = tenant_contact_email()
-        if not staff_email:
+        if not was_sent(deliveries):
             logger.warning(
-                "send_dispute_notification_email: no contact email configured — skipping",
+                "send_dispute_notification_email: not sent (%s) — skipping",
+                deliveries[0].status,
                 extra={"order_id": order_id, "dispute_id": dispute_id},
             )
             return False
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [staff_email],
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
 
         logger.info(
             "Dispute notification email sent for order #%s (dispute=%s)",
@@ -405,10 +386,12 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
     """Notify the store operator that a new order has been placed.
 
     This is a MERCHANT-facing alert, not a platform one: it goes to the
-    tenant's ``tenant_contact_email()`` FROM ``tenant_from_email()``, so
-    each store's operator gets their own orders (NOT ``settings.ADMINS``,
-    which is the SaaS platform's admin list shared across all tenants).
-    Skips silently if the tenant has no contact email configured.
+    store's operators (``emails.recipients.store_operators``: its contact
+    and owner addresses) FROM the store's sender, so each store's operator
+    gets their own orders (NOT ``settings.ADMINS``, which is the SaaS
+    platform's admin list shared across all tenants). A store with neither
+    address, or one that switched the alert off, sends nothing and the task
+    returns ``False``.
     """
     try:
         order = (
@@ -417,29 +400,15 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             .get(id=order_id)
         )
 
-        staff_email = tenant_contact_email()
-        if not staff_email:
+        # Merchant-facing: the pipeline renders in the store's own language.
+        deliveries = send_email("team.new_order", order)
+        if not was_sent(deliveries):
             logger.warning(
-                "send_admin_new_order_email: no contact email configured — skipping",
+                "send_admin_new_order_email: not sent (%s) — skipping",
+                deliveries[0].status,
                 extra={"order_id": order_id},
             )
             return False
-
-        # Merchant-facing: the store's own language, not the worker's.
-        email = admin_new_order_email(
-            order, language=store_language(), staff_email=staff_email
-        )
-        text_content, html_content = email.render()
-        subject = email.subject
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [staff_email],
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
 
         logger.info(
             "Merchant new-order email sent for order #%s",
@@ -517,20 +486,12 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         # context nor renders a line table.
         order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
-        email = payment_failed_email(order, language=get_order_language(order))
-        text_content, html_content = email.render()
-        subject = email.subject
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(list_id="payment_failed"),
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        if not was_sent(send_email("order.payment_failed", order)):
+            logger.info(
+                "Payment failed email for order #%s not sent: turned off",
+                order_id,
+            )
+            return True
         email_sent = True
 
         OrderHistory.log_note(
@@ -627,9 +588,9 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
     two leaves the refund claimed and unsent: the price of never sending
     it twice. A send that fails for good releases the claim.
 
-    Renders ``emails/order/order_refunded.html`` (which inherits from
-    ``order_status_generic.html``'s REFUNDED branch). Reuses the
-    transactional ``List-Unsubscribe`` headers added in PR #4.
+    Sends the ``order.refunded`` email type, which renders
+    ``emails/order/order_refunded.html`` (it builds on
+    ``emails/base/order_status.html``'s REFUNDED branch).
     """
     email_sent = False
     try:
@@ -650,24 +611,12 @@ def send_refund_confirmation_email(self, refund_id: int) -> bool:
             )
             return True
 
-        email = refund_confirmation_email(
-            refund, language=get_order_language(order)
-        )
-        text_content, html_content = email.render()
-        subject = email.subject
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(
-                list_id="refund_confirmation"
-            ),
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        if not was_sent(send_email("order.refunded", refund)):
+            logger.info(
+                "Refund confirmation email for refund #%s not sent: turned off",
+                refund_id,
+            )
+            return True
         email_sent = True
 
         OrderHistory.log_note(
@@ -781,38 +730,35 @@ def send_order_status_update_email(
         ):
             return True
 
-        email = order_status_update_email(
-            order, status, language=get_order_language(order)
-        )
-        text_content, html_content = email.render()
-        subject = email.subject
-        template_base = email.template
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(list_id="order_status"),
-        )
-        msg.attach_alternative(html_content, "text/html")
-
-        msg.send()
+        email_type = STATUS_EMAIL_KEYS[status]
+        deliveries = send_email(email_type, order)
+        if not was_sent(deliveries):
+            # The store switched this status mail off (delivered and
+            # completed can be): the reservation stays, so a re-fired
+            # signal does not ask again.
+            logger.info(
+                "Status update email for order #%s status=%s not sent: %s",
+                order_id,
+                status,
+                deliveries[0].status,
+            )
+            return True
         email_sent = True
+        [delivery] = deliveries
+        subject = delivery.subject
 
         logger.info(
             "Order status update email sent for order #%s - Status: %s "
             "(%s): %r",
             order.id,
             status,
-            template_base,
+            email_type,
             subject,
             extra={
                 "order_id": order.id,
                 "status": status,
                 "email": order.email,
-                "template": template_base,
+                "email_type": email_type,
                 "subject": subject,
             },
         )
@@ -974,23 +920,13 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             )
             return True
 
-        email = order_shipped_email(order, language=get_order_language(order))
-        text_content, html_content = email.render()
-        subject = email.subject
-
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [order.email],
-            reply_to=tenant_reply_to(),
-            headers=build_transactional_list_headers(
-                list_id="shipping_notification"
-            ),
-        )
-        msg.attach_alternative(html_content, "text/html")
-
-        msg.send()
+        if not was_sent(send_email("order.shipped", order)):
+            logger.info(
+                "Shipping notification email for order #%s not sent: "
+                "turned off",
+                order_id,
+            )
+            return True
         email_sent = True
 
         logger.info(
@@ -1150,35 +1086,25 @@ def _release_document_email(order_id: int, flag: str) -> None:
             order.save(update_fields=["metadata"])
 
 
-def _send_document_email(order: Order, document, *, is_credit: bool) -> None:
-    """Email the document's PDF to the buyer."""
-    email = document_issued_email(
-        order,
-        document,
-        is_credit=is_credit,
-        language=get_order_language(order),
-    )
-    text_content, html_content = email.render()
-    subject = email.subject
-
-    msg = EmailMultiAlternatives(
-        subject,
-        text_content,
-        tenant_from_email(),
-        [order.email],
-        reply_to=tenant_reply_to(),
-        headers=build_transactional_list_headers(
-            list_id="order_credit" if is_credit else "order_invoice"
-        ),
-    )
-    msg.attach_alternative(html_content, "text/html")
+def _send_document_email(document, *, is_credit: bool) -> bool:
+    """Email the document's PDF to the buyer; whether it went out."""
     # ``storage.open`` works for both S3 and FileSystem — streams
     # from S3 in prod, opens the file in dev. ``.read()`` is fine
     # at these sizes (≤ ~50kB typical).
     with document.document_file.open("rb") as fh:
         pdf_bytes = fh.read()
-    msg.attach(f"{document.document_number}.pdf", pdf_bytes, "application/pdf")
-    msg.send()
+    deliveries = send_email(
+        "order.credit_issued" if is_credit else "order.receipt_issued",
+        document,
+        attachments=[
+            Attachment(
+                filename=f"{document.document_number}.pdf",
+                content=pdf_bytes,
+                mimetype="application/pdf",
+            )
+        ],
+    )
+    return was_sent(deliveries)
 
 
 @celery_app.task(
@@ -1228,7 +1154,11 @@ def send_invoice_email(self, order_id: int) -> bool:
             )
             return False
 
-        _send_document_email(order, invoice, is_credit=False)
+        if not _send_document_email(invoice, is_credit=False):
+            logger.info(
+                "Receipt email for order #%s not sent: turned off", order_id
+            )
+            return True
         email_sent = True
 
         logger.info(
@@ -1528,7 +1458,11 @@ def send_credit_email(self, credit_id: int) -> bool:
         # Rendered here, after the MARK landed, so the PDF carries it and
         # AADE's QR; a retry re-renders from the same frozen figures.
         render_credit_pdf(credit)
-        _send_document_email(order, credit, is_credit=True)
+        if not _send_document_email(credit, is_credit=True):
+            logger.info(
+                "Credit email for credit #%s not sent: turned off", credit_id
+            )
+            return True
         email_sent = True
         OrderHistory.log_note(
             order=order,

@@ -59,12 +59,12 @@ def _order_of(product):
 
 
 def _send(order) -> tuple[str, str]:
-    with patch("order.tasks.EmailMultiAlternatives") as email:
+    with patch("emails.transport.EmailMultiAlternatives") as email:
         instance = MagicMock()
         email.return_value = instance
         assert send_order_confirmation_email(order.id) is True
     instance.send.assert_called_once()
-    text = email.call_args.args[1]
+    text = email.call_args.kwargs["body"]
     html = instance.attach_alternative.call_args.args[0]
     return text, html
 

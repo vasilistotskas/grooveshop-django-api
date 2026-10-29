@@ -156,10 +156,19 @@ class TestEmailHelperCallSites:
         # path inside grooveshop-django-api / required helpers
         ("user/utils/subscription.py", REQUIRED_HELPERS),
         ("contact/tasks.py", REQUIRED_HELPERS),
-        ("order/tasks.py", REQUIRED_HELPERS),
-        ("shipping_acs/tasks.py", REQUIRED_HELPERS),
-        ("shipping_boxnow/tasks.py", REQUIRED_HELPERS),
+        # The abandoned-checkout mail is still built here.
+        ("order/tasks.py", ("tenant_from_email",)),
         ("shipping/alerts.py", OPS_ALERT_HELPERS),
+        # Every mail sent through ``emails.send_email`` takes its
+        # envelope from here.
+        ("emails/sender.py", ("tenant_from_email", "tenant_reply_to")),
+    )
+
+    #: Modules whose mail goes through ``emails.send_email`` only.
+    PIPELINE_CALLERS = (
+        "order/tasks.py",
+        "shipping_acs/tasks.py",
+        "shipping_boxnow/tasks.py",
     )
 
     def test_outbound_email_paths_use_tenant_helpers(self) -> None:
@@ -176,6 +185,20 @@ class TestEmailHelperCallSites:
                     "either the file was renamed or a contributor "
                     "switched it back to settings.DEFAULT_FROM_EMAIL"
                 )
+
+    def test_pipeline_callers_never_pick_their_own_sender(self) -> None:
+        import pathlib
+
+        root = pathlib.Path(__file__).resolve().parents[3]
+        for rel_path in self.PIPELINE_CALLERS:
+            body = (root / rel_path).read_text(encoding="utf-8")
+            assert "send_email(" in body, (
+                f"{rel_path} no longer sends through emails.send_email"
+            )
+            assert "DEFAULT_FROM_EMAIL" not in body, (
+                f"{rel_path} reads settings.DEFAULT_FROM_EMAIL: the "
+                "pipeline's sender (emails.sender) decides the From"
+            )
 
     def test_shipping_modules_never_use_mail_admins(self) -> None:
         """``mail_admins`` targets platform ADMINS. Merchant-facing

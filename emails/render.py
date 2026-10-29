@@ -30,6 +30,8 @@ class RenderedEmail:
     text: str
     html: str
     language: str
+    #: What the templates were rendered with, for the admin preview.
+    context: Mapping[str, object]
 
 
 def clean_header_text(
@@ -104,4 +106,5 @@ def render(email_type: EmailType, obj: object, env: RenderEnv) -> RenderedEmail:
             text=render_to_string(f"{email_type.templates}.txt", context),
             html=render_to_string(f"{email_type.templates}.html", context),
             language=env.language,
+            context=context,
         )

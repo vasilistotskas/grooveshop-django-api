@@ -1,1 +1,1 @@
-{% include "emails/order/order_status_generic.txt" %}
+{% include "emails/base/order_status.txt" %}

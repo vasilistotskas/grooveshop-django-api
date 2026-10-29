@@ -1,7 +1,10 @@
 {
   "attachments": [],
   "from": "Acme Gadgets <noreply@platform.test>",
-  "headers": {},
+  "headers": {
+    "List-ID": "<boxnow_at_locker.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
   "reply_to": [
     "owner@store.test"
   ],

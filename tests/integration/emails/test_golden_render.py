@@ -18,11 +18,9 @@ footer's copyright year (``tests/utils/golden.py``).
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -34,7 +32,6 @@ from djmoney.money import Money
 from phonenumber_field.phonenumber import PhoneNumber
 
 from country.models import Country
-from order.emails import order_status_update_email
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
@@ -58,6 +55,7 @@ from pay_way.enum.pay_way import PayWayEnum
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.models import Region
+from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.tasks import acs_send_arrival_notification
 from shipping_boxnow.factories import (
@@ -66,7 +64,13 @@ from shipping_boxnow.factories import (
     BoxNowShipmentFactory,
 )
 from shipping_boxnow.tasks import boxnow_send_arrival_notification
-from tests.utils.golden import assert_golden, snapshot, stable
+from tests.utils.golden import assert_golden, snapshot
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -142,23 +146,25 @@ def _greek_catalogue_is_compiled():
 
 
 @pytest.fixture(autouse=True)
-def _store(bind_tenant, settings, language):
+def _store(settings, language):
     """A bound store whose language is the one under test, a platform
     sender and storefront that do not follow the developer's ``.env``, and
     no suggestion strip (``recommendation`` has its own tests, and the
     strip is drawn from whatever products the database holds)."""
     settings.NUXT_BASE_URL = "https://shop.example"
     settings.DEFAULT_FROM_EMAIL = "noreply@platform.test"
-    bind_tenant(
-        SimpleNamespace(
-            schema_name="acme",
+    previous = bind_store_tenant(
+        store_tenant(
+            "acme",
             default_locale=language,
             store_name="Acme Gadgets",
             contact_email=STORE_INBOX,
+            owner_email=STORE_INBOX,
         )
     )
     with patch("order.emails.order_email_strip", return_value=None):
         yield
+    unbind_store_tenant(previous)
     mail.outbox.clear()
 
 
@@ -307,6 +313,7 @@ class TestCustomerOrderEmails:
         assert_sent("order_refunded", language)
 
     def test_receipt_with_its_pdf(self, language):
+        switch_store_settings(MYDATA_ENABLED=True)
         order = build_order(language, status=OrderStatus.SHIPPED)
         invoice = Invoice.objects.create(
             order=order,
@@ -321,6 +328,7 @@ class TestCustomerOrderEmails:
         assert_sent("retail_document_issued_receipt", language)
 
     def test_credit_with_its_pdf(self, language):
+        switch_store_settings(MYDATA_ENABLED=True)
         order = build_order(language, status=OrderStatus.SHIPPED)
         invoice = Invoice.objects.create(
             order=order,
@@ -346,6 +354,7 @@ class TestCustomerOrderEmails:
         assert_sent("retail_document_issued_credit", language)
 
     def test_acs_out_for_delivery(self, language):
+        ShippingProvider.objects.filter(code="acs").update(is_active=True)
         order = build_order(language)
         shipment = AcsShipmentFactory(
             order=order, with_voucher=True, voucher_no="7000000001"
@@ -356,6 +365,7 @@ class TestCustomerOrderEmails:
         assert_sent("acs_out_for_delivery", language)
 
     def test_boxnow_parcel_at_locker(self, language):
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
         order = build_order(language)
         locker = BoxNowLockerFactory(
             external_id="apm-0001",
@@ -421,28 +431,3 @@ class TestStoreOrderEmails:
         )
 
         assert_sent("dispute_notification_lost", language)
-
-
-def test_the_generic_status_template_is_recorded_from_its_builder(language):
-    """No task reaches ``order_status_generic`` any more (every status that
-    emails has its own template), so there is no sent message to compare.
-    Its bodies are still recorded, because the migration decides whether
-    the template goes (``order.emails.ORDER_EMAIL_KINDS``)."""
-    order = build_order(language)
-
-    email = order_status_update_email(
-        order, OrderStatus.PROCESSING, language=language
-    )
-    text, html = email.render()
-
-    assert_golden(
-        GOLDEN,
-        "order_status_generic",
-        language,
-        {
-            "json": json.dumps({"subject": email.subject}, ensure_ascii=False)
-            + "\n",
-            "html": stable(html),
-            "txt": stable(text),
-        },
-    )

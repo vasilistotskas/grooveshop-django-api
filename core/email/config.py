@@ -110,13 +110,6 @@ class EmailTemplateConfig:
             order_statuses=[OrderStatus.CANCELED],
             is_used=True,
         ),
-        "order_status_generic": TemplateConfig(
-            name="order_status_generic",
-            category_name=_("Order Lifecycle"),
-            description=_("Generic template for any status update"),
-            order_statuses=[],
-            is_used=True,
-        ),
         "order_completed": TemplateConfig(
             name="order_completed",
             category_name=_("Order Lifecycle"),

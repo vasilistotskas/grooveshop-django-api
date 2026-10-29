@@ -13,9 +13,11 @@ the preview calls the same function with a real order and renders the same
 thing (``core.email.preview_service``). A change to what an email says is
 made once.
 
-Each builder runs under ``translation.override(language)``, so the subject
-and every lazy label in the context resolve in the recipient's language;
-:meth:`OrderEmail.render` renders under the same override.
+Each builder runs under ``_email_language(order, language)``: the
+recipient's language is active, so the subject and every lazy label in the
+context resolve in it, and the order's translated rows (pay way, country,
+region) are switched to it whatever language they were loaded in;
+:meth:`OrderEmail.render` renders under the same language.
 
 What stays with the tasks: choosing WHEN to send (idempotency claims,
 status gates), the recipient, ``Reply-To`` and list headers, attachments,
@@ -30,7 +32,8 @@ builder; ``ORDER_EMAIL_KINDS`` below is that entry for the order emails.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from html import unescape
 from typing import TYPE_CHECKING, Any
@@ -175,6 +178,31 @@ def is_paid_online(order: Order) -> bool:
     )
 
 
+# The translated rows an order email prints through the order:
+# ``{{ order.country }}``, the region, the pay way's name and its
+# payment instructions.
+_TRANSLATED_RELATIONS = ("pay_way", "country", "region")
+
+
+@contextmanager
+def _email_language(order: Order, language: str) -> Generator[None]:
+    """Build one email in *language*, the order's translated rows included.
+
+    parler fixes a model instance's language when it is loaded, so a pay
+    way or country the sending task loaded before it chose the email's
+    language printed its name and instructions in the worker's language
+    (an English email showed the Greek payment instructions). Every
+    builder enters through here, so how a caller loaded the order no
+    longer decides the language of what the email says.
+    """
+    with translation.override(language):
+        for name in _TRANSLATED_RELATIONS:
+            related = getattr(order, name, None)
+            if related is not None:
+                related.set_current_language(language)
+        yield
+
+
 def _lines(order: Order):
     """The order's lines, read NOW, in the active language.
 
@@ -278,7 +306,7 @@ def _confirmation_context(order: Order, language: str) -> tuple[dict, Any]:
 def _confirmation(
     order: Order, *, language: str, template: str, subject: Callable[[int], str]
 ) -> OrderEmail:
-    with translation.override(language):
+    with _email_language(order, language):
         context, strip = _confirmation_context(order, language)
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/{template}",
@@ -342,7 +370,7 @@ def order_status_update_email(
             extra={"order_id": order.id, "status": status},
         )
         template = f"{TEMPLATE_DIR}/order_status_generic"
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=template,
             subject=order_status_update_subject(order.id, status),
@@ -358,7 +386,7 @@ def order_status_update_email(
 
 
 def order_shipped_email(order: Order, *, language: str) -> OrderEmail:
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/order_shipped",
             subject=order_shipped_subject(order.id),
@@ -373,7 +401,7 @@ def order_shipped_email(order: Order, *, language: str) -> OrderEmail:
 
 
 def payment_failed_email(order: Order, *, language: str) -> OrderEmail:
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/payment_failed",
             subject=payment_failed_subject(order.id),
@@ -393,7 +421,7 @@ def refund_confirmation_email(
 ) -> OrderEmail:
     """The email about ONE refund (a ``PaymentTransaction`` REFUND)."""
     order = refund.order
-    with translation.override(language):
+    with _email_language(order, language):
         # What THIS refund paid back and what is still held, so a partial
         # refund does not read as the whole order refunded.
         currency = refund.amount.currency
@@ -433,7 +461,7 @@ def document_issued_email(
     order: Order, document: Any, *, is_credit: bool, language: str
 ) -> OrderEmail:
     """The email that carries a registered receipt (or credit) PDF."""
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/retail_document_issued",
             subject=document_issued_subject(
@@ -454,7 +482,7 @@ def document_issued_email(
 
 
 def acs_out_for_delivery_email(shipment: Any, *, language: str) -> OrderEmail:
-    with translation.override(language):
+    with _email_language(shipment.order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/acs_out_for_delivery",
             subject=acs_out_for_delivery_subject(),
@@ -472,7 +500,7 @@ def boxnow_parcel_at_locker_email(
     shipment: Any, *, language: str
 ) -> OrderEmail:
     locker = shipment.locker
-    with translation.override(language):
+    with _email_language(shipment.order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/boxnow_parcel_at_locker",
             subject=boxnow_parcel_at_locker_subject(),
@@ -502,7 +530,7 @@ def admin_new_order_email(
 ) -> OrderEmail:
     """The store's "new order" alert; ``INFO_EMAIL`` is the staff address
     the template shows, not the public contact one."""
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/admin_new_order",
             subject=admin_new_order_subject(order.id),
@@ -539,7 +567,7 @@ def dispute_notification_email(
         else None
     )
     provider_name = payment_provider_label(provider_code) or provider_code
-    with translation.override(language):
+    with _email_language(order, language):
         return OrderEmail(
             template=f"{TEMPLATE_DIR}/dispute_notification",
             subject=dispute_subject(

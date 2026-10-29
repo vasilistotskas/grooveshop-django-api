@@ -21,7 +21,7 @@ from django.core import mail
 
 from core.email.preview_service import EmailTemplatePreviewService
 from order.emails import ORDER_EMAIL_KINDS
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.order import OrderFactory
 from order.models import Order
@@ -33,6 +33,7 @@ from order.tasks import (
     send_refund_confirmation_email,
     send_shipping_notification_email,
 )
+from pay_way.factories import PayWayFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -76,16 +77,41 @@ def _assert_same_email(preview, sent) -> None:
 
 @pytest.mark.parametrize("language", ["en", "el"])
 class TestPreviewEqualsTheSentEmail:
-    def test_order_received(self, language):
-        order = OrderFactory(num_order_items=1, language_code=language)
+    def _confirmation_sent(self, order):
         # Creating the order already sent its confirmation, once.
         Order.objects.filter(pk=order.pk).update(metadata={})
         mail.outbox.clear()
-
         assert send_order_confirmation_email.run(order.id) is True
+        return mail.outbox[-1]
 
-        sent = mail.outbox[-1]
+    # OrderFactory draws its pay way and payment status at random, and
+    # the sender picks "payment confirmed" over "received" for a
+    # captured online payment, so each case states the one it needs.
+    def test_order_received(self, language):
+        order = OrderFactory(
+            num_order_items=1,
+            language_code=language,
+            pay_way=PayWayFactory.create_offline_payment(),
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        sent = self._confirmation_sent(order)
+
         _assert_same_email(_preview("order_received", order, language), sent)
+
+    def test_order_payment_confirmed(self, language):
+        order = OrderFactory(
+            num_order_items=1,
+            language_code=language,
+            pay_way=PayWayFactory.create_online_payment(),
+            payment_status=PaymentStatus.COMPLETED,
+        )
+
+        sent = self._confirmation_sent(order)
+
+        _assert_same_email(
+            _preview("order_payment_confirmed", order, language), sent
+        )
 
     def test_order_shipped(self, language):
         order = OrderFactory(

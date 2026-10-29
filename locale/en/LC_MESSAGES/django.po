@@ -1066,6 +1066,9 @@ msgstr "Active Tags"
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 msgstr "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 
+msgid "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
+msgstr "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
+
 #, python-format
 msgid "Active products with fewer than %(count)s left"
 msgstr "Active products with fewer than %(count)s left"
@@ -4240,6 +4243,9 @@ msgstr "Facebook URL"
 
 msgid "Facebook page URL. Must use https://. Empty → link hidden in storefront footer."
 msgstr "Facebook page URL. Must use https://. Empty → link hidden in storefront footer."
+
+msgid "Facet Search"
+msgstr "Facet Search"
 
 msgid "Failed"
 msgstr "Failed"
@@ -9924,6 +9930,9 @@ msgstr "Product alerts"
 
 msgid "Product being reserved"
 msgstr "Product being reserved"
+
+msgid "Product feed"
+msgstr "Product feed"
 
 msgid "Product ids must be positive."
 msgstr "Product ids must be positive."

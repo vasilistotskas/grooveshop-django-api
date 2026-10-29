@@ -3,6 +3,42 @@
 
 
 
+## v3.163.1 (2026-10-29)
+
+### Bug fixes
+
+* fix(product): state that every product response carries stock and active (#364) ([`fe5966f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe5966f608b422ac64decc892d1de2068fec0b48))
+
+* fix(product): state that every product response carries stock and active
+
+ProductSerializer is only ever a response (lists, the detail, the feed,
+and nested in carts, orders and reviews; writes use
+ProductWriteSerializer), yet stock and active were writable fields, so
+the schema called them optional although every row carries them (both
+are non-null model fields). They are read-only now, which the schema
+states as required. That lets a consumer that requires them, like the
+storefront's ProductCard reader, pair with this release without an
+exception in the API contract gate.
+
+The product feed's summary and description are now in the schema's
+language, like every other operation.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`fe5966f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe5966f608b422ac64decc892d1de2068fec0b48))
+
+* fix(product): keep stock's range in the schema while it is read-only
+
+A read-only ModelSerializer field drops its validators, and with them the
+schema's minimum and maximum, which the API contract check counts as
+loosening the response. stock is declared with its column's own range
+(connection.ops.integer_field_range) and label, so only its required
+flag changes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fe5966f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe5966f608b422ac64decc892d1de2068fec0b48))
+
 ## v3.163.0 (2026-10-29)
 
 ### Bug fixes

@@ -9,8 +9,10 @@ check they exercise were deleted from the pipeline.
 from __future__ import annotations
 
 import logging
+import re
 from smtplib import SMTPServerDisconnected
 from unittest import mock
+from urllib.parse import urlsplit
 
 import pytest
 from django.core import mail
@@ -310,7 +312,14 @@ class TestHeaders:
         [message] = mail.outbox
         headers = message.extra_headers
         assert headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
-        assert "https://api.shop.example" in headers["List-Unsubscribe"]
+        [https] = [
+            url
+            for url in re.findall(r"<([^>]+)>", headers["List-Unsubscribe"])
+            if url.startswith("https:")
+        ]
+        target = urlsplit(https)
+        assert target.netloc == "api.shop.example"
+        assert target.path.startswith(f"{optout.UNSUBSCRIBE_PATH}/")
         assert headers["List-ID"] == "<cart-abandoned.shop.example>"
 
     def test_transactional_never_claims_one_click(self, catalogue):

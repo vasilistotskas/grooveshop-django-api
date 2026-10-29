@@ -3,6 +3,42 @@
 
 
 
+## v3.162.3 (2026-10-29)
+
+### Chores
+
+* chore(ci): rebalance the test shards from CI's own durations (#358)
+
+Shard 1 had been running 17 to 18.5 minutes against its 18-minute
+timeout on every recent PR, and timed out on #357, while shards 3 and 4
+finished in about 7. The tests added since the last refresh carried the
+average weight. Merged from CI run 40917110020, the recorded test time
+per shard was 20.9, 10.9, 6.3 and 4.5 minutes; with those weights
+pytest-split now estimates 674, 649, 650 and 621 seconds per group.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`7227c90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7227c90a9e565b7cb8744fb7ea7e5a1250e01b13))
+
+### Performance improvements
+
+* perf(i18n): stop writing every loaded translation to Redis (#359)
+
+parler cached each translation it loaded, so a request wrote one Redis
+key per translated object it touched: 153 writes for a product list, 50
+for recommendations, at about 1.6 ms each in production. Every list view
+already prefetches its translations, so the cache saved no queries; it
+only added the writes. PARLER_ENABLE_CACHING is now off.
+
+Admin changelists were the one place it hid queries. BaseModelAdmin now
+prefetches a translatable model's translations, plus any related
+translations an admin names in prefetch_translations, and
+RelatedDropdownFilter prefetches the translations its options print.
+The translations cache surface goes with the cache.
+
+Locally, warm: a product list goes from 153 to 44 ms, recommendations
+from 73 to 36, a product page from 44 to 30.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`949b2f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/949b2f5fa7ac12e17bb941410e0925130d799529))
+
 ## v3.162.2 (2026-10-29)
 
 ### Performance improvements

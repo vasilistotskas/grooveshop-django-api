@@ -1,4 +1,12 @@
-"""Email template preview service for admin interface."""
+"""Email template preview service for admin interface.
+
+An order email previewed from a real order is the email that order would
+be sent: ``order.emails`` builds the subject and the context for the
+sending task and for this preview alike. Everything else, and every email
+previewed on sample data, renders its template against made-up values and
+shows no subject, because no real sender builds one for it yet (the
+email-type catalogue will).
+"""
 
 import logging
 from dataclasses import dataclass
@@ -11,8 +19,8 @@ from core.email.config import EmailTemplateConfig
 from core.email.sample_data import SampleOrderDataGenerator
 from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import get_tenant_base_url
+from order.emails import ORDER_EMAIL_KINDS, NothingToPreview
 from order.models import Order
-from tenant.credentials import tenant_site_name
 
 logger = logging.getLogger(__name__)
 
@@ -58,37 +66,61 @@ class EmailTemplatePreviewService:
             # Determine category from configuration
             category = self._extract_category(template_name)
 
-            # Get context data based on template configuration
-            context, is_sample = self._get_context_data_for_category(
-                template_name, order_id
+            html_template, txt_template = self._template_paths(
+                template_name, category
             )
+            kind = ORDER_EMAIL_KINDS.get(template_name)
 
-            # Determine template paths based on category
-            if category is None:
-                # Root level templates
-                html_template = f"emails/{template_name}.html"
-                txt_template = f"emails/{template_name}.txt"
-            else:
-                html_template = f"emails/{category}/{template_name}.html"
-                txt_template = f"emails/{category}/{template_name}.txt"
+            if kind is not None and order_id:
+                order = Order.objects.filter(pk=order_id).first()
+                if order is None:
+                    raise NothingToPreview(f"Order {order_id} not found.")
+                email = kind.from_order(order, language)
+                return EmailPreview(
+                    template_name=template_name,
+                    subject=email.subject,
+                    html_content=self._render_template(
+                        f"{email.template}.html", email.context
+                    ),
+                    text_content=self._render_template(
+                        f"{email.template}.txt", email.context
+                    ),
+                    context_data=email.context,
+                    order_id=order_id,
+                    is_sample_data=False,
+                )
 
-            # Render templates with the activated language
-            html_content = self._render_template(html_template, context)
-            text_content = self._render_template(txt_template, context)
-
-            # Generate subject
-            subject = self._generate_subject(template_name, context)
-
+            context = build_email_context(
+                language=language,
+                **self._get_sample_context(template_name),
+            )
             return EmailPreview(
                 template_name=template_name,
-                subject=subject,
-                html_content=html_content,
-                text_content=text_content,
+                subject=(
+                    kind.sample_subject(context["order"]["id"])
+                    if kind is not None
+                    else ""
+                ),
+                html_content=self._render_template(html_template, context),
+                text_content=self._render_template(txt_template, context),
                 context_data=context,
-                order_id=order_id if not is_sample else None,
-                is_sample_data=is_sample,
+                order_id=None,
+                is_sample_data=True,
             )
 
+        except NothingToPreview as e:
+            # Not a failure: the chosen order simply has nothing this
+            # email is about. Say so instead of rendering something else.
+            return EmailPreview(
+                template_name=template_name,
+                subject="",
+                html_content="",
+                text_content="",
+                context_data={},
+                order_id=order_id,
+                is_sample_data=False,
+                error=str(e),
+            )
         except Exception as e:
             logger.error(
                 f"Error generating preview for template {template_name}: {e!s}",
@@ -96,7 +128,7 @@ class EmailTemplatePreviewService:
             )
             return EmailPreview(
                 template_name=template_name,
-                subject="Error",
+                subject="",
                 html_content="",
                 text_content="",
                 context_data={},
@@ -108,14 +140,21 @@ class EmailTemplatePreviewService:
             # Restore the original language
             translation.activate(current_language)
 
-    def _get_context_data_for_category(
-        self, template_name: str, order_id: int | None = None
-    ) -> tuple[dict, bool]:
-        """Get context data for template rendering based on configuration."""
+    def _template_paths(
+        self, template_name: str, category: str | None
+    ) -> tuple[str, str]:
+        if category is None:
+            return f"emails/{template_name}.html", f"emails/{template_name}.txt"
+        return (
+            f"emails/{category}/{template_name}.html",
+            f"emails/{category}/{template_name}.txt",
+        )
+
+    def _get_sample_context(self, template_name: str) -> dict:
+        """Made-up values for a template, chosen by its directory."""
         # Resolve the generator from the template's REAL directory, not
-        # its name prefix. Fixing only the path would have left these
-        # rendering with USER sample data — invoice_issued and
-        # admin_new_order would preview with no order in context at all.
+        # its name prefix: a name-based guess previewed invoice_issued and
+        # admin_new_order with USER sample data and no order at all.
         generator_by_directory = {
             "order": "generate_order_context",
             "cart": "generate_order_context",
@@ -133,116 +172,11 @@ class EmailTemplatePreviewService:
                 template_name
             ),
         )
-
-        # Map generator names to methods
-        generator_map = {
-            "generate_order_context": lambda: self._get_context_data(
-                order_id, template_name
-            ),
-            "generate_subscription_context": lambda: (
-                self._get_sample_subscription_context(),
-                True,
-            ),
-            "generate_user_context": lambda: (
-                self._get_sample_user_context(),
-                True,
-            ),
-        }
-
-        generator = (
-            generator_map.get(generator_name) if generator_name else None
-        )
-        if generator:
-            result = generator()
-            # Handle both tuple and single dict returns
-            if isinstance(result, tuple):
-                return result
-            return result, True
-
-        # Fallback to order context
-        return self._get_context_data(order_id, template_name)
-
-    def _get_context_data(
-        self, order_id: int | None, template_name: str = ""
-    ) -> tuple[dict, bool]:
-        """Get context data for order templates."""
-        if order_id:
-            try:
-                return self._get_real_order_context(order_id), False
-            except Order.DoesNotExist:
-                logger.warning(
-                    f"Order {order_id} not found, falling back to sample data",
-                    extra={"order_id": order_id},
-                )
-        return self._get_sample_order_context(template_name), True
-
-    def _get_real_order_context(self, order_id: int) -> dict:
-        """Load real order data for preview."""
-        order = Order.objects.get(id=order_id)
-        items = order.items.all()
-
-        # Format items for template
-        formatted_items = []
-        for item in items:
-            # Handle Money objects by accessing .amount attribute
-            item_price = (
-                float(item.price.amount)
-                if hasattr(item.price, "amount")
-                else float(item.price)
-            )
-            item_total = (
-                float(item.total_price.amount)
-                if hasattr(item.total_price, "amount")
-                else float(item.total_price)
-            )
-
-            formatted_items.append(
-                {
-                    "id": item.id,
-                    "product": {
-                        "id": item.product.id,
-                        "name": item.product.safe_translation_getter(
-                            "name", any_language=True
-                        )
-                        or "",
-                    },
-                    "quantity": item.quantity,
-                    "price": f"€{item_price:.2f}",
-                    "total_price": f"€{item_total:.2f}",
-                }
-            )
-
-        return {
-            "order": {
-                "id": order.id,
-                "uuid": str(order.uuid),
-                "status": order.status,
-                "get_status_display": order.get_status_display(),
-                "first_name": order.first_name,
-                "last_name": order.last_name,
-                "email": order.email,
-                "phone": order.phone or "",
-                "street": order.street,
-                "street_number": order.street_number,
-                "city": order.city,
-                "zipcode": order.zipcode,
-                "country": str(order.country) if order.country else "Greece",
-                "total_price": f"€{float(order.total_price.amount) if hasattr(order.total_price, 'amount') else float(order.total_price):.2f}",
-                "total_price_items": f"€{float(order.total_price_items.amount) if hasattr(order.total_price_items, 'amount') else float(order.total_price_items):.2f}",
-                "shipping_price": f"€{float(order.shipping_price.amount) if hasattr(order.shipping_price, 'amount') else float(order.shipping_price):.2f}",
-                "amount_due": f"€{float(order.total_price.amount) if hasattr(order.total_price, 'amount') else float(order.total_price):.2f}",
-                "created_at": order.created_at,
-                "status_updated_at": order.status_updated_at
-                or order.created_at,
-                "tracking_number": order.tracking_number or "",
-                "shipping_carrier": order.shipping_carrier or "",
-            },
-            "items": formatted_items,
-            "tracking_number": order.tracking_number or "",
-            "carrier": order.shipping_carrier or "",
-            "status": order.status,
-            "status_display": order.get_status_display(),
-        }
+        if generator_name == "generate_subscription_context":
+            return self._get_sample_subscription_context()
+        if generator_name == "generate_user_context":
+            return self._get_sample_user_context()
+        return self._get_sample_order_context(template_name)
 
     def _get_sample_order_context(self, template_name: str = "") -> dict:
         """Generate sample order data for preview."""
@@ -274,22 +208,10 @@ class EmailTemplatePreviewService:
         return status_map.get(template_name, "PENDING")
 
     def _render_template(self, template_path: str, context: dict) -> str:
-        """Render template with context."""
+        """Render a template with a COMPLETE context (one from
+        ``build_email_context`` or from an ``order.emails`` builder), and
+        report a failure as the preview's text rather than raising."""
         from django.template import TemplateDoesNotExist, TemplateSyntaxError
-        from django.utils import translation
-
-        # Build the SAME shared context real sends use, so the preview
-        # shows what the recipient actually gets — tenant logo included.
-        # Hand-rolling these keys here previously pinned SITE_URL to the
-        # PLATFORM base url and omitted SITE_LOGO_URL entirely, so every
-        # preview rendered the text wordmark instead of the tenant's
-        # logo, on the wrong domain.
-        language = translation.get_language() or settings.LANGUAGE_CODE
-        context = build_email_context(
-            **context,
-            language=language,
-            LANGUAGE_CODE=language,
-        )
 
         try:
             return render_to_string(template_path, context)
@@ -356,8 +278,6 @@ class EmailTemplatePreviewService:
     def _get_available_template_list(self) -> list[str]:
         """Get list of available email templates for error messages."""
         import os
-
-        from django.conf import settings
 
         templates = []
         emails_dir = os.path.join(
@@ -428,36 +348,3 @@ class EmailTemplatePreviewService:
             },
             "app_base_url": get_tenant_base_url(),
         }
-
-    def _generate_subject(self, template_name: str, context: dict) -> str:
-        """Generate email subject based on template configuration."""
-        config = EmailTemplateConfig.get_template_config(template_name)
-
-        if config and config.subject_template:
-            try:
-                # Use string formatting with context
-                # Support both {key} and {dict[key]} syntax
-                subject = config.subject_template
-                for key, value in context.items():
-                    if isinstance(value, dict):
-                        # Handle nested dict access like {order[id]}
-                        for subkey, subvalue in value.items():
-                            placeholder = f"{{{key}[{subkey}]}}"
-                            if placeholder in subject:
-                                subject = subject.replace(
-                                    placeholder, str(subvalue)
-                                )
-                    else:
-                        # Handle simple {key} access
-                        placeholder = f"{{{key}}}"
-                        if placeholder in subject:
-                            subject = subject.replace(placeholder, str(value))
-                return subject
-            except Exception as e:
-                logger.warning(
-                    f"Error formatting subject for {template_name}: {e}",
-                    extra={"template_name": template_name, "error": str(e)},
-                )
-
-        # Fallback to generic subject
-        return f"Email from {tenant_site_name()}"

@@ -4,10 +4,8 @@ import logging
 from typing import Any
 
 from celery import shared_task
-from django.utils import translation
 
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language
 from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
@@ -320,8 +318,6 @@ def boxnow_send_arrival_notification(
     # cleanly at worker startup without pulling in the full Django ORM
     # graph for shipping_boxnow, order, and notification apps.
     from django.core.mail import EmailMultiAlternatives
-    from django.template.loader import render_to_string
-    from django.utils.translation import gettext as _
 
     from notification.enum import (
         NotificationCategoryEnum,
@@ -330,6 +326,7 @@ def boxnow_send_arrival_notification(
         NotificationTypeEnum,
     )
     from notification.services import create_user_notification
+    from order.emails import boxnow_parcel_at_locker_email
     from shipping_boxnow.models import BoxNowParcelEvent
 
     try:
@@ -359,26 +356,13 @@ def boxnow_send_arrival_notification(
     )
 
     # --- Email -----------------------------------------------------------
-    language = get_order_language(order)
-    with translation.override(language):
-        subject = _("Your BOX NOW parcel arrived at the locker")
-        context = build_email_context(
-            language=language,
-            order=order,
-            shipment=shipment,
-            locker=locker,
-            locker_address=locker_address,
-            parcel_id=shipment.parcel_id,
-        )
-        text_body = render_to_string(
-            "emails/order/boxnow_parcel_at_locker.txt", context
-        )
-        html_body = render_to_string(
-            "emails/order/boxnow_parcel_at_locker.html", context
-        )
+    email = boxnow_parcel_at_locker_email(
+        shipment, language=get_order_language(order)
+    )
+    text_body, html_body = email.render()
 
     msg = EmailMultiAlternatives(
-        subject=str(subject),
+        subject=email.subject,
         body=text_body,
         from_email=tenant_from_email(),
         to=[order.email],

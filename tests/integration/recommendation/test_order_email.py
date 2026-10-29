@@ -128,7 +128,7 @@ def test_a_broken_strip_never_costs_the_confirmation(bought_and_paired):
     bought, paired = bought_and_paired
 
     with patch(
-        "order.tasks.order_email_strip", side_effect=RuntimeError("boom")
+        "order.emails.order_email_strip", side_effect=RuntimeError("boom")
     ):
         text, html = _send(_order_of(bought))
 

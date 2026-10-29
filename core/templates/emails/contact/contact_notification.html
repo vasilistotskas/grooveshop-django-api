@@ -1,0 +1,28 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "New contact form submission" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "New contact form submission" %}</h1>
+
+<div class="email-card">
+    <p><strong>{% trans "Name" %}:</strong> {{ contact.name }}</p>
+    <p><strong>{% trans "Email" %}:</strong> {{ contact.email }}</p>
+    {% if contact.phone %}<p><strong>{% trans "Phone" %}:</strong> {{ contact.phone }}</p>{% endif %}
+    {% if contact.company %}<p><strong>{% trans "Company" %}:</strong> {{ contact.company }}</p>{% endif %}
+    {% if contact.subject %}<p><strong>{% trans "Subject" %}:</strong> {{ contact.subject }}</p>{% endif %}
+    <p><strong>{% trans "Message" %}:</strong><br>{{ contact.message|linebreaksbr }}</p>
+</div>
+
+{% if attachments %}
+<p>{% blocktrans count counter=attachments|length %}{{ counter }} attachment, download it in the admin:{% plural %}{{ counter }} attachments, download them in the admin:{% endblocktrans %}</p>
+<ul>
+    {% for file in attachments %}
+    <li>{{ file.original_name }} ({{ file.size }} B, {{ file.get_scan_status_display }})</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<p class="text-muted" style="font-size: 13px;">{% trans "Reply to this email to answer the customer." %}</p>
+{% endblock %}

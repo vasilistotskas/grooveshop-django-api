@@ -7,10 +7,15 @@ failures are automatically retried.
 """
 
 import logging
+import re
 from datetime import timedelta
 
-from django.core.mail import send_mail
-from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.core.mail import EmailMultiAlternatives
+from django.core.validators import validate_email
+from django.template.loader import render_to_string
+from django.utils import timezone, translation
+from django.utils.translation import gettext as _
 
 from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
@@ -20,9 +25,68 @@ from core.retry import (
     TRANSIENT_ERRORS,
 )
 from core.tasks import MonitoredTask
+from core.utils.email_context import build_email_context
+from core.utils.i18n import store_language
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
+
+_LINE_BREAKS = re.compile(r"[\r\n\t]+")
+
+
+def _one_line(value: str) -> str:
+    """Collapse line breaks and tabs, so free text can sit in a subject."""
+    return _LINE_BREAKS.sub(" ", value).strip()[:200]
+
+
+def _submitter_reply_to(address: str, *, log_extra: dict) -> list[str]:
+    """``Reply-To`` for the store's copy of a submission: the submitter.
+
+    A form submission is how a stranger reaches the store, so pressing
+    reply must answer them. The address is validated before it reaches a
+    header: anything that is not one bare, well-formed address (a line
+    break, a display name, a second recipient) is dropped and the mail
+    goes out without ``Reply-To``, rather than carrying text a stranger
+    typed into a header.
+    """
+    if not address:
+        return []
+    try:
+        validate_email(address)
+    except ValidationError:
+        logger.warning(
+            "Submitter address is not a valid email address — sending the "
+            "notification without Reply-To",
+            extra=log_extra,
+        )
+        return []
+    return [address]
+
+
+def _send_store_notification(
+    *,
+    recipient: str,
+    reply_to: list[str],
+    subject: str,
+    template: str,
+    context: dict,
+) -> None:
+    """Send one rendered notification from the store to its own inbox.
+
+    Must run inside ``translation.override`` for the language the
+    ``subject`` and ``context`` were built in: both templates render here.
+    """
+    message = EmailMultiAlternatives(
+        subject,
+        render_to_string(f"{template}.txt", context),
+        tenant_from_email(),
+        [recipient],
+        reply_to=reply_to,
+    )
+    message.attach_alternative(
+        render_to_string(f"{template}.html", context), "text/html"
+    )
+    message.send(fail_silently=False)
 
 
 @celery_app.task(
@@ -33,30 +97,18 @@ logger = logging.getLogger(__name__)
     retry_jitter=True,
 )
 def send_contact_notification_email_task(contact_id: int) -> bool:
-    """Send a contact-form notification email to site administrators.
+    """Tell the store that someone filled in its contact form.
 
-    Loads the Contact row by PK, renders a plain-text notification, and
-    dispatches it to the active tenant's own contact inbox — NOT
-    ``settings.ADMINS``, which this docstring claimed for long enough to
-    nearly justify repointing ``ADMIN_EMAIL`` away from a merchant. The
-    routing is a few lines below and has been tenant-scoped since
-    multi-tenancy landed.
-
-    Subject and name fields are CRLF-sanitised at write time (see
-    ``contact/signals.py::_sanitize_header_value``) but we guard here
-    too so the task is safe even when called outside the signal path.
+    Loads the Contact row by PK and mails the active tenant's own contact
+    inbox (``tenant_contact_email``), NOT ``settings.ADMINS``. The mail is
+    for the store's staff, so it is rendered in the store's language
+    (``store_language``) and carries the submitter's address as
+    ``Reply-To``: replying answers the customer.
 
     Returns True on success, False when the contact no longer exists or
-    no admin recipients are configured.
+    the store has no contact address.
     """
-    import re
-
     from contact.models import Contact
-
-    _CRLF_RE = re.compile(r"[\r\n\t]+")
-
-    def _sanitize(value: str) -> str:
-        return _CRLF_RE.sub(" ", value).strip()[:200]
 
     try:
         contact = Contact.objects.get(id=contact_id)
@@ -69,9 +121,7 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         return False
 
     # Route to the tenant's public contact inbox, not the platform
-    # ADMINS list. On a single-tenant
-    # deployment this resolves to the same address operators use
-    # already; on multi-tenant it puts each tenant's submissions in
+    # ADMINS list: on multi-tenant it puts each tenant's submissions in
     # their own inbox.
     recipient = tenant_contact_email()
     if not recipient:
@@ -81,37 +131,31 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
             extra={"contact_id": contact_id},
         )
         return False
-    recipient_list = [recipient]
 
-    safe_name = _sanitize(contact.name)
-    subject = f"New Contact Form Submission from {safe_name}"
-    message = (
-        f"Name: {contact.name}\n"
-        f"Email: {contact.email}\n"
-        f"Message: {contact.message}"
-    )
     # ``contact`` here is the row, not the package: the FK's
     # related_name. Files are never sent as mail attachments - the
     # bytes are anonymous uploads and may be unscanned, so they stay
     # in the private tree and staff fetch them from the admin. The
     # email only has to say they exist, or nobody looks.
-    files = list(contact.attachments.all())
-    if files:
-        listed = "\n".join(
-            f"  - {f.original_name} ({f.size} B, {f.get_scan_status_display()})"
-            for f in files
-        )
-        message += (
-            f"\n\nAttachments ({len(files)}) - download in the admin:\n{listed}"
-        )
+    attachments = list(contact.attachments.all())
 
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=tenant_from_email(),
-        recipient_list=recipient_list,
-        fail_silently=False,
-    )
+    language = store_language()
+    with translation.override(language):
+        _send_store_notification(
+            recipient=recipient,
+            reply_to=_submitter_reply_to(
+                contact.email, log_extra={"contact_id": contact_id}
+            ),
+            subject=_("New contact form submission from {name}").format(
+                name=_one_line(contact.name)
+            ),
+            template="emails/contact/contact_notification",
+            context=build_email_context(
+                language=language,
+                contact=contact,
+                attachments=attachments,
+            ),
+        )
 
     logger.info(
         "Contact notification email sent for Contact #%s",
@@ -129,28 +173,16 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
     retry_jitter=True,
 )
 def send_feedback_notification_email_task(feedback_id: int) -> bool:
-    """Send a feedback-submission notification email to the tenant.
+    """Tell the store that someone left feedback.
 
-    Loads the Feedback row by PK, renders a plain-text notification,
-    and dispatches it to the active tenant's public contact inbox.
+    Same shape as the contact-form notification: the store's contact
+    inbox, the store's language, and the submitter's address (when they
+    gave one) as ``Reply-To``.
 
     Returns True on success, False when the feedback no longer exists
     or no recipient is configured for the active tenant.
-
-    Subject/name are CRLF-sanitised the same way as the contact-form
-    task (``contact/signals.py::_sanitize_header_value``) — the name
-    is free-text and, while not currently interpolated into the
-    subject, is guarded here so a future subject change stays safe by
-    default.
     """
-    import re
-
     from contact.models import Feedback
-
-    _CRLF_RE = re.compile(r"[\r\n\t]+")
-
-    def _sanitize(value: str) -> str:
-        return _CRLF_RE.sub(" ", value).strip()[:200]
 
     try:
         feedback = Feedback.objects.get(id=feedback_id)
@@ -170,28 +202,24 @@ def send_feedback_notification_email_task(feedback_id: int) -> bool:
             extra={"feedback_id": feedback_id},
         )
         return False
-    recipient_list = [recipient]
 
-    safe_name = _sanitize(feedback.name) or "Anonymous"
-    category_display = feedback.get_category_display()
-    subject = _sanitize(
-        f"New Feedback ({feedback.rating}★ {category_display}) submission"
-    )
-    message = (
-        f"Rating: {feedback.rating}/5\n"
-        f"Category: {category_display}\n"
-        f"Name: {safe_name}\n"
-        f"Email: {feedback.email or '—'}\n"
-        f"Message: {feedback.message}"
-    )
-
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=tenant_from_email(),
-        recipient_list=recipient_list,
-        fail_silently=False,
-    )
+    language = store_language()
+    with translation.override(language):
+        _send_store_notification(
+            recipient=recipient,
+            reply_to=_submitter_reply_to(
+                feedback.email, log_extra={"feedback_id": feedback_id}
+            ),
+            subject=_("New feedback ({rating}★ {category}) submission").format(
+                rating=feedback.rating,
+                category=feedback.get_category_display(),
+            ),
+            template="emails/contact/feedback_notification",
+            context=build_email_context(
+                language=language,
+                feedback=feedback,
+            ),
+        )
 
     logger.info(
         "Feedback notification email sent for Feedback #%s",

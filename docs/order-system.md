@@ -5,7 +5,7 @@ Keep this file synchronised when invariants change. Cross-references
 are file paths + line numbers; the system has enough load-bearing
 "don't undo this" pieces that drift here is expensive.
 
-Last refresh: 2026-10-18 (value-based refunds and the negative-balance setting, §7.2; refunds claim, call and record with no transaction open across the provider, `RefundAttempt`, Stripe `refund.failed` reversal, §4.2.0 / §7.2; before that 2026-10-13: refunding collected cash on delivery, §7.2; before that 2026-10-12: the myDATA retail document lifecycle: a receipt at shipment, a credit document per refund, no platform invoices, §7.4; before that the payment ledger: partial refunds, §7.2 / §7.3; before that 2026-09-30: every payment start refuses a non-PENDING order, a change during the provider call wins with 409, webhook history/emails only for an applied event, BoxNow webhook 400 for a non-object, non-UTF-8 or too-deep body; before that: order acquisition source, admin payment-method column, then no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
+Last refresh: 2026-10-29 (the order emails' subject and context are built once in `order/emails.py` for the sender and the admin preview, §6.1; marketing mail honours the account-level opt-out the one-click link records, §6.5; the store's contact/feedback notifications and the allauth account emails, §6.6 / §6.7; before that 2026-10-18: value-based refunds and the negative-balance setting, §7.2; refunds claim, call and record with no transaction open across the provider, `RefundAttempt`, Stripe `refund.failed` reversal, §4.2.0 / §7.2; before that 2026-10-13: refunding collected cash on delivery, §7.2; before that 2026-10-12: the myDATA retail document lifecycle: a receipt at shipment, a credit document per refund, no platform invoices, §7.4; before that the payment ledger: partial refunds, §7.2 / §7.3; before that 2026-09-30: every payment start refuses a non-PENDING order, a change during the provider call wins with 409, webhook history/emails only for an applied event, BoxNow webhook 400 for a non-object, non-UTF-8 or too-deep body; before that: order acquisition source, admin payment-method column, then no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
 
 ## 1. Overview
 
@@ -1446,6 +1446,32 @@ is **per store, per kind**. `OpsAlertKind` is the whole list:
 All transactional emails carry `List-Unsubscribe: mailto:` headers
 via `build_transactional_list_headers` (PR #4).
 
+**Subject and context are built once, in `order/emails.py`.** Each
+order email has a builder (`order_received_email`,
+`order_payment_confirmed_email`, `order_status_update_email`,
+`order_shipped_email`, `payment_failed_email`,
+`refund_confirmation_email`, `document_issued_email`,
+`acs_out_for_delivery_email`, `boxnow_parcel_at_locker_email`, and the
+store-facing `admin_new_order_email` / `dispute_notification_email`)
+that takes the objects the email is about and returns an `OrderEmail`:
+the template, the translated subject, the context and the language, with
+no side effect. The task calls it, calls `email.render()` and sends;
+choosing *when* to send (the idempotency claims above), the recipient,
+`Reply-To`, list headers and attachments stay in the task. The admin
+email preview (`core/email/preview_service.py`) calls the same function
+for a real order through `ORDER_EMAIL_KINDS`, so what it shows is what
+that order is sent, subject included
+(`tests/integration/core/email/test_preview_matches_send.py` sends each
+email and compares). The preview of an order that has no record the email
+is about (no refund, no receipt, no shipment) says so instead of
+rendering something else. A subject lives in its builder module and
+nowhere else: never in `core/email/config.py`.
+
+The builders read the order's lines (`_lines`) **inside**
+`translation.override`: parler fixes a model's language when the instance
+is created, so lines a task prefetched before the override named every
+product in the worker's language. Do not prefetch `items` in the task.
+
 **The "your order has shipped" email is honest about timing.** It only
 goes out once the order is *genuinely in transit* — `status == SHIPPED`
 **and** a tracking number is present — never at voucher-mint. The
@@ -1495,8 +1521,10 @@ premature "shipped"); now it sends only the confirmation.
   A cart that fails `validate_cart_for_checkout` is `insufficient_stock`
   or `cart_invalid` (`CartNotReadyError`), and a hold that lapsed between
   the cart check and its conversion is `reservation_unavailable`.
-- Every email task wraps render in
-  `translation.override(get_order_language(order))`.
+- Every order-email builder (`order/emails.py`) runs under
+  `translation.override(language)` and `OrderEmail.render()` renders under
+  the same override; the task passes `get_order_language(order)` (or
+  `store_language()` for store-facing mail).
 
 ### 6.3 Customer-notification suppression on chained transitions (PR #7)
 
@@ -1535,6 +1563,72 @@ was redundant with the SHIPPED toast, so it was removed alongside the
 email fix.
 
 All WS notifications go through `notification.consumers.NotificationConsumer` and require auth; **guest orders silently get no live notification** (the email IS sent for guests since it goes to `order.email`).
+
+### 6.5 Marketing email and the unsubscribe link
+
+Marketing mail is the mail a customer did not ask for in the moment:
+the re-engagement email (`core.tasks.send_inactive_user_notifications`)
+and the abandoned-cart reminder
+(`order.tasks.send_checkout_abandonment_emails`). Neither belongs to a
+subscription topic, so there is no `UserSubscription` row for the
+unsubscribe link to end. The customer's refusal is therefore kept on the
+**account**: `UserAccount.marketing_opted_out_at` (nullable timestamp,
+additive migration; the moment is the proof of when they asked).
+
+- The blanket link (`generate_blanket_unsubscribe_link`, the
+  `List-Unsubscribe` URL of both emails) sets it, in the same
+  transaction that ends the account's active topic subscriptions
+  (`user.views.subscription._apply_unsubscribe`,
+  `user.services.subscription.opt_out_of_marketing`). The one-click POST
+  (RFC 8058: `List-Unsubscribe=One-Click`, no cookies, always 200) and the
+  GET link do the same. A topic link (`/unsubscribe/<token>/<topic>`) ends
+  that topic only; a guest subscription's link touches no account.
+- Every marketing send skips an opted-out account:
+  `UserAccount.objects.accepting_marketing()` for the re-engagement
+  query, `user__marketing_opted_out_at__isnull=True` for the cart query.
+  A cart reminder skipped for that reason has its reservations settled
+  (`abandonment_notified`), so the next run does not find it again and a
+  lifted opt-out never sends a months-old reminder.
+- **A new marketing send must start from the same filter**, and carry
+  `build_list_unsubscribe_headers` with `generate_blanket_unsubscribe_link`
+  (Gmail and Yahoo require one-click unsubscribe on marketing mail;
+  RFC 8058 also needs the HTTPS URI to carry a hard-to-forge component,
+  which the signed token is, and the message to be DKIM-signed over both
+  headers, which the relay does).
+- Product alerts (restock, price drop) are not gated: the customer
+  created each one for one product and it fires once. Their link records
+  the opt-out all the same, which then stops the two emails above.
+- Nothing lifts the opt-out by itself. Staff clear it from the customer's
+  admin page (Loyalty & Engagement tab) on the customer's request.
+
+### 6.6 The store's copy of a contact or feedback submission
+
+`contact.tasks.send_contact_notification_email_task` and
+`send_feedback_notification_email_task` mail the store's own contact
+inbox (`tenant_contact_email()`), from `tenant_from_email()`, rendered
+from `emails/contact/{contact,feedback}_notification.{html,txt}` in the
+**store's** language (`store_language()`), subject included. The
+submitter's address is `Reply-To`, so replying answers the customer; it is
+checked with `validate_email` first, and anything that is not one bare
+address (a line break, a display name, two addresses) is dropped and the
+mail goes out without `Reply-To`. Files are never attached: the mail only
+says they exist.
+
+### 6.7 Account emails (allauth)
+
+`user.adapter.UserAccountAdapter.send_mail` replaces allauth's own
+`send_mail`, so allauth's `current_site` is not in the context and must
+not be (`SITE_ID` is one store's `Site` row: every store would sign as
+it). Every allauth template reads the store from
+`build_email_context` instead: `SITE_NAME`, `SITE_URL`, the logo and
+theme. `core/templates/account/email/base_message.txt` and
+`email_confirmation_message.txt` replace allauth's text layout for that
+reason, and every email allauth can send (`account/email/*`,
+`mfa/email/*`, `socialaccount/email/*`) has an HTML twin under
+`core/templates/`.
+`tests/integration/user/test_allauth_email_store_identity.py` discovers
+the kinds from the installed allauth, so a template a later allauth adds
+fails there until it is covered.
 
 ## 7. Cancellation + refund flows
 
@@ -1766,14 +1860,21 @@ the linked memory note or the originating PR's commit message.
 
 ### 9.1 Adding a new order email
 
-1. Create the template under `core/templates/emails/order/`.
-2. Add a Celery task in `order/tasks.py` mirroring `send_payment_failed_email`:
+1. Create the `.html` + `.txt` pair under `core/templates/emails/order/`.
+2. Add its subject function and builder to `order/emails.py` (the builder
+   returns an `OrderEmail` and runs under `translation.override`) and an
+   `ORDER_EMAIL_KINDS` entry, so the admin preview renders it from a real
+   order. `test_every_order_email_template_has_a_builder_entry` fails
+   until you do.
+3. Add a Celery task in `order/tasks.py` mirroring `send_payment_failed_email`:
    - Idempotency reservation helper (`_reserve_<task>_email`).
-   - `translation.override(get_order_language(order))` block.
+   - The builder, then `email.render()`: no subject, context or
+     `translation.override` of its own.
    - `EmailMultiAlternatives(...)` with `headers=build_transactional_list_headers(list_id="<kind>")`.
    - Catch exceptions; on permanent failure, release the reservation.
-3. Wire from a signal handler in `order/signals/handlers.py` via `transaction.on_commit`.
-4. Add a regression test in `tests/integration/order/test_signals.py`.
+4. Wire from a signal handler in `order/signals/handlers.py` via `transaction.on_commit`.
+5. Add a regression test in `tests/integration/order/test_signals.py` and a
+   case in `tests/integration/core/email/test_preview_matches_send.py`.
 
 ### 9.2 Adding a new order status
 

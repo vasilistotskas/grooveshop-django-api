@@ -1,0 +1,12 @@
+{% load i18n %}{% trans "New feedback" %}
+{{ SITE_NAME }}
+================================================================================
+
+{% trans "Rating" %}: {{ feedback.rating }}/5
+{% trans "Category" %}: {{ feedback.get_category_display }}
+{% trans "Name" %}: {% if feedback.name %}{{ feedback.name|safe }}{% else %}{% trans "Anonymous" %}{% endif %}
+{% trans "Email" %}: {% if feedback.email %}{{ feedback.email|safe }}{% else %}—{% endif %}
+{% trans "Message" %}: {{ feedback.message|safe }}
+{% if feedback.email %}
+{% trans "Reply to this email to answer the customer." %}
+{% endif %}

@@ -235,6 +235,12 @@ msgstr[0] "%(count)s προγραμματισμένη εργασία ενεργ�
 msgstr[1] "%(count)s προγραμματισμένες εργασίες ενεργές"
 
 #, python-format
+msgid "%(counter)s attachment, download it in the admin:"
+msgid_plural "%(counter)s attachments, download them in the admin:"
+msgstr[0] "%(counter)s συνημμένο, κατεβάστε το από το διαχειριστικό:"
+msgstr[1] "%(counter)s συνημμένα, κατεβάστε τα από το διαχειριστικό:"
+
+#, python-format
 msgctxt "return window"
 msgid "%(days)s day"
 msgid_plural "%(days)s days"
@@ -604,6 +610,12 @@ msgstr "Πολλά έχουν συμβεί από την τελευταία σα
 msgid "A main address already exists for this user"
 msgstr "Υπάρχει ήδη κύρια διεύθυνση για αυτόν τον χρήστη"
 
+msgid "A new security key has been added."
+msgstr "Προστέθηκε νέο κλειδί ασφαλείας."
+
+msgid "A new set of Two-Factor Authentication recovery codes has been generated."
+msgstr "Δημιουργήθηκε νέο σετ κωδικών ανάκτησης για την ταυτοποίηση δύο παραγόντων."
+
 msgid "A note is required."
 msgstr "Η σημείωση είναι υποχρεωτική."
 
@@ -641,6 +653,9 @@ msgstr "Μια κριτική περιμένει έγκριση"
 msgid "A search query is required."
 msgstr "Η αναζήτηση είναι υποχρεωτική."
 
+msgid "A security key has been removed."
+msgstr "Αφαιρέθηκε ένα κλειδί ασφαλείας."
+
 msgid "A seed product is required for this surface."
 msgstr "Απαιτείται προϊόν αναφοράς για αυτή την επιφάνεια."
 
@@ -664,6 +679,14 @@ msgstr "Η διαδρομή του καταστήματος δεν μπορεί 
 
 msgid "A subscription topic with this slug already exists."
 msgstr "Υπάρχει ήδη θέμα εγγραφής με αυτό το slug."
+
+#, python-format
+msgid "A third-party account from %(provider)s has been connected to your account."
+msgstr "Ένας λογαριασμός τρίτου παρόχου από %(provider)s συνδέθηκε με τον λογαριασμό σας."
+
+#, python-format
+msgid "A third-party account from %(provider)s has been disconnected from your account."
+msgstr "Ένας λογαριασμός τρίτου παρόχου από %(provider)s αποσυνδέθηκε από τον λογαριασμό σας."
 
 msgid "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
 msgstr "Token μόνο με το δικαίωμα Zone → Cache Purge → Purge σε αυτή τη ζώνη. Απόρρητο — χρησιμοποιείται για να καθαρίζονται οι σελίδες του καταστήματος από την cache του Cloudflare μετά από μια αλλαγή ή μια νέα έκδοση."
@@ -1456,6 +1479,18 @@ msgstr "Απαιτείται ταυτοποίηση για την επανάλη
 
 msgid "Authentication is required to view your orders"
 msgstr "Απαιτείται ταυτοποίηση για να δείτε τις παραγγελίες σας"
+
+msgid "Authenticator app activated"
+msgstr "Ενεργοποιήθηκε η εφαρμογή ταυτοποίησης"
+
+msgid "Authenticator app activated."
+msgstr "Ενεργοποιήθηκε η εφαρμογή ταυτοποίησης."
+
+msgid "Authenticator app deactivated"
+msgstr "Απενεργοποιήθηκε η εφαρμογή ταυτοποίησης"
+
+msgid "Authenticator app deactivated."
+msgstr "Απενεργοποιήθηκε η εφαρμογή ταυτοποίησης."
 
 msgid "Authenticator or recovery code"
 msgstr "Κωδικός εφαρμογής ταυτοποίησης ή κωδικός ανάκτησης"
@@ -6185,6 +6220,10 @@ msgstr "Ύψος"
 msgid "Hello %(first_name)s,"
 msgstr "Γεια σας %(first_name)s,"
 
+#, python-format
+msgid "Hello from %(site_name)s!"
+msgstr "Γεια σας από το %(site_name)s!"
+
 msgid "Hello,"
 msgstr "Γεια σας,"
 
@@ -7482,6 +7521,9 @@ msgstr "Marketing"
 msgid "Marketing Campaigns"
 msgstr "Καμπάνιες marketing"
 
+msgid "Marketing Opted Out At"
+msgstr "Απεγγραφή από το marketing στις"
+
 msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 msgstr "Γενικός διακόπτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής) — όταν είναι κλειστός, δεν εμφανίζεται στην ολοκλήρωση αγοράς, ανεξάρτητα από το ``is_active`` του παρόχου."
 
@@ -7860,8 +7902,22 @@ msgstr "Νέα τιμή"
 msgid "New and improved user interface"
 msgstr "Νέα και βελτιωμένη διεπαφή χρήστη"
 
+msgid "New contact form submission"
+msgstr "Νέο μήνυμα από τη φόρμα επικοινωνίας"
+
+#, python-brace-format
+msgid "New contact form submission from {name}"
+msgstr "Νέο μήνυμα από τη φόρμα επικοινωνίας: {name}"
+
 msgid "New customers"
 msgstr "Νέοι πελάτες"
+
+msgid "New feedback"
+msgstr "Νέα υποβολή σχολίων"
+
+#, python-brace-format
+msgid "New feedback ({rating}★ {category}) submission"
+msgstr "Νέα υποβολή σχολίων ({rating}★ {category})"
 
 msgid "New messages"
 msgstr "Νέα μηνύματα"
@@ -7872,6 +7928,9 @@ msgstr "Νέα παραγγελία — #{order_id}"
 
 msgid "New product"
 msgstr "Νέο προϊόν"
+
+msgid "New recovery codes generated"
+msgstr "Δημιουργήθηκαν νέοι κωδικοί ανάκτησης"
 
 msgid "New sort order value"
 msgstr "Νέα τιμή σειράς ταξινόμησης"
@@ -10600,6 +10659,9 @@ msgstr "Αντικαθιστά την αλυσίδα, τα βάρη, την εκ
 msgid "Replaces this surface's chain, weights, weight learning, limits and price band with the defaults for this store's vertical. Your edits are lost."
 msgstr "Αντικαθιστά την αλυσίδα, τα βάρη, την εκμάθηση βαρών, τα όρια και το εύρος τιμών αυτής της επιφάνειας με τις προεπιλογές για τον κλάδο αυτού του καταστήματος. Οι αλλαγές σας θα χαθούν."
 
+msgid "Reply to this email to answer the customer."
+msgstr "Απαντήστε σε αυτό το email για να απαντήσετε στον πελάτη."
+
 msgid "Request Cookies"
 msgstr "Cookies αιτήματος"
 
@@ -11173,6 +11235,12 @@ msgstr "Ασφάλεια & πρόσβαση"
 msgid "Security Related"
 msgstr "Σχετικά με ασφάλεια"
 
+msgid "Security key added"
+msgstr "Προστέθηκε κλειδί ασφαλείας"
+
+msgid "Security key removed"
+msgstr "Αφαιρέθηκε κλειδί ασφαλείας"
+
 msgid "Seed product"
 msgstr "Προϊόν αναφοράς"
 
@@ -11337,6 +11405,9 @@ msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας 
 
 msgid "Set up your authenticator app"
 msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
+
+msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
+msgstr "Ορίζεται όταν ο πελάτης απεγγράφηκε από κάθε διαφημιστικό email (με τον σύνδεσμο ενός κλικ σε διαφημιστικό email). Όσο ισχύει, καμία αποστολή marketing δεν στέλνεται στον λογαριασμό."
 
 msgid "Setting Information"
 msgstr "Πληροφορίες Ρύθμισης"
@@ -12309,6 +12380,14 @@ msgstr "Ευχαριστούμε που αγοράσατε από %(site_name)s!
 msgid "Thank you for shopping with us!"
 msgstr "Ευχαριστούμε που αγοράσατε από μας!"
 
+#, python-format
+msgid ""
+"Thank you for using %(site_name)s!\n"
+"%(site_domain)s"
+msgstr ""
+"Ευχαριστούμε που χρησιμοποιείτε το %(site_name)s!\n"
+"%(site_domain)s"
+
 msgid "Thank you for your purchase!"
 msgstr "Ευχαριστούμε για την αγορά σας!"
 
@@ -12750,6 +12829,12 @@ msgstr "Αυτά τα κλειδιά είναι δεσμευμένα και δε
 msgid "Third Floor"
 msgstr "3ος όροφος"
 
+msgid "Third-party account connected"
+msgstr "Συνδέθηκε λογαριασμός τρίτου παρόχου"
+
+msgid "Third-party account disconnected"
+msgstr "Αποσυνδέθηκε λογαριασμός τρίτου παρόχου"
+
 msgid "This Month"
 msgstr "Αυτόν τον μήνα"
 
@@ -12821,17 +12906,29 @@ msgstr "Αυτή η παραγγελία έχει ήδη πληρωθεί."
 msgid "This order has already been refunded."
 msgstr "Αυτή η παραγγελία έχει ήδη επιστραφεί."
 
+msgid "This order has no dispute to report."
+msgstr "Η παραγγελία δεν έχει αμφισβήτηση πληρωμής προς αναφορά."
+
 msgid "This order has no payment ID."
 msgstr "Αυτή η παραγγελία δεν έχει ID πληρωμής."
 
 msgid "This order has no payment method configured."
 msgstr "Αυτή η παραγγελία δεν έχει διαμορφωμένη μέθοδο πληρωμής."
 
+msgid "This order has no receipt to send."
+msgstr "Η παραγγελία δεν έχει απόδειξη προς αποστολή."
+
+msgid "This order has no refund to describe."
+msgstr "Η παραγγελία δεν έχει επιστροφή χρημάτων για να περιγραφεί."
+
 msgid "This order has no registered receipt."
 msgstr "Η παραγγελία δεν έχει καταχωρισμένη απόδειξη."
 
 msgid "This order has no specimen receipt."
 msgstr "Η παραγγελία δεν έχει δείγμα απόδειξης."
+
+msgid "This order has no such shipment."
+msgstr "Η παραγγελία δεν έχει τέτοια αποστολή."
 
 msgid "This order has not been paid yet."
 msgstr "Αυτή η παραγγελία δεν έχει πληρωθεί ακόμα."
@@ -13039,6 +13136,10 @@ msgstr "Προς έκδοση στο timologio"
 #, python-format
 msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
 msgstr "Για να επανέλθει το κατάστημά σας, κανονίστε την ανανέωση απαντώντας σε αυτό το email ή επικοινωνώντας μαζί μας στο %(email)s. Μόλις καταχωρηθεί, το κατάστημά σας επανενεργοποιείται αυτόματα."
+
+#, python-format
+msgid "To confirm this is correct, go to %(activate_url)s"
+msgstr "Για να επιβεβαιώσετε ότι είναι σωστό, μεταβείτε στη διεύθυνση %(activate_url)s"
 
 msgid "To issue in timologio"
 msgstr "Για έκδοση στο timologio"
@@ -14390,6 +14491,10 @@ msgstr "Θα λάβετε ένα δεύτερο email μόλις επιβεβα�
 msgid "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
 msgstr "Λαμβάνετε αυτό το email επειδή ο χρήστης %(user_display)s πρόσθεσε τη διεύθυνση email σας στον λογαριασμό του στο %(SITE_NAME)s."
 
+#, python-format
+msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+msgstr "Λαμβάνετε αυτό το email επειδή ο χρήστης %(user_display)s έδωσε τη διεύθυνση email σας για να δημιουργήσει λογαριασμό στο %(site_name)s."
+
 msgid "You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset."
 msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάποιος άλλος ζήτησε επαναφορά του κωδικού πρόσβασης του λογαριασμού σας. Μπορείτε να το αγνοήσετε με ασφάλεια αν δεν ζητήσατε επαναφορά κωδικού πρόσβασης."
 
@@ -14545,6 +14650,12 @@ msgstr "Έγινε επαναφορά του κωδικού πρόσβασής �
 
 msgid "Your password has been set."
 msgstr "Ο κωδικός πρόσβασής σας ορίστηκε."
+
+msgid "Your password reset code"
+msgstr "Ο κωδικός επαναφοράς του κωδικού πρόσβασής σας"
+
+msgid "Your password reset code is listed below. Please enter it in your open browser window."
+msgstr "Ο κωδικός επαναφοράς του κωδικού πρόσβασής σας εμφανίζεται παρακάτω. Εισαγάγετέ τον στο ανοιχτό παράθυρο του προγράμματος περιήγησης."
 
 msgid "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
 msgstr "Ο κωδικός πρόσβασής σας άλλαξε. Συνδεθείτε με τον νέο κωδικό· αν ο λογαριασμός σας χρησιμοποιεί εφαρμογή ελέγχου ταυτότητας, θα σας ζητηθεί κωδικός όπως πάντα."
@@ -15305,10 +15416,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Group by Continent"
 #~ msgstr "Ομαδοποίηση ανά ήπειρο"
-
-#, python-format
-#~ msgid "Hello %(name)s!"
-#~ msgstr "Γεια σου %(name)s!"
 
 #~ msgid "Hero section image"
 #~ msgstr "Εικόνα ενότητας hero"

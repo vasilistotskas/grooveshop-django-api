@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from django.core import mail
 from django.db import connection
 from django.test import TestCase, override_settings
@@ -8,6 +9,14 @@ from contact.models import Feedback, FeedbackCategory
 from contact.signals import send_feedback_email_notification
 
 _INFO_EMAIL = "admin@example.com"
+
+
+@pytest.fixture(autouse=True)
+def _english_store():
+    """These tests read the English copy; ``tests/integration/contact/``
+    covers the store's language."""
+    with patch("contact.tasks.store_language", return_value="en"):
+        yield
 
 
 class TestFeedbackSignals(TestCase):

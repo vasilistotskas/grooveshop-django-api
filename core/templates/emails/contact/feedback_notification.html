@@ -1,0 +1,20 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "New feedback" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "New feedback" %}</h1>
+
+<div class="email-card">
+    <p><strong>{% trans "Rating" %}:</strong> {{ feedback.rating }}/5</p>
+    <p><strong>{% trans "Category" %}:</strong> {{ feedback.get_category_display }}</p>
+    <p><strong>{% trans "Name" %}:</strong> {% if feedback.name %}{{ feedback.name }}{% else %}{% trans "Anonymous" %}{% endif %}</p>
+    <p><strong>{% trans "Email" %}:</strong> {% if feedback.email %}{{ feedback.email }}{% else %}—{% endif %}</p>
+    <p><strong>{% trans "Message" %}:</strong><br>{{ feedback.message|linebreaksbr }}</p>
+</div>
+
+{% if feedback.email %}
+<p class="text-muted" style="font-size: 13px;">{% trans "Reply to this email to answer the customer." %}</p>
+{% endif %}
+{% endblock %}

@@ -494,7 +494,6 @@ def send_staff_password_reset_email(
             )
             context = build_email_context(
                 language=language,
-                LANGUAGE_CODE=language,
                 reset_url=f"{'https' if secure else 'http'}://{host}{path}",
                 valid_minutes=settings.PASSWORD_RESET_TIMEOUT // 60,
             )

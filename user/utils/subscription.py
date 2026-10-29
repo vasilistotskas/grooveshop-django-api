@@ -100,7 +100,6 @@ def send_subscription_confirmation(subscription: UserSubscription) -> bool:
         topic=subscription.topic,
         subscription=subscription,
         confirmation_url=confirmation_url,
-        LANGUAGE_CODE=language,
     )
 
     with translation.override(language):

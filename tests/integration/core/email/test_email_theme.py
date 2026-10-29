@@ -32,14 +32,18 @@ from django.template.loader import render_to_string
 from core.utils.email_context import build_email_context
 
 EMAIL_TEMPLATE_ROOT = Path(settings.BASE_DIR) / "core" / "templates" / "emails"
-# django-allauth account emails (login code, password reset, email
-# confirmation, security notices) live in the separate ``account/email/``
-# tree — allauth's own template-lookup convention — but must be no less
-# themed than the rest of transactional mail, so the sweep covers both.
-ACCOUNT_EMAIL_TEMPLATE_ROOT = (
-    Path(settings.BASE_DIR) / "core" / "templates" / "account"
+# django-allauth emails (login code, password reset, email confirmation,
+# security notices, MFA and social-account notices) live in allauth's own
+# template-lookup trees (``account/``, ``mfa/``, ``socialaccount/``) but
+# must be no less themed than the rest of transactional mail, so the sweep
+# covers all of them.
+TEMPLATES = Path(settings.BASE_DIR) / "core" / "templates"
+SWEPT_ROOTS = (
+    EMAIL_TEMPLATE_ROOT,
+    TEMPLATES / "account",
+    TEMPLATES / "mfa",
+    TEMPLATES / "socialaccount",
 )
-SWEPT_ROOTS = (EMAIL_TEMPLATE_ROOT, ACCOUNT_EMAIL_TEMPLATE_ROOT)
 
 
 class TestNoCssCustomProperties:

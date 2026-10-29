@@ -459,6 +459,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "loyalty_level",
                     "loyalty_tier_name",
                     "engagement_metrics",
+                    "marketing_opted_out_at",
                     "id",
                     "created_at",
                     "updated_at",

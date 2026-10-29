@@ -1,8 +1,10 @@
 import logging
+from typing import NamedTuple
 
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection, transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -49,7 +51,11 @@ from user.serializers.subscription import (
     UserSubscriptionSerializer,
     UserSubscriptionWriteSerializer,
 )
-from user.services.subscription import SubscribeOutcome, subscribe_account
+from user.services.subscription import (
+    SubscribeOutcome,
+    opt_out_of_marketing,
+    subscribe_account,
+)
 from user.utils.subscription import (
     UNSUBSCRIBE_MAX_AGE,
     UNSUBSCRIBE_SALT,
@@ -669,10 +675,19 @@ class UnsubscribeResponseSerializer(serializers.Serializer):
     error = serializers.CharField(required=False)
 
 
-def _validate_unsubscribe_token(token: str):
-    """Resolve an unsubscribe token to the subscriptions it may end.
+class UnsubscribeTarget(NamedTuple):
+    """What a valid unsubscribe token lets its holder end."""
 
-    Returns ``(queryset, None)`` or ``(None, error)``. The token is a
+    subscriptions: QuerySet[UserSubscription]
+    #: The account the token names, or None for a guest subscription's
+    #: token: a guest has no account to opt out of marketing.
+    account_pk: int | None
+
+
+def _validate_unsubscribe_token(token: str):
+    """Resolve an unsubscribe token to what it may end.
+
+    Returns ``(UnsubscribeTarget, None)`` or ``(None, error)``. The token is a
     ``django.core.signing`` value carrying the owning schema plus either
     an account pk (``pk`` — every subscription of that account) or a
     guest subscription's uuid (``sid`` — that one row); see
@@ -727,7 +742,7 @@ def _validate_unsubscribe_token(token: str):
                 payload["sid"],
             )
             return None, _("Invalid unsubscribe link")
-        return subscriptions, None
+        return UnsubscribeTarget(subscriptions, None), None
 
     user_pk = payload.get("pk")
     if user_pk is None or not User.objects.filter(pk=user_pk).exists():
@@ -735,11 +750,29 @@ def _validate_unsubscribe_token(token: str):
             "unsubscribe: signed user_id=%s no longer exists", user_pk
         )
         return None, _("Invalid unsubscribe link")
-    return UserSubscription.objects.filter(user_id=user_pk), None
+    return (
+        UnsubscribeTarget(
+            UserSubscription.objects.filter(user_id=user_pk), user_pk
+        ),
+        None,
+    )
 
 
-def _apply_unsubscribe(subscriptions, topic_slug: str | None):
-    qs = subscriptions.filter(
+def _apply_unsubscribe(target: UnsubscribeTarget, topic_slug: str | None):
+    """End the subscriptions the token names; for the blanket link of an
+    account (no topic), also record that the account no longer wants
+    marketing mail.
+
+    The second half is what makes "unsubscribe from everything" mean
+    everything: re-engagement and abandoned-cart mail belong to no topic,
+    so there is no subscription row to flip and, before the opt-out was
+    recorded on the account, the link ended nothing for them.
+
+    Returns ``(count, topic_name, recipient, opted_out)``: how many topic
+    subscriptions ended, the last one's name and address, and whether the
+    account's marketing opt-out was recorded by THIS call.
+    """
+    qs = target.subscriptions.filter(
         status=UserSubscription.SubscriptionStatus.ACTIVE,
     )
     if topic_slug:
@@ -747,16 +780,22 @@ def _apply_unsubscribe(subscriptions, topic_slug: str | None):
     count = 0
     topic_name = None
     recipient = None
-    for subscription in qs.select_related("topic", "user"):
-        subscription.unsubscribe()
-        topic_name = subscription.topic.name
-        recipient = subscription.recipient_email
-        count += 1
-    return count, topic_name, recipient
+    with transaction.atomic():
+        for subscription in qs.select_related("topic", "user"):
+            subscription.unsubscribe()
+            topic_name = subscription.topic.name
+            recipient = subscription.recipient_email
+            count += 1
+        opted_out = (
+            not topic_slug
+            and target.account_pk is not None
+            and opt_out_of_marketing(target.account_pk)
+        )
+    return count, topic_name, recipient, opted_out
 
 
 def _unsubscribe_get_response(token: str, topic_slug: str | None):
-    subscriptions, error = _validate_unsubscribe_token(token)
+    target, error = _validate_unsubscribe_token(token)
     if error is not None:
         return Response(
             {
@@ -766,8 +805,10 @@ def _unsubscribe_get_response(token: str, topic_slug: str | None):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
-    count, topic_name, recipient = _apply_unsubscribe(subscriptions, topic_slug)
-    if count == 0:
+    count, topic_name, recipient, opted_out = _apply_unsubscribe(
+        target, topic_slug
+    )
+    if count == 0 and not opted_out:
         return Response(
             {
                 "message": str(_("Already unsubscribed")),
@@ -785,9 +826,9 @@ def _unsubscribe_get_response(token: str, topic_slug: str | None):
 
 
 def _unsubscribe_post_response(token: str, topic_slug: str | None):
-    subscriptions, _err = _validate_unsubscribe_token(token)
-    if subscriptions is not None:
-        _apply_unsubscribe(subscriptions, topic_slug)
+    target, _err = _validate_unsubscribe_token(token)
+    if target is not None:
+        _apply_unsubscribe(target, topic_slug)
     # RFC 8058: always 200 to avoid leaking token validity to scanners.
     return Response(status=status.HTTP_200_OK)
 

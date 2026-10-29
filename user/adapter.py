@@ -85,7 +85,7 @@ class UserAccountAdapter(DefaultAccountAdapter):
             else resolve_request_language(self.request)
         )
         merged_context = {
-            **build_email_context(language=language, LANGUAGE_CODE=language),
+            **build_email_context(language=language),
             **context,
             **{
                 key: localize_storefront_url(context[key], language=language)

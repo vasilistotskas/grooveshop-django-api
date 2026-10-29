@@ -230,6 +230,12 @@ msgstr[0] "%(count)s scheduled task enabled"
 msgstr[1] "%(count)s scheduled tasks enabled"
 
 #, python-format
+msgid "%(counter)s attachment, download it in the admin:"
+msgid_plural "%(counter)s attachments, download them in the admin:"
+msgstr[0] "%(counter)s attachment, download it in the admin:"
+msgstr[1] "%(counter)s attachments, download them in the admin:"
+
+#, python-format
 msgctxt "return window"
 msgid "%(days)s day"
 msgid_plural "%(days)s days"
@@ -599,6 +605,12 @@ msgstr "A lot has happened since your last visit, and we'd love to have you back
 msgid "A main address already exists for this user"
 msgstr "A main address already exists for this user"
 
+msgid "A new security key has been added."
+msgstr "A new security key has been added."
+
+msgid "A new set of Two-Factor Authentication recovery codes has been generated."
+msgstr "A new set of Two-Factor Authentication recovery codes has been generated."
+
 msgid "A note is required."
 msgstr "A note is required."
 
@@ -636,6 +648,9 @@ msgstr "A review is waiting for approval"
 msgid "A search query is required."
 msgstr "A search query is required."
 
+msgid "A security key has been removed."
+msgstr "A security key has been removed."
+
 msgid "A seed product is required for this surface."
 msgstr "A seed product is required for this surface."
 
@@ -659,6 +674,14 @@ msgstr "A storefront path cannot start with a locale prefix."
 
 msgid "A subscription topic with this slug already exists."
 msgstr "A subscription topic with this slug already exists."
+
+#, python-format
+msgid "A third-party account from %(provider)s has been connected to your account."
+msgstr "A third-party account from %(provider)s has been connected to your account."
+
+#, python-format
+msgid "A third-party account from %(provider)s has been disconnected from your account."
+msgstr "A third-party account from %(provider)s has been disconnected from your account."
 
 msgid "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
 msgstr "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
@@ -1451,6 +1474,18 @@ msgstr "Authentication is required to reorder a past order."
 
 msgid "Authentication is required to view your orders"
 msgstr "Authentication is required to view your orders"
+
+msgid "Authenticator app activated"
+msgstr "Authenticator app activated"
+
+msgid "Authenticator app activated."
+msgstr "Authenticator app activated."
+
+msgid "Authenticator app deactivated"
+msgstr "Authenticator app deactivated"
+
+msgid "Authenticator app deactivated."
+msgstr "Authenticator app deactivated."
 
 msgid "Authenticator or recovery code"
 msgstr "Authenticator or recovery code"
@@ -6176,6 +6211,10 @@ msgstr "Height"
 msgid "Hello %(first_name)s,"
 msgstr "Hello %(first_name)s,"
 
+#, python-format
+msgid "Hello from %(site_name)s!"
+msgstr "Hello from %(site_name)s!"
+
 msgid "Hello,"
 msgstr "Hello,"
 
@@ -7471,6 +7510,9 @@ msgstr "Marketing"
 msgid "Marketing Campaigns"
 msgstr "Marketing Campaigns"
 
+msgid "Marketing Opted Out At"
+msgstr "Marketing Opted Out At"
+
 msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 msgstr "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 
@@ -7849,8 +7891,22 @@ msgstr "New Value"
 msgid "New and improved user interface"
 msgstr "New and improved user interface"
 
+msgid "New contact form submission"
+msgstr "New contact form submission"
+
+#, python-brace-format
+msgid "New contact form submission from {name}"
+msgstr "New contact form submission from {name}"
+
 msgid "New customers"
 msgstr "New customers"
+
+msgid "New feedback"
+msgstr "New feedback"
+
+#, python-brace-format
+msgid "New feedback ({rating}★ {category}) submission"
+msgstr "New feedback ({rating}★ {category}) submission"
 
 msgid "New messages"
 msgstr "New messages"
@@ -7861,6 +7917,9 @@ msgstr "New order — #{order_id}"
 
 msgid "New product"
 msgstr "New product"
+
+msgid "New recovery codes generated"
+msgstr "New recovery codes generated"
 
 msgid "New sort order value"
 msgstr "New sort order value"
@@ -10589,6 +10648,9 @@ msgstr "Replaces the chain, weights, weight learning, limits and price band of e
 msgid "Replaces this surface's chain, weights, weight learning, limits and price band with the defaults for this store's vertical. Your edits are lost."
 msgstr "Replaces this surface's chain, weights, weight learning, limits and price band with the defaults for this store's vertical. Your edits are lost."
 
+msgid "Reply to this email to answer the customer."
+msgstr "Reply to this email to answer the customer."
+
 msgid "Request Cookies"
 msgstr "Request Cookies"
 
@@ -11163,6 +11225,12 @@ msgstr "Security & Access"
 msgid "Security Related"
 msgstr "Security Related"
 
+msgid "Security key added"
+msgstr "Security key added"
+
+msgid "Security key removed"
+msgstr "Security key removed"
+
 msgid "Seed product"
 msgstr "Seed product"
 
@@ -11327,6 +11395,9 @@ msgstr "Set this address as the user's main address."
 
 msgid "Set up your authenticator app"
 msgstr "Set up your authenticator app"
+
+msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
+msgstr "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 
 msgid "Setting Information"
 msgstr "Setting Information"
@@ -12303,6 +12374,14 @@ msgstr "Thank you for shopping with %(site_name)s! We look forward to serving yo
 msgid "Thank you for shopping with us!"
 msgstr "Thank you for shopping with us!"
 
+#, python-format
+msgid ""
+"Thank you for using %(site_name)s!\n"
+"%(site_domain)s"
+msgstr ""
+"Thank you for using %(site_name)s!\n"
+"%(site_domain)s"
+
 msgid "Thank you for your purchase!"
 msgstr "Thank you for your purchase!"
 
@@ -12744,6 +12823,12 @@ msgstr "These keys are reserved and cannot be sent: %(keys)s"
 msgid "Third Floor"
 msgstr "Third Floor"
 
+msgid "Third-party account connected"
+msgstr "Third-party account connected"
+
+msgid "Third-party account disconnected"
+msgstr "Third-party account disconnected"
+
 msgid "This Month"
 msgstr "This Month"
 
@@ -12815,17 +12900,29 @@ msgstr "This order has already been paid."
 msgid "This order has already been refunded."
 msgstr "This order has already been refunded."
 
+msgid "This order has no dispute to report."
+msgstr "This order has no dispute to report."
+
 msgid "This order has no payment ID."
 msgstr "This order has no payment ID."
 
 msgid "This order has no payment method configured."
 msgstr "This order has no payment method configured."
 
+msgid "This order has no receipt to send."
+msgstr "This order has no receipt to send."
+
+msgid "This order has no refund to describe."
+msgstr "This order has no refund to describe."
+
 msgid "This order has no registered receipt."
 msgstr "This order has no registered receipt."
 
 msgid "This order has no specimen receipt."
 msgstr "This order has no specimen receipt."
+
+msgid "This order has no such shipment."
+msgstr "This order has no such shipment."
 
 msgid "This order has not been paid yet."
 msgstr "This order has not been paid yet."
@@ -13033,6 +13130,10 @@ msgstr "To be issued in timologio"
 #, python-format
 msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
 msgstr "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
+
+#, python-format
+msgid "To confirm this is correct, go to %(activate_url)s"
+msgstr "To confirm this is correct, go to %(activate_url)s"
 
 msgid "To issue in timologio"
 msgstr "To issue in timologio"
@@ -14384,6 +14485,10 @@ msgstr "You will receive a second email as soon as we confirm your payment."
 msgid "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
 msgstr "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
 
+#, python-format
+msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+msgstr "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+
 msgid "You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset."
 msgstr "You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset."
 
@@ -14539,6 +14644,12 @@ msgstr "Your password has been reset."
 
 msgid "Your password has been set."
 msgstr "Your password has been set."
+
+msgid "Your password reset code"
+msgstr "Your password reset code"
+
+msgid "Your password reset code is listed below. Please enter it in your open browser window."
+msgstr "Your password reset code is listed below. Please enter it in your open browser window."
 
 msgid "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
 msgstr "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."

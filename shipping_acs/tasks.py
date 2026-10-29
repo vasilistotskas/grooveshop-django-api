@@ -836,9 +836,6 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
     # worker start without pulling in the full ORM graph for
     # shipping_acs, order and notification apps.
     from django.core.mail import EmailMultiAlternatives
-    from django.template.loader import render_to_string
-    from django.utils import translation
-    from django.utils.translation import gettext as _
 
     from notification.enum import (
         NotificationCategoryEnum,
@@ -847,6 +844,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         NotificationTypeEnum,
     )
     from notification.services import create_user_notification
+    from order.emails import acs_out_for_delivery_email
     from shipping_acs.models import AcsShipment
 
     try:
@@ -861,24 +859,13 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         return {"status": "not_found", "shipment_id": shipment_id}
 
     order = shipment.order
-    language = get_order_language(order)
-    with translation.override(language):
-        subject = _("Your ACS parcel is out for delivery")
-        context = build_email_context(
-            language=language,
-            order=order,
-            shipment=shipment,
-            voucher_no=shipment.voucher_no,
-        )
-        text_body = render_to_string(
-            "emails/order/acs_out_for_delivery.txt", context
-        )
-        html_body = render_to_string(
-            "emails/order/acs_out_for_delivery.html", context
-        )
+    email = acs_out_for_delivery_email(
+        shipment, language=get_order_language(order)
+    )
+    text_body, html_body = email.render()
 
     msg = EmailMultiAlternatives(
-        subject=str(subject),
+        subject=email.subject,
         body=text_body,
         from_email=tenant_from_email(),
         to=[order.email],

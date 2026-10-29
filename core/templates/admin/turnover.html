@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+
+{% comment %}
+The store's monthly turnover report.
+
+Selected by admin.turnover.TurnoverView, mounted on the store admin only
+and behind order.view_turnover_report. The definition of every figure is
+order.turnover (docs/turnover-report.md); the page only lays it out.
+{% endcomment %}
+{% load i18n unfold %}
+
+{% block title %}{% trans "Turnover" %} | {{ site_title }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+            {% component "unfold/components/title.html" %}{% trans "Turnover" %} {{ year }}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Sales without VAT and without shipping, less the money that went back in the month it went back." %}{% endcomponent %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {% trans "Year" as year_aria %}
+            {% include "admin/dashboard/components/segmented.html" with items=years label=year_aria %}
+            {% component "unfold/components/button.html" with href=export_url icon="download" variant="default" %}{% trans "Export CSV" %}{% endcomponent %}
+        </div>
+    </div>
+
+    {% include "admin/dashboard/components/kpi_list.html" with kpis=kpis class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" %}
+
+    {% trans "Months" as months_title %}
+    {% component "unfold/components/card.html" with title=months_title %}
+        {% component "unfold/components/table.html" with table=table card_included=1 striped=1 %}{% endcomponent %}
+    {% endcomponent %}
+
+    {% component "unfold/components/card.html" %}
+        <div class="flex flex-col gap-2 text-sm">
+            {% component "unfold/components/text.html" %}{% trans "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted." %}{% endcomponent %}
+            {% component "unfold/components/text.html" %}{% trans "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion." %}{% endcomponent %}
+        </div>
+    {% endcomponent %}
+</div>
+{% endblock %}

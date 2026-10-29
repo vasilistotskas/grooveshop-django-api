@@ -455,6 +455,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         verbose_name = _("Order")
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
+        # Store ADMIN and OWNER only (``tenant.auth_backends`` grants a
+        # custom permission to the roles that get the full action set):
+        # the store's takings are not the day-to-day operations STAFF run.
+        permissions = [
+            ("view_turnover_report", _("Can view the monthly turnover report"))
+        ]
         indexes = [
             # Declaring ``indexes`` REPLACES the abstract parents' list
             # rather than extending it, so an index a mixin declares

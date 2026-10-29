@@ -643,6 +643,9 @@ msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάρ
 msgid "A refund with this reference is already recorded for this order."
 msgstr "Μια επιστροφή με αυτή την αναφορά έχει ήδη καταγραφεί για αυτή την παραγγελία."
 
+msgid "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion."
+msgstr "Μια επιστροφή χρημάτων, ή αξία που επέστρεψε σε δωροκάρτα, μετράει στον μήνα που έγινε και όχι στον μήνα της πώλησης. Το μέρος της επιστροφής που αφορά τα μεταφορικά αφαιρείται αναλογικά."
+
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
@@ -1319,6 +1322,9 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορ
 
 msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
 msgstr "Όνομα εικονιδίου i-*, π.χ. i-heroicons-light-bulb."
+
+msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
+msgstr "Μια παραγγελία μετράει όταν εισπραχθεί η πληρωμή της, στον μήνα που υποβλήθηκε. Οι ακυρωμένες παραγγελίες και οι αντικαταβολές που δεν έχουν εισπραχθεί δεν μετράνε."
 
 msgid "An unexpected error occurred"
 msgstr "Παρουσιάστηκε απρόσμενο σφάλμα"
@@ -2157,6 +2163,9 @@ msgstr "Όνομα καμπάνιας"
 
 msgid "Can purge caches"
 msgstr "Μπορεί να εκκαθαρίζει cache"
+
+msgid "Can view the monthly turnover report"
+msgstr "Μπορεί να δει την αναφορά μηνιαίου τζίρου"
 
 msgid "Cancel"
 msgstr "Ακύρωση"
@@ -4210,6 +4219,9 @@ msgstr "Ημερομηνία Λήξης"
 
 msgid "Expiry Reminder Sent At"
 msgstr "Υπενθύμιση λήξης στάλθηκε στις"
+
+msgid "Export CSV"
+msgstr "Εξαγωγή CSV"
 
 #, python-format
 msgid "Export capped — refine filter to ≤ %(max)d rows"
@@ -7824,6 +7836,12 @@ msgstr "Έλεγχος"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Χρήματα που απέδωσε η ACS και καμία αποστολή δεν εξηγεί"
 
+msgid "Month"
+msgstr "Μήνας"
+
+msgid "Months"
+msgstr "Μήνες"
+
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Αριθμοί θυγατρικών vouchers πολλαπλών δεμάτων, τελευταία απόκριση δημιουργίας voucher, τελευταίος φάκελος σφάλματος, URL POD σε cache."
 
@@ -7927,6 +7945,12 @@ msgstr "Καθαρό"
 
 msgid "Net price override"
 msgstr "Καθαρή τιμή (παράκαμψη)"
+
+msgid "Net sales"
+msgstr "Καθαρές πωλήσεις"
+
+msgid "Net turnover"
+msgstr "Καθαρός τζίρος"
 
 msgid "Neutral Color"
 msgstr "Ουδέτερο Χρώμα"
@@ -10984,6 +11008,9 @@ msgstr "Επιστράφηκε ή δεν παραδόθηκε: η πώληση �
 msgid "Returned units"
 msgstr "Επιστραφέντα τεμάχια"
 
+msgid "Returns"
+msgstr "Επιστροφές"
+
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Επιστρέφει λίστα με τις παραγγελίες του συνδεδεμένου χρήστη"
 
@@ -11126,6 +11153,9 @@ msgstr "Δεν επιτρέπονται αρχεία SVG με URL javascript: ή
 
 msgid "Sales"
 msgstr "Πωλήσεις"
+
+msgid "Sales without VAT and without shipping, less the money that went back in the month it went back."
+msgstr "Πωλήσεις χωρίς ΦΠΑ και χωρίς μεταφορικά, μείον τα χρήματα που επιστράφηκαν, στον μήνα που επιστράφηκαν."
 
 msgid "Same cart"
 msgstr "Ίδιο καλάθι"
@@ -13458,6 +13488,9 @@ msgstr "Δοκιμάστε ξανά"
 
 msgid "Try using a different email address."
 msgstr "Δοκιμάστε μια διαφορετική διεύθυνση email."
+
+msgid "Turnover"
+msgstr "Τζίρος"
 
 msgid "Twitter / X URL"
 msgstr "URL Twitter / X"

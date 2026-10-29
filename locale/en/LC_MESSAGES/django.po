@@ -638,6 +638,9 @@ msgstr "A refund the provider accepted failed"
 msgid "A refund with this reference is already recorded for this order."
 msgstr "A refund with this reference is already recorded for this order."
 
+msgid "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion."
+msgstr "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion."
+
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
@@ -1314,6 +1317,9 @@ msgstr "An error occurred while restocking the item. Please try again later."
 
 msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
 msgstr "An i-* icon name, e.g. i-heroicons-light-bulb."
+
+msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
+msgstr "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 
 msgid "An unexpected error occurred"
 msgstr "An unexpected error occurred"
@@ -2151,6 +2157,9 @@ msgstr "Campaign name"
 
 msgid "Can purge caches"
 msgstr "Can purge caches"
+
+msgid "Can view the monthly turnover report"
+msgstr "Can view the monthly turnover report"
 
 msgid "Cancel"
 msgstr "Cancel"
@@ -4203,6 +4212,9 @@ msgstr "Expiry Date"
 
 msgid "Expiry Reminder Sent At"
 msgstr "Expiry Reminder Sent At"
+
+msgid "Export CSV"
+msgstr "Export CSV"
 
 #, python-format
 msgid "Export capped — refine filter to ≤ %(max)d rows"
@@ -7813,6 +7825,12 @@ msgstr "Moderation"
 msgid "Money ACS paid out that no shipment explains"
 msgstr "Money ACS paid out that no shipment explains"
 
+msgid "Month"
+msgstr "Month"
+
+msgid "Months"
+msgstr "Months"
+
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 
@@ -7916,6 +7934,12 @@ msgstr "Net"
 
 msgid "Net price override"
 msgstr "Net price override"
+
+msgid "Net sales"
+msgstr "Net sales"
+
+msgid "Net turnover"
+msgstr "Net turnover"
 
 msgid "Neutral Color"
 msgstr "Neutral Color"
@@ -10974,6 +10998,9 @@ msgstr "Returned or not delivered: the sale is reversed, and the receipt is cred
 msgid "Returned units"
 msgstr "Returned units"
 
+msgid "Returns"
+msgstr "Returns"
+
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Returns a list of the authenticated user's orders"
 
@@ -11116,6 +11143,9 @@ msgstr "SVG files with javascript: or data: URLs are not allowed for security re
 
 msgid "Sales"
 msgstr "Sales"
+
+msgid "Sales without VAT and without shipping, less the money that went back in the month it went back."
+msgstr "Sales without VAT and without shipping, less the money that went back in the month it went back."
 
 msgid "Same cart"
 msgstr "Same cart"
@@ -13452,6 +13482,9 @@ msgstr "Try again"
 
 msgid "Try using a different email address."
 msgstr "Try using a different email address."
+
+msgid "Turnover"
+msgstr "Turnover"
 
 msgid "Twitter / X URL"
 msgstr "Twitter / X URL"

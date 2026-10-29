@@ -3,6 +3,25 @@
 
 
 
+## v3.162.4 (2026-10-29)
+
+### Bug fixes
+
+* fix(admin): show each store's square mark in the platform's tenant list (#360)
+
+The tenant list's store column draws a square avatar, and filled it with
+the store's light logo: a wordmark that the square slot cropped to a
+sliver (demo's is 992x248). Only a store whose logo happened to be
+square showed correctly, and the platform storefront, whose marks are
+the bundled assets rather than row fields, showed initials.
+
+admin.branding.store_mark_url names a store's square mark by the rule
+the admin chrome and email already follow: its own favicon, then the
+platform's bundled icon for the platform storefront, then nothing, so
+the column falls back to the store's initials.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4afa837`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4afa837e7e0c90a56032f8d539185b39b1f8e876))
+
 ## v3.162.3 (2026-10-29)
 
 ### Chores

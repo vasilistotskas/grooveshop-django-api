@@ -3,6 +3,82 @@
 
 
 
+## v3.160.1 (2026-10-29)
+
+### Bug fixes
+
+* fix(email): name the store in account emails, honour one-click unsubscribe, reply to contact submitters, preview the email that is sent (#352) ([`c124c21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c124c2150c629c9c62f52e6478813d3395acbfed))
+
+* fix(email): name the store in account emails, honour one-click unsubscribe, reply to contact submitters, preview the email that is sent
+
+Four verified email bugs, one change.
+
+1. allauth account emails rendered the store name blank in their text
+   part ("Hello from !"). UserAccountAdapter.send_mail replaces allauth's
+   send_mail, which is where current_site came from, so allauth's text
+   layout printed an empty name and domain. The text layouts are now
+   Django-owned and read SITE_NAME / SITE_URL from build_email_context
+   (never get_current_site: SITE_ID is one store). The MFA, social
+   account and password-reset-code notifications, which had no HTML
+   at all, get HTML twins in the same style. A test discovers every email
+   kind from the installed allauth and renders each for a tenant.
+
+2. The one-click unsubscribe link of the re-engagement and abandoned-cart
+   emails stopped nothing: neither sender checked any opt-out and the link
+   only flipped UserSubscription rows, which these emails do not belong
+   to. The refusal is now recorded on the account
+   (UserAccount.marketing_opted_out_at, additive nullable column) by the
+   blanket unsubscribe link, and both senders skip an opted-out account.
+   A cart reminder skipped for that reason is settled so it is not found
+   again. Staff can clear the date in the customer admin.
+
+3. Contact and feedback notifications to the store were bare send_mail
+   calls with an English subject and no Reply-To. They are now a template
+   pair each (emails/contact), rendered in the store's language, sent
+   from tenant_from_email, with the submitter's address as Reply-To once
+   validated as one bare address.
+
+4. The admin email preview rendered a different email than the one sent
+   (English subjects typed into config.py, a reduced hand-built order
+   context). Subject and context of every order email are now built by
+   one function in order/emails.py that the sending task and the preview
+   both call; config.py no longer holds subjects. Building the lines
+   inside the email's language also fixes product names in order
+   confirmations, which followed the worker's language when the task had
+   prefetched them. build_email_context now sets LANGUAGE_CODE, so the
+   layout's lang attribute is right for every email.
+
+Left for the email-type catalogue: the emails that are not about an
+order still build subject and context inside their task, and preview on
+sample data without a subject.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`c124c21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c124c2150c629c9c62f52e6478813d3395acbfed))
+
+* fix(email): print an order's pay way and country in the email's language
+
+parler fixes a model instance's language when it is loaded. The sending
+tasks load the order with its pay way, country and region before they
+choose the email's language, so an English confirmation printed the pay
+way's Greek payment instructions and `{{ order.country }}` in Greek. The
+preview loads its order after activating the language, so it showed the
+right text and the two differed.
+
+Every order-email builder now enters through `_email_language(order,
+language)`, which activates the language and switches the order's
+translated rows to it, so how a caller loaded the order no longer decides
+the email's language.
+
+The preview-matches-send test drew the order's pay way and payment status
+at random, so it passed or failed with the draw (CI shard 1). It now states
+an offline, pending order for "received" and adds the paid-online case for
+"payment confirmed".
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c124c21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c124c2150c629c9c62f52e6478813d3395acbfed))
+
 ## v3.160.0 (2026-10-28)
 
 ### Features

@@ -23945,9 +23945,10 @@ paths:
   /api/v1/product/feed:
     get:
       operationId: listProductFeed
-      description: Active products with all their attributes and images, for catalogue
-        feeds. Filtered, sorted and paginated like the product list.
-      summary: Product feed
+      description: Ενεργά προϊόντα με όλα τα χαρακτηριστικά και τις εικόνες τους,
+        για τα feeds του καταλόγου. Φιλτράρονται, ταξινομούνται και σελιδοποιούνται
+        όπως η λίστα προϊόντων.
+      summary: Ροή προϊόντων
       parameters:
       - in: query
         name: active
@@ -44756,8 +44757,7 @@ components:
           title: Προβολές
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
+          readOnly: true
           title: Απόθεμα
         lowStockThreshold:
           type: integer
@@ -44768,6 +44768,7 @@ components:
             ειδοποιήσεων για αυτό το προϊόν.
         active:
           type: boolean
+          readOnly: true
           title: Ενεργή
         weight:
           type: object
@@ -44877,6 +44878,7 @@ components:
           nullable: true
           readOnly: true
       required:
+      - active
       - announcedDiscountPercent
       - attributes
       - brand
@@ -44896,6 +44898,7 @@ components:
       - reviewAverage
       - reviewCount
       - slug
+      - stock
       - translations
       - updatedAt
       - uuid
@@ -45561,8 +45564,7 @@ components:
           title: Προβολές
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
+          readOnly: true
           title: Απόθεμα
         lowStockThreshold:
           type: integer
@@ -45573,6 +45575,7 @@ components:
             ειδοποιήσεων για αυτό το προϊόν.
         active:
           type: boolean
+          readOnly: true
           title: Ενεργή
         weight:
           type: object
@@ -45690,6 +45693,7 @@ components:
             στόχο. Απενεργοποιημένο από προεπιλογή — οι διαχειριστές το ενεργοποιούν
             ανά SKU.
       required:
+      - active
       - announcedDiscountPercent
       - attributes
       - brand
@@ -45710,6 +45714,7 @@ components:
       - reviewAverage
       - reviewCount
       - slug
+      - stock
       - translations
       - updatedAt
       - uuid
@@ -45793,8 +45798,7 @@ components:
           title: Προβολές
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
+          readOnly: true
           title: Απόθεμα
         lowStockThreshold:
           type: integer
@@ -45805,6 +45809,7 @@ components:
             ειδοποιήσεων για αυτό το προϊόν.
         active:
           type: boolean
+          readOnly: true
           title: Ενεργή
         weight:
           type: object
@@ -45922,6 +45927,7 @@ components:
             στόχο. Απενεργοποιημένο από προεπιλογή — οι διαχειριστές το ενεργοποιούν
             ανά SKU.
       required:
+      - active
       - announcedDiscountPercent
       - attributes
       - brand
@@ -45942,6 +45948,7 @@ components:
       - reviewAverage
       - reviewCount
       - slug
+      - stock
       - translations
       - updatedAt
       - uuid
@@ -46756,8 +46763,7 @@ components:
           title: Προβολές
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
+          readOnly: true
           title: Απόθεμα
         lowStockThreshold:
           type: integer
@@ -46768,6 +46774,7 @@ components:
             ειδοποιήσεων για αυτό το προϊόν.
         active:
           type: boolean
+          readOnly: true
           title: Ενεργή
         weight:
           type: object
@@ -46890,6 +46897,7 @@ components:
             $ref: '#/components/schemas/RatingDistribution'
           readOnly: true
       required:
+      - active
       - announcedDiscountPercent
       - attributes
       - brand
@@ -46911,6 +46919,7 @@ components:
       - reviewAverage
       - reviewCount
       - slug
+      - stock
       - translations
       - updatedAt
       - uuid

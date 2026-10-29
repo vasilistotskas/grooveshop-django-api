@@ -186,6 +186,11 @@ class ProductSerializer(
             "review_count",
             "likes_count",
             "view_count",
+            # Responses only (writes go through ProductWriteSerializer), so
+            # the schema states what every row carries: both are non-null
+            # model fields.
+            "stock",
+            "active",
             "low_stock_threshold",
             "created_at",
             "updated_at",

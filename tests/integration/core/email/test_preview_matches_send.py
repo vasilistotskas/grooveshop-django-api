@@ -261,13 +261,13 @@ class TestProductNamesFollowTheEmailsLanguage:
         order = OrderFactory(num_order_items=1, language_code="en")
         Order.objects.filter(pk=order.pk).update(metadata={})
         product = order.items.get().product
-        english = product.safe_translation_getter(
-            "name", language_code="en", any_language=False
-        )
-        greek = product.safe_translation_getter(
-            "name", language_code="el", any_language=False
-        )
-        assert english != greek
+        # Named here: the factory draws each translation's name from one
+        # word list, so the two can come out equal and prove nothing.
+        english, greek = "Wool socks", "Μάλλινες κάλτσες"
+        for language, name in (("en", english), ("el", greek)):
+            product.set_current_language(language)
+            product.name = name
+            product.save()
         mail.outbox.clear()
 
         assert send_order_confirmation_email.run(order.id) is True

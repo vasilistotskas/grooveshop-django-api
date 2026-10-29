@@ -10,8 +10,8 @@ Two things had to be true before it could actually run, and neither was:
 
 2. ``--all-tenants`` targets every ACTIVE tenant, not every tenant that
    sells through ACS. In production on 2026-09-08 that was 3 unconfigured
-   tenants (delta_sigma, demo, ekfyseosfyteias) and one configured one
-   (webside) — and ``delta_sigma`` sorts first, so the run aborted before
+   tenants and one configured one (webside), and an unconfigured tenant
+   sorted first, so the run aborted before
    reaching the only schema with payouts to reconcile. This module covers
    that half.
 """

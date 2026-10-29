@@ -22,7 +22,7 @@ from texts.storefront import MessageShape
         ("components/variants/webside/Chrome/Footer", "Chrome/Footer"),
         ("components/Chrome/variants/webside/Footer", "Chrome/Footer"),
         (
-            "components/PageSection/variants/delta_sigma/Hero",
+            "components/PageSection/variants/acme/Hero",
             "PageSection/Hero",
         ),
         ("layouts/auth-split", "layouts/auth-split"),

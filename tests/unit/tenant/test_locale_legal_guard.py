@@ -2,7 +2,7 @@
 
 ``Tenant.clean`` guards the TRANSITION, not the state: only locales this
 save adds are checked. A tenant whose stored set is already inconsistent
-— delta-sigma serves ``en`` with Greek-only legal documents — must stay
+— ``en`` served with Greek-only legal documents — must stay
 editable for every unrelated field, or the guard would lock operators
 out of rows it was meant to protect.
 
@@ -104,7 +104,7 @@ class TestLegalDocumentGuard:
     def test_leaves_an_already_inconsistent_tenant_editable(
         self, tenant: Tenant
     ) -> None:
-        # delta-sigma's state: `en` already stored, documents Greek-only.
+        # An already inconsistent state: `en` already stored, documents Greek-only.
         # Saving an unrelated field must not be blocked by history.
         tenant.available_locales = ["el", "en"]
         tenant.save()

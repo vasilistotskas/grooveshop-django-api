@@ -143,7 +143,7 @@ class TestPurges:
         for schema in ("edge_o1", "edge_o2"):
             _tenant(
                 schema,
-                [f"{schema}.example"],
+                [f"{schema.replace('_', '-')}.example"],
                 cloudflare_zone_id=OWN_ZONE,
                 cloudflare_api_token="own-token",
             )
@@ -385,16 +385,6 @@ class TestTenantMediaPurges:
         )
         assert [p["zone_id"] for p in edge.tenant_media_purges(tenant)] == [
             PLATFORM_ZONE
-        ]
-
-    def test_hosts_are_lowercased_like_the_edge_cache_key(self):
-        tenant = _tenant(
-            "media_case",
-            ["Case.Grooveshop.Space", "Assets.Case.Grooveshop.Space"],
-        )
-        assert edge.tenant_media_purges(tenant)[0]["prefixes"] == [
-            _prefix("assets.case.grooveshop.space", "media_case"),
-            _prefix(SHARED, "media_case"),
         ]
 
     def test_a_shared_host_outside_the_platform_zone_is_not_ours_to_purge(

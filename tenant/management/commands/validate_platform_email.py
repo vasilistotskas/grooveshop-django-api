@@ -94,7 +94,7 @@ class Command(BaseCommand):
 
         with schema_context(get_public_schema_name()):
             owned = {
-                d.domain.lower(): d.tenant.schema_name
+                d.domain: d.tenant.schema_name
                 for d in TenantDomain.objects.select_related("tenant")
             }
 

@@ -4,6 +4,7 @@ Schemas instead (``tenant.json_schemas``)."""
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from collections.abc import Iterable
 from urllib.parse import urlsplit
@@ -770,3 +771,74 @@ class SocialProfileUrlValidator:
 
     def __hash__(self) -> int:
         return hash((self.domains, self.country_subdomains))
+
+
+# ---------------------------------------------------------------------------
+# TenantDomain.domain
+# ---------------------------------------------------------------------------
+
+HOSTNAME_MAX_LENGTH = 253
+
+_HOSTNAME_LABEL_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+
+
+def validate_store_hostname(value: str) -> None:
+    """Field validator for ``TenantDomain.domain``: a bare lowercase host.
+
+    The storefront lower-cases the Host and strips its port, then both
+    sides match a ``TenantDomain`` row EXACTLY, so any other spelling
+    saves fine and never resolves. Uppercase is rejected, not lowered,
+    so the stored text is what the operator typed. An IDN is stored as
+    its ``xn--`` punycode form.
+    """
+    if not value:
+        return
+    if len(value) > HOSTNAME_MAX_LENGTH:
+        raise ValidationError(
+            _("A domain is at most %(max)d characters long."),
+            code="domain_too_long",
+            params={"max": HOSTNAME_MAX_LENGTH},
+        )
+    if "://" in value or any(char in value for char in "/?#@"):
+        raise ValidationError(
+            _("Enter the bare host name, without a scheme or a path."),
+            code="domain_has_scheme_or_path",
+        )
+    try:
+        ipaddress.ip_address(value.strip("[]"))
+    except ValueError:
+        pass
+    else:
+        raise ValidationError(
+            _("An IP address is not a store domain; use a host name."),
+            code="domain_is_ip_address",
+        )
+    if ":" in value:
+        raise ValidationError(
+            _("Enter the host name without a port."),
+            code="domain_has_port",
+        )
+    if value.endswith("."):
+        raise ValidationError(
+            _("Enter the host name without a trailing dot."),
+            code="domain_trailing_dot",
+        )
+    if value != value.lower():
+        raise ValidationError(
+            _("Enter the host name in lowercase."),
+            code="domain_not_lowercase",
+        )
+    labels = value.split(".")
+    if len(labels) < 2:
+        raise ValidationError(
+            _("A domain needs at least two labels, such as shop.example.com."),
+            code="domain_single_label",
+        )
+    if not all(_HOSTNAME_LABEL_RE.fullmatch(label) for label in labels):
+        raise ValidationError(
+            _(
+                "Each part of a domain is 1 to 63 letters, digits or hyphens "
+                "and neither starts nor ends with a hyphen."
+            ),
+            code="domain_invalid_label",
+        )

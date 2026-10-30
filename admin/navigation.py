@@ -230,6 +230,9 @@ def store_sidebar(request: Any) -> list[Item]:
                 "order.RetailCredit", _("Credit Documents"), "assignment_return"
             ),
             page("cart.Cart", _("Carts"), "shopping_cart"),
+            _tool(_("Turnover"), "bar_chart", reverse("admin:turnover"))
+            if user.has_perm("order.view_turnover_report")
+            else None,
         ],
     )
 

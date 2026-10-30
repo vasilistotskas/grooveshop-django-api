@@ -3,6 +3,32 @@
 
 
 
+## v3.167.0 (2026-10-30)
+
+### Features
+
+* feat(emails): let customers manage their marketing email preferences (#372)
+
+An EmailOptOut could be written by the blanket link, the one-click
+endpoint and the customer admin, but nothing could lift it, so a
+customer who once unsubscribed from everything could never opt back in.
+GET and PATCH /api/v1/user/email-preferences list the store's offered
+marketing types for the signed-in customer and turn each on or off for
+their own account address. Turning one on under a "*" opt-out replaces
+it with per-type rows for the others; when no row is left the account
+flag is cleared. set_marketing_preferences is the one writer and runs
+under a lock in one transaction.
+
+A signed-in customer who asks for a restock or price-drop alert while
+opted out of it gets 409 email_opted_out instead of an alert that could
+never be delivered. Guests are unchanged. The alert create operation
+documents its 409 responses.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxNPjR7mkfvjcduoVYd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`916e901`](https://github.com/vasilistotskas/grooveshop-django-api/commit/916e90177e045d4ec37d273b7df57a79fc7b122f))
+
 ## v3.166.2 (2026-10-30)
 
 ### Bug fixes

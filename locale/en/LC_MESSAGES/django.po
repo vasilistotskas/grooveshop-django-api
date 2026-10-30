@@ -2896,6 +2896,7 @@ msgstr "Confirm your email address"
 msgid "Confirm your subscription"
 msgstr "Confirm your subscription"
 
+#, python-brace-format
 msgid "Confirm your subscription to {topic_name}"
 msgstr "Confirm your subscription to {topic_name}"
 
@@ -3478,6 +3479,9 @@ msgstr "Decided by"
 msgid "Declined"
 msgstr "Declined"
 
+msgid "Declining a type records an opt-out for it. Accepting one lifts the opt-out that covers it and leaves your other choices as they are, including after an unsubscribe from all marketing email. Answers with the same list as the GET."
+msgstr "Declining a type records an opt-out for it. Accepting one lifts the opt-out that covers it and leaves your other choices as they are, including after an unsubscribe from all marketing email. Answers with the same list as the GET."
+
 msgid "Decrease quantity by 1"
 msgstr "Decrease quantity by 1"
 
@@ -3878,6 +3882,9 @@ msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the c
 
 msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 msgstr "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
+
+msgid "Each email type may appear once."
+msgstr "Each email type may appear once."
 
 msgid "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
 msgstr "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
@@ -7318,6 +7325,9 @@ msgstr "List the coupons available for this cart"
 msgid "List the gift cards linked to my account"
 msgstr "List the gift cards linked to my account"
 
+msgid "List the marketing emails you can choose"
+msgstr "List the marketing emails you can choose"
+
 msgid "List the offers that apply to a product"
 msgstr "List the offers that apply to a product"
 
@@ -8313,6 +8323,10 @@ msgstr "No vouchers are waiting for a pickup list."
 
 msgid "Normal Priority"
 msgstr "Normal Priority"
+
+#, python-format
+msgid "Not an email type you can choose: %(keys)s."
+msgstr "Not an email type you can choose: %(keys)s."
 
 msgid "Not checked"
 msgstr "Not checked"
@@ -12899,6 +12913,9 @@ msgstr "The legal obligation the retention rests on."
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 
+msgid "The marketing emails this store sends, each with whether your account's address still receives it."
+msgstr "The marketing emails this store sends, each with whether your account's address still receives it."
+
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
 msgstr "The order costs {due}; confirm exactly that amount."
@@ -13145,6 +13162,9 @@ msgstr "This Quarter"
 
 msgid "This Week"
 msgstr "This Week"
+
+msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
+msgstr "This address has unsubscribed from these emails, so the alert could not be delivered."
 
 msgid "This attachment is withheld pending its scan result."
 msgstr "This attachment is withheld pending its scan result."
@@ -13622,6 +13642,9 @@ msgstr "Try again"
 
 msgid "Try using a different email address."
 msgstr "Try using a different email address."
+
+msgid "Turn marketing emails on or off"
+msgstr "Turn marketing emails on or off"
 
 msgid "Turnover"
 msgstr "Turnover"

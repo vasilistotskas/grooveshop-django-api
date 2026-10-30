@@ -15,10 +15,18 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from emails import optout
+from emails.registry import registry
 from product.models.alert import ProductAlert, ProductAlertKind
 from product.models.product import Product
 from product.serializers.alert import ProductAlertSerializer
 from tenant.membership import is_store_staff
+
+#: The email type each kind of alert sends.
+ALERT_EMAIL_TYPES = {
+    ProductAlertKind.RESTOCK: "product.restock_alert",
+    ProductAlertKind.PRICE_DROP: "product.price_drop_alert",
+}
 
 serializers_config: SerializersConfig = {
     "list": ActionConfig(response=ProductAlertSerializer),
@@ -26,6 +34,8 @@ serializers_config: SerializersConfig = {
     "create": ActionConfig(
         request=ProductAlertSerializer,
         response=ProductAlertSerializer,
+        # ``alert_exists``, and ``email_opted_out`` for a signed-in customer.
+        responses={status.HTTP_409_CONFLICT: ErrorResponseSerializer},
     ),
     "destroy": ActionConfig(response=None),
 }
@@ -142,6 +152,24 @@ class ProductAlertViewSet(BaseModelViewSet):
         # alert email they asked for comes back in it. Unstated: the
         # email uses the store's.
         validated["language_code"] = stated_request_language(request)
+
+        # The mail is skipped for an address that opted out, so an alert
+        # made for one could never be delivered: say so instead of a 201.
+        # Only for the customer's own address: answering for an address a
+        # guest typed would reveal whether somebody else opted out.
+        if user is not None and optout.is_opted_out(
+            user.email, registry.get(ALERT_EMAIL_TYPES[validated["kind"]])
+        ):
+            return Response(
+                {
+                    "detail": _(
+                        "This address has unsubscribed from these emails, "
+                        "so the alert could not be delivered."
+                    ),
+                    "code": "email_opted_out",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         try:
             alert = ProductAlert.objects.create(**validated)

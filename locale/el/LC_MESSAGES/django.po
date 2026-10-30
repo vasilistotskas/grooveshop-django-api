@@ -2902,6 +2902,7 @@ msgstr "Επιβεβαιώστε τη διεύθυνση email σας"
 msgid "Confirm your subscription"
 msgstr "Επιβεβαίωση εγγραφής"
 
+#, python-brace-format
 msgid "Confirm your subscription to {topic_name}"
 msgstr "Επιβεβαίωση εγγραφής στο {topic_name}"
 
@@ -3485,6 +3486,9 @@ msgstr "Απόφαση από"
 msgid "Declined"
 msgstr "Απορρίφθηκε"
 
+msgid "Declining a type records an opt-out for it. Accepting one lifts the opt-out that covers it and leaves your other choices as they are, including after an unsubscribe from all marketing email. Answers with the same list as the GET."
+msgstr "Η απενεργοποίηση ενός τύπου καταγράφει την εξαίρεσή σας από αυτόν. Η ενεργοποίηση άρει την εξαίρεση που τον καλύπτει και αφήνει τις υπόλοιπες επιλογές σας ως έχουν, ακόμη και μετά από απεγγραφή από όλα τα προωθητικά email. Απαντά με την ίδια λίστα με το GET."
+
 msgid "Decrease quantity by 1"
 msgstr "Μείωση ποσότητας κατά 1"
 
@@ -3885,6 +3889,9 @@ msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη �
 
 msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 msgstr "Κάθε κωδικός ισχύει μία φορά και δεν θα εμφανιστεί ξανά. Φυλάξτε τους σε ασφαλές μέρος: σας επιτρέπουν να συνδεθείτε αν χάσετε το κινητό σας."
+
+msgid "Each email type may appear once."
+msgstr "Κάθε τύπος email μπορεί να εμφανίζεται μία φορά."
 
 msgid "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
 msgstr "Κάθε τμήμα ενός domain έχει 1 έως 63 γράμματα, ψηφία ή παύλες και δεν αρχίζει ούτε τελειώνει με παύλα."
@@ -7329,6 +7336,9 @@ msgstr "Λίστα των διαθέσιμων κουπονιών για αυτ�
 msgid "List the gift cards linked to my account"
 msgstr "Λίστα των δωροκαρτών που είναι συνδεδεμένες με τον λογαριασμό μου"
 
+msgid "List the marketing emails you can choose"
+msgstr "Λίστα προωθητικών email που μπορείτε να επιλέξετε"
+
 msgid "List the offers that apply to a product"
 msgstr "Λίστα των προσφορών που ισχύουν για ένα προϊόν"
 
@@ -8323,6 +8333,10 @@ msgstr "Δεν υπάρχουν vouchers σε αναμονή για λίστα �
 
 msgid "Normal Priority"
 msgstr "Κανονική προτεραιότητα"
+
+#, python-format
+msgid "Not an email type you can choose: %(keys)s."
+msgstr "Δεν είναι τύπος email που μπορείτε να επιλέξετε: %(keys)s."
 
 msgid "Not checked"
 msgstr "Δεν έχει ελεγχθεί"
@@ -12905,6 +12919,9 @@ msgstr "Η νομική υποχρέωση στην οποία βασίζετα�
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από αυτό μπορείτε να ζητήσετε νέα εξαγωγή από τη σελίδα ρυθμίσεων απορρήτου."
 
+msgid "The marketing emails this store sends, each with whether your account's address still receives it."
+msgstr "Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη."
+
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
 msgstr "Η παραγγελία κοστίζει {due}· επιβεβαιώστε ακριβώς αυτό το ποσό."
@@ -13151,6 +13168,9 @@ msgstr "Αυτό το τρίμηνο"
 
 msgid "This Week"
 msgstr "Αυτήν την εβδομάδα"
+
+msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
+msgstr "Αυτή η διεύθυνση έχει απεγγραφεί από αυτά τα email, επομένως η ειδοποίηση δεν μπορεί να παραδοθεί."
 
 msgid "This attachment is withheld pending its scan result."
 msgstr "Αυτό το συνημμένο παρακρατείται μέχρι το αποτέλεσμα της σάρωσής του."
@@ -13628,6 +13648,9 @@ msgstr "Δοκιμάστε ξανά"
 
 msgid "Try using a different email address."
 msgstr "Δοκιμάστε μια διαφορετική διεύθυνση email."
+
+msgid "Turn marketing emails on or off"
+msgstr "Ενεργοποίηση ή απενεργοποίηση προωθητικών email"
 
 msgid "Turnover"
 msgstr "Τζίρος"

@@ -567,10 +567,7 @@ class TestDeriveApiDomain:
         ("primary", "expected"),
         [
             ("demo.grooveshop.space", "api-demo.grooveshop.space"),
-            (
-                "Acme-Shop.GrooveShop.space",
-                "api-acme-shop.grooveshop.space",
-            ),
+            ("acme-shop.grooveshop.space", "api-acme-shop.grooveshop.space"),
             ("a.b.grooveshop.space", "api-a-b.grooveshop.space"),
             ("webside.gr", "api.webside.gr"),
             ("shop.com.gr", "api.shop.com.gr"),

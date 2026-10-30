@@ -582,6 +582,13 @@ msgstr "Μια ημερήσια εργασία χρέωσης διατρέχει
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr "Υπάρχει ανοιχτή αμφισβήτηση για αυτή την πληρωμή και ο πάροχος πληρωμών δεν δέχεται επιστροφή μέχρι να κριθεί. Κάντε την επιστροφή αφού κλείσει."
 
+#, python-format
+msgid "A domain is at most %(max)d characters long."
+msgstr "Ένα domain έχει το πολύ %(max)d χαρακτήρες."
+
+msgid "A domain needs at least two labels, such as shop.example.com."
+msgstr "Ένα domain χρειάζεται τουλάχιστον δύο τμήματα, όπως shop.example.com."
+
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
 
@@ -1304,6 +1311,9 @@ msgstr "Ποσό που επιστράφηκε"
 
 msgid "Amount to be Collected"
 msgstr "Ποσό προς Είσπραξη"
+
+msgid "An IP address is not a store domain; use a host name."
+msgstr "Μια διεύθυνση IP δεν είναι domain καταστήματος· χρησιμοποιήστε όνομα host."
 
 msgid "An absolute https URL on another site."
 msgstr "Απόλυτο https URL σε άλλον ιστότοπο."
@@ -3876,6 +3886,9 @@ msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη �
 msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 msgstr "Κάθε κωδικός ισχύει μία φορά και δεν θα εμφανιστεί ξανά. Φυλάξτε τους σε ασφαλές μέρος: σας επιτρέπουν να συνδεθείτε αν χάσετε το κινητό σας."
 
+msgid "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
+msgstr "Κάθε τμήμα ενός domain έχει 1 έως 63 γράμματα, ψηφία ή παύλες και δεν αρχίζει ούτε τελειώνει με παύλα."
+
 msgid "Each store's commercial terms, and how the platform records and enforces them."
 msgstr "Οι εμπορικοί όροι κάθε καταστήματος και πώς η πλατφόρμα τους καταχωρεί και τους επιβάλλει."
 
@@ -4082,6 +4095,9 @@ msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μ
 msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
 msgstr "Εισαγάγετε τη διεύθυνση URL του προφίλ σας στο %(hosts)s: https://, ένας από αυτούς τους ιστότοπους και μια διαδρομή που δείχνει το προφίλ, όχι μόνο την αρχική σελίδα."
 
+msgid "Enter the bare host name, without a scheme or a path."
+msgstr "Εισαγάγετε μόνο το όνομα host, χωρίς πρωτόκολλο ή διαδρομή."
+
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
 
@@ -4090,6 +4106,15 @@ msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή 
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Συμπληρώστε το email του λογαριασμού προσωπικού σας. Αν μπορεί να συνδεθεί εδώ, θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό πρόσβασης."
+
+msgid "Enter the host name in lowercase."
+msgstr "Εισαγάγετε το όνομα host με πεζά γράμματα."
+
+msgid "Enter the host name without a port."
+msgstr "Εισαγάγετε το όνομα host χωρίς θύρα."
+
+msgid "Enter the host name without a trailing dot."
+msgstr "Εισαγάγετε το όνομα host χωρίς τελεία στο τέλος."
 
 msgid "Enter the street name here; the number goes in the street number field."
 msgstr "Εισαγάγετε εδώ την οδό· ο αριθμός μπαίνει στο πεδίο του αριθμού οδού."

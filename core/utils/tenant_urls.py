@@ -270,7 +270,7 @@ def derive_api_domain(primary_domain: str) -> str:
     ``docs/edge-trust-boundary.md``). A store on its own domain is the
     apex of its own zone, where ``api.<primary>`` is one label deep.
     """
-    primary = (primary_domain or "").lower()
+    primary = primary_domain or ""
     zone = (settings.CLOUDFLARE_PLATFORM_ZONE_NAME or "").lower()
     if zone and primary.endswith(f".{zone}"):
         label = primary[: -len(zone) - 1]
@@ -354,11 +354,10 @@ def _has_prefix_boundary(domain: str, prefix: str) -> bool:
     ``api.webside.gr`` and ``api-staging.webside.gr`` qualify;
     ``apiary.gr`` does not.
     """
-    lowered = (domain or "").lower()
-    prefix = prefix.lower()
-    if not lowered.startswith(prefix):
+    domain = domain or ""
+    if not domain.startswith(prefix):
         return False
-    rest = lowered[len(prefix) :]
+    rest = domain[len(prefix) :]
     return rest[:1] in (".", "-")
 
 

@@ -22,8 +22,10 @@ from core.utils.tenant_urls import (
     storefront_language_choices,
 )
 from tenant.validators import (
+    HOSTNAME_MAX_LENGTH,
     SocialProfileUrlValidator,
     validate_reserved_schema_name,
+    validate_store_hostname,
 )
 
 
@@ -1652,12 +1654,27 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
 
 class TenantDomain(DomainMixin):
+    # Redeclared only to add the validator; the rest is DomainMixin's.
+    domain = models.CharField(
+        max_length=HOSTNAME_MAX_LENGTH,
+        unique=True,
+        db_index=True,
+        validators=[validate_store_hostname],
+    )
+
     class Meta:
         verbose_name = _("Tenant Domain")
         verbose_name_plural = _("Tenant Domains")
 
     def __str__(self):
         return self.domain
+
+    def save(self, *args, **kwargs):
+        # ``create()`` / ``get_or_create()`` never run ``full_clean``, and
+        # the routing matches this text exactly: refuse a spelling that
+        # could never resolve at every write, not only in forms.
+        validate_store_hostname(self.domain)
+        super().save(*args, **kwargs)
 
 
 class TenantMembershipRole(models.TextChoices):

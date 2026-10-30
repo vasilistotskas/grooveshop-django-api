@@ -89,7 +89,6 @@ def platform_zone() -> Zone | None:
 
 def _on_platform_zone(domain: str) -> bool:
     zone_name = settings.CLOUDFLARE_PLATFORM_ZONE_NAME.lower()
-    domain = domain.lower()
     return domain == zone_name or domain.endswith(f".{zone_name}")
 
 
@@ -165,7 +164,7 @@ class MediaPurge(TypedDict):
 
 
 def _url_host(url: str) -> str:
-    return (urlparse(url).hostname or "").lower()
+    return urlparse(url).hostname or ""
 
 
 def tenant_media_purges(tenant) -> list[MediaPurge]:
@@ -187,7 +186,7 @@ def tenant_media_purges(tenant) -> list[MediaPurge]:
     shared_host = _url_host(settings.MEDIA_STREAM_BASE_URL)
     if shared_host and _on_platform_zone(shared_host):
         platform_prefixes.add(f"{shared_host}/{MEDIA_PATH}/{schema_name}/")
-    own_host = resolve_tenant_assets_domain(tenant).lower()
+    own_host = resolve_tenant_assets_domain(tenant)
     if own_host:
         bucket = (
             platform_prefixes if _on_platform_zone(own_host) else own_prefixes

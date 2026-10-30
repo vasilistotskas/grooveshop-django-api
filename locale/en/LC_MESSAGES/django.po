@@ -577,6 +577,13 @@ msgstr "A daily billing task walks the estate and notifies the store owner at th
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 
+#, python-format
+msgid "A domain is at most %(max)d characters long."
+msgstr "A domain is at most %(max)d characters long."
+
+msgid "A domain needs at least two labels, such as shop.example.com."
+msgstr "A domain needs at least two labels, such as shop.example.com."
+
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 
@@ -1299,6 +1306,9 @@ msgstr "Amount refunded"
 
 msgid "Amount to be Collected"
 msgstr "Amount to be Collected"
+
+msgid "An IP address is not a store domain; use a host name."
+msgstr "An IP address is not a store domain; use a host name."
 
 msgid "An absolute https URL on another site."
 msgstr "An absolute https URL on another site."
@@ -3869,6 +3879,9 @@ msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the c
 msgid "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 msgstr "Each code works once, and they are not shown again. Keep them somewhere safe: they let you in if you lose your phone."
 
+msgid "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
+msgstr "Each part of a domain is 1 to 63 letters, digits or hyphens and neither starts nor ends with a hyphen."
+
 msgid "Each store's commercial terms, and how the platform records and enforces them."
 msgstr "Each store's commercial terms, and how the platform records and enforces them."
 
@@ -4075,6 +4088,9 @@ msgstr "Enter how many units of at least one line came back."
 msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
 msgstr "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
 
+msgid "Enter the bare host name, without a scheme or a path."
+msgstr "Enter the bare host name, without a scheme or a path."
+
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 
@@ -4083,6 +4099,15 @@ msgstr "Enter the code from your authenticator app. If you no longer have your p
 
 msgid "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
 msgstr "Enter the email address of your staff account. If it can sign in here, we will send you a link to choose a new password."
+
+msgid "Enter the host name in lowercase."
+msgstr "Enter the host name in lowercase."
+
+msgid "Enter the host name without a port."
+msgstr "Enter the host name without a port."
+
+msgid "Enter the host name without a trailing dot."
+msgstr "Enter the host name without a trailing dot."
 
 msgid "Enter the street name here; the number goes in the street number field."
 msgstr "Enter the street name here; the number goes in the street number field."

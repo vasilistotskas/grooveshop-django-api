@@ -144,7 +144,35 @@ for every account that opted out before the link also wrote `EmailOptOut`
 (#368). In the customer admin staff may RECORD an objection a customer made
 by phone or email (setting the field writes `EmailOptOut("*")`,
 `UserAdmin.save_model`); once set the field is read-only, because only the
-customer can lift an opt-out, through their own preferences.
+customer can lift an opt-out, through their own preferences (below).
+
+### Email preferences (`GET` and `PATCH /api/v1/user/email-preferences`)
+
+A signed-in customer reads and changes the opt-outs of THEIR OWN account
+address (`request.user.email`; nothing in the body names an address).
+`emails.preferences.offered_types()` is the list: the store's marketing
+types for customers whose gates are open and that the store has not
+switched off. `GET` returns `{types: [{key, title, enabled}]}`; `enabled`
+is false when an `EmailOptOut` row for the address covers the type (its key
+or `*`). `PATCH {types: [{key, enabled}]}` answers with the same list. A key
+that is not an offered marketing type is a `400` (`unknown_email_type`), a
+repeated key a `400` (`duplicate_email_type`).
+
+`user.services.subscription.set_marketing_preferences` is the only writer
+that lifts. In one transaction, per choice: declining records a per-type row
+(source `account`; nothing is added under a `*` row); accepting deletes the
+type's own row and, when a `*` row covers it, replaces the `*` with one row
+for every OTHER marketing type (the `*` row's source is kept), so the
+customer's other choices stand. When no row is left for the address,
+`marketing_opted_out_at` is cleared too; while any row remains it stays.
+The blanket link and the admin still only write (`opt_out_of_marketing`).
+
+A product alert made by a signed-in customer whose account address opted
+out of its type is refused with a `409` (`email_opted_out`) instead of a
+`201` that could never be delivered (`product.views.alert`). A guest's alert
+is not checked: answering for a typed-in address would reveal whether its
+owner opted out, so a guest gets the same answer either way (guest double
+opt-in is a separate change).
 
 A task treats a skip by what it protects. An alert, a delivery or a
 reminder skipped because its type is OFF (gate closed, or switched off)
@@ -358,7 +386,7 @@ concatenation at a call site.
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
 - The storefront confirm page and the `GET` redirect to it, and the
-  email-preferences endpoint.
+  storefront's email-preferences UI (the endpoint exists).
 - The other domains' email types (ops alerts, allauth, the platform's own
   mail) and the admin page. The preview of every registered type already
   goes through `render`; a real object is chosen only for the order types

@@ -4,6 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from user.views.account import UserAccountViewSet
 from user.views.address import UserAddressViewSet
 from user.views.data_export import UserDataExportDownloadView
+from user.views.email_preferences import EmailPreferencesView
 from user.views.subscription import (
     ConfirmSubscriptionByTokenView,
     NewsletterSubscribeView,
@@ -120,6 +121,11 @@ urlpatterns = [
         "user/address/<int:pk>/set_main",
         UserAddressViewSet.as_view({"post": "set_main"}),
         name="user-address-set-main",
+    ),
+    path(
+        "user/email-preferences",
+        EmailPreferencesView.as_view(),
+        name="user-email-preferences",
     ),
     path(
         "user/subscription",

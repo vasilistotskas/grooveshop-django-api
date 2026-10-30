@@ -29,6 +29,9 @@ from django.utils.translation import gettext_lazy as _
 
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
+from emails.preferences import offered_types
+from emails.registry import registry
+from emails.types import EmailType
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -85,6 +88,91 @@ def opt_out_of_marketing(
                 pk=account_pk, marketing_opted_out_at__isnull=True
             ).update(marketing_opted_out_at=timezone.now())
         )
+
+
+@dataclass(frozen=True)
+class MarketingPreference:
+    email_type: EmailType
+    #: False while an opt-out row covers the type (its own or ``*``).
+    enabled: bool
+
+
+def marketing_preferences(address: str) -> list[MarketingPreference]:
+    """The marketing types the store offers, each with whether *address*
+    still receives it."""
+    declined = set(
+        EmailOptOut.objects.filter(
+            address_hash=optout.address_hash(address)
+        ).values_list("type_key", flat=True)
+    )
+    every = EVERY_MARKETING_TYPE in declined
+    return [
+        MarketingPreference(
+            email_type=email_type,
+            enabled=not every and email_type.key not in declined,
+        )
+        for email_type in offered_types()
+    ]
+
+
+def _allow_marketing_type(hashed: str, type_key: str) -> None:
+    """Lift the opt-out that covers *type_key*, and nothing else.
+
+    A ``*`` row is replaced by one row per OTHER marketing type, in the
+    source the ``*`` row had, so the customer's other choices stand.
+    """
+    EmailOptOut.objects.filter(address_hash=hashed, type_key=type_key).delete()
+    every = EmailOptOut.objects.filter(
+        address_hash=hashed, type_key=EVERY_MARKETING_TYPE
+    ).first()
+    if every is None:
+        return
+    every.delete()
+    EmailOptOut.objects.bulk_create(
+        EmailOptOut(address_hash=hashed, type_key=key, source=every.source)
+        for key in (t.key for t in registry.all_types() if t.opt_out_applies)
+        if key != type_key
+    )
+
+
+def set_marketing_preferences(
+    address: str,
+    *,
+    account_pk: int,
+    choices: dict[str, bool],
+) -> list[MarketingPreference]:
+    """Apply a customer's choices for their own *address*: the one writer
+    of a lifted opt-out.
+
+    ``choices`` maps a marketing type key to whether the customer wants it.
+    Declining records a per-type row, accepting lifts the row that covers
+    the type (see :func:`_allow_marketing_type`). When no row is left the
+    account's ``marketing_opted_out_at`` is cleared as well, in the same
+    transaction, so the flag and the rows never disagree about "none".
+    Staff never come through here: they record, only the customer lifts.
+    """
+    from user.models.account import UserAccount
+
+    hashed = optout.address_hash(address)
+    with transaction.atomic():
+        # One writer per account at a time: two requests splitting the
+        # same ``*`` row would otherwise both recreate the others.
+        UserAccount.objects.select_for_update().get(pk=account_pk)
+        for type_key, enabled in choices.items():
+            if enabled:
+                _allow_marketing_type(hashed, type_key)
+            elif not EmailOptOut.objects.filter(
+                address_hash=hashed,
+                type_key__in=[type_key, EVERY_MARKETING_TYPE],
+            ).exists():
+                optout.opt_out(
+                    address, type_key, source=EmailOptOut.Source.ACCOUNT
+                )
+        if not EmailOptOut.objects.filter(address_hash=hashed).exists():
+            UserAccount.objects.filter(
+                pk=account_pk, marketing_opted_out_at__isnull=False
+            ).update(marketing_opted_out_at=None)
+    return marketing_preferences(address)
 
 
 def dispatch_confirmation(subscription: UserSubscription) -> None:

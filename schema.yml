@@ -11795,10 +11795,11 @@ paths:
   /api/v1/emails/unsubscribe/{token}:
     post:
       operationId: unsubscribeFromEmailOneClick
-      description: 'Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
-        The token names the email type, or every marketing type, and is valid for
-        the store that sent it only. Idempotent: repeating it changes nothing.'
-      summary: RFC 8058 one-click unsubscribe from marketing email
+      description: Καλείται από πελάτες αλληλογραφίας που υποστηρίζουν το List-Unsubscribe-Post=One-Click.
+        Το διακριτικό ορίζει τον τύπο email, ή όλους τους τύπους προωθητικών μηνυμάτων,
+        και ισχύει μόνο για το κατάστημα που το έστειλε. Η επανάληψη της κλήσης δεν
+        αλλάζει τίποτα.
+      summary: Απεγγραφή με ένα κλικ από προωθητικά email κατά RFC 8058
       parameters:
       - in: path
         name: token
@@ -20448,6 +20449,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductAlert'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/product/alert/{id}:
     get:
@@ -31641,6 +31648,58 @@ paths:
           description: No response body
         '410':
           description: No response body
+  /api/v1/user/email-preferences:
+    get:
+      operationId: getEmailPreferences
+      description: Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν
+        η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη.
+      summary: Λίστα προωθητικών email που μπορείτε να επιλέξετε
+      tags:
+      - User Subscriptions
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailPreferences'
+          description: ''
+    patch:
+      operationId: updateEmailPreferences
+      description: Η απενεργοποίηση ενός τύπου καταγράφει την εξαίρεσή σας από αυτόν.
+        Η ενεργοποίηση άρει την εξαίρεση που τον καλύπτει και αφήνει τις υπόλοιπες
+        επιλογές σας ως έχουν, ακόμη και μετά από απεγγραφή από όλα τα προωθητικά
+        email. Απαντά με την ίδια λίστα με το GET.
+      summary: Ενεργοποίηση ή απενεργοποίηση προωθητικών email
+      tags:
+      - User Subscriptions
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEmailPreferencesWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEmailPreferencesWriteRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEmailPreferencesWriteRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailPreferences'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/user/subscription:
     get:
       operationId: listUserSubscription
@@ -38716,6 +38775,43 @@ components:
             που είναι στη γλώσσα του αιτήματος.
       required:
       - detail
+    EmailPreference:
+      type: object
+      properties:
+        key:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        enabled:
+          type: boolean
+          readOnly: true
+      required:
+      - enabled
+      - key
+      - title
+    EmailPreferenceChoiceRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          minLength: 1
+        enabled:
+          type: boolean
+      required:
+      - enabled
+      - key
+    EmailPreferences:
+      type: object
+      properties:
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailPreference'
+          readOnly: true
+      required:
+      - types
     ErrorResponse:
       type: object
       properties:
@@ -43671,6 +43767,13 @@ components:
           description: Ένας έγκυρος ταχυδρομικός κώδικας που βλέπουν οι πελάτες, π.χ.
             151 24.
           maxLength: 50
+    PatchedEmailPreferencesWriteRequest:
+      type: object
+      properties:
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailPreferenceChoiceRequest'
     PatchedNavigationMenuRequest:
       type: object
       description: |-

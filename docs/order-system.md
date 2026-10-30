@@ -1644,7 +1644,12 @@ additive migration; the moment is the proof of when they asked).
   alert skipped because the type is OFF stays armed; one skipped for an
   opt-out is settled.
 - Nothing lifts the opt-out by itself, and staff never do: only the
-  customer can, through their own preferences. Staff may record an
+  customer can, through their own preferences
+  (`PATCH /api/v1/user/email-preferences`, `set_marketing_preferences`: a
+  `*` row is split into rows for the other types, and the flag clears when
+  no row is left; `docs/emails.md`). A restock or price-drop alert made by a
+  signed-in customer who opted out answers `409 email_opted_out` (a guest's
+  is not checked). Staff may record an
   objection a customer made by phone or email (Loyalty & Engagement tab:
   saving the field writes `EmailOptOut("*")`); once set the field is
   read-only.

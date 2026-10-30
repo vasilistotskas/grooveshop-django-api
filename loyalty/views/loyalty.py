@@ -385,7 +385,9 @@ class LoyaltyViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["GET"])
+    @action(
+        detail=False, methods=["GET"], pagination_class=None, filter_backends=[]
+    )
     def tiers(self, request):
         """GET /api/v1/loyalty/tiers - List all loyalty tiers."""
         queryset = LoyaltyTier.objects.for_list().order_by("required_level")

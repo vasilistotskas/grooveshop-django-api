@@ -93,6 +93,8 @@ class RegionViewSet(BaseModelViewSet):
     @action(
         detail=True,
         methods=["GET"],
+        pagination_class=None,
+        filter_backends=[],
     )
     def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs):
         regions = Region.objects.for_list().filter(country__alpha_2=pk)

@@ -141,6 +141,17 @@ class TestCostOfGoodsSold:
 
         assert _march().cogs == D("25.00")
 
+    def test_a_deleted_order_costs_nothing_as_it_earns_nothing(self):
+        order = _sale([("124.00", "24", 3, "20.00")])
+        order.items.get().refund(quantity=1)
+        _charge(order, "124.00", _at(2026, 3), fee="2.10")
+        Order.objects.filter(pk=order.pk).update(is_deleted=True)
+
+        [row] = figures(date(2026, 1, 1), date(2026, 12, 31), None)
+        assert row.revenue == 0
+        assert row.cogs == 0
+        assert row.payment_fees == 0
+
 
 class TestRestockedReturns:
     def _restocked(self, quantity, when):

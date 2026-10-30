@@ -253,6 +253,7 @@ def _cogs(first, last, bucket: Bucket | None) -> dict:
         period_of(row): row["cost"]
         for row in by_period(
             OrderItem.objects.filter(
+                order__is_deleted=False,
                 order__shipped_at__gte=first,
                 order__shipped_at__lt=last,
                 unit_cost__isnull=False,
@@ -267,6 +268,7 @@ def _cogs(first, last, bucket: Bucket | None) -> dict:
         period_of(row): row["cost"]
         for row in by_period(
             StockLog.objects.filter(
+                order_item__order__is_deleted=False,
                 operation_type=StockLog.OPERATION_INCREMENT,
                 order_item__unit_cost__isnull=False,
                 created_at__gte=first,
@@ -300,7 +302,9 @@ def _fees(first, last, bucket: Bucket | None) -> dict:
     rows = (
         by_period(
             PaymentTransaction.objects.filter(
-                created_at__gte=first, created_at__lt=last
+                order__is_deleted=False,
+                created_at__gte=first,
+                created_at__lt=last,
             ),
             "created_at",
             bucket,
@@ -429,6 +433,7 @@ def figures_by_group(
         (period_of(row), row["group"]): row["cost"]
         for row in by_period(
             OrderItem.objects.filter(
+                order__is_deleted=False,
                 order__shipped_at__gte=first,
                 order__shipped_at__lt=last,
                 unit_cost__isnull=False,

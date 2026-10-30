@@ -3,6 +3,26 @@
 
 
 
+## v3.165.0 (2026-10-30)
+
+### Features
+
+* feat(emails): accept the RFC 8058 one-click unsubscribe (#368)
+
+Marketing mail will name POST /api/v1/emails/unsubscribe/<token> in
+List-Unsubscribe with List-Unsubscribe-Post, so the endpoint ships before
+the first marketing type moves onto send_email. It takes the store-scoped
+opt-out token, records EmailOptOut once, and answers 200 with no body;
+a forged, expired, other-store or unknown-type token is one 400
+(unsubscribe_token_invalid). There is no GET: link scanners follow every
+URL in a mail. The blanket unsubscribe link also writes EmailOptOut("*"),
+so unsubscribing from everything covers store mail.
+
+The list-header builders move from user.utils.subscription to
+emails.headers. Two obsolete fuzzy entries leave the Greek catalogue.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8bb4f49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8bb4f49ea85e19c70963261b6abeef509f55bef5))
+
 ## v3.164.2 (2026-10-30)
 
 ### Bug fixes

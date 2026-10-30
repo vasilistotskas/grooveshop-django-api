@@ -3,6 +3,24 @@
 
 
 
+## v3.167.1 (2026-10-30)
+
+### Bug fixes
+
+* fix(deps): raise tornado to 6.6 for three advisories (#374)
+
+Flower serves the Celery dashboard on Tornado, and 6.5.10 is open to
+GHSA-r4j5-9xpp-3985 (event-loop blocking and memory growth from
+chunked bodies of many small chunks), GHSA-pcg2-g6cj-q92c (quadratic
+CPU parsing folded header lines) and GHSA-pw9p-v7r6-gx4p (open redirect
+in RedirectHandler). The override floor moves to 6.6, relocked with the
+pinned uv so the lock keeps its format revision.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxNPjR7mkfvjcduoVYd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ed25ccb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed25ccb297f22caa3229d20432030ec813d3ae4c))
+
 ## v3.167.0 (2026-10-30)
 
 ### Features

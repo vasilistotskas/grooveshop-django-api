@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
@@ -23,6 +24,10 @@ class ProductFilter(
     CamelCaseTimeStampFilterSet,
 ):
     id = filters.NumberFilter(field_name="id")
+    id__in = IntegerInFilter(
+        field_name="id",
+        help_text=_("Filter by multiple product IDs (comma-separated)"),
+    )
     sku = filters.CharFilter(field_name="sku", lookup_expr="icontains")
     active = filters.BooleanFilter(field_name="active")
 

@@ -2727,6 +2727,10 @@ msgstr "Come back and see what's new"
 msgid "Comma-separated Acs_Delivery_Products codes (COD, REC, SAT, RDO …)."
 msgstr "Comma-separated Acs_Delivery_Products codes (COD, REC, SAT, RDO …)."
 
+#, python-brace-format
+msgid "Comma-separated IDs of the products to preview points for, from 1 to {max}."
+msgstr "Comma-separated IDs of the products to preview points for, from 1 to {max}."
+
 msgid "Comma-separated attribute value IDs. Values of the same attribute are alternatives (any of them); values of different attributes must all match. With the attribute_values facet, an attribute's own values are counted without its own selection."
 msgstr "Comma-separated attribute value IDs. Values of the same attribute are alternatives (any of them); values of different attributes must all match. With the attribute_values facet, an attribute's own values are counted without its own selection."
 
@@ -5834,6 +5838,9 @@ msgstr "Get images by type"
 msgid "Get liked posts"
 msgstr "Get liked posts"
 
+msgid "Get loyalty points preview for several products"
+msgstr "Get loyalty points preview for several products"
+
 msgid "Get loyalty summary"
 msgstr "Get loyalty summary"
 
@@ -6055,6 +6062,10 @@ msgstr "Gift cards off from %(start)s"
 
 msgid "Github Profile"
 msgstr "Github Profile"
+
+#, python-format
+msgid "Give from 1 to %(max)d product IDs, each a positive integer."
+msgstr "Give from 1 to %(max)d product IDs, each a positive integer."
 
 msgid "Give the bank's transaction reference for the transfer."
 msgstr "Give the bank's transaction reference for the transfer."
@@ -12802,6 +12813,9 @@ msgstr "The platform manages this text (legal, consent, cookie or error wording)
 
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
+
+msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
+msgstr "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 
 msgid "The previous payment could not be closed."
 msgstr "The previous payment could not be closed."

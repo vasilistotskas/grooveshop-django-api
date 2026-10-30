@@ -5,6 +5,7 @@ Tests cover:
 - Transactions pagination and filtering (GET /api/v1/loyalty/transactions)
 - Redeem validation: insufficient balance, disabled system (POST /api/v1/loyalty/redeem)
 - Product points preview (GET /api/v1/loyalty/product/<pk>/points)
+- Points preview for several products (GET /api/v1/loyalty/product/points)
 
 Requirements: 10.1, 10.2, 10.3, 10.4
 """
@@ -13,6 +14,8 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
@@ -605,6 +608,133 @@ class TestProductPointsEndpoint:
 
 
 @pytest.mark.django_db
+class TestProductsPointsEndpoint:
+    """One request for every product of a cart."""
+
+    url = "/api/v1/loyalty/product/points"
+
+    def _client(self, user):
+        client = APIClient()
+        client.force_authenticate(user=user)
+        return client
+
+    def _get(self, user, product_ids, settings=_mock_settings_enabled):
+        query = ",".join(str(pk) for pk in product_ids)
+        with patch("extra_settings.models.Setting.get", side_effect=settings):
+            return self._client(user).get(self.url, {"productIds": query})
+
+    def _single(self, user, product, settings=_mock_settings_enabled):
+        with patch("extra_settings.models.Setting.get", side_effect=settings):
+            return self._client(user).get(
+                f"/api/v1/loyalty/product/{product.pk}/points"
+            )
+
+    def test_matches_the_single_product_preview(self):
+        user = UserAccountFactory(num_addresses=0)
+        products = sorted(
+            ProductFactory.create_batch(3, points=7), key=lambda p: p.pk
+        )
+
+        response = self._get(user, [p.pk for p in reversed(products)])
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == [
+            self._single(user, product).data for product in products
+        ]
+
+    def test_applies_the_customer_tier(self):
+        tier = _create_tier(required_level=1, multiplier="2.00")
+        user = UserAccountFactory(num_addresses=0)
+        user.loyalty_tier = tier
+        user.save(update_fields=["loyalty_tier"])
+        product = ProductFactory(points=0)
+
+        def tiered(key, default=None):
+            if key == "LOYALTY_TIER_MULTIPLIER_ENABLED":
+                return True
+            return _mock_settings_enabled(key, default)
+
+        response = self._get(user, [product.pk], settings=tiered)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data[0]["tier_multiplier_applied"] is True
+        assert response.data == [
+            self._single(user, product, settings=tiered).data
+        ]
+
+    def test_leaves_out_a_product_that_does_not_exist(self):
+        user = UserAccountFactory(num_addresses=0)
+        product = ProductFactory()
+
+        response = self._get(user, [product.pk, 999999])
+
+        assert response.status_code == status.HTTP_200_OK
+        assert [row["product_id"] for row in response.data] == [product.pk]
+
+    @pytest.mark.parametrize(
+        "product_ids",
+        [[], ["x"], [0], [-3], list(range(1, 102))],
+        ids=["empty", "not-a-number", "zero", "negative", "over-the-cap"],
+    )
+    def test_rejects_a_bad_id_list(self, product_ids):
+        user = UserAccountFactory(num_addresses=0)
+
+        response = self._get(user, product_ids)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "productIds" in response.json()["fields"]
+
+    def test_rejects_a_missing_id_list(self):
+        user = UserAccountFactory(num_addresses=0)
+
+        with patch(
+            "extra_settings.models.Setting.get",
+            side_effect=_mock_settings_enabled,
+        ):
+            response = self._client(user).get(self.url)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_accepts_the_cap(self):
+        user = UserAccountFactory(num_addresses=0)
+        product = ProductFactory()
+
+        response = self._get(user, [product.pk, *range(10**6, 10**6 + 99)])
+
+        assert response.status_code == status.HTTP_200_OK
+        assert [row["product_id"] for row in response.data] == [product.pk]
+
+    def test_queries_stay_flat_in_the_number_of_products(self):
+        tier = _create_tier(required_level=1, multiplier="1.50")
+        user = UserAccountFactory(num_addresses=0)
+        user.loyalty_tier = tier
+        user.save(update_fields=["loyalty_tier"])
+        products = ProductFactory.create_batch(5)
+
+        def count(ids):
+            with CaptureQueriesContext(connection) as ctx:
+                response = self._get(user, ids)
+            assert response.status_code == status.HTTP_200_OK
+            assert len(response.data) == len(ids)
+            return len(ctx.captured_queries)
+
+        one = count([products[0].pk])
+        five = count([p.pk for p in products])
+
+        assert one == five
+
+    def test_store_with_the_programme_off_answers_404(self):
+        switch_store_settings(LOYALTY_ENABLED=False)
+        user = UserAccountFactory(num_addresses=0)
+
+        response = self._client(user).get(
+            self.url, {"productIds": str(ProductFactory().pk)}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("method", "name", "kwargs"),
     [
@@ -612,6 +742,7 @@ class TestProductPointsEndpoint:
         ("get", "loyalty:loyalty-transactions", {}),
         ("post", "loyalty:loyalty-redeem", {}),
         ("get", "loyalty:loyalty-product-points", {"pk": 1}),
+        ("get", "loyalty:loyalty-products-points", {}),
     ],
 )
 def test_member_endpoints_refuse_anonymous_callers(method, name, kwargs):

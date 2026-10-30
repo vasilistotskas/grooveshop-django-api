@@ -286,6 +286,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
                     product_id=item.product_id,
                     quantity=refund_qty,
                     order_id=item.order_id,
+                    order_item_id=item.pk,
                     reason=(
                         f"Refund of {refund_qty} unit(s) for order item "
                         f"{item.pk}: {reason}"

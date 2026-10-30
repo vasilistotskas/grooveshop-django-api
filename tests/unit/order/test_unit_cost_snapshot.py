@@ -86,3 +86,23 @@ class TestTheSnapshot:
 
         line.refresh_from_db()
         assert line.unit_cost == Money(D("0"), "EUR")
+
+
+class TestARestockNamesItsLine:
+    def test_the_stock_log_of_a_returned_unit_points_at_the_line(self):
+        from order.enum.status import OrderStatus
+        from order.models import Order, StockLog
+
+        product = ProductFactory(cost_price=Money(D("4.25"), "EUR"), stock=10)
+        line = _line(product)
+        Order.objects.filter(pk=line.order_id).update(
+            status=OrderStatus.DELIVERED
+        )
+
+        line.refund(quantity=1)
+
+        [log] = StockLog.objects.filter(
+            operation_type=StockLog.OPERATION_INCREMENT
+        )
+        assert log.order_item_id == line.pk
+        assert log.quantity_delta == 1

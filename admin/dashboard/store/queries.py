@@ -1,7 +1,10 @@
 """The store dashboard's cached queries.
 
-Each returns plain data (see ``admin.dashboard.cache``). Revenue is money
-that landed - orders whose payment COMPLETED - everywhere it appears.
+Each returns plain data (see ``admin.dashboard.cache``). Revenue is the
+turnover of ``order.turnover``, the one definition behind the turnover
+report: net of VAT, shipping and fees included, an order counted when it
+left the store, returns in the month they happened. The dashboard never
+adds its own.
 
 The dashboard shows one period at a time (``PERIODS``). A period is a
 whole number of calendar buckets ending with the current one - days,
@@ -23,6 +26,7 @@ from django.db.models.functions import Length, TruncDay, TruncMonth, TruncWeek
 from django.utils import timezone
 
 from admin.dashboard.cache import dashboard_query
+from order.turnover import Bucket, figures_between
 
 
 @dataclass(frozen=True)
@@ -112,10 +116,21 @@ def _bucket_of(value: datetime | date) -> date:
     return value
 
 
+#: What moves the turnover: the order itself (it ships), the VAT lines it
+#: was created with, and the returns booked against it.
+TURNOVER_MODELS = (
+    "order.Order",
+    "order.OrderVatLine",
+    "order.PaymentTransaction",
+    "order.ChargebackDecision",
+    "giftcard.GiftCardTransaction",
+)
+
+
 @dashboard_query(
-    "store:overview:v1",
+    "store:overview:v2",
     ttl=300,
-    depends_on=("order.Order",),
+    depends_on=TURNOVER_MODELS,
     variants=PERIOD_KEYS,
 )
 def overview(key: str) -> dict[str, Any]:
@@ -126,16 +141,16 @@ def overview(key: str) -> dict[str, Any]:
     a dependency (every login saves the user row); the TTL bounds them.
     Guests have no identity to repeat, so repeat buyers count accounts.
     """
-    prior_start, start, _now = PERIODS_BY_KEY[key].window()
+    prior_start, start, now = PERIODS_BY_KEY[key].window()
     Order = apps.get_model("order", "Order")
     User = apps.get_model("user", "UserAccount")
     paid = _paid()
     current = Q(created_at__gte=start)
     prior = Q(created_at__gte=prior_start, created_at__lt=start)
 
+    [sold] = figures_between(start, now, None)
+    [prior_sold] = figures_between(prior_start, start, None)
     orders = Order.objects.filter(created_at__gte=prior_start).aggregate(
-        revenue=Sum("amount_due", filter=paid & current),
-        prior_revenue=Sum("amount_due", filter=paid & prior),
         orders=Count("id", filter=current),
         prior_orders=Count("id", filter=prior),
         paid=Count("id", filter=paid & current),
@@ -155,8 +170,10 @@ def overview(key: str) -> dict[str, Any]:
         )
     )
     return {
-        "revenue": float(orders["revenue"] or 0),
-        "prior_revenue": float(orders["prior_revenue"] or 0),
+        "revenue": float(sold.turnover),
+        "prior_revenue": float(prior_sold.turnover),
+        "sold": sold.orders,
+        "prior_sold": prior_sold.orders,
         "orders": orders["orders"],
         "prior_orders": orders["prior_orders"],
         "paid": orders["paid"],
@@ -169,16 +186,17 @@ def overview(key: str) -> dict[str, Any]:
 
 
 @dashboard_query(
-    "store:sales-series:v1",
+    "store:sales-series:v2",
     ttl=300,
-    depends_on=("order.Order",),
+    depends_on=TURNOVER_MODELS,
     variants=PERIOD_KEYS,
 )
 def sales_series(key: str) -> list[dict[str, Any]]:
-    """Per bucket of the period: revenue landed, orders placed, orders
-    paid and accounts created. Empty buckets are zeros, not gaps."""
+    """Per bucket of the period: revenue, orders sold, orders placed,
+    orders paid and accounts created. Empty buckets are zeros, not
+    gaps."""
     period = PERIODS_BY_KEY[key]
-    _prior_start, start, _now = period.window()
+    _prior_start, start, now = period.window()
     Order = apps.get_model("order", "Order")
     User = apps.get_model("user", "UserAccount")
     paid = _paid()
@@ -191,8 +209,11 @@ def sales_series(key: str) -> list[dict[str, Any]]:
         .annotate(
             orders=Count("id"),
             paid=Count("id", filter=paid),
-            revenue=Sum("amount_due", filter=paid),
         )
+    }
+    sold = {
+        row.period: row
+        for row in figures_between(start, now, Bucket(period.bucket))
     }
     customers = {
         _bucket_of(row["bucket"]): row["count"]
@@ -204,10 +225,12 @@ def sales_series(key: str) -> list[dict[str, Any]]:
     series = []
     for bucket in period.buckets():
         row = orders.get(bucket)
+        shipped = sold.get(bucket)
         series.append(
             {
                 "start": bucket,
-                "revenue": float(row["revenue"] or 0) if row else 0.0,
+                "revenue": float(shipped.turnover) if shipped else 0.0,
+                "sold": shipped.orders if shipped else 0,
                 "orders": row["orders"] if row else 0,
                 "paid": row["paid"] if row else 0,
                 "customers": customers.get(bucket, 0),
@@ -217,7 +240,7 @@ def sales_series(key: str) -> list[dict[str, Any]]:
 
 
 @dashboard_query(
-    "store:best-sellers:v1",
+    "store:best-sellers:v2",
     ttl=900,
     # A partial refund can save only the line (refunded_quantity).
     depends_on=("order.Order", "order.OrderItem"),
@@ -225,18 +248,13 @@ def sales_series(key: str) -> list[dict[str, Any]]:
     variants=PERIOD_KEYS,
 )
 def best_sellers(key: str) -> list[dict[str, Any]]:
-    """The products most units of were PAID for in the period, net of
-    refunded units."""
+    """The products most units of left the store in the period, net of
+    refunded units: the same moment ``order.turnover`` counts a sale."""
     _prior_start, start, _now = PERIODS_BY_KEY[key].window()
     OrderItem = apps.get_model("order", "OrderItem")
     Product = apps.get_model("product", "Product")
-    from order.enum.status import PaymentStatus
-
     top = list(
-        OrderItem.objects.filter(
-            order__created_at__gte=start,
-            order__payment_status=PaymentStatus.COMPLETED,
-        )
+        OrderItem.objects.filter(order__shipped_at__gte=start)
         .values("product_id")
         .annotate(units=Sum(F("quantity") - F("refunded_quantity")))
         .filter(units__gt=0)

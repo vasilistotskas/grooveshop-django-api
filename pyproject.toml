@@ -65,6 +65,8 @@ dependencies = [
   "websockets>=17.3",
   "pypdf>=6.20.1",
   "cryptography==50.0.2",
+  "openpyxl>=3.1.5",
+  "babel>=2.18.0",
 ]
 
 [project.urls]

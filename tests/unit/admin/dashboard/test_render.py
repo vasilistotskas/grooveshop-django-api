@@ -30,9 +30,11 @@ pytestmark = pytest.mark.django_db
 # and these reads are cache hits. Measured 2026-10-17 (39 warm, 69 cold: the
 # follow-up counter reads ORDER_FOLLOW_UP_DAYS and four more counts add a
 # query each; 70 cold on 2026-10-19: the lost-dispute counter is one more
-# count); re-measure before raising.
+# count; 79 cold on 2026-10-30: revenue is the turnover of ``order.turnover``,
+# three queries each for this period, the one before and the chart's
+# buckets); re-measure before raising.
 WARM_BUDGET = 39
-COLD_BUDGET = 70
+COLD_BUDGET = 79
 
 
 @pytest.fixture

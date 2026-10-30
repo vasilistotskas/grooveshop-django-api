@@ -38,6 +38,10 @@ msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
 #, python-format
+msgid "%(change)s against the same period last year"
+msgstr "%(change)s against the same period last year"
+
+#, python-format
 msgid "%(chars)d chars, %(words)d words, %(lines)d lines"
 msgstr "%(chars)d chars, %(words)d words, %(lines)d lines"
 
@@ -561,6 +565,9 @@ msgstr "9-series MARK returned by a successful ``CancelInvoice`` call — proves
 msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "A Cloudflare zone ID is 32 lowercase hex characters."
 
+msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
+msgstr "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
+
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 
@@ -645,8 +652,8 @@ msgstr "A refund the provider accepted failed"
 msgid "A refund with this reference is already recorded for this order."
 msgstr "A refund with this reference is already recorded for this order."
 
-msgid "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion."
-msgstr "A refund, or value returned to a gift card, counts in the month it was made, not in the month of the sale. Part of a refund that paid back shipping is taken out in proportion."
+msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
+msgstr "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
@@ -1331,8 +1338,8 @@ msgstr "An error occurred while restocking the item. Please try again later."
 msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
 msgstr "An i-* icon name, e.g. i-heroicons-light-bulb."
 
-msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
-msgstr "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
+msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
+msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 
 msgid "An unexpected error occurred"
 msgstr "An unexpected error occurred"
@@ -1562,6 +1569,9 @@ msgstr "Average order"
 
 msgid "Awaiting a decision"
 msgstr "Awaiting a decision"
+
+msgid "Awaiting collection"
+msgstr "Awaiting collection"
 
 msgid "B2B"
 msgstr "B2B"
@@ -1974,6 +1984,9 @@ msgstr "Branding"
 
 msgid "Brands"
 msgstr "Brands"
+
+msgid "Break down by"
+msgstr "Break down by"
 
 msgid "Browser"
 msgstr "Browser"
@@ -2498,6 +2511,9 @@ msgstr "Chain"
 msgid "Change"
 msgstr "Change"
 
+msgid "Change (%)"
+msgstr "Change (%)"
+
 msgid "Change Type"
 msgstr "Change Type"
 
@@ -2527,6 +2543,9 @@ msgstr "Changed by (staff)"
 
 msgid "Changed only"
 msgstr "Changed only"
+
+msgid "Channel"
+msgstr "Channel"
 
 msgid "Charge"
 msgstr "Charge"
@@ -2833,6 +2852,9 @@ msgstr "Company registered address street — blank copies the shipping street o
 
 msgid "Company tax office (ΔΟΥ)"
 msgstr "Company tax office (ΔΟΥ)"
+
+msgid "Compare with"
+msgstr "Compare with"
 
 msgid "Comparison Table"
 msgstr "Comparison Table"
@@ -3460,6 +3482,9 @@ msgstr "Date the statutory retention expires, derived from the LAST invoice's ta
 msgid "Dates"
 msgstr "Dates"
 
+msgid "Day"
+msgstr "Day"
+
 msgid "Days stale"
 msgstr "Days stale"
 
@@ -3553,6 +3578,9 @@ msgstr "Delete cart"
 
 msgid "Deleted At"
 msgstr "Deleted At"
+
+msgid "Deleted product"
+msgstr "Deleted product"
 
 msgid "Deliver At"
 msgstr "Deliver At"
@@ -4291,6 +4319,9 @@ msgstr "Expiry Reminder Sent At"
 msgid "Export CSV"
 msgstr "Export CSV"
 
+msgid "Export XLSX"
+msgstr "Export XLSX"
+
 #, python-format
 msgid "Export capped — refine filter to ≤ %(max)d rows"
 msgstr "Export capped — refine filter to ≤ %(max)d rows"
@@ -4438,6 +4469,9 @@ msgstr "Feedback received"
 
 msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
 msgstr "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
+
+msgid "Fees"
+msgstr "Fees"
 
 msgid "Fifth Floor"
 msgstr "Fifth Floor"
@@ -5720,6 +5754,9 @@ msgstr "Free-gift promotions need a gift quantity of at least 1."
 msgid "Free-text additional information from BoxNow"
 msgstr "Free-text additional information from BoxNow"
 
+msgid "From"
+msgstr "From"
+
 #, python-format
 msgid "From %(sender)s"
 msgstr "From %(sender)s"
@@ -6274,6 +6311,9 @@ msgstr "Group #%(id)s"
 
 msgid "Group Results"
 msgstr "Group Results"
+
+msgid "Group by period"
+msgstr "Group by period"
 
 #, no-python-format, python-brace-format
 msgid "Group “{name}” — {percent}% off net"
@@ -7937,9 +7977,6 @@ msgstr "Money ACS paid out that no shipment explains"
 msgid "Month"
 msgstr "Month"
 
-msgid "Months"
-msgstr "Months"
-
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 
@@ -8049,6 +8086,12 @@ msgstr "Net sales"
 
 msgid "Net turnover"
 msgstr "Net turnover"
+
+msgid "Net turnover last year"
+msgstr "Net turnover last year"
+
+msgid "Net turnover per period"
+msgstr "Net turnover per period"
 
 msgid "Neutral Color"
 msgstr "Neutral Color"
@@ -8289,6 +8332,12 @@ msgstr "No products currently use this VAT rate"
 msgid "No provider"
 msgstr "No provider"
 
+msgid "No sales in the same period last year"
+msgstr "No sales in the same period last year"
+
+msgid "No sales in this period"
+msgstr "No sales in this period"
+
 msgid "No searches in this period"
 msgstr "No searches in this period"
 
@@ -8298,6 +8347,9 @@ msgstr "No shipment row for order #%(order_id)s — the create-shipment task has
 
 msgid "No social media links"
 msgstr "No social media links"
+
+msgid "No source recorded"
+msgstr "No source recorded"
 
 msgid "No stock activity recorded yet."
 msgstr "No stock activity recorded yet."
@@ -8399,6 +8451,9 @@ msgstr "Note: Ensure all money fields use the same currency (EUR preferred) to a
 
 msgid "Notes"
 msgstr "Notes"
+
+msgid "Nothing"
+msgstr "Nothing"
 
 msgid "Nothing has been changed yet."
 msgstr "Nothing has been changed yet."
@@ -8763,6 +8818,10 @@ msgid "Order %(order)s - %(change)s - %(date)s"
 msgstr "Order %(order)s - %(change)s - %(date)s"
 
 #, python-format
+msgid "Order %(order)s - %(kind)s %(rate)s%%"
+msgstr "Order %(order)s - %(kind)s %(rate)s%%"
+
+#, python-format
 msgid "Order %(order)s - %(product)s × %(quantity)s"
 msgstr "Order %(order)s - %(product)s × %(quantity)s"
 
@@ -8919,6 +8978,12 @@ msgstr "Order Status Update"
 msgid "Order Total"
 msgstr "Order Total"
 
+msgid "Order VAT Line"
+msgstr "Order VAT Line"
+
+msgid "Order VAT Lines"
+msgstr "Order VAT Lines"
+
 msgid "Order associated with this stock operation (if applicable)"
 msgstr "Order associated with this stock operation (if applicable)"
 
@@ -8958,6 +9023,9 @@ msgstr "Order emails can render one of the recent orders."
 #, python-brace-format
 msgid "Order in status {status} cannot be canceled. Only orders in PENDING or PROCESSING status can be canceled."
 msgstr "Order in status {status} cannot be canceled. Only orders in PENDING or PROCESSING status can be canceled."
+
+msgid "Order item"
+msgstr "Order item"
 
 #, python-format
 msgid "Order item %(item)s - %(change)s - %(date)s"
@@ -9022,6 +9090,9 @@ msgstr "Orders placed"
 #, python-format
 msgid "Orders placed per %(bucket)s"
 msgstr "Orders placed per %(bucket)s"
+
+msgid "Orders shipped"
+msgstr "Orders shipped"
 
 msgid "Orders to follow up"
 msgstr "Orders to follow up"
@@ -9150,13 +9221,6 @@ msgstr "Paid amount of every order whose payment completed."
 
 msgid "Paid online at checkout"
 msgstr "Paid online at checkout"
-
-msgid "Paid orders"
-msgstr "Paid orders"
-
-#, python-format
-msgid "Paid revenue per %(bucket)s"
-msgstr "Paid revenue per %(bucket)s"
 
 msgid "Paid to the carrier before pickup"
 msgstr "Paid to the carrier before pickup"
@@ -9424,6 +9488,9 @@ msgstr "Payment failed"
 msgid "Payment failed for order #{order_id}"
 msgstr "Payment failed for order #{order_id}"
 
+msgid "Payment fee"
+msgstr "Payment fee"
+
 msgid "Payment fee (incl. VAT)"
 msgstr "Payment fee (incl. VAT)"
 
@@ -9438,6 +9505,9 @@ msgstr "Payment intent ID is required for online payment methods"
 
 msgid "Payment intent ID is required for order creation"
 msgstr "Payment intent ID is required for order creation"
+
+msgid "Payment method"
+msgstr "Payment method"
 
 msgid "Payment method ID"
 msgstr "Payment method ID"
@@ -9565,6 +9635,12 @@ msgstr "Period"
 
 msgid "Periodic Tasks"
 msgstr "Periodic Tasks"
+
+msgid "Periods"
+msgstr "Periods"
+
+msgid "Periods follow your store's timezone."
+msgstr "Periods follow your store's timezone."
 
 msgid "Permanently destroy tenant + drop schema"
 msgstr "Permanently destroy tenant + drop schema"
@@ -10327,6 +10403,10 @@ msgstr "Puts returned units of an order line back into stock and records them on
 msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
 msgstr "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
 
+#, python-format
+msgid "Q%(quarter)s %(year)s"
+msgstr "Q%(quarter)s %(year)s"
+
 msgid "QR code for the authenticator app"
 msgstr "QR code for the authenticator app"
 
@@ -10364,6 +10444,9 @@ msgstr "Quantity must be greater than zero."
 
 msgid "Quantity returned and restocked. If not provided, every unit not yet restocked."
 msgstr "Quantity returned and restocked. If not provided, every unit not yet restocked."
+
+msgid "Quarter"
+msgstr "Quarter"
 
 msgid "Query"
 msgstr "Query"
@@ -11160,6 +11243,10 @@ msgstr "Returns the notifications for a list of ids."
 msgid "Revenue"
 msgstr "Revenue"
 
+#, python-format
+msgid "Revenue without VAT per %(bucket)s"
+msgstr "Revenue without VAT per %(bucket)s"
+
 msgid "Review"
 msgstr "Review"
 
@@ -11291,9 +11378,6 @@ msgstr "SVG files with javascript: or data: URLs are not allowed for security re
 msgid "Sales"
 msgstr "Sales"
 
-msgid "Sales without VAT and without shipping, less the money that went back in the month it went back."
-msgstr "Sales without VAT and without shipping, less the money that went back in the month it went back."
-
 msgid "Same cart"
 msgstr "Same cart"
 
@@ -11302,6 +11386,9 @@ msgstr "Same category"
 
 msgid "Same customer"
 msgstr "Same customer"
+
+msgid "Same period last year"
+msgstr "Same period last year"
 
 msgid "Same variant group"
 msgstr "Same variant group"
@@ -11801,6 +11888,9 @@ msgstr "Shipment state"
 msgid "Shipped"
 msgstr "Shipped"
 
+msgid "Shipped At"
+msgstr "Shipped At"
+
 msgid "Shipping"
 msgstr "Shipping"
 
@@ -11884,6 +11974,9 @@ msgstr "Short display title"
 
 msgid "Short hash AADE generates alongside the MARK; part of the ``qr_url`` query string. Populated only via licensed provider channels (kept for forward compatibility)."
 msgstr "Short hash AADE generates alongside the MARK; part of the ``qr_url`` query string. Populated only via licensed provider channels (kept for forward compatibility)."
+
+msgid "Show"
+msgstr "Show"
 
 msgid "Show all configured synonyms"
 msgstr "Show all configured synonyms"
@@ -12898,6 +12991,9 @@ msgstr "The dispute closed against you and the money was taken back. It is recor
 msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
 msgstr "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
 
+msgid "The end is before the start."
+msgstr "The end is before the start."
+
 msgid "The exact consent sentence shown to the subscriber."
 msgstr "The exact consent sentence shown to the subscriber."
 
@@ -12958,6 +13054,9 @@ msgstr "The ledger refund this document credits. One document per refund; empty 
 
 msgid "The legal obligation the retention rests on."
 msgstr "The legal obligation the retention rests on."
+
+msgid "The line a goods row was taken from; empty otherwise."
+msgstr "The line a goods row was taken from; empty otherwise."
 
 #, python-format
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
@@ -13353,6 +13452,10 @@ msgstr "This product is already in the user's favorites."
 msgid "This product is the reward"
 msgstr "This product is the reward"
 
+#, python-format
+msgid "This range would show more than %(rows)s rows: choose longer periods, or export it."
+msgstr "This range would show more than %(rows)s rows: choose longer periods, or export it."
+
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "This receipt is your proof of purchase — please keep it for your records."
 
@@ -13513,6 +13616,9 @@ msgstr "Title"
 #, python-format
 msgid "Title %(title_len)d chars · Message %(msg_len)d chars · Link: %(link)s"
 msgstr "Title %(title_len)d chars · Message %(msg_len)d chars · Link: %(link)s"
+
+msgid "To"
+msgstr "To"
 
 msgid "To be issued in timologio"
 msgstr "To be issued in timologio"
@@ -13785,11 +13891,17 @@ msgstr "Unit Price"
 msgid "Unit price: %(price)s. Final price: %(final)s. Quantity: %(qty)s. Total: %(total)s."
 msgstr "Unit price: %(price)s. Final price: %(final)s. Quantity: %(qty)s. Total: %(total)s."
 
+msgid "Units"
+msgstr "Units"
+
 msgid "Units can only be restocked on a delivered, completed or returned order."
 msgstr "Units can only be restocked on a delivered, completed or returned order."
 
 msgid "Units paid for"
 msgstr "Units paid for"
+
+msgid "Units sold"
+msgstr "Units sold"
 
 msgid "Unknown"
 msgstr "Unknown"
@@ -14153,6 +14265,9 @@ msgstr "VAT number (ΑΦΜ)"
 msgid "VAT percentage this line was sold at, fixed when the line was created. Invoices and myDATA use it, never the product's current VAT."
 msgstr "VAT percentage this line was sold at, fixed when the line was created. Invoices and myDATA use it, never the product's current VAT."
 
+msgid "VAT rate"
+msgstr "VAT rate"
+
 #, python-format
 msgid "VAT value cannot exceed %(limit_value)s."
 msgstr "VAT value cannot exceed %(limit_value)s."
@@ -14497,6 +14612,13 @@ msgstr "Website & UX"
 msgid "Website must start with http:// or https://"
 msgstr "Website must start with http:// or https://"
 
+msgid "Week"
+msgstr "Week"
+
+#, python-format
+msgid "Week of %(day)s"
+msgstr "Week of %(day)s"
+
 msgid "Weight"
 msgstr "Weight"
 
@@ -14558,6 +14680,9 @@ msgstr "What the shopper pays for this (provider, country, kind), before ``free_
 msgid "What the store sells. Selects the recommendation preset the store starts from; merchants can still edit every slot."
 msgstr "What the store sells. Selects the recommendation preset the store starts from; merchants can still edit every slot."
 
+msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
+msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
+
 msgid "What's Next?"
 msgstr "What's Next?"
 
@@ -14596,6 +14721,9 @@ msgstr "When the decision last took its current value. A receipt issued after it
 
 msgid "When the download link stops working."
 msgstr "When the download link stops working."
+
+msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
+msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 
 msgid "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
 msgstr "When the payment link or session last opened for this order stops being payable. The stock stays reserved until then (plus a short grace window), after which the order is canceled if still unpaid. Empty until a payment is opened."
@@ -14743,6 +14871,9 @@ msgstr "Window"
 
 msgid "Wishlist"
 msgstr "Wishlist"
+
+msgid "Without a category"
+msgstr "Without a category"
 
 msgid "Working hours"
 msgstr "Working hours"
@@ -15455,6 +15586,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 #~ msgstr "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 
+#~ msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
+#~ msgstr "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
+
 #~ msgid "Awaiting payment"
 #~ msgstr "Awaiting payment"
 
@@ -15524,6 +15658,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 
+#~ msgid "Months"
+#~ msgstr "Months"
+
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
 
@@ -15538,6 +15675,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Order Reminder"
 #~ msgstr "Order Reminder"
+
+#~ msgid "Paid orders"
+#~ msgstr "Paid orders"
 
 #, python-format
 #~ msgid "Partial (%(refunded)s/%(qty)s)"

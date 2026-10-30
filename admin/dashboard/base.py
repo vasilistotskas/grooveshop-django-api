@@ -30,6 +30,7 @@ from unfold.components import BaseComponent
 from unfold.settings import get_config
 
 from admin.dashboard.cache import DashboardQuery
+from admin.displays import store_currency
 
 
 class DashboardWidget(BaseComponent):
@@ -125,7 +126,7 @@ def bar_chart_options(
     if currency:
         ticks["format"] = {
             "style": "currency",
-            "currency": "EUR",
+            "currency": store_currency(),
             "minimumFractionDigits": 0,
             "maximumFractionDigits": 0,
         }
@@ -176,23 +177,40 @@ def bar_chart_options(
 
 
 def bar_chart(
-    labels: list[str], values: list[float], *, label: str, currency: bool
+    labels: list[str],
+    values: list[float],
+    *,
+    label: str,
+    currency: bool,
+    prior: tuple[str, list[float]] | None = None,
 ) -> dict[str, str]:
-    """``data``/``options`` JSON for one measure as bars."""
-    data = {
-        "labels": labels,
-        "datasets": [
+    """``data``/``options`` JSON for one measure as bars; ``prior`` is the
+    same measure of an earlier span (its label and values), drawn beside
+    each bar in a quiet tone with a legend to tell them apart."""
+    datasets = [
+        {
+            "label": label,
+            "data": values,
+            "backgroundColor": color("primary-500"),
+            "borderRadius": 4,
+            "borderSkipped": "start",
+            "maxBarThickness": 32,
+        }
+    ]
+    if prior is not None:
+        prior_label, prior_values = prior
+        datasets.append(
             {
-                "label": label,
-                "data": values,
-                "backgroundColor": color("primary-500"),
+                "label": prior_label,
+                "data": prior_values,
+                "backgroundColor": color("base-300"),
                 "borderRadius": 4,
                 "borderSkipped": "start",
                 "maxBarThickness": 32,
             }
-        ],
-    }
-    options = bar_chart_options(legend=False, currency=currency)
+        )
+    data = {"labels": labels, "datasets": datasets}
+    options = bar_chart_options(legend=prior is not None, currency=currency)
     return {"data": chart_json(data), "options": chart_json(options)}
 
 

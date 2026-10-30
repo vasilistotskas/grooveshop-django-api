@@ -191,7 +191,11 @@ class MyAdminSite(
         return context
 
     def get_urls(self):
-        from admin.turnover import TurnoverCsvView, TurnoverView
+        from admin.turnover import (
+            TurnoverCsvView,
+            TurnoverView,
+            TurnoverXlsxView,
+        )
 
         urls = super().get_urls()
         custom_urls = [
@@ -206,9 +210,14 @@ class MyAdminSite(
                 name="turnover",
             ),
             path(
-                "turnover/export/",
+                "turnover/export.csv",
                 self.admin_view(TurnoverCsvView.as_view(admin_site=self)),
                 name="turnover-csv",
+            ),
+            path(
+                "turnover/export.xlsx",
+                self.admin_view(TurnoverXlsxView.as_view(admin_site=self)),
+                name="turnover-xlsx",
             ),
         ]
         return custom_urls + urls

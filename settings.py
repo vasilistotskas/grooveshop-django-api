@@ -2727,8 +2727,8 @@ EXTRA_SETTINGS_DEFAULTS = [
             "Distinctive title (διακριτικός τίτλος) the store trades "
             "under, when it differs from the legal company name. Printed "
             "under the name on receipts and credit documents, and shown "
-            "on the storefront in place of the legal name when set. "
-            "Blank: the legal name is used everywhere."
+            "on the storefront next to the legal name when set. "
+            "Blank: only the legal name is shown."
         ),
     },
     {

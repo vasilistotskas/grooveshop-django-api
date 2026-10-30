@@ -1477,9 +1477,13 @@ contact address.
 to the product page with the `#write-review` fragment that opens the
 storefront's review form. It is empty when the store's `product_reviews`
 feature is off, or when `PRODUCT_REVIEWS_PURCHASE_REQUIRED` is on and the
-order has no account (a guest order is never a verified purchase). A
-verified purchase also needs the order COMPLETED, so with the purchase rule
-on, a click from the `order.delivered` mail before completion is refused.
+order has no account (a guest order is never a verified purchase). The
+link and the review gate agree: a verified purchase
+(`product.managers.review.purchase_items`) is a COMPLETED order, or a
+DELIVERED one whose pay way is collected on delivery (the shopper paid the
+courier or carrier; the order stays DELIVERED until the payout is
+reconciled). An online-paid order is COMPLETED milliseconds after the
+carrier reports it delivered, before this mail is sent.
 
 `order.status_refunded` is the email the REFUNDED status change sends
 through `send_order_status_update_email`; `order.refunded` is the one per

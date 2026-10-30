@@ -22,18 +22,32 @@ def purchase_items(*, user, product):
     """Order lines that entitle ``user`` to review ``product``.
 
     The single definition of a verified purchase: a line of the user's
-    COMPLETED order. Only COMPLETED, because that is the state machine's
-    closed, successful end: PAID-but-undelivered, DELIVERED (still inside
-    the return window), CANCELED, RETURNED and REFUNDED orders prove
-    nothing about the customer having kept the goods. The review gate
+    order that was delivered and paid for. That is COMPLETED, the state
+    machine's closed, successful end, which a paid delivery reaches at
+    once (``OrderService.maybe_advance_to_completed``). It is also
+    DELIVERED when the shopper pays at the door or to the carrier
+    (``PaySettlement.collected_on_delivery``): the order then stays
+    DELIVERED until the carrier's payout is reconciled, days later, which
+    is the store's bookkeeping and says nothing about the shopper, who has
+    paid and holds the goods, and whom the delivered email invites to
+    review. PAID-but-undelivered, a delivered order still unpaid
+    (transfer), CANCELED, RETURNED and REFUNDED orders prove nothing about
+    the customer having kept the goods. The review gate
     (``ProductReviewViewSet.perform_create``) and the ``verified_purchase``
     flag both read it, so they cannot drift apart.
     """
     from order.enum.status import OrderStatus
     from order.models.item import OrderItem
+    from pay_way.enum.settlement import PaySettlement
 
     return OrderItem.objects.filter(
-        order__user=user, order__status=OrderStatus.COMPLETED, product=product
+        Q(order__status=OrderStatus.COMPLETED)
+        | Q(
+            order__status=OrderStatus.DELIVERED,
+            order__pay_way__settlement__in=PaySettlement.collected_on_delivery(),
+        ),
+        order__user=user,
+        product=product,
     )
 
 

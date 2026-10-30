@@ -107,6 +107,7 @@ STORE_PREFERENCES: dict[str, str] = {
     "mobile_bottom_nav": "MOBILE_BOTTOM_NAV_ENABLED",
     "sticky_add_to_cart": "STICKY_ADD_TO_CART_ENABLED",
     "recently_viewed": "RECENTLY_VIEWED_ENABLED",
+    "product_assurances": "PRODUCT_ASSURANCES_ENABLED",
     "demo_account": "DEMO_ACCOUNT_ENABLED",
 }
 

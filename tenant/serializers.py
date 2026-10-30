@@ -85,6 +85,7 @@ class StorePreferencesSerializer(serializers.Serializer):
     mobile_bottom_nav = serializers.BooleanField(read_only=True)
     sticky_add_to_cart = serializers.BooleanField(read_only=True)
     recently_viewed = serializers.BooleanField(read_only=True)
+    product_assurances = serializers.BooleanField(read_only=True)
     demo_account = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:

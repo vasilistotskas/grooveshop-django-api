@@ -48933,12 +48933,16 @@ components:
         recentlyViewed:
           type: boolean
           readOnly: true
+        productAssurances:
+          type: boolean
+          readOnly: true
         demoAccount:
           type: boolean
           readOnly: true
       required:
       - demoAccount
       - mobileBottomNav
+      - productAssurances
       - recentlyViewed
       - stickyAddToCart
     StrategyEnum:

@@ -2226,6 +2226,19 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRODUCT_ASSURANCES_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the purchase-assurances box under the buy button on "
+            "product pages: delivery days from the shipping rates, the "
+            "free-shipping threshold, the payment methods and the "
+            "return window. Each row hides itself when the store has "
+            "no data for it. A store UI preference; the storefront "
+            "fails OPEN if this setting cannot be fetched."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,

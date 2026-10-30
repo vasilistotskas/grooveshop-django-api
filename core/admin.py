@@ -175,6 +175,7 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "MOBILE_BOTTOM_NAV_",
             "STICKY_ADD_TO_CART_",
             "RECENTLY_VIEWED_",
+            "PRODUCT_ASSURANCES_",
             "CHAT_WIDGET_",
             "ACCOUNT_REVIEWS_",
             "PRODUCT_REVIEWS_",

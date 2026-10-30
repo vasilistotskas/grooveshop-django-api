@@ -193,6 +193,8 @@ Tasks are split by domain:
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 - `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
+**Data retention.** Every sweep deletes through `core.retention.delete_in_batches` (batch size `RETENTION_PURGE_BATCH_SIZE`) and per-store tables fan out through `tenant.tasks.fanout_purge_*` with `include_suspended=True`. A model whose `HistoricalRecords` sets `excluded_fields` and is saved by a bookkeeping task uses `core.history.ChangeOnlyHistoricalRecords`, or every poll tick writes a history row. The full table (what, how long, which setting) is `grooveshop-docs/src/dev/operations/data-retention.md`.
+
 **Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps
 `scheduled-database-backup` and `cleanup-old-backups` in the beat schedule;
 staging sets it `False`. `DatabaseScheduler` never deletes a row whose entry

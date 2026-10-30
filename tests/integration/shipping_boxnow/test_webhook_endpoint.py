@@ -24,6 +24,7 @@ from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -45,9 +46,12 @@ def _build_raw_body(
     parcel_id: str,
     event: str,
     message_id: str = "msg-test-001",
-    event_time: str = "2025-01-15T10:30:00Z",
+    event_time: str | None = None,
 ) -> bytes:
     """Build a realistic raw webhook body that satisfies the signature."""
+    # Now, not a fixed date: an event older than the replay window is
+    # ignored by design.
+    event_time = event_time or timezone.now().isoformat()
     data_obj = {
         "parcelId": parcel_id,
         "parcelState": event,
@@ -307,7 +311,7 @@ class TestWebhookEndpoint:
             "parcelId": shipment.parcel_id,
             "parcelState": "in-depot",
             "event": "in-depot",
-            "time": "2025-01-15T10:30:00Z",
+            "time": timezone.now().isoformat(),
             "orderNumber": "ORD-TEST",
             "eventLocation": {
                 "displayName": "Test Locker",

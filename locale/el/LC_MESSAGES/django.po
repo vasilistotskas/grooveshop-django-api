@@ -1182,6 +1182,9 @@ msgstr "Ποσό προσαρμογής"
 msgid "Admin"
 msgstr "Διαχειριστής"
 
+msgid "Admin History"
+msgstr "Ιστορικό διαχειριστή"
+
 msgid "Admin display name for this layout."
 msgstr "Όνομα εμφάνισης αυτής της διάταξης στη διαχείριση."
 

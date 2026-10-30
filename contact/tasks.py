@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from contact.scanners import INFECTED, AttachmentScannerError
 from core import celery_app
+from core.retention import delete_in_batches
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_DB_ERRORS,
@@ -262,11 +263,6 @@ def purge_expired_attachment_files() -> int:
     return purged
 
 
-#: Rows deleted per statement, so the first run on a store with years of
-#: backlog never loads them all into one deletion collector at once.
-RETENTION_BATCH_SIZE = 500
-
-
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
@@ -300,8 +296,12 @@ def purge_expired_contact_records() -> dict[str, int]:
     cutoff = timezone.now() - timedelta(days=days)
 
     counts = {
-        "contacts": _delete_older_than(Contact, cutoff),
-        "feedback": _delete_older_than(Feedback, cutoff),
+        "contacts": delete_in_batches(
+            Contact.objects.filter(created_at__lt=cutoff)
+        ),
+        "feedback": delete_in_batches(
+            Feedback.objects.filter(created_at__lt=cutoff)
+        ),
     }
     if any(counts.values()):
         logger.info(
@@ -312,15 +312,3 @@ def purge_expired_contact_records() -> dict[str, int]:
             days,
         )
     return counts
-
-
-def _delete_older_than(model, cutoff) -> int:
-    """Delete ``model`` rows created before ``cutoff``, in batches."""
-    deleted = 0
-    stale = model.objects.filter(created_at__lt=cutoff)
-    while pks := list(
-        stale.values_list("pk", flat=True)[:RETENTION_BATCH_SIZE]
-    ):
-        _, per_model = model.objects.filter(pk__in=pks).delete()
-        deleted += per_model.get(model._meta.label, 0)
-    return deleted

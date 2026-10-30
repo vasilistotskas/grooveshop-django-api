@@ -210,6 +210,11 @@ class TestBeatScheduleTenantCoverage:
         "core.tasks.clear_expired_sessions_task",
         "core.tasks.clear_all_cache_task",
         "core.tasks.clear_development_log_files_task",
+        # The platform staff's own audit trail lives in public (the
+        # stores' are reached through their own fanout entry), and
+        # CachePurgeLog exists only there.
+        "core.tasks.purge_expired_admin_log_entries",
+        "core.tasks.purge_expired_cache_purge_logs",
         # Billing terms + dunning bookkeeping are public-schema Tenant
         # rows; the cycle never enters a tenant schema (tenant/billing.py).
         "tenant.tasks.process_tenant_billing",

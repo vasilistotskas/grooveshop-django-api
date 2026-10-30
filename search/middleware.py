@@ -110,6 +110,14 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
             # Extract query parameters
             query = request.GET.get("query", "")
+
+            # A blank query is a listing load, not a search: the
+            # storefront's category and listing pages read this same
+            # endpoint with no text, as does its cache warm-up. Every
+            # reader of the analytics already leaves these rows out, and
+            # they were 96% of the table.
+            if not query.strip():
+                return
             language_code = request.GET.get("language_code", "")
 
             # Parse response data to extract results metadata

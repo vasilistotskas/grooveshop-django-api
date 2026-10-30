@@ -6,9 +6,14 @@ External HTTP calls (BoxNowClient) are always mocked.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.test import override_settings
 from django.utils import timezone
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -338,6 +343,42 @@ class TestApplyWebhookEvent:
             webhook_message_id=message_id
         ).count()
         assert count == 1
+
+    @pytest.mark.parametrize(("age_days", "applied"), [(89, True), (91, False)])
+    def test_an_event_older_than_the_replay_window_is_ignored(
+        self, age_days, applied
+    ):
+        """The signed ``data.time`` bounds replay, whatever rows survive."""
+        shipment = BoxNowShipmentFactory(with_parcel=True)
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="in-depot",
+            event_time=(timezone.now() - timedelta(days=age_days)).isoformat(),
+        )
+
+        with override_settings(BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS=90):
+            result = BoxNowService.apply_webhook_event(envelope)
+
+        assert (result is not None) is applied
+        assert BoxNowParcelEvent.objects.count() == int(applied)
+
+    def test_the_replay_window_must_end_before_the_guard_rows_are_swept(self):
+        env = {
+            **os.environ,
+            "BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS": "730",
+            "CARRIER_TRACKING_EVENT_RETENTION_DAYS": "730",
+        }
+
+        run = subprocess.run(
+            [sys.executable, "-c", "import settings"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert run.returncode != 0
+        assert "BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS" in run.stderr
 
     def test_stores_and_dedupes_on_data_fingerprint(self):
         """The signed-data fingerprint is stored, and a replay of the same

@@ -1177,6 +1177,9 @@ msgstr "Adjustment amount"
 msgid "Admin"
 msgstr "Admin"
 
+msgid "Admin History"
+msgstr "Admin History"
+
 msgid "Admin display name for this layout."
 msgstr "Admin display name for this layout."
 

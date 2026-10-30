@@ -8,12 +8,14 @@ on the real router.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
 from django_tenants.utils import schema_context
 from djmoney.money import Money
+
+from order.turnover import figures
 
 pytestmark = pytest.mark.django_db
 
@@ -24,8 +26,8 @@ YEAR = 2026
 def sale(mt_tenant):
     from order.enum.status import OrderStatus, PaymentStatus
     from order.factories.order import OrderFactory
-    from order.models import Order
     from product.factories.product import ProductFactory
+    from tests.utils.turnover import snapshot_sale
     from vat.factories import VatFactory
 
     with schema_context(mt_tenant.schema_name):
@@ -47,30 +49,27 @@ def sale(mt_tenant):
             quantity=1,
             vat_rate=Decimal(24),
         )
-        Order.objects.filter(pk=order.pk).update(
-            created_at=datetime(YEAR, 3, 15, 12, tzinfo=UTC)
-        )
+        snapshot_sale(order, datetime(YEAR, 3, 15, 12, tzinfo=UTC))
         yield order
         order.items.all().delete()
         order.delete()
 
 
 def test_a_sale_is_in_its_own_stores_figures(mt_tenant, sale):
-    from order.turnover import turnover_by_month
-
     with schema_context(mt_tenant.schema_name):
-        march = turnover_by_month(YEAR)[2]
+        [march] = figures(date(YEAR, 3, 1), date(YEAR, 3, 31), None)
 
-    assert march.sales == Decimal("100.00")
+    assert march.goods == Decimal("100.00")
+    assert march.sales_net == Decimal("108.06")
     assert march.orders == 1
 
 
 def test_a_sale_is_not_in_another_stores_figures(mt_tenant, mt_tenant_b, sale):
-    from order.turnover import first_year, turnover_by_month
+    from order.turnover import first_year
 
     with schema_context(mt_tenant_b.schema_name):
-        months = turnover_by_month(YEAR)
+        [year] = figures(date(YEAR, 1, 1), date(YEAR, 12, 31), None)
         assert first_year() is None
 
-    assert all(m.sales == m.returns == Decimal(0) for m in months)
-    assert sum(m.orders for m in months) == 0
+    assert year.sales_net == year.returns_net == Decimal(0)
+    assert year.orders == 0

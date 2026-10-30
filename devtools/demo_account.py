@@ -982,6 +982,51 @@ def _seed_shipment(row: OrderRow, order, now) -> bool:
     return True
 
 
+def _seed_refund(order) -> bool:
+    """The charge and the full refund behind a REFUNDED demo order.
+
+    The turnover report reads a return from the payment ledger, never from
+    ``payment_status``, so an order written REFUNDED with no ledger would
+    count as a sale that was never paid back. Written as rows, not through
+    ``PaymentLedger.record_refund``: that saves the order, and a seeded
+    order must stay out of its signals (``devtools.demo_orders``).
+    """
+    from order.enum.payment_transaction import PaymentTransactionKind
+    from order.models.payment_transaction import PaymentTransaction
+
+    if order.payment_status != "REFUNDED" or order.amount_due.amount <= 0:
+        return False
+    provider = order.pay_way.provider_code
+    reference = f"DEMO-{order.uuid}"
+    charge, created = PaymentTransaction.objects.get_or_create(
+        provider=provider,
+        provider_reference=reference,
+        kind=PaymentTransactionKind.CHARGE,
+        defaults={"order": order, "amount": order.amount_due},
+    )
+    refund, refunded = PaymentTransaction.objects.get_or_create(
+        provider=provider,
+        provider_reference=reference,
+        kind=PaymentTransactionKind.REFUND,
+        defaults={
+            "order": order,
+            "amount": order.amount_due,
+            "charge": charge,
+        },
+    )
+    # ``created_at`` is ``auto_now_add``: the rows are backdated to the
+    # order's own history.
+    if created:
+        PaymentTransaction.objects.filter(pk=charge.pk).update(
+            created_at=order.created_at
+        )
+    if refunded:
+        PaymentTransaction.objects.filter(pk=refund.pk).update(
+            created_at=order.status_updated_at
+        )
+    return created or refunded
+
+
 def _seed_redemption(order, user) -> bool:
     """The coupon the order redeemed, as the usage-limit ledger sees it."""
     from djmoney.money import Money
@@ -1244,6 +1289,7 @@ def _seed_account_history(user, pairs, *, with_extras: bool) -> dict[str, int]:
     for row, order in pairs:
         _bump(report, "shipments", int(_seed_shipment(row, order, now)))
         _bump(report, "redemptions", int(_seed_redemption(order, user)))
+        _bump(report, "refunds", int(_seed_refund(order)))
         if row.gift_card:
             _bump(report, "gift_card_spend", int(_seed_gift_spend(order)))
     if with_extras:

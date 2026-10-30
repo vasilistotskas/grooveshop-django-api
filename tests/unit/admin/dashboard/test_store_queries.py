@@ -18,6 +18,8 @@ from admin.dashboard.store import queries
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
+from product.factories.product import ProductFactory
+from tests.utils.turnover import snapshot_sale
 
 pytestmark = pytest.mark.django_db
 
@@ -27,9 +29,16 @@ pytestmark = pytest.mark.django_db
 UNPAID_AMOUNT_DUE = 999
 
 
-def _order(*, paid: float | None = None, days_ago: int = 0, **fields):
-    """A COMPLETED order that owed ``paid``, or a PENDING one when ``paid``
-    is ``None``."""
+def _order(
+    *,
+    paid: float | None = None,
+    days_ago: int = 0,
+    with_line: bool = True,
+    **fields,
+):
+    """A COMPLETED order that shipped with one line worth ``paid`` (VAT
+    free, so its net is ``paid``), or a PENDING one that has not shipped
+    when ``paid`` is ``None``."""
     order = OrderFactory(
         num_order_items=0,
         payment_status=(
@@ -41,15 +50,23 @@ def _order(*, paid: float | None = None, days_ago: int = 0, **fields):
             UNPAID_AMOUNT_DUE if paid is None else paid,
             settings.DEFAULT_CURRENCY,
         ),
+        shipping_price=Money(0, settings.DEFAULT_CURRENCY),
+        payment_method_fee=Money(0, settings.DEFAULT_CURRENCY),
         **fields,
     )
+    if paid is not None and with_line:
+        order.items.create(
+            product=ProductFactory(),
+            price=Money(paid, settings.DEFAULT_CURRENCY),
+            quantity=1,
+            vat_rate=0,
+        )
     # created_at is auto_now_add; backdate through the queryset. In local
     # wall-clock days, the way the dashboard buckets: on the 25-hour day a
     # clock goes back, ``now - 24h`` is still today for an hour.
-    Order.objects.filter(pk=order.pk).update(
-        created_at=timezone.localtime() - timedelta(days=days_ago)
-    )
-    return order
+    placed = timezone.localtime() - timedelta(days=days_ago)
+    Order.objects.filter(pk=order.pk).update(created_at=placed)
+    return snapshot_sale(order, None if paid is None else placed)
 
 
 class TestPeriods:
@@ -111,6 +128,43 @@ class TestOverview:
         assert data["revenue"] == 100.0
         assert data["prior_revenue"] == 50.0
 
+    def test_revenue_is_the_turnover_not_the_amount_that_landed(self):
+        """A refunded order stays in its month and the refund comes out of
+        the month it was made: one definition with the turnover report."""
+        from order.enum.payment_transaction import PaymentTransactionKind
+        from order.factories.payment_transaction import (
+            PaymentTransactionFactory,
+        )
+
+        order = _order(paid=100, days_ago=2)
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.PARTIALLY_REFUNDED
+        )
+        charge = PaymentTransactionFactory(
+            order=order,
+            kind=PaymentTransactionKind.CHARGE,
+            amount=Money(100, settings.DEFAULT_CURRENCY),
+        )
+        PaymentTransactionFactory(
+            order=order,
+            kind=PaymentTransactionKind.REFUND,
+            amount=Money(25, settings.DEFAULT_CURRENCY),
+            charge=charge,
+        )
+
+        data = queries.overview.compute("7d")
+
+        assert data["revenue"] == 75.0
+        assert data["sold"] == 1
+
+    def test_cash_on_delivery_counts_when_it_ships(self):
+        order = _order(paid=60, days_ago=1)
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.PENDING
+        )
+
+        assert queries.overview.compute("7d")["revenue"] == 60.0
+
     def test_unpaid_orders_are_orders_but_not_revenue(self):
         _order(paid=None)
         _order(paid=40)
@@ -149,9 +203,11 @@ class TestOverview:
         assert data["new_customers"] == before + 1
         assert data["prior_new_customers"] >= 1
 
-    def test_three_queries(self, django_assert_num_queries):
+    def test_a_fixed_number_of_queries(self, django_assert_num_queries):
+        # Orders, customers, repeat buyers, and the turnover of this
+        # period and of the one before (three each).
         _order(paid=10)
-        with django_assert_num_queries(3):
+        with django_assert_num_queries(9):
             queries.overview.compute("30d")
 
 
@@ -166,6 +222,7 @@ class TestSalesSeries:
         assert days[-1]["start"] == timezone.localdate()
         yesterday = days[-2]
         assert (yesterday["orders"], yesterday["paid"]) == (2, 1)
+        assert yesterday["sold"] == 1
         assert yesterday["revenue"] == 40.0
 
     def test_the_bars_add_up_to_the_headline(self):
@@ -191,7 +248,10 @@ class TestBestSellers:
     def _sold(self, product, quantity, *, paid=True, refunded=0):
         from order.factories.item import OrderItemFactory
 
-        order = _order(paid=10 if paid else None)
+        order = _order(paid=10 if paid else None, with_line=False)
+        Order.objects.filter(pk=order.pk).update(
+            shipped_at=order.created_at if paid else None
+        )
         OrderItemFactory(
             order=order,
             product=product,
@@ -201,7 +261,7 @@ class TestBestSellers:
             is_refunded=bool(refunded),
         )
 
-    def test_units_paid_for_net_of_refunds(self):
+    def test_units_that_shipped_net_of_refunds(self):
         from product.factories.product import ProductFactory
 
         mug, bag, candle = ProductFactory.create_batch(3)

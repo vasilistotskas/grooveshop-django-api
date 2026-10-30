@@ -1134,6 +1134,45 @@ class TestSeededAccount:
 
 
 @pytest.mark.django_db
+class TestARefundedOrderHasItsLedger:
+    def test_a_refunded_demo_order_is_a_return_in_the_turnover(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from order.models.order import Order
+        from order.models.payment_transaction import PaymentTransaction
+        from order.turnover import figures
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+
+        refunded = Order.objects.filter(payment_status="REFUNDED")
+        assert refunded.exists()
+        for order in refunded:
+            kinds = set(
+                PaymentTransaction.objects.filter(order=order).values_list(
+                    "kind", flat=True
+                )
+            )
+            assert kinds == {"CHARGE", "REFUND"}
+        today = timezone.localdate()
+        [row] = figures(today - timedelta(days=120), today, None)
+        assert row.returns_gross > 0
+
+    def test_seeding_again_writes_no_second_ledger(self):
+        from order.models.payment_transaction import PaymentTransaction
+
+        _prepare_store()
+        demo_account.seed_demo_account()
+        written = PaymentTransaction.objects.count()
+
+        demo_account.seed_demo_account()
+
+        assert PaymentTransaction.objects.count() == written
+
+
+@pytest.mark.django_db
 class TestResetRebuildsTheAccounts:
     """The nightly reset wipes what a visitor can change and rebuilds it."""
 
@@ -1151,6 +1190,7 @@ class TestResetRebuildsTheAccounts:
         from notification.models import Notification, NotificationUser
         from order.models.invoice import Invoice
         from order.models.order import Order
+        from order.models.payment_transaction import PaymentTransaction
         from promotion.models.redemption import PromotionRedemption
         from shipping_acs.models import AcsShipment
         from shipping_boxnow.models import BoxNowShipment
@@ -1164,6 +1204,7 @@ class TestResetRebuildsTheAccounts:
             "notifications": Notification.objects.count(),
             "notification_users": NotificationUser.objects.count(),
             "redemptions": PromotionRedemption.objects.count(),
+            "ledger": PaymentTransaction.objects.count(),
         }
 
     def test_reset_converges_and_never_duplicates(
@@ -1200,11 +1241,15 @@ class TestResetRebuildsTheAccounts:
         demo_account.seed_demo_account()
         user = get_user_model().objects.get(email=demo_account.RETAIL_EMAIL)
         visitor_order = Order.objects.filter(user=user).first()
-        PaymentTransactionFactory(order=visitor_order)
+        visitor_row = PaymentTransactionFactory(order=visitor_order)
 
         demo_account.reset_demo_account()
 
-        assert not PaymentTransaction.objects.exists()
+        assert not PaymentTransaction.objects.filter(pk=visitor_row.pk).exists()
+        # What is left is the seed's own: the refunded orders' ledgers.
+        assert set(
+            PaymentTransaction.objects.values_list("order__status", flat=True)
+        ) == {"REFUNDED"}
 
     def test_a_visitors_changes_are_wiped_and_the_history_comes_back(self):
         from django.contrib.auth import get_user_model

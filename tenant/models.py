@@ -224,8 +224,13 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     default_currency = models.CharField(
         _("Default Currency"),
         max_length=3,
-        choices=settings.CURRENCY_CHOICES,
-        default="EUR",
+        # Every money path works in DEFAULT_CURRENCY and nothing converts
+        # (``tenant.role_scopes`` says why a store may not pick another),
+        # so offering a second currency only lets a store render prices
+        # the backend never charged. Add one together with the code that
+        # honours it.
+        choices=[(settings.DEFAULT_CURRENCY, settings.DEFAULT_CURRENCY)],
+        default=settings.DEFAULT_CURRENCY,
     )
     available_locales = models.JSONField(
         _("Available Locales"),

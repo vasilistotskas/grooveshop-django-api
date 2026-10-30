@@ -74,6 +74,7 @@ from order.payment_ledger import (
 )
 from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
+from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
 from pay_way.enum.settlement import PaySettlement
@@ -1555,6 +1556,11 @@ class OrderService:
                 ]
             )
 
+            # Items, discounts and charges are final: keep what the
+            # receipt will bill, so every sales figure reads it
+            # (order.vat_snapshot).
+            write_vat_lines(order)
+
             # The coupon's durable record is the redemption row — the
             # cart attachment has served its purpose.
             CouponService.clear_after_order(cart)
@@ -2145,6 +2151,11 @@ class OrderService:
                     "metadata",
                 ]
             )
+
+            # Items, discounts and charges are final: keep what the
+            # receipt will bill, so every sales figure reads it
+            # (order.vat_snapshot).
+            write_vat_lines(order)
 
             # The coupon's durable record is the redemption row — the
             # cart attachment has served its purpose.

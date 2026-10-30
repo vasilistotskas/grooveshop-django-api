@@ -3,6 +3,23 @@
 
 
 
+## v3.166.1 (2026-10-30)
+
+### Bug fixes
+
+* fix(tenant): accept only a bare lowercase host name as a store domain (#370)
+
+TenantDomain.domain took any text, while routing matches it exactly: a
+store saved with uppercase, a port, a trailing dot, a scheme or an IP
+would never resolve. validate_store_hostname refuses each of those, and
+a single label or an invalid RFC 1123 label, with its own code; it runs
+in the admin forms and in save(), which covers the provisioning
+commands. Every stored domain already passed (14 production, 10
+staging). The .lower() calls that only ever saw a stored domain are
+removed; those on settings, URLs and user input stay.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ae56cc8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ae56cc8287b8820e5e419e8c9f7e693242071078))
+
 ## v3.166.0 (2026-10-30)
 
 ### Features

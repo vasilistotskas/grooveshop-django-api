@@ -4,6 +4,7 @@ from typing import Any
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import AutoSchema as SpectacularAutoSchema
+from drf_spectacular.utils import extend_schema_serializer
 
 
 class AutoSchema(SpectacularAutoSchema):
@@ -226,4 +227,41 @@ def publish_error_schemas(
 ) -> dict[str, Any]:
     schemas = result.setdefault("components", {}).setdefault("schemas", {})
     schemas.update(ERROR_SCHEMAS)
+    return result
+
+
+OPTIONAL_FIELDS_EXTENSION = "x-optional-fields"
+
+
+def deprecated_optional_fields(*names: str):
+    """Mark response fields of a serializer deprecated AND not required.
+
+    The server still sends them, but a client generated from the schema
+    must not depend on them, so a later release can drop them without a
+    second client release. ``deprecate_fields`` alone only adds
+    ``deprecated: true``; a read-only field stays in ``required`` (drf-
+    spectacular lists every read-only field there), so
+    ``drop_optional_fields_from_required`` takes the named ones out.
+    Only the fields named here are touched, never a component's others.
+    """
+    return extend_schema_serializer(
+        deprecate_fields=list(names),
+        extensions={OPTIONAL_FIELDS_EXTENSION: list(names)},
+    )
+
+
+def drop_optional_fields_from_required(
+    result: dict[str, Any], generator: Any, request: Any, public: bool
+) -> dict[str, Any]:
+    """Postprocessing hook for ``deprecated_optional_fields``. Runs before
+    the camel-case hook, so the names are still the serializer's."""
+    for component in result.get("components", {}).get("schemas", {}).values():
+        names = component.pop(OPTIONAL_FIELDS_EXTENSION, None)
+        if not names or "required" not in component:
+            continue
+        component["required"] = [
+            name for name in component["required"] if name not in names
+        ]
+        if not component["required"]:
+            del component["required"]
     return result

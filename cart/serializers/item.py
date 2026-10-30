@@ -6,6 +6,7 @@ from rest_framework import serializers
 
 from cart.models import CartItem
 from cart.services import CartAttributionService
+from core.api.schema import deprecated_optional_fields
 from order.serializers.order import OrderAttributionInputSerializer
 from order.services import OrderAttributionService
 from product.serializers.product import ProductSerializer
@@ -106,6 +107,7 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
         )
 
 
+@deprecated_optional_fields("recommendations")
 class CartItemDetailSerializer(CartItemSerializer):
     recommendations = serializers.SerializerMethodField(
         help_text=_("Related products that might interest the customer")

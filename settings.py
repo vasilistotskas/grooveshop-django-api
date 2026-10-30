@@ -4029,6 +4029,7 @@ SPECTACULAR_SETTINGS = {
         "rest_framework.authentication.SessionAuthentication",
     ],
     "POSTPROCESSING_HOOKS": [
+        "core.api.schema.drop_optional_fields_from_required",
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api.schema.postprocess_schema_parameters_to_accept_strings",

@@ -37385,6 +37385,7 @@ components:
             $ref: '#/components/schemas/Product'
           readOnly: true
           description: Προτάσεις προϊόντων βάσει περιεχομένου καλαθιού
+          deprecated: true
       required:
       - appliedCouponCodes
       - appliedCoupons
@@ -37401,7 +37402,6 @@ components:
       - promotionFreeShipping
       - promotionGiftItems
       - promotionNearMiss
-      - recommendations
       - totalDiscountValue
       - totalItems
       - totalItemsUnique
@@ -37669,6 +37669,7 @@ components:
             $ref: '#/components/schemas/Product'
           readOnly: true
           description: Σχετικά προϊόντα που ίσως ενδιαφέρουν τον πελάτη
+          deprecated: true
       required:
       - cartId
       - createdAt
@@ -37679,7 +37680,6 @@ components:
       - price
       - priceSavePercent
       - product
-      - recommendations
       - totalDiscountValue
       - totalPrice
       - updatedAt
@@ -37806,6 +37806,7 @@ components:
             $ref: '#/components/schemas/Product'
           readOnly: true
           description: Σχετικά προϊόντα που ίσως ενδιαφέρουν τον πελάτη
+          deprecated: true
         cart:
           allOf:
           - $ref: '#/components/schemas/CartDetail'
@@ -37822,7 +37823,6 @@ components:
       - price
       - priceSavePercent
       - product
-      - recommendations
       - totalDiscountValue
       - totalPrice
       - updatedAt

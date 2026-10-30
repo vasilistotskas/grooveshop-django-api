@@ -22,6 +22,10 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from emails.headers import (
+    build_list_unsubscribe_headers,
+    build_transactional_list_headers,
+)
 from emails.send import send_email, was_sent
 from emails.transport import Attachment
 from order import payment_hold
@@ -47,10 +51,6 @@ from tenant.credentials import (
     tenant_from_email,
     tenant_reply_to,
     tenant_site_name,
-)
-from user.utils.subscription import (
-    build_list_unsubscribe_headers,
-    build_transactional_list_headers,
 )
 
 logger = logging.getLogger(__name__)

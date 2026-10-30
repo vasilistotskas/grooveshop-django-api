@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
-from urllib.parse import urlsplit
 
 from django.contrib.auth import get_user_model
 from django.core import signing
@@ -17,14 +16,9 @@ from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
-    get_tenant_base_url,
     get_tenant_frontend_url,
 )
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_reply_to,
-)
+from tenant.credentials import tenant_from_email, tenant_reply_to
 from user.models.subscription import UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -235,73 +229,3 @@ def generate_blanket_unsubscribe_link(
     token = _make_unsubscribe_token(user)
     base_url = get_tenant_api_base_url()
     return f"{base_url}/api/v1/user/unsubscribe/{token}"
-
-
-def _list_id_domain() -> str:
-    """Bare hostname for the ``List-ID`` domain half.
-
-    RFC 2919 requires the identifier to be ``list-label.domain`` enclosed
-    in angle brackets, with no spaces or display names inside the
-    brackets — ``tenant_site_name()`` (a human store name, potentially
-    containing spaces/unicode) does not qualify. Uses the same tenant
-    domain ``get_tenant_frontend_url`` resolves against, never a
-    hardcoded platform domain.
-    """
-    return urlsplit(get_tenant_base_url()).netloc
-
-
-def _mailto_unsubscribe_forms() -> list[str]:
-    """The ``<mailto:…>`` half of ``List-Unsubscribe``, or ``[]``.
-
-    A store with no contact address (``tenant_contact_email() == ""``)
-    gets no ``mailto:`` form at all: ``<mailto:?subject=unsubscribe>``
-    is not a usable address, and RFC 8058 only requires the HTTPS form
-    for one-click, so marketing mail keeps that alone.
-    """
-    email = tenant_contact_email()
-    return [f"<mailto:{email}?subject=unsubscribe>"] if email else []
-
-
-def build_list_unsubscribe_headers(
-    unsubscribe_url: str, *, list_id: str
-) -> dict[str, str]:
-    """Build the ``List-Unsubscribe`` + ``List-ID`` header dict.
-
-    Centralised so every marketing/notification email emits the same
-    Gmail/Yahoo-friendly shape (per RFC 8058 + 2024 sender rules):
-
-    * ``List-Unsubscribe`` — both ``mailto:`` and HTTPS so MUAs that
-      don't support one-click POST still have a working link.
-    * ``List-Unsubscribe-Post`` — flags one-click as supported.
-    * ``List-ID`` — opaque list identifier; helps mailbox providers
-      bucket per-list deliverability stats.
-    """
-    return {
-        "List-Unsubscribe": ", ".join(
-            [*_mailto_unsubscribe_forms(), f"<{unsubscribe_url}>"]
-        ),
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        "List-ID": f"<{list_id}.{_list_id_domain()}>",
-    }
-
-
-def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
-    """Build the ``List-Unsubscribe`` + ``List-ID`` header dict for
-    transactional emails (order receipts, payment failures, shipping
-    notifications, invoices).
-
-    The shopper can't really opt out of receipts for what they bought,
-    but Gmail/Yahoo's 2024 bulk-sender rules expect a usable
-    ``List-Unsubscribe`` even on transactional traffic — so we emit
-    just the ``mailto:`` form, and nothing when the store has no
-    contact address. ``List-Unsubscribe-Post=One-Click`` is
-    intentionally omitted: there's no programmatic unsubscribe path
-    for transactional, and clients that see One-Click without a
-    matching HTTPS endpoint penalise the sender. ``List-ID`` keeps
-    per-stream deliverability stats clean at the mailbox provider.
-    """
-    headers = {"List-ID": f"<{list_id}.{_list_id_domain()}>"}
-    mailto = _mailto_unsubscribe_forms()
-    if mailto:
-        headers["List-Unsubscribe"] = mailto[0]
-    return headers

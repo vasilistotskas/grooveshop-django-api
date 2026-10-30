@@ -641,8 +641,8 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         total_users += 1
 
         try:
+            from emails.headers import build_list_unsubscribe_headers
             from user.utils.subscription import (
-                build_list_unsubscribe_headers,
                 generate_blanket_unsubscribe_link,
             )
 

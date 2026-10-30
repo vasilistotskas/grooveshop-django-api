@@ -61,6 +61,7 @@ FAIL_OPEN = {
     "SearchClickThrottle",
     "ViewCountThrottle",
     "RecommendationEventThrottle",
+    "EmailUnsubscribeThrottle",
 }
 
 

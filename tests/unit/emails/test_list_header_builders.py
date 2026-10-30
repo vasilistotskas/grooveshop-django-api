@@ -13,7 +13,7 @@ from unittest import mock
 
 import pytest
 
-from user.utils.subscription import (
+from emails.headers import (
     build_list_unsubscribe_headers,
     build_transactional_list_headers,
 )
@@ -24,7 +24,7 @@ URL = "https://api.shop.example/api/v1/user/unsubscribe/tok/"
 @pytest.fixture
 def list_domain():
     with mock.patch(
-        "user.utils.subscription.get_tenant_base_url",
+        "emails.headers.get_tenant_base_url",
         return_value="https://shop.example",
     ):
         yield
@@ -33,7 +33,7 @@ def list_domain():
 @pytest.fixture
 def contact_email(request):
     with mock.patch(
-        "user.utils.subscription.tenant_contact_email",
+        "emails.headers.tenant_contact_email",
         return_value=request.param,
     ):
         yield request.param

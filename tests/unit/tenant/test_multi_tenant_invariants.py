@@ -154,7 +154,9 @@ class TestEmailHelperCallSites:
 
     EXPECTED_CALLERS = (
         # path inside grooveshop-django-api / required helpers
-        ("user/utils/subscription.py", REQUIRED_HELPERS),
+        ("user/utils/subscription.py", ("tenant_from_email",)),
+        # The ``mailto:`` unsubscribe carries the store's contact address.
+        ("emails/headers.py", ("tenant_contact_email",)),
         ("contact/tasks.py", REQUIRED_HELPERS),
         # The abandoned-checkout mail is still built here.
         ("order/tasks.py", ("tenant_from_email",)),

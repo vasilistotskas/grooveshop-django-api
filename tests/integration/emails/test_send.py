@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from django.core import mail
+from rest_framework.test import APIClient
 
 from emails import optout
 from emails.gates import FeatureGate, StoreSwitchGate
@@ -344,6 +345,29 @@ class TestOptOut:
 
         assert delivery.status is Status.SKIPPED_OPTED_OUT
         assert mail.outbox == []
+
+    def test_the_one_click_link_in_the_headers_opts_the_recipient_out(
+        self, catalogue
+    ):
+        marketing = probe("cart.abandoned", kind=Kind.MARKETING)
+        catalogue(marketing, probe("order.shipped"))
+        [first] = send_email("cart.abandoned", probe_object())
+        url = urlsplit(
+            mail.outbox[0]
+            .extra_headers["List-Unsubscribe"]
+            .split(", ")[-1]
+            .strip("<>")
+        )
+        mail.outbox.clear()
+
+        response = APIClient().post(url.path)
+
+        assert first.status is Status.SENT
+        assert response.status_code == 200
+        [marketing_after] = send_email("cart.abandoned", probe_object())
+        [transactional] = send_email("order.shipped", probe_object())
+        assert marketing_after.status is Status.SKIPPED_OPTED_OUT
+        assert transactional.status is Status.SENT
 
     def test_the_star_row_stops_every_marketing_type(self, catalogue):
         catalogue(probe("cart.abandoned", kind=Kind.MARKETING))

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 from django.core import mail
+from django.urls import reverse
+from django_tenants.test.client import TenantClient
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from emails import optout
@@ -123,3 +125,28 @@ def test_an_opt_out_is_the_stores_own(mt_tenant, catalogue):
 
     with schema_context(PUBLIC):
         assert optout.is_opted_out("customer@example.test", marketing) is False
+
+
+@pytest.mark.django_db
+def test_an_opt_out_link_for_one_store_is_a_400_on_anothers_host(
+    mt_tenant, mt_tenant_b, catalogue
+):
+    catalogue(probe(MARKETING_KEY, kind=Kind.MARKETING))
+    with schema_context(mt_tenant.schema_name):
+        token = optout.make_token("customer@example.test", MARKETING_KEY)
+    url = reverse("email-unsubscribe", args=[token])
+
+    on_b = TenantClient(mt_tenant_b).post(url)
+
+    assert on_b.status_code == 400
+    for schema in (mt_tenant.schema_name, mt_tenant_b.schema_name, PUBLIC):
+        with schema_context(schema):
+            assert not EmailOptOut.objects.exists(), schema
+
+    on_a = TenantClient(mt_tenant).post(url)
+
+    assert on_a.status_code == 200
+    with schema_context(mt_tenant.schema_name):
+        assert EmailOptOut.objects.count() == 1
+    with schema_context(mt_tenant_b.schema_name):
+        assert not EmailOptOut.objects.exists()

@@ -6846,6 +6846,9 @@ msgstr "Τιμολόγηση & myDATA"
 msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
 msgstr "Καλείται από προγράμματα email που τηρούν το List-Unsubscribe-Post=One-Click. Επιστρέφει 200 OK ανεξάρτητα από την εγκυρότητα του token (σιωπηλά, κατά RFC 8058)."
 
+msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
+msgstr "Καλείται από πελάτες αλληλογραφίας που υποστηρίζουν το List-Unsubscribe-Post=One-Click. Το διακριτικό ορίζει τον τύπο email, ή όλους τους τύπους προωθητικών μηνυμάτων, και ισχύει μόνο για το κατάστημα που το έστειλε. Η επανάληψη της κλήσης δεν αλλάζει τίποτα."
+
 msgid "Is Active"
 msgstr "Ενεργό"
 
@@ -10271,6 +10274,9 @@ msgstr "Απεγγραφή με ένα κλικ από θέμα κατά RFC 805
 
 msgid "RFC 8058 one-click unsubscribe from all topics"
 msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
+
+msgid "RFC 8058 one-click unsubscribe from marketing email"
+msgstr "Απεγγραφή με ένα κλικ από προωθητικά email κατά RFC 8058"
 
 msgid "RabbitMQ"
 msgstr "RabbitMQ"
@@ -15449,10 +15455,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Configuration keys: %(keys)s"
 #~ msgstr "Κλειδιά διαμόρφωσης: %(keys)s"
 
-#, fuzzy
-#~ msgid "Configuration must be a JSON object."
-#~ msgstr "Κατάσταση Διαμόρφωσης"
-
 #~ msgid "Configured"
 #~ msgstr "Διαμορφωμένο"
 
@@ -16271,10 +16273,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-brace-format
 #~ msgid "Your package is being handled by {carrier}. Tracking number: {tracking_number}."
 #~ msgstr "Το δέμα σου διαχειρίζεται η {carrier}. Αριθμός παρακολούθησης: {tracking_number}."
-
-#, fuzzy
-#~ msgid "Zero Results"
-#~ msgstr "Αποτελέσματα ομάδας"
 
 #~ msgid "Zero VAT (0%)"
 #~ msgstr "Μηδενικός ΦΠΑ (0%)"

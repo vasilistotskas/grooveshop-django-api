@@ -11792,6 +11792,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/emails/unsubscribe/{token}:
+    post:
+      operationId: unsubscribeFromEmailOneClick
+      description: 'Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
+        The token names the email type, or every marketing type, and is valid for
+        the store that sent it only. Idempotent: repeating it changes nothing.'
+      summary: RFC 8058 one-click unsubscribe from marketing email
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - Emails
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/feedback:
     post:
       operationId: createFeedback

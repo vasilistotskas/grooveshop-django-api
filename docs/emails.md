@@ -22,8 +22,9 @@ each move keeping the recorded golden files equal (see Tests).
 | `gates.py` | The four gates a type can list. |
 | `recipients.py` | `Recipient(address, language)` and the resolvers `customer_of`, `store_operators`, `platform_operators`. |
 | `sender.py` | The `From` and `Reply-To`. Reuses `tenant.credentials`. |
-| `headers.py` | `build_headers`: the list headers by kind. Reuses `user.utils.subscription`. |
+| `headers.py` | `build_headers`: the list headers by kind, and the two builders under it. |
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
+| `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`. |
 | `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it; the pipeline's only sender. |
 | `send.py` | `send_email`: the whole envelope. |
@@ -215,8 +216,31 @@ something a person can decline.
   signature, an expired token (365 days), another store, an unknown type or
   a type that takes no opt-out.
 - `unsubscribe_url` builds `<api host>/api/v1/emails/unsubscribe/<token>`
-  (`UNSUBSCRIBE_PATH`). **No view serves that path yet**: a marketing type
-  must not be registered before it does.
+  (`UNSUBSCRIBE_PATH`); `EmailUnsubscribeView` serves it (below).
+
+### The unsubscribe endpoint
+
+`POST /api/v1/emails/unsubscribe/<token>` is the RFC 8058 one-click target
+named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
+
+- It records `EmailOptOut` (source `one_click`) for the token's type, or for
+  every marketing type when the token carries `*`, and answers `200` with
+  no body. It is idempotent: the row is created once.
+- A forged, tampered, expired or other-store token, an unknown type and a
+  type that takes no opt-out all answer the same `400`
+  (`code: unsubscribe_token_invalid`). The reason goes to the log only. A
+  token minted in one store's schema is a `400` on every other host.
+- No authentication and no CSRF check (a mailbox provider sends neither);
+  the POST body is not read, so the `List-Unsubscribe=One-Click` form, in
+  any encoding, is accepted. Throttled per client address by
+  `EmailUnsubscribeThrottle` (`email_unsubscribe`, fail open).
+- **There is no `GET`** (it answers `405`). A link scanner follows every URL
+  in a mail, so a GET must never opt anyone out. The plan's GET redirect to
+  the storefront confirm page waits for that page; until it ships, no mail
+  body links to this URL, only the header does.
+- The blanket newsletter link (`UnsubscribeAllView`, `/user/unsubscribe/<token>`)
+  also writes `EmailOptOut(type_key="*")` for the address the link was sent
+  to, beside the account-level `marketing_opted_out_at`.
 
 ### `EMAIL_HASH_KEY`
 
@@ -246,9 +270,9 @@ customers:
   `List-Unsubscribe-Post: List-Unsubscribe=One-Click` and `List-ID`
   (RFC 2369, RFC 8058, Google's bulk-sender rules).
 
-The builders are `user.utils.subscription.build_transactional_list_headers`
-and `build_list_unsubscribe_headers`, reused; they move here when the send
-sites that call them do.
+`build_list_unsubscribe_headers(url, *, list_id)` and
+`build_transactional_list_headers(list_id=...)` live in `headers.py`; the
+send sites not yet on the pipeline call them directly.
 
 ## Header safety
 
@@ -263,13 +287,10 @@ concatenation at a call site.
 
 ## Not built yet
 
-- The unsubscribe endpoints behind `UNSUBSCRIBE_PATH`; marketing headers
-  already point at them.
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
-- The import move: `sender.py` and `headers.py` reuse
-  `tenant.credentials` and `user.utils.subscription`, whose code moves here
-  with the send sites (the header import will then need its cycle broken).
+- The storefront confirm page and the `GET` redirect to it, and the
+  email-preferences endpoint.
 - The other domains' email types (shipping alerts, product, giftcard, b2b,
   contact, user, core, tenant, allauth) and the admin page. The preview of
   the order emails already goes through `render`.

@@ -558,6 +558,9 @@ REST_FRAMEWORK = {
         # bandwidth budget, not just an anti-spam one. Generous enough
         # for a three-file enquiry plus retries on a bad connection.
         "contact_attachment": None if DEBUG else "20/hour",
+        # One-click unsubscribe POSTs arrive from a mailbox provider's
+        # shared address pool, so the budget is per address, not per mail.
+        "email_unsubscribe": None if DEBUG else "120/minute",
         "payment": None if DEBUG else "10/minute",
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",

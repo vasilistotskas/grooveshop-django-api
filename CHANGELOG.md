@@ -3,6 +3,362 @@
 
 
 
+## v3.169.0 (2026-10-30)
+
+### Bug fixes
+
+* fix(deps): uv 0.13.6 in CI and both Dockerfiles
+
+Pin uv 0.13.6 in the Dockerfile, dev.Dockerfile and the CI UV_VERSION,
+and add required-version as a lower bound so an older uv refuses to
+rewrite uv.lock.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(product): a delivered order paid on delivery counts as a purchase
+
+purchase_items required a COMPLETED order, but an order paid to the
+courier or carrier stays DELIVERED until the payout is reconciled, days
+after the shopper has the goods and the delivered email has invited a
+review. A DELIVERED order whose pay way is collected on delivery now
+counts too, for the review gate and the verified-purchase flag alike.
+Unpaid transfers, shipped, canceled and returned orders still do not.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(boxnow): bound webhook replay by the signed event time, and categorise the admin history setting
+
+apply_webhook_event ignores an event whose HMAC-signed data.time is older
+than BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS (90), so replay protection no
+longer depends on the parcel event rows the retention sweep deletes; the
+settings module refuses a window not shorter than the retention. The
+webhook endpoint tests use the current time instead of a fixed date.
+
+ADMIN_LOG_RETENTION_DAYS gets its own Admin History category in the
+settings admin, with the Greek and English catalogue entries.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(order): distinctive title setting describes the storefront as next to the legal name
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(order): distinctive title setting describes the storefront as in place of the legal name
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(tenant): offer only the platform currency as a store currency
+
+Every money path works in DEFAULT_CURRENCY and nothing converts, so a USD
+choice only let a store render prices the backend never charged. No store in
+production or staging uses it.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(order): keep the timestamp indexes on Expense and read an order line only in the stock log
+
+Expense declares its own indexes, which replaces the abstract parent's
+list, so it lists the timestamp indexes again. The stock log's admin shows
+the order line it restocked as a read-only field instead of a form
+dropdown over every order line. A tenant-isolation test pins that a cost,
+a fee and an expense of one store are not in another's profit.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* fix(order): leave deleted orders out of the profit costs and fees
+
+Revenue reads only orders that are not deleted; the cost of goods, the
+restock reversal and the provider fees now apply the same rule, so a
+deleted order no longer lowers the profit.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+### Documentation
+
+* docs(order): describe the profit inputs and who sees them
+
+The profit report, the cost price, the provider fee (Stripe balance
+transaction, Viva event 1799) and the owner-only permissions in the
+order-system reference and the role docstring, with a pointer in CLAUDE.md.
+The message catalogues carry the new strings.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+### Features
+
+* feat(order): complete turnover, management profit, feature-gated admin, data retention and faster cart (#378) ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(tenant): PRODUCT_ASSURANCES_ENABLED store preference
+
+A store UI preference (default on) for the product page purchase
+assurances box, served in the tenant payload as product_assurances.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): review links in the delivered and completed emails
+
+Each distinct product of the order gets a "Write a review" link to its
+storefront page with the write-review fragment. Shown only when product
+reviews are on and, with PRODUCT_REVIEWS_PURCHASE_REQUIRED, the order has
+an account. Greek and English copy, goldens re-recorded, tests for the
+gates.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): distinctive title in the seller identity
+
+INVOICE_SELLER_DISTINCTIVE_TITLE (blank by default) joins the seller
+identity map, so it reaches the legal-identity API as distinctive_title
+and the receipt and credit document snapshot. The receipt prints it under
+the legal name. missing_disclosure_fields is unchanged: the title is
+optional.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(cart): record a source on every fill and return the cart from add and update
+
+An add that carries no attribution object is now classified like an
+order with no signal (User-Agent, else direct), so every cart filled
+after the add has a source; the old gate left gateway and
+storage-blocked carts blank.
+
+POST /cart/item and PUT/PATCH /cart/item/{id} gain an additive cart
+field, the body of GET /cart, so the storefront needs no refresh. The
+written line is serialized through CartItem.objects.for_detail().
+Cart.last_activity is written at most once per interval instead of on
+every request, and the cart retrieve resolves the cart once.
+
+The cart admin drops the always-empty Checkout column and keeps its
+filter.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): accept mcp as an agent protocol and keep the last_activity write
+
+Carts filled through the gateway's MCP tools are AI-agent traffic: mcp
+joins ucp and acp, believed only with the gateway secret, labelled
+"AI agent (MCP)". The enum is request-only (OrderAttributionInputRequest).
+
+The last_activity throttle is dropped: the guest-cart sweep reads that
+column, so it is written on every request as before.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(page_config): footer column flag for the seller details
+
+NavigationColumn.shows_merchant_identity (default false, at most one per
+menu through a conditional unique constraint) marks the footer column the
+storefront renders the seller identity under. The public navigation lists
+it as shows_merchant_identity on the flagged column only. Additive
+migration, admin field and help text, Greek and English copy.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(retention): delete unbounded operational tables on a schedule and stop recording noise
+
+Blank-query product searches (the storefront's listing loads and its
+cache warm-up) are no longer recorded as searches, and a migration
+deletes the existing ones in every store schema. A save that writes only
+excluded fields of a shipment (the carrier tracking poll) no longer
+writes a history row, through core.history.ChangeOnlyHistoricalRecords
+on AcsShipment and BoxNowShipment.
+
+core.retention.delete_in_batches is the one batched primary-key delete;
+the ACS API call sweep and the contact sweep move onto it. New daily
+sweeps: recommendation events, Meta CAPI delivery log, cache purge log,
+ACS and BoxNow checkpoints of settled shipments, and the admin history
+(per-store ADMIN_LOG_RETENTION_DAYS, 0 keeps). Successful ACS tracking
+reads keep ACS_API_CALL_POLL_RETENTION_DAYS (14) instead of 90 days. The
+sessions task also deletes allauth user-session rows whose session is
+gone and expired knox tokens.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(admin): show a feature's pages, tabs and fields only while it is usable or holds records
+
+One registry (admin/features.py, built on STORE_FEATURES plus the retail
+documents) decides every admin surface of an optional feature by one rule:
+shown while the store can use the feature or holds records of it.
+
+- Setup pages follow the plan; with the store setting off they carry the
+  Off badge and only OWNER and ADMIN see them. Record pages show while the
+  feature is live or the table has rows; off the plan they are read-only,
+  and a record is only added while the feature is live.
+- BaseModelAdmin refuses a hidden page (has_module_permission and the
+  object permissions), so a typed URL, the sidebar, the dashboard links
+  and the palette follow one predicate. The store site keeps a tab only
+  while its page opens.
+- feature_gates (Gate) hide fields, fieldsets and list filters of a
+  feature that is off unless the object has data for it; FeatureInline
+  does the same for an inline. Applied to the order (receipt, credit,
+  billing and discount fields, wholesale and document filters), customer
+  (loyalty, newsletter), product (points, alerts, likes, reviews), blog
+  comments and contact attachments.
+- Stores without a catalogue or cart follow the same rule for Products,
+  Carts and Orders.
+- Receipts and credit documents follow MYDATA_ENABLED; issuing keeps
+  MyDataConfig.is_ready and its action permission is now has_issuing_permission.
+- Adjusting loyalty points requires a live programme.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(cart): mark the cart recommendations fields deprecated and optional
+
+CartItemDetail, CartDetail and CartItemMutationResponse still send
+recommendations, but the schema now lists it as deprecated and not
+required, so a storefront generated from it can stop reading it and a
+later release can drop the field. The mechanism is the serializer
+decorator deprecated_optional_fields plus a postprocessing hook that
+only touches the fields it names.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+* revert(cart): keep the recommendations fields required in the schema
+
+The loosening is refused by the deploy gate while the live storefront
+requires the fields; the fields are removed outright in a later release.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): snapshot VAT lines and the ship moment of every order
+
+Turnover reads what the receipt bills and when the parcel left, so both are
+kept on the order instead of being re-derived: OrderVatLine rows written at
+the end of both checkout paths from the receipt's own order_vat_lines, and
+Order.shipped_at stamped by Order.save the first time the status is a
+dispatched one. The VAT rule is split into a pure vat_lines over plain
+values so the live models and a migration's historical ones feed one
+implementation.
+
+Migration 0095 fills existing orders (lines from the same function, the ship
+moment from the order history) and manage.py backfill_turnover_snapshots
+covers orders the previous release creates during a rollout.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): turnover is the legal revenue with ranges, comparison, breakdowns and exports
+
+Turnover now counts the shipping and payment-fee revenue and the VAT beside
+the net goods, on an accrual basis: an order is a sale when it left the
+store, whatever the payment method, so a month never changes because a
+courier paid late; what is still owed is reported as awaiting collection and
+a refused parcel is reversed in the month it came back. Returns are split
+over goods, shipping and fees pro rata over the receipt, in the month they
+happen, and an order that never shipped is neither a sale nor a return.
+
+figures(start, end, bucket, group_by) serves one definition to the page, the
+CSV, the new XLSX export and the store dashboard, whose revenue and best
+sellers read the same module instead of counting COMPLETED payments. The page
+gets a filter form, quarter/month/week/day buckets, year-over-year, a chart,
+and breakdowns by payment method, category, product, channel and VAT rate.
+Money is formatted in the store's currency instead of a hardcoded euro sign.
+
+The demo seed gives a REFUNDED order its ledger rows, and the admin guide and
+developer docs describe the new rule.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): record product cost, provider fees and expenses for the profit report
+
+The inputs a management profit figure needs, none of them shown to anyone
+but the store owner:
+
+- Product.cost_price (net, nullable) and OrderItem.unit_cost, copied onto
+  the line when it is created, so a later cost edit never restates a sale.
+  The cost is kept out of product history, exports and every API.
+- PaymentTransaction.fee and fee_source: the provider's own figure or
+  nothing. Stripe's comes from the charge's balance transaction (charge
+  events, and the payment intent that books the payment), Viva's from the
+  Transaction Price Calculated event (1799, TotalCommission), verified
+  like every other Viva event.
+- Expense: date, category, description, net and VAT amounts, a private
+  attachment and the staff member who entered it, with an admin.
+- order.view_profit_report, the Expense permissions and
+  product.manage_cost_price are granted to the OWNER only: ADMIN and STAFF
+  are denied them in the role mapping.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): tie a restocked return to its order line
+
+StockLog.order_item names the line whose returned units a restock put
+back, so the profit report can give that line's cost back in the month
+of the restock. Older restocks name no line; none of them belongs to a
+line that carries a cost.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* feat(order): add the management profit report for the store owner
+
+order.profit builds net revenue (the turnover figures), cost of goods sold
+(unit cost of what shipped, less restocked returns), payment fees, carrier
+invoices and other expenses into gross profit, contribution and operating
+profit, with cost and fee coverage so that what is not recorded is shown,
+never counted as zero. The page (Sales -> Profit, owner only) takes the
+turnover page's range, period, comparison and breakdown and exports CSV and
+XLSX. Migrations of the profit inputs follow the turnover snapshots.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+### Refactoring
+
+* refactor(order): make the turnover bucketing helpers public
+
+by_period, period_of, local_date, sold_lines and TRUNC are the pieces another
+report needs to bucket and select sales the way turnover does.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+* refactor(admin): share the report filters, columns and files between pages
+
+The turnover page's filter form, period and group labels, column and cell
+formatting, and its CSV and XLSX writers move to admin.reports, so the
+profit page reads the same parameters and writes the same files instead
+of copying them. No behaviour change; the XLSX content type constant now
+lives in admin.reports.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
+### Testing
+
+* test: switch loyalty on for the adjustment action and give the sample preview a database
+
+The loyalty adjustment now needs the programme live, and the delivered
+email preview reads the review switch from the store settings.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`32d96f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32d96f3bda825ac2a405c3d08520bad3290183dc))
+
 ## v3.168.0 (2026-10-30)
 
 ### Features

@@ -1,5 +1,6 @@
 from .attribution import OrderAttribution
 from .chargeback_decision import ChargebackDecision
+from .expense import Expense
 from .history import OrderHistory, OrderItemHistory
 from .invoice import Invoice, InvoiceCounter
 from .item import OrderItem
@@ -17,6 +18,7 @@ from .viva_webhook_event import VivaWebhookEvent
 __all__ = [
     "ChargebackDecision",
     "CreditCounter",
+    "Expense",
     "Invoice",
     "InvoiceCounter",
     "Order",

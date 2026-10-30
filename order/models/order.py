@@ -471,7 +471,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # custom permission to the roles that get the full action set):
         # the store's takings are not the day-to-day operations STAFF run.
         permissions = [
-            ("view_turnover_report", _("Can view the monthly turnover report"))
+            ("view_turnover_report", _("Can view the monthly turnover report")),
+            # Store OWNER only (``tenant.role_scopes.OWNER_ONLY_PERMISSIONS``):
+            # what the store earns after its costs is the owner's figure.
+            ("view_profit_report", _("Can view the profit report")),
         ]
         indexes = [
             # Declaring ``indexes`` REPLACES the abstract parents' list

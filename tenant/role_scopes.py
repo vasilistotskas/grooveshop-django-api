@@ -140,6 +140,27 @@ STORE_SETTINGS_APP_LABELS: frozenset[str] = frozenset(
 STAFF_READ_ONLY_APP_LABELS: frozenset[str] = frozenset({"texts"})
 
 
+# What the store OWNER holds back from ADMIN: the store's profit and the
+# costs behind it. ADMIN runs the store day to day and sees its takings
+# (the turnover report), not what it costs to earn them. Enumerated, the
+# same way ``PLATFORM_ONLY_APP_LABELS`` is, because forgetting an entry
+# here is a leak and not a missing feature.
+#
+# ``order.*expense``: the whole Expense model; ``order.view_profit_report``:
+# the report; ``product.manage_cost_price``: reading and editing a
+# product's cost price (``Product.cost_price``).
+OWNER_ONLY_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        "order.view_profit_report",
+        "order.view_expense",
+        "order.add_expense",
+        "order.change_expense",
+        "order.delete_expense",
+        "product.manage_cost_price",
+    }
+)
+
+
 def store_app_labels() -> frozenset[str]:
     """App labels whose admin pages show STORE data.
 

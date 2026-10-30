@@ -277,6 +277,8 @@ REGISTRY: dict[str, Scrub | Delete] = {
     ),
     "order.OrderItemHistoryTranslation": _scrub_all(description=Kind.TEXT),
     "order.StockLog": _scrub_all(reason=Kind.TEXT),
+    # Typed from an invoice: a payroll line can name the employee.
+    "order.Expense": _scrub_all(description=Kind.FREE_TEXT),
     # ── carriers ────────────────────────────────────────────────────
     "shipping_acs.AcsShipment": Scrub(
         order_fk="order",

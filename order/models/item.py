@@ -75,6 +75,25 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             "the VAT of what was actually charged."
         ),
     )
+    # What one unit cost the store (net of VAT), copied from the product
+    # when the line is created, like ``vat_rate``: a later edit of the
+    # product's cost never restates a sale. Empty means no cost was
+    # recorded (a line sold before the field existed, or a product with no
+    # cost), which the profit report counts as unknown, never as free.
+    # Never shown or edited in the store admin and in no API: only the
+    # OWNER's profit report reads it.
+    unit_cost = MoneyField(
+        _("Unit cost"),
+        max_digits=11,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Net cost of one unit when the line was created. Empty when "
+            "no cost was recorded."
+        ),
+    )
     quantity = models.IntegerField(_("Quantity"), default=1)
     original_quantity = models.IntegerField(
         _("Original Quantity"), null=True, blank=True
@@ -182,6 +201,8 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             # Nobody stated a rate (admin, staff API, a script): the line's
             # snapshot is the rate its product carries right now.
             self.vat_rate = self.product.vat_percent
+        if self._state.adding and self.unit_cost is None:
+            self.unit_cost = self.product.cost_price
         super().save(*args, **kwargs)
 
     def refund(self, quantity=None, *, performed_by=None, reason=""):

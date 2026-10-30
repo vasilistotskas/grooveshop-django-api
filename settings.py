@@ -4693,6 +4693,20 @@ ACS_API_CALL_POLL_RETENTION_DAYS = int(
 CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
     getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
 )
+# A BoxNow webhook event whose signed time is older than this is ignored.
+# The ``BoxNowParcelEvent`` rows are the replay guard, so the window must
+# end before the sweep above can delete a row an event could still meet.
+BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS = int(
+    getenv("BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS", "90")
+)
+if BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS >= CARRIER_TRACKING_EVENT_RETENTION_DAYS:
+    raise ImproperlyConfigured(
+        "BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS "
+        f"({BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS}) must be shorter than "
+        "CARRIER_TRACKING_EVENT_RETENTION_DAYS "
+        f"({CARRIER_TRACKING_EVENT_RETENTION_DAYS}): the replay guard rows "
+        "must outlive the events the guard admits."
+    )
 # Days after a COD parcel is DELIVERED before an absent ACS payout is
 # reported as overdue. The measured remittance lag is ~4 days, so 10
 # leaves headroom and fires only on genuinely stuck money. Nothing else

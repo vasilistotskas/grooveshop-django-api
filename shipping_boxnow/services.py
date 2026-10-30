@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
@@ -971,6 +973,25 @@ class BoxNowService:
         # "no fingerprint" — every use below already tests it for truth.
         data_fingerprint: str = envelope.get("_data_fingerprint") or ""
 
+        # --- Replay window -------------------------------------------------
+        # ``data.time`` is inside the HMAC-signed bytes, so an old event
+        # cannot be re-dated. The dedup rows below are kept for
+        # ``CARRIER_TRACKING_EVENT_RETENTION_DAYS``, far longer than this
+        # window (``settings`` refuses the reverse), so every event the
+        # window admits still meets its own row, and one it refuses never
+        # needed the row.
+        signed_time = parse_datetime(data["time"])
+        max_age = timedelta(days=settings.BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS)
+        if signed_time is not None and signed_time < timezone.now() - max_age:
+            logger.warning(
+                "apply_webhook_event: event older than %s days — ignoring "
+                "(message_id=%s, time=%s)",
+                settings.BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS,
+                message_id,
+                data["time"],
+            )
+            return None
+
         # --- Idempotency check (outside transaction) ----------------------
         # Dedup on the message id (BoxNow retries reuse it) AND on the
         # signed-content fingerprint (a replay under a forged/new id keeps
@@ -1024,7 +1045,7 @@ class BoxNowService:
             mapped_state = raw_event
 
         # --- Parse event timestamp ---------------------------------------
-        event_time = parse_datetime(data["time"])
+        event_time = signed_time
 
         # --- Atomic block: lock shipment + create event + update order ---
         # ``select_for_update`` MUST live inside ``transaction.atomic``

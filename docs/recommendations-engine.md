@@ -33,11 +33,10 @@ treat **cold start as the normal state, not the edge case**.
 
 What existed before this design: two ad-hoc recommenders — *same
 category, ordered by `view_count`* — computed inline on every cart GET
-(the `recommendations` SerializerMethodFields in `cart/serializers/cart.py`
-and `cart/serializers/item.py`) and
-rendered by nothing on the storefront. The engine replaces both **in
-place**, keeping the `recommendations` field names so the OpenAPI
-contract does not move.
+and add-to-cart response. The engine replaced both, and the cart
+payloads no longer carry recommendations at all: the storefront asks
+`GET /recommendations?surface=cart&seeds=<line product ids>` when the
+strip is on screen, so a cart read or an add does not pay for them.
 
 ## 2. Three commitments
 
@@ -207,7 +206,7 @@ Every `Surface` is served where its slot promises:
 |---|---|---|
 | `pdp` | the product | storefront product page |
 | `out_of_stock` | the product | storefront product page, when the product is sold out |
-| `cart` | every basket line | the cart payload's `recommendations` field, rendered by the cart page |
+| `cart` | every basket line | the storefront cart page and drawer, through `GET /recommendations` with the line product ids as `seeds` |
 | `empty_cart` | **none** | storefront cart page, when the cart is empty |
 | `order_email` | the order's products | the order confirmation email (`order_received` / `order_payment_confirmed`) |
 

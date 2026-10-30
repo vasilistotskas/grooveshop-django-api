@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
-from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -103,43 +102,6 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
             "created_at",
             "updated_at",
             "uuid",
-        )
-
-
-class CartItemDetailSerializer(CartItemSerializer):
-    recommendations = serializers.SerializerMethodField(
-        help_text=_("Related products that might interest the customer")
-    )
-
-    @extend_schema_field(
-        lazy_serializer("product.serializers.product.ProductSerializer")(
-            many=True
-        )
-    )
-    def get_recommendations(self, obj: CartItem):
-        # Single-seed cart surface for the line just added or changed.
-        # Same field, same shape as before; the source is now the
-        # recommendation engine (docs/recommendations-engine.md), whose
-        # candidates are precomputed per product, so this is a read of
-        # a few rows plus one ``for_list()`` hydration — cheaper than
-        # the category query it replaces on the add-to-cart response.
-        from recommendation.engine import SuggestionContext, suggest
-        from recommendation.enum import Surface
-        from recommendation.hydrate import hydrate_products
-
-        suggestions = suggest(
-            SuggestionContext(
-                surface=Surface.CART,
-                seed_ids=(obj.product_id,),
-                limit=3,
-            )
-        )
-        return hydrate_products(suggestions, context=self.context)
-
-    class Meta(CartItemSerializer.Meta):
-        fields = (
-            *CartItemSerializer.Meta.fields,
-            "recommendations",
         )
 
 

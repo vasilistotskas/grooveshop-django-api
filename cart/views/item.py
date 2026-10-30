@@ -18,7 +18,6 @@ from cart.models import CartItem
 from cart.serializers.cart import CartItemMutationResponseSerializer
 from cart.serializers.item import (
     CartItemCreateSerializer,
-    CartItemDetailSerializer,
     CartItemSerializer,
     CartItemUpdateSerializer,
 )
@@ -73,7 +72,7 @@ serializers_config: SerializersConfig = {
         parameters=CART_TOKEN_HEADERS,
     ),
     "retrieve": ActionConfig(
-        response=CartItemDetailSerializer,
+        response=CartItemSerializer,
         operation_id="retrieveCartItem",
         summary=_("Retrieve a cart item"),
         description=_(

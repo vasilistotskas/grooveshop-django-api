@@ -23,12 +23,11 @@ from user.factories.account import UserAccountFactory
 pytestmark = pytest.mark.django_db
 
 # Measured on the factory data below (a cart of two lines), with a
-# one-query allowance for the tenant artifacts a cold cache adds. The add
-# is dearer than the cart read because its response carries the cart the
-# shopper no longer has to fetch, plus the line's own ``recommendations``
-# until the storefront stops requiring that field.
-GET_CART_QUERIES = 38
-ADD_ITEM_QUERIES = 59
+# one-query allowance for the tenant artifacts a cold cache adds. Neither
+# response computes product recommendations (the storefront asks the
+# recommendations endpoint for them), which was most of both.
+GET_CART_QUERIES = 24
+ADD_ITEM_QUERIES = 40
 
 
 def _product():
@@ -83,6 +82,26 @@ class TestQueryBudget:
 
         assert response.status_code == status.HTTP_201_CREATED
         assert count <= ADD_ITEM_QUERIES + 1, count
+
+
+class TestNoRecommendationsInTheCartPayloads:
+    def test_cart_and_lines_carry_none(self, shopper):
+        _user, cart, client = shopper
+        line = cart.items.first()
+
+        bodies = [
+            client.get(reverse("cart-detail")).json(),
+            client.get(reverse("cart-item-detail", args=[line.pk])).json(),
+            client.post(
+                reverse("cart-item-list"),
+                {"product": _product().pk, "quantity": 1},
+                format="json",
+            ).json(),
+        ]
+
+        for body in bodies:
+            assert "recommendations" not in body
+        assert "recommendations" not in bodies[2]["cart"]
 
 
 class TestAddResponseCarriesTheCart:

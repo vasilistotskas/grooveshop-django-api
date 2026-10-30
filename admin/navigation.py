@@ -233,6 +233,9 @@ def store_sidebar(request: Any) -> list[Item]:
             _tool(_("Turnover"), "bar_chart", reverse("admin:turnover"))
             if user.has_perm("order.view_turnover_report")
             else None,
+            _tool(_("Profit"), "trending_up", reverse("admin:profit"))
+            if user.has_perm("order.view_profit_report")
+            else None,
             page("order.Expense", _("Expenses"), "payments"),
         ],
     )

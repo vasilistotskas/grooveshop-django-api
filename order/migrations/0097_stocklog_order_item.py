@@ -14,7 +14,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('order', '0094_profit_costs_fees_and_expenses'),
+        ('order', '0096_profit_costs_fees_and_expenses'),
     ]
 
     operations = [

@@ -21,7 +21,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('order', '0093_order_turnover_report_permission'),
+        ('order', '0095_backfill_turnover_snapshots'),
     ]
 
     operations = [

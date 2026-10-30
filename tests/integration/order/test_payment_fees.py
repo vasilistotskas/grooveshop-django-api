@@ -251,7 +251,7 @@ class TestVivaTransactionPriceCalculated:
         assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
 
     def test_the_event_goes_through_the_webhook_dispatch_once(self):
-        order, row = _viva_order()
+        _order, row = _viva_order()
 
         for _ in range(2):
             with _retrieved():

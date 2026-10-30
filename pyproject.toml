@@ -1,5 +1,5 @@
 [project]
-version = "3.167.0"
+version = "3.167.1"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -263,7 +263,9 @@ override-dependencies = [
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
     # GHSA-chx6-46f5-w4vp, GHSA-c2m8-h5v5-343r (HIGH) — fixed in 6.5.9
-    "tornado>=6.5.9",
+    # GHSA-r4j5-9xpp-3985, GHSA-pcg2-g6cj-q92c (MODERATE), GHSA-pw9p-v7r6-gx4p
+    # (LOW) — fixed in 6.6
+    "tornado>=6.6",
     # CVE-2026-71491, CVE-2026-59893, CVE-2026-54284 (HIGH) — three
     # quadratic-CPU paths in grouping/lexer/TokenList reachable from
     # sqlparse.parse/format/split; all fixed in 0.6.0. Transitive via

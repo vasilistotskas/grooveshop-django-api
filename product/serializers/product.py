@@ -195,7 +195,6 @@ class ProductSerializer(
         min_value=_STOCK_RANGE[0],
         max_value=_STOCK_RANGE[1],
     )
-    category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     # Mirrors Product.vat (null=True, blank=True, SET_NULL). An
     # explicitly-declared relation does NOT inherit the model's
     # nullability, so without this the field is required — and on a
@@ -276,6 +275,10 @@ class ProductSerializer(
 
         read_only_fields = (
             "id",
+            # Product.category is SET_NULL and optional in the admin, so a
+            # product can have none: read-only, the model field makes it
+            # nullable in the schema.
+            "category",
             "variant_group",
             "brand",
             "brand_name",
@@ -371,7 +374,12 @@ class ProductRetrieveSerializer(ProductDetailSerializer):
 class ProductWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
-    category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
+    # Matches the model's nullability, like ``vat``: a product the admin
+    # saved without a category, or whose category was deleted, must
+    # round-trip through a PUT of its own payload.
+    category = PrimaryKeyRelatedField(
+        queryset=ProductCategory.objects.all(), required=False, allow_null=True
+    )
     # See ProductSerializer.vat — matches the model's nullability so a
     # tenant without seeded VAT rates can still create products.
     vat = PrimaryKeyRelatedField(

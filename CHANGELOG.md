@@ -3,6 +3,28 @@
 
 
 
+## v3.166.2 (2026-10-30)
+
+### Bug fixes
+
+* fix(api): document product category as nullable and the tiers and regions lists as arrays (#371)
+
+Product.category is a nullable foreign key (SET_NULL): a product whose
+category was deleted serialises null, while Product, ProductDetail and
+ProductRetrieve declared it required and non-null. Reads now state it
+nullable, and ProductWriteSerializer accepts null like vat and brand, so
+a category-less product can be saved back with its own payload.
+
+The tiers and regions-by-country actions had paginated=False in their
+ActionConfig but no pagination_class=None, so drf-spectacular documented a
+paginated envelope around the bare array they return. A test now checks
+that every paginated=False action declares no paginator.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxNPjR7mkfvjcduoVYd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0ed5cf6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ed5cf64131a4a3cf0786e8b3421719e4202f833))
+
 ## v3.166.1 (2026-10-30)
 
 ### Bug fixes

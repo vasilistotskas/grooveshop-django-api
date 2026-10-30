@@ -42,6 +42,11 @@ msgstr "%(active)d/%(total)d ενεργά"
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
+#, fuzzy, python-format
+#| msgid "%(kind)s %(amount)s on order %(order)s"
+msgid "%(category)s %(amount)s on %(date)s"
+msgstr "%(kind)s %(amount)s στην παραγγελία %(order)s"
+
 #, python-format
 msgid "%(change)s against the same period last year"
 msgstr "%(change)s σε σχέση με την ίδια περίοδο πέρυσι"
@@ -1298,6 +1303,11 @@ msgstr "Πάντα θετικό· το είδος δείχνει προς ποι
 msgid "Amount"
 msgstr "Ποσό"
 
+#, fuzzy
+#| msgid "Discount (incl. VAT)"
+msgid "Amount (net of VAT)"
+msgstr "Έκπτωση (με ΦΠΑ)"
+
 msgid "Amount Due"
 msgstr "Οφειλόμενο ποσό"
 
@@ -1472,6 +1482,11 @@ msgstr "Προσθήκη"
 
 msgid "Attach a coupon code to the cart. Returns the updated cart with promotion discount fields. Rejections carry a machine-readable reason."
 msgstr "Επισύναψη κωδικού κουπονιού στο καλάθι. Επιστρέφει το ενημερωμένο καλάθι με τα πεδία έκπτωσης προσφοράς. Οι απορρίψεις φέρουν μηχανικά αναγνώσιμη αιτιολογία."
+
+#, fuzzy
+#| msgid "Attach"
+msgid "Attachment"
+msgstr "Προσθήκη"
 
 msgid "Attachment not found."
 msgstr "Το συνημμένο δεν βρέθηκε."
@@ -2199,7 +2214,15 @@ msgstr "Όνομα καμπάνιας"
 msgid "Can purge caches"
 msgstr "Μπορεί να εκκαθαρίζει cache"
 
+msgid "Can view and edit the cost price"
+msgstr ""
+
 msgid "Can view the monthly turnover report"
+msgstr "Μπορεί να δει την αναφορά μηνιαίου τζίρου"
+
+#, fuzzy
+#| msgid "Can view the monthly turnover report"
+msgid "Can view the profit report"
 msgstr "Μπορεί να δει την αναφορά μηνιαίου τζίρου"
 
 msgid "Cancel"
@@ -3117,6 +3140,11 @@ msgstr "Κόστος"
 
 msgid "Cost cannot be negative."
 msgstr "Το κόστος δεν μπορεί να είναι αρνητικό."
+
+#, fuzzy
+#| msgid "Consumer price"
+msgid "Cost price"
+msgstr "Τιμή καταναλωτή"
 
 #, python-format
 msgid "Could not print voucher %(voucher)s (order #%(order)s): %(error)s"
@@ -4291,6 +4319,12 @@ msgstr "Εξαιρούμενες κατηγορίες"
 msgid "Excluded Products"
 msgstr "Εξαιρούμενα προϊόντα"
 
+msgid "Expense"
+msgstr ""
+
+msgid "Expenses"
+msgstr ""
+
 msgid "Experimental feature to enable. Available: , "
 msgstr "Πειραματική λειτουργία προς ενεργοποίηση. Διαθέσιμες: , "
 
@@ -4463,6 +4497,11 @@ msgstr "Πλέγμα χαρακτηριστικών"
 
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Χρέωση από τη μέθοδο πληρωμής (π.χ. τέλος αντικαταβολής)"
+
+#, fuzzy
+#| msgid "Order source"
+msgid "Fee source"
+msgstr "Πηγή παραγγελίας"
 
 msgid "Feedback"
 msgstr "Feedback"
@@ -8088,6 +8127,14 @@ msgstr "Ενσωματωμένα στοιχεία locker BoxNow"
 msgid "Net"
 msgstr "Καθαρό"
 
+#, fuzzy
+#| msgid "Payment amount"
+msgid "Net amount"
+msgstr "Ποσό πληρωμής"
+
+msgid "Net cost of one unit when the line was created. Empty when no cost was recorded."
+msgstr ""
+
 msgid "Net price override"
 msgstr "Καθαρή τιμή (παράκαμψη)"
 
@@ -9164,6 +9211,11 @@ msgstr "PENDING / PAID / FAILED / CANCELED"
 msgid "PRODUCT INDEX INSPECTION"
 msgstr "ΕΛΕΓΧΟΣ INDEX ΠΡΟΪΟΝΤΩΝ"
 
+#, fuzzy
+#| msgid "Staging"
+msgid "Packaging"
+msgstr "Staging"
+
 msgid "Page"
 msgstr "Σελίδα"
 
@@ -9570,6 +9622,9 @@ msgstr "Πληρωμές"
 
 msgid "Payout marked as reconciled."
 msgstr "Η απόδοση σημάνθηκε ως συμφωνημένη."
+
+msgid "Payroll"
+msgstr ""
 
 msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
 msgstr "Επιστρέφει το ποσό μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι, στο καθολικό πληρωμών της παραγγελίας. Μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες μέχρι να μην απομένει τίποτα. Η κατάσταση της παραγγελίας και το απόθεμά της δεν αλλάζουν."
@@ -10337,6 +10392,11 @@ msgstr "Αναγνωριστικό συναλλαγής παρόχου"
 msgid "Provider customer id to attach the payment to"
 msgstr "ID πελάτη του παρόχου στον οποίο θα συνδεθεί η πληρωμή"
 
+#, fuzzy
+#| msgid "Provider Code"
+msgid "Provider fee"
+msgstr "Κωδικός παρόχου"
+
 msgid "Provider payment-method id to charge"
 msgstr "ID μεθόδου πληρωμής του παρόχου προς χρέωση"
 
@@ -10977,6 +11037,11 @@ msgstr "Εμφανίζεται στα meta tags author/creator/publisher του 
 
 msgid "Renders, on demand, a watermarked specimen of the order's retail receipt: the same document with no number, no QR code and no tax standing. Demo stores only, for an order a receipt is issued for (shipped onwards); 404 when no specimen is available. Nothing is stored and nothing is sent to myDATA. Open to the order's owner, store staff, and the guest who holds the order's UUID (``?uuid=``)."
 msgstr "Δημιουργεί κατά παραγγελία ένα δείγμα της απόδειξης λιανικής της παραγγελίας με υδατογράφημα: το ίδιο έγγραφο χωρίς αριθμό, χωρίς κωδικό QR και χωρίς φορολογική ισχύ. Μόνο για καταστήματα επίδειξης και για παραγγελία για την οποία εκδίδεται απόδειξη (από την αποστολή και μετά). Όταν δεν υπάρχει διαθέσιμο δείγμα επιστρέφει 404. Τίποτα δεν αποθηκεύεται και τίποτα δεν στέλνεται στο myDATA. Ανοιχτό στον ιδιοκτήτη της παραγγελίας, στο προσωπικό του καταστήματος και στον επισκέπτη που έχει το UUID της παραγγελίας (``?uuid=``)."
+
+#, fuzzy
+#| msgid "Recent activity"
+msgid "Rent and utilities"
+msgstr "Πρόσφατη δραστηριότητα"
 
 msgid "Reorder categories"
 msgstr "Αναδιάταξη κατηγοριών"
@@ -11906,6 +11971,11 @@ msgstr "Μεταφορικά"
 msgid "Shipping & Tracking"
 msgstr "Αποστολή & Παρακολούθηση"
 
+#, fuzzy
+#| msgid "Shipping Carrier"
+msgid "Shipping (carrier invoices)"
+msgstr "Εταιρεία μεταφοράς"
+
 msgid "Shipping (incl. VAT)"
 msgstr "Μεταφορικά (με ΦΠΑ)"
 
@@ -12110,6 +12180,11 @@ msgstr "Παρουσία στα Μέσα Κοινωνικής Δικτύωσης
 msgid "Social URL must use https://. Got: %(value)s"
 msgstr "Το URL κοινωνικού δικτύου πρέπει να χρησιμοποιεί https://. Λήφθηκε: %(value)s"
 
+#, fuzzy
+#| msgid "Get my subscriptions"
+msgid "Software and subscriptions"
+msgstr "Λήψη συνδρομών μου"
+
 msgid "Solar Schedules"
 msgstr "Προγραμματισμοί Ηλιακοί"
 
@@ -12185,6 +12260,11 @@ msgstr "Οι συνδυάσιμες προσφορές συνδυάζονται 
 
 msgid "Staff"
 msgstr "Προσωπικό"
+
+#, fuzzy
+#| msgid "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgid "Staff member who entered the expense. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Μέλος του προσωπικού που έλεγξε την εταιρεία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
 msgid "Staff member who last changed the product from the admin. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Μέλος του προσωπικού που άλλαξε τελευταίο το προϊόν από το διαχειριστικό. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
@@ -12481,6 +12561,11 @@ msgstr "ID του Stripe PaymentIntent (μόνο για stripe)"
 
 msgid "Stripe SharedPaymentToken (spt_…) granted to this store by the agent platform, scoped to this exact purchase."
 msgstr "Stripe SharedPaymentToken (spt_…) που παραχωρήθηκε στο κατάστημα από την πλατφόρμα AI πράκτορα, δεσμευμένο σε αυτή ακριβώς την αγορά."
+
+#, fuzzy
+#| msgid "List loyalty transactions"
+msgid "Stripe balance transaction"
+msgstr "Λίστα συναλλαγών πιστότητας"
 
 #, python-format
 msgid "Stripe dispute closed: dispute_id=%(dispute_id)s, status=%(status)s"
@@ -12915,6 +13000,9 @@ msgstr "Το endpoint εκκαθάρισης του Nuxt δεν έχει ρυθ�
 msgid "The Ocp-Apim-Subscription-Key from the myDATA developer portal. Secret. No platform fallback — empty disables myDATA."
 msgstr "Το Ocp-Apim-Subscription-Key από την πύλη προγραμματιστών myDATA. Μυστικό. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το myDATA."
 
+msgid "The VAT on the invoice, kept for your accountant."
+msgstr ""
+
 msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
 msgstr "Τα διαπιστευτήρια Viva Wallet και Stripe κάθε tenant είναι οι δικοί του λογαριασμοί εμπόρου για την ολοκλήρωση αγοράς των πελατών του — άσχετα με το τι οφείλει ο έμπορος στην πλατφόρμα. Το Stripe Connect Account ID είναι δεσμευμένο για μελλοντικό κανάλι χρέωσης της πλατφόρμας και παραμένει αδρανές σήμερα."
 
@@ -12972,6 +13060,9 @@ msgstr "Ο κωδικός δεν υπάρχει"
 msgid "The code has reached its usage limit"
 msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης του"
 
+msgid "The cost without VAT: this is what the profit report uses."
+msgstr ""
+
 msgid "The country these thresholds were resolved for — the caller's ``country_code`` when given, else the first shippable country, matching the rule checkout uses for its initial country. Null only when the store has no active shipping rate anywhere yet."
 msgstr "Η χώρα για την οποία υπολογίστηκαν τα όρια — το ``country_code`` του αιτήματος αν δόθηκε, αλλιώς η πρώτη χώρα αποστολής, όπως και η αρχική χώρα της ολοκλήρωσης αγοράς. Null μόνο όταν το κατάστημα δεν έχει ακόμη καμία ενεργή τιμή αποστολής."
 
@@ -12986,6 +13077,9 @@ msgstr "Ο πελάτης δεν είναι επιλέξιμος για αυτή
 
 msgid "The customer kept the product"
 msgstr "Ο πελάτης κράτησε το προϊόν"
+
+msgid "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
+msgstr ""
 
 msgid "The destination this option was priced for."
 msgstr "Ο προορισμός για τον οποίο τιμολογήθηκε αυτή η επιλογή."
@@ -13038,6 +13132,9 @@ msgstr "Το δώρο αυτού του κωδικού δεν είναι δια�
 
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρωσε ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά."
+
+msgid "The invoice or receipt (PDF or image). Kept private."
+msgstr ""
 
 msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 msgstr "Το ``document.referrer`` της σελίδας προσγείωσης. Κρατείται μόνο ο ιστότοπος, και καθόλου όταν είναι ένα από τα domain του ίδιου του καταστήματος."
@@ -13131,6 +13228,9 @@ msgstr "Η προσφορά έχει λήξει"
 
 msgid "The promotion has not started yet"
 msgstr "Η προσφορά δεν έχει ξεκινήσει ακόμα"
+
+msgid "The provider report the fee was read from."
+msgstr ""
 
 msgid "The provider's own id for this movement (a Stripe PaymentIntent or refund id, a Viva transaction id, a courier voucher)."
 msgstr "Ο δικός του κωδικός του παρόχου για αυτή την κίνηση (PaymentIntent ή κωδικός επιστροφής του Stripe, κωδικός συναλλαγής της Viva, voucher μεταφορέα)."
@@ -13749,6 +13849,11 @@ msgstr "Αναγνωριστικό συναλλαγής"
 msgid "Transaction Payment Created"
 msgstr "Δημιουργήθηκε συναλλαγή πληρωμής"
 
+#, fuzzy
+#| msgid "Transaction Payment Created"
+msgid "Transaction Price Calculated"
+msgstr "Δημιουργήθηκε συναλλαγή πληρωμής"
+
 msgid "Transaction Reversal Created"
 msgstr "Δημιουργήθηκε αντιστροφή συναλλαγής"
 
@@ -13891,6 +13996,11 @@ msgstr "Μονάδα (μικτή)"
 
 msgid "Unit Price"
 msgstr "Τιμή μονάδας"
+
+#, fuzzy
+#| msgid "Unit (gross)"
+msgid "Unit cost"
+msgstr "Μονάδα (μικτή)"
 
 #, python-format
 msgid "Unit price: %(price)s. Final price: %(final)s. Quantity: %(qty)s. Total: %(total)s."
@@ -14258,6 +14368,11 @@ msgstr "Συντελεστής ΦΠΑ"
 msgid "VAT Rates"
 msgstr "Συντελεστές ΦΠΑ"
 
+#, fuzzy
+#| msgid "Amount"
+msgid "VAT amount"
+msgstr "Ποσό"
+
 msgid "VAT breakdown"
 msgstr "Ανάλυση ΦΠΑ"
 
@@ -14522,8 +14637,15 @@ msgstr "Viva ``EventData.StatusId`` ('F' = Ολοκληρώθηκε)"
 msgid "Viva ``EventData.TransactionId`` — idempotency key"
 msgstr "Viva ``EventData.TransactionId`` — κλειδί ιδεμποτεντίας"
 
-msgid "Viva ``EventTypeId`` — 1796/1797/1798/2054"
+#, fuzzy
+#| msgid "Viva ``EventTypeId`` — 1796/1797/1798/2054"
+msgid "Viva ``EventTypeId`` — 1796/1797/1798/1799/2054"
 msgstr "Viva ``EventTypeId`` — 1796/1797/1798/2054"
+
+#, fuzzy
+#| msgid "Bank transaction reference"
+msgid "Viva transaction price calculated"
+msgstr "Αριθμός συναλλαγής τράπεζας"
 
 #, python-brace-format
 msgid "Viva's Smart Checkout redirects to a static success URL configured in the merchant portal and appends ``?t=<transaction_id>&s=<order_code>&lang=..&eventId=<int>&eci=..`` (see developer.viva.com Smart Checkout integration). This endpoint translates those params into the order's UUID so the storefront can forward the customer to the canonical ``/checkout/success/{uuid}`` route. ``t`` resolves via ``payment_id`` (set by the webhook, may lag the redirect); ``s`` resolves via the ``viva_order_codes`` recorded at session creation, so it works during the webhook race. Permission is open because both keys are unguessable Viva-generated identifiers and the response carries no PII — just the order's UUID, public id, status, and payment_status."
@@ -14673,11 +14795,17 @@ msgstr "Τι κάνει αυτή τη στιγμή κάθε συνδεδεμέν
 msgid "What is enforced"
 msgstr "Τι επιβάλλεται αυτόματα"
 
+msgid "What one unit costs the store, net of VAT. Copied onto each order line when it is sold, so a later edit never changes a past sale. Empty means unknown: the profit report lists such sales as having no cost, it never counts them as free."
+msgstr ""
+
 msgid "What shoppers look for most."
 msgstr "Τι αναζητούν περισσότερο οι πελάτες."
 
 msgid "What the customer owes for the order, fixed at creation: lines and extras, less every deduction. Not what was collected; that is on the payment ledger."
 msgstr "Το ποσό που οφείλει ο πελάτης για την παραγγελία, καθορισμένο κατά τη δημιουργία: προϊόντα και έξτρα, μείον κάθε έκπτωση. Δεν είναι το ποσό που εισπράχθηκε· αυτό βρίσκεται στο καθολικό πληρωμών."
+
+msgid "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
+msgstr ""
 
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "Τι πληρώνει ο πελάτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν από το ``free_shipping_threshold`` ή τη ζωντανή τιμή (``live_quote``) του courier."

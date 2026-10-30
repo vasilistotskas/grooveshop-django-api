@@ -1695,10 +1695,13 @@ class TenantMembershipRole(models.TextChoices):
     - STAFF   — can view the tenant's operational admin (orders,
                 products) but cannot change tenant settings or invite
                 other staff.
-    - ADMIN   — full admin within the tenant (settings, team).
-    - OWNER   — same as ADMIN plus cannot be demoted/removed by other
-                admins; the tenant must always have at least one owner
-                (``UserTenantMembership`` refuses to remove the last).
+    - ADMIN   — full admin within the tenant (settings, team), except
+                what the owner keeps (``tenant.role_scopes.
+                OWNER_ONLY_PERMISSIONS``: the profit report, expenses and
+                product cost prices).
+    - OWNER   — same as ADMIN plus those, and cannot be demoted/removed by
+                other admins; the tenant must always have at least one
+                owner (``UserTenantMembership`` refuses to remove the last).
     """
 
     STAFF = "staff", _("Staff")

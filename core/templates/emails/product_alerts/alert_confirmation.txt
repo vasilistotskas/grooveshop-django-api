@@ -1,0 +1,24 @@
+{% load i18n %}{% trans "CONFIRM YOUR ALERT" %}
+{{ SITE_NAME }}
+================================================================================
+
+{% trans "Hello," %}
+
+{% if kind == "price_drop" %}{% blocktrans with product_name=product_name target_price=target_price %}Please confirm you'd like an email when the price of {{ product_name }} drops to {{ target_price }} or less. Your alert isn't active yet — open the link below to start it.{% endblocktrans %}{% else %}{% blocktrans with product_name=product_name %}Please confirm you'd like an email when {{ product_name }} is back in stock. Your alert isn't active yet — open the link below to start it.{% endblocktrans %}{% endif %}
+
+{% trans "CONFIRM HERE" %}
+--------------------------------------------------------------------------------
+{{ confirmation_url }}
+
+{% trans "THE PRODUCT" %}
+--------------------------------------------------------------------------------
+{{ product_name }}
+{{ product_url }}
+
+{% trans "If you didn't ask for this alert, you can safely ignore this email — nothing will happen." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thanks,
+The {{ site_name }} team{% endblocktrans %}
+
+================================================================================
+{{ SITE_NAME }} - {{ SITE_URL }}

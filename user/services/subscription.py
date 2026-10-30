@@ -119,12 +119,17 @@ def _allow_marketing_type(hashed: str, type_key: str) -> None:
     """Lift the opt-out that covers *type_key*, and nothing else.
 
     A ``*`` row is replaced by one row per OTHER marketing type, in the
-    source the ``*`` row had, so the customer's other choices stand.
+    source the ``*`` row had, so the customer's other choices stand. The
+    ``*`` row is locked BEFORE the type's own row is deleted: a concurrent
+    split of the same row commits that type's row first, and only a
+    delete issued after the wait sees it.
     """
+    every = (
+        EmailOptOut.objects.select_for_update()
+        .filter(address_hash=hashed, type_key=EVERY_MARKETING_TYPE)
+        .first()
+    )
     EmailOptOut.objects.filter(address_hash=hashed, type_key=type_key).delete()
-    every = EmailOptOut.objects.filter(
-        address_hash=hashed, type_key=EVERY_MARKETING_TYPE
-    ).first()
     if every is None:
         return
     every.delete()
@@ -138,7 +143,7 @@ def _allow_marketing_type(hashed: str, type_key: str) -> None:
 def set_marketing_preferences(
     address: str,
     *,
-    account_pk: int,
+    account_pk: int | None,
     choices: dict[str, bool],
 ) -> list[MarketingPreference]:
     """Apply a customer's choices for their own *address*: the one writer
@@ -149,7 +154,10 @@ def set_marketing_preferences(
     the type (see :func:`_allow_marketing_type`). When no row is left the
     account's ``marketing_opted_out_at`` is cleared as well, in the same
     transaction, so the flag and the rows never disagree about "none".
-    Staff never come through here: they record, only the customer lifts.
+    *account_pk* is None for an address no account holds: a guest who
+    confirmed a product alert from its inbox (``product.alerts``).
+    Staff never come through here: they record, only the owner of the
+    address lifts.
     """
     from user.models.account import UserAccount
 
@@ -157,7 +165,8 @@ def set_marketing_preferences(
     with transaction.atomic():
         # One writer per account at a time: two requests splitting the
         # same ``*`` row would otherwise both recreate the others.
-        UserAccount.objects.select_for_update().get(pk=account_pk)
+        if account_pk is not None:
+            UserAccount.objects.select_for_update().get(pk=account_pk)
         for type_key, enabled in choices.items():
             if enabled:
                 _allow_marketing_type(hashed, type_key)
@@ -168,7 +177,10 @@ def set_marketing_preferences(
                 optout.opt_out(
                     address, type_key, source=EmailOptOut.Source.ACCOUNT
                 )
-        if not EmailOptOut.objects.filter(address_hash=hashed).exists():
+        if (
+            account_pk is not None
+            and not EmailOptOut.objects.filter(address_hash=hashed).exists()
+        ):
             UserAccount.objects.filter(
                 pk=account_pk, marketing_opted_out_at__isnull=False
             ).update(marketing_opted_out_at=None)

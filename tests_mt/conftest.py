@@ -66,6 +66,23 @@ settings.DEBUG = False
 # ``CustomCache`` whose ``clear()`` is scoped to this run's namespace —
 # with the production KEY_FUNCTION = tenant.cache.make_tenant_key.
 
+
+@pytest.fixture(autouse=True)
+def _connection_back_to_public():
+    """Start every test in the public schema.
+
+    A ``TenantClient`` request leaves the shared connection bound to the
+    store it hit (``TenantMainMiddleware`` sets it, nothing unsets it),
+    so the next test would run inside that store's schema: saving the
+    other tenant's row then fails with "Can't update tenant outside it's
+    own schema", depending only on the order the files run in.
+    """
+    yield
+    from django.db import connection
+
+    connection.set_schema_to_public()
+
+
 # The one tenant this whole lane shares.
 MT_TENANT_SCHEMA = "mt_smoke"
 MT_TENANT_DOMAIN = "mt-smoke.test"

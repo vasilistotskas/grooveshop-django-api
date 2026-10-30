@@ -75,6 +75,16 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
     )
     is_active = models.BooleanField(_("Is active"), default=True)
     notified_at = models.DateTimeField(_("Notified at"), null=True, blank=True)
+    # A guest's alert waits, inactive, for the click on the link emailed
+    # to its address (double opt-in): ``confirmation_sent_at`` is when it
+    # was last asked for, ``confirmed_at`` when the link was used. A
+    # signed-in customer's alert is active at once and has neither.
+    confirmation_sent_at = models.DateTimeField(
+        _("Confirmation sent at"), null=True, blank=True
+    )
+    confirmed_at = models.DateTimeField(
+        _("Confirmed at"), null=True, blank=True
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product alert")
@@ -115,6 +125,20 @@ class ProductAlert(TimeStampMixinModel, UUIDModel):
             "recipient": recipient,
             "product": self.product_id,
         }
+
+    @property
+    def awaiting_confirmation(self) -> bool:
+        """A guest alert whose emailed link has not been used yet."""
+        return (
+            not self.is_active
+            and self.confirmation_sent_at is not None
+            and self.confirmed_at is None
+        )
+
+    @property
+    def is_live(self) -> bool:
+        """Armed: its email goes out when the product fires."""
+        return self.is_active and self.notified_at is None
 
     @property
     def email_language(self) -> str:

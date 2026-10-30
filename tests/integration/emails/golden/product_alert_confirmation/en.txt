@@ -1,0 +1,24 @@
+CONFIRM YOUR ALERT
+Acme Gadgets
+================================================================================
+
+Hello,
+
+Please confirm you'd like an email when the price of Wireless earbuds drops to 30.00 EUR or less. Your alert isn't active yet — open the link below to start it.
+
+CONFIRM HERE
+--------------------------------------------------------------------------------
+https://shop.example/en/alerts/confirm/eyJzY2hlbWEiOiJhY21lIiwiYWlkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGExIn0:1AbCdE:lHtnM6_4vm8nwDJTGhH16P2_StcuJiC_ql37hcz_QrE
+
+THE PRODUCT
+--------------------------------------------------------------------------------
+Wireless earbuds
+https://shop.example/en/products/700001/wireless-earbuds
+
+If you didn't ask for this alert, you can safely ignore this email — nothing will happen.
+
+Thanks,
+The Acme Gadgets team
+
+================================================================================
+Acme Gadgets - https://shop.example/en

@@ -42,6 +42,7 @@ FAIL_CLOSED = {
     "GiftCardCheckThrottle",
     "B2BProfileSubmitThrottle",
     "NewsletterSubscribeThrottle",
+    "ProductAlertCreateThrottle",
     "ContactAttachmentThrottle",
     "VivaReturnThrottle",
     "AcsAddressValidationThrottle",

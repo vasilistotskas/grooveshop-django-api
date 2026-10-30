@@ -58,6 +58,7 @@ from product.factories.product import ProductFactory
 from product.models.alert import ProductAlert, ProductAlertKind
 from product.tasks import (
     check_low_stock_products,
+    send_product_alert_confirmation,
     send_product_alert_price_drop,
     send_product_alert_restock,
 )
@@ -84,6 +85,7 @@ STORE_INBOX = "owner@store.test"
 CUSTOMER_INBOX = "customer@example.test"
 NOW = datetime(2026, 3, 14, 10, 30, tzinfo=UTC)
 CART_UUID = UUID("00000000-0000-4000-8000-0000000000c1")
+ALERT_UUID = UUID("00000000-0000-4000-8000-0000000000a1")
 TOKEN_STAMP = "1AbCdE"
 BEAT_ENTRY = "send-inactive-user-notifications"
 
@@ -220,6 +222,26 @@ class TestProductEmails:
         send_product_alert_price_drop.run(product.pk, 25.5)
 
         assert_sent("product_price_drop_alert_member", language)
+
+    def test_alert_confirmation_for_a_guest(self, language):
+        product = named_product(id=700_001, slug="wireless-earbuds", stock=0)
+        alert = ProductAlert.objects.create(
+            uuid=ALERT_UUID,
+            kind=ProductAlertKind.PRICE_DROP,
+            product=product,
+            email="guest@example.test",
+            language_code=language,
+            target_price=Money(Decimal("30.00"), "EUR"),
+            is_active=False,
+            confirmation_sent_at=NOW,
+        )
+        mail.outbox.clear()
+
+        assert send_product_alert_confirmation.run(alert.pk)["status"] == (
+            "sent"
+        )
+
+        assert_sent("product_alert_confirmation", language)
 
     def test_low_stock_alert(self, language):
         named_product(

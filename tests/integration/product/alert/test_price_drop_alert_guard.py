@@ -61,7 +61,7 @@ class PriceDropAlertGuardTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     # ------------------------------------------------------------------
-    # Flag ON — expect 201
+    # Flag ON — expect 201 (a guest: 202, confirm by email)
     # ------------------------------------------------------------------
 
     def test_price_drop_allowed_when_flag_true_authenticated(self):
@@ -75,7 +75,7 @@ class PriceDropAlertGuardTestCase(APITestCase):
         payload = self._price_drop_payload(self.product_enabled)
         payload["email"] = "guest2@example.com"
         response = self.client.post(self.alert_list_url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
 
     # ------------------------------------------------------------------
     # Restock alerts unaffected by the flag

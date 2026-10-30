@@ -2122,6 +2122,9 @@ msgstr "COD recorded as received outside ACS."
 msgid "CONFIRM HERE"
 msgstr "CONFIRM HERE"
 
+msgid "CONFIRM YOUR ALERT"
+msgstr "CONFIRM YOUR ALERT"
+
 msgid "CONFIRM YOUR SUBSCRIPTION"
 msgstr "CONFIRM YOUR SUBSCRIPTION"
 
@@ -2602,6 +2605,9 @@ msgstr "Check which comments from a list are liked by the current user."
 msgid "Check your email"
 msgstr "Check your email"
 
+msgid "Check your inbox for a link to confirm your alert."
+msgstr "Check your inbox for a link to confirm your alert."
+
 msgid "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
 msgstr "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
 
@@ -2867,6 +2873,10 @@ msgstr "Configuration"
 msgid "Configure loyalty points earning for this product. Points coefficient multiplies the global points factor, and bonus points are awarded as a fixed amount on purchase."
 msgstr "Configure loyalty points earning for this product. Points coefficient multiplies the global points factor, and bonus points are awarded as a fixed amount on purchase."
 
+# Email Template Translations
+msgid "Confirm a guest's product alert via email token"
+msgstr "Confirm a guest's product alert via email token"
+
 msgid "Confirm a pending subscription using the confirmation token."
 msgstr "Confirm a pending subscription using the confirmation token."
 
@@ -2876,6 +2886,9 @@ msgstr "Confirm a pending subscription via email token"
 
 msgid "Confirm a user subscription"
 msgstr "Confirm a user subscription"
+
+msgid "Confirm alert"
+msgstr "Confirm alert"
 
 msgid "Confirm my email"
 msgstr "Confirm my email"
@@ -2889,6 +2902,9 @@ msgstr "Confirm subscription"
 
 msgid "Confirm the bank transfer arrived"
 msgstr "Confirm the bank transfer arrived"
+
+msgid "Confirm your alert"
+msgstr "Confirm your alert"
 
 msgid "Confirm your email address"
 msgstr "Confirm your email address"
@@ -2906,6 +2922,9 @@ msgstr "Confirmation Sent At"
 msgid "Confirmation Token"
 msgstr "Confirmation Token"
 
+msgid "Confirmation sent at"
+msgstr "Confirmation sent at"
+
 msgid "Confirmed"
 msgstr "Confirmed"
 
@@ -2917,6 +2936,9 @@ msgstr "Confirmed At"
 
 msgid "Confirmed From IP"
 msgstr "Confirmed From IP"
+
+msgid "Confirmed at"
+msgstr "Confirmed at"
 
 msgid "Connection or timeout"
 msgstr "Connection or timeout"
@@ -6608,6 +6630,9 @@ msgstr "If you did not request this cancellation or have any questions, please c
 msgid "If you did not request this export, please contact support right away."
 msgstr "If you did not request this export, please contact support right away."
 
+msgid "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
+msgstr "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
+
 msgid "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 msgstr "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 
@@ -9671,6 +9696,22 @@ msgid "Platform update to review"
 msgstr "Platform update to review"
 
 #, python-format
+msgid "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — open the link below to start it."
+msgstr "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — open the link below to start it."
+
+#, python-format
+msgid "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — tap the button below to start it."
+msgstr "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — tap the button below to start it."
+
+#, python-format
+msgid "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — open the link below to start it."
+msgstr "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — open the link below to start it."
+
+#, python-format
+msgid "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — tap the button below to start it."
+msgstr "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — tap the button below to start it."
+
+#, python-format
 msgid "Please confirm you'd like to subscribe to %(topic_name)s. Your subscription isn't active yet — open the link below to complete it."
 msgstr "Please confirm you'd like to subscribe to %(topic_name)s. Your subscription isn't active yet — open the link below to complete it."
 
@@ -10045,6 +10086,9 @@ msgstr "Product Variant Groups"
 
 msgid "Product alert"
 msgstr "Product alert"
+
+msgid "Product alert confirmation"
+msgstr "Product alert confirmation"
 
 msgid "Product alerts"
 msgstr "Product alerts"
@@ -11547,6 +11591,9 @@ msgstr "Sent to a customer who has not signed in for a long while, a few times a
 msgid "Sent to confirm a subscription before it starts (double opt-in)."
 msgstr "Sent to confirm a subscription before it starts (double opt-in)."
 
+msgid "Sent to the address a guest gave for a restock or price-drop alert, which starts only once the link in it is used (double opt-in)."
+msgstr "Sent to the address a guest gave for a restock or price-drop alert, which starts only once the link in it is used (double opt-in)."
+
 msgid "Sent to the buyer of a gift card once the payment lands."
 msgstr "Sent to the buyer of a gift card once the payment lands."
 
@@ -12537,6 +12584,9 @@ msgstr "System Notifications"
 msgid "THANK YOU FOR YOUR PURCHASE!"
 msgstr "THANK YOU FOR YOUR PURCHASE!"
 
+msgid "THE PRODUCT"
+msgstr "THE PRODUCT"
+
 msgid "TOTP Issuer"
 msgstr "TOTP Issuer"
 
@@ -13174,6 +13224,9 @@ msgstr "This can't change once the order is placed: the shipping cost and VAT we
 
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
+
+msgid "This confirmation link has expired. Please ask for the alert again to get a new one."
+msgstr "This confirmation link has expired. Please ask for the alert again to get a new one."
 
 msgid "This confirmation link has expired. Please subscribe again to get a new one."
 msgstr "This confirmation link has expired. Please subscribe again to get a new one."
@@ -14260,6 +14313,9 @@ msgstr "View on the storefront"
 msgid "View store"
 msgstr "View store"
 
+msgid "View the product"
+msgstr "View the product"
+
 msgid "View your favourite products"
 msgstr "View your favourite products"
 
@@ -15107,6 +15163,10 @@ msgstr "Zipcode"
 
 msgid "Zipcode is required."
 msgstr "Zipcode is required."
+
+#, python-brace-format
+msgid "[{site}] Confirm your alert for {name}"
+msgstr "[{site}] Confirm your alert for {name}"
 
 #, python-brace-format
 msgid "[{site}] Low stock alert — {n} product(s)"

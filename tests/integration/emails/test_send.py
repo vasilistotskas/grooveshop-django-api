@@ -427,11 +427,17 @@ class TestHeaders:
 
 
 class TestOwner:
-    @pytest.mark.unbound_store
-    def test_a_store_type_needs_a_bound_store(self, catalogue, tenant):
+    def test_a_store_type_needs_a_bound_store(
+        self, catalogue, tenant, monkeypatch
+    ):
         catalogue(probe())
+        from emails import send
+        from tenant.membership import bound_tenant
         from tests.utils.staff import bind_store_tenant
 
+        # ``tests/`` runs as one store (``_tests_run_as_one_store``); the
+        # refusal is proved against the real lookup, with none bound.
+        monkeypatch.setattr(send, "bound_tenant", bound_tenant)
         bind_store_tenant(None)
 
         with pytest.raises(StoreRequired):

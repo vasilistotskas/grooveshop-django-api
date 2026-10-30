@@ -576,23 +576,23 @@ def _reset_payment_events_redis_client():
 
 
 @pytest.fixture(autouse=True)
-def _a_store_for_store_mail(request, monkeypatch):
-    """Lend ``send_email`` a store when the test bound none.
+def _tests_run_as_one_store(monkeypatch):
+    """Give ``tests/`` the one store it is written for.
 
-    A store email needs a store (``emails.send.StoreRequired``), and almost
-    every test that creates an order runs unbound, in the public schema,
-    while the order's signals send its mails eagerly. Only the pipeline's
-    own question, "which store is this?", is answered here, with a stand-in
-    that has no row, so no tenant lookup elsewhere can find it. The schema,
-    the credentials and every other reader of ``connection.tenant`` stay
-    exactly what the test made them, so no existing assertion about a
-    sender or a recipient moves. A test that binds a store row
-    (``tests.utils.staff.bind_store_tenant``) keeps it, and one that proves
-    the refusal opts out with ``@pytest.mark.unbound_store``.
+    ``tests/`` is the single-store suite: it runs in the public schema
+    and makes its own tenants, so an order's signals send store mail
+    where ``emails.send`` finds no store and raises ``StoreRequired``.
+    Eager tasks bind the schema they were dispatched in
+    (``tenant.celery.TenantTask``), so this fixture does not stand in
+    for that; it only answers the pipeline's question, "which store is
+    this?", with a row-less stand-in no tenant lookup can find. The
+    schema, the credentials and every other reader of
+    ``connection.tenant`` stay what the test made them, and a test that
+    binds a store row (``tests.utils.staff.bind_store_tenant``) keeps
+    it. A test that proves the refusal restores the real
+    ``tenant.membership.bound_tenant`` itself. Real per-store binding is
+    ``tests_mt``'s job.
     """
-    if request.node.get_closest_marker("unbound_store"):
-        return
-
     from emails import send
     from tenant.models import Tenant
 

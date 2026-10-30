@@ -78,7 +78,11 @@ def test_a_tenant_save_that_leaves_the_flag_alone_reprices_nothing():
 
 def test_saving_the_switch_unchanged_reprices_nothing(bind_tenant_and_schema):
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
-    switch_store_settings(PROMOTIONS_ENABLED=True)
+
+    # The first save is setup: its task would now run in ``shop_one``
+    # (an eager task binds its dispatching schema), which has no row.
+    with patch(DISPATCH):
+        switch_store_settings(PROMOTIONS_ENABLED=True)
 
     with patch(DISPATCH) as dispatch:
         switch_store_settings(PROMOTIONS_ENABLED=True)

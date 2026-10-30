@@ -249,7 +249,6 @@ timeout = 600
 # module pins what must be right before ``django.setup()``; see its docstring.
 addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db"
 markers = [
-    "unbound_store: run without the default store tests/conftest.py lends to store emails, so a test can prove that a store email with no store bound is refused.",
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
 ]
 

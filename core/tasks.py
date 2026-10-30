@@ -10,14 +10,12 @@ from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import EmailMultiAlternatives, mail_admins
+from django.core.mail import mail_admins
 from django.db import connections, transaction
 from django.db.models import F
-from django.template.loader import render_to_string
 
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
-from django.utils import timezone, translation
-from django.utils.translation import gettext as _
+from django.utils import timezone
 
 from cart.models import Cart
 from core import celery_app
@@ -36,13 +34,8 @@ from core.retry import (
     is_permanent_failure,
 )
 from core.store_settings import store_setting
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
+from emails.send import Status, send_email, was_sent
 from tenant.celery import TenantTask
-from tenant.credentials import (
-    tenant_from_email,
-    tenant_reply_to,
-)
 
 User = get_user_model()
 
@@ -613,11 +606,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     cutoff_date = now - timedelta(days=inactive_days)
     cooldown_cutoff = now - timedelta(days=cooldown_days)
 
-    # Re-engagement is marketing: an account that used the one-click
-    # unsubscribe link in any marketing email is not written to again.
+    # Who opted out is the pipeline's to decide (``EmailOptOut``).
     inactive_users_qs = (
-        User.objects.accepting_marketing()
-        .filter(
+        User.objects.filter(
             last_login__lt=cutoff_date,
             is_active=True,
             email__isnull=False,
@@ -641,46 +632,21 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         total_users += 1
 
         try:
-            from emails.headers import build_list_unsubscribe_headers
-            from user.utils.subscription import (
-                generate_blanket_unsubscribe_link,
-            )
-
-            unsubscribe_url = generate_blanket_unsubscribe_link(user)
-
-            language = get_user_language(user)
-            context = build_email_context(
-                language=language,
-                user={
-                    "id": user.id,
-                    "first_name": user.first_name,
-                    "username": user.username,
-                    "email": user.email,
-                },
-                unsubscribe_url=unsubscribe_url,
-            )
-
-            with translation.override(language):
-                mail_subject = _("We miss you!")
-                html_body = render_to_string(
-                    "emails/user/inactive_user_email_template.html", context
-                )
-                text_body = render_to_string(
-                    "emails/user/inactive_user_email_template.txt", context
-                )
-
-            email_msg = EmailMultiAlternatives(
-                subject=mail_subject,
-                body=text_body,
-                from_email=tenant_from_email(),
-                to=[user.email],
-                reply_to=tenant_reply_to(),
-                headers=build_list_unsubscribe_headers(
-                    unsubscribe_url, list_id="reengagement"
-                ),
-            )
-            email_msg.attach_alternative(html_body, "text/html")
-            email_msg.send(fail_silently=False)
+            deliveries = send_email("user.reengagement", user)
+            if not was_sent(deliveries):
+                if deliveries[0].status in (
+                    Status.SKIPPED_FEATURE_OFF,
+                    Status.SKIPPED_SWITCHED_OFF,
+                ):
+                    # The whole run is off (not scheduled, or the store
+                    # switched the mail off): nobody is written to.
+                    logger.info(
+                        "Re-engagement run stopped: %s", deliveries[0].status
+                    )
+                    break
+                # Opted out through the one-click link: not counted as a
+                # send, so the cooldown and the count stay as they were.
+                continue
 
             User.objects.filter(pk=user.pk).update(
                 reengagement_email_count=F("reengagement_email_count") + 1,

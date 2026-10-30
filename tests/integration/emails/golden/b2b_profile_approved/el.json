@@ -1,0 +1,15 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<b2b-profile_approved.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "[Acme Gadgets] Ο εταιρικός σας λογαριασμός εγκρίθηκε",
+  "to": [
+    "customer@example.test"
+  ]
+}

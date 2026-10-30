@@ -1,0 +1,12 @@
+New feedback
+Acme Gadgets
+================================================================================
+
+Rating: 4/5
+Category: General
+Name: Nikos Georgiou
+Email: customer@example.test
+Message: Quick checkout, thank you.
+
+Reply to this email to answer the customer.
+

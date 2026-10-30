@@ -27,6 +27,8 @@ from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from emails import optout
+from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -54,25 +56,35 @@ class SubscribeResult:
     created: bool
 
 
-def opt_out_of_marketing(account_pk: int) -> bool:
-    """Record that an account no longer wants marketing email.
+def opt_out_of_marketing(
+    address: str,
+    *,
+    account_pk: int | None,
+    source: EmailOptOut.Source,
+) -> bool:
+    """Unsubscribe *address* from every marketing email: the one writer.
 
-    The account-level half of "unsubscribe from everything". Marketing
-    that belongs to no topic (re-engagement, abandoned cart) has no
-    subscription row to end, so the customer's refusal is kept on the
-    account, and every such send reads it
-    (``UserAccount.objects.accepting_marketing``).
+    Writes ``EmailOptOut`` for every marketing type, which is what stops the
+    mail, and, for an account, ``marketing_opted_out_at`` (account state the
+    admin shows), in one transaction. A guest has no account: *account_pk*
+    is None. Both the blanket unsubscribe link and the customer admin come
+    here, so neither half is ever written alone.
 
-    Returns True when this call recorded it, False when the account had
-    already opted out (the first time stands) or does not exist.
+    Returns True when this call recorded the account's flag, False when it
+    was already set (the first time stands), there is no account, or the
+    account does not exist.
     """
     from user.models.account import UserAccount
 
-    return bool(
-        UserAccount.objects.filter(
-            pk=account_pk, marketing_opted_out_at__isnull=True
-        ).update(marketing_opted_out_at=timezone.now())
-    )
+    with transaction.atomic():
+        optout.opt_out(address, EVERY_MARKETING_TYPE, source=source)
+        if account_pk is None:
+            return False
+        return bool(
+            UserAccount.objects.filter(
+                pk=account_pk, marketing_opted_out_at__isnull=True
+            ).update(marketing_opted_out_at=timezone.now())
+        )
 
 
 def dispatch_confirmation(subscription: UserSubscription) -> None:

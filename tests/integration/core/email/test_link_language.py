@@ -61,6 +61,7 @@ from shipping_boxnow.factories import (
     BoxNowShipmentFactory,
 )
 from shipping_boxnow.tasks import boxnow_send_arrival_notification
+from tests.utils.emails import open_email_gates  # noqa: F401
 from tests.utils.mydata import issuable, mydata_enabled
 from user.adapter import UserAccountAdapter
 from user.factories.account import UserAccountFactory
@@ -72,6 +73,8 @@ from user.tasks import export_user_data_task
 from user.utils.subscription import send_subscription_confirmation
 
 BASE = "https://shop.example"
+
+pytestmark = pytest.mark.usefixtures("open_email_gates")
 
 LANGUAGES = pytest.mark.parametrize(
     ("language", "prefix"), [("en", "/en"), ("el", "")]

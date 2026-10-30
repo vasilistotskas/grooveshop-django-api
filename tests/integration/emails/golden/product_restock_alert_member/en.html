@@ -1,0 +1,381 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Ξανά σε απόθεμα: Wireless earbuds - Acme Gadgets</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f5f5f5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+
+        /* Container */
+        .email-wrapper {
+            width: 100%;
+            background-color: #f5f5f5;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .email-header {
+            background: #97b7ff;
+            padding: 32px 24px;
+            text-align: center;
+        }
+
+        .email-logo {
+            max-width: 250px;
+            height: auto;
+            display: inline-block;
+        }
+
+        /* Body */
+        .email-body {
+            padding: 32px 24px;
+        }
+
+        .email-body h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .email-body h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        .email-body h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .email-body p {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        /* Cards */
+        .email-card {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        /* Buttons */
+        .email-button {
+            display: inline-block;
+            padding: 14px 28px;
+            background-color: #2563eb;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: background-color 0.2s ease;
+            margin: 16px 0;
+        }
+
+        .email-button:hover {
+            background-color: #1e40af;
+        }
+
+        .email-button-secondary {
+            background-color: #10b981;
+        }
+
+        .email-button-secondary:hover {
+            background-color: #059669;
+        }
+
+        /* Tables */
+        .email-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .email-table th {
+            background-color: #f9fafb;
+            color: #1f2937;
+            font-weight: 600;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .email-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #6b7280;
+        }
+
+        .email-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Footer */
+        .email-footer {
+            background-color: #f9fafb;
+            padding: 24px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .email-footer p {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+
+        .email-footer a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        .email-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .social-links {
+            margin: 16px 0;
+        }
+
+        .social-links a {
+            display: inline-block;
+            margin: 0 8px;
+            color: #6b7280;
+            text-decoration: none;
+        }
+
+        /* Utility Classes */
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-bold {
+            font-weight: 600;
+        }
+
+        .text-muted {
+            color: #6b7280;
+        }
+
+        .mt-1 { margin-top: 8px; }
+        .mt-2 { margin-top: 16px; }
+        .mt-3 { margin-top: 24px; }
+        .mb-1 { margin-bottom: 8px; }
+        .mb-2 { margin-bottom: 16px; }
+        .mb-3 { margin-bottom: 24px; }
+
+        /* Responsive Design */
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+                margin: 0;
+            }
+
+            .email-header {
+                padding: 24px 16px;
+            }
+
+            .email-body {
+                padding: 24px 16px;
+            }
+
+            .email-body h1 {
+                font-size: 24px;
+            }
+
+            .email-body h2 {
+                font-size: 20px;
+            }
+
+            .email-body h3 {
+                font-size: 16px;
+            }
+
+            .email-button {
+                display: block;
+                width: 100%;
+                padding: 12px 20px;
+            }
+
+            .email-table {
+                font-size: 14px;
+            }
+
+            .email-table th,
+            .email-table td {
+                padding: 8px;
+            }
+
+            .email-footer {
+                padding: 20px 16px;
+            }
+        }
+
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1f2937;
+            }
+
+            .email-wrapper {
+                background-color: #1f2937;
+            }
+
+            .email-container {
+                background-color: #111827;
+            }
+
+            .email-body h1,
+            .email-body h2,
+            .email-body h3 {
+                color: #f9fafb;
+            }
+
+            .email-body p {
+                color: #d1d5db;
+            }
+
+            .email-body li {
+                color: #d1d5db;
+            }
+
+            .email-card {
+                background-color: #1f2937;
+                border-color: #374151;
+                /* Text that is not in a <p> — the operator-authored
+                   payment instructions render inside a plain <div> —
+                   inherits the light-mode body colour and vanishes
+                   into this background. Colour the card itself so
+                   every descendant reads. */
+                color: #d1d5db;
+            }
+
+            .email-table th {
+                background-color: #1f2937;
+                color: #f9fafb;
+                border-color: #374151;
+            }
+
+            .email-table td {
+                color: #d1d5db;
+                border-color: #374151;
+            }
+
+            .email-footer {
+                background-color: #1f2937;
+                border-color: #374151;
+            }
+
+            .email-footer p {
+                color: #d1d5db;
+            }
+
+            .social-links a {
+                color: #d1d5db;
+            }
+        }
+    </style>
+    
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <!-- Header with Logo -->
+            <div class="email-header">
+                
+                
+                <span class="email-logo" style="font-size: 22px; font-weight: 700;">Acme Gadgets</span>
+                
+            </div>
+
+            <!-- Main Content -->
+            <div class="email-body">
+                
+<h1>Το προϊόν είναι ξανά διαθέσιμο!</h1>
+<p>Σας ενημερώνουμε ότι το προϊόν που παρακολουθείτε είναι ξανά σε απόθεμα.</p>
+
+<div class="email-card">
+    <h2>Wireless earbuds</h2>
+    <p>Το προϊόν είναι τώρα διαθέσιμο. Μην το χάσετε — το απόθεμα μπορεί να εξαντληθεί γρήγορα.</p>
+</div>
+
+<div class="text-center mt-3 mb-3">
+    <a href="https://shop.example/en/products/700001/wireless-earbuds" class="email-button">Δείτε το προϊόν</a>
+</div>
+
+<p>Αν δεν επιθυμείτε να λαμβάνετε ειδοποιήσεις αποθέματος, μπορείτε να καταργήσετε την ειδοποίηση από τη σελίδα του προϊόντος.</p>
+
+<p class="mt-3">
+    <strong>Ευχαριστούμε για την εμπιστοσύνη σας,</strong><br>
+    Η ομάδα Acme Gadgets
+</p>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="email-footer">
+                
+<p class="text-bold">Acme Gadgets</p>
+<p>
+    Ερωτήσεις;
+    <a href="mailto:owner@store.test">Επικοινωνήστε μαζί μας</a>
+</p>
+<p class="text-muted">
+    &copy; {YEAR} Acme Gadgets. Με επιφύλαξη παντός δικαιώματος.
+</p>
+<div class="social-links">
+    <a href="https://shop.example/en">Επισκεφθείτε τον ιστότοπό μας</a>
+</div>
+
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

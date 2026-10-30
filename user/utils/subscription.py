@@ -6,19 +6,13 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
-from django.template.loader import render_to_string
-from django.utils import translation
-from django.utils.translation import gettext as _
 
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
     get_tenant_frontend_url,
 )
-from tenant.credentials import tenant_from_email, tenant_reply_to
+from emails.send import send_email, was_sent
 from user.models.subscription import UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -64,7 +58,8 @@ def send_subscription_confirmation(subscription: UserSubscription) -> bool:
     subscription was made in (an account row that recorded none uses
     the account's language).
 
-    Returns False when there is nothing to send. A failure to SEND is
+    Returns False when there is nothing to send (the row is not pending, or
+    the type is off for the store). A failure to SEND is
     raised, not swallowed: ``send_subscription_confirmation_email_task``
     retries on it, and a helper that caught it made that retry policy
     unreachable.
@@ -82,40 +77,8 @@ def send_subscription_confirmation(subscription: UserSubscription) -> bool:
         )
         return False
 
-    user = subscription.user
-    language = subscription.language or get_user_language(user)
-    confirmation_url = subscription_confirmation_url(
-        subscription.confirmation_token, language=language
-    )
-
-    context = build_email_context(
-        language=language,
-        user=user,
-        topic=subscription.topic,
-        subscription=subscription,
-        confirmation_url=confirmation_url,
-    )
-
-    with translation.override(language):
-        subject = _("Confirm your subscription to {topic}").format(
-            topic=subscription.topic.name
-        )
-        html_message = render_to_string(
-            "emails/subscription/confirmation.html", context
-        )
-        text_message = render_to_string(
-            "emails/subscription/confirmation.txt", context
-        )
-
-    email = EmailMultiAlternatives(
-        subject=subject,
-        body=text_message,
-        from_email=tenant_from_email(),
-        to=[subscription.recipient_email],
-        reply_to=tenant_reply_to(),
-    )
-    email.attach_alternative(html_message, "text/html")
-    email.send()
+    if not was_sent(send_email("newsletter.confirmation", subscription)):
+        return False
 
     logger.info("Sent confirmation email for subscription %s", subscription.id)
     return True

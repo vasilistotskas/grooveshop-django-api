@@ -1,0 +1,12 @@
+LOW STOCK ALERT
+
+The following 1 product has reached its low-stock threshold:
+
+- Wireless earbuds (SKU: SKU-GOLD-1) — stock: 2 / threshold: 5
+
+
+Please review and restock as needed.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

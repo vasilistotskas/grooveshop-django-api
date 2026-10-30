@@ -1,9 +1,10 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.core import mail, signing
 from django.test import override_settings
 
+from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.utils.subscription import (
@@ -14,6 +15,7 @@ from user.utils.subscription import (
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("open_email_gates")
 class TestSubscriptionUtils:
     def setup_method(self):
         self.user = UserAccountFactory()
@@ -37,44 +39,27 @@ class TestSubscriptionUtils:
         SUPPORT_EMAIL="support@test.com",
         DEFAULT_FROM_EMAIL="noreply@test.com",
     )
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
-    def test_send_subscription_confirmation_success(
-        self, mock_email_class, mock_render
-    ):
-        mock_render.return_value = "<html>Test confirmation email</html>"
-        mock_email = MagicMock()
-        mock_email_class.return_value = mock_email
-
+    def test_send_subscription_confirmation_success(self):
         subscription = UserSubscription.objects.create(
             user=self.user,
             topic=self.topic,
             status=UserSubscription.SubscriptionStatus.PENDING,
             confirmation_token="test-token-123",
         )
+        mail.outbox.clear()
 
         result = send_subscription_confirmation(subscription)
 
         assert result is True
-        # Renders both the .html body and the dedicated .txt body.
-        assert mock_render.call_count == 2
-        rendered_templates = {
-            call.args[0] for call in mock_render.call_args_list
-        }
-        assert rendered_templates == {
-            "emails/subscription/confirmation.html",
-            "emails/subscription/confirmation.txt",
-        }
-        assert mock_email_class.call_args.kwargs["to"] == [self.user.email]
-        mock_email.attach_alternative.assert_called_once()
-        mock_email.send.assert_called_once()
+        [sent] = mail.outbox
+        assert sent.to == [self.user.email]
+        # The .txt body and the .html alternative both carry the link.
+        [(html, _mimetype)] = sent.alternatives
+        assert "/newsletter/confirm/test-token-123" in sent.body
+        assert "/newsletter/confirm/test-token-123" in html
 
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
     @patch("user.utils.subscription.get_tenant_frontend_url")
-    def test_confirmation_url_is_the_storefront_page(
-        self, mock_frontend_url, mock_email_class, mock_render
-    ):
+    def test_confirmation_url_is_the_storefront_page(self, mock_frontend_url):
         """The link opens the STOREFRONT confirmation page on the tenant's
         primary domain — built like every other storefront link in mail —
         whose button POSTs the token, so a prefetching scanner confirms
@@ -82,20 +67,19 @@ class TestSubscriptionUtils:
         mock_frontend_url.side_effect = lambda path, *, language: (
             f"https://tenant-b.example{path}"
         )
-        mock_render.return_value = "<html></html>"
-        mock_email_class.return_value = MagicMock()
-
         subscription = UserSubscription.objects.create(
             user=self.user,
             topic=self.topic,
             status=UserSubscription.SubscriptionStatus.PENDING,
             confirmation_token="test-token-123",
         )
+        mail.outbox.clear()
 
         assert send_subscription_confirmation(subscription) is True
-        rendered_context = mock_render.call_args_list[0].args[1]
-        assert rendered_context["confirmation_url"] == (
+
+        assert (
             "https://tenant-b.example/newsletter/confirm/test-token-123"
+            in mail.outbox[0].body
         )
 
     def test_guest_confirmation_renders_without_a_user(self):
@@ -145,16 +129,7 @@ class TestSubscriptionUtils:
     @override_settings(
         DEFAULT_FROM_EMAIL="noreply@test.com",
     )
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
-    def test_send_subscription_confirmation_email_exception(
-        self, mock_email_class, mock_render
-    ):
-        mock_render.return_value = "<html>Test email</html>"
-        mock_email = MagicMock()
-        mock_email.send.side_effect = Exception("Email sending failed")
-        mock_email_class.return_value = mock_email
-
+    def test_send_subscription_confirmation_email_exception(self):
         subscription = UserSubscription.objects.create(
             user=self.user,
             topic=self.topic,
@@ -163,7 +138,13 @@ class TestSubscriptionUtils:
         )
 
         # Raised, not swallowed: the task's retry policy depends on it.
-        with pytest.raises(Exception, match="Email sending failed"):
+        with (
+            patch(
+                "emails.send.transport.deliver",
+                side_effect=Exception("Email sending failed"),
+            ),
+            pytest.raises(Exception, match="Email sending failed"),
+        ):
             send_subscription_confirmation(subscription)
 
     @patch("user.utils.subscription._make_unsubscribe_token")

@@ -1,0 +1,12 @@
+New contact form submission
+Acme Gadgets
+================================================================================
+
+Name: Nikos Georgiou
+Email: customer@example.test
+Phone: +302101234567
+Company: Georgiou SA
+Subject: Shipping to Crete
+Message: Do you ship to Crete?
+
+Reply to this email to answer the customer.

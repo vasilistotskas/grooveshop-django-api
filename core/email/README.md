@@ -3,14 +3,13 @@
 The admin tool that renders any transactional email the platform ships, in
 any of the configured languages, against sample data or a real order.
 
-**Nothing in this package sends email.** Sending lives with the domain that
-owns the event — `order/notifications.py`, `order/tasks.py`, `b2b/tasks.py`,
-`giftcard/tasks.py`, `product/tasks.py`, `tenant/billing.py`,
-`shipping/alerts.py`, `shipping_acs/tasks.py`, `shipping_boxnow/tasks.py`,
-`contact/tasks.py`, `user/tasks.py`, `core/tasks.py`. The order emails are
-`EmailType`s declared in `order/emails.py` and sent by `emails.send`, and this
-preview renders them through `emails.render.render`; the others still build
-their own inside the task. This package is read-only tooling for humans.
+**Nothing in this package sends email.** Sending lives with the domain
+that owns the event, as an `EmailType` declared in its `<app>/emails.py` and
+sent by `emails.send` (`order`, `product`, `giftcard`, `b2b`, `contact`,
+`user`, `cart`); this preview renders those through `emails.render.render`.
+The ops alerts, allauth and the platform mail (`tenant/billing.py`,
+`shipping/alerts.py`, `core/tasks.py`) still build their own inside the task.
+This package is read-only tooling for humans.
 
 Mounted at `admin/email-templates/` (locale-prefixed) on a **store** admin
 host only; the views query `Order`, which lives in TENANT_APPS. Every view is

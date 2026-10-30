@@ -1,0 +1,12 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [
+    "customer@example.test"
+  ],
+  "subject": "Νέα υποβολή σχολίων (4★ Γενικά)",
+  "to": [
+    "owner@store.test"
+  ]
+}

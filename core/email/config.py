@@ -65,6 +65,7 @@ class EmailTemplateConfig:
         "contact": _("Contact"),
         "giftcard": _("Gift Cards"),
         "product": _("Product"),
+        "product_alerts": _("Product alerts"),
         "shipping_acs": _("ACS Shipping"),
     }
 

@@ -9,6 +9,8 @@ the platform's sender there.
 
 from __future__ import annotations
 
+from typing import Any
+
 from emails.types import Audience, EmailType, Owner
 from tenant.credentials import tenant_from_email, tenant_reply_to
 
@@ -19,11 +21,15 @@ def from_address() -> str:
     return tenant_from_email()
 
 
-def reply_to(email_type: EmailType) -> list[str]:
-    """Where replies go: the store's contact address for a store's mail to
-    its customers, nobody otherwise. The platform's mail is not answered in
-    a store's name, and an alert to the store's own staff has no one to
-    reply to (it would come back to the staff's own inbox)."""
+def reply_to(email_type: EmailType, obj: Any) -> list[str]:
+    """Where replies go: what the type itself names for *obj* (a form
+    submission is answered to its submitter), else the store's contact
+    address for a store's mail to its customers, nobody otherwise. The
+    platform's mail is not answered in a store's name, and an alert to the
+    store's own staff has no one to reply to (it would come back to the
+    staff's own inbox)."""
+    if email_type.reply_to is not None:
+        return list(email_type.reply_to(obj))
     if email_type.owner is Owner.STORE and (
         email_type.audience is Audience.CUSTOMER
     ):

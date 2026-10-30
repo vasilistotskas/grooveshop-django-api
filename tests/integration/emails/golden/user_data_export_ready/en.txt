@@ -1,0 +1,19 @@
+Your data export is ready — Acme Gadgets
+
+Hi Maria,
+
+Your personal data export is ready to download. The archive contains every record we hold that relates to you: profile, addresses, orders, favourites, reviews, blog comments, loyalty activity, notifications, and subscriptions.
+
+Download your export: https://shop.example/en/account/settings/privacy?export=export-token
+
+File size: 0.0 KB
+The link expires on 03/21/2026 12:30 p.m.. After that you can request a new export from the privacy settings page.
+
+This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires.
+
+If you did not request this export, please contact support right away.
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en

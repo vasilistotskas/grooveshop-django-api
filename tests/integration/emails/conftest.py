@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from tests.utils.emails import catalogue, probe_templates  # noqa: F401
+from tests.utils.emails import (  # noqa: F401
+    catalogue,
+    open_email_gates,
+    probe_templates,
+)
 from tests.utils.staff import (
     bind_store_tenant,
     store_tenant,

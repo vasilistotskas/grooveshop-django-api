@@ -12,10 +12,19 @@ _INFO_EMAIL = "admin@example.com"
 
 
 @pytest.fixture(autouse=True)
-def _english_store():
-    """These tests read the English copy; ``tests/integration/contact/``
-    covers the store's language."""
-    with patch("contact.tasks.store_language", return_value="en"):
+def _english_store(settings):
+    """These tests read the English copy of a store whose contact address is
+    the ``INFO_EMAIL`` each test sets; ``tests/integration/contact/`` covers
+    the store's language and the real operator addresses."""
+    with (
+        patch("emails.recipients.store_language", return_value="en"),
+        patch(
+            "emails.recipients.tenant_operator_addresses",
+            side_effect=lambda: (
+                [settings.INFO_EMAIL] if settings.INFO_EMAIL else []
+            ),
+        ),
+    ):
         yield
 
 

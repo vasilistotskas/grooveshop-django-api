@@ -30,8 +30,7 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from emails import optout
-from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
+from emails.models import EmailOptOut
 from user.filters.subscription import (
     SubscriptionTopicFilter,
     UserSubscriptionFilter,
@@ -805,15 +804,13 @@ def _apply_unsubscribe(
             topic_name = subscription.topic.name
             recipient = subscription.recipient_email
             count += 1
-        opted_out = (
-            not topic_slug
-            and target.account_pk is not None
-            and opt_out_of_marketing(target.account_pk)
-        )
+        opted_out = False
         if not topic_slug and target.address:
-            # The blanket link also covers the email pipeline's marketing
-            # types, which read ``EmailOptOut`` rather than the account.
-            optout.opt_out(target.address, EVERY_MARKETING_TYPE, source=source)
+            # The blanket link ends marketing mail of every kind, topic or
+            # not: one writer records the row and the account's state.
+            opted_out = opt_out_of_marketing(
+                target.address, account_pk=target.account_pk, source=source
+            )
     return count, topic_name, recipient, opted_out
 
 

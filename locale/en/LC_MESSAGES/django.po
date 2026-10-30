@@ -947,6 +947,9 @@ msgstr "Abandoned"
 msgid "Abandoned Carts"
 msgstr "Abandoned Carts"
 
+msgid "Abandoned checkout reminder"
+msgstr "Abandoned checkout reminder"
+
 msgid "Abandonment Notified"
 msgstr "Abandonment Notified"
 
@@ -1995,6 +1998,12 @@ msgstr "Business Profile"
 msgid "Business Profiles"
 msgstr "Business Profiles"
 
+msgid "Business account application rejected"
+msgstr "Business account application rejected"
+
+msgid "Business account approved"
+msgstr "Business account approved"
+
 msgid "Business accounts to verify"
 msgstr "Business accounts to verify"
 
@@ -2426,6 +2435,9 @@ msgstr "Cash or card to the courier on delivery"
 
 msgid "Catalog"
 msgstr "Catalog"
+
+msgid "Catalogue feature"
+msgstr "Catalogue feature"
 
 msgid "Categories"
 msgstr "Categories"
@@ -2874,9 +2886,8 @@ msgstr "Confirm your email address"
 msgid "Confirm your subscription"
 msgstr "Confirm your subscription"
 
-#, python-brace-format
-msgid "Confirm your subscription to {topic}"
-msgstr "Confirm your subscription to {topic}"
+msgid "Confirm your subscription to {topic_name}"
+msgstr "Confirm your subscription to {topic_name}"
 
 msgid "Confirmation Sent At"
 msgstr "Confirmation Sent At"
@@ -2956,6 +2967,9 @@ msgstr "Contact and forms"
 msgctxt "legal details alert"
 msgid "Contact email"
 msgstr "Contact email"
+
+msgid "Contact form message"
+msgstr "Contact form message"
 
 msgid "Contact us"
 msgstr "Contact us"
@@ -3388,6 +3402,9 @@ msgstr "Data Exported"
 #, python-format
 msgid "Data export #%(id)s for user %(user)s (%(status)s)"
 msgstr "Data export #%(id)s for user %(user)s (%(status)s)"
+
+msgid "Data export ready"
+msgstr "Data export ready"
 
 msgid "Data type for this setting's value"
 msgstr "Data type for this setting's value"
@@ -4358,6 +4375,12 @@ msgstr "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 
 msgid "Feedback"
 msgstr "Feedback"
+
+msgid "Feedback feature"
+msgstr "Feedback feature"
+
+msgid "Feedback received"
+msgstr "Feedback received"
 
 msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
 msgstr "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
@@ -6024,8 +6047,14 @@ msgstr "Gift card codes the shopper wants to redeem — the intent is created fo
 msgid "Gift card codes to redeem against this order (max 3). When they cover the full total, omit payment_intent_id — no provider charge happens at all."
 msgstr "Gift card codes to redeem against this order (max 3). When they cover the full total, omit payment_intent_id — no provider charge happens at all."
 
+msgid "Gift card delivery"
+msgstr "Gift card delivery"
+
 msgid "Gift card details"
 msgstr "Gift card details"
+
+msgid "Gift card expiry reminder"
+msgstr "Gift card expiry reminder"
 
 #, python-format
 msgid "Gift card purchase %(amount)s → %(email)s"
@@ -6055,6 +6084,9 @@ msgstr "Gift cards and points"
 
 msgid "Gift cards are not available."
 msgstr "Gift cards are not available."
+
+msgid "Gift cards feature"
+msgstr "Gift cards feature"
 
 #, python-format
 msgid "Gift cards off from %(start)s"
@@ -7404,6 +7436,9 @@ msgstr "Low Usage (2-5)"
 msgid "Low stock"
 msgstr "Low stock"
 
+msgid "Low stock alert"
+msgstr "Low stock alert"
+
 msgid "Low-stock threshold"
 msgstr "Low-stock threshold"
 
@@ -7989,6 +8024,9 @@ msgstr "New Value"
 msgid "New and improved user interface"
 msgstr "New and improved user interface"
 
+msgid "New business application"
+msgstr "New business application"
+
 msgid "New contact form submission"
 msgstr "New contact form submission"
 
@@ -8039,6 +8077,12 @@ msgstr "Newsletter"
 
 msgid "Newsletter Signup"
 msgstr "Newsletter Signup"
+
+msgid "Newsletter confirmation"
+msgstr "Newsletter confirmation"
+
+msgid "Newsletter feature"
+msgstr "Newsletter feature"
 
 msgid "Newsletter form"
 msgstr "Newsletter form"
@@ -9966,6 +10010,9 @@ msgstr "Product alert"
 msgid "Product alerts"
 msgstr "Product alerts"
 
+msgid "Product alerts feature"
+msgstr "Product alerts feature"
+
 msgid "Product being reserved"
 msgstr "Product being reserved"
 
@@ -11242,6 +11289,9 @@ msgstr "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 
+msgid "Scheduled re-engagement run"
+msgstr "Scheduled re-engagement run"
+
 #, python-format
 msgid "Scheduled the credit documents for order #%(order_id)s. Nothing is issued before the receipt is registered with AADE."
 msgstr "Scheduled the credit documents for order #%(order_id)s. Nothing is issued before the receipt is registered with AADE."
@@ -11440,11 +11490,41 @@ msgstr "Sent"
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Sent once for every refund paid back to the customer."
 
+msgid "Sent once to a customer who asked to hear when a product is available again."
+msgstr "Sent once to a customer who asked to hear when a product is available again."
+
+msgid "Sent once to a customer who asked to hear when a product reaches their target price."
+msgstr "Sent once to a customer who asked to hear when a product reaches their target price."
+
+msgid "Sent once to a signed-in customer who reserved stock and never placed the order."
+msgstr "Sent once to a signed-in customer who reserved stock and never placed the order."
+
+msgid "Sent once, shortly before an unused gift card expires."
+msgstr "Sent once, shortly before an unused gift card expires."
+
+msgid "Sent to a customer who has not signed in for a long while, a few times at most."
+msgstr "Sent to a customer who has not signed in for a long while, a few times at most."
+
+msgid "Sent to confirm a subscription before it starts (double opt-in)."
+msgstr "Sent to confirm a subscription before it starts (double opt-in)."
+
+msgid "Sent to the buyer of a gift card once the payment lands."
+msgstr "Sent to the buyer of a gift card once the payment lands."
+
+msgid "Sent to the person a gift card was given to, with its code."
+msgstr "Sent to the person a gift card was given to, with its code."
+
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Sent to the provider so a repeat is not a second refund."
 
 msgid "Sent when ACS has the parcel out for delivery."
 msgstr "Sent when ACS has the parcel out for delivery."
+
+msgid "Sent when a business application is approved."
+msgstr "Sent when a business application is approved."
+
+msgid "Sent when a business application is rejected."
+msgstr "Sent when a business application is rejected."
 
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Sent when a delivered, paid order is completed."
@@ -11475,6 +11555,9 @@ msgstr "Sent when order is delivered"
 
 msgid "Sent when order is shipped"
 msgstr "Sent when order is shipped"
+
+msgid "Sent when the archive of a customer's personal data is ready to download."
+msgstr "Sent when the archive of a customer's personal data is ready to download."
 
 msgid "Sent when the carrier reports the parcel delivered."
 msgstr "Sent when the carrier reports the parcel delivered."
@@ -12488,8 +12571,20 @@ msgstr "Tells the store's staff that a dispute closed against it."
 msgid "Tells the store's staff that a payment was disputed."
 msgstr "Tells the store's staff that a payment was disputed."
 
+msgid "Tells the store's staff that an application awaits review."
+msgstr "Tells the store's staff that an application awaits review."
+
 msgid "Tells the store's staff that an order was placed."
 msgstr "Tells the store's staff that an order was placed."
+
+msgid "Tells the store's staff that someone left feedback."
+msgstr "Tells the store's staff that someone left feedback."
+
+msgid "Tells the store's staff that someone used the contact form."
+msgstr "Tells the store's staff that someone used the contact form."
+
+msgid "Tells the store's staff which products have run down to their low-stock threshold."
+msgstr "Tells the store's staff which products have run down to their low-stock threshold."
 
 msgid "Templates"
 msgstr "Templates"
@@ -14262,6 +14357,9 @@ msgstr "We hope to see you again soon!"
 msgid "We hope you are satisfied with your purchase. If you have any issues with your order, please contact our customer service."
 msgstr "We hope you are satisfied with your purchase. If you have any issues with your order, please contact our customer service."
 
+msgid "We miss you"
+msgstr "We miss you"
+
 msgid "We miss you!"
 msgstr "We miss you!"
 
@@ -14508,6 +14606,9 @@ msgstr "Who sees what"
 
 msgid "Wholesale"
 msgstr "Wholesale"
+
+msgid "Wholesale feature"
+msgstr "Wholesale feature"
 
 msgid "Wholesale prices for a set of products"
 msgstr "Wholesale prices for a set of products"

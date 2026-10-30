@@ -1,6 +1,7 @@
-"""Tests that ``check_low_stock_products`` routes its render context
-through ``build_email_context`` — the SITE_LOGO_URL flow representative
-test for ``product/tasks.py`` (see ``core/utils/email_context.py``).
+"""The low-stock email is built through ``build_email_context`` — the
+SITE_LOGO_URL flow representative test for ``product/tasks.py`` (see
+``core/utils/email_context.py``): the logo that reaches the sent mail is the
+tenant's, or the platform's for the platform's own store.
 """
 
 from __future__ import annotations
@@ -8,64 +9,48 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from django.test import override_settings
+from django.core import mail
 
 from product.factories.product import ProductFactory
 from product.tasks import check_low_stock_products
 
+LOGO = "https://cdn.example.com/tenant-logo.svg"
+
+
+@pytest.fixture(autouse=True)
+def _store_with_a_low_product():
+    ProductFactory(
+        active=True,
+        num_images=0,
+        num_reviews=0,
+        stock=1,
+        low_stock_threshold=5,
+        low_stock_alert_sent=False,
+    )
+    mail.outbox.clear()
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["admin@example.com"],
+    ):
+        yield
+
 
 @pytest.mark.django_db
 class TestLowStockAlertEmailContext:
-    @override_settings(INFO_EMAIL="admin@example.com")
-    @patch("product.tasks.EmailMultiAlternatives")
-    @patch("product.tasks.render_to_string")
-    @patch(
-        "core.utils.email_context.tenant_logo_url",
-        return_value="https://cdn.example.com/tenant-logo.svg",
-    )
-    def test_includes_tenant_logo_when_configured(
-        self, _mock_logo_url, mock_render, mock_email_cls
-    ):
-        ProductFactory(
-            active=True,
-            num_images=0,
-            num_reviews=0,
-            stock=1,
-            low_stock_threshold=5,
-            low_stock_alert_sent=False,
-        )
-        mock_render.return_value = "<html>Low stock</html>"
-
+    @patch("core.utils.email_context.tenant_logo_url", return_value=LOGO)
+    def test_includes_tenant_logo_when_configured(self, _mock_logo_url):
         result = check_low_stock_products()
 
         assert result["alerted"] == 1
-        rendered_context = mock_render.call_args_list[0][0][1]
-        assert (
-            rendered_context["SITE_LOGO_URL"]
-            == "https://cdn.example.com/tenant-logo.svg"
-        )
+        [(html, _mimetype)] = mail.outbox[0].alternatives
+        assert LOGO in html
 
-    @override_settings(INFO_EMAIL="admin@example.com")
-    @patch("product.tasks.EmailMultiAlternatives")
-    @patch("product.tasks.render_to_string")
-    def test_falls_back_without_tenant_logo(self, mock_render, mock_email_cls):
-        ProductFactory(
-            active=True,
-            num_images=0,
-            num_reviews=0,
-            stock=1,
-            low_stock_threshold=5,
-            low_stock_alert_sent=False,
-        )
-        mock_render.return_value = "<html>Low stock</html>"
-
+    def test_falls_back_without_tenant_logo(self):
         result = check_low_stock_products()
 
         assert result["alerted"] == 1
-        rendered_context = mock_render.call_args_list[0][0][1]
-        # No tenant bound in this test — that context counts as PLATFORM
+        # No tenant is bound in this test — that context counts as PLATFORM
         # (see build_email_context._is_platform_tenant), so the platform
         # logo is used. Only an unbranded NON-platform tenant gets "".
-        assert rendered_context["SITE_LOGO_URL"].endswith(
-            "/static/logo-dark.svg"
-        )
+        [(html, _mimetype)] = mail.outbox[0].alternatives
+        assert "/static/logo-dark.svg" in html

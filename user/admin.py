@@ -46,6 +46,7 @@ from admin.displays import (
 from admin.export import ExportActionMixin
 from admin.filters import RelatedDropdownFilter
 from admin.mixins import IsSuperuserOnlyModelAdmin
+from emails.models import EmailOptOut
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
@@ -58,6 +59,7 @@ from user.models import UserAccount
 from user.models.address import UserAddress
 from user.models.data_export import UserDataExport
 from user.models.subscription import SubscriptionTopic, UserSubscription
+from user.services.subscription import opt_out_of_marketing
 
 admin.site.unregister(Group)
 
@@ -372,6 +374,8 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         readonly = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.marketing_opted_out_at is not None:
+            readonly += ("marketing_opted_out_at",)
         if getattr(request.user, "is_superuser", False):
             return readonly
         identity = self.IDENTITY_FIELDS if obj is not None else ()
@@ -492,6 +496,19 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         if obj is None:
             kwargs.setdefault("form", self.add_form)
         return super().get_form(request, obj, change=change, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change and "marketing_opted_out_at" in form.changed_data:
+            # The flag is account state; what stops the mail is
+            # ``EmailOptOut``. Staff RECORD an objection the customer made
+            # by phone or email; the field is read-only once set, because
+            # only the customer can lift it.
+            opt_out_of_marketing(
+                obj.email,
+                account_pk=obj.pk,
+                source=EmailOptOut.Source.STAFF,
+            )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

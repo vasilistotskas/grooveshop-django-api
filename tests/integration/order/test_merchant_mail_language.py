@@ -18,20 +18,20 @@ from b2b.factories import BusinessProfileFactory
 from b2b.tasks import send_admin_new_business_profile_email
 from order.factories.order import OrderFactory
 from order.tasks import send_admin_new_order_email
+from tests.utils.emails import open_email_gates  # noqa: F401
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("open_email_gates"),
+]
 
 CONTACT = "owner@store.test"
 
 
 @pytest.fixture(autouse=True)
 def _contact_email():
-    with (
-        patch(
-            "emails.recipients.tenant_operator_addresses",
-            return_value=[CONTACT],
-        ),
-        patch("b2b.tasks.tenant_contact_email", return_value=CONTACT),
+    with patch(
+        "emails.recipients.tenant_operator_addresses", return_value=[CONTACT]
     ):
         yield
 

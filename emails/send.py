@@ -144,7 +144,7 @@ def _send_to(
             rendered,
             from_email=sender.from_address(),
             to=[recipient.address],
-            reply_to=sender.reply_to(email_type),
+            reply_to=sender.reply_to(email_type, obj),
             headers=build_headers(email_type, recipient),
             attachments=attachments,
         )

@@ -1,0 +1,16 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<reengagement.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0IjoidXNlci5yZWVuZ2FnZW1lbnQifQ:1AbCdE:6hIleb86eElNBD6cfzKIhCUdT3SIOtdf2O8Sw6w0VsE>",
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "We miss you!",
+  "to": [
+    "customer@example.test"
+  ]
+}

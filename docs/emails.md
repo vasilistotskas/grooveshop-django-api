@@ -7,17 +7,18 @@ Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `transport.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
-**State.** The order emails are on the pipeline (see Registered types).
-Every other email the platform sends still goes through its own task
-(`product/tasks.py`, `giftcard/tasks.py`, ...) and `core/email/` (the
-admin preview of those). They move onto the pipeline one domain at a time,
-each move keeping the recorded golden files equal (see Tests).
+**State.** The order, shipping, product, gift card, B2B, contact, account
+and cart emails are on the pipeline (see Registered types). What is not yet
+(ops alerts, allauth's account, MFA and social mail, the platform's own
+mail) still goes through its own send path and moves onto it one domain at
+a time, each move keeping the recorded golden files equal (see Tests).
 
 ## The pieces
 
 | Module | What it does |
 |---|---|
 | `types.py` | `EmailType`, the contract of one kind of email, and `Audience`, `Kind`, `Owner`, `RenderEnv`. |
+| `declare.py` | `customer_email`, `marketing_email`, `staff_email`: the three shapes a domain declares its types with. |
 | `registry.py` | `registry`: `register`, `freeze`, `get`, `all_types`, `types_for`. |
 | `gates.py` | The four gates a type can list. |
 | `recipients.py` | `Recipient(address, language)` and the resolvers `customer_of`, `store_operators`, `platform_operators`. |
@@ -61,6 +62,10 @@ module (`autodiscover_modules`), then freezes the registry.
 - `sample(env)`: an unsaved object graph the preview renders.
 - `recipients(obj) -> Sequence[Recipient]`.
 - `gates`: every gate must be open.
+- `reply_to(obj) -> Sequence[str]` (optional): where replies go when that is
+  not the store's contact address. Only the contact and feedback alerts set
+  it: a store's mail to its own staff about a submission is answered to the
+  submitter.
 
 `switchable` is `not required`; `opt_out_applies` is `kind is MARKETING`.
 
@@ -89,6 +94,66 @@ Declared in `order/emails.py`, next to the builders that read the order:
 | `shipping.boxnow_at_locker` | the `BoxNowShipment` | required; `CarrierGate("boxnow")` |
 | `team.new_order` | the `Order` | switchable, store staff |
 | `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
+
+Declared in `product/emails.py` (templates in `emails/product_alerts/`; the
+ops mail `emails/product/review_pending` stays where it is until it moves):
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `product.restock_alert` | a `ProductAlert` (restock) | **marketing**; `FeatureGate("product_alerts")` |
+| `product.price_drop_alert` | a `PriceDrop` (the alert and the price reached) | **marketing**; `FeatureGate("product_alerts")` |
+| `team.low_stock` | a `LowStock` (the products at their threshold) | switchable, store staff; `FeatureGate("catalogue")` |
+
+Declared in `giftcard/emails.py` (`FeatureGate("gift_cards")` on all):
+
+| Key | About | Requirement |
+|---|---|---|
+| `giftcard.delivery` | the `GiftCard`, to its recipient | required |
+| `giftcard.purchase_receipt` | the `GiftCardPurchase`, to the buyer | required |
+| `giftcard.expiry_reminder` | the `GiftCard`, to its recipient | switchable |
+
+Declared in `b2b/emails.py` (`FeatureGate("wholesale")` on all):
+
+| Key | About | Requirement |
+|---|---|---|
+| `b2b.profile_approved`, `b2b.profile_rejected` | the `BusinessProfile`, to its applicant | required |
+| `team.b2b_application` | the `BusinessProfile`, to the store's staff | switchable, store staff |
+
+Declared in `contact/emails.py` (the submitter is `Reply-To`):
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `team.contact_message` | the `Contact` | switchable, store staff |
+| `team.feedback` | the `Feedback` | switchable, store staff; `FeatureGate("feedback")` |
+
+Declared in `user/emails.py` and `cart/emails.py`:
+
+| Key | About | Requirement / gates |
+|---|---|---|
+| `user.data_export_ready` | the `UserDataExport` | required (GDPR) |
+| `newsletter.confirmation` | the `UserSubscription` (a guest row too) | required (double opt-in); `FeatureGate("newsletter")` |
+| `user.reengagement` | the `UserAccount` | **marketing**; `ScheduleGate("send-inactive-user-notifications")` |
+| `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")` |
+
+A marketing type is switchable, honours `EmailOptOut` and carries the
+RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
+no task filters on `UserAccount.marketing_opted_out_at` any more. That
+field stays as account state (the admin shows it, the blanket link sets
+it), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
+for every account that opted out before the link also wrote `EmailOptOut`
+(#368). In the customer admin staff may RECORD an objection a customer made
+by phone or email (setting the field writes `EmailOptOut("*")`,
+`UserAdmin.save_model`); once set the field is read-only, because only the
+customer can lift an opt-out, through their own preferences.
+
+A task treats a skip by what it protects. An alert, a delivery or a
+reminder skipped because its type is OFF (gate closed, or switched off)
+stays armed for when it is back on: the product alerts stay active, a gift
+card stays undelivered, a low-stock claim is released. One that is settled
+for good is not found again: an alert or reminder to a recipient who opted
+out, and an abandoned-checkout reservation (also settled when the store
+switched the reminder off, so turning it on later never sends a
+months-old reminder).
 
 Customer types are transactional with the `List-ID` the old send sites
 used (`order_confirmation`, `order_status`, `order_invoice`, ...), set as
@@ -240,7 +305,7 @@ named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
   body links to this URL, only the header does.
 - The blanket newsletter link (`UnsubscribeAllView`, `/user/unsubscribe/<token>`)
   also writes `EmailOptOut(type_key="*")` for the address the link was sent
-  to, beside the account-level `marketing_opted_out_at`.
+  to, beside the account-level `marketing_opted_out_at` (state, not a gate).
 
 ### `EMAIL_HASH_KEY`
 
@@ -271,8 +336,11 @@ customers:
   (RFC 2369, RFC 8058, Google's bulk-sender rules).
 
 `build_list_unsubscribe_headers(url, *, list_id)` and
-`build_transactional_list_headers(list_id=...)` live in `headers.py`; the
-send sites not yet on the pipeline call them directly.
+`build_transactional_list_headers(list_id=...)` live in `headers.py`, under
+`build_headers`; nothing else calls them. The one-click URL is the
+pipeline's own (`/api/v1/emails/unsubscribe/<token>`), never the blanket
+link of `user.utils.subscription`, which only the re-engagement body still
+prints.
 
 ## Header safety
 
@@ -291,9 +359,10 @@ concatenation at a call site.
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
 - The storefront confirm page and the `GET` redirect to it, and the
   email-preferences endpoint.
-- The other domains' email types (shipping alerts, product, giftcard, b2b,
-  contact, user, core, tenant, allauth) and the admin page. The preview of
-  the order emails already goes through `render`.
+- The other domains' email types (ops alerts, allauth, the platform's own
+  mail) and the admin page. The preview of every registered type already
+  goes through `render`; a real object is chosen only for the order types
+  (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
 
 ## Tests
 
@@ -314,5 +383,19 @@ concatenation at a call site.
   normalised value is the footer's copyright year. The Greek files need
   the compiled catalogue (`manage.py compilemessages --ignore=.venv`); the
   test fails with that instruction rather than recording English.
+- `tests/integration/emails/test_golden_render_domains.py` does the same
+  for the product, gift card, B2B, contact, account and cart emails. It
+  pins what the rows cannot (the user and product ids, the signer's clock,
+  `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
+- `tests/integration/emails/test_every_type.py` is parametrised over
+  `registry.all_types()`, so a type added to any `<app>/emails.py` is covered
+  without editing a test: its sample sends, a closed gate stops it with the
+  gate's label, a store's switch stops a switchable one and refuses a
+  required one, the headers are exactly those of its audience and kind, an
+  opt-out stops marketing mail and only that, and the preview is the mail
+  sent.
+- `tests/integration/emails/test_domain_tasks.py`: what each migrated task
+  does with a skip (alerts stay armed, claims are released or settled).
 - Add a golden case (the helper takes any sent message) before moving
-  another domain's send sites onto the pipeline.
+  another domain's send sites onto the pipeline. A test about what an email
+  says rather than whether it is sent uses the `open_email_gates` fixture.

@@ -1,0 +1,16 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<product-restock-alerts.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjM1OGQyMTAwNGY1Y2Y0YzJmNDYxNTlmODhhMTk5MzJiY2UxNzAxNzc0OGQ0OGZkZjg2Y2ZiODRmNWFmY2E4OWEiLCJ0IjoicHJvZHVjdC5yZXN0b2NrX2FsZXJ0In0:1AbCdE:KM5gm_sr3rlbVo5aN-NH7VqG8-7qrUm1ptCJOcMDgTM>",
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "[Acme Gadgets] Wireless earbuds is back in stock",
+  "to": [
+    "guest@example.test"
+  ]
+}

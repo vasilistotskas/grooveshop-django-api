@@ -1,0 +1,12 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [
+    "customer@example.test"
+  ],
+  "subject": "New contact form submission from Nikos Georgiou",
+  "to": [
+    "owner@store.test"
+  ]
+}

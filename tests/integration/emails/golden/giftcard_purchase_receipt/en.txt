@@ -1,0 +1,15 @@
+GIFT CARD PURCHASE CONFIRMATION
+
+Thank you for your purchase!
+
+Amount: €50.00
+Recipient: recipient@example.test
+Delivery date: 04/01/2026
+
+The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out.
+
+This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

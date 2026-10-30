@@ -205,7 +205,7 @@ class TestThePreviewRendersTheRealContext:
         """A template no registered email type sends shows NO subject,
         not "Email from {store}"."""
         preview = EmailTemplatePreviewService().generate_preview(
-            "confirmation", language="en"
+            "expiring", language="en"
         )
 
         assert preview.error is None

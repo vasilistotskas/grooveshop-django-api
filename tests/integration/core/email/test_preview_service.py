@@ -139,7 +139,7 @@ class TestEmailTemplatePreviewService:
             mock_render.side_effect = Exception("Template error")
 
             preview = service.generate_preview(
-                template_name="confirmation", order_id=None
+                template_name="expiring", order_id=None
             )
 
             # When rendering fails, error message should be in the content

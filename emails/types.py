@@ -99,6 +99,10 @@ class EmailType:
     recipients: Callable[[Any], Sequence[Recipient]]
     #: Every gate must be open for the type to be sent.
     gates: tuple[Gate, ...] = ()
+    #: Where replies go when that is not the store's contact address: a
+    #: store's mail to its own staff about a submission is answered to the
+    #: person who made it. Returns validated bare addresses.
+    reply_to: Callable[[Any], Sequence[str]] | None = None
     #: RFC 2919 list label; the key with dashes for dots when omitted.
     list_id: str = field(default="")
 

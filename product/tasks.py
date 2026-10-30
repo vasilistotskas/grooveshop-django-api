@@ -1,12 +1,11 @@
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.html import escape
 from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override as translation_override
@@ -20,12 +19,12 @@ from core.retry import (
 from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import store_language
-from core.utils.tenant_urls import get_tenant_frontend_url, storefront_path
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_site_name,
-)
+from core.utils.tenant_urls import storefront_path
+from emails.send import Status, send_email, was_sent
+from product.emails import ALERTS_GATE, LowStock, PriceDrop
+
+if TYPE_CHECKING:
+    from product.models.alert import ProductAlert
 
 logger = logging.getLogger(__name__)
 
@@ -270,56 +269,14 @@ def check_low_stock_products() -> dict:
             low_stock_alert_sent=True
         )
 
-    admin_email = tenant_contact_email()
-    if not admin_email:
-        logger.warning(
-            "check_low_stock_products: no tenant contact email — rolling back claim"
-        )
-        # Release the claim so a future run with admins configured can send.
-        Product.objects.filter(id__in=product_ids).update(
-            low_stock_alert_sent=False
-        )
-        return {"alerted": 0, "reason": "no_admins"}
-
     products_to_alert = list(
         Product.objects.filter(id__in=product_ids).prefetch_related(
             "translations"
         )
     )
 
-    rows = [
-        {
-            "name": p.safe_translation_getter("name", any_language=True)
-            or f"Product #{p.id}",
-            "sku": getattr(p, "sku", "") or "",
-            "stock": p.stock,
-            "low_stock_threshold": p.low_stock_threshold,
-        }
-        for p in products_to_alert
-    ]
-
-    # Merchant-facing: the store's own language, not the worker's.
-    language = store_language()
     try:
-        with translation_override(language):
-            context = build_email_context(language=language, products=rows)
-            subject = _("[{site}] Low stock alert — {n} product(s)").format(
-                site=tenant_site_name(), n=len(rows)
-            )
-            text_content = render_to_string(
-                "emails/product/low_stock_alert.txt", context
-            )
-            html_content = render_to_string(
-                "emails/product/low_stock_alert.html", context
-            )
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [admin_email],
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        deliveries = send_email("team.low_stock", LowStock(products_to_alert))
     except Exception as e:
         logger.exception(
             "check_low_stock_products: failed to send alert email",
@@ -330,6 +287,19 @@ def check_low_stock_products() -> dict:
         )
         return {"alerted": 0, "error": str(e)}
 
+    if not was_sent(deliveries):
+        # Nobody to write to, the type switched off or its feature closed:
+        # release the claim so a run after that is fixed can send.
+        reason = deliveries[0].status
+        logger.warning(
+            "check_low_stock_products: not sent (%s) — rolling back claim",
+            reason,
+        )
+        Product.objects.filter(id__in=product_ids).update(
+            low_stock_alert_sent=False
+        )
+        return {"alerted": 0, "reason": reason}
+
     logger.info(
         "Low-stock alert email sent for %s product(s): %s",
         len(product_ids),
@@ -338,75 +308,43 @@ def check_low_stock_products() -> dict:
     return {"alerted": len(product_ids), "ids": product_ids}
 
 
-def _send_product_alert_email(
-    *,
-    recipient: str,
-    subject: str,
-    context: dict,
-    template_basename: str,
-    user=None,
-    list_id: str = "product-alerts",
-) -> bool:
-    """Send a product-alert email with RFC 8058 unsubscribe headers.
+def _notify_alerts(alerts, *, type_key: str, wrap=lambda alert: alert):
+    """Send the email of *type_key* for each alert; returns the alerts that
+    were handled and how many were sent, or ``None`` when the type is off.
 
-    Callers must invoke this inside ``translation_override(...)`` for the
-    recipient's language — the templates are rendered here, so the active
-    language at call time is what the recipient sees.
-
-    When ``user`` is provided the email carries a ``List-Unsubscribe``
-    header pointing to the blanket-unsubscribe URL so Gmail/Outlook
-    surface a one-click control. Anonymous alerts (``ProductAlert``
-    rows with only ``email``, no ``user``) skip the header — there's
-    no token we can mint for them — and the email is delivered without
-    one-click semantics. Both paths are otherwise identical.
+    An alert is single-shot: it is handled, sent or not, so a retry loop
+    never hammers a broken address. A type that is off (its feature closed,
+    or the store switched it off) handles nothing: the alerts stay armed
+    for when it is back on.
     """
-    from emails.headers import build_list_unsubscribe_headers
-    from user.utils.subscription import generate_blanket_unsubscribe_link
+    handled: list[ProductAlert] = []
+    sent = 0
+    for alert in alerts:
+        try:
+            deliveries = send_email(type_key, wrap(alert))
+        except Exception:
+            logger.exception(
+                "Failed to send product alert %s (alert %s)",
+                type_key,
+                alert.pk,
+            )
+            handled.append(alert)
+            continue
+        if deliveries[0].status in (
+            Status.SKIPPED_FEATURE_OFF,
+            Status.SKIPPED_SWITCHED_OFF,
+        ):
+            return None
+        handled.append(alert)
+        sent += was_sent(deliveries)
+    return handled, sent
 
-    try:
-        text_content = render_to_string(
-            f"emails/product/{template_basename}.txt", context
-        )
-        html_content = render_to_string(
-            f"emails/product/{template_basename}.html", context
-        )
-    except Exception:
-        # Minimal plain-text fallback keeps the feature working even if
-        # the dedicated template has not been authored yet.
-        # Strip CR/LF from subject so it cannot be used for header
-        # injection if the caller ever passes it directly into headers.
-        safe_subject = subject.replace("\r", "").replace("\n", "")
-        product_url = context.get("product_url", "")
-        text_content = f"{safe_subject}\n\nCheck it out: {product_url}\n"
-        html_content = (
-            f"<p>{escape(safe_subject)}</p>"
-            f"<p><a href='{escape(product_url)}'>View product</a></p>"
-        )
 
-    headers: dict[str, str] | None = None
-    if user is not None and getattr(user, "pk", None) is not None:
-        unsubscribe_url = generate_blanket_unsubscribe_link(user)
-        headers = build_list_unsubscribe_headers(
-            unsubscribe_url, list_id=list_id
-        )
-
-    try:
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [recipient],
-            headers=headers,
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
-        return True
-    except Exception:
-        logger.exception(
-            "Failed to send product alert email to %s",
-            recipient,
-        )
-        return False
+def _with_product(alerts, product):
+    """The alerts, each pointing at the one product already loaded."""
+    for alert in alerts:
+        alert.product = product
+        yield alert
 
 
 @celery_app.task(
@@ -418,9 +356,7 @@ def _send_product_alert_email(
 )
 def send_product_alert_restock(product_id: int) -> dict:
     """Notify every active RESTOCK ProductAlert subscriber for a product."""
-    from core.store_settings import store_setting
-
-    if not bool(store_setting("PRODUCT_ALERTS_ENABLED")):
+    if not ALERTS_GATE.is_open():
         return {"status": "skipped", "reason": "product_alerts_disabled"}
 
     from product.models.alert import ProductAlert, ProductAlertKind
@@ -431,8 +367,6 @@ def send_product_alert_restock(product_id: int) -> dict:
     except Product.DoesNotExist:
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_path = product.storefront_path
-
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
         kind=ProductAlertKind.RESTOCK,
@@ -440,42 +374,13 @@ def send_product_alert_restock(product_id: int) -> dict:
         notified_at__isnull=True,
     ).select_related("user")
 
-    sent = 0
     now = timezone.now()
-    for alert in alerts:
-        recipient = alert.email or (alert.user.email if alert.user_id else "")
-        if not recipient:
-            continue
-
-        # Localize the whole email — product name, subject, and the
-        # templates rendered inside the helper — to the recipient's
-        # language (anonymous alerts fall back to LANGUAGE_CODE).
-        user = alert.user if alert.user_id else None
-        language = alert.email_language
-        with translation_override(language):
-            product_name = (
-                product.safe_translation_getter("name", any_language=True)
-                or f"Product {product.slug or product.id}"
-            )
-            context = build_email_context(
-                language=language,
-                product_name=product_name,
-                product_url=get_tenant_frontend_url(
-                    product_path, language=language
-                ),
-            )
-            subject = _("[{site}] {name} is back in stock").format(
-                site=tenant_site_name(), name=product_name
-            )
-            if _send_product_alert_email(
-                recipient=recipient,
-                subject=str(subject),
-                context=context,
-                template_basename="restock_alert",
-                user=user,
-                list_id="product-restock-alerts",
-            ):
-                sent += 1
+    outcome = _notify_alerts(
+        _with_product(alerts, product), type_key="product.restock_alert"
+    )
+    if outcome is None:
+        return {"status": "skipped", "reason": "switched_off"}
+    _handled, sent = outcome
 
     # Single-shot: deactivate every alert we processed, even failures —
     # a retry loop would otherwise hammer broken addresses.
@@ -498,9 +403,7 @@ def send_product_alert_restock(product_id: int) -> dict:
 )
 def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
     """Notify PRICE_DROP subscribers whose target_price is >= new_price."""
-    from core.store_settings import store_setting
-
-    if not bool(store_setting("PRODUCT_ALERTS_ENABLED")):
+    if not ALERTS_GATE.is_open():
         return {"status": "skipped", "reason": "product_alerts_disabled"}
 
     from product.models.alert import ProductAlert, ProductAlertKind
@@ -511,59 +414,27 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
     except Product.DoesNotExist:
         return {"status": "skipped", "reason": "product_not_found"}
 
-    new_price_dec = Decimal(str(new_price))
-    product_path = product.storefront_path
-
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
         kind=ProductAlertKind.PRICE_DROP,
         is_active=True,
         notified_at__isnull=True,
-        target_price__gte=new_price_dec,
+        target_price__gte=Decimal(str(new_price)),
         target_price_currency=getattr(settings, "DEFAULT_CURRENCY", "EUR"),
     ).select_related("user")
 
-    sent = 0
     now = timezone.now()
-    triggered_ids: list[int] = []
-    for alert in alerts:
-        recipient = alert.email or (alert.user.email if alert.user_id else "")
-        if not recipient:
-            continue
+    outcome = _notify_alerts(
+        _with_product(alerts, product),
+        type_key="product.price_drop_alert",
+        wrap=lambda alert: PriceDrop(alert=alert, new_price=new_price),
+    )
+    if outcome is None:
+        return {"status": "skipped", "reason": "switched_off"}
+    handled, sent = outcome
 
-        # Same per-recipient localization rationale as the restock task.
-        user = alert.user if alert.user_id else None
-        language = alert.email_language
-        with translation_override(language):
-            product_name = (
-                product.safe_translation_getter("name", any_language=True)
-                or f"Product {product.slug or product.id}"
-            )
-            context = build_email_context(
-                language=language,
-                product_name=product_name,
-                product_url=get_tenant_frontend_url(
-                    product_path, language=language
-                ),
-                new_price=new_price,
-                target_price=str(alert.target_price.amount),
-            )
-            subject = _(
-                "[{site}] Price drop: {name} is now at your target"
-            ).format(site=tenant_site_name(), name=product_name)
-            if _send_product_alert_email(
-                recipient=recipient,
-                subject=str(subject),
-                context=context,
-                template_basename="price_drop_alert",
-                user=user,
-                list_id="product-price-drop-alerts",
-            ):
-                sent += 1
-        triggered_ids.append(alert.id)
-
-    if triggered_ids:
-        ProductAlert.objects.filter(id__in=triggered_ids).update(
+    if handled:
+        ProductAlert.objects.filter(id__in=[a.id for a in handled]).update(
             is_active=False, notified_at=now
         )
 

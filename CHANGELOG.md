@@ -3,6 +3,50 @@
 
 
 
+## v3.168.0 (2026-10-30)
+
+### Features
+
+* feat(product): confirm a guest's product alert by email (double opt-in) (#373)
+
+A guest's restock or price-drop alert was stored active the moment any
+address was typed into the storefront, so anyone could enrol a stranger
+in marketing mail, the answer (409 alert_exists) told whether an address
+held an alert, and an address that had unsubscribed had no way back.
+
+A guest's request now answers the same 202 and detail whatever the
+address holds, and always enqueues one task that does every
+address-dependent step (product.alerts.request_guest_alert): the alert
+is stored inactive and product.alert_confirmation, a transactional
+customer email, carries the link. A live alert is left alone unless its
+address opted out of its type; a pending one is asked again only after a
+10-minute cooldown. The link opens the storefront's confirm page, whose
+button POSTs the token to /api/v1/product/alert/confirm/<token>: the
+token is signed under its own salt, names the store's schema and the
+alert's uuid, and lasts the newsletter's week (410 expired, 400 bad,
+another store's, or no longer pending). Confirming activates the alert
+and lifts the address's opt-out of that alert's type only, through
+set_marketing_preferences, which now takes account_pk=None for an
+address no account holds and locks the "*" row before splitting it.
+Pending alerts whose link expired are deleted daily, in every store.
+The create endpoint gets its own fail-closed throttle.
+
+A signed-in customer's alert is one row per kind and product, kept after
+it fires, so asking again after it fired answered 409 "You already have
+an active alert" for an alert that was not active, and the storefront,
+which looks up active alerts only, could never show it. Asking again
+now re-arms that row (product.alerts.arm_customer_alert); 409
+alert_exists only while it is live.
+
+tests_mt: every test starts in the public schema. A TenantClient request
+left the connection bound to the store it hit, so a later test saving
+the other tenant's row failed depending only on file order.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxNPjR7mkfvjcduoVYd
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ab1d9c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab1d9c0219e79f92294e9aed5f7664b001210bf9))
+
 ## v3.167.1 (2026-10-30)
 
 ### Bug fixes

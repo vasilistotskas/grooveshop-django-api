@@ -11912,8 +11912,14 @@ msgstr "Εμφάνιση λεπτομερών ρυθμίσεων index"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Να μην εμφανίζεται τίποτα αντί για λιγότερες προτάσεις από αυτόν τον αριθμό."
 
+msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+msgstr "Εμφανίζει τα νομικά στοιχεία του καταστήματος (επωνυμία, ΑΦΜ, διεύθυνση) κάτω από τους συνδέσμους αυτής της στήλης. Μόνο μία στήλη του υποσέλιδου μπορεί να το κάνει. Όταν καμία δεν το κάνει, τα στοιχεία μένουν εκεί που τα βάζει από προεπιλογή η βιτρίνα."
+
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
+
+msgid "Shows the seller's details"
+msgstr "Δείχνει τα στοιχεία του πωλητή"
 
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"

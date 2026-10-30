@@ -222,7 +222,13 @@ class NavigationColumnAdmin(BaseTranslatableAdmin):
 
     list_display = ("__str__", "menu", "link_count", "sort_order")
     list_filter = ("menu__slot",)
-    fields = ("menu", "label", "icon", "sort_order")
+    fields = (
+        "menu",
+        "label",
+        "icon",
+        "shows_merchant_identity",
+        "sort_order",
+    )
     inlines = [NavigationLinkInline]
 
     list_select_related = ("menu",)
@@ -248,7 +254,7 @@ class NavigationColumnInline(BaseTranslatableTabularInline):
 
     model = NavigationColumn
     extra = 0
-    fields = ("label", "icon", "sort_order")
+    fields = ("label", "icon", "shows_merchant_identity", "sort_order")
     ordering_field = "sort_order"
     hide_ordering_field = True
     show_change_link = True

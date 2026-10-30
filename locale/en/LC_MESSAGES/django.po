@@ -11903,8 +11903,14 @@ msgstr "Show detailed index settings"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Show nothing rather than fewer than this many suggestions."
 
+msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
+
+msgid "Shows the seller's details"
+msgstr "Shows the seller's details"
 
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"

@@ -404,6 +404,32 @@ class CartService:
             rehomed,
         )
 
+    @staticmethod
+    def load_for_detail(cart: Cart) -> Cart:
+        """Re-load *cart* through ``for_detail()`` for serialization.
+
+        The items are prefetched and the totals annotated, where the bare
+        row this service hands out would re-run ``get_items()`` per
+        ``total_*`` property and N+1 per line (G0081). The wholesale
+        pricing context is transplanted onto the fresh instance of the
+        SAME row, or it would silently fall back to retail prices, the
+        preview != charge desync the binding design prevents. Same
+        request, same user, same row: the context is reused as-is.
+        """
+        reloaded = Cart.objects.for_detail().get(pk=cart.pk)
+        context = getattr(cart, "_b2b_pricing", None)
+        if context is not None:
+            reloaded._b2b_pricing = context
+            # The items prefetch routes through CartItem.objects
+            # .for_list(), whose select_related("cart") hands every
+            # line its OWN (unbound) cart instance: re-point them at the
+            # bound cart or the serializer prices lines at retail while
+            # the cart totals say wholesale.
+            prefetched = getattr(reloaded, "_prefetched_objects_cache", {})
+            for item in prefetched.get("items", []):
+                item.cart = reloaded
+        return reloaded
+
     def get_cart_by_id(self, cart_uuid: str | uuid.UUID):
         """Return the cart identified by ``cart_uuid`` if the caller owns it.
 

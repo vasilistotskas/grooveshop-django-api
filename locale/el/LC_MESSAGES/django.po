@@ -2637,10 +2637,6 @@ msgstr "Πορεία ολοκλήρωσης αγοράς"
 msgid "Checkout started, awaiting payment"
 msgstr "Η ολοκλήρωση αγοράς ξεκίνησε, αναμένεται πληρωμή"
 
-#, python-format
-msgid "Checkout started, awaiting payment: order #%(id)s"
-msgstr "Η ολοκλήρωση αγοράς ξεκίνησε, αναμένεται πληρωμή: παραγγελία #%(id)s"
-
 msgid "Checkpoint action"
 msgstr "Ενέργεια σημείου ελέγχου"
 
@@ -13162,6 +13158,9 @@ msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημε�
 
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
+
+msgid "The updated cart, as returned by the cart detail endpoint"
+msgstr "Το ενημερωμένο καλάθι, όπως το επιστρέφει η λήψη καλαθιού"
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "Η αξία με την οποία κρίνονται τα δωρεάν μεταφορικά και το δωρεάν τέλος πληρωμής: τα προϊόντα μετά τις εκπτώσεις προωθήσεων και κουπονιών, χωρίς μεταφορικά και τέλη. Συγκρίνετε ένα όριο «δωρεάν πάνω από» με αυτήν, ποτέ με το total_price."

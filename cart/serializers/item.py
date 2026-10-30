@@ -146,8 +146,9 @@ class CartItemDetailSerializer(CartItemSerializer):
 class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
     # The storefront's first-touch capture, the same shape and rules as
     # on order create. Read by ``CartAttributionService.capture`` only
-    # when this add takes the cart from no lines to some; absent means
-    # the cart records no source (the agent gateway sends none).
+    # when this add takes the cart from no lines to some. Absent means
+    # no signal, classified like an order's: from the shopper's
+    # User-Agent, else "direct" (the agent gateway sends none).
     attribution = OrderAttributionInputSerializer(
         required=False, write_only=True
     )
@@ -224,16 +225,14 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                 _("Cart is not provided."), code="cart_missing"
             )
 
-        if "attribution" in validated_data:
-            request = self.context["request"]
-            CartAttributionService.capture(
-                cart,
-                OrderAttributionService.classify_for_store(
-                    OrderAttributionService.input_from_request(
-                        request, validated_data["attribution"]
-                    )
-                ),
-            )
+        CartAttributionService.capture(
+            cart,
+            OrderAttributionService.classify_for_store(
+                OrderAttributionService.input_from_request(
+                    self.context["request"], validated_data.get("attribution")
+                )
+            ),
+        )
 
         # Atomic upsert: the previous filter().first()→create() was a
         # check-then-act race — two concurrent add-to-cart calls for the same

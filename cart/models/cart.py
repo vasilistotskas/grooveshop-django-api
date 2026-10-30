@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import timedelta
 from decimal import Decimal
 from typing import Literal, cast
 
@@ -14,6 +15,12 @@ from djmoney.money import Money
 from cart.managers.cart import CartManager
 from core.models import TimeStampMixinModel, UUIDModel
 from order.taxation import split_gross
+
+# How stale ``Cart.last_activity`` may get before a request rewrites it.
+# Every reader compares it in hours or days (``CART_ABANDONED_HOURS``, the
+# abandoned-cart emails, the guest-cart sweeps), so a write on each of a
+# shopper's back-to-back requests, page loads included, bought nothing.
+LAST_ACTIVITY_WRITE_INTERVAL = timedelta(minutes=5)
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
@@ -59,10 +66,15 @@ class Cart(TimeStampMixinModel, UUIDModel):
         ) % {"id": self.id, "count": count, "total": self.total_price}
 
     def refresh_last_activity(self):
+        """Record that the cart was just used, at most once per
+        ``LAST_ACTIVITY_WRITE_INTERVAL``."""
+        current = now()
+        if current - self.last_activity < LAST_ACTIVITY_WRITE_INTERVAL:
+            return
         # Use UPDATE to touch only last_activity — avoids triggering
         # pre_save/post_save signals and saves all other fields.
-        Cart.objects.filter(pk=self.pk).update(last_activity=now())
-        self.last_activity = now()
+        Cart.objects.filter(pk=self.pk).update(last_activity=current)
+        self.last_activity = current
 
     def get_items(self):
         """Get cart items with optimized prefetching to avoid N+1 queries."""

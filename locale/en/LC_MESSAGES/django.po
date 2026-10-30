@@ -2630,10 +2630,6 @@ msgstr "Checkout funnel"
 msgid "Checkout started, awaiting payment"
 msgstr "Checkout started, awaiting payment"
 
-#, python-format
-msgid "Checkout started, awaiting payment: order #%(id)s"
-msgstr "Checkout started, awaiting payment: order #%(id)s"
-
 msgid "Checkpoint action"
 msgstr "Checkpoint action"
 
@@ -13157,6 +13153,9 @@ msgstr "The text must keep the same placeholders as the original."
 
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
+
+msgid "The updated cart, as returned by the cart detail endpoint"
+msgstr "The updated cart, as returned by the cart detail endpoint"
 
 msgid "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."
 msgstr "The value free shipping and a free payment fee are judged on: the products after promotion and coupon discounts, excluding shipping and fees. Compare a free-above threshold with this, never with total_price."

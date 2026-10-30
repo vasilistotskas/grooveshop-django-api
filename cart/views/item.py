@@ -15,6 +15,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from cart.agent_token import CART_TOKEN_PARAMETER
 from cart.filters.item import CartItemFilter
 from cart.models import CartItem
+from cart.serializers.cart import CartItemMutationResponseSerializer
 from cart.serializers.item import (
     CartItemCreateSerializer,
     CartItemDetailSerializer,
@@ -62,7 +63,7 @@ serializers_config: SerializersConfig = {
     ),
     "create": ActionConfig(
         request=CartItemCreateSerializer,
-        response=CartItemDetailSerializer,
+        response=CartItemMutationResponseSerializer,
         operation_id="createCartItem",
         summary=_("Create a cart item"),
         description=_(
@@ -83,7 +84,7 @@ serializers_config: SerializersConfig = {
     ),
     "update": ActionConfig(
         request=CartItemUpdateSerializer,
-        response=CartItemDetailSerializer,
+        response=CartItemMutationResponseSerializer,
         operation_id="updateCartItem",
         summary=_("Update a cart item"),
         description=_(
@@ -94,7 +95,7 @@ serializers_config: SerializersConfig = {
     ),
     "partial_update": ActionConfig(
         request=CartItemUpdateSerializer,
-        response=CartItemDetailSerializer,
+        response=CartItemMutationResponseSerializer,
         operation_id="partialUpdateCartItem",
         summary=_("Partially update a cart item"),
         description=_(
@@ -257,6 +258,22 @@ class CartItemViewSet(BaseModelViewSet):
                 items, request, serializer_class=self.get_response_serializer()
             )
         return super().list(request, *args, **kwargs)
+
+    def _reload_line(self, item):
+        """The written line through ``for_detail()``: the bare row the
+        write returns would N+1 on its product's translations, images,
+        counts and attributes when serialized."""
+        return self._repoint_to_bound_cart(
+            CartItem.objects.for_detail().get(pk=item.pk)
+        )
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        serializer.instance = self._reload_line(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        serializer.instance = self._reload_line(serializer.instance)
 
     def create(self, request, *args, **kwargs):
         if not self.cart_service.cart:

@@ -14,8 +14,10 @@ class CartAttribution(AcquisitionSourceModel):
     cart from no lines to some, and never rewritten while the cart keeps
     them. The order built from the cart keeps its own checkout source and
     copies this one next to it (``OrderAttribution.cart_source``), since
-    the cart is deleted once its lines become an order. A cart that
-    predates this table has no row.
+    the cart is deleted once its lines become an order. Every add that
+    fills a cart records a row, "direct" when it carried no signal, so a
+    cart has no row only when it predates this table (2026-10-17) or has
+    never held a line.
     """
 
     cart = models.OneToOneField(

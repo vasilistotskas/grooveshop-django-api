@@ -398,41 +398,18 @@ class CartViewSet(BaseModelViewSet):
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
-    @staticmethod
-    def _carry_b2b_pricing(source, target):
-        """Transplant the wholesale-pricing context onto a freshly
-        materialized instance of the SAME cart row.
-
-        The ``for_detail()`` reloads below exist for prefetching — but a
-        fresh instance silently falls back to retail prices, which is
-        exactly the preview≠charge desync the binding design prevents.
-        Same request, same user, same row → the context is reused as-is
-        (no extra queries).
-        """
-        context = getattr(source, "_b2b_pricing", None)
-        if context is not None and source.pk == target.pk:
-            target._b2b_pricing = context
-            # The items prefetch routes through CartItem.objects
-            # .for_list(), whose select_related("cart") hands every
-            # line its OWN (unbound) cart instance — re-point them at
-            # the bound target or the serializer prices lines at
-            # retail while the cart totals say wholesale.
-            prefetched = getattr(target, "_prefetched_objects_cache", {})
-            for item in prefetched.get("items", []):
-                item.cart = target
-        return target
-
     def retrieve(self, request, *args, **kwargs):
-        cart = self.cart_service.get_or_create_cart()
+        # The service resolved the cart in ``initial()`` (and merged a
+        # guest cart into it); only a visitor with no cart yet needs one
+        # created here.
+        cart = self.cart_service.cart or self.cart_service.get_or_create_cart()
         if not cart:
             return self._cart_not_found()
         # Re-load through for_detail() so the items are prefetched and the
         # totals are annotated: the cart_service returns a bare row whose
         # total_* properties would otherwise re-run get_items() several
         # times and the nested items serializer would N+1 per line (G0081).
-        cart = self._carry_b2b_pricing(
-            cart, Cart.objects.for_detail().get(pk=cart.pk)
-        )
+        cart = CartService.load_for_detail(cart)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(cart)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
@@ -451,9 +428,7 @@ class CartViewSet(BaseModelViewSet):
         # Re-load optimized so the response serialization reads prefetched
         # items + annotated totals rather than re-querying per property/line
         # (G0081).
-        cart = self._carry_b2b_pricing(
-            cart, Cart.objects.for_detail().get(pk=cart.pk)
-        )
+        cart = CartService.load_for_detail(cart)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(
             cart, context=self.get_serializer_context()
@@ -481,9 +456,7 @@ class CartViewSet(BaseModelViewSet):
     def _cart_detail_response(self, cart, status_code=status.HTTP_200_OK):
         """Serialize the cart the same way ``retrieve`` does (optimized
         reload so items are prefetched and totals annotated)."""
-        cart = self._carry_b2b_pricing(
-            cart, Cart.objects.for_detail().get(pk=cart.pk)
-        )
+        cart = CartService.load_for_detail(cart)
         response_serializer = CartDetailSerializer(
             cart, context=self.get_serializer_context()
         )

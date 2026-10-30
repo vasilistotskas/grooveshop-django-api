@@ -10,7 +10,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cart.models import Cart
-from cart.serializers.item import CartItemSerializer
+from cart.serializers.item import CartItemDetailSerializer, CartItemSerializer
+from cart.services import CartService
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
@@ -677,6 +678,27 @@ class CartDetailSerializer(CartSerializer):
             *CartSerializer.Meta.fields,
             "recommendations",
         )
+
+
+class CartItemMutationResponseSerializer(CartItemDetailSerializer):
+    """The line an add or a quantity change wrote, plus the whole cart it
+    now sits in, so a client shows the new state without a second ``GET``.
+
+    ``cart`` is the same body as ``GET /cart``, read from the cart the
+    request resolved (``context["cart"]``) after the write.
+    """
+
+    cart = serializers.SerializerMethodField(
+        help_text=_("The updated cart, as returned by the cart detail endpoint")
+    )
+
+    @extend_schema_field(CartDetailSerializer)
+    def get_cart(self, obj) -> dict:
+        cart = CartService.load_for_detail(self.context["cart"])
+        return CartDetailSerializer(cart, context=self.context).data
+
+    class Meta(CartItemDetailSerializer.Meta):
+        fields = (*CartItemDetailSerializer.Meta.fields, "cart")
 
 
 # A reservation exists per cart line, and this endpoint does database

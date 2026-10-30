@@ -100,6 +100,8 @@ class Expense(TimeStampMixinModel, UUIDModel):
         verbose_name_plural = _("Expenses")
         ordering = ["-date", "-id"]
         indexes = [
+            # Declaring ``indexes`` replaces the abstract parents' list.
+            *TimeStampMixinModel.Meta.indexes,
             models.Index(
                 fields=["date", "category"], name="expense_date_cat_ix"
             ),

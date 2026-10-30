@@ -10,6 +10,7 @@ Lines and payments that exist hold no cost and no fee: "not recorded" and
 "not reported", never zero.
 """
 
+import django.contrib.postgres.indexes
 import django.core.validators
 import djmoney.models.fields
 import djmoney.money
@@ -97,5 +98,13 @@ class Migration(migrations.Migration):
             model_name='vivawebhookevent',
             name='event_type_id',
             field=models.PositiveSmallIntegerField(choices=[(1796, 'Transaction Payment Created'), (1797, 'Transaction Reversal Created'), (1798, 'Transaction Failed'), (1799, 'Transaction Price Calculated'), (2054, 'Account Transaction Created')], help_text='Viva ``EventTypeId`` — 1796/1797/1798/1799/2054', verbose_name='Event Type ID'),
+        ),
+        migrations.AddIndex(
+            model_name='expense',
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='expense_created_at_ix'),
+        ),
+        migrations.AddIndex(
+            model_name='expense',
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='expense_updated_at_ix'),
         ),
     ]

@@ -86,11 +86,15 @@ PLACED_AT = datetime(2026, 3, 14, 10, 30, tzinfo=UTC)
 #: visible in every product name it prints.
 PRODUCTS = (
     {
+        "id": 700_001,
+        "slug": "wireless-earbuds",
         "names": {"el": "Ασύρματα ακουστικά", "en": "Wireless earbuds"},
         "price": Decimal("20.00"),
         "quantity": 1,
     },
     {
+        "id": 700_002,
+        "slug": "charging-pad",
         "names": {"el": "Φορτιστής επαφής", "en": "Charging pad"},
         "price": Decimal("31.50"),
         "quantity": 2,
@@ -216,6 +220,8 @@ def build_order(language: str, *, items: bool = True, **fields) -> Order:
     if items:
         for line in PRODUCTS:
             product = ProductFactory(
+                id=line["id"],
+                slug=line["slug"],
                 num_images=0,
                 num_reviews=0,
                 price=Money(line["price"], "EUR"),

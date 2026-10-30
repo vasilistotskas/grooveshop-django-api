@@ -39,10 +39,12 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from django.utils import timezone, translation
 from django.utils.html import strip_tags
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
+from core.store_settings import store_setting
 from core.utils.tenant_urls import get_tenant_frontend_url
 from emails.declare import customer_email, staff_email
 from emails.gates import CarrierGate, FeatureGate, StoreSwitchGate
@@ -54,6 +56,7 @@ from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
 from pay_way.enum.settlement import PaySettlement
 from recommendation.order_email import EmailStrip, order_email_strip
+from tenant.features import feature_on
 
 if TYPE_CHECKING:
     from order.models import Order, PaymentTransaction
@@ -77,6 +80,15 @@ STATUS_EMAIL_KEYS: Mapping[str, str] = {
     OrderStatus.RETURNED: "order.returned",
     OrderStatus.REFUNDED: "order.status_refunded",
 }
+
+
+#: The statuses whose email invites the shopper to review what arrived.
+REVIEW_INVITING_STATUSES = frozenset(
+    {OrderStatus.DELIVERED, OrderStatus.COMPLETED}
+)
+
+#: The fragment the storefront's product page reads to open the review form.
+REVIEW_FORM_FRAGMENT = "#write-review"
 
 
 class NothingToPreview(Exception):
@@ -260,6 +272,36 @@ def _confirmation(order: Order, env: RenderEnv) -> dict[str, Any]:
         return _confirmation_context(order, env.language)
 
 
+def _review_links(order: Order, language: str) -> list[dict[str, str]]:
+    """One "write a review" link per distinct product of *order*, to the
+    storefront page that opens the review form (``REVIEW_FORM_FRAGMENT``).
+
+    Empty when the store has product reviews off, or when it requires a
+    purchase to review and the order has no account: a guest order can
+    never count as a verified purchase (``product.managers.review.
+    purchase_items`` matches on the order's user), so the link would only
+    lead to a refusal.
+    """
+    if not feature_on("product_reviews"):
+        return []
+    if not order.user_id and store_setting("PRODUCT_REVIEWS_PURCHASE_REQUIRED"):
+        return []
+    products = {line.product_id: line.product for line in _lines(order)}
+    return [
+        {
+            "name": product.safe_translation_getter("name", any_language=True)
+            or product.slug,
+            "url": (
+                get_tenant_frontend_url(
+                    product.storefront_path, language=language
+                )
+                + REVIEW_FORM_FRAGMENT
+            ),
+        }
+        for product in products.values()
+    ]
+
+
 def _status_update(order: Order, env: RenderEnv, status: str) -> dict[str, Any]:
     with _email_language(order, env.language):
         return {
@@ -268,6 +310,11 @@ def _status_update(order: Order, env: RenderEnv, status: str) -> dict[str, Any]:
             "items": _lines(order),
             "status": status,
             "status_display": OrderStatus(status).label,
+            "review_links": (
+                _review_links(order, env.language)
+                if status in REVIEW_INVITING_STATUSES
+                else []
+            ),
         }
 
 
@@ -451,11 +498,14 @@ def _sample_order(
     country.set_current_language(env.language)
 
     lines = []
-    for name, price, quantity in (
-        ("Wireless headphones", Decimal("89.99"), 1),
-        ("USB-C cable", Decimal("12.99"), 2),
+    for product_id, (name, price, quantity) in enumerate(
+        (
+            ("Wireless headphones", Decimal("89.99"), 1),
+            ("USB-C cable", Decimal("12.99"), 2),
+        ),
+        start=1,
     ):
-        product = Product()
+        product = Product(id=product_id, slug=slugify(name))
         for code in codes:
             product.set_current_language(code)
             product.name = name
@@ -470,6 +520,7 @@ def _sample_order(
 
     order = Order(
         id=SAMPLE_ORDER_ID,
+        user_id=SAMPLE_ORDER_ID,
         status=status,
         payment_status=payment_status,
         first_name="Maria",

@@ -1472,6 +1472,15 @@ switched it off or a gate is closed is a deliberate no-op: the task returns
 store-staff tasks, which return `False` as they did for a store without a
 contact address.
 
+`order.delivered` and `order.completed` carry a `review_links` list: one
+"Write a review" link per distinct product (`order.emails._review_links`),
+to the product page with the `#write-review` fragment that opens the
+storefront's review form. It is empty when the store's `product_reviews`
+feature is off, or when `PRODUCT_REVIEWS_PURCHASE_REQUIRED` is on and the
+order has no account (a guest order is never a verified purchase). A
+verified purchase also needs the order COMPLETED, so with the purchase rule
+on, a click from the `order.delivered` mail before completion is refused.
+
 `order.status_refunded` is the email the REFUNDED status change sends
 through `send_order_status_update_email`; `order.refunded` is the one per
 refund (`send_refund_confirmation_email`). They share `order_refunded`. The

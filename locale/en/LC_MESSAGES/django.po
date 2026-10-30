@@ -10379,6 +10379,9 @@ msgstr "Questions?"
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 
+msgid "RATE YOUR PURCHASE"
+msgstr "RATE YOUR PURCHASE"
+
 msgid "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 msgstr "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 
@@ -10419,6 +10422,9 @@ msgstr "Rate"
 msgctxt "shipping"
 msgid "Rate"
 msgstr "Rate"
+
+msgid "Rate your purchase"
+msgstr "Rate your purchase"
 
 msgid "Rates"
 msgstr "Rates"
@@ -14747,6 +14753,9 @@ msgstr "Wishlist"
 msgid "Working hours"
 msgstr "Working hours"
 
+msgid "Write a review"
+msgstr "Write a review"
+
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Writes an ADJUST row on the ledger — the card history stays auditable."
 
@@ -14988,6 +14997,9 @@ msgstr "Your gift card expires soon"
 
 msgid "Your legal pages need an update"
 msgstr "Your legal pages need an update"
+
+msgid "Your opinion helps other shoppers. Share how you like your products."
+msgstr "Your opinion helps other shoppers. Share how you like your products."
 
 #, python-format
 msgid "Your order #%(order_id)s has been canceled as requested."

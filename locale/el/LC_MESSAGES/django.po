@@ -10389,6 +10389,9 @@ msgstr "Ερωτήσεις;"
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή UserDataExport."
 
+msgid "RATE YOUR PURCHASE"
+msgstr "ΑΞΙΟΛΟΓΗΣΤΕ ΤΗΝ ΑΓΟΡΑ ΣΑΣ"
+
 msgid "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 msgstr "RECEIPT (Α.Λ.Π., Tier A — λιανική) ή INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Η επιλογή INVOICE απαιτεί έγκυρο ``billing_vat_id``."
 
@@ -10429,6 +10432,9 @@ msgstr "Συντελεστής"
 msgctxt "shipping"
 msgid "Rate"
 msgstr "Τιμή αποστολής"
+
+msgid "Rate your purchase"
+msgstr "Αξιολογήστε την αγορά σας"
 
 msgid "Rates"
 msgstr "Τιμές αποστολής"
@@ -14752,6 +14758,9 @@ msgstr "Λίστα επιθυμιών"
 msgid "Working hours"
 msgstr "Ωράριο λειτουργίας"
 
+msgid "Write a review"
+msgstr "Γράψτε κριτική"
+
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Καταχωρεί μια γραμμή ADJUST στο καθολικό — το ιστορικό της κάρτας παραμένει ελέγξιμο."
 
@@ -14993,6 +15002,9 @@ msgstr "Η δωροκάρτα σας λήγει σύντομα"
 
 msgid "Your legal pages need an update"
 msgstr "Οι νομικές σελίδες σας χρειάζονται ενημέρωση"
+
+msgid "Your opinion helps other shoppers. Share how you like your products."
+msgstr "Η γνώμη σας βοηθά άλλους αγοραστές. Πείτε μας πώς σας φάνηκαν τα προϊόντα σας."
 
 #, python-format
 msgid "Your order #%(order_id)s has been canceled as requested."

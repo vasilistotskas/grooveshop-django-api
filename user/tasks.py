@@ -188,19 +188,9 @@ def export_user_data_task(self, export_id: int) -> dict:
     import os
 
     from django.core.files.storage import FileSystemStorage
-    from django.core.mail import EmailMultiAlternatives
-    from django.template.loader import render_to_string
     from django.utils import timezone
-    from django.utils.translation import gettext as _
-    from django.utils.translation import override
 
-    from core.utils.email_context import build_email_context
-    from core.utils.i18n import get_user_language
-    from core.utils.tenant_urls import get_tenant_frontend_url
-    from tenant.credentials import (
-        tenant_from_email,
-        tenant_reply_to,
-    )
+    from emails.send import send_email, was_sent
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -255,38 +245,12 @@ def export_user_data_task(self, export_id: int) -> dict:
             ]
         )
 
-        language = get_user_language(user)
-        download_url = get_tenant_frontend_url(
-            f"/account/settings/privacy?export={export.token}",
-            language=language,
-        )
-
-        context = build_email_context(
-            language=language,
-            user=user,
-            download_url=download_url,
-            expires_at=export.expires_at,
-            file_size_kb=round(export.file_size / 1024, 1),
-        )
-
-        with override(language):
-            subject = _("Your data export is ready")
-            html_body = render_to_string(
-                "emails/user/data_export_ready.html", context
+        if not was_sent(send_email("user.data_export_ready", export)):
+            logger.warning(
+                "export_user_data_task: export %s ready but the email was "
+                "not sent",
+                export_id,
             )
-            text_body = render_to_string(
-                "emails/user/data_export_ready.txt", context
-            )
-
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text_body,
-            from_email=tenant_from_email(),
-            to=[user.email],
-            reply_to=tenant_reply_to(),
-        )
-        msg.attach_alternative(html_body, "text/html")
-        msg.send(fail_silently=False)
 
         logger.info(
             "export_user_data_task: export %s ready (%s bytes) for user %s",

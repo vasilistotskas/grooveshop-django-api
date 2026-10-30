@@ -1,119 +1,97 @@
-"""Unit tests for product-alert email unsubscribe headers.
+"""Product-alert emails carry Gmail/Yahoo-compliant unsubscribe headers.
 
-Verifies that ``_send_product_alert_email`` emits Gmail/Yahoo-compliant
-``List-Unsubscribe`` headers when ``user`` is provided and skips them
-for guest alerts (no associated user → no token to mint).
+The alerts are marketing mail (``emails.types.Kind.MARKETING``), so the
+pipeline gives every one the RFC 8058 one-click ``List-Unsubscribe`` headers,
+a guest's alert (an address with no account) included: the opt-out token
+names the address, not an account.
 """
 
 from __future__ import annotations
 
-from unittest import mock
+from urllib.parse import urlsplit
 
 import pytest
 from django.core import mail
-from django.test import override_settings
 
-from product.tasks import _send_product_alert_email
+from emails import optout
+from product.factories.product import ProductFactory
+from product.models.alert import ProductAlert, ProductAlertKind
+from product.tasks import send_product_alert_restock
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
+pytestmark = pytest.mark.django_db
 
-@pytest.mark.django_db
-class TestProductAlertEmailUnsubscribeHeaders:
-    """Cover both the user-bound and guest paths."""
 
-    def _context(self) -> dict:
-        return {
-            "product_name": "Test Product",
-            "product_url": "https://example.com/products/1/test",
-            "SITE_NAME": "GrooveShop",
-        }
+@pytest.fixture(autouse=True)
+def _alerts_on(bind_tenant):
+    switch_store_settings(PRODUCT_ALERTS_ENABLED=True)
+    mail.outbox.clear()
 
-    @override_settings(
-        DEFAULT_FROM_EMAIL="from@example.com",
-        INFO_EMAIL="info@example.com",
-        SITE_NAME="GrooveShop",
-        API_BASE_URL="https://api.example.com",
-        NUXT_BASE_URL="https://example.com",
+
+def _send(**alert_fields) -> mail.EmailMessage:
+    product = ProductFactory(stock=5, num_images=0, num_reviews=0)
+    ProductAlert.objects.create(
+        kind=ProductAlertKind.RESTOCK, product=product, **alert_fields
     )
-    def test_user_bound_alert_emits_list_unsubscribe_headers(self):
+    mail.outbox.clear()
+    send_product_alert_restock.run(product.pk)
+    [message] = mail.outbox
+    return message
+
+
+class TestProductAlertUnsubscribeHeaders:
+    @pytest.fixture(autouse=True)
+    def _hosts(self, settings):
+        settings.API_BASE_URL = "https://api.example.com"
+        settings.NUXT_BASE_URL = "https://example.com"
+
+    def test_an_alert_to_a_member_is_one_click_unsubscribable(self):
         user = UserAccountFactory(num_addresses=0)
-        mail.outbox = []
 
-        sent = _send_product_alert_email(
-            recipient=user.email,
-            subject="Back in stock",
-            context=self._context(),
-            template_basename="restock_alert",
-            user=user,
-            list_id="product-restock-alerts",
+        headers = _send(user=user).extra_headers
+
+        # RFC 8058: the https form is signed for this address and type.
+        url = headers["List-Unsubscribe"].split("<")[-1].rstrip(">")
+        token = urlsplit(url).path.rsplit("/", 1)[-1]
+        claims = optout.read_token(token)
+        assert claims.address_hash == optout.address_hash(user.email)
+        assert claims.type_key == "product.restock_alert"
+        assert url.startswith(
+            "https://api.example.com/api/v1/emails/unsubscribe/"
         )
+        assert headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+        assert headers["List-ID"] == "<product-restock-alerts.example.com>"
 
-        assert sent is True
-        assert len(mail.outbox) == 1
-        msg = mail.outbox[0]
+    def test_an_alert_to_a_guest_is_too(self):
+        headers = _send(email="anon@example.com").extra_headers
 
-        # RFC 8058: both URI forms separated by comma; both <>-bracketed.
-        unsubscribe_header = msg.extra_headers["List-Unsubscribe"]
-        assert (
-            "<mailto:info@example.com?subject=unsubscribe>"
-            in unsubscribe_header
+        claims = optout.read_token(
+            headers["List-Unsubscribe"]
+            .split("<")[-1]
+            .rstrip(">")
+            .rsplit("/", 1)[-1]
         )
-        assert (
-            "<https://api.example.com/api/v1/user/unsubscribe/"
-            in unsubscribe_header
+        assert claims.address_hash == optout.address_hash("anon@example.com")
+        assert headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+    def test_a_guest_who_opted_out_is_not_written_to(self):
+        optout.opt_out(
+            "anon@example.com",
+            "product.restock_alert",
+            source=optout.EmailOptOut.Source.ONE_CLICK,
         )
-
-        # One-click POST flag — required by Gmail/Yahoo bulk-sender rules.
-        assert (
-            msg.extra_headers["List-Unsubscribe-Post"]
-            == "List-Unsubscribe=One-Click"
+        product = ProductFactory(stock=5, num_images=0, num_reviews=0)
+        alert = ProductAlert.objects.create(
+            kind=ProductAlertKind.RESTOCK,
+            product=product,
+            email="anon@example.com",
         )
+        mail.outbox.clear()
 
-        # List-ID lets mailbox providers bucket per-list reputation. RFC
-        # 2919 requires a bracketed ``label.domain`` — no display names.
-        assert (
-            msg.extra_headers["List-ID"]
-            == "<product-restock-alerts.example.com>"
-        )
+        result = send_product_alert_restock.run(product.pk)
 
-    @override_settings(DEFAULT_FROM_EMAIL="from@example.com")
-    def test_guest_alert_omits_list_unsubscribe_headers(self):
-        """No user → no token → no header (skipping is correct)."""
-        mail.outbox = []
-
-        sent = _send_product_alert_email(
-            recipient="anon@example.com",
-            subject="Back in stock",
-            context=self._context(),
-            template_basename="restock_alert",
-            user=None,
-            list_id="product-restock-alerts",
-        )
-
-        assert sent is True
-        assert len(mail.outbox) == 1
-        msg = mail.outbox[0]
-        assert "List-Unsubscribe" not in msg.extra_headers
-        assert "List-Unsubscribe-Post" not in msg.extra_headers
-        assert "List-ID" not in msg.extra_headers
-
-    @override_settings(DEFAULT_FROM_EMAIL="from@example.com")
-    def test_user_without_pk_falls_back_to_guest_path(self):
-        """A defensive guard: an in-memory user that's never been
-        saved has no pk and can't have a token minted; we must not
-        crash and must not emit a malformed header."""
-        mail.outbox = []
-        sentinel_user = mock.Mock(pk=None)
-
-        sent = _send_product_alert_email(
-            recipient="user@example.com",
-            subject="Back in stock",
-            context=self._context(),
-            template_basename="restock_alert",
-            user=sentinel_user,
-            list_id="product-restock-alerts",
-        )
-
-        assert sent is True
-        msg = mail.outbox[0]
-        assert "List-Unsubscribe" not in msg.extra_headers
+        assert mail.outbox == []
+        assert result["sent"] == 0
+        alert.refresh_from_db()
+        assert alert.is_active is False

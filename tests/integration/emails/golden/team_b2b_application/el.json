@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "Νέα αίτηση B2B — Acme Trading IKE",
+  "to": [
+    "owner@store.test"
+  ]
+}

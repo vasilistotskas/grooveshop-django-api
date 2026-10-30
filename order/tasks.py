@@ -5,11 +5,8 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
-from django.template.loader import render_to_string
-from django.utils import timezone, translation
-from django.utils.translation import gettext as _
+from django.utils import timezone
 
 from core import celery_app
 from core.retry import (
@@ -19,13 +16,6 @@ from core.retry import (
 )
 from core.store_settings import store_setting
 from core.tasks import MonitoredTask
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
-from core.utils.tenant_urls import get_tenant_frontend_url
-from emails.headers import (
-    build_list_unsubscribe_headers,
-    build_transactional_list_headers,
-)
 from emails.send import send_email, was_sent
 from emails.transport import Attachment
 from order import payment_hold
@@ -47,11 +37,6 @@ from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.payment import get_payment_provider_class
 from order.services import OrderService
 from recommendation.order_email import record_impression
-from tenant.credentials import (
-    tenant_from_email,
-    tenant_reply_to,
-    tenant_site_name,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -1916,101 +1901,24 @@ def send_checkout_abandonment_emails() -> int:
     if not abandoned_session_ids:
         return 0
 
-    # A cart reminder is marketing: an account that used the one-click
-    # unsubscribe link in any marketing email is not written to. Its
-    # reservations are settled, not left for tomorrow's run to find again
-    # (and to send a months-old reminder if the opt-out is ever lifted).
-    opted_out_sessions = [
-        str(uuid)
-        for uuid in Cart.objects.filter(
-            uuid__in=abandoned_session_ids,
-            user__marketing_opted_out_at__isnull=False,
-        ).values_list("uuid", flat=True)
-    ]
-    if opted_out_sessions:
-        StockReservation.objects.filter(
-            session_id__in=opted_out_sessions
-        ).update(abandonment_notified=True)
-
-    carts = (
-        Cart.objects.select_related("user")
-        .filter(
-            uuid__in=abandoned_session_ids,
-            user__isnull=False,
-            user__marketing_opted_out_at__isnull=True,
-        )
-        .prefetch_related("items__product__translations")
+    carts = Cart.objects.select_related("user").filter(
+        uuid__in=abandoned_session_ids,
+        user__isnull=False,
     )
 
     sent = 0
     for cart in carts:
-        if not cart.user or not cart.user.email:
-            continue
         try:
-            # Use the shared signing-based helper — the old
-            # uidb64/default_token_generator scheme was removed with the
-            # unsubscribe URL migration, so a hand-rolled link now resolves
-            # to the wrong view and always fails BadSignature (regression).
-            from user.utils.subscription import (
-                generate_blanket_unsubscribe_link,
-            )
-
-            unsubscribe_url = generate_blanket_unsubscribe_link(cart.user)
-
-            language = get_user_language(cart.user)
-            context = build_email_context(
-                language=language,
-                cart=cart,
-                items=list(cart.items.all()),
-                # Point the CTA at the recovery route — the Nuxt page
-                # there re-attaches the cart to the session (including
-                # the logged-out → login → back round-trip via the
-                # global auth middleware) and forwards to /cart with a
-                # ``recovered=1`` flag so the shopper sees a welcome
-                # banner instead of landing silently on their items.
-                cart_url=get_tenant_frontend_url(
-                    f"/cart/recover/{cart.uuid}", language=language
-                ),
-                preferences_url=get_tenant_frontend_url(
-                    "/account/subscriptions/", language=language
-                ),
-                unsubscribe_url=unsubscribe_url,
-            )
-            with translation.override(language):
-                subject = _("Did you forget something? — {site_name}").format(
-                    site_name=tenant_site_name()
-                )
-                text_content = render_to_string(
-                    "emails/cart/checkout_abandoned.txt", context
-                )
-                html_content = render_to_string(
-                    "emails/cart/checkout_abandoned.html", context
-                )
-            if unsubscribe_url:
-                headers = build_list_unsubscribe_headers(
-                    unsubscribe_url, list_id="abandoned-cart"
-                )
-            else:
-                headers = {
-                    "List-ID": build_transactional_list_headers(
-                        list_id="abandoned-cart"
-                    )["List-ID"]
-                }
-            msg = EmailMultiAlternatives(
-                subject,
-                text_content,
-                tenant_from_email(),
-                [cart.user.email],
-                reply_to=tenant_reply_to(),
-                headers=headers,
-            )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send()
-
+            deliveries = send_email("cart.checkout_abandoned", cart)
+            # Settled whether it was sent or not: an account that opted
+            # out through the one-click header, a store that switched the
+            # reminder off, or a closed cart feature must not have today's
+            # reservations found again tomorrow, nor a months-old reminder
+            # go out the day the reminder is back on.
             StockReservation.objects.filter(session_id=str(cart.uuid)).update(
                 abandonment_notified=True
             )
-            sent += 1
+            sent += was_sent(deliveries)
         except Exception:
             logger.exception(
                 "Error sending checkout-abandonment email for cart %s",

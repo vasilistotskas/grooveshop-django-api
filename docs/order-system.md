@@ -1494,6 +1494,13 @@ its type and nowhere else: never in `core/email/config.py`.
 A receipt or credit mail carries its PDF as an `emails.transport.Attachment`
 passed to `send_email`; the bytes are never logged.
 
+Every other domain's emails follow the same pattern (`product/emails.py`,
+`giftcard/emails.py`, `b2b/emails.py`, `contact/emails.py`, `user/emails.py`,
+`cart/emails.py`; see `docs/emails.md`). A builder states the language of
+every translated row it prints (`set_current_language(env.language)`), so a
+product, topic or cart line is named in the recipient's language whatever
+language the task loaded it in.
+
 The builders read the order's lines (`_lines`) **inside**
 `translation.override`: parler fixes a model's language when the instance
 is created, so lines a task prefetched before the override named every
@@ -1618,36 +1625,44 @@ additive migration; the moment is the proof of when they asked).
   (RFC 8058: `List-Unsubscribe=One-Click`, no cookies, always 200) and the
   GET link do the same. A topic link (`/unsubscribe/<token>/<topic>`) ends
   that topic only; a guest subscription's link touches no account.
-- Every marketing send skips an opted-out account:
-  `UserAccount.objects.accepting_marketing()` for the re-engagement
-  query, `user__marketing_opted_out_at__isnull=True` for the cart query.
-  A cart reminder skipped for that reason has its reservations settled
-  (`abandonment_notified`), so the next run does not find it again and a
-  lifted opt-out never sends a months-old reminder.
-- **A new marketing send must start from the same filter**, and carry
-  `emails.headers.build_list_unsubscribe_headers` with `generate_blanket_unsubscribe_link`
-  (Gmail and Yahoo require one-click unsubscribe on marketing mail;
-  RFC 8058 also needs the HTTPS URI to carry a hard-to-forge component,
-  which the signed token is, and the message to be DKIM-signed over both
-  headers, which the relay does).
-- Product alerts (restock, price drop) are not gated: the customer
-  created each one for one product and it fires once. Their link records
-  the opt-out all the same, which then stops the two emails above.
-- Nothing lifts the opt-out by itself. Staff clear it from the customer's
-  admin page (Loyalty & Engagement tab) on the customer's request.
+- **`EmailOptOut` is the one gate.** Every marketing send is a
+  `Kind.MARKETING` email type (`emails.declare.marketing_email`), and
+  `send_email` skips a recipient with an `EmailOptOut` row for the type or
+  for `*` (every marketing type). No task filters on
+  `marketing_opted_out_at`; the field is account state only.
+  `emails/0002_import_marketing_opt_outs` gave every account that opted out
+  before #368 (flag, no row) its `*` row. The pipeline also gives the type
+  the RFC 8058 `List-Unsubscribe` headers (Gmail and Yahoo require
+  one-click unsubscribe on marketing mail; the HTTPS URI carries a signed
+  token, and the relay DKIM-signs both headers).
+- A cart reminder skipped (opt-out, or the type OFF) has its reservations
+  settled (`abandonment_notified`), so the next run does not find it again
+  and a lifted opt-out never sends a months-old reminder.
+- Product alerts (restock, price drop) are marketing types too
+  (`product.restock_alert`, `product.price_drop_alert`): each fires once for
+  one product the customer picked, and they honour the same opt-out. An
+  alert skipped because the type is OFF stays armed; one skipped for an
+  opt-out is settled.
+- Nothing lifts the opt-out by itself, and staff never do: only the
+  customer can, through their own preferences. Staff may record an
+  objection a customer made by phone or email (Loyalty & Engagement tab:
+  saving the field writes `EmailOptOut("*")`); once set the field is
+  read-only.
 
 ### 6.6 The store's copy of a contact or feedback submission
 
 `contact.tasks.send_contact_notification_email_task` and
-`send_feedback_notification_email_task` mail the store's own contact
-inbox (`tenant_contact_email()`), from `tenant_from_email()`, rendered
-from `emails/contact/{contact,feedback}_notification.{html,txt}` in the
-**store's** language (`store_language()`), subject included. The
-submitter's address is `Reply-To`, so replying answers the customer; it is
-checked with `validate_email` first, and anything that is not one bare
-address (a line break, a display name, two addresses) is dropped and the
-mail goes out without `Reply-To`. Files are never attached: the mail only
-says they exist.
+`send_feedback_notification_email_task` send the `team.contact_message`
+and `team.feedback` types (`contact/emails.py`) to the store's operators
+(`emails.recipients.store_operators`: the contact address, then the
+owner's), rendered from `emails/contact/{contact,feedback}_notification.
+{html,txt}` in the **store's** language, subject included. The submitter's
+address is `Reply-To` (the type's `reply_to`), so replying answers the
+customer; it is checked with `validate_email` first, and anything that is
+not one bare address (a line break, a display name, two addresses) is
+dropped and the mail goes out without `Reply-To`. Files are never attached:
+the mail only says they exist. A task returns `False` when nothing was sent
+(no operator address, the type switched off, the feedback feature closed).
 
 ### 6.7 Account emails (allauth)
 

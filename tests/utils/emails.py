@@ -13,9 +13,11 @@ import copy
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
+from emails.gates import CarrierGate, FeatureGate, ScheduleGate, StoreSwitchGate
 from emails.recipients import Recipient
 from emails.registry import registry
 from emails.types import Audience, EmailType, Kind
@@ -94,3 +96,16 @@ def catalogue(
         return types
 
     return register
+
+
+@pytest.fixture
+def open_email_gates():
+    """Every gate of every email type open, for a test about what an email
+    says or where it goes rather than whether the store sends it."""
+    with (
+        patch.object(FeatureGate, "is_open", return_value=True),
+        patch.object(StoreSwitchGate, "is_open", return_value=True),
+        patch.object(CarrierGate, "is_open", return_value=True),
+        patch.object(ScheduleGate, "is_open", return_value=True),
+    ):
+        yield

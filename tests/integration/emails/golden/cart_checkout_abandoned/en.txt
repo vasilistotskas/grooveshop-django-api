@@ -1,0 +1,18 @@
+YOU LEFT SOMETHING BEHIND
+
+It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart.
+
+YOUR CART
+- Wireless earbuds x 2
+
+Return to your cart:
+https://shop.example/en/cart/recover/00000000-0000-4000-8000-0000000000c1
+
+Hurry — popular items may sell out quickly!
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+
+Don't want to receive these reminders?
+Manage your preferences: https://shop.example/en/account/subscriptions/

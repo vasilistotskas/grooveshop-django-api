@@ -12,16 +12,16 @@ from __future__ import annotations
 import re
 from datetime import timedelta
 
-from django.core import mail, signing
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from cart.factories.cart import CartFactory
+from emails import optout
 from order.models.stock_reservation import StockReservation
 from order.tasks import send_checkout_abandonment_emails
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
-from user.utils.subscription import UNSUBSCRIBE_SALT
 
 
 @override_settings(
@@ -57,16 +57,14 @@ class AbandonmentEmailUnsubscribeTestCase(TestCase):
         self.assertEqual(sent, 1)
         self.assertEqual(len(mail.outbox), 1)
 
+        # RFC 8058 one-click: the header names this address and this type
+        # under the pipeline's signed token (schema-scoped), not the dead
+        # uidb64/reset-token format.
         header = mail.outbox[0].extra_headers["List-Unsubscribe"]
         match = re.search(r"<(https://[^>]+)>", header)
         self.assertIsNotNone(match)
         url = match.group(1)
-        token = url.rstrip("/").rsplit("/", 1)[1]
-
-        # The token must decode back to the user's pk + owning schema
-        # under the unsubscribe salt — i.e. the current schema-scoped
-        # signing scheme, not the dead uidb64/reset-token format.
-        self.assertEqual(
-            signing.loads(token, salt=UNSUBSCRIBE_SALT),
-            {"schema": "public", "pk": user.pk},
-        )
+        self.assertIn("/api/v1/emails/unsubscribe/", url)
+        claims = optout.read_token(url.rstrip("/").rsplit("/", 1)[1])
+        self.assertEqual(claims.address_hash, optout.address_hash(user.email))
+        self.assertEqual(claims.type_key, "cart.checkout_abandoned")

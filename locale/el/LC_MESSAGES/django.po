@@ -959,6 +959,9 @@ msgstr "Εγκαταλελειμμένη"
 msgid "Abandoned Carts"
 msgstr "Εγκαταλελειμμένα Καλάθια"
 
+msgid "Abandoned checkout reminder"
+msgstr "Υπενθύμιση ολοκλήρωσης αγοράς"
+
 msgid "Abandonment Notified"
 msgstr "Ενημερώθηκε για εγκατάλειψη"
 
@@ -2011,6 +2014,12 @@ msgstr "Εταιρικό Προφίλ"
 msgid "Business Profiles"
 msgstr "Εταιρικά Προφίλ"
 
+msgid "Business account application rejected"
+msgstr "Απόρριψη αίτησης εταιρικού λογαριασμού"
+
+msgid "Business account approved"
+msgstr "Έγκριση εταιρικού λογαριασμού"
+
 msgid "Business accounts to verify"
 msgstr "Επαγγελματικοί λογαριασμοί προς έλεγχο"
 
@@ -2443,6 +2452,9 @@ msgstr "Μετρητά ή κάρτα στον κούριερ κατά την π�
 
 msgid "Catalog"
 msgstr "Κατάλογος"
+
+msgid "Catalogue feature"
+msgstr "Λειτουργία καταλόγου"
 
 msgid "Categories"
 msgstr "Κατηγορίες"
@@ -2890,9 +2902,8 @@ msgstr "Επιβεβαιώστε τη διεύθυνση email σας"
 msgid "Confirm your subscription"
 msgstr "Επιβεβαίωση εγγραφής"
 
-#, python-brace-format
-msgid "Confirm your subscription to {topic}"
-msgstr "Επιβεβαίωση εγγραφής στο {topic}"
+msgid "Confirm your subscription to {topic_name}"
+msgstr "Επιβεβαίωση εγγραφής στο {topic_name}"
 
 msgid "Confirmation Sent At"
 msgstr "Αποστολή επιβεβαίωσης"
@@ -2972,6 +2983,9 @@ msgstr "Επικοινωνία και φόρμες"
 msgctxt "legal details alert"
 msgid "Contact email"
 msgstr "Email επικοινωνίας"
+
+msgid "Contact form message"
+msgstr "Μήνυμα από τη φόρμα επικοινωνίας"
 
 msgid "Contact us"
 msgstr "Επικοινωνήστε μαζί μας"
@@ -3405,6 +3419,9 @@ msgstr "Εξήχθησαν Δεδομένα"
 #, python-format
 msgid "Data export #%(id)s for user %(user)s (%(status)s)"
 msgstr "Εξαγωγή δεδομένων #%(id)s για τον χρήστη %(user)s (%(status)s)"
+
+msgid "Data export ready"
+msgstr "Η εξαγωγή δεδομένων είναι έτοιμη"
 
 msgid "Data type for this setting's value"
 msgstr "Τύπος δεδομένων για την τιμή αυτής της ρύθμισης"
@@ -4390,6 +4407,12 @@ msgstr "Χρέωση από τη μέθοδο πληρωμής (π.χ. τέλο�
 
 msgid "Feedback"
 msgstr "Feedback"
+
+msgid "Feedback feature"
+msgstr "Λειτουργία feedback"
+
+msgid "Feedback received"
+msgstr "Ελήφθη feedback"
 
 msgid "Feeds the learning loop. Pass the impression_id from the suggestions response. Attach events are written server-side when an order completes and cannot be posted here."
 msgstr "Τροφοδοτεί τον βρόχο εκμάθησης. Περάστε το impression_id από την απόκριση των προτάσεων. Τα συμβάντα προσθήκης καταγράφονται στον server όταν ολοκληρώνεται μια παραγγελία και δεν μπορούν να υποβληθούν εδώ."
@@ -6057,8 +6080,14 @@ msgstr "Κωδικοί δωροκαρτών που θέλει να εξαργυ�
 msgid "Gift card codes to redeem against this order (max 3). When they cover the full total, omit payment_intent_id — no provider charge happens at all."
 msgstr "Κωδικοί δωροκαρτών για εξαργύρωση σε αυτή την παραγγελία (έως 3). Όταν καλύπτουν ολόκληρο το σύνολο, παράλειψε το payment_intent_id — δεν γίνεται καμία χρέωση από τον πάροχο."
 
+msgid "Gift card delivery"
+msgstr "Παράδοση δωροκάρτας"
+
 msgid "Gift card details"
 msgstr "Στοιχεία δωροκάρτας"
+
+msgid "Gift card expiry reminder"
+msgstr "Υπενθύμιση λήξης δωροκάρτας"
 
 #, python-format
 msgid "Gift card purchase %(amount)s → %(email)s"
@@ -6088,6 +6117,9 @@ msgstr "Δωροκάρτες και πόντοι"
 
 msgid "Gift cards are not available."
 msgstr "Οι δωροκάρτες δεν είναι διαθέσιμες."
+
+msgid "Gift cards feature"
+msgstr "Λειτουργία δωροκαρτών"
 
 #, python-format
 msgid "Gift cards off from %(start)s"
@@ -7440,6 +7472,9 @@ msgstr "Χαμηλή χρήση (2-5)"
 msgid "Low stock"
 msgstr "Χαμηλό απόθεμα"
 
+msgid "Low stock alert"
+msgstr "Ειδοποίηση χαμηλού αποθέματος"
+
 msgid "Low-stock threshold"
 msgstr "Όριο χαμηλού αποθέματος"
 
@@ -8025,6 +8060,9 @@ msgstr "Νέα τιμή"
 msgid "New and improved user interface"
 msgstr "Νέα και βελτιωμένη διεπαφή χρήστη"
 
+msgid "New business application"
+msgstr "Νέα αίτηση εταιρικού λογαριασμού"
+
 msgid "New contact form submission"
 msgstr "Νέο μήνυμα από τη φόρμα επικοινωνίας"
 
@@ -8075,6 +8113,12 @@ msgstr "Newsletter"
 
 msgid "Newsletter Signup"
 msgstr "Εγγραφή στο newsletter"
+
+msgid "Newsletter confirmation"
+msgstr "Επιβεβαίωση εγγραφής στο newsletter"
+
+msgid "Newsletter feature"
+msgstr "Λειτουργία newsletter"
 
 msgid "Newsletter form"
 msgstr "Φόρμα newsletter"
@@ -10002,6 +10046,9 @@ msgstr "Ειδοποίηση προϊόντος"
 msgid "Product alerts"
 msgstr "Ειδοποιήσεις προϊόντος"
 
+msgid "Product alerts feature"
+msgstr "Λειτουργία ειδοποιήσεων προϊόντων"
+
 msgid "Product being reserved"
 msgstr "Προϊόν που δεσμεύεται"
 
@@ -11277,6 +11324,9 @@ msgstr "Προγραμματίστηκε ακύρωση στο myDATA για τ�
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Προγραμματίστηκε υποβολή στο myDATA για το τιμολόγιο %(num)s (παραγγελία #%(order_id)s). Ανανεώστε τη διαχείριση Τιμολογίων για να δείτε το MARK μόλις απαντήσει η ΑΑΔΕ."
 
+msgid "Scheduled re-engagement run"
+msgstr "Προγραμματισμένη αποστολή επανασύνδεσης"
+
 #, python-format
 msgid "Scheduled the credit documents for order #%(order_id)s. Nothing is issued before the receipt is registered with AADE."
 msgstr "Προγραμματίστηκαν τα πιστωτικά παραστατικά για την παραγγελία #%(order_id)s. Τίποτα δεν εκδίδεται πριν η απόδειξη καταχωριστεί στην ΑΑΔΕ."
@@ -11475,11 +11525,41 @@ msgstr "Απεστάλη"
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Αποστέλλεται μία φορά για κάθε επιστροφή χρημάτων στον πελάτη."
 
+msgid "Sent once to a customer who asked to hear when a product is available again."
+msgstr "Αποστέλλεται μία φορά σε πελάτη που ζήτησε να ενημερωθεί όταν ένα προϊόν γίνει ξανά διαθέσιμο."
+
+msgid "Sent once to a customer who asked to hear when a product reaches their target price."
+msgstr "Αποστέλλεται μία φορά σε πελάτη που ζήτησε να ενημερωθεί όταν ένα προϊόν φτάσει στην τιμή-στόχο του."
+
+msgid "Sent once to a signed-in customer who reserved stock and never placed the order."
+msgstr "Αποστέλλεται μία φορά σε συνδεδεμένο πελάτη που δέσμευσε απόθεμα και δεν ολοκλήρωσε την παραγγελία."
+
+msgid "Sent once, shortly before an unused gift card expires."
+msgstr "Αποστέλλεται μία φορά, λίγο πριν λήξει μια αχρησιμοποίητη δωροκάρτα."
+
+msgid "Sent to a customer who has not signed in for a long while, a few times at most."
+msgstr "Αποστέλλεται σε πελάτη που δεν έχει συνδεθεί για αρκετό καιρό, το πολύ λίγες φορές."
+
+msgid "Sent to confirm a subscription before it starts (double opt-in)."
+msgstr "Αποστέλλεται για να επιβεβαιωθεί μια εγγραφή πριν ξεκινήσει (διπλή επιβεβαίωση)."
+
+msgid "Sent to the buyer of a gift card once the payment lands."
+msgstr "Αποστέλλεται στον αγοραστή μιας δωροκάρτας μόλις εισπραχθεί η πληρωμή."
+
+msgid "Sent to the person a gift card was given to, with its code."
+msgstr "Αποστέλλεται σε αυτόν στον οποίο δόθηκε η δωροκάρτα, μαζί με τον κωδικό της."
+
 msgid "Sent to the provider so a repeat is not a second refund."
 msgstr "Αποστέλλεται στον πάροχο ώστε μια επανάληψη να μην αποτελεί δεύτερη επιστροφή."
 
 msgid "Sent when ACS has the parcel out for delivery."
 msgstr "Αποστέλλεται όταν η ACS έχει το δέμα προς παράδοση."
+
+msgid "Sent when a business application is approved."
+msgstr "Αποστέλλεται όταν εγκριθεί μια αίτηση εταιρικού λογαριασμού."
+
+msgid "Sent when a business application is rejected."
+msgstr "Αποστέλλεται όταν απορριφθεί μια αίτηση εταιρικού λογαριασμού."
 
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Αποστέλλεται όταν μια παραδομένη, εξοφλημένη παραγγελία ολοκληρώνεται."
@@ -11510,6 +11590,9 @@ msgstr "Αποστέλλεται όταν η παραγγελία παραδοθ
 
 msgid "Sent when order is shipped"
 msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
+
+msgid "Sent when the archive of a customer's personal data is ready to download."
+msgstr "Αποστέλλεται όταν το αρχείο με τα προσωπικά δεδομένα του πελάτη είναι έτοιμο για λήψη."
 
 msgid "Sent when the carrier reports the parcel delivered."
 msgstr "Αποστέλλεται όταν ο μεταφορέας δηλώνει το δέμα παραδομένο."
@@ -12519,8 +12602,20 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Tells the store's staff that a payment was disputed."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια πληρωμή αμφισβητήθηκε."
 
+msgid "Tells the store's staff that an application awaits review."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια αίτηση περιμένει έλεγχο."
+
 msgid "Tells the store's staff that an order was placed."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι έγινε μια παραγγελία."
+
+msgid "Tells the store's staff that someone left feedback."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι κάποιος άφησε feedback."
+
+msgid "Tells the store's staff that someone used the contact form."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι κάποιος χρησιμοποίησε τη φόρμα επικοινωνίας."
+
+msgid "Tells the store's staff which products have run down to their low-stock threshold."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ποια προϊόντα έφτασαν στο όριο χαμηλού αποθέματος."
 
 msgid "Templates"
 msgstr "Πρότυπα"
@@ -14293,6 +14388,9 @@ msgstr "Ελπίζουμε να σας δούμε ξανά σύντομα!"
 msgid "We hope you are satisfied with your purchase. If you have any issues with your order, please contact our customer service."
 msgstr "Ελπίζουμε να είστε ικανοποιημένοι με την αγορά σας. Αν έχετε οποιοδήποτε πρόβλημα με την παραγγελία σας, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
 
+msgid "We miss you"
+msgstr "Μας λείπετε"
+
 msgid "We miss you!"
 msgstr "Μας λείπετε!"
 
@@ -14539,6 +14637,9 @@ msgstr "Ποιος βλέπει τι"
 
 msgid "Wholesale"
 msgstr "Χονδρική"
+
+msgid "Wholesale feature"
+msgstr "Λειτουργία χονδρικής"
 
 msgid "Wholesale prices for a set of products"
 msgstr "Τιμές χονδρικής για ένα σύνολο προϊόντων"

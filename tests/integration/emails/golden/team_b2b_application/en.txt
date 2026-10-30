@@ -1,0 +1,10 @@
+New B2B application awaiting review
+
+Company: Acme Trading IKE
+VAT number (ΑΦΜ): 094019245
+Tax office: Α&#x27; Αθηνών
+Activity: Retail trade
+Account: customer@example.test
+VIES: Not checked
+
+Review the application from the store admin — Business Customers.

@@ -1,0 +1,31 @@
+CONFIRM YOUR SUBSCRIPTION
+Acme Gadgets
+================================================================================
+
+Hi Maria,
+
+Please confirm you'd like to subscribe to Weekly news. Your subscription isn't active yet — open the link below to complete it.
+
+CONFIRM HERE
+--------------------------------------------------------------------------------
+https://shop.example/en/newsletter/confirm/confirm-token
+
+SUBSCRIPTION DETAILS
+--------------------------------------------------------------------------------
+Topic:         Weekly news
+Category:      Marketing Campaigns
+Requested On:  03/14/2026
+
+
+WHAT YOU'LL RECEIVE
+--------------------------------------------------------------------------------
+Weekly news digest
+
+
+If you didn't request this subscription, you can safely ignore this email — nothing will happen.
+
+Thanks,
+The Acme Gadgets team
+
+================================================================================
+Acme Gadgets - https://shop.example/en

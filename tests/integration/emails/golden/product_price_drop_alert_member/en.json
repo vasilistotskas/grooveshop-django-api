@@ -1,0 +1,16 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<product-price-drop-alerts.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0IjoicHJvZHVjdC5wcmljZV9kcm9wX2FsZXJ0In0:1AbCdE:_W63sMQO3s4WYjdeHhIkqJKZ9h6TSQ0MSBXP7TxhiCk>",
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "[Acme Gadgets] Price drop: Wireless earbuds is now at your target",
+  "to": [
+    "customer@example.test"
+  ]
+}

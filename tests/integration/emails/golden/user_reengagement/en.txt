@@ -1,0 +1,33 @@
+WE MISS YOU! - Acme Gadgets
+
+Hi Maria,
+
+We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!
+
+A lot has happened since your last visit, and we'd love to have you back to explore all the exciting updates and features we've been working on at Acme Gadgets.
+
+Welcome Back: https://shop.example/en
+
+HERE'S WHAT YOU MIGHT HAVE MISSED:
+
+✓ New and improved user interface
+✓ Enhanced performance and faster loading times
+✓ Exciting new features based on user feedback
+✓ Better mobile experience
+✓ Your data and preferences are still safely stored
+
+
+Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!
+
+If you have any questions or need help getting back into your account, please contact our support team - we're always happy to help.
+
+Looking forward to seeing you again!
+The Acme Gadgets Team
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+
+Don't want to receive these emails?
+Unsubscribe: https://api.shop.example/api/v1/user/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwicGsiOjUwMDAwMX0:1AbCdE:PKrlMdo_yvNug7f72eLNs0_HgaqR5GKxkcVUN0TrqC0

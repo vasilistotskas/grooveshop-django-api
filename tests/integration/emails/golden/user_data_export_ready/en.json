@@ -1,0 +1,15 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<user-data_export_ready.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Your data export is ready",
+  "to": [
+    "customer@example.test"
+  ]
+}

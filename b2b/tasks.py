@@ -1,31 +1,12 @@
 import logging
 
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-
-# Eager gettext over lazy for email subjects — the string must resolve
-# INSIDE the recipient-language override (see order/tasks.py rationale).
-from django.utils import translation
-from django.utils.translation import gettext as _
-
+from b2b.emails import REVIEW_EMAIL_KEYS
 from core import celery_app
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language, store_language
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_reply_to,
-    tenant_site_name,
-)
+from emails.send import send_email, was_sent
 
 logger = logging.getLogger(__name__)
-
-_STATUS_TEMPLATES = {
-    "APPROVED": "emails/b2b/business_profile_approved",
-    "REJECTED": "emails/b2b/business_profile_rejected",
-}
 
 
 @celery_app.task(
@@ -52,37 +33,13 @@ def send_business_profile_status_email(self, profile_id: int) -> dict:
         logger.error("Business profile %s not found for email", profile_id)
         return {"status": "error", "reason": "not_found"}
 
-    template_base = _STATUS_TEMPLATES.get(profile.status)
-    if template_base is None:
+    key = REVIEW_EMAIL_KEYS.get(profile.status)
+    if key is None:
         return {"status": "skipped", "reason": f"status_{profile.status}"}
 
-    recipient = profile.user.email
-    if not recipient:
-        return {"status": "skipped", "reason": "no_email"}
-
-    language = get_user_language(profile.user)
-    context = build_email_context(language=language, profile=profile)
-    with translation.override(language):
-        if profile.status == "APPROVED":
-            subject = _(
-                "[{site}] Your business account has been approved"
-            ).format(site=tenant_site_name())
-        else:
-            subject = _(
-                "[{site}] Update on your business account application"
-            ).format(site=tenant_site_name())
-        text_content = render_to_string(f"{template_base}.txt", context)
-        html_content = render_to_string(f"{template_base}.html", context)
-
-    msg = EmailMultiAlternatives(
-        subject,
-        text_content,
-        tenant_from_email(),
-        [recipient],
-        reply_to=tenant_reply_to(),
-    )
-    msg.attach_alternative(html_content, "text/html")
-    msg.send()
+    deliveries = send_email(key, profile)
+    if not was_sent(deliveries):
+        return {"status": "skipped", "reason": deliveries[0].status}
 
     logger.info(
         "Sent business profile %s email for profile %s",
@@ -118,37 +75,9 @@ def send_admin_new_business_profile_email(self, profile_id: int) -> dict:
         logger.error("Business profile %s not found for email", profile_id)
         return {"status": "error", "reason": "not_found"}
 
-    staff_email = tenant_contact_email()
-    if not staff_email:
-        logger.warning(
-            "send_admin_new_business_profile_email: no contact email "
-            "configured — skipping",
-            extra={"profile_id": profile_id},
-        )
-        return {"status": "skipped", "reason": "no_contact_email"}
-
-    # Merchant-facing: the store's own language, not the worker's.
-    language = store_language()
-    with translation.override(language):
-        context = build_email_context(language=language, profile=profile)
-        subject = _("New B2B application — {company}").format(
-            company=profile.company_name
-        )
-        text_content = render_to_string(
-            "emails/b2b/admin_new_business_profile.txt", context
-        )
-        html_content = render_to_string(
-            "emails/b2b/admin_new_business_profile.html", context
-        )
-
-    msg = EmailMultiAlternatives(
-        subject,
-        text_content,
-        tenant_from_email(),
-        [staff_email],
-    )
-    msg.attach_alternative(html_content, "text/html")
-    msg.send()
+    deliveries = send_email("team.b2b_application", profile)
+    if not was_sent(deliveries):
+        return {"status": "skipped", "reason": deliveries[0].status}
 
     logger.info(
         "Merchant new-B2B-application email sent for profile %s", profile_id

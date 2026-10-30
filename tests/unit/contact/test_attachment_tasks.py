@@ -305,7 +305,13 @@ class TestTheNotificationEmail:
 
     @pytest.fixture(autouse=True)
     def _english_store(self):
-        with mock.patch("contact.tasks.store_language", return_value="en"):
+        with (
+            mock.patch("emails.recipients.store_language", return_value="en"),
+            mock.patch(
+                "emails.recipients.tenant_operator_addresses",
+                return_value=["admin@example.com"],
+            ),
+        ):
             yield
 
     def test_the_attachments_are_listed_with_their_scan_state(

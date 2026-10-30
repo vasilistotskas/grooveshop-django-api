@@ -1,0 +1,15 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<giftcard-purchase_receipt.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "[Acme Gadgets] Your gift card purchase",
+  "to": [
+    "customer@example.test"
+  ]
+}

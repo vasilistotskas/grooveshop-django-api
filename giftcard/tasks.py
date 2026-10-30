@@ -1,24 +1,11 @@
 import logging
 
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-
-# See order/tasks.py for rationale — eager gettext over lazy for email
-# subjects: the string must resolve INSIDE the recipient-language
-# override, not whenever the lazy proxy happens to be formatted.
-from django.utils import timezone, translation
-from django.utils.translation import gettext as _
+from django.utils import timezone
 
 from core import celery_app
 from core.retry import MAIL_TRANSIENT_ERRORS, TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
-from tenant.credentials import (
-    tenant_from_email,
-    tenant_reply_to,
-    tenant_site_name,
-)
+from emails.send import send_email, was_sent
 
 logger = logging.getLogger(__name__)
 
@@ -48,29 +35,9 @@ def deliver_gift_card_email(self, gift_card_id: int) -> dict:
     if not card.recipient_email:
         return {"status": "skipped", "reason": "no_recipient"}
 
-    language = get_user_language(card.issued_to)
-    context = build_email_context(
-        language=language, card=card, balance=card.balance
-    )
-    with translation.override(language):
-        subject = _("[{site}] You received a gift card!").format(
-            site=tenant_site_name()
-        )
-        text_content = render_to_string(
-            "emails/giftcard/gift_card_delivery.txt", context
-        )
-        html_content = render_to_string(
-            "emails/giftcard/gift_card_delivery.html", context
-        )
-    msg = EmailMultiAlternatives(
-        subject,
-        text_content,
-        tenant_from_email(),
-        [card.recipient_email],
-        reply_to=tenant_reply_to(),
-    )
-    msg.attach_alternative(html_content, "text/html")
-    msg.send()
+    deliveries = send_email("giftcard.delivery", card)
+    if not was_sent(deliveries):
+        return {"status": "skipped", "reason": deliveries[0].status}
 
     card.delivered_at = timezone.now()
     card.save(update_fields=["delivered_at"])
@@ -148,27 +115,9 @@ def send_gift_card_purchase_receipt(self, purchase_id: int) -> dict:
     if not purchase.buyer_email:
         return {"status": "skipped", "reason": "no_buyer_email"}
 
-    language = get_user_language(purchase.buyer)
-    context = build_email_context(language=language, purchase=purchase)
-    with translation.override(language):
-        subject = _("[{site}] Your gift card purchase").format(
-            site=tenant_site_name()
-        )
-        text_content = render_to_string(
-            "emails/giftcard/gift_card_purchase_receipt.txt", context
-        )
-        html_content = render_to_string(
-            "emails/giftcard/gift_card_purchase_receipt.html", context
-        )
-    msg = EmailMultiAlternatives(
-        subject,
-        text_content,
-        tenant_from_email(),
-        [purchase.buyer_email],
-        reply_to=tenant_reply_to(),
-    )
-    msg.attach_alternative(html_content, "text/html")
-    msg.send()
+    deliveries = send_email("giftcard.purchase_receipt", purchase)
+    if not was_sent(deliveries):
+        return {"status": "skipped", "reason": deliveries[0].status}
     logger.info("Sent gift card purchase receipt for %s", purchase.uuid)
     return {"status": "success", "purchase_id": purchase.id}
 
@@ -221,29 +170,11 @@ def send_gift_card_expiry_reminders(self) -> dict:
     for card in due:
         if card.balance.amount <= 0:
             continue
-        language = get_user_language(card.issued_to)
-        context = build_email_context(
-            language=language, card=card, balance=card.balance
-        )
-        with translation.override(language):
-            subject = _("[{site}] Your gift card expires soon").format(
-                site=tenant_site_name()
-            )
-            text_content = render_to_string(
-                "emails/giftcard/gift_card_expiry_reminder.txt", context
-            )
-            html_content = render_to_string(
-                "emails/giftcard/gift_card_expiry_reminder.html", context
-            )
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            tenant_from_email(),
-            [card.recipient_email],
-            reply_to=tenant_reply_to(),
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        deliveries = send_email("giftcard.expiry_reminder", card)
+        if not was_sent(deliveries):
+            # The type is off for the whole store: no card is reminded now,
+            # and each stays unreminded for the run after it is back on.
+            return {"status": "skipped", "reason": deliveries[0].status}
         card.expiry_reminder_sent_at = timezone.now()
         card.save(update_fields=["expiry_reminder_sent_at"])
         sent += 1

@@ -27,9 +27,12 @@ from rest_framework.test import APIClient
 
 from cart.factories.cart import CartFactory
 from core.tasks import send_inactive_user_notifications
+from emails import optout
+from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from order.models.stock_reservation import StockReservation
 from order.tasks import send_checkout_abandonment_emails
 from product.factories.product import ProductFactory
+from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
@@ -39,7 +42,10 @@ from user.utils.subscription import (
     generate_unsubscribe_link,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("open_email_gates"),
+]
 
 API = "https://api.test-site.com"
 
@@ -207,15 +213,15 @@ class TestReengagementHonoursTheOptOut:
 
         assert [m.to[0] for m in mail.outbox] == [stayer.email]
 
-    def test_an_opted_out_account_is_not_even_counted(self):
+    def test_an_opted_out_account_is_not_mailed_or_counted_as_sent(self):
         user = _inactive_user()
-        UserAccount.objects.filter(pk=user.pk).update(
-            marketing_opted_out_at=timezone.now()
+        optout.opt_out(
+            user.email, EVERY_MARKETING_TYPE, source=EmailOptOut.Source.LINK
         )
 
         result = send_inactive_user_notifications()
 
-        assert result["total_users"] == 0
+        assert result["emails_sent"] == 0
         assert mail.outbox == []
 
 
@@ -243,8 +249,9 @@ class TestAbandonedCartHonoursTheOptOut:
         assert stayer_reservation.abandonment_notified is True
 
     def test_an_opted_out_account_gets_no_reminder(self):
-        user = UserAccountFactory(
-            num_addresses=0, marketing_opted_out_at=timezone.now()
+        user = UserAccountFactory(num_addresses=0)
+        optout.opt_out(
+            user.email, EVERY_MARKETING_TYPE, source=EmailOptOut.Source.LINK
         )
         _abandoned_cart(user)
 

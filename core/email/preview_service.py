@@ -23,7 +23,7 @@ from emails.recipients import Recipient
 from emails.registry import registry
 from emails.render import render
 from emails.types import EmailType, RenderEnv
-from order.emails import NothingToPreview, preview_object
+from order.emails import ORDER_EMAIL_KEYS, NothingToPreview, preview_object
 from order.models import Order
 
 logger = logging.getLogger(__name__)
@@ -144,9 +144,10 @@ class EmailTemplatePreviewService:
         language: str,
     ) -> EmailPreview:
         """*email_type* rendered by the pipeline's own ``render``: for the
-        chosen order's record, else for the type's sample."""
+        chosen order's record when the type is about an order, else for the
+        type's sample."""
         real = None
-        if order_id:
+        if order_id and email_type.key in ORDER_EMAIL_KEYS:
             order = Order.objects.filter(pk=order_id).first()
             if order is None:
                 raise NothingToPreview(f"Order {order_id} not found.")

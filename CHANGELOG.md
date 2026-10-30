@@ -3,6 +3,31 @@
 
 
 
+## v3.166.0 (2026-10-30)
+
+### Features
+
+* feat(emails): send product, gift card, wholesale, contact and account mail through the pipeline (#369)
+
+Seventeen more types are declared on the registry and sent with
+send_email: restock and price-drop alerts, low stock, the three gift card
+mails, wholesale approval, rejection and application, contact and
+feedback, data export, newsletter confirmation, re-engagement and
+abandoned checkout. Each task's builder, template lookup and sender is
+deleted, and the admin preview renders every type from its sample.
+
+The marketing types carry the one-click unsubscribe URL. EmailOptOut is
+now the only marketing gate: emails/0002 gives every account that opted
+out through the old account flag a "*" row, the task-level filters on
+that flag are gone, and opting out of all marketing is one writer
+(opt_out_of_marketing) used by the blanket link and the customer admin,
+where staff can record an opt-out but never lift one.
+
+English mail no longer prints Greek product and topic names: the
+builders read translated rows in the mail's language.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`bd10843`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd1084394b9e6d019a798e8efa9e5b3bf101157e))
+
 ## v3.165.0 (2026-10-30)
 
 ### Features

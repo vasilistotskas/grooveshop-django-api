@@ -44,10 +44,10 @@ from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
 from core.utils.tenant_urls import get_tenant_frontend_url
+from emails.declare import customer_email, staff_email
 from emails.gates import CarrierGate, FeatureGate, StoreSwitchGate
-from emails.recipients import Recipient, customer_of, store_operators
-from emails.registry import registry
-from emails.types import Audience, EmailType, Kind, RenderEnv
+from emails.recipients import Recipient, customer_of
+from emails.types import EmailType, RenderEnv
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.payment import payment_provider_label
@@ -624,11 +624,20 @@ _PREVIEW_OBJECTS: Mapping[str, Callable[[Order], Any]] = {
 }
 
 
+#: The keys of the types declared in this module: the emails that are about
+#: an order, which the admin previews from a chosen order.
+ORDER_EMAIL_KEYS: set[str] = set()
+
+
 def preview_object(key: str, order: Order) -> Any:
     """What the email of type *key* would be about for *order*.
 
-    Raises :class:`NothingToPreview` when the order has no such record.
+    Raises :class:`NothingToPreview` when the order has no such record, and
+    ``KeyError`` for a type this module did not declare (it is not about an
+    order: ``ORDER_EMAIL_KEYS``).
     """
+    if key not in ORDER_EMAIL_KEYS:
+        raise KeyError(key)
     find = _PREVIEW_OBJECTS.get(key)
     return order if find is None else find(order)
 
@@ -651,63 +660,26 @@ def _customer_of_related_order(obj: Any) -> list[Recipient]:
 def _customer_email(
     key: str,
     *,
-    title: Any,
-    description: Any,
     templates: str,
-    subject: str,
-    build_context: Callable[[Any, RenderEnv], Mapping[str, object]],
-    sample: Callable[[RenderEnv], Any],
-    list_id: str,
     recipients: Callable[[Any], list[Recipient]] = _customer_of_order,
     required: bool = True,
     area: str = "orders",
-    gates: tuple[Any, ...] = (),
+    **fields: Any,
 ) -> EmailType:
-    return registry.register(
-        EmailType(
-            key=key,
-            title=title,
-            description=description,
-            area=area,
-            audience=Audience.CUSTOMER,
-            kind=Kind.TRANSACTIONAL,
-            required=required,
-            templates=f"{TEMPLATE_DIR}/{templates}",
-            subject=subject,
-            build_context=build_context,
-            sample=sample,
-            recipients=recipients,
-            gates=gates,
-            list_id=list_id,
-        )
+    ORDER_EMAIL_KEYS.add(key)
+    return customer_email(
+        key,
+        templates=f"{TEMPLATE_DIR}/{templates}",
+        recipients=recipients,
+        required=required,
+        area=area,
+        **fields,
     )
 
 
-def _staff_email(
-    key: str,
-    *,
-    title: Any,
-    description: Any,
-    templates: str,
-    subject: str,
-    build_context: Callable[[Any, RenderEnv], Mapping[str, object]],
-    sample: Callable[[RenderEnv], Any],
-) -> EmailType:
-    return registry.register(
-        EmailType(
-            key=key,
-            title=title,
-            description=description,
-            area="team",
-            audience=Audience.STORE_STAFF,
-            kind=Kind.TRANSACTIONAL,
-            templates=f"{TEMPLATE_DIR}/{templates}",
-            subject=subject,
-            build_context=build_context,
-            sample=sample,
-            recipients=lambda obj: store_operators(),
-        )
-    )
+def _staff_email(key: str, *, templates: str, **fields: Any) -> EmailType:
+    ORDER_EMAIL_KEYS.add(key)
+    return staff_email(key, templates=f"{TEMPLATE_DIR}/{templates}", **fields)
 
 
 _cart = FeatureGate(feature="cart", label=_("Cart feature"))

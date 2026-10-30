@@ -315,7 +315,7 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   (`OrderAttributionInputSerializer`, write-only, optional): `utm_source`,
   `utm_medium`, `utm_campaign`, `click_ids` (parameter NAMES from
   `CLICK_ID_PARAMS`, never values), `referrer`, `landing_path`, and
-  `agent_protocol` (`ucp`/`acp`). The agent gateway sets it, and
+  `agent_protocol` (`ucp`/`acp`/`mcp`). The agent gateway sets it, and
   `_attribution_input` believes it only when the request also carries the
   gateway's shared secret, which it sends as `X-Internal-Gateway` on
   every cart and order call (`is_internal_caller`, `tenant/internal.py`); from anyone else it is dropped and the order is
@@ -373,11 +373,16 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   replacing an earlier fill's; a cart holding lines keeps its own, so a
   second add never overwrites it; the merge carries the guest cart's
   touch over only when it is earlier than the account cart's (or the
-  account cart has none). An add with no `attribution` object records
-  nothing, so the agent gateway's carts and carts from before
-  `0015_cartattribution` simply have no row (a missing row is "unknown",
-  never "direct"). The cart response does not expose it; the storefront
-  never reads it.
+  account cart has none). An add with no `attribution` object is
+  classified like an order with no signal: from the shopper's
+  `User-Agent` (an in-app browser names itself there), else `direct`.
+  So every cart filled since `0015_cartattribution` has a row, the agent
+  gateway's and the storage-blocked storefront's included, and **no row
+  means only** a cart from before that migration (2026-10-17, no
+  backfill: the first touch was never stored) or one that never held a
+  line, never "direct". A guest cart from before it that is merged into
+  an account cart brings no source, so the merged cart has none either.
+  The cart response does not expose it; the storefront never reads it.
 - **Cart source on the order.** The cart is deleted once its lines
   become an order (`_clear_cart_for_order`), so both creation paths copy
   the cart's first touch into `OrderAttribution.cart_source_type` /
@@ -387,12 +392,14 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
 - **Cart admin.** Carts show an "Order source" column and filters
   (`attribution__source_type`, `CartSourceFilter`), built on the same
   `AcquisitionSourceFilter` (`admin/filters.py`) as `OrderSourceFilter`,
-  and a "Checkout" column / filter ("Checkout started, awaiting
-  payment: order #N", linked) for a live cart whose checkout already
-  created an order in `awaiting_online_payment_q`. The order is found
-  through `metadata["cart_snapshot"]["cart_uuid"]` in one correlated
-  subquery on the changelist queryset. The filter is named apart from
-  the idle "Abandoned" cart type. The order list adds a "Cart source"
+  and a "Checkout" filter ("Checkout started, awaiting payment") for a
+  live cart whose checkout already created an order in
+  `awaiting_online_payment_q`. The order is found through
+  `metadata["cart_snapshot"]["cart_uuid"]` in one correlated subquery on
+  the changelist queryset. There is no column for it: the state lasts
+  only while the hosted payment is open, so a column was blank on
+  nearly every row. The filter is named apart from the idle "Abandoned"
+  cart type. The order list adds a "Cart source"
   column, filters (`attribution__cart_source_type`,
   `OrderCartSourceFilter`) and change-form fields next to the order
   source: conversion by cart source is read from the orders list.
@@ -660,6 +667,10 @@ the session's `amount_total` under the session's PaymentIntent id, so the
 `payment_intent.succeeded` that follows adds nothing. An event without
 `amount_received` is dropped as malformed, like one without an id.
 
+### 4.2a Stripe fee (`charge.succeeded`, `charge.updated`)
+
+`order/payment_fees.py`. A Stripe fee is the `fee` of the charge's balance transaction, which dj-stripe syncs with the charge (`Charge.sync_from_stripe_data`, `Charge.balance_transaction`). `handle_stripe_charge_fee` writes it onto the CHARGE row keyed on the PaymentIntent id; `charge.updated` is as much a fee event as `charge.succeeded`, because a slower payment method attaches its balance transaction later. Stripe orders its events freely, so when the charge's events came first and found no ledger row, `handle_stripe_payment_succeeded` calls `record_stripe_fee_for_intent` after it books the payment and reads the charge itself (a Stripe outage there is logged and swallowed: the payment is booked). A charge with no ledger row costs no Stripe call, and a fee settled in another currency than the payment is left unreported (`PaymentLedger.record_fee` converts nothing).
+
 ### 4.2 Stripe refund (`charge.refunded`)
 
 Webhook handler: `handle_stripe_charge_refunded` (`order/signals/handlers.py`).
@@ -824,7 +835,7 @@ nothing) is `skipped`, a booked refund `processed`. Ops: each tenant's Viva
 account needs the *Transaction Reversal Created* webhook subscribed
 (Settings → API Access → Webhooks). Production had received no 1797 by
 2026-10-10, so check the subscription before assuming that a refund made in
-Viva's dashboard reached the order. Dispute tracking needs a second subscription, *Account Transaction Created* (2054), in the same place.
+Viva's dashboard reached the order. Dispute tracking needs a second subscription, *Account Transaction Created* (2054), in the same place. The provider fee needs a third, *Transaction Price Calculated* (1799): `_handle_transaction_price_calculated` retrieves the transaction like every other event (a forged body, or another store's transaction, records nothing), requires one of the order's own order codes, and writes `EventData.TotalCommission` (interchange + ISV fee + Viva's fee, major units of `CurrencyCode`) as `fee` on the ledger row whose `provider_reference` is `EventData.TransactionId`. `Interchange` is not read: Viva's own samples disagree on its sign. A payment the ledger lacks, a missing or negative commission or an unknown currency is skipped (`outcome` `skipped`), never booked as zero. A store that does not subscribe 1799 simply shows its Viva payments as "fee not reported".
 
 **Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
 success/failure URLs are static strings configured on the source in
@@ -1472,6 +1483,19 @@ switched it off or a gate is closed is a deliberate no-op: the task returns
 store-staff tasks, which return `False` as they did for a store without a
 contact address.
 
+`order.delivered` and `order.completed` carry a `review_links` list: one
+"Write a review" link per distinct product (`order.emails._review_links`),
+to the product page with the `#write-review` fragment that opens the
+storefront's review form. It is empty when the store's `product_reviews`
+feature is off, or when `PRODUCT_REVIEWS_PURCHASE_REQUIRED` is on and the
+order has no account (a guest order is never a verified purchase). The
+link and the review gate agree: a verified purchase
+(`product.managers.review.purchase_items`) is a COMPLETED order, or a
+DELIVERED one whose pay way is collected on delivery (the shopper paid the
+courier or carrier; the order stays DELIVERED until the payout is
+reconciled). An online-paid order is COMPLETED milliseconds after the
+carrier reports it delivered, before this mail is sent.
+
 `order.status_refunded` is the email the REFUNDED status change sends
 through `send_order_status_update_email`; `order.refunded` is the one per
 refund (`send_refund_confirmation_email`). They share `order_refunded`. The
@@ -1793,7 +1817,7 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 
 ### 7.3 The payment ledger (`PaymentTransaction`)
 
-`order/models/payment_transaction.py`, written only through `order/payment_ledger.py` (`PaymentLedger`). Append-only, like `GiftCardTransaction`: a row is never updated or deleted, and `Order` → ledger is `PROTECT` (deleting an order for real has to remove its ledger first, as the demo reset does).
+`order/models/payment_transaction.py`, written only through `order/payment_ledger.py` (`PaymentLedger`). Append-only, like `GiftCardTransaction`: a row is never deleted and, but for its provider `fee` (below), never updated, and `Order` → ledger is `PROTECT` (deleting an order for real has to remove its ledger first, as the demo reset does).
 
 | Column | Meaning |
 |---|---|
@@ -1804,6 +1828,7 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 | `provider_reference` | the provider's own id: PaymentIntent, Viva transaction, refund id, voucher / parcel (a Stripe dashboard refund has no id in `charge.refunded`, so it carries the event id) |
 | `charge` | on a REFUND or a CHARGEBACK, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
 | `description` | the reason given for a refund |
+| `fee`, `fee_source` | what the provider charged for this movement, as the provider reported it, and which report (`PaymentFeeSource`: `STRIPE_BALANCE_TRANSACTION`, `VIVA_TRANSACTION_PRICE`). Both empty until reported: **null is "not reported", never zero, never an estimate**. The only column written after the row exists (`PaymentLedger.record_fee`, replacing an earlier figure); a CHECK keeps a fee and its source together and the fee non-negative. Only the OWNER's profit report reads it (`docs/profit-report.md`) |
 | `created_at` | when it was recorded |
 
 `UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`); `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The Viva handlers (`_handle_account_transaction_event`, and `_handle_reversal_created` for a refund-claim type) book it through the same `record_chargeback`.

@@ -27,6 +27,7 @@ class VivaWebhookEvent(TimeStampMixinModel):
         (1796, _("Transaction Payment Created")),
         (1797, _("Transaction Reversal Created")),
         (1798, _("Transaction Failed")),
+        (1799, _("Transaction Price Calculated")),
         (2054, _("Account Transaction Created")),
     )
 
@@ -47,7 +48,7 @@ class VivaWebhookEvent(TimeStampMixinModel):
     event_type_id = models.PositiveSmallIntegerField(
         _("Event Type ID"),
         choices=EVENT_TYPE_CHOICES,
-        help_text=_("Viva ``EventTypeId`` — 1796/1797/1798/2054"),
+        help_text=_("Viva ``EventTypeId`` — 1796/1797/1798/1799/2054"),
     )
     order = models.ForeignKey(
         "order.Order",

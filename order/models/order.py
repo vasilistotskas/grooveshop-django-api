@@ -25,6 +25,7 @@ from core.models import (
 from core.validators import address as address_rules
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
+    DISPATCHED_STATUSES,
     PAYMENT_CLOSING_STATUSES,
     SETTLED_PAYMENT_STATUSES,
     OrderStatus,
@@ -233,6 +234,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     status_updated_at = models.DateTimeField(
         _("Status Updated At"), auto_now=False, null=True, blank=True
+    )
+    shipped_at = models.DateTimeField(
+        _("Shipped At"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the order first left the store. The sale is counted in "
+            "the month of this moment (turnover report); an order that "
+            "never shipped has none."
+        ),
     )
     payment_id = models.CharField(
         _("Payment ID"), max_length=255, blank=True, null=True, default=""
@@ -459,7 +471,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         # custom permission to the roles that get the full action set):
         # the store's takings are not the day-to-day operations STAFF run.
         permissions = [
-            ("view_turnover_report", _("Can view the monthly turnover report"))
+            ("view_turnover_report", _("Can view the monthly turnover report")),
+            # Store OWNER only (``tenant.role_scopes.OWNER_ONLY_PERMISSIONS``):
+            # what the store earns after its costs is the owner's figure.
+            ("view_profit_report", _("Can view the profit report")),
         ]
         indexes = [
             # Declaring ``indexes`` REPLACES the abstract parents' list
@@ -481,6 +496,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             GinIndex(fields=["metadata"], name="order_meta_ix"),
             BTreeIndex(fields=["status"], name="order_status_ix"),
             BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
+            BTreeIndex(fields=["shipped_at"], name="order_shipped_at_ix"),
             BTreeIndex(
                 fields=["status_updated_at"], name="order_status_upd_ix"
             ),
@@ -583,6 +599,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         )
         if status_changed:
             self.status_updated_at = timezone.now()
+        # The first time the order is in a dispatched status, whatever the
+        # path that put it there (the service, the admin form, a carrier
+        # event, a script): the one save they all share.
+        shipped_stamped = (
+            self.shipped_at is None
+            and self.status in DISPATCHED_STATUSES
+            and (status_changed or self._state.adding)
+        )
+        if shipped_stamped:
+            self.shipped_at = self.status_updated_at or timezone.now()
         # An order that leaves unpaid owes nothing any more, so its
         # financial state is final too. Decided HERE, in the one save
         # every cancel path shares (the service, the admin form, a
@@ -643,6 +669,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             fields.add("updated_at")
             if status_changed:
                 fields.add("status_updated_at")
+            if shipped_stamped:
+                fields.add("shipped_at")
             if payment_settled:
                 fields.add("payment_status")
             if pay_way_key_changed:

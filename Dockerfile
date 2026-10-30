@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION=3.14.7
 ARG ALPINE_VERSION=3.23
-ARG UV_VERSION=0.12.5
+ARG UV_VERSION=0.13.6
 # PostgreSQL major of the CLIENT tools baked into the runtime image.
 # pg_dump refuses to dump a server NEWER than itself ("aborting because
 # of server version mismatch"), so this must track the server major:

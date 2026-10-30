@@ -177,6 +177,7 @@
   <div class="header">
     <div class="seller">
       <h1>{{ seller.name }}</h1>
+      {% if seller.distinctive_title %}<p><strong>{% trans "Distinctive title" %}:</strong> {{ seller.distinctive_title }}</p>{% endif %}
       {% if seller.business_activity %}<p>{{ seller.business_activity }}</p>{% endif %}
       {% if seller.address_line_1 %}<p>{{ seller.address_line_1 }}</p>{% endif %}
       {% if seller.address_line_2 %}<p>{{ seller.address_line_2 }}</p>{% endif %}

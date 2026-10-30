@@ -34,6 +34,13 @@ from shipping_acs.observability import Exchange, observe_call
 
 logger = logging.getLogger("shipping_acs.client")
 
+# The two read-only aliases of the tracking poll. They write nothing at
+# ACS, which is why the retention sweep keeps their successful calls for
+# a shorter period than the rest (``ACS_API_CALL_POLL_RETENTION_DAYS``).
+TRACKING_SUMMARY_ALIAS = "ACS_Trackingsummary"
+TRACKING_DETAILS_ALIAS = "ACS_TrackingDetails"
+TRACKING_ALIASES = (TRACKING_SUMMARY_ALIAS, TRACKING_DETAILS_ALIAS)
+
 # Retry only on connection errors (no request was ever delivered, so
 # no risk of duplicate mutation on the ACS side). 5xx and read-timeout
 # responses are NOT retried at the HTTP layer because every ACS call
@@ -490,7 +497,9 @@ class AcsClient:
         or {} when the voucher is unknown.
         """
         envelope = self._call(
-            "ACS_Trackingsummary", {"Voucher_No": voucher_no}, background=True
+            TRACKING_SUMMARY_ALIAS,
+            {"Voucher_No": voucher_no},
+            background=True,
         )
         rows = self._table_output(envelope)
         return rows[0] if rows else {}
@@ -498,7 +507,9 @@ class AcsClient:
     def tracking_details(self, voucher_no: str) -> list[dict[str, Any]]:
         """Return the full event history for ``voucher_no``."""
         envelope = self._call(
-            "ACS_TrackingDetails", {"Voucher_No": voucher_no}, background=True
+            TRACKING_DETAILS_ALIAS,
+            {"Voucher_No": voucher_no},
+            background=True,
         )
         return self._table_output(envelope)
 

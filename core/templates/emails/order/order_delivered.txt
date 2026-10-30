@@ -11,6 +11,13 @@
 {{ order.city }}, {{ order.zipcode }}
 {{ order.country }}
 
+{% if review_links %}{% trans "RATE YOUR PURCHASE" %}
+{% trans "Your opinion helps other shoppers. Share how you like your products." %}
+{% for link in review_links %}
+{{ link.name }}
+{% trans "Write a review" %}: {{ link.url }}
+{% endfor %}
+{% endif %}
 {% trans "We hope you are satisfied with your purchase. If you have any issues with your order, please contact our customer service." %}
 
 {% trans "Thank you for shopping with us!" %}

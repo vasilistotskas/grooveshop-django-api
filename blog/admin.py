@@ -27,6 +27,7 @@ from admin.filters import (
     LikesCountFilter,
     RelatedDropdownFilter,
 )
+from admin.mixins import FeatureInline
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
@@ -99,7 +100,8 @@ class PublishStatusFilter(DropdownFilter):
         return queryset
 
 
-class BlogCommentInline(TabularInline):
+class BlogCommentInline(FeatureInline, TabularInline):
+    feature = "blog_comments"
     model = BlogComment
     extra = 0
     fields = ("user", "content_preview", "approved", "created_at")

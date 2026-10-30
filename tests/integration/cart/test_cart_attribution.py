@@ -2,9 +2,10 @@
 
 ``POST /cart/item`` takes the same optional ``attribution`` object as
 order create. ``CartAttributionService.capture`` stores it on the add
-that takes the cart from no lines to some, keeps it while the cart holds
-lines, starts over after the cart was emptied, and the guest-to-account
-merge keeps the earliest one.
+that takes the cart from no lines to some (an add with no object is
+classified from the shopper's User-Agent, else recorded as "direct"),
+keeps it while the cart holds lines, starts over after the cart was
+emptied, and the guest-to-account merge keeps the earliest one.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from knox.models import get_token_model
@@ -150,15 +151,44 @@ class TestCaptureOnAdd:
         )
         assert row.created_at > first.created_at
 
-    def test_an_add_without_attribution_records_nothing(self):
+    def test_an_add_without_attribution_records_direct(self):
         cart = CartFactory(is_guest=True, num_cart_items=0)
 
         response = _add(APIClient(), _product(), HTTP_X_CART_ID=str(cart.uuid))
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
-        assert not CartAttribution.objects.exists()
+        row = CartAttribution.objects.get(cart=cart)
+        assert (row.source_type, row.source) == (OrderSourceType.DIRECT, "")
 
-    def test_the_cart_token_path_works_without_attribution(self):
+    def test_an_add_without_attribution_reads_an_in_app_browser(self):
+        cart = CartFactory(is_guest=True, num_cart_items=0)
+
+        response = _add(
+            APIClient(),
+            _product(),
+            HTTP_X_CART_ID=str(cart.uuid),
+            HTTP_USER_AGENT="Mozilla/5.0 Instagram 330.0.0.40",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        row = CartAttribution.objects.get(cart=cart)
+        assert (row.source_type, row.source) == (
+            OrderSourceType.SOCIAL,
+            "instagram",
+        )
+
+    def test_the_second_add_without_attribution_keeps_the_first_source(self):
+        cart = CartFactory(is_guest=True, num_cart_items=0)
+        headers = {"HTTP_X_CART_ID": str(cart.uuid)}
+        client = APIClient()
+        _add(client, _product(), INSTAGRAM, **headers)
+
+        response = _add(client, _product(), **headers)
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        assert CartAttribution.objects.get(cart=cart).source == "instagram"
+
+    def test_the_cart_token_path_records_direct_without_attribution(self):
         user = UserAccountFactory(num_addresses=0)
         cart = CartFactory(user=user, num_cart_items=0)
         auth_token, _client = AuthToken.objects.create(user)
@@ -170,7 +200,10 @@ class TestCaptureOnAdd:
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert cart.items.count() == 1
-        assert not CartAttribution.objects.exists()
+        assert (
+            CartAttribution.objects.get(cart=cart).source_type
+            == OrderSourceType.DIRECT
+        )
 
     def test_the_cart_token_path_records_a_capture_it_is_given(self):
         user = UserAccountFactory(num_addresses=0)
@@ -183,6 +216,22 @@ class TestCaptureOnAdd:
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert CartAttribution.objects.get(cart=cart).source == "instagram"
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="gateway-secret")
+    def test_the_gateways_mcp_add_is_an_agent_cart(self):
+        cart = CartFactory(is_guest=True, num_cart_items=0)
+
+        response = _add(
+            APIClient(),
+            _product(),
+            {"agentProtocol": "mcp"},
+            HTTP_X_CART_ID=str(cart.uuid),
+            HTTP_X_INTERNAL_GATEWAY="gateway-secret",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        row = CartAttribution.objects.get(cart=cart)
+        assert (row.source_type, row.source) == (OrderSourceType.AGENT, "mcp")
 
     def test_an_unknown_click_id_is_rejected_like_the_order_rejects_it(self):
         cart = CartFactory(is_guest=True, num_cart_items=0)
@@ -271,6 +320,21 @@ class TestMergeKeepsTheEarliest:
 
         assert CartAttribution.objects.get(cart=target).source == "instagram"
         assert target.items.count() == 1
+
+    def test_a_guest_cart_filled_without_a_payload_carries_direct(self):
+        user, target, guest = self._carts()
+        _add(
+            APIClient(),
+            _product(),
+            HTTP_X_CART_ID=str(guest.uuid),
+        )
+
+        self._merge(guest, user)
+
+        assert (
+            CartAttribution.objects.get(cart=target).source_type
+            == OrderSourceType.DIRECT
+        )
 
     def test_an_account_cart_without_a_source_takes_the_guest_one(self):
         user, target, guest = self._carts()

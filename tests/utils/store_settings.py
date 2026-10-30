@@ -17,3 +17,19 @@ def switch_store_settings(**values: bool) -> None:
         Setting.objects.update_or_create(
             name=name, defaults={"value_type": "bool", "value_bool": value}
         )
+
+
+def switch_every_feature_on() -> None:
+    """Every setting an optional feature needs, on, so each of its pages
+    is shown (``admin.features``). A test that walks every admin page
+    needs it: a page of a feature that is not live and holds no rows is
+    refused."""
+    from admin.features import FEATURES
+
+    switch_store_settings(
+        **{
+            gate.setting_key: True
+            for feature in FEATURES.values()
+            for gate in feature.settings
+        }
+    )

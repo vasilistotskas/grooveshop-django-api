@@ -852,6 +852,7 @@ def _process_event_in_tenant(
             # 1796 = Transaction Payment Created
             # 1797 = Transaction Reversal Created
             # 1798 = Transaction Failed
+            # 1799 = Transaction Price Calculated (the commission)
             logger.info(
                 "Viva webhook dispatching event_type=%s for order #%s",
                 event_type_id,
@@ -875,6 +876,13 @@ def _process_event_in_tenant(
             elif event_type_id == 1798:
                 outcome = (
                     _handle_payment_failed(order, event_data, transaction_id)
+                    or VivaWebhookEvent.OUTCOME_PROCESSED
+                )
+            elif event_type_id == VIVA_TRANSACTION_PRICE_CALCULATED:
+                outcome = (
+                    _handle_transaction_price_calculated(
+                        order, event_data, transaction_id
+                    )
                     or VivaWebhookEvent.OUTCOME_PROCESSED
                 )
             else:
@@ -1545,6 +1553,90 @@ def _handle_payment_created(order, event_data, transaction_id):
     ShippingService.dispatch_create_shipment_task(order)
 
 
+def _handle_transaction_price_calculated(order, event_data, transaction_id):
+    """Record the commission Viva withdrew for a payment (event 1799).
+
+    ``TotalCommission`` is the interchange fee, the ISV fee and Viva's own
+    fee together, in major units of ``CurrencyCode``
+    (developer.viva.com/webhooks-for-payments/transaction-price-calculated).
+    It lands on the ledger row of the payment as its ``fee``, the provider's
+    own figure, so the profit report can count what the payment cost.
+    ``Interchange`` is not read: Viva's own samples disagree on its sign, and
+    the total is all the report needs.
+
+    Verified like every other event: the transaction is retrieved from Viva
+    with this tenant's credentials and must carry one of the order's own
+    order codes, so a forged body, or another store's transaction, records
+    nothing (a ``RuntimeError`` answers 500, and the candidate loop moves on).
+    Returns ``OUTCOME_SKIPPED`` when nothing was recorded; ``None`` when a
+    fee was.
+    """
+    from djmoney.money import Money
+
+    from order.enum.payment_transaction import PaymentFeeSource
+    from order.models.viva_webhook_event import VivaWebhookEvent
+    from order.payment import VivaWalletPaymentProvider, alpha_currency
+    from order.payment_ledger import PaymentLedger
+
+    if not transaction_id:
+        logger.error(
+            "Viva webhook event %s missing TransactionId for order %s: "
+            "cannot verify, no fee recorded",
+            VIVA_TRANSACTION_PRICE_CALCULATED,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
+    _status, verified_data = _retrieve_transaction(transaction_id)
+    if not _transaction_belongs_to_order(order, verified_data):
+        logger.error(
+            "Viva transaction %s is none of order %s's payments: no fee "
+            "recorded",
+            transaction_id,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
+    # The commission fields only, never the whole body: the allowlist the
+    # webhook log keeps for every event (no merchant or reseller ids).
+    reported = {
+        name: event_data.get(name)
+        for name in ("CurrencyCode", "TotalCommission", "Interchange", "IsvFee")
+    }
+    logger.info(
+        "Viva transaction price calculated for order %s: %s", order.id, reported
+    )
+    currency = alpha_currency(event_data.get("CurrencyCode"))
+    try:
+        commission = Decimal(str(event_data.get("TotalCommission")))
+    except InvalidOperation:
+        commission = None
+    if currency is None or commission is None or commission < 0:
+        logger.error(
+            "Viva transaction %s reports no usable commission for order %s: %s",
+            transaction_id,
+            order.id,
+            reported,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
+    row = PaymentLedger.record_fee(
+        provider=VivaWalletPaymentProvider.code,
+        reference=transaction_id,
+        fee=Money(commission, currency),
+        source=PaymentFeeSource.VIVA_TRANSACTION_PRICE,
+    )
+    if row is None:
+        logger.warning(
+            "Viva transaction %s has no payment row on order %s: its "
+            "commission is not recorded",
+            transaction_id,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+    return None
+
+
 def _handle_payment_failed(order, event_data, transaction_id):
     from order.models.viva_webhook_event import VivaWebhookEvent
 
@@ -1811,6 +1903,10 @@ def _record_viva_chargeback(order, charge, amount):
         return VivaWebhookEvent.OUTCOME_SKIPPED
     return None
 
+
+#: Viva ``EventTypeId`` of Transaction Price Calculated: the commission Viva
+#: withdrew for a payment.
+VIVA_TRANSACTION_PRICE_CALCULATED = 1799
 
 #: Viva ``EventTypeId`` of Account Transaction Created
 #: (developer.viva.com/webhooks-for-payments/account-transaction-created/):

@@ -15,9 +15,12 @@ agent-gateway event), and so does ``OrderItem.save()``
 backdated afterwards with ``bulk_update``, which writes the ``auto_now``
 columns as given.
 
-``bulk_create`` also skips the two things ``Order.save()`` derives, and
-both are written here: ``pay_way_key`` through the model's own snapshot,
-and ``amount_due`` — what the shopper owed, as on a real order.
+``bulk_create`` also skips what ``Order.save()`` and checkout derive, and
+all of it is written here: ``pay_way_key`` through the model's own
+snapshot, ``amount_due`` — what the shopper owed, as on a real order — the
+``shipped_at`` of an order that left the store (its last status change: a
+seeded order has no history to read it from) and the VAT lines the
+turnover report reads (``order.vat_snapshot``).
 """
 
 from __future__ import annotations
@@ -90,8 +93,10 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
         order_discount_total,
         spread_by_remaining_value,
     )
+    from order.enum.status import DISPATCHED_STATUSES
     from order.models.item import OrderItem
     from order.models.order import Order
+    from order.vat_snapshot import write_vat_lines
 
     if not fixtures:
         return []
@@ -125,6 +130,8 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
         order.created_at = fixture.placed_at
         order.updated_at = updated_at
         order.status_updated_at = updated_at
+        if order.status in DISPATCHED_STATUSES:
+            order.shipped_at = updated_at
     written = OrderItem.objects.bulk_create(items)
     # The discount a fixture order carries lands on its lines, as checkout
     # snapshots it: the tax documents refuse a discounted order without it.
@@ -135,8 +142,16 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
         )
     Order.objects.bulk_update(
         created,
-        ["amount_due", "created_at", "updated_at", "status_updated_at"],
+        [
+            "amount_due",
+            "created_at",
+            "updated_at",
+            "status_updated_at",
+            "shipped_at",
+        ],
     )
+    for order in created:
+        write_vat_lines(order)
 
     placed = {order.pk: order.created_at for order in created}
     for item in written:

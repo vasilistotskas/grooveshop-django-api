@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+from django.forms.models import _get_foreign_key
+
+from admin.features import (
+    PLACEMENTS,
+    Gate,
+    Kind,
+    Placement,
+    store_features,
+)
+
 
 class AdminSiteLoginNextMixin:
     """Land a successful admin login back in the admin.
@@ -219,3 +229,181 @@ class WithheldOnTenantHostModelAdmin:
         if self._withheld_on_tenant_host(request):
             return False
         return super().has_delete_permission(request, obj)
+
+
+def _without_fields(fields, hidden: set[str]) -> list:
+    """``fields`` of a fieldset minus ``hidden``; a row (a nested tuple)
+    that loses all its fields goes too."""
+    kept = []
+    for entry in fields:
+        if isinstance(entry, (list, tuple)):
+            if row := _without_fields(entry, hidden):
+                kept.append(tuple(row))
+        elif entry not in hidden:
+            kept.append(entry)
+    return kept
+
+
+class FeatureGatedModelAdmin:
+    """Show a model's pages, and the feature surfaces on them, by the one
+    rule of ``admin.features``.
+
+    The model's own page: ``FEATURE_SURFACES`` names the feature that
+    owns it and whether it is setup or records. ``has_module_permission``
+    and the four object permissions all answer from that, so the sidebar,
+    the ⌘K palette and the dashboard (built from ``has_module_permission``)
+    omit a page the store cannot use and holds nothing for, and a typed
+    URL to it is refused rather than merely not linked. Off the plan, what
+    a store still holds is read-only; a record is only added while its
+    feature is live.
+
+    Fields and list filters of other features on this model's admin are
+    declared in ``feature_gates``.
+    """
+
+    feature_gates: tuple[Gate, ...] = ()
+
+    def _page_placement(self, request) -> Placement | None:
+        if request is None:
+            return None
+        return PLACEMENTS.get(self.model._meta.label)
+
+    def _page_shown(self, request, placement: Placement) -> bool:
+        features = store_features(request)
+        label = self.model._meta.label
+        return features.shows(
+            request,
+            placement.feature,
+            kind=placement.kind,
+            has_data=lambda: features.has_rows(label),
+        )
+
+    def has_module_permission(self, request) -> bool:
+        placement = self._page_placement(request)
+        if placement is not None and not self._page_shown(request, placement):
+            return False
+        return super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        placement = self._page_placement(request)
+        if placement is not None and not self._page_shown(request, placement):
+            return False
+        return super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request) -> bool:
+        placement = self._page_placement(request)
+        if placement is not None and not (
+            self._page_shown(request, placement)
+            and store_features(request).may_create(
+                placement.feature, placement.kind
+            )
+        ):
+            return False
+        return super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        placement = self._page_placement(request)
+        if placement is not None and not (
+            self._page_shown(request, placement)
+            and store_features(request).may_modify(placement.feature)
+        ):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        placement = self._page_placement(request)
+        if placement is not None and not (
+            self._page_shown(request, placement)
+            and store_features(request).may_modify(placement.feature)
+        ):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if not self.feature_gates:
+            return fieldsets
+        features = store_features(request)
+        hidden = {
+            name
+            for gate in self.feature_gates
+            if not features.gate_shows(request, self.model, gate, obj)
+            for name in gate.fields
+        }
+        if not hidden:
+            return fieldsets
+        kept = []
+        for title, options in fieldsets:
+            fields = _without_fields(options["fields"], hidden)
+            if fields or not set(options["fields"]) & hidden:
+                kept.append((title, {**options, "fields": tuple(fields)}))
+        return kept
+
+    def get_list_filter(self, request):
+        entries = super().get_list_filter(request)
+        if not self.feature_gates:
+            return entries
+        features = store_features(request)
+        hidden = [
+            entry
+            for gate in self.feature_gates
+            if not features.gate_shows(request, self.model, gate)
+            for entry in gate.filters
+        ]
+        return [entry for entry in entries if entry not in hidden]
+
+
+class FeatureInline:
+    """An inline that belongs to a feature (``feature``): shown while the
+    feature is live, or when the parent object has rows of it. With the
+    feature off the rows are there to read: no row is added, and off the
+    plan none is changed either. Django drops an inline with no
+    permission at all, so its tab goes without touching ``get_inlines``.
+    """
+
+    feature: str
+
+    def _inline_shown(self, request, obj) -> bool:
+        features = store_features(request)
+
+        def has_rows() -> bool:
+            if obj is None or obj.pk is None:
+                return False
+            fk = _get_foreign_key(
+                self.parent_model, self.model, fk_name=self.fk_name
+            )
+            return self.model._default_manager.filter(**{fk.name: obj}).exists()
+
+        key = ("inline", type(self), getattr(obj, "pk", None))
+        return features.remember(
+            key,
+            lambda: features.shows(
+                request, self.feature, kind=Kind.RECORD, has_data=has_rows
+            ),
+        )
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        return self._inline_shown(request, obj) and super().has_view_permission(
+            request, obj
+        )
+
+    def has_add_permission(self, request, obj=None) -> bool:
+        return (
+            self._inline_shown(request, obj)
+            and store_features(request).may_create(self.feature, Kind.RECORD)
+            and super().has_add_permission(request, obj)
+        )
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return (
+            self._inline_shown(request, obj)
+            and store_features(request).may_modify(self.feature)
+            and super().has_change_permission(request, obj)
+        )
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return (
+            self._inline_shown(request, obj)
+            and store_features(request).may_modify(self.feature)
+            and super().has_delete_permission(request, obj)
+        )

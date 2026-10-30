@@ -44,3 +44,34 @@ def test_relative_time_follows_the_active_language():
         assert relative_time(then, now) == "5\xa0ημέρες"
     with translation.override("en"):
         assert relative_time(then, now) == "5\xa0days"
+
+
+def test_money_uses_the_bound_stores_currency(settings):
+    from unittest import mock
+
+    from admin.displays import money, store_currency
+
+    with translation.override("en"):
+        assert money(1234.5) == "€1,234.50"
+        settings.DEFAULT_CURRENCY = "USD"
+        assert store_currency() == "USD"
+        assert money(1234.5) == "$1,234.50"
+
+    store = mock.Mock(default_currency="GBP")
+    with (
+        mock.patch("admin.displays.bound_tenant", return_value=store),
+        translation.override("en"),
+    ):
+        assert store_currency() == "GBP"
+        assert money(2) == "£2.00"
+
+
+def test_the_chart_axis_formats_in_the_stores_currency():
+    import json
+
+    from admin.dashboard.base import bar_chart
+
+    chart = bar_chart(["a"], [1.0], label="x", currency=True)
+
+    ticks = json.loads(chart["options"])["scales"]["y"]["ticks"]
+    assert ticks["format"]["currency"] == "EUR"

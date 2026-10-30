@@ -41,9 +41,9 @@ from admin.dashboard.base import (
 from admin.dashboard.store import queries
 from admin.dashboard.store.queries import PERIODS, PERIODS_BY_KEY, Period
 from admin.displays import ORDER_STATUS_VARIANT, label_cell, link_cell, money
-from admin.features import store_features
+from admin.features import RETAIL_DOCUMENTS, store_features
 from admin.navigation import changelist_link
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import OrderStatus
 
 PERIOD_LABELS = {
     "7d": (_("7 days"), _("Last 7 days")),
@@ -53,7 +53,7 @@ PERIOD_LABELS = {
 }
 
 METRICS = {
-    "revenue": (_("Revenue"), _("Paid revenue per %(bucket)s")),
+    "revenue": (_("Revenue"), _("Revenue without VAT per %(bucket)s")),
     "orders": (_("Orders"), _("Orders placed per %(bucket)s")),
 }
 DEFAULT_METRIC = "revenue"
@@ -193,10 +193,10 @@ class StoreKpis(StorePeriodWidget):
         series = queries.sales_series.get(self.variant())
         compared = _("vs the period before")
         # An average of no orders is not zero: "—", and nothing to compare.
-        average = data["revenue"] / data["paid"] if data["paid"] else None
+        average = data["revenue"] / data["sold"] if data["sold"] else None
         prior_average = (
-            data["prior_revenue"] / data["prior_paid"]
-            if data["prior_paid"]
+            data["prior_revenue"] / data["prior_sold"]
+            if data["prior_sold"]
             else 0.0
         )
         if data["paying_customers"]:
@@ -217,11 +217,7 @@ class StoreKpis(StorePeriodWidget):
                     _trend(data["revenue"], data["prior_revenue"]),
                     [row["revenue"] for row in series],
                     compared,
-                    changelist_link(
-                        self.request,
-                        "order.Order",
-                        f"payment_status__exact={PaymentStatus.COMPLETED}",
-                    ),
+                    changelist_link(self.request, "order.Order"),
                 ),
                 _kpi_card(
                     _("Orders"),
@@ -236,10 +232,10 @@ class StoreKpis(StorePeriodWidget):
                     "—" if average is None else money(average),
                     None if average is None else _trend(average, prior_average),
                     [
-                        row["revenue"] / row["paid"] if row["paid"] else 0.0
+                        row["revenue"] / row["sold"] if row["sold"] else 0.0
                         for row in series
                     ],
-                    _("Paid orders"),
+                    _("Orders shipped"),
                     None,
                 ),
                 _kpi_card(
@@ -391,7 +387,7 @@ class StoreAttention(DashboardWidget):
                 f"active__exact=1&stock__gt=0&stock__lt={queries.LOW_STOCK_BELOW}",
             ),
             (
-                features.mydata,
+                features.live(RETAIL_DOCUMENTS),
                 "mydata_rejected",
                 "report",
                 "danger",
@@ -401,7 +397,7 @@ class StoreAttention(DashboardWidget):
                 urlencode({"mydata_status__exact": MyDataStatus.REJECTED}),
             ),
             (
-                features.reviews,
+                features.live("product_reviews"),
                 "pending_reviews",
                 "star_rate",
                 "default",
@@ -411,7 +407,7 @@ class StoreAttention(DashboardWidget):
                 "status__exact=NEW",
             ),
             (
-                features.blog_comments,
+                features.live("blog_comments"),
                 "pending_comments",
                 "chat_bubble",
                 "default",
@@ -434,7 +430,7 @@ class StoreAttention(DashboardWidget):
                 ),
             ),
             (
-                features.wholesale.live,
+                features.live("wholesale"),
                 "pending_business_profiles",
                 "business_center",
                 "default",
@@ -814,7 +810,7 @@ class StoreAlerts(DashboardWidget):
 
         # The request already knows whether myDATA is on; the rest of the
         # config is read only for a store that switched it on.
-        if not store_features(self.request).mydata:
+        if not store_features(self.request).live(RETAIL_DOCUMENTS):
             return []
         config = load_config()
         alerts = []

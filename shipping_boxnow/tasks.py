@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Any
 
 from celery import shared_task
+from django.conf import settings
+from django.utils import timezone
 
+from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
@@ -520,3 +524,30 @@ def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
         "shipment_id": shipment_id,
         **result,
     }
+
+
+@shared_task(base=TenantTask)
+def purge_expired_boxnow_parcel_events() -> dict[str, int]:
+    """Delete parcel events of settled shipments past the retention period.
+
+    ``CARRIER_TRACKING_EVENT_RETENTION_DAYS`` counts from the day the event
+    was recorded; only a shipment in a terminal state loses events, the
+    tracking poll still reads one in flight.
+    """
+    from shipping_boxnow.models import BoxNowParcelEvent
+    from shipping_boxnow.models.shipment import TERMINAL_STATES
+
+    cutoff = timezone.now() - timedelta(
+        days=settings.CARRIER_TRACKING_EVENT_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        BoxNowParcelEvent.objects.filter(
+            shipment__parcel_state__in=TERMINAL_STATES,
+            created_at__lt=cutoff,
+        )
+    )
+    if deleted:
+        logger.info(
+            "Purged %s BoxNow parcel events of settled shipments", deleted
+        )
+    return {"deleted": deleted}

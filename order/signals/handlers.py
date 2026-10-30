@@ -34,6 +34,10 @@ from order.notifications import (
     notify_payment_failed_live,
 )
 from order.payment import StripePaymentProvider, money_from_minor_units
+from order.payment_fees import (
+    record_stripe_charge_fee,
+    record_stripe_fee_for_intent,
+)
 from order.payment_ledger import PaymentLedger
 from order.services import PAYMENT_AMOUNT_TOLERANCE, OrderService
 from order.signals import (
@@ -827,6 +831,7 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
         event: Event = kwargs["event"]
         payment_intent = event.data["object"]
         payment_intent_id = payment_intent["id"]
+        latest_charge_id = payment_intent.get("latest_charge")
         # What Stripe actually collected, for the payment ledger.
         captured = money_from_minor_units(
             payment_intent["amount_received"], payment_intent["currency"]
@@ -908,6 +913,21 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     )
 
     announce_stripe_payment_applied(outcome, payment_intent_id)
+    record_stripe_fee_for_intent(payment_intent_id, latest_charge_id)
+
+
+@djstripe_receiver(["charge.succeeded", "charge.updated"])
+@with_tenant_schema_from_event
+def handle_stripe_charge_fee(sender, **kwargs):
+    """Record what Stripe charged for a payment (``order.payment_fees``).
+
+    ``charge.updated`` is as much a fee event as ``charge.succeeded``: a
+    payment method that settles later attaches its balance transaction then.
+    A failure propagates, so Stripe redelivers it: this receiver does
+    nothing else.
+    """
+    event: Event = kwargs["event"]
+    record_stripe_charge_fee(event.data["object"])
 
 
 def announce_stripe_payment_applied(outcome, payment_intent_id: str) -> None:

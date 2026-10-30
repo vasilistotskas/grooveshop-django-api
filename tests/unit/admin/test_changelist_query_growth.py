@@ -250,6 +250,9 @@ BUILDERS: dict[str, Callable[[], object]] = {
         invoice_number=f"INV-{_uid()}",
     ),
     "order.RetailCredit": _build_retail_credit,
+    "order.Expense": lambda: __import__(
+        "order.factories.expense", fromlist=["ExpenseFactory"]
+    ).ExpenseFactory(),
     "order.VivaWebhookEvent": lambda: __import__(
         "order.models", fromlist=["VivaWebhookEvent"]
     ).VivaWebhookEvent.objects.create(

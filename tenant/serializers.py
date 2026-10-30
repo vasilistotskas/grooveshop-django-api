@@ -85,6 +85,7 @@ class StorePreferencesSerializer(serializers.Serializer):
     mobile_bottom_nav = serializers.BooleanField(read_only=True)
     sticky_add_to_cart = serializers.BooleanField(read_only=True)
     recently_viewed = serializers.BooleanField(read_only=True)
+    product_assurances = serializers.BooleanField(read_only=True)
     demo_account = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:
@@ -665,6 +666,7 @@ class MerchantLegalIdentitySerializer(serializers.Serializer):
     """
 
     name = serializers.CharField(read_only=True, allow_blank=True)
+    distinctive_title = serializers.CharField(read_only=True, allow_blank=True)
     legal_form = serializers.CharField(read_only=True, allow_blank=True)
     vat_id = serializers.CharField(read_only=True, allow_blank=True)
     tax_office = serializers.CharField(read_only=True, allow_blank=True)

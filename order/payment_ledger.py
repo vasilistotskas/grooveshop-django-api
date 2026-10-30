@@ -26,6 +26,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, NamedTuple
 
+from django.db import transaction
 from django.db.models import (
     Case,
     DecimalField,
@@ -37,7 +38,10 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from djmoney.money import Money
 
-from order.enum.payment_transaction import PaymentTransactionKind
+from order.enum.payment_transaction import (
+    PaymentFeeSource,
+    PaymentTransactionKind,
+)
 from order.enum.status import PaymentStatus
 from order.models.payment_transaction import PaymentTransaction
 from order.models.refund_attempt import (
@@ -594,6 +598,50 @@ class PaymentLedger:
             provider=provider,
             reference=reference,
         )
+
+    @staticmethod
+    def record_fee(
+        *,
+        provider: str,
+        reference: str,
+        fee: Money,
+        source: PaymentFeeSource,
+    ) -> PaymentTransaction | None:
+        """Write the fee *provider* reported for the movement it knows as
+        *reference*, onto that ledger row. ``None`` when the ledger holds no
+        such row (yet), or holds it in another currency than the fee is
+        reported in: nothing is invented or converted.
+
+        The provider's latest figure replaces an earlier one, so a
+        redelivered or corrected report cannot add up twice. It is the only
+        update a ledger row ever gets, and it touches the fee columns alone.
+        The reference is matched without regard to case, as Viva's transaction
+        ids are elsewhere in this module.
+        """
+        if fee.amount < 0:
+            raise ValueError(f"A provider fee is never negative: {fee}")
+        with transaction.atomic():
+            row = (
+                PaymentTransaction.objects.select_for_update()
+                .filter(provider=provider, provider_reference__iexact=reference)
+                .first()
+            )
+            if row is None:
+                return None
+            if row.amount.currency != fee.currency:
+                logger.error(
+                    "Payment %s %r is %s but its fee is reported in %s: "
+                    "fee not recorded",
+                    provider,
+                    reference,
+                    row.amount.currency,
+                    fee.currency,
+                )
+                return None
+            row.fee = fee
+            row.fee_source = source
+            row.save(update_fields=["fee", "fee_currency", "fee_source"])
+        return row
 
     @classmethod
     def record_cod_collection(

@@ -31,6 +31,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from babel.numbers import get_currency_symbol
+from django.conf import settings
 from django.contrib.admin import AdminSite
 from django.db.models import Model
 from django.template.loader import render_to_string
@@ -39,8 +41,14 @@ from django.utils import formats, timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django.utils.timesince import timesince
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext_lazy
+from django.utils.translation import (
+    get_language,
+    ngettext_lazy,
+    to_locale,
+)
+from django.utils.translation import (
+    gettext_lazy as _,
+)
 from django_stubs_ext import StrOrPromise
 from unfold.decorators import display
 
@@ -50,6 +58,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from product.enum.review import ReviewStatus
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_boxnow.enum import BoxNowParcelState
+from tenant.membership import bound_tenant
 
 # ── Shared variant maps (single source of truth) ──────────────────────
 # Keyed by the TextChoices *values*; used by order/, shipping_*/ admins
@@ -160,9 +169,22 @@ def choice_label(
 # hard-coded to Greek separators and to strftime on UTC datetimes.
 
 
-def money(amount: Decimal | float | None, currency: str = "€") -> str:
-    """A money amount in the active locale; ``None`` reads as zero."""
-    return currency + formats.number_format(
+def store_currency() -> str:
+    """The ISO code of the store's currency: the bound store's own, the
+    platform default on a page that belongs to no store."""
+    return (
+        getattr(bound_tenant(), "default_currency", None)
+        or settings.DEFAULT_CURRENCY
+    )
+
+
+def money(amount: Decimal | float | None) -> str:
+    """A money amount in the store's currency and the active locale;
+    ``None`` reads as zero."""
+    symbol = get_currency_symbol(
+        store_currency(), locale=to_locale(get_language())
+    )
+    return symbol + formats.number_format(
         amount or 0, decimal_pos=2, use_l10n=True, force_grouping=True
     )
 

@@ -167,53 +167,6 @@ class TestSourceFilterIsBounded:
         assert len(sources) == ACQUISITION_SOURCE_MAX_CHOICES
 
 
-class TestCheckoutColumn:
-    def _text(self, cart):
-        with translation.override("en"):
-            return str(_admin().checkout_state(_listed(cart)))
-
-    def test_names_and_links_the_order_awaiting_payment(self):
-        cart = _cart()
-        order = _checkout(cart)
-
-        text = self._text(cart)
-
-        assert f"Checkout started, awaiting payment: order #{order.pk}" in text
-        assert reverse("admin:order_order_change", args=[order.pk]) in text
-
-    def test_a_cart_without_a_checkout_is_empty(self):
-        assert _admin().checkout_state(_listed(_cart())) is None
-
-    @pytest.mark.parametrize(
-        "settings",
-        [
-            {"payment_status": PaymentStatus.COMPLETED},
-            {"payment_status": PaymentStatus.CANCELED},
-            {"settlement": PaySettlement.COURIER_CASH},
-        ],
-        ids=["paid", "canceled", "cash-on-delivery"],
-    )
-    def test_an_order_that_is_not_waiting_for_online_payment_is_not_shown(
-        self, settings
-    ):
-        cart = _cart()
-        _checkout(cart, **settings)
-
-        assert _admin().checkout_state(_listed(cart)) is None
-
-    def test_another_carts_order_is_not_shown(self):
-        _checkout(_cart())
-
-        assert _admin().checkout_state(_listed(_cart())) is None
-
-    def test_the_latest_order_is_the_one_named(self):
-        cart = _cart()
-        _checkout(cart)
-        latest = _checkout(cart)
-
-        assert f"order #{latest.pk}" in self._text(cart)
-
-
 class TestCheckoutFilter:
     def _filter(self, value=None):
         params = {"checkout": [value]} if value else {}

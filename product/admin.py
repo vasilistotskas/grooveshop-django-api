@@ -42,6 +42,7 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.features import Gate, Kind
 from admin.filters import (
     AnnotatedRangeFilter,
     LikesCountFilter,
@@ -61,7 +62,11 @@ from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.price_spell import ProductPriceSpell
-from product.models.product import Product
+from product.models.product import (
+    COST_PRICE_FIELDS,
+    COST_PRICE_PERMISSION,
+    Product,
+)
 from product.models.product_attribute import ProductAttribute
 from product.models.relation import ProductRelation
 from product.models.review import ProductReview
@@ -831,6 +836,29 @@ class ProductAdmin(
     the bases itself.
     """
 
+    # A feature that is off keeps its surface off the product form: its
+    # setup (points, the alert switch) for those who can switch it on,
+    # what shoppers produced (likes) only while there is some.
+    feature_gates = (
+        Gate(
+            "loyalty",
+            fields=("points_coefficient", "points"),
+            kind=Kind.SETUP,
+        ),
+        Gate(
+            "product_alerts",
+            fields=("price_drop_alerts_enabled",),
+            filters=("price_drop_alerts_enabled",),
+            kind=Kind.SETUP,
+        ),
+        Gate(
+            "favourites",
+            fields=("likes_count",),
+            filters=(LikesCountFilter,),
+        ),
+        Gate("product_reviews", filters=(ReviewAverageFilter,)),
+    )
+
     prefetch_translations = ("category__translations",)
     list_display = (
         "product_info",
@@ -1026,6 +1054,39 @@ class ProductAdmin(
         ),
     )
 
+    # The cost price never reaches a file an ADMIN can download.
+    export_exclude_fields = ExportActionMixin.export_exclude_fields | set(
+        COST_PRICE_FIELDS
+    )
+
+    def get_fieldsets(self, request, obj=None):
+        """The cost price sits under the price, for the OWNER only.
+
+        The field is left out of the form altogether for everyone else, so a
+        crafted POST cannot write it either.
+        """
+        fieldsets = super().get_fieldsets(request, obj)
+        if not request.user.has_perm(COST_PRICE_PERMISSION):
+            return fieldsets
+        return [
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        name
+                        for field in options["fields"]
+                        for name in (
+                            (field, "cost_price")
+                            if field == "price"
+                            else (field,)
+                        )
+                    ),
+                },
+            )
+            for title, options in fieldsets
+        ]
+
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         form.base_fields["weight"].widget = MeasurementWidget(
@@ -1126,6 +1187,14 @@ class ProductAdmin(
                 "vat_id",
                 "changed_by_id",
                 "variant_group_id",
+                # django-money reads a deferred amount straight from the
+                # instance dict, so the form of a page that shows the cost
+                # price has to load it up front.
+                *(
+                    COST_PRICE_FIELDS
+                    if request.user.has_perm(COST_PRICE_PERMISSION)
+                    else ()
+                ),
             )
         )
 

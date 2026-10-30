@@ -175,6 +175,7 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "MOBILE_BOTTOM_NAV_",
             "STICKY_ADD_TO_CART_",
             "RECENTLY_VIEWED_",
+            "PRODUCT_ASSURANCES_",
             "CHAT_WIDGET_",
             "ACCOUNT_REVIEWS_",
             "PRODUCT_REVIEWS_",
@@ -224,6 +225,7 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     (gettext_noop("Agent Commerce"), ("AGENT_", "PRODUCT_FEEDS_")),
     (gettext_noop("Analytics"), ("META_CAPI_",)),
     (gettext_noop("Search"), ("SEARCH_",)),
+    (gettext_noop("Admin History"), ("ADMIN_LOG_",)),
 ]
 
 

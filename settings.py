@@ -1001,6 +1001,14 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # whenever this is set (django_celery_beat/schedulers.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
+# Retention sweeps (``core.retention``): primary keys deleted per statement.
+RETENTION_PURGE_BATCH_SIZE = int(getenv("RETENTION_PURGE_BATCH_SIZE", "1000"))
+# Days a ``CachePurgeLog`` audit row (public schema, every store's purges)
+# is kept.
+CACHE_PURGE_LOG_RETENTION_DAYS = int(
+    getenv("CACHE_PURGE_LOG_RETENTION_DAYS", "90")
+)
+
 # Timezone (use UTC)
 CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")
@@ -1267,6 +1275,63 @@ def get_celery_beat_schedule():
             # Fanout: AcsApiCall is per-tenant. Deletes the ACS call
             # history older than ACS_API_CALL_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_acs_api_calls",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-acs-tracking-events": {
+            # Fanout: AcsTrackingEvent is per-tenant. Deletes checkpoints
+            # of settled shipments older than
+            # CARRIER_TRACKING_EVENT_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_acs_tracking_events",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-boxnow-parcel-events": {
+            # Fanout: BoxNowParcelEvent is per-tenant; same period as the
+            # ACS checkpoints above.
+            "task": "tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-recommendation-events": {
+            # Fanout: RecommendationEvent is per-tenant. Deletes events
+            # older than RECOMMENDATION_EVENT_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_recommendation_events",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-expired-meta-capi-event-logs": {
+            # Fanout: MetaCapiEventLog is per-tenant. Deletes delivery
+            # rows older than META_CAPI_EVENT_LOG_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_meta_capi_event_logs",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # Runs in PUBLIC: the platform staff's own audit trail, under the
+        # ADMIN_LOG_RETENTION_DAYS stored in the public schema.
+        "purge-expired-admin-log-entries": {
+            "task": "core.tasks.purge_expired_admin_log_entries",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # Fans the same task into every store: django_admin_log is per
+        # schema, so the public pass above never reaches a store's rows.
+        "purge-expired-admin-log-entries-tenants": {
+            "task": "tenant.tasks.fanout_purge_expired_admin_log_entries",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # Runs in PUBLIC: CachePurgeLog exists only there (every store's
+        # purges, tagged by schema_name).
+        "purge-expired-cache-purge-logs": {
+            "task": "core.tasks.purge_expired_cache_purge_logs",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -2226,6 +2291,19 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRODUCT_ASSURANCES_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the purchase-assurances box under the buy button on "
+            "product pages: delivery days from the shipping rates, the "
+            "free-shipping threshold, the payment methods and the "
+            "return window. Each row hides itself when the store has "
+            "no data for it. A store UI preference; the storefront "
+            "fails OPEN if this setting cannot be fetched."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,
@@ -2344,6 +2422,17 @@ EXTRA_SETTINGS_DEFAULTS = [
             "(GDPR art. 5(1)(e) storage limitation without destroying "
             "the business record). 0 keeps files indefinitely. Raise "
             "it for a store that must retain tender documents."
+        ),
+    },
+    {
+        "name": "ADMIN_LOG_RETENTION_DAYS",
+        "type": "int",
+        "value": 730,
+        "description": (
+            "Days after which an entry of the admin history (who added, "
+            "changed or deleted what) is DELETED. 0 keeps the whole "
+            "history indefinitely. Entries already older than this are "
+            "deleted on the next nightly run after you set it."
         ),
     },
     {
@@ -2705,6 +2794,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "",
         "description": "Legal company name shown at the top of the invoice.",
+    },
+    {
+        "name": "INVOICE_SELLER_DISTINCTIVE_TITLE",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Distinctive title (διακριτικός τίτλος) the store trades "
+            "under, when it differs from the legal company name. Printed "
+            "under the name on receipts and credit documents, and shown "
+            "on the storefront in place of the legal name when set. "
+            "Blank: the legal name is used everywhere."
+        ),
     },
     {
         "name": "INVOICE_SELLER_LEGAL_FORM",
@@ -4604,6 +4705,33 @@ ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
 # ACS call, recipient details included) before the retention sweep
 # deletes it.
 ACS_API_CALL_RETENTION_DAYS = int(getenv("ACS_API_CALL_RETENTION_DAYS", "90"))
+# Days a SUCCESSFUL tracking read (``ACS_Trackingsummary`` and
+# ``ACS_TrackingDetails``, the 15-minute poll: 85% of the rows) is kept.
+# Nothing is written to ACS by it and a failure keeps the full period
+# above, so a short period costs no evidence.
+ACS_API_CALL_POLL_RETENTION_DAYS = int(
+    getenv("ACS_API_CALL_POLL_RETENTION_DAYS", "14")
+)
+# Days a carrier's tracking checkpoints (``AcsTrackingEvent``,
+# ``BoxNowParcelEvent``) are kept once the shipment is in a terminal
+# state. Long enough for a delivery dispute or a returned-parcel claim.
+CARRIER_TRACKING_EVENT_RETENTION_DAYS = int(
+    getenv("CARRIER_TRACKING_EVENT_RETENTION_DAYS", "730")
+)
+# A BoxNow webhook event whose signed time is older than this is ignored.
+# The ``BoxNowParcelEvent`` rows are the replay guard, so the window must
+# end before the sweep above can delete a row an event could still meet.
+BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS = int(
+    getenv("BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS", "90")
+)
+if BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS >= CARRIER_TRACKING_EVENT_RETENTION_DAYS:
+    raise ImproperlyConfigured(
+        "BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS "
+        f"({BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS}) must be shorter than "
+        "CARRIER_TRACKING_EVENT_RETENTION_DAYS "
+        f"({CARRIER_TRACKING_EVENT_RETENTION_DAYS}): the replay guard rows "
+        "must outlive the events the guard admits."
+    )
 # Days after a COD parcel is DELIVERED before an absent ACS payout is
 # reported as overdue. The measured remittance lag is ~4 days, so 10
 # leaves headroom and fires only on genuinely stuck money. Nothing else
@@ -4663,8 +4791,30 @@ RECOMMENDATION_LEARNING_MIN_IMPRESSIONS = int(
 RECOMMENDATION_LEARNING_WEIGHT_FLOOR = float(
     getenv("RECOMMENDATION_LEARNING_WEIGHT_FLOOR", "0.05")
 )
+# Days a ``RecommendationEvent`` is kept. It must outlive the longest
+# window a reader looks back over (learning, attribution), or the engine
+# would learn from a truncated history.
+RECOMMENDATION_EVENT_RETENTION_DAYS = int(
+    getenv("RECOMMENDATION_EVENT_RETENTION_DAYS", "90")
+)
+_RECOMMENDATION_LONGEST_WINDOW_DAYS = max(
+    RECOMMENDATION_LEARNING_WINDOW_DAYS,
+    RECOMMENDATION_ATTACH_USER_WINDOW_DAYS,
+    -(-RECOMMENDATION_ATTACH_CART_WINDOW_HOURS // 24),
+)
+if RECOMMENDATION_EVENT_RETENTION_DAYS < _RECOMMENDATION_LONGEST_WINDOW_DAYS:
+    raise ImproperlyConfigured(
+        "RECOMMENDATION_EVENT_RETENTION_DAYS "
+        f"({RECOMMENDATION_EVENT_RETENTION_DAYS}) is shorter than the "
+        "longest window the recommendation engine reads events over "
+        f"({_RECOMMENDATION_LONGEST_WINDOW_DAYS} days)."
+    )
 
 # ---------- Meta Conversions API ----------
+# Days a ``MetaCapiEventLog`` delivery row (status, trace id) is kept.
+META_CAPI_EVENT_LOG_RETENTION_DAYS = int(
+    getenv("META_CAPI_EVENT_LOG_RETENTION_DAYS", "90")
+)
 # Pixel ID / dataset ID and the access token are per-tenant secrets —
 # they live ONLY on the ``Tenant`` model (see ``tenant/credentials.py:
 # tenant_meta_pixel_id()`` / ``tenant_meta_capi_access_token()``), no

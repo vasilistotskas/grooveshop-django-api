@@ -41,6 +41,7 @@ from django.utils.translation import gettext as _
 
 from admin.dashboard.store.queries import attention_counts
 from admin.features import Availability, store_features
+from admin.permissions import opens_changelist
 from core.rosetta_access import tenant_scoped_rosetta_access
 from core.utils.tenant_urls import get_tenant_base_url
 from tenant.membership import get_current_tenant, is_platform_superuser
@@ -67,11 +68,7 @@ def changelist_link(request: Any, label: str, query: str = "") -> str | None:
     """
     model = apps.get_model(label)
     model_admin = django_admin.site._registry.get(model)
-    if (
-        model_admin is None
-        or not model_admin.has_module_permission(request)
-        or not model_admin.has_view_or_change_permission(request)
-    ):
+    if not opens_changelist(request, model_admin):
         return None
     opts = model._meta
     url = reverse(f"admin:{opts.app_label}_{opts.model_name}_changelist")
@@ -130,13 +127,17 @@ def _count_badge(count: int, variant: str = "default") -> dict[str, Any]:
     return {"badge": count or None, "badge_variant": variant}
 
 
+def _off_badge() -> dict[str, Any]:
+    return {"badge": _("Off"), "badge_variant": "default"}
+
+
 def _availability_badge(
     availability: Availability, count: int = 0
 ) -> dict[str, Any]:
-    """ "Off" while only the store setting is off; else the count."""
-    if availability is Availability.SETTING_OFF:
-        return {"badge": _("Off"), "badge_variant": "default"}
-    return _count_badge(count)
+    """ "Off" while the feature is not live; else the count."""
+    if availability.live:
+        return _count_badge(count)
+    return _off_badge()
 
 
 def _tool(title: str, icon: str, link: str) -> Item:
@@ -208,12 +209,11 @@ def _store_profile(request: Any) -> Item | None:
 def store_sidebar(request: Any) -> list[Item]:
     user = request.user
     features = store_features(request)
-    absent = features.absent_models()
     counts = _counts(request)
 
     def page(label: str, title: str, icon: str = "", **extra: Any):
-        if label in absent:
-            return None
+        if features.is_off(label):
+            extra = {**extra, **_off_badge()}
         return _page(request, label, title, icon, **extra)
 
     sales = _group(
@@ -233,6 +233,10 @@ def store_sidebar(request: Any) -> list[Item]:
             _tool(_("Turnover"), "bar_chart", reverse("admin:turnover"))
             if user.has_perm("order.view_turnover_report")
             else None,
+            _tool(_("Profit"), "trending_up", reverse("admin:profit"))
+            if user.has_perm("order.view_profit_report")
+            else None,
+            page("order.Expense", _("Expenses"), "payments"),
         ],
     )
 
@@ -255,6 +259,7 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("product.AttributeValue", _("Attribute Values")),
                     page("product.ProductVariantGroup", _("Variant Groups")),
                 ],
+                **_availability_badge(features.state("catalogue")),
             ),
             _menu(
                 _("Images"),
@@ -263,6 +268,7 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("product.ProductImage", _("Product Images")),
                     page("product.ProductCategoryImage", _("Category Images")),
                 ],
+                **_availability_badge(features.state("catalogue")),
             ),
             page("tag.Tag", _("Tags"), "label"),
             page(
@@ -304,11 +310,10 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("b2b.PriceListItem", _("B2B Price Lists")),
                 ],
                 **_availability_badge(
-                    features.wholesale, counts["pending_business_profiles"]
+                    features.state("wholesale"),
+                    counts["pending_business_profiles"],
                 ),
-            )
-            if features.wholesale.configurable
-            else None,
+            ),
             _menu(
                 _("Loyalty"),
                 "workspace_premium",
@@ -316,10 +321,8 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("loyalty.LoyaltyTier", _("Loyalty Tiers")),
                     page("loyalty.PointsTransaction", _("Points Transactions")),
                 ],
-                **_availability_badge(features.loyalty),
-            )
-            if features.loyalty.configurable
-            else None,
+                **_availability_badge(features.state("loyalty")),
+            ),
             _menu(
                 _("Newsletter"),
                 "campaign",
@@ -342,10 +345,8 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("promotion.PromotionCode", _("Coupon Codes")),
                     page("promotion.PromotionRedemption", _("Redemptions")),
                 ],
-                **_availability_badge(features.promotions),
-            )
-            if features.promotions.configurable
-            else None,
+                **_availability_badge(features.state("promotions")),
+            ),
             _menu(
                 _("Gift Cards"),
                 "card_giftcard",
@@ -354,10 +355,8 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("giftcard.GiftCardPurchase", _("Purchases")),
                     page("giftcard.GiftCardTransaction", _("Transactions")),
                 ],
-                **_availability_badge(features.gift_cards),
-            )
-            if features.gift_cards.configurable
-            else None,
+                **_availability_badge(features.state("gift_cards")),
+            ),
             _menu(
                 _("Recommendations"),
                 "auto_awesome",
@@ -369,10 +368,8 @@ def store_sidebar(request: Any) -> list[Item]:
                         _("Candidates"),
                     ),
                 ],
-                **_availability_badge(features.recommendations),
-            )
-            if features.recommendations.configurable
-            else None,
+                **_availability_badge(features.state("product_suggestions")),
+            ),
         ],
     )
 
@@ -413,13 +410,17 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("blog.BlogTag", _("Blog Tags")),
                 ],
                 **_count_badge(
-                    counts["pending_comments"] if features.blog_comments else 0
+                    counts["pending_comments"]
+                    if features.live("blog_comments")
+                    else 0
                 ),
-            )
-            if features.blog
-            else None,
+            ),
         ],
     )
+
+    inactive = features.inactive_carrier_apps()
+    acs = "shipping_acs" not in inactive
+    boxnow = "shipping_boxnow" not in inactive
 
     shipping = _group(
         _("Shipping"),
@@ -427,24 +428,24 @@ def store_sidebar(request: Any) -> list[Item]:
             page(
                 "shipping_acs.AcsShipment", _("ACS Shipments"), "local_shipping"
             )
-            if features.acs
+            if acs
             else None,
             page(
                 "shipping_boxnow.BoxNowShipment",
                 _("BoxNow Shipments"),
                 "package_2",
             )
-            if features.boxnow
+            if boxnow
             else None,
             _menu(
                 _("Pickup Points"),
                 "location_on",
                 [
                     page("shipping_boxnow.BoxNowLocker", _("BoxNow Lockers"))
-                    if features.boxnow
+                    if boxnow
                     else None,
                     page("shipping_acs.AcsStation", _("ACS Stations"))
-                    if features.acs
+                    if acs
                     else None,
                 ],
             ),

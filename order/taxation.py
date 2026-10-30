@@ -45,26 +45,33 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from enum import StrEnum
 from typing import Any
+
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from order.discounts import CENT, discounted_line_gross, proportional_shares
 
 
-class ChargeKind(StrEnum):
-    GOODS = "goods"
-    SHIPPING = "shipping"
-    PAYMENT_FEE = "payment_fee"
+class ChargeKind(models.TextChoices):
+    GOODS = "goods", _("Goods")
+    SHIPPING = "shipping", _("Shipping")
+    PAYMENT_FEE = "payment_fee", _("Payment fee")
 
 
 @dataclass(frozen=True)
 class VatLine:
-    """One taxable line: its rate and its net and VAT amounts, to the cent."""
+    """One taxable line: its rate and its net and VAT amounts, to the cent.
+
+    ``item_pk`` is the ``OrderItem`` a goods line was taken from; shipping
+    and the fee belong to no item.
+    """
 
     kind: ChargeKind
     rate: Decimal
     net: Decimal
     vat: Decimal
+    item_pk: int | None = None
 
     @property
     def gross(self) -> Decimal:
@@ -88,30 +95,86 @@ def split_gross(gross: Decimal, rate: Decimal) -> tuple[Decimal, Decimal]:
     return net, gross - net
 
 
-def _line(kind: ChargeKind, gross: Decimal, rate: Decimal) -> VatLine:
+def _line(
+    kind: ChargeKind,
+    gross: Decimal,
+    rate: Decimal,
+    item_pk: int | None = None,
+) -> VatLine:
     net, vat = split_gross(gross, rate)
-    return VatLine(kind=kind, rate=rate, net=net, vat=vat)
+    return VatLine(kind=kind, rate=rate, net=net, vat=vat, item_pk=item_pk)
 
 
-def _rate_weights(
-    items: Sequence[Any], gross_by_pk: dict[int, Decimal]
-) -> dict[Decimal, Decimal]:
+@dataclass(frozen=True)
+class Goods:
+    """What the VAT rule reads of one order line: the plain values, so the
+    live models and a migration's historical ones feed the same code."""
+
+    pk: int
+    rate: Decimal
+    quantity: int
+    gross: Decimal
+    """Charged for, after the line's snapshotted discount."""
+
+
+def _rate_weights(goods: Sequence[Goods]) -> dict[Decimal, Decimal]:
     """What each VAT rate weighs in the order's goods.
 
     Value comes first: the gross the goods were charged for, after their
-    discounts (``gross_by_pk``; Εγκ. 10/1987, "the value of the goods").
-    An order whose goods carry no value at all (a free sample with paid
-    delivery, a fully discounted basket) falls back to units, so the
-    charge still follows the goods it travels with.
+    discounts (Εγκ. 10/1987, "the value of the goods"). An order whose
+    goods carry no value at all (a free sample with paid delivery, a fully
+    discounted basket) falls back to units, so the charge still follows
+    the goods it travels with.
     """
     value: dict[Decimal, Decimal] = defaultdict(Decimal)
     units: dict[Decimal, Decimal] = defaultdict(Decimal)
-    for item in items:
-        value[item.vat_rate] += gross_by_pk[item.pk]
-        units[item.vat_rate] += item.quantity
+    for line in goods:
+        value[line.rate] += line.gross
+        units[line.rate] += line.quantity
     return {rate: weight for rate, weight in value.items() if weight > 0} or {
         rate: weight for rate, weight in units.items() if weight > 0
     }
+
+
+def vat_lines(
+    goods: Sequence[Goods],
+    *,
+    shipping: Decimal,
+    payment_fee: Decimal,
+    order_pk: int,
+) -> list[VatLine]:
+    """Every taxable line of an order: goods, then shipping, then the fee.
+
+    The one place the rule is applied, to plain values: ``order_vat_lines``
+    reads them off the live order, ``order.vat_snapshot`` off whatever
+    models it is given. A zero-gross line is left out.
+    """
+    lines = [
+        _line(ChargeKind.GOODS, line.gross, line.rate, line.pk)
+        for line in goods
+        if line.gross > 0
+    ]
+
+    charges = (
+        (ChargeKind.SHIPPING, shipping),
+        (ChargeKind.PAYMENT_FEE, payment_fee),
+    )
+    weights = _rate_weights(goods)
+    for kind, amount in charges:
+        if amount <= 0:
+            continue
+        if not weights:
+            raise ValueError(
+                f"Order {order_pk} charges {kind.value.replace('_', ' ')} "
+                "but has no goods for it to follow, so no VAT rate applies."
+            )
+        shares = proportional_shares(amount, weights)
+        lines.extend(
+            _line(kind, share, rate)
+            for rate, share in sorted(shares.items(), reverse=True)
+            if share > 0
+        )
+    return lines
 
 
 def order_vat_lines(
@@ -125,32 +188,20 @@ def order_vat_lines(
     """
     rows = list(order.items.all()) if items is None else list(items)
     gross_by_pk = discounted_line_gross(order, rows)
-    lines = [
-        _line(ChargeKind.GOODS, gross_by_pk[item.pk], item.vat_rate)
-        for item in rows
-        if gross_by_pk[item.pk] > 0
-    ]
-
-    charges = (
-        (ChargeKind.SHIPPING, order.shipping_price),
-        (ChargeKind.PAYMENT_FEE, order.payment_method_fee),
-    )
-    weights = _rate_weights(rows, gross_by_pk)
-    for kind, money in charges:
-        if money.amount <= 0:
-            continue
-        if not weights:
-            raise ValueError(
-                f"Order {order.pk} charges {kind.value.replace('_', ' ')} "
-                "but has no goods for it to follow, so no VAT rate applies."
+    return vat_lines(
+        [
+            Goods(
+                pk=item.pk,
+                rate=item.vat_rate,
+                quantity=item.quantity,
+                gross=gross_by_pk[item.pk],
             )
-        shares = proportional_shares(Decimal(money.amount), weights)
-        lines.extend(
-            _line(kind, share, rate)
-            for rate, share in sorted(shares.items(), reverse=True)
-            if share > 0
-        )
-    return lines
+            for item in rows
+        ],
+        shipping=Decimal(order.shipping_price.amount),
+        payment_fee=Decimal(order.payment_method_fee.amount),
+        order_pk=order.pk,
+    )
 
 
 def breakdown_by_rate(lines: Iterable[VatLine]) -> list[dict[str, str]]:

@@ -30,10 +30,13 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
 from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import storefront_path
 from shipping.exceptions import ShipmentAwaitingPaymentError
+from shipping_acs.client import TRACKING_ALIASES
+from shipping_acs.enum.shipment_state import TERMINAL_STATES
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
@@ -596,31 +599,68 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
     }
 
 
-# Rows per DELETE, so a large backlog never holds one long lock.
-_API_CALL_PURGE_BATCH = 1000
-
-
 @shared_task(base=TenantTask)
 def purge_expired_acs_api_calls() -> dict[str, int]:
-    """Delete ``AcsApiCall`` rows older than ``ACS_API_CALL_RETENTION_DAYS``.
+    """Delete ``AcsApiCall`` rows past their retention period.
+
+    A successful tracking read (the 15-minute poll) is kept
+    ``ACS_API_CALL_POLL_RETENTION_DAYS``; every other call, and a failed
+    poll, ``ACS_API_CALL_RETENTION_DAYS``.
 
     Runs per tenant through ``tenant.tasks.fanout_purge_expired_acs_api_calls``;
     the history holds recipient details, so it is not kept indefinitely.
     """
     from shipping_acs.models import AcsApiCall
+    from shipping_acs.models.api_call import AcsApiCallOutcome
 
-    cutoff = timezone.now() - timedelta(
-        days=settings.ACS_API_CALL_RETENTION_DAYS
+    now = timezone.now()
+    polls = delete_in_batches(
+        AcsApiCall.objects.filter(
+            alias__in=TRACKING_ALIASES,
+            outcome=AcsApiCallOutcome.OK,
+            created_at__lt=now
+            - timedelta(days=settings.ACS_API_CALL_POLL_RETENTION_DAYS),
+        )
     )
-    stale = AcsApiCall.objects.filter(created_at__lt=cutoff)
-    deleted = 0
-    while pks := list(
-        stale.values_list("pk", flat=True)[:_API_CALL_PURGE_BATCH]
-    ):
-        deleted += AcsApiCall.objects.filter(pk__in=pks).delete()[0]
+    others = delete_in_batches(
+        AcsApiCall.objects.filter(
+            created_at__lt=now
+            - timedelta(days=settings.ACS_API_CALL_RETENTION_DAYS)
+        )
+    )
+    deleted = polls + others
     if deleted:
         logger.info(
-            "Purged %s ACS API call rows older than the cutoff", deleted
+            "Purged %s ACS API call rows (%s successful tracking reads)",
+            deleted,
+            polls,
+        )
+    return {"deleted": deleted, "polls": polls}
+
+
+@shared_task(base=TenantTask)
+def purge_expired_acs_tracking_events() -> dict[str, int]:
+    """Delete checkpoints of settled shipments older than the retention period.
+
+    Only events of a shipment in a terminal state go: the poll and the
+    stale-shipment alert still read the history of one in flight.
+    ``CARRIER_TRACKING_EVENT_RETENTION_DAYS`` counts from the day the
+    event was recorded.
+    """
+    from shipping_acs.models import AcsTrackingEvent
+
+    cutoff = timezone.now() - timedelta(
+        days=settings.CARRIER_TRACKING_EVENT_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        AcsTrackingEvent.objects.filter(
+            shipment__shipment_state__in=TERMINAL_STATES,
+            created_at__lt=cutoff,
+        )
+    )
+    if deleted:
+        logger.info(
+            "Purged %s ACS tracking events of settled shipments", deleted
         )
     return {"deleted": deleted}
 

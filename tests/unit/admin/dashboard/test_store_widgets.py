@@ -9,7 +9,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.test import RequestFactory
-from django.utils import translation
+from django.utils import timezone, translation
 from extra_settings.models import Setting
 
 from admin.dashboard.store import queries, widgets
@@ -132,7 +132,7 @@ class TestKpis:
         assert all(card["href"] is None for card in anonymous)
 
         cards = _context(widgets.StoreKpis, _superuser())["cards"]
-        assert cards[0]["href"].endswith("payment_status__exact=COMPLETED")
+        assert cards[0]["href"].endswith("/order/order/")
 
 
 class TestAttention:
@@ -249,7 +249,9 @@ def test_best_sellers_link_each_product():
 
     product = ProductFactory()
     order = OrderFactory(
-        num_order_items=0, payment_status=PaymentStatus.COMPLETED
+        num_order_items=0,
+        payment_status=PaymentStatus.COMPLETED,
+        shipped_at=timezone.now(),
     )
     OrderItemFactory(
         order=order,

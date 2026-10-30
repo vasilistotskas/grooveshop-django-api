@@ -3,8 +3,9 @@
 What a store can switch on or off, and how a client learns the answer.
 Source: `tenant/features.py` (`STORE_FEATURES`, `feature_on`,
 `effective_features`), `tenant/permissions.py` (the gates),
-`tenant/serializers.py` (`StoreFeaturesSerializer`). The code wins over
-this page.
+`tenant/serializers.py` (`StoreFeaturesSerializer`), `admin/features.py`
+(the admin's registry), `admin/mixins.py` (`FeatureGatedModelAdmin`,
+`FeatureInline`), `admin/navigation.py`. The code wins over this page.
 
 ## The rule
 
@@ -79,6 +80,7 @@ consumed by tasks and integrations.
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
 | `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
 | `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
+| `PRODUCT_ASSURANCES_ENABLED` | (b) `product_assurances` | the product page's delivery / payment / returns box; each row hides itself without data |
 | `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED`, `OPS_ALERT_*_ENABLED` | (s) | never read by a client |
@@ -182,3 +184,51 @@ It is queued once the change commits and held for
 its copy of the tenant-resolve payload and a purge before that copy expires
 would re-cache pages rendered from the old list. A save that leaves the list
 unchanged queues nothing.
+
+## The admin
+
+The store admin shows a feature by one rule: **a feature's surface is shown
+when the store can use the feature, or when it holds records.** Nothing that
+exists is made unreachable, nothing empty and unusable is shown, and a hidden
+page is refused (403), not only unlinked. `admin/features.py` is the one
+registry: `FEATURES` is `STORE_FEATURES` plus `retail_documents`
+(`MYDATA_ENABLED`, a server-side setting no client reads), and
+`FEATURE_SURFACES` names the model pages each feature owns.
+
+A feature is in one of three states (`Availability`): `LIVE`, `SETTING_OFF`
+(plan on, the store's setting off) or `UNAVAILABLE` (off the plan). It is
+read once per request (`store_features(request)`; the settings in one
+`store_settings` read), through the same plan flag and settings as the API.
+
+| Surface | Shown | Off |
+|---|---|---|
+| **Setup** page (tiers, promotions, slots, products and catalogue pages), a product's loyalty-points and alert fields | the plan allows it; with the setting off only to a role that can switch it on (`extra_settings.change_setting`: OWNER, ADMIN) | "Off" badge; STAFF do not see it; off the plan, hidden |
+| **Record** page (receipts, ledgers, subscriptions, orders, carts) | live, or the table has rows | "Off" badge; off the plan the rows are read-only (no add, change or delete); with only the setting off nothing new is added |
+| **Per-object** surface: inline, fieldset, field, list filter | live, or this object (a filter: any row) has data for it | the order of an invoice keeps its Billing / Invoice fields, an order that was charged a loyalty discount keeps the field |
+| **Action** that creates a record | the feature is live | refused |
+
+How it is wired:
+
+- `BaseModelAdmin` (via `FeatureGatedModelAdmin`) answers
+  `has_module_permission` and the four object permissions from the model's
+  placement, so the sidebar, the dashboard links and the ⌘K palette (all built
+  from `has_module_permission`) and a typed URL follow the same predicate.
+  `MyAdminSite.get_tabs_list` keeps a tab of `UNFOLD["TABS"]` only while its
+  page opens, through Unfold's own per-tab `has_permission`.
+- `feature_gates` on an admin lists `Gate(feature, fields=…, filters=…,
+  kind=…, data=Q(...))`: the fields (an emptied fieldset goes with them) and the
+  list filters hidden while the feature is not shown. `data` is the filter that
+  says what "this object has data" means; without it, any row of the feature's
+  own pages.
+- `FeatureInline` (`feature = "…"`) gates an inline: Django already drops an
+  inline with no permission, so its tab goes without touching `get_inlines`.
+- A new feature-owned page is added to `FEATURE_SURFACES`; a new gated inline
+  names its feature. `tests/integration/admin/test_feature_gating.py` walks
+  the registry and fails for a placed model whose admin is not gated, a gate
+  naming a field or filter the admin does not declare, and an inline of a
+  feature's records that is not a `FeatureInline`.
+- Two predicates for receipts, kept apart on purpose: `retail_documents` is
+  `MYDATA_ENABLED`, when the pages are *shown* (an owner who switched myDATA on
+  but is not ready still sees where receipts will appear); `MyDataConfig.is_ready`
+  (environment, FHM ground, credentials) is when the platform can *issue*, and
+  the order's "Invoicing & myDATA" actions ask it (`has_issuing_permission`).

@@ -30,6 +30,7 @@ from tests.utils.staff import (
     store_tenant,
     unbind_store_tenant,
 )
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 # The shape ``UnfoldAdminSite.get_sidebar_list`` returns.
@@ -225,26 +226,18 @@ class TestStoreSearch:
 
     def test_a_feature_the_store_has_is_offered(self, bound):
         bound(gift_cards_enabled=True)
+        switch_store_settings(GIFT_CARDS_ENABLED=True)
         links = [result.link for result in self._results("gift")]
 
         assert [link for link in links if "/giftcard/" in link]
 
     @pytest.mark.parametrize("enabled", [True, False])
     def test_a_page_its_settings_switch_off_is_not_offered(
-        self, bound, monkeypatch, enabled
+        self, bound, enabled
     ):
-        from extra_settings.models import Setting
-
         from tenant.permissions import IsProductReviewsEnabled
 
-        real_get = Setting.get.__func__
-
-        def get(cls, name, default=None):
-            if name == IsProductReviewsEnabled.setting_key:
-                return enabled
-            return real_get(cls, name, default)
-
-        monkeypatch.setattr(Setting, "get", classmethod(get))
+        switch_store_settings(**{IsProductReviewsEnabled.setting_key: enabled})
         bound()
         reviews = reverse("admin:product_productreview_changelist")
 

@@ -69,7 +69,7 @@ class TestThePermission:
     ):
         order = _shipped_order()
 
-        assert not order_admin.has_retail_documents_permission(
+        assert not order_admin.has_issuing_permission(
             _request(staff_user), object_id=order.pk
         )
 
@@ -79,14 +79,14 @@ class TestThePermission:
         order = _shipped_order()
 
         with mydata_enabled(auto_submit=False):
-            assert order_admin.has_retail_documents_permission(
+            assert order_admin.has_issuing_permission(
                 _request(staff_user), object_id=order.pk
             )
 
     def test_every_action_asks_for_it(self, order_admin):
         for name in RETAIL_DOCUMENT_ACTIONS:
             method = getattr(OrderAdmin, name)
-            assert "retail_documents" in method.allowed_permissions, name
+            assert "issuing" in method.allowed_permissions, name
 
     @pytest.mark.parametrize("name", RETAIL_DOCUMENT_ACTIONS)
     def test_a_forged_request_is_refused_and_creates_nothing(

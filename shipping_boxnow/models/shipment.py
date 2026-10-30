@@ -5,8 +5,8 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
-from simple_history.models import HistoricalRecords
 
+from core.history import ChangeOnlyHistoricalRecords
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping.querysets import ShipmentQuerySet
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
@@ -14,7 +14,7 @@ from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
 from tenant.staff_actors import history_user_getter, history_user_setter
 
-_TERMINAL_STATES = frozenset(
+TERMINAL_STATES = frozenset(
     {
         BoxNowParcelState.DELIVERED,
         BoxNowParcelState.CANCELED,
@@ -178,7 +178,7 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
     # Audit trail mirrors AcsShipment.history. ``metadata``/
     # ``last_event_at``/``updated_at`` excluded so the history rows
     # focus on state-machine transitions, not high-frequency churn.
-    history = HistoricalRecords(
+    history = ChangeOnlyHistoricalRecords(
         excluded_fields=[
             "metadata",
             "last_event_at",
@@ -231,4 +231,4 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
     @property
     def is_active(self) -> bool:
         """Return True if the shipment has not reached a terminal state."""
-        return self.parcel_state not in _TERMINAL_STATES
+        return self.parcel_state not in TERMINAL_STATES

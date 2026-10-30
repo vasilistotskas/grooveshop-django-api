@@ -36,7 +36,9 @@ redacted and size-capped request parameters and response, and the voucher /
 order / pickup date / reference it concerns. PDF and base64 bodies are
 replaced by `<N chars omitted>`. Rows older than `ACS_API_CALL_RETENTION_DAYS`
 (default 90) are deleted by `purge_expired_acs_api_calls`, fanned out daily
-by `tenant.tasks.fanout_purge_expired_acs_api_calls`.
+by `tenant.tasks.fanout_purge_expired_acs_api_calls`; a successful tracking
+read (`ACS_Trackingsummary`, `ACS_TrackingDetails`, the 15-minute poll) is
+kept only `ACS_API_CALL_POLL_RETENTION_DAYS` (default 14).
 
 **A run record per pickup-list attempt**, `AcsPickupListRun` (admin: ACS
 Pickup List Runs, visible to store staff): date, start time, outcome

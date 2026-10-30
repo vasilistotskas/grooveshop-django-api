@@ -579,6 +579,7 @@ class StockManager:
         order_id: int,
         reason: str = "order_cancelled",
         performed_by=None,
+        order_item_id: int | None = None,
     ) -> None:
         """
         Increment stock (for cancellations/returns).
@@ -605,6 +606,9 @@ class StockManager:
             reason: Human-readable reason for the increment (default: "order_cancelled")
             performed_by: UserAccount who did it, when a person did (staff
                 restocking a return); None for system operations.
+            order_item_id: The order line whose returned units these are,
+                for a return restocked line by line; the profit report
+                gives that line's cost back by it.
 
         Raises:
             ProductNotFoundError: If product doesn't exist
@@ -651,6 +655,7 @@ class StockManager:
         StockLog.objects.create(
             product=product,
             order_id=order_id,
+            order_item_id=order_item_id,
             operation_type=StockLog.OPERATION_INCREMENT,
             quantity_delta=quantity,  # Positive because stock increased
             stock_before=stock_before,

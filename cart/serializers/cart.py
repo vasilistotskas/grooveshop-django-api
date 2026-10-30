@@ -12,7 +12,6 @@ from rest_framework import serializers
 from cart.models import Cart
 from cart.serializers.item import CartItemDetailSerializer, CartItemSerializer
 from cart.services import CartService
-from core.api.schema import deprecated_optional_fields
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
     REWARD_PREVIEW_LIMIT,
@@ -645,7 +644,6 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         )
 
 
-@deprecated_optional_fields("recommendations")
 class CartDetailSerializer(CartSerializer):
     recommendations = serializers.SerializerMethodField(
         help_text=_("Product recommendations based on cart contents")
@@ -682,7 +680,6 @@ class CartDetailSerializer(CartSerializer):
         )
 
 
-@deprecated_optional_fields("recommendations")
 class CartItemMutationResponseSerializer(CartItemDetailSerializer):
     """The line an add or a quantity change wrote, plus the whole cart it
     now sits in, so a client shows the new state without a second ``GET``.

@@ -3,6 +3,25 @@
 
 
 
+## v3.164.2 (2026-10-30)
+
+### Bug fixes
+
+* fix(tenant): bind an eagerly applied task to the store that dispatched it (#367)
+
+TenantTask read its _schema_name header as a request attribute. A worker
+flattens message headers onto the request, but Task.apply hands them to
+Context as one headers key, so an eagerly applied task found no schema
+and ran in public. request.headers is where both paths keep it.
+
+The tests/ suite's stand-in store no longer covers for that: it is
+renamed for what it is, the single-store suite's store, and the
+unbound_store marker goes, since the StoreRequired test binds no store
+itself. Two tests whose setup save now dispatches into a row-less schema
+patch that dispatch.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`1361982`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1361982273cb758c9a52ffd1f8a40a7502ba3c98))
+
 ## v3.164.1 (2026-10-30)
 
 ### Performance improvements

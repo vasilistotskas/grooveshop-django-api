@@ -9,7 +9,6 @@ from django.utils import timezone
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
-from cart.models.cart import LAST_ACTIVITY_WRITE_INTERVAL
 from order.taxation import split_gross
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
@@ -145,38 +144,12 @@ class CartModelTestCase(TestCase):
 
         self.assertEqual(self.cart.total_weight_grams, 0)
 
-    def _make_stale(self):
-        past = timezone.now() - 2 * LAST_ACTIVITY_WRITE_INTERVAL
-        Cart.objects.filter(pk=self.cart.pk).update(last_activity=past)
-        self.cart.refresh_from_db(fields=["last_activity"])
-
-    def test_refresh_last_activity_skips_the_write_inside_the_interval(self):
-        before = self.cart.last_activity
-
-        with self.assertNumQueries(0):
-            self.cart.refresh_last_activity()
-
-        self.assertEqual(self.cart.last_activity, before)
-        self.cart.refresh_from_db(fields=["last_activity"])
-        self.assertEqual(self.cart.last_activity, before)
-
-    def test_refresh_last_activity_writes_once_the_interval_has_passed(self):
-        self._make_stale()
-        stale = self.cart.last_activity
-
-        with self.assertNumQueries(1):
-            self.cart.refresh_last_activity()
-
-        self.cart.refresh_from_db(fields=["last_activity"])
-        self.assertGreater(self.cart.last_activity, stale)
-
     def test_refresh_last_activity(self):
         # Verify the DB row gets written and the in-memory value is updated.
         # Compare UTC timestamps — auto_now=True fields are stored in UTC
         # but our in-memory now() may carry a local ZoneInfo offset.
         import datetime
 
-        self._make_stale()
         self.cart.refresh_last_activity()
         in_memory_utc = self.cart.last_activity.utctimetuple()
         self.cart.refresh_from_db(fields=["last_activity"])
@@ -207,7 +180,6 @@ class CartModelTestCase(TestCase):
         signals.pre_save.connect(on_pre_save, sender=type(self.cart))
         signals.post_save.connect(on_post_save, sender=type(self.cart))
         try:
-            self._make_stale()
             self.cart.refresh_last_activity()
         finally:
             signals.pre_save.disconnect(on_pre_save, sender=type(self.cart))

@@ -34118,10 +34118,12 @@ components:
       enum:
       - ucp
       - acp
+      - mcp
       type: string
       description: |-
         * `ucp` - ucp
         * `acp` - acp
+        * `mcp` - mcp
     Attribute:
       type: object
       description: Serializer for Attribute with translations.
@@ -37808,7 +37810,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/CartDetail'
           readOnly: true
-          description: The updated cart, as returned by the cart detail endpoint
+          description: Το ενημερωμένο καλάθι, όπως το επιστρέφει η λήψη καλαθιού
       required:
       - cart
       - cartId
@@ -40490,10 +40492,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/AgentProtocolEnum'
           description: |-
-            Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP ή ACP.
+            Ορίζεται από το agent gateway για παραγγελία που έκανε πράκτορας AI μέσω UCP, ACP ή MCP.
 
             * `ucp` - ucp
             * `acp` - acp
+            * `mcp` - mcp
     OrderCancelError:
       type: object
       description: |-

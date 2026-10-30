@@ -315,7 +315,7 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   (`OrderAttributionInputSerializer`, write-only, optional): `utm_source`,
   `utm_medium`, `utm_campaign`, `click_ids` (parameter NAMES from
   `CLICK_ID_PARAMS`, never values), `referrer`, `landing_path`, and
-  `agent_protocol` (`ucp`/`acp`). The agent gateway sets it, and
+  `agent_protocol` (`ucp`/`acp`/`mcp`). The agent gateway sets it, and
   `_attribution_input` believes it only when the request also carries the
   gateway's shared secret, which it sends as `X-Internal-Gateway` on
   every cart and order call (`is_internal_caller`, `tenant/internal.py`); from anyone else it is dropped and the order is

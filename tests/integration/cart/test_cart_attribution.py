@@ -14,7 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from knox.models import get_token_model
@@ -216,6 +216,22 @@ class TestCaptureOnAdd:
 
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert CartAttribution.objects.get(cart=cart).source == "instagram"
+
+    @override_settings(AGENT_GATEWAY_INTERNAL_SECRET="gateway-secret")
+    def test_the_gateways_mcp_add_is_an_agent_cart(self):
+        cart = CartFactory(is_guest=True, num_cart_items=0)
+
+        response = _add(
+            APIClient(),
+            _product(),
+            {"agentProtocol": "mcp"},
+            HTTP_X_CART_ID=str(cart.uuid),
+            HTTP_X_INTERNAL_GATEWAY="gateway-secret",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.json()
+        row = CartAttribution.objects.get(cart=cart)
+        assert (row.source_type, row.source) == (OrderSourceType.AGENT, "mcp")
 
     def test_an_unknown_click_id_is_rejected_like_the_order_rejects_it(self):
         cart = CartFactory(is_guest=True, num_cart_items=0)

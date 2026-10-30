@@ -10,6 +10,7 @@ source, and the landing path loses its query string.
 from __future__ import annotations
 
 import pytest
+from django.utils import translation
 
 from order.attribution import (
     CAMPAIGN_MAX_LENGTH,
@@ -47,6 +48,12 @@ SAFARI_UA = (
 @pytest.mark.parametrize(
     ("inp", "source_type", "source"),
     [
+        pytest.param(
+            AttributionInput(agent_protocol="mcp"),
+            OrderSourceType.AGENT,
+            "mcp",
+            id="mcp-protocol-is-an-agent",
+        ),
         pytest.param(
             AttributionInput(
                 agent_protocol="ucp",
@@ -355,6 +362,13 @@ class TestSourceLabel:
 
     def test_an_agent_protocol_names_the_agent(self):
         assert "UCP" in str(source_label("ucp", OrderSourceType.AGENT))
+
+    def test_the_mcp_protocol_reads_as_an_ai_agent(self):
+        with translation.override("en"):
+            assert (
+                str(source_label("mcp", OrderSourceType.AGENT))
+                == "AI agent (MCP)"
+            )
 
     def test_a_direct_visit_reads_as_its_type(self):
         assert source_label("", OrderSourceType.DIRECT) == (

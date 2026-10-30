@@ -234,9 +234,10 @@ CLICK_ID_PARAMS: dict[str, ClickIdSource] = {
     ),
 }
 
-# The protocols the agent gateway speaks: Universal Commerce Protocol
-# and Agentic Commerce Protocol.
-AGENT_PROTOCOLS: dict[str, str] = {"ucp": "UCP", "acp": "ACP"}
+# The protocols the agent gateway speaks: Universal Commerce Protocol,
+# Agentic Commerce Protocol, and the Model Context Protocol its /mcp
+# tools serve.
+AGENT_PROTOCOLS: dict[str, str] = {"ucp": "UCP", "acp": "ACP", "mcp": "MCP"}
 
 
 @dataclass(frozen=True, slots=True)

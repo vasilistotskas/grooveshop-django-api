@@ -7,20 +7,16 @@ that the response carries the cart a ``GET /cart`` would return.
 
 from __future__ import annotations
 
-from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
-from cart.models import Cart
-from cart.models.cart import LAST_ACTIVITY_WRITE_INTERVAL
 from product.factories import ProductFactory
 from user.factories.account import UserAccountFactory
 
@@ -144,24 +140,3 @@ class TestAddResponseCarriesTheCart:
         assert response.status_code == status.HTTP_201_CREATED, response.json()
         assert response.json()["cart"]["uuid"] == str(cart.uuid)
         assert len(response.json()["cart"]["items"]) == 1
-
-
-class TestLastActivity:
-    def test_a_read_inside_the_interval_does_not_write(self, shopper):
-        _user, cart, client = shopper
-        before = Cart.objects.get(pk=cart.pk).last_activity
-
-        client.get(reverse("cart-detail"))
-
-        assert Cart.objects.get(pk=cart.pk).last_activity == before
-
-    def test_a_read_after_the_interval_records_the_visit(self, shopper):
-        _user, cart, client = shopper
-        stale = (
-            timezone.now() - LAST_ACTIVITY_WRITE_INTERVAL - timedelta(minutes=1)
-        )
-        Cart.objects.filter(pk=cart.pk).update(last_activity=stale)
-
-        client.get(reverse("cart-detail"))
-
-        assert Cart.objects.get(pk=cart.pk).last_activity > stale

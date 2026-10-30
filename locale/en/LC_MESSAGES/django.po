@@ -11709,8 +11709,8 @@ msgstr "Set both delivery bounds or neither."
 msgid "Set by check_stale_acs_shipments after admins were alerted that this shipment shows no tracking movement; cleared automatically when a new tracking event arrives."
 msgstr "Set by check_stale_acs_shipments after admins were alerted that this shipment shows no tracking movement; cleared automatically when a new tracking event arrives."
 
-msgid "Set by the agent gateway for an order an AI agent placed over UCP or ACP."
-msgstr "Set by the agent gateway for an order an AI agent placed over UCP or ACP."
+msgid "Set by the agent gateway for an order an AI agent placed over UCP, ACP or MCP."
+msgstr "Set by the agent gateway for an order an AI agent placed over UCP, ACP or MCP."
 
 msgid "Set on a refund or a chargeback: the charge it took money from."
 msgstr "Set on a refund or a chargeback: the charge it took money from."

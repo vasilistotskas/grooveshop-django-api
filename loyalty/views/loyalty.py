@@ -4,13 +4,16 @@ import logging
 
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.store_settings import store_setting
@@ -35,6 +38,9 @@ from product.models.product import Product
 from tenant.permissions import IsLoyaltyEnabled, IsLoyaltyRuntimeEnabled
 
 logger = logging.getLogger(__name__)
+
+# A cart's distinct products, at most: one request previews them all.
+MAX_POINTS_PREVIEW_PRODUCTS = 100
 
 serializers_config: SerializersConfig = {
     "summary": ActionConfig(
@@ -62,6 +68,34 @@ serializers_config: SerializersConfig = {
         operation_id="getProductLoyaltyPoints",
         summary=_("Get product loyalty points preview"),
         tags=["Loyalty"],
+    ),
+    "products_points": ActionConfig(
+        response=ProductPointsSerializer,
+        many=True,
+        paginated=False,
+        operation_id="getProductsLoyaltyPoints",
+        summary=_("Get loyalty points preview for several products"),
+        description=_(
+            "The points the signed-in customer would earn per product, for "
+            "every listed product that exists. A product that does not "
+            "exist is left out."
+        ),
+        tags=["Loyalty"],
+        parameters=[
+            OpenApiParameter(
+                name="productIds",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description=format_lazy(
+                    _(
+                        "Comma-separated IDs of the products to preview "
+                        "points for, from 1 to {max}."
+                    ),
+                    max=MAX_POINTS_PREVIEW_PRODUCTS,
+                ),
+            ),
+        ],
     ),
     "tiers": ActionConfig(
         response=LoyaltyTierSerializer,
@@ -280,29 +314,74 @@ class LoyaltyViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
+    def _points_preview(self, products) -> list[dict]:
+        """Each product's points for the caller, at their current tier."""
+        user = self.request.user
+        tier_multiplier_applied = (
+            bool(user.loyalty_tier)
+            and user.loyalty_tier.points_multiplier > 1
+            and bool(store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED"))
+        )
+        return [
+            {
+                "product_id": product.id,
+                "potential_points": LoyaltyService.get_product_potential_points(
+                    product, user
+                ),
+                "tier_multiplier_applied": tier_multiplier_applied,
+            }
+            for product in products
+        ]
+
     @action(detail=True, methods=["GET"])
     def product_points(self, request, pk=None):
         """GET /api/v1/loyalty/product/<pk>/points - Product points preview."""
         product = get_object_or_404(Product, pk=pk)
-        potential_points = LoyaltyService.get_product_potential_points(
-            product, request.user
-        )
-
-        tier_multiplier_applied = (
-            bool(request.user.loyalty_tier)
-            and request.user.loyalty_tier.points_multiplier > 1
-            and bool(store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED"))
-        )
-
-        response_data = {
-            "product_id": product.id,
-            "potential_points": potential_points,
-            "tier_multiplier_applied": tier_multiplier_applied,
-        }
+        (response_data,) = self._points_preview([product])
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(
             response_data, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"], pagination_class=None)
+    def products_points(self, request):
+        """GET /api/v1/loyalty/product/points?productIds=1,2 - Points
+        preview per product.
+
+        One request for a cart's products instead of one per product.
+        """
+        product_ids = parse_int_csv(
+            request.query_params.get("product_ids"), "productIds"
+        )
+        if not (
+            1 <= len(product_ids) <= MAX_POINTS_PREVIEW_PRODUCTS
+            and min(product_ids) >= 1
+        ):
+            raise DRFValidationError(
+                {
+                    "productIds": _(
+                        "Give from 1 to %(max)d product IDs, each a positive "
+                        "integer."
+                    )
+                    % {"max": MAX_POINTS_PREVIEW_PRODUCTS}
+                },
+                code="invalid_product_ids",
+            )
+
+        products = (
+            Product.objects.filter(pk__in=product_ids)
+            # ``final_price`` and ``vat_percent`` read the VAT row.
+            .select_related("vat")
+            .order_by("id")
+        )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            self._points_preview(products),
+            many=True,
+            context=self.get_serializer_context(),
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 

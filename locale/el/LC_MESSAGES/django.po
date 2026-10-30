@@ -2735,6 +2735,10 @@ msgstr "Επιστρέψτε και δείτε τι νέο υπάρχει"
 msgid "Comma-separated Acs_Delivery_Products codes (COD, REC, SAT, RDO …)."
 msgstr "Κωδικοί Acs_Delivery_Products διαχωρισμένοι με κόμμα (COD, REC, SAT, RDO …)."
 
+#, python-brace-format
+msgid "Comma-separated IDs of the products to preview points for, from 1 to {max}."
+msgstr "ID των προϊόντων για προεπισκόπηση πόντων, χωρισμένα με κόμμα, από 1 έως {max}."
+
 msgid "Comma-separated attribute value IDs. Values of the same attribute are alternatives (any of them); values of different attributes must all match. With the attribute_values facet, an attribute's own values are counted without its own selection."
 msgstr "ID τιμών χαρακτηριστικών διαχωρισμένα με κόμμα. Οι τιμές του ίδιου χαρακτηριστικού είναι εναλλακτικές (αρκεί μία από αυτές)· οι τιμές διαφορετικών χαρακτηριστικών πρέπει να ταιριάζουν όλες. Με το facet attribute_values, οι τιμές ενός χαρακτηριστικού μετριούνται χωρίς τη δική τους επιλογή."
 
@@ -5842,6 +5846,9 @@ msgstr "Λήψη εικόνων ανά τύπο"
 msgid "Get liked posts"
 msgstr "Λήψη άρθρων με επισήμανση"
 
+msgid "Get loyalty points preview for several products"
+msgstr "Λήψη προεπισκόπησης πόντων πιστότητας για πολλά προϊόντα"
+
 msgid "Get loyalty summary"
 msgstr "Λήψη σύνοψης πιστότητας"
 
@@ -6063,6 +6070,10 @@ msgstr "Δωροκάρτες ανενεργές από %(start)s"
 
 msgid "Github Profile"
 msgstr "Προφίλ Github"
+
+#, python-format
+msgid "Give from 1 to %(max)d product IDs, each a positive integer."
+msgstr "Δώστε από 1 έως %(max)d ID προϊόντων, το καθένα θετικό ακέραιο."
 
 msgid "Give the bank's transaction reference for the transfer."
 msgstr "Δώστε τον αριθμό συναλλαγής της τράπεζας για τη μεταφορά."
@@ -12808,6 +12819,9 @@ msgstr "Αυτό το κείμενο διαχειρίζεται η πλατφό�
 
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "Η πλατφόρμα μπορεί να εκδίδει αποδείξεις λιανικής μόνο για επιχείρηση που απαλλάσσεται από τον φορολογικό ηλεκτρονικό μηχανισμό (ΦΗΜ). Καταχωρίστε τη νομική βάση στο MYDATA_FHM_EXEMPTION_GROUND ή απενεργοποιήστε το MYDATA_ENABLED και εκδίδετε τις αποδείξεις από τον ΦΗΜ ή τον πάροχο ηλεκτρονικής τιμολόγησής σας."
+
+msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
+msgstr "Οι πόντοι που θα κέρδιζε ο συνδεδεμένος πελάτης ανά προϊόν, για κάθε προϊόν της λίστας που υπάρχει. Ένα προϊόν που δεν υπάρχει παραλείπεται."
 
 msgid "The previous payment could not be closed."
 msgstr "Η προηγούμενη πληρωμή δεν μπόρεσε να κλείσει."

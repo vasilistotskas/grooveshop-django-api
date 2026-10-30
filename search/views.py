@@ -26,6 +26,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.permissions import IsStoreStaff
+from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from core.store_settings import store_setting
@@ -137,19 +138,6 @@ def _parse_optional_float(value: str | None, name: str) -> float | None:
     except ValueError, TypeError:
         raise ValidationError(
             {name: _("Must be a valid number.")}, code="invalid_number"
-        )
-
-
-def _parse_int_csv(value: str | None, name: str) -> list[int]:
-    """Parse a comma-separated list of integers, 400 (not 500) on garbage."""
-    if not value:
-        return []
-    try:
-        return [int(v.strip()) for v in value.split(",") if v.strip()]
-    except ValueError, TypeError:
-        raise ValidationError(
-            {name: _("Must be a comma-separated list of integers.")},
-            code="invalid_integer_list",
         )
 
 
@@ -675,13 +663,13 @@ def product_meili_search(request):
     views_min = _parse_optional_int(
         request.query_params.get("views_min"), "views_min"
     )
-    category_ids = _parse_int_csv(
+    category_ids = parse_int_csv(
         request.query_params.get("categories"), "categories"
     )
-    attribute_value_ids = _parse_int_csv(
+    attribute_value_ids = parse_int_csv(
         request.query_params.get("attribute_values"), "attribute_values"
     )
-    brand_ids = _parse_int_csv(request.query_params.get("brands"), "brands")
+    brand_ids = parse_int_csv(request.query_params.get("brands"), "brands")
     in_stock = _parse_bool_flag(request.query_params.get("in_stock"), "inStock")
     on_offer = _parse_bool_flag(request.query_params.get("on_offer"), "onOffer")
     sidebar_facets = _parse_bool_flag(

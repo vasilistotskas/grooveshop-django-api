@@ -1,6 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -122,6 +124,56 @@ class ProductFilterTest(APITestCase):
         self.assertEqual(
             response.data["results"][0]["id"], self.cheap_product.id
         )
+
+    def test_id_in_filter(self):
+        """Several products by id in one request: the hero's chips."""
+        url = reverse("product-list")
+        wanted = [
+            self.cheap_product.id,
+            self.expensive_product.id,
+            self.inactive_product.id,
+        ]
+
+        response = self.client.get(
+            url, {"id_In": ",".join(str(pk) for pk in wanted)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # The list's own scope stands: an inactive product is not served.
+        self.assertEqual(
+            sorted(r["id"] for r in response.data["results"]),
+            sorted([self.cheap_product.id, self.expensive_product.id]),
+        )
+
+    def test_id_in_filter_rejects_a_non_number(self):
+        response = self.client.get(reverse("product-list"), {"id_In": "1,x"})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_id_in_filter_queries_stay_flat(self):
+        """One id or three, the list costs the same number of queries."""
+        url = reverse("product-list")
+
+        def count(ids):
+            with CaptureQueriesContext(connection) as ctx:
+                response = self.client.get(
+                    url, {"id_In": ",".join(str(pk) for pk in ids)}
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.data["results"]), len(ids))
+            return len(ctx.captured_queries)
+
+        # Warm the per-process caches (settings, site) first.
+        count([self.cheap_product.id])
+        one = count([self.cheap_product.id])
+        three = count(
+            [
+                self.cheap_product.id,
+                self.expensive_product.id,
+                self.out_of_stock_product.id,
+            ]
+        )
+        self.assertEqual(one, three)
 
     def test_active_filter(self):
         """Test that only active products are returned by default."""

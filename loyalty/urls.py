@@ -22,6 +22,11 @@ urlpatterns = [
         name="loyalty-redeem",
     ),
     path(
+        "loyalty/product/points",
+        LoyaltyViewSet.as_view({"get": "products_points"}),
+        name="loyalty-products-points",
+    ),
+    path(
         "loyalty/product/<int:pk>/points",
         LoyaltyViewSet.as_view({"get": "product_points"}),
         name="loyalty-product-points",

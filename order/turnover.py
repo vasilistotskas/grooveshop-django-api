@@ -142,7 +142,7 @@ class GroupBy(TextChoices):
     VAT_RATE = "vat_rate", _("VAT rate")
 
 
-_TRUNC = {
+TRUNC = {
     Bucket.QUARTER: TruncQuarter,
     Bucket.MONTH: TruncMonth,
     Bucket.WEEK: TruncWeek,
@@ -285,30 +285,30 @@ def a_year_earlier(day: date) -> date:
         return day.replace(year=day.year - 1, day=28)
 
 
-def _local_date(value: datetime) -> date:
+def local_date(value: datetime) -> date:
     return timezone.localtime(value).date()
 
 
-def _period_of(row: dict[str, Any]) -> date | None:
+def period_of(row: dict[str, Any]) -> date | None:
     value = row.get("period")
-    return None if value is None else _local_date(value)
+    return None if value is None else local_date(value)
 
 
-def _by_period(
+def by_period(
     rows: QuerySet, field: str, bucket: Bucket | None, *extra: str
 ) -> QuerySet:
     """``rows`` grouped by the bucket of ``field`` (and ``extra``). With no
     bucket the period is a constant NULL, which Django leaves out of the
     GROUP BY, so the aggregates cover the whole queryset."""
     period = (
-        _TRUNC[bucket](field)
+        TRUNC[bucket](field)
         if bucket
         else Value(None, output_field=DateTimeField())
     )
     return rows.annotate(period=period).values("period", *extra)
 
 
-def _sold_lines(start: datetime, end: datetime, group_by: GroupBy | None):
+def sold_lines(start: datetime, end: datetime, group_by: GroupBy | None):
     from order.models import OrderVatLine
 
     lines = OrderVatLine.objects.filter(
@@ -327,10 +327,10 @@ def _sales(
     bucket: Bucket | None,
     group_by: GroupBy | None,
 ) -> dict[tuple[date | None, GroupKey], dict[str, Any]]:
-    lines = _sold_lines(start, end, group_by)
+    lines = sold_lines(start, end, group_by)
     if group_by is not None:
         lines = lines.annotate(group=F(_GROUP_FIELD[group_by]))
-    grouped = _by_period(
+    grouped = by_period(
         lines, "order__shipped_at", bucket, *(["group"] if group_by else [])
     )
     rows = grouped.order_by().annotate(
@@ -341,7 +341,7 @@ def _sales(
         units=Sum("item__quantity", filter=Q(kind=ChargeKind.GOODS)),
         orders=Count("order_id", distinct=True),
     )
-    return {(_period_of(row), row.get("group")): row for row in rows}
+    return {(period_of(row), row.get("group")): row for row in rows}
 
 
 def _orders(
@@ -353,7 +353,7 @@ def _orders(
 
     shipped = Order.objects.filter(shipped_at__gte=start, shipped_at__lt=end)
     rows = (
-        _by_period(shipped, "shipped_at", bucket)
+        by_period(shipped, "shipped_at", bucket)
         .order_by()
         .annotate(
             orders=Count("id"),
@@ -363,7 +363,7 @@ def _orders(
             ),
         )
     )
-    return {_period_of(row): row for row in rows}
+    return {period_of(row): row for row in rows}
 
 
 def _order_totals():
@@ -415,7 +415,7 @@ def _returned(
         order__in=OrderVatLine.objects.values("order"),
     )
     return (
-        _by_period(sold, when, bucket)
+        by_period(sold, when, bucket)
         .order_by()
         .annotate(net_sum=Sum(net_share), gross_sum=Sum(money))
         .values_list("period", "net_sum", "gross_sum")
@@ -467,7 +467,7 @@ def _returns(
         ),
         # An order that shipped and then closed unpaid (the parcel was
         # refused): no money moved, the whole sale is reversed.
-        _by_period(
+        by_period(
             OrderVatLine.objects.filter(
                 order__is_deleted=False,
                 order__payment_status=PaymentStatus.CANCELED,
@@ -488,7 +488,7 @@ def _returns(
     totals: dict[date | None, tuple[Decimal, Decimal]] = {}
     # One round trip for all four: they share one shape.
     for moment, net, gross in sources[0].union(*sources[1:], all=True):
-        period = None if moment is None else _local_date(moment)
+        period = None if moment is None else local_date(moment)
         was_net, was_gross = totals.get(period, (_ZERO, _ZERO))
         totals[period] = (
             was_net + (net or _ZERO),
@@ -549,8 +549,8 @@ def figures_between(
     periods: list[date | None] = (
         list(
             buckets(
-                _local_date(first),
-                _local_date(last - timedelta(microseconds=1)),
+                local_date(first),
+                local_date(last - timedelta(microseconds=1)),
                 bucket,
             )
         )

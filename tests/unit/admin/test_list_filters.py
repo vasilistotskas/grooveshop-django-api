@@ -21,6 +21,8 @@ from order.models.order import Order
 from product.admin import ProductAdmin
 from product.models.product import Product
 from tenant.models import Tenant
+from tests.utils.store_settings import switch_every_feature_on
+from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.parametrize(
@@ -44,11 +46,15 @@ def _filter_class(entry):
     return entry[1] if isinstance(entry, tuple) else entry
 
 
+@pytest.mark.django_db
 def test_no_first_party_sheet_keeps_a_django_filter():
     """Every filter renders through Unfold's templates, so the whole
     sheet is one form sent by "Apply" — a Django ``SimpleListFilter``
     subclass is a link that applies on click."""
+    # Every feature on, so no gated filter is left out of the walk.
+    switch_every_feature_on()
     request = RequestFactory().get("/admin/")
+    request.user = UserAccountFactory(admin=True)
     django_filters = [
         f"{model._meta.label}: {entry}"
         for site in (django_admin.site, platform_admin_site)

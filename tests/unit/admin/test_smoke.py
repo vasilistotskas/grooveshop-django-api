@@ -21,6 +21,7 @@ from django.contrib import admin as django_admin
 from django.test import Client, RequestFactory
 from django.urls import reverse
 
+from tests.utils.store_settings import switch_every_feature_on
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -63,6 +64,13 @@ def _changelist_url(model) -> str:
 def _add_url(model) -> str:
     opts = model._meta
     return reverse(f"admin:{opts.app_label}_{opts.model_name}_add")
+
+
+@pytest.fixture(autouse=True)
+def every_feature_on():
+    """A page of a feature that is off and empty is refused, and this walks
+    every page."""
+    switch_every_feature_on()
 
 
 @pytest.fixture

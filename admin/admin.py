@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.views import PasswordChangeView
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
-from django.urls import path, reverse
+from django.urls import Resolver404, path, resolve, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
@@ -19,6 +19,7 @@ from admin.forms import (
 )
 from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
 from admin.password_reset import StaffPasswordResetMixin
+from admin.permissions import opens_changelist
 from admin.search import CommandSearchMixin
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
@@ -135,8 +136,33 @@ class MyAdminSite(
         has switched off, as its sidebar does."""
         from admin.features import store_features
 
-        features = store_features(request)
-        return features.absent_apps() | features.absent_models()
+        return store_features(request).inactive_carrier_apps()
+
+    def get_tabs_list(self, request):
+        """Unfold's tab strips, each tab kept only while its page opens.
+
+        A strip is configured once (``UNFOLD["TABS"]``) for every store
+        and role, so it listed Receipts on a store with no receipts and
+        Orders to a role with no access to them. Unfold's own per-tab
+        ``permission`` callback takes the request and nothing else, so a
+        callback per page would repeat what the page's ModelAdmin already
+        answers; ask the ModelAdmin the tab's link resolves to instead.
+        """
+        tabs = super().get_tabs_list(request)
+        urlconf = getattr(request, "urlconf", None)
+        for tab in tabs:
+            for item in tab["items"]:
+                link = str(item.get("link_callback") or item["link"])
+                try:
+                    match = resolve(urlsplit(link).path, urlconf)
+                except Resolver404:
+                    continue
+                model_admin = getattr(match.func, "model_admin", None)
+                if model_admin is not None and not opens_changelist(
+                    request, model_admin
+                ):
+                    item["has_permission"] = False
+        return tabs
 
     def password_change(self, request, extra_context=None):
         """Unfold's password-change view, saving to the PUBLIC schema.

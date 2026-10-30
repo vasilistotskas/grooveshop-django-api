@@ -17,9 +17,17 @@ from django.urls import reverse
 
 from admin.navigation import store_sidebar
 from tests.utils.staff import stamp_platform_identity
+from tests.utils.store_settings import switch_every_feature_on
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _every_feature_on():
+    """Receipts and the other feature pages are listed while their feature
+    is on."""
+    switch_every_feature_on()
 
 
 def _active_links(path: str) -> list[str]:

@@ -42,6 +42,7 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.features import Gate, Kind
 from admin.filters import (
     AnnotatedRangeFilter,
     LikesCountFilter,
@@ -830,6 +831,29 @@ class ProductAdmin(
     parler then ``BaseModelAdmin``), which is why this one admin lists
     the bases itself.
     """
+
+    # A feature that is off keeps its surface off the product form: its
+    # setup (points, the alert switch) for those who can switch it on,
+    # what shoppers produced (likes) only while there is some.
+    feature_gates = (
+        Gate(
+            "loyalty",
+            fields=("points_coefficient", "points"),
+            kind=Kind.SETUP,
+        ),
+        Gate(
+            "product_alerts",
+            fields=("price_drop_alerts_enabled",),
+            filters=("price_drop_alerts_enabled",),
+            kind=Kind.SETUP,
+        ),
+        Gate(
+            "favourites",
+            fields=("likes_count",),
+            filters=(LikesCountFilter,),
+        ),
+        Gate("product_reviews", filters=(ReviewAverageFilter,)),
+    )
 
     prefetch_translations = ("category__translations",)
     list_display = (

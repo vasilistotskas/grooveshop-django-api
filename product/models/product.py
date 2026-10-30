@@ -68,6 +68,13 @@ PRICING_DERIVED_FIELDS = (
 )
 
 
+#: The columns of a product that only the store OWNER may read or write
+#: (``product.manage_cost_price``). It stays out of the history table, which
+#: the admin's history page shows to anyone who can change the product.
+COST_PRICE_FIELDS = ("cost_price", "cost_price_currency")
+COST_PRICE_PERMISSION = "product.manage_cost_price"
+
+
 def _quantize_cents(value: Decimal) -> Decimal:
     """Round a monetary amount to whole cents (2dp, ROUND_HALF_UP — the
     AADE convention, see ``order/mydata/builder.py``).
@@ -128,6 +135,19 @@ class Product(
         max_digits=11,
         decimal_places=2,
         default=0,
+    )
+    cost_price = MoneyField(
+        _("Cost price"),
+        max_digits=11,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            "What one unit costs the store, net of VAT. Copied onto each "
+            "order line when it is sold, so a later edit never changes a "
+            "past sale. Empty means unknown: the profit report lists such "
+            "sales as having no cost, it never counts them as free."
+        ),
     )
     active = models.BooleanField(_("Active"), default=True)
     stock = models.PositiveIntegerField(_("Stock"), default=0)
@@ -277,7 +297,7 @@ class Product(
         # Derived from price, markdown, VAT and promotions by
         # ``product.pricing.service``; the legal record of prices is
         # ``ProductPriceSpell``, not this table.
-        excluded_fields=PRICING_DERIVED_FIELDS,
+        excluded_fields=(*PRICING_DERIVED_FIELDS, *COST_PRICE_FIELDS),
     )
 
     points_coefficient = models.DecimalField(
@@ -302,6 +322,10 @@ class Product(
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
+        # Store OWNER only (``tenant.role_scopes.OWNER_ONLY_PERMISSIONS``).
+        permissions = [
+            ("manage_cost_price", _("Can view and edit the cost price"))
+        ]
         indexes = [
             *MetaDataModel.Meta.indexes,
             *TimeStampMixinModel.Meta.indexes,

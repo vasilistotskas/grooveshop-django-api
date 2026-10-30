@@ -222,12 +222,12 @@ class TestCurrencyIsCompared:
 def test_viva_numeric_currency_codes_normalise():
     """Grounded in docs/viva-payment-api.yaml: Retrieve Transaction
     returns ``currencyCode: "978"``."""
-    from order.payment import _alpha_currency
+    from order.payment import alpha_currency
 
-    assert _alpha_currency("978") == "EUR"
-    assert _alpha_currency("840") == "USD"
-    assert _alpha_currency("EUR") == "EUR"
-    assert _alpha_currency(None) is None
+    assert alpha_currency("978") == "EUR"
+    assert alpha_currency("840") == "USD"
+    assert alpha_currency("EUR") == "EUR"
+    assert alpha_currency(None) is None
 
 
 class TestTransactionMustBelongToTheOrder:

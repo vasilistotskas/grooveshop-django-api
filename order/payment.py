@@ -839,7 +839,7 @@ _ISO_NUMERIC_TO_ALPHA: dict[str, str] = {
 }
 
 
-def _alpha_currency(reported: str | None) -> str | None:
+def alpha_currency(reported: str | None) -> str | None:
     """Normalise Viva's currency code to the alphabetic form we store.
 
     Viva reports ISO 4217 in its NUMERIC form as a string — ``"978"`` for
@@ -1354,7 +1354,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "raw_status": status_id,
                 "provider": "viva_wallet",
                 "amount": data.get("amount"),
-                "currency": _alpha_currency(data.get("currencyCode")),
+                "currency": alpha_currency(data.get("currencyCode")),
                 "order_code": data.get("orderCode"),
                 "transaction_type_id": data.get("transactionTypeId"),
                 "created": data.get("insDate"),

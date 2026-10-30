@@ -667,6 +667,10 @@ the session's `amount_total` under the session's PaymentIntent id, so the
 `payment_intent.succeeded` that follows adds nothing. An event without
 `amount_received` is dropped as malformed, like one without an id.
 
+### 4.2a Stripe fee (`charge.succeeded`, `charge.updated`)
+
+`order/payment_fees.py`. A Stripe fee is the `fee` of the charge's balance transaction, which dj-stripe syncs with the charge (`Charge.sync_from_stripe_data`, `Charge.balance_transaction`). `handle_stripe_charge_fee` writes it onto the CHARGE row keyed on the PaymentIntent id; `charge.updated` is as much a fee event as `charge.succeeded`, because a slower payment method attaches its balance transaction later. Stripe orders its events freely, so when the charge's events came first and found no ledger row, `handle_stripe_payment_succeeded` calls `record_stripe_fee_for_intent` after it books the payment and reads the charge itself (a Stripe outage there is logged and swallowed: the payment is booked). A charge with no ledger row costs no Stripe call, and a fee settled in another currency than the payment is left unreported (`PaymentLedger.record_fee` converts nothing).
+
 ### 4.2 Stripe refund (`charge.refunded`)
 
 Webhook handler: `handle_stripe_charge_refunded` (`order/signals/handlers.py`).
@@ -831,7 +835,7 @@ nothing) is `skipped`, a booked refund `processed`. Ops: each tenant's Viva
 account needs the *Transaction Reversal Created* webhook subscribed
 (Settings → API Access → Webhooks). Production had received no 1797 by
 2026-10-10, so check the subscription before assuming that a refund made in
-Viva's dashboard reached the order. Dispute tracking needs a second subscription, *Account Transaction Created* (2054), in the same place.
+Viva's dashboard reached the order. Dispute tracking needs a second subscription, *Account Transaction Created* (2054), in the same place. The provider fee needs a third, *Transaction Price Calculated* (1799): `_handle_transaction_price_calculated` retrieves the transaction like every other event (a forged body, or another store's transaction, records nothing), requires one of the order's own order codes, and writes `EventData.TotalCommission` (interchange + ISV fee + Viva's fee, major units of `CurrencyCode`) as `fee` on the ledger row whose `provider_reference` is `EventData.TransactionId`. `Interchange` is not read: Viva's own samples disagree on its sign. A payment the ledger lacks, a missing or negative commission or an unknown currency is skipped (`outcome` `skipped`), never booked as zero. A store that does not subscribe 1799 simply shows its Viva payments as "fee not reported".
 
 **Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
 success/failure URLs are static strings configured on the source in
@@ -1813,7 +1817,7 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 
 ### 7.3 The payment ledger (`PaymentTransaction`)
 
-`order/models/payment_transaction.py`, written only through `order/payment_ledger.py` (`PaymentLedger`). Append-only, like `GiftCardTransaction`: a row is never updated or deleted, and `Order` → ledger is `PROTECT` (deleting an order for real has to remove its ledger first, as the demo reset does).
+`order/models/payment_transaction.py`, written only through `order/payment_ledger.py` (`PaymentLedger`). Append-only, like `GiftCardTransaction`: a row is never deleted and, but for its provider `fee` (below), never updated, and `Order` → ledger is `PROTECT` (deleting an order for real has to remove its ledger first, as the demo reset does).
 
 | Column | Meaning |
 |---|---|
@@ -1824,6 +1828,7 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 | `provider_reference` | the provider's own id: PaymentIntent, Viva transaction, refund id, voucher / parcel (a Stripe dashboard refund has no id in `charge.refunded`, so it carries the event id) |
 | `charge` | on a REFUND or a CHARGEBACK, the CHARGE it reverses (an order paid twice is refunded payment by payment); null otherwise (a DB check enforces both) |
 | `description` | the reason given for a refund |
+| `fee`, `fee_source` | what the provider charged for this movement, as the provider reported it, and which report (`PaymentFeeSource`: `STRIPE_BALANCE_TRANSACTION`, `VIVA_TRANSACTION_PRICE`). Both empty until reported: **null is "not reported", never zero, never an estimate**. The only column written after the row exists (`PaymentLedger.record_fee`, replacing an earlier figure); a CHECK keeps a fee and its source together and the fee non-negative. Only the OWNER's profit report reads it (`docs/profit-report.md`) |
 | `created_at` | when it was recorded |
 
 `UNIQUE (provider, provider_reference, kind)` is the idempotency of every writer: a delivery repeated by the provider records nothing the second time (`record_*` return `created=False`). Writers (all under the order row lock): `OrderService.handle_payment_succeeded`, `handle_stripe_checkout_completed`, `_handle_payment_created` (CHARGE); `OrderService.settle_cod_payment`, reached from `AcsService._mark_cod_order_paid_if_pending` and `BoxNowService._mark_cod_order_paid_on_delivery` (COD_COLLECTION, written in the same atomic step as the payment status, §4.4); `OrderService.refund_order`, `handle_stripe_charge_refunded`, `_handle_reversal_created` (REFUND, through `record_refund`); `handle_stripe_dispute_closed` (CHARGEBACK, through `record_chargeback`). The Viva handlers (`_handle_account_transaction_event`, and `_handle_reversal_created` for a refund-claim type) book it through the same `record_chargeback`.

@@ -1,0 +1,97 @@
+{% extends "admin/base_site.html" %}
+
+{% comment %}
+The store's management profit report.
+
+Selected by admin.profit.ProfitView, mounted on the store admin only and
+behind order.view_profit_report (the store OWNER). The definition of every
+figure is order.profit (docs/profit-report.md); the page only lays it out.
+{% endcomment %}
+{% load i18n unfold %}
+
+{% block title %}{% trans "Profit" %} | {{ site_title }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+            {% component "unfold/components/title.html" %}{% trans "Profit" %}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "What the store earned after what the goods cost, the payment fees, the shipping you pay and your other expenses. A management figure, not the profit of your tax return." %}{% endcomponent %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {% trans "Year" as year_aria %}
+            {% include "admin/dashboard/components/segmented.html" with items=years label=year_aria %}
+            {% if report %}
+                {% component "unfold/components/button.html" with href=csv_url icon="download" variant="default" %}{% trans "Export CSV" %}{% endcomponent %}
+                {% component "unfold/components/button.html" with href=xlsx_url icon="table_view" variant="default" %}{% trans "Export XLSX" %}{% endcomponent %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% component "unfold/components/card.html" %}
+        <form method="get" class="flex flex-wrap items-end gap-4">
+            {% for field in form %}
+                <div class="*:mb-0">
+                    {% include "unfold/helpers/field.html" with field=field %}
+                </div>
+            {% endfor %}
+            {% component "unfold/components/button.html" with type="submit" variant="primary" %}{% trans "Show" %}{% endcomponent %}
+        </form>
+        {% if form.errors %}
+            <div class="mt-4">
+                {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+            </div>
+        {% endif %}
+    {% endcomponent %}
+
+    {% if report %}
+        {% if incomplete %}
+            {% component "unfold/components/card.html" %}
+                {% component "unfold/components/text.html" %}{% trans "Some of what these figures need is not recorded: goods sold without a cost price, or card payments whose fee the provider has not reported. They are left out, never counted as free, so the profit shown is higher than the real one until both coverage figures are complete." %}{% endcomponent %}
+            {% endcomponent %}
+        {% endif %}
+
+        {% include "admin/dashboard/components/kpi_list.html" with kpis=kpis class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" %}
+
+        {% trans "Operating profit per period" as chart_title %}
+        {% component "unfold/components/card.html" with title=chart_title %}
+            {% if has_activity %}
+                {% component "unfold/components/chart/bar.html" with data=chart.data options=chart.options class="h-[300px]" %}{% endcomponent %}
+            {% else %}
+                {% trans "No sales or costs in this period" as empty_text %}
+                {% include "admin/dashboard/components/empty_state.html" with icon="bar_chart" text=empty_text class="h-[300px]" %}
+            {% endif %}
+        {% endcomponent %}
+
+        {% trans "Periods" as periods_title %}
+        {% component "unfold/components/card.html" with title=periods_title %}
+            {% component "unfold/components/table.html" with table=table card_included=1 striped=1 %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% if expense_table %}
+            {% trans "Expenses by category" as expenses_title %}
+            {% component "unfold/components/card.html" with title=expenses_title %}
+                {% component "unfold/components/table.html" with table=expense_table card_included=1 striped=1 %}{% endcomponent %}
+            {% endcomponent %}
+        {% endif %}
+
+        {% if group_table %}
+            {% component "unfold/components/card.html" with title=group_title %}
+                {% component "unfold/components/table.html" with table=group_table card_included=1 striped=1 %}{% endcomponent %}
+                <div class="mt-4">
+                    {% component "unfold/components/text.html" %}{% trans "A breakdown shows the goods only, before returns, biggest first. The profit and the margin are those of the sales that have a cost price. Payment fees and expenses belong to the store, not to a product or an order. The export lists every group, period by period." %}{% endcomponent %}
+                </div>
+            {% endcomponent %}
+        {% endif %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex flex-col gap-2 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "Net revenue is the turnover of the same period. Cost of goods sold is the cost price each product had when it was sold, less the cost of returned units put back in stock, in the period they were put back. Cost coverage is the share of the goods sold that have a cost price; a sale made before a cost price was entered has none." %}{% endcomponent %}
+                {% component "unfold/components/text.html" %}{% trans "Payment fees are what the card providers reported for each payment, in the period of the payment; fee coverage is the share of card payments, by value, with a reported fee. Delivery costs and other expenses are the expenses you entered, by their date." %}{% endcomponent %}
+                {% component "unfold/components/text.html" %}{% trans "Periods follow your store's timezone." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+    {% endif %}
+</div>
+{% endblock %}

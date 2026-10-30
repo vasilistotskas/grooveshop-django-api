@@ -9,6 +9,7 @@ from djmoney.models.fields import MoneyField
 
 from order.enum.payment_transaction import (
     CHARGE_REVERSAL_KINDS,
+    PaymentFeeSource,
     PaymentTransactionKind,
 )
 
@@ -23,6 +24,13 @@ class PaymentTransaction(models.Model):
     still owes each have one source and cannot drift apart the way the
     old ``metadata["refunds"]`` list could. ``Order.amount_due`` is what
     the order costs, never what was paid.
+
+    The one column written after the row exists is ``fee``: what the
+    provider charged for the movement, which it reports later than the
+    movement itself (Stripe's balance transaction, Viva's "transaction price
+    calculated" event). It is the provider's own figure or nothing: a row
+    with no fee is "not reported", never "free", and ``fee_source`` names
+    the report it came from.
 
     ``amount`` is always positive; ``kind`` gives the direction. A REFUND
     or a CHARGEBACK (money a card network took back after a lost dispute)
@@ -69,6 +77,26 @@ class PaymentTransaction(models.Model):
             "or refund id, a Viva transaction id, a courier voucher)."
         ),
     )
+    fee = MoneyField(
+        _("Provider fee"),
+        max_digits=11,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            "What the provider charged for this movement, as the provider "
+            "reported it. Empty until reported; never an estimate."
+        ),
+    )
+    fee_source = models.CharField(
+        _("Fee source"),
+        max_length=32,
+        choices=PaymentFeeSource.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("The provider report the fee was read from."),
+    )
     charge = models.ForeignKey(
         "self",
         related_name="refunds",
@@ -103,6 +131,11 @@ class PaymentTransaction(models.Model):
             models.CheckConstraint(
                 condition=models.Q(amount__gt=0),
                 name="payment_transaction_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(fee__isnull=True) & models.Q(fee_source=""))
+                | (models.Q(fee__gte=0) & ~models.Q(fee_source="")),
+                name="payment_transaction_fee_names_source",
             ),
             models.CheckConstraint(
                 condition=(

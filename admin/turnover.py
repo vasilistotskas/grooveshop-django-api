@@ -11,31 +11,19 @@ not disagree about what a column is.
 
 from __future__ import annotations
 
-import csv
-import io
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
 from typing import Any
 
-from django import forms
 from django.core.exceptions import BadRequest
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.formats import date_format
 from django.utils.http import urlencode
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
-from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
 from unfold.views import UnfoldSiteViewMixin
-from unfold.widgets import (
-    INPUT_CLASSES,
-    UnfoldAdminSelectWidget,
-)
 
 from admin.dashboard.base import (
     bar_chart,
@@ -43,251 +31,44 @@ from admin.dashboard.base import (
     percent_text,
 )
 from admin.displays import money
-from order.enum.attribution import OrderSourceType
+from admin.reports import (
+    BREAKDOWN_PAGE_ROWS,
+    COMPARE_YEAR,
+    COUNT,
+    MAX_PAGE_ROWS,
+    MONEY,
+    PERCENT,
+    Column,
+    FilterForm,
+    Kind,
+    csv_response,
+    display,
+    filter_form,
+    group_labels,
+    period_key,
+    period_label,
+    right,
+    xlsx_response,
+    years,
+)
 from order.turnover import (
     Bucket,
     GroupBy,
     GroupKey,
     Row,
     a_year_earlier,
-    buckets,
     figures,
     figures_with_prior_year,
-    first_year,
     total,
 )
-from pay_way.enum.pay_way import PayWayEnum
 
 PERMISSION = "order.view_turnover_report"
-
-# A spreadsheet opens a UTF-8 file without a byte-order mark as Latin-1,
-# which turns the Greek headings into noise.
-BYTE_ORDER_MARK = "﻿"
-
-#: The most rows the page draws. A table of thousands of days is not a
-#: report anyone reads; the export has no such limit.
-MAX_PAGE_ROWS = 400
-
-#: The biggest groups a breakdown shows on the page; the export lists all.
-BREAKDOWN_PAGE_ROWS = 25
-
-COMPARE_YEAR = "year"
-
-#: Excel refuses a sheet name longer than this.
-EXCEL_TITLE_LENGTH = 31
-XLSX_MONEY_FORMAT = "#,##0.00"
-
-XLSX_CONTENT_TYPE = (
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
-
-class FilterForm(forms.Form):
-    """What the page shows: validated, so the page, the CSV and the XLSX
-    refuse the same requests."""
-
-    start = forms.DateField(
-        label=_("From"),
-        widget=forms.DateInput(
-            format="%Y-%m-%d",
-            attrs={"type": "date", "class": " ".join(INPUT_CLASSES)},
-        ),
-    )
-    end = forms.DateField(
-        label=_("To"),
-        widget=forms.DateInput(
-            format="%Y-%m-%d",
-            attrs={"type": "date", "class": " ".join(INPUT_CLASSES)},
-        ),
-    )
-    bucket = forms.ChoiceField(
-        label=_("Group by period"),
-        choices=Bucket.choices,
-        widget=UnfoldAdminSelectWidget,
-    )
-    compare = forms.ChoiceField(
-        label=_("Compare with"),
-        choices=[
-            ("", _("Nothing")),
-            (COMPARE_YEAR, _("Same period last year")),
-        ],
-        required=False,
-        widget=UnfoldAdminSelectWidget,
-    )
-    group = forms.ChoiceField(
-        label=_("Break down by"),
-        choices=[("", _("Nothing")), *GroupBy.choices],
-        required=False,
-        widget=UnfoldAdminSelectWidget,
-    )
-
-    def __init__(
-        self, data: dict[str, str], *, max_rows: int | None = None
-    ) -> None:
-        super().__init__(data)
-        self.max_rows = max_rows
-
-    def clean(self) -> dict[str, Any]:
-        cleaned = super().clean()
-        start, end = cleaned.get("start"), cleaned.get("end")
-        if start and end:
-            if end < start:
-                self.add_error("end", _("The end is before the start."))
-            elif (
-                self.max_rows is not None
-                and cleaned.get("bucket")
-                and sum(1 for _day in buckets(start, end, cleaned["bucket"]))
-                > self.max_rows
-            ):
-                self.add_error(
-                    "bucket",
-                    _(
-                        "This range would show more than %(rows)s rows: "
-                        "choose longer periods, or export it."
-                    )
-                    % {"rows": self.max_rows},
-                )
-        return cleaned
-
-    @property
-    def compare_year(self) -> bool:
-        return self.cleaned_data["compare"] == COMPARE_YEAR
-
-    @property
-    def group_by(self) -> GroupBy | None:
-        return (
-            GroupBy(self.cleaned_data["group"])
-            if self.cleaned_data["group"]
-            else None
-        )
-
-
-def _defaults() -> dict[str, str]:
-    today = timezone.localdate()
-    return {
-        "start": date(today.year, 1, 1).isoformat(),
-        "end": today.isoformat(),
-        "bucket": Bucket.MONTH,
-        "compare": COMPARE_YEAR,
-        "group": "",
-    }
-
-
-def _filter_form(request: HttpRequest, *, max_rows: int | None) -> FilterForm:
-    """The request over the defaults: a parameter that is absent takes its
-    default, one that is present (a ``compare`` left empty) is kept."""
-    return FilterForm({**_defaults(), **request.GET.dict()}, max_rows=max_rows)
 
 
 # ── Labels ──────────────────────────────────────────────────────────────
 
 
-def period_label(period: date, bucket: Bucket) -> str:
-    """A period as the page prints it, in the active language."""
-    match bucket:
-        case Bucket.DAY:
-            return date_format(period, "SHORT_DATE_FORMAT")
-        case Bucket.WEEK:
-            return gettext("Week of %(day)s") % {
-                "day": date_format(period, "SHORT_DATE_FORMAT")
-            }
-        case Bucket.MONTH:
-            return date_format(period, "YEAR_MONTH_FORMAT")
-        case Bucket.QUARTER:
-            return gettext("Q%(quarter)s %(year)s") % {
-                "quarter": (period.month - 1) // 3 + 1,
-                "year": period.year,
-            }
-
-
-def period_key(period: date, bucket: Bucket) -> str:
-    """A period as a file carries it: ISO, whatever the language."""
-    match bucket:
-        case Bucket.DAY:
-            return period.isoformat()
-        case Bucket.WEEK:
-            year, week, _day = period.isocalendar()
-            return f"{year}-W{week:02d}"
-        case Bucket.MONTH:
-            return f"{period:%Y-%m}"
-        case Bucket.QUARTER:
-            return f"{period.year}-Q{(period.month - 1) // 3 + 1}"
-
-
-def group_labels(group_by: GroupBy, keys: set[GroupKey]) -> dict[GroupKey, str]:
-    """The names of the groups a breakdown found."""
-    from product.models import Product, ProductCategory
-
-    match group_by:
-        case GroupBy.PAYMENT_METHOD:
-            return {
-                key: PayWayEnum(key).label if key in PayWayEnum else "—"
-                for key in keys
-            }
-        case GroupBy.CHANNEL:
-            return {
-                key: (
-                    gettext("No source recorded")
-                    if key is None
-                    else OrderSourceType.DIRECT.label
-                    if key == ""
-                    else key
-                )
-                for key in keys
-            }
-        case GroupBy.VAT_RATE:
-            return {key: f"{key.normalize():f}%" for key in keys}
-        case GroupBy.PRODUCT | GroupBy.CATEGORY:
-            model = Product if group_by == GroupBy.PRODUCT else ProductCategory
-            names = {
-                row.pk: row.safe_translation_getter("name", any_language=True)
-                for row in model.objects.filter(pk__in=keys).prefetch_related(
-                    "translations"
-                )
-            }
-            missing = (
-                gettext("Deleted product")
-                if group_by == GroupBy.PRODUCT
-                else gettext("Without a category")
-            )
-            return {
-                key: missing if key is None else names.get(key) or f"#{key}"
-                for key in keys
-            }
-
-
 # ── Columns: one definition for the page, the CSV and the XLSX ──────────
-
-type Kind = str  # "money", "count" or "percent"
-MONEY, COUNT, PERCENT = "money", "count", "percent"
-
-
-@dataclass(frozen=True)
-class Column:
-    header: Any
-    value: Callable[[Row], Decimal | int | float | None]
-    kind: Kind
-
-
-def display(kind: Kind, value: Decimal | float | None) -> str:
-    if value is None:
-        return "—"
-    if kind == MONEY:
-        return money(value)
-    if kind == PERCENT:
-        return percent_text(float(value), signed=True)
-    return str(value)
-
-
-def plain(kind: Kind, value: Decimal | float | None) -> str | int:
-    """A cell of the CSV: a point, two decimals, nothing locale-bound."""
-    if value is None:
-        return ""
-    if kind == MONEY:
-        return f"{value:.2f}"
-    if kind == PERCENT:
-        return f"{value:.1f}"
-    return int(value)
 
 
 def _columns(*, compared: bool, prior: dict[date | None, Row]) -> list[Column]:
@@ -418,24 +199,20 @@ def build_report(form: FilterForm, *, group_rows: int | None) -> Report:
 # ── The page ────────────────────────────────────────────────────────────
 
 
-def _right(content: Any) -> dict[str, Any]:
-    return {"content": content, "class": "text-right tabular-nums"}
-
-
 def _table(report: Report) -> dict[str, Any]:
     columns = report.columns
     table_rows = [
         [report.period_name(row)]
-        + [_right(display(c.kind, c.value(row))) for c in columns]
+        + [right(display(c.kind, c.value(row))) for c in columns]
         for row in report.rows
     ]
     table_rows.append(
         [gettext("Total")]
-        + [_right(display(c.kind, c.value(report.totals))) for c in columns]
+        + [right(display(c.kind, c.value(report.totals))) for c in columns]
     )
     return {
         "headers": [gettext("Period")]
-        + [_right(column.header) for column in columns],
+        + [right(column.header) for column in columns],
         "rows": table_rows,
     }
 
@@ -444,10 +221,10 @@ def _group_table(report: Report) -> dict[str, Any]:
     assert report.group_by is not None
     return {
         "headers": [GroupBy(report.group_by).label]
-        + [_right(column.header) for column in _GROUP_COLUMNS],
+        + [right(column.header) for column in _GROUP_COLUMNS],
         "rows": [
             [report.labels[row.group]]
-            + [_right(display(c.kind, c.value(row))) for c in _GROUP_COLUMNS]
+            + [right(display(c.kind, c.value(row))) for c in _GROUP_COLUMNS]
             for row in report.groups
         ],
     }
@@ -533,14 +310,6 @@ def _chart(report: Report) -> dict[str, str]:
     )
 
 
-def _years() -> list[int]:
-    """The years offered as shortcuts, newest first: from the first sale to
-    this one."""
-    current = timezone.localdate().year
-    first = first_year() or current
-    return list(range(current, first - 1, -1))
-
-
 class TurnoverView(UnfoldSiteViewMixin, TemplateView):
     title = _("Turnover")
     permission_required = (PERMISSION,)
@@ -548,7 +317,7 @@ class TurnoverView(UnfoldSiteViewMixin, TemplateView):
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        form = _filter_form(self.request, max_rows=MAX_PAGE_ROWS)
+        form = filter_form(self.request, max_rows=MAX_PAGE_ROWS)
         index = reverse(f"{self.admin_site.name}:turnover")
         today = timezone.localdate()
         context.update(
@@ -573,7 +342,7 @@ class TurnoverView(UnfoldSiteViewMixin, TemplateView):
                         and form.cleaned_data["end"]
                         == min(date(year, 12, 31), today),
                     }
-                    for year in _years()
+                    for year in years()
                 ],
             }
         )
@@ -659,7 +428,7 @@ class TurnoverExportView(UnfoldSiteViewMixin, TemplateView):
     filename_stem = "turnover"
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any):
-        form = _filter_form(request, max_rows=None)
+        form = filter_form(request, max_rows=None)
         if not form.is_valid():
             raise BadRequest("; ".join(form.errors.keys()))
         report = build_report(form, group_rows=None)
@@ -676,73 +445,31 @@ class TurnoverCsvView(TurnoverExportView):
     """One table: the periods, or the breakdown when one was asked for."""
 
     def render_report(self, report: Report) -> HttpResponse:
-        response = HttpResponse(content_type="text/csv; charset=utf-8")
-        response["Content-Disposition"] = (
-            f'attachment; filename="{self.filename(report, "csv")}"'
-        )
-        response.write(BYTE_ORDER_MARK)
         group = report.group_by is not None
-        sheet = _group_sheet(report) if group else _period_sheet(report)
-        kinds = _kinds(report, group=group)
-        writer = csv.writer(response)
-        writer.writerow(sheet[0])
-        for row in sheet[1:]:
-            writer.writerow(
-                [
-                    plain(kind, cell) if kind != "text" else cell
-                    for kind, cell in zip(kinds, row, strict=True)
-                ]
-            )
-        return response
+        return csv_response(
+            _group_sheet(report) if group else _period_sheet(report),
+            _kinds(report, group=group),
+            self.filename(report, "csv"),
+        )
 
 
 class TurnoverXlsxView(TurnoverExportView):
     """The periods, and the breakdown on a second sheet when asked for."""
 
     def render_report(self, report: Report) -> HttpResponse:
-        workbook = Workbook(write_only=True)
-        self._sheet(
-            workbook,
-            gettext("Turnover"),
-            _period_sheet(report),
-            report,
-            group=False,
-        )
-        if report.group_by is not None:
-            self._sheet(
-                workbook,
-                str(GroupBy(report.group_by).label),
-                _group_sheet(report),
-                report,
-                group=True,
+        sheets = [
+            (
+                gettext("Turnover"),
+                _period_sheet(report),
+                _kinds(report, group=False),
             )
-        buffer = io.BytesIO()
-        workbook.save(buffer)
-        response = HttpResponse(
-            buffer.getvalue(), content_type=XLSX_CONTENT_TYPE
-        )
-        response["Content-Disposition"] = (
-            f'attachment; filename="{self.filename(report, "xlsx")}"'
-        )
-        return response
-
-    @staticmethod
-    def _sheet(
-        workbook: Workbook,
-        title: str,
-        rows: list[list[Any]],
-        report: Report,
-        *,
-        group: bool,
-    ) -> None:
-        sheet = workbook.create_sheet(title=title[:EXCEL_TITLE_LENGTH])
-        sheet.append(rows[0])
-        kinds = _kinds(report, group=group)
-        for row in rows[1:]:
-            cells = []
-            for kind, value in zip(kinds, row, strict=True):
-                cell = WriteOnlyCell(sheet, value=value)
-                if kind == MONEY:
-                    cell.number_format = XLSX_MONEY_FORMAT
-                cells.append(cell)
-            sheet.append(cells)
+        ]
+        if report.group_by is not None:
+            sheets.append(
+                (
+                    str(GroupBy(report.group_by).label),
+                    _group_sheet(report),
+                    _kinds(report, group=True),
+                )
+            )
+        return xlsx_response(sheets, self.filename(report, "xlsx"))

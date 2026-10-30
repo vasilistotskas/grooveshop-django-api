@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
@@ -78,6 +78,7 @@ from order.invoicing import (
     receipt_issuable,
 )
 from order.models.attribution import OrderAttribution
+from order.models.expense import Expense
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
@@ -2936,6 +2937,7 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         "stock_before",
         "stock_after",
         "order",
+        "order_item",
         "reason_display",
         "actor",
         "created_at",
@@ -3394,3 +3396,110 @@ class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(Expense)
+class ExpenseAdmin(BaseModelAdmin):
+    """What the store spent outside the cost of its products: a carrier's
+    invoice, advertising, rent. The profit report's operating costs.
+
+    The store OWNER's alone (``tenant.role_scopes.OWNER_ONLY_PERMISSIONS``):
+    the page's permissions are the model's own, so no other role reaches it.
+    The invoice behind a row is a private file, streamed only through
+    ``attachment_download_view``.
+    """
+
+    list_display = (
+        "date",
+        "category",
+        "description",
+        "net_amount",
+        "vat",
+        "attachment_link",
+        "created_by",
+    )
+    list_filter = (
+        "category",
+        ("date", RangeDateFilter),
+    )
+    search_fields = ("description",)
+    date_hierarchy = "date"
+    staff_actor_fields = ("created_by",)
+    readonly_fields = ("created_by", "created_at", "updated_at")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "date",
+                    "category",
+                    "description",
+                    "amount_net",
+                    "vat_amount",
+                    "attachment",
+                )
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": ("created_by", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    @display(description=_("Net amount"), ordering="amount_net")
+    def net_amount(self, obj: Expense) -> str:
+        return money(obj.amount_net.amount)
+
+    @display(description=_("VAT"), ordering="vat_amount")
+    def vat(self, obj: Expense) -> str:
+        return money(obj.vat_amount.amount)
+
+    @display(description=_("Attachment"))
+    def attachment_link(self, obj: Expense):
+        if not obj.has_attachment():
+            return "—"
+        return format_html(
+            '<a href="{}">{}</a>',
+            reverse("admin:order_expense_attachment", args=[obj.pk]),
+            _("Download"),
+        )
+
+    def get_urls(self):
+        return [
+            path(
+                "<int:expense_id>/attachment/",
+                self.admin_site.admin_view(self.attachment_download_view),
+                name="order_expense_attachment",
+            ),
+            *super().get_urls(),
+        ]
+
+    def attachment_download_view(self, request, expense_id: int):
+        """Stream an expense's invoice through the admin's own gate.
+
+        The bytes sit in a private per-tenant tree no web server serves, so
+        this view is the only reader. It needs the model's ``view``
+        permission (the OWNER's), and hands the file back as an attachment
+        that a browser is told not to sniff.
+        """
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        expense = Expense.objects.filter(pk=expense_id).first()
+        if expense is None or not expense.has_attachment():
+            raise Http404(_("Attachment not found."))
+        response = FileResponse(
+            expense.attachment.open("rb"),
+            content_type="application/octet-stream",
+            as_attachment=True,
+            filename=expense.attachment.name.rsplit("/", 1)[-1],
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)

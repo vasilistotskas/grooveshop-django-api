@@ -234,6 +234,7 @@ def _permissions_for_role(role: str) -> set[str]:
     """The permission set a role grants inside its tenant."""
     from tenant.models import TenantMembershipRole
     from tenant.role_scopes import (
+        OWNER_ONLY_PERMISSIONS,
         REFERENCE_DATA_APP_LABELS,
         STAFF_READ_ONLY_APP_LABELS,
         operational_app_labels,
@@ -249,7 +250,7 @@ def _permissions_for_role(role: str) -> set[str]:
         # but cannot change tenant settings or invite other staff"
         # (TenantMembershipRole). Delete is withheld as well: it is the
         # irreversible action, and nothing in that description implies
-        # it.
+        # it. What the OWNER keeps to themselves stays withheld too.
         return (
             reference
             | _permissions_for_apps(
@@ -258,10 +259,12 @@ def _permissions_for_role(role: str) -> set[str]:
             | _permissions_for_apps(
                 STAFF_READ_ONLY_APP_LABELS, actions=("view",)
             )
-        )
+        ) - OWNER_ONLY_PERMISSIONS
 
     if role in (TenantMembershipRole.ADMIN, TenantMembershipRole.OWNER):
         perms = reference | _permissions_for_apps(store_app_labels())
+        if role == TenantMembershipRole.ADMIN:
+            perms -= OWNER_ONLY_PERMISSIONS
         # Narrow, deliberate exceptions to "platform scope is never
         # granted": a store's own row and its own team. Object scoping
         # (own tenant only) is enforced in the ModelAdmin — this only

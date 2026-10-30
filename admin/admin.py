@@ -217,6 +217,7 @@ class MyAdminSite(
         return context
 
     def get_urls(self):
+        from admin.profit import ProfitCsvView, ProfitView, ProfitXlsxView
         from admin.turnover import (
             TurnoverCsvView,
             TurnoverView,
@@ -244,6 +245,21 @@ class MyAdminSite(
                 "turnover/export.xlsx",
                 self.admin_view(TurnoverXlsxView.as_view(admin_site=self)),
                 name="turnover-xlsx",
+            ),
+            path(
+                "profit/",
+                self.admin_view(ProfitView.as_view(admin_site=self)),
+                name="profit",
+            ),
+            path(
+                "profit/export.csv",
+                self.admin_view(ProfitCsvView.as_view(admin_site=self)),
+                name="profit-csv",
+            ),
+            path(
+                "profit/export.xlsx",
+                self.admin_view(ProfitXlsxView.as_view(admin_site=self)),
+                name="profit-xlsx",
             ),
         ]
         return custom_urls + urls

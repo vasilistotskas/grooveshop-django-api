@@ -28,3 +28,21 @@ CHARGE_REVERSAL_KINDS = (
     PaymentTransactionKind.CHARGEBACK,
     PaymentTransactionKind.REFUND_REVERSAL,
 )
+
+
+class PaymentFeeSource(models.TextChoices):
+    """Which provider report a ``PaymentTransaction.fee`` was read from.
+
+    A fee is only ever the provider's own figure, never an estimate, so
+    every value names the report it came out of. A row whose provider has
+    not reported one has no fee and no source.
+    """
+
+    STRIPE_BALANCE_TRANSACTION = (
+        "STRIPE_BALANCE_TRANSACTION",
+        _("Stripe balance transaction"),
+    )
+    VIVA_TRANSACTION_PRICE = (
+        "VIVA_TRANSACTION_PRICE",
+        _("Viva transaction price calculated"),
+    )

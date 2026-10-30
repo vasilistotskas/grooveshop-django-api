@@ -67,6 +67,22 @@ class StockLog(TimeStampMixinModel):
         ),
         verbose_name=_("Order"),
     )
+    order_item = models.ForeignKey(
+        "order.OrderItem",
+        related_name="stock_logs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        # Nothing looks a log up by its line, and a plain index build is a
+        # lock on a table that only grows.
+        db_index=False,
+        help_text=_(
+            "The order line whose returned units this restock put back "
+            "(empty for every other stock operation). The profit report "
+            "reverses a line's cost by it."
+        ),
+        verbose_name=_("Order item"),
+    )
     operation_type = models.CharField(
         _("Operation Type"),
         max_length=50,

@@ -7523,9 +7523,6 @@ msgstr "Χαμηλότερο όριο μεταξύ των ενεργών παρ�
 msgid "Loyalty"
 msgstr "Πιστότητα"
 
-msgid "Loyalty & Engagement"
-msgstr "Πιστότητα & Αλληλεπίδραση"
-
 msgid "Loyalty Discount"
 msgstr "Έκπτωση πόντων"
 
@@ -15934,6 +15931,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Low VAT (0.1% - 10%)"
 #~ msgstr "Χαμηλός ΦΠΑ (0.1% - 10%)"
+
+#~ msgid "Loyalty & Engagement"
+#~ msgstr "Πιστότητα & Αλληλεπίδραση"
 
 #~ msgid "Loyalty & Rewards"
 #~ msgstr "Πιστότητα & Ανταμοιβές"

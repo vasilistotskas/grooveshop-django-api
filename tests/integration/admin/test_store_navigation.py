@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 from django.test import RequestFactory, override_settings
 from django.utils import translation
-from extra_settings.models import Setting
 
 from admin.navigation import ops_site_dropdown, store_sidebar
 from shipping.models import ShippingProvider
@@ -23,6 +22,10 @@ from tests.utils.staff import (
     store_staff,
     store_tenant,
     unbind_store_tenant,
+)
+from tests.utils.store_settings import (
+    switch_every_feature_on,
+    switch_store_settings,
 )
 from user.factories.account import UserAccountFactory
 
@@ -58,19 +61,22 @@ ALL_SETTINGS = {
 }
 
 
+class _Switches(dict):
+    """The store settings, written as rows as a test sets them."""
+
+    def __setitem__(self, name, value):
+        super().__setitem__(name, value)
+        switch_store_settings(**{name: value})
+
+
 @pytest.fixture
-def settings_values(monkeypatch):
+def settings_values():
     """The store settings every feature reads, all on by default."""
-    values = dict(ALL_SETTINGS)
-    real_get = Setting.get.__func__
-
-    def fake_get(cls, name, default=None):
-        if name in values:
-            return values[name]
-        return real_get(cls, name, default)
-
-    monkeypatch.setattr(Setting, "get", classmethod(fake_get))
-    return values
+    switches = _Switches()
+    for name, value in ALL_SETTINGS.items():
+        switches[name] = value
+    switch_every_feature_on()
+    return switches
 
 
 @pytest.fixture
@@ -174,7 +180,8 @@ class TestFeatures:
         finally:
             unbind_store_tenant(previous)
 
-        assert entries["Loyalty"]["badge"] == "Off"
+        # Points Transactions hold nothing, so the menu is its one page.
+        assert entries["Loyalty Tiers"]["badge"] == "Off"
         assert entries["Promotions"]["badge"] == "Off"
         assert entries["Gift Cards"].get("badge") != "Off"
 

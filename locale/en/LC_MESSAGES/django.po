@@ -7513,9 +7513,6 @@ msgstr "Lowest threshold across active providers — the headline 'free shipping
 msgid "Loyalty"
 msgstr "Loyalty"
 
-msgid "Loyalty & Engagement"
-msgstr "Loyalty & Engagement"
-
 msgid "Loyalty Discount"
 msgstr "Loyalty Discount"
 
@@ -15537,6 +15534,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"
+
+#~ msgid "Loyalty & Engagement"
+#~ msgstr "Loyalty & Engagement"
 
 #~ msgid "Maximum total number of results to return"
 #~ msgstr "Maximum total number of results to return"

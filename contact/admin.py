@@ -21,6 +21,7 @@ from unfold.decorators import display
 from admin.base import BaseModelAdmin
 from admin.displays import format_dt, header_two_line, relative_time
 from admin.export import ExportActionMixin
+from admin.mixins import FeatureInline
 from contact.models import Contact, ContactAttachment, Feedback
 from contact.utils import contact_retention_days
 
@@ -104,7 +105,7 @@ class RecentContactFilter(DropdownFilter):
         return queryset
 
 
-class ContactAttachmentInline(TabularInline):
+class ContactAttachmentInline(FeatureInline, TabularInline):
     """The files that came with an enquiry, and the way to read them.
 
     Read-only apart from delete: nothing about an upload is editable -
@@ -113,6 +114,7 @@ class ContactAttachmentInline(TabularInline):
     ``contact.signals.delete_attachment_file``.
     """
 
+    feature = "contact_attachments"
     model = ContactAttachment
     extra = 0
     max_num = 0

@@ -38,7 +38,7 @@ from unfold.mixins import FormFieldModelAdminMixin
 from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.filters import RelatedDropdownFilter
-from admin.mixins import WithheldOnTenantHostModelAdmin
+from admin.mixins import FeatureGatedModelAdmin, WithheldOnTenantHostModelAdmin
 from core.json_schema import schema_validator
 
 
@@ -75,12 +75,19 @@ def _own_copy(method: Callable) -> Callable:
     return action
 
 
-class BaseModelAdmin(WithheldOnTenantHostModelAdmin, ModelAdmin):
+class BaseModelAdmin(
+    FeatureGatedModelAdmin, WithheldOnTenantHostModelAdmin, ModelAdmin
+):
     """Project-wide defaults for unfold ModelAdmin.
 
     The values below are the consensus defaults seen across the 30+
     admins in this project; every admin had been re-setting them by
     hand. Subclasses can override any flag freely.
+
+    A model that owns an admin page for an optional store feature is
+    shown, and refused, by the feature's state (``FeatureGatedModelAdmin``,
+    ``admin.features``), and ``feature_gates`` hides the fields and list
+    filters of a feature that is off.
 
     Attributes
     ----------

@@ -6,7 +6,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, F, Sum
+from django.db.models import Count, F, Q, Sum
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import path, reverse
@@ -51,8 +51,9 @@ from admin.displays import (
     relative_time,
     source_badge,
 )
+from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
-from admin.mixins import IsSuperuserOnlyModelAdmin
+from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
 from order.attribution import source_label
 from order.chargebacks import (
     ChargebackDecisionError,
@@ -740,7 +741,7 @@ def _credit_download_url(credit: RetailCredit) -> str | None:
     return reverse("admin:order_credit_download", args=[credit.pk])
 
 
-class InvoiceInline(TabularInline):
+class InvoiceInline(FeatureInline, TabularInline):
     """Single-row inline surfacing the order's retail receipt (if any).
 
     Archival-only — the receipt itself is immutable once rendered
@@ -748,6 +749,7 @@ class InvoiceInline(TabularInline):
     via the order-level detail actions on OrderAdmin.
     """
 
+    feature = RETAIL_DOCUMENTS
     model = Invoice
     extra = 0
     max_num = 0
@@ -792,9 +794,10 @@ class InvoiceInline(TabularInline):
         )
 
 
-class RetailCreditInline(TabularInline):
+class RetailCreditInline(FeatureInline, TabularInline):
     """The retail credit documents issued for the order's refunds."""
 
+    feature = RETAIL_DOCUMENTS
     model = RetailCredit
     extra = 0
     max_num = 0
@@ -833,8 +836,65 @@ class RetailCreditInline(TabularInline):
         )
 
 
+# The buyer's identity for an invoice and the figures to issue it in
+# timologio: the surface of the ``b2b_invoicing`` feature, on the orders
+# that are invoice orders.
+BILLING_FIELDS = (
+    "document_type",
+    "billing_company_name",
+    "billing_vat_id",
+    "billing_tax_office",
+    "billing_activity",
+    "billing_country",
+    "billing_street",
+    "billing_street_number",
+    "billing_city",
+    "billing_zipcode",
+)
+TIMOLOGIO_FIELDS = (
+    "timologio_summary",
+    "timologio_invoice_number",
+    "timologio_invoice_mark",
+    "timologio_credit_number",
+    "timologio_credit_mark",
+)
+
+
 @admin.register(Order)
 class OrderAdmin(BaseModelAdmin):
+    # What an order shows of a feature that is off: only if this order (or,
+    # for a filter, any order) carries its data. The figures are stamped
+    # at checkout, so an order keeps showing what it was charged.
+    feature_gates = (
+        Gate(
+            "b2b_invoicing",
+            fields=(*BILLING_FIELDS, *TIMOLOGIO_FIELDS),
+            filters=("document_type",),
+            data=Q(document_type=OrderDocumentTypeEnum.INVOICE.value),
+        ),
+        Gate(
+            "wholesale",
+            fields=("wholesale_pricing",),
+            filters=(WholesaleOrderFilter,),
+            data=Q(metadata__has_key="b2b_pricing"),
+        ),
+        Gate(
+            "promotions",
+            fields=("discount_amount",),
+            data=Q(discount_amount__gt=0),
+        ),
+        Gate(
+            "loyalty",
+            fields=("loyalty_discount",),
+            data=Q(loyalty_discount__gt=0),
+        ),
+        Gate(
+            "gift_cards",
+            fields=("gift_card_amount",),
+            data=Q(gift_card_amount__gt=0),
+        ),
+    )
+
     list_display = [
         "status_label",
         "follow_up_flag",
@@ -976,22 +1036,9 @@ class OrderAdmin(BaseModelAdmin):
             _("Billing / Invoice"),
             {
                 "fields": (
-                    "document_type",
-                    "billing_company_name",
-                    "billing_vat_id",
-                    "billing_tax_office",
-                    "billing_activity",
-                    "billing_country",
-                    "billing_street",
-                    "billing_street_number",
-                    "billing_city",
-                    "billing_zipcode",
+                    *BILLING_FIELDS,
                     "wholesale_pricing",
-                    "timologio_summary",
-                    "timologio_invoice_number",
-                    "timologio_invoice_mark",
-                    "timologio_credit_number",
-                    "timologio_credit_mark",
+                    *TIMOLOGIO_FIELDS,
                 ),
                 "classes": ("tab",),
                 "description": _(
@@ -1931,10 +1978,15 @@ class OrderAdmin(BaseModelAdmin):
             }
         )
 
-    def has_retail_documents_permission(self, request, object_id=None):
+    def has_issuing_permission(self, request, object_id=None):
         """The "Invoicing & myDATA" actions exist only for a store whose
-        retail receipts the platform issues. Any other store issues them
-        outside the platform, so the actions are hidden and refused."""
+        retail receipts the platform can ISSUE (``MyDataConfig.is_ready``:
+        enabled, environment, FHM ground, credentials). Any other store
+        issues them outside the platform, so the actions are hidden and
+        refused. Whether the receipt pages are SHOWN is the weaker
+        ``retail_documents`` feature (``MYDATA_ENABLED``,
+        ``admin.features``): a store that switched myDATA on but is not
+        ready still sees where its receipts will appear."""
         return self._issues_receipts(request)
 
     @staticmethod
@@ -2152,7 +2204,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Issue receipt (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt_long",
-        permissions=["change", "retail_documents"],
+        permissions=["change", "issuing"],
     )
     def issue_receipt_now(self, request, object_id):
         """Issue the order's retail receipt now (generate, register with
@@ -2200,7 +2252,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Issue credit documents (myDATA)"),
         variant=ActionVariant.PRIMARY,
         icon="receipt",
-        permissions=["change", "retail_documents"],
+        permissions=["change", "issuing"],
     )
     def issue_credit_documents_now(self, request, object_id):
         """Issue the retail credit documents the order owes, and resubmit
@@ -2234,7 +2286,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Regenerate receipt (same number)"),
         variant=ActionVariant.WARNING,
         icon="refresh",
-        permissions=["change", "retail_documents"],
+        permissions=["change", "issuing"],
     )
     def regenerate_invoice(self, request, object_id):
         """Re-render the receipt PDF + snapshots in place.
@@ -2282,7 +2334,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Send receipt to myDATA"),
         variant=ActionVariant.PRIMARY,
         icon="cloud_upload",
-        permissions=["change", "retail_documents"],
+        permissions=["change", "issuing"],
     )
     def send_invoice_to_mydata_now(self, request, object_id):
         """Dispatch a manual myDATA submission for this order.
@@ -2327,7 +2379,7 @@ class OrderAdmin(BaseModelAdmin):
         description=_("Cancel receipt in myDATA (issued in error)"),
         variant=ActionVariant.DANGER,
         icon="cancel",
-        permissions=["change", "retail_documents"],
+        permissions=["change", "issuing"],
     )
     def cancel_mydata_invoice_now(self, request, object_id):
         """Schedule a ``CancelInvoice`` call for this order's MARK.

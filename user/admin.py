@@ -44,8 +44,9 @@ from admin.displays import (
     relative_time,
 )
 from admin.export import ExportActionMixin
+from admin.features import Gate, store_features
 from admin.filters import RelatedDropdownFilter
-from admin.mixins import IsSuperuserOnlyModelAdmin
+from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
 from emails.models import EmailOptOut
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
@@ -102,14 +103,18 @@ class UserStatusFilter(DropdownFilter):
     parameter_name = "user_status"
 
     def lookups(self, request, model_admin):
-        return [
+        lookups = [
             ("active_staff", _("Active Staff")),
             ("active_regular", _("Active Regular Users")),
             ("inactive", _("Inactive Users")),
             ("superuser", _("Super Users")),
-            ("with_subscriptions", _("Users with Subscriptions")),
-            ("no_subscriptions", _("Users without Subscriptions")),
         ]
+        if store_features(request).shows_records(request, "newsletter"):
+            lookups += [
+                ("with_subscriptions", _("Users with Subscriptions")),
+                ("no_subscriptions", _("Users without Subscriptions")),
+            ]
+        return lookups
 
     def queryset(self, request, queryset):
         v = self.value()
@@ -216,7 +221,8 @@ class UserAddressInline(TabularInline):
     tab = True
 
 
-class UserSubscriptionInline(TabularInline):
+class UserSubscriptionInline(FeatureInline, TabularInline):
+    feature = "newsletter"
     model = UserSubscription
     extra = 0
     per_page = 15
@@ -284,9 +290,29 @@ class CustomerOrderDataset(BaseDataset):
     tab = True
 
 
+# The customer's points and level: the surface of ``loyalty`` on a customer.
+LOYALTY_FIELDS = (
+    "loyalty_points_balance",
+    "loyalty_total_xp",
+    "loyalty_level",
+    "loyalty_tier_name",
+)
+
+
 @admin.register(UserAccount)
 class UserAdmin(ExportActionMixin, BaseModelAdmin):
     actions = ["export_csv", "export_xml"]
+
+    # Off the loyalty programme, a customer shows its points only if it
+    # earned any; the newsletter filter only while there are subscriptions.
+    feature_gates = (
+        Gate(
+            "loyalty",
+            fields=LOYALTY_FIELDS,
+            data=Q(total_xp__gt=0) | Q(points_transactions__isnull=False),
+        ),
+        Gate("newsletter", filters=(SubscriptionCountFilter,)),
+    )
 
     form = UserChangeForm
     # Generates a handle when the operator leaves ``username``
@@ -344,10 +370,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "updated_at",
         "engagement_metrics",
         "social_links_summary",
-        "loyalty_points_balance",
-        "loyalty_total_xp",
-        "loyalty_level",
-        "loyalty_tier_name",
+        *LOYALTY_FIELDS,
     ]
 
     # Fields that hand out privilege. Only a superuser may set them.
@@ -454,14 +477,17 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
             },
         ),
         (
-            _("Loyalty & Engagement"),
+            _("Loyalty"),
+            {
+                "classes": ("tab",),
+                "fields": LOYALTY_FIELDS,
+            },
+        ),
+        (
+            _("Engagement"),
             {
                 "classes": ("tab",),
                 "fields": (
-                    "loyalty_points_balance",
-                    "loyalty_total_xp",
-                    "loyalty_level",
-                    "loyalty_tier_name",
                     "engagement_metrics",
                     "marketing_opted_out_at",
                     "id",
@@ -660,8 +686,11 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
 
     def has_adjust_loyalty_points_permission(self, request, object_id=None):
         """Points are money-like: only a platform superuser adjusts
-        them by hand."""
-        return is_platform_superuser(request.user)
+        them by hand, and only while the programme is live: an
+        adjustment is a record, created only for a live feature."""
+        return is_platform_superuser(request.user) and store_features(
+            request
+        ).live("loyalty")
 
     actions_detail = ["adjust_loyalty_points"]
 
@@ -761,6 +790,8 @@ class PlatformUserAdmin(PublicSchemaDeletionMixin, UserAdmin):
     list_select_related = []
     readonly_fields = ["id", "last_login", "created_at", "updated_at"]
     date_hierarchy = None
+    # Shopper features: the public schema holds none of their tables.
+    feature_gates = ()
     fieldsets = (
         (
             _("Account"),

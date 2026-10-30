@@ -2,7 +2,9 @@
 
 The restock and price-drop alerts go to a customer who asked for them
 (marketing: they can decline, and each carries the one-click unsubscribe);
-the low-stock alert goes to the store's own staff. ``emails.EmailsConfig``
+a guest's alert is first confirmed from its own inbox (transactional: it
+answers the request just made, see ``product.alerts``); the low-stock
+alert goes to the store's own staff. ``emails.EmailsConfig``
 imports this module at boot. What stays with the tasks
 (``product.tasks``) is choosing WHEN to send: which alerts fired, the
 claim on the products a low-stock run reports, and the bookkeeping after.
@@ -21,10 +23,11 @@ from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
 from core.utils.tenant_urls import get_tenant_frontend_url
-from emails.declare import marketing_email, staff_email
+from emails.declare import customer_email, marketing_email, staff_email
 from emails.gates import FeatureGate
 from emails.recipients import Recipient
 from emails.types import RenderEnv
+from product.alerts import confirmation_url
 from tenant.credentials import tenant_site_name
 
 if TYPE_CHECKING:
@@ -85,6 +88,19 @@ def _price_drop(drop: PriceDrop, env: RenderEnv) -> dict[str, Any]:
         **_alert_context(drop.alert, env.language),
         "new_price": drop.new_price,
         "target_price": str(drop.alert.target_price.amount),
+    }
+
+
+def _confirmation(alert: ProductAlert, env: RenderEnv) -> dict[str, Any]:
+    return {
+        **_alert_context(alert, env.language),
+        "kind": alert.kind,
+        "target_price": (
+            f"{alert.target_price.amount} {alert.target_price.currency}"
+            if alert.target_price
+            else ""
+        ),
+        "confirmation_url": confirmation_url(alert, language=env.language),
     }
 
 
@@ -196,6 +212,23 @@ marketing_email(
     ),
     recipients=lambda drop: _recipient_of(drop.alert),
     list_id="product-price-drop-alerts",
+    gates=(ALERTS_GATE,),
+)
+
+customer_email(
+    "product.alert_confirmation",
+    title=_("Product alert confirmation"),
+    description=_(
+        "Sent to the address a guest gave for a restock or price-drop "
+        "alert, which starts only once the link in it is used (double "
+        "opt-in)."
+    ),
+    area="products",
+    templates=f"{TEMPLATE_DIR}/alert_confirmation",
+    subject=gettext_noop("[{site}] Confirm your alert for {name}"),
+    build_context=_confirmation,
+    sample=lambda env: _sample_alert(env, "price_drop"),
+    recipients=_recipient_of,
     gates=(ALERTS_GATE,),
 )
 

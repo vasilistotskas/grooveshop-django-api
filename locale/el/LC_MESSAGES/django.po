@@ -2128,6 +2128,9 @@ msgstr "Η αντικαταβολή καταγράφηκε ως εισπραγμ
 msgid "CONFIRM HERE"
 msgstr "ΕΠΙΒΕΒΑΙΩΣΗ ΕΔΩ"
 
+msgid "CONFIRM YOUR ALERT"
+msgstr "ΕΠΙΒΕΒΑΙΩΣΤΕ ΤΗΝ ΕΙΔΟΠΟΙΗΣΗ ΣΑΣ"
+
 msgid "CONFIRM YOUR SUBSCRIPTION"
 msgstr "ΕΠΙΒΕΒΑΙΩΣΤΕ ΤΗΝ ΕΓΓΡΑΦΗ ΣΑΣ"
 
@@ -2609,6 +2612,9 @@ msgstr "Έλεγχος ποια σχόλια από μια λίστα έχει �
 msgid "Check your email"
 msgstr "Ελέγξτε το email σας"
 
+msgid "Check your inbox for a link to confirm your alert."
+msgstr "Θα βρείτε στα εισερχόμενά σας έναν σύνδεσμο για να επιβεβαιώσετε την ειδοποίησή σας."
+
 msgid "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
 msgstr "Ελέγχεται σε κάθε ολοκλήρωση αγοράς και αποθηκευμένη διεύθυνση. Αρχικές τιμές από το Address Data Service της Google."
 
@@ -2875,6 +2881,9 @@ msgstr "Διαμόρφωση"
 msgid "Configure loyalty points earning for this product. Points coefficient multiplies the global points factor, and bonus points are awarded as a fixed amount on purchase."
 msgstr "Διαμορφώστε την απόκτηση πόντων πιστότητας για αυτό το προϊόν. Ο συντελεστής πόντων πολλαπλασιάζει τον καθολικό συντελεστή πόντων και οι μπόνους πόντοι αποδίδονται ως σταθερό ποσό κατά την αγορά."
 
+msgid "Confirm a guest's product alert via email token"
+msgstr "Επιβεβαίωση ειδοποίησης προϊόντος επισκέπτη μέσω token email"
+
 msgid "Confirm a pending subscription using the confirmation token."
 msgstr "Επιβεβαίωση εκκρεμούς εγγραφής με χρήση του token επιβεβαίωσης."
 
@@ -2883,6 +2892,9 @@ msgstr "Επιβεβαίωση εκκρεμούς εγγραφής μέσω toke
 
 msgid "Confirm a user subscription"
 msgstr "Επιβεβαίωση συνδρομής χρήστη"
+
+msgid "Confirm alert"
+msgstr "Επιβεβαίωση ειδοποίησης"
 
 msgid "Confirm my email"
 msgstr "Επιβεβαίωση του email μου"
@@ -2895,6 +2907,9 @@ msgstr "Επιβεβαίωση εγγραφής"
 
 msgid "Confirm the bank transfer arrived"
 msgstr "Επιβεβαίωση ότι έφτασε η τραπεζική μεταφορά"
+
+msgid "Confirm your alert"
+msgstr "Επιβεβαιώστε την ειδοποίησή σας"
 
 msgid "Confirm your email address"
 msgstr "Επιβεβαιώστε τη διεύθυνση email σας"
@@ -2912,6 +2927,9 @@ msgstr "Αποστολή επιβεβαίωσης"
 msgid "Confirmation Token"
 msgstr "Token επιβεβαίωσης"
 
+msgid "Confirmation sent at"
+msgstr "Αποστολή επιβεβαίωσης"
+
 msgid "Confirmed"
 msgstr "Επιβεβαιώθηκε"
 
@@ -2923,6 +2941,9 @@ msgstr "Επιβεβαιώθηκε"
 
 msgid "Confirmed From IP"
 msgstr "IP επιβεβαίωσης"
+
+msgid "Confirmed at"
+msgstr "Επιβεβαιώθηκε"
 
 msgid "Connection or timeout"
 msgstr "Σύνδεση ή χρονικό όριο"
@@ -6617,6 +6638,9 @@ msgstr "Εάν δεν ζητήσατε αυτή την ακύρωση ή έχε�
 msgid "If you did not request this export, please contact support right away."
 msgstr "Εάν δεν ζητήσατε αυτή την εξαγωγή, παρακαλούμε επικοινωνήστε άμεσα με την υποστήριξη."
 
+msgid "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
+msgstr "Εάν δεν ζητήσατε αυτή την ειδοποίηση, μπορείτε να αγνοήσετε αυτό το email με ασφάλεια — δεν θα γίνει καμία ενέργεια."
+
 msgid "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 msgstr "Εάν δεν ζητήσατε αυτή την εγγραφή, μπορείτε να αγνοήσετε αυτό το email με ασφάλεια — δεν θα γίνει καμία ενέργεια."
 
@@ -9682,6 +9706,22 @@ msgid "Platform update to review"
 msgstr "Ενημέρωση της πλατφόρμας προς έλεγχο"
 
 #, python-format
+msgid "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — open the link below to start it."
+msgstr "Παρακαλούμε επιβεβαιώστε ότι θέλετε να λάβετε email όταν το %(product_name)s είναι ξανά διαθέσιμο. Η ειδοποίησή σας δεν είναι ακόμα ενεργή — ανοίξτε τον παρακάτω σύνδεσμο για να την ενεργοποιήσετε."
+
+#, python-format
+msgid "Please confirm you'd like an email when %(product_name)s is back in stock. Your alert isn't active yet — tap the button below to start it."
+msgstr "Παρακαλούμε επιβεβαιώστε ότι θέλετε να λάβετε email όταν το %(product_name)s είναι ξανά διαθέσιμο. Η ειδοποίησή σας δεν είναι ακόμα ενεργή — πατήστε το παρακάτω κουμπί για να την ενεργοποιήσετε."
+
+#, python-format
+msgid "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — open the link below to start it."
+msgstr "Παρακαλούμε επιβεβαιώστε ότι θέλετε να λάβετε email όταν η τιμή του %(product_name)s πέσει στα %(target_price)s ή χαμηλότερα. Η ειδοποίησή σας δεν είναι ακόμα ενεργή — ανοίξτε τον παρακάτω σύνδεσμο για να την ενεργοποιήσετε."
+
+#, python-format
+msgid "Please confirm you'd like an email when the price of %(product_name)s drops to %(target_price)s or less. Your alert isn't active yet — tap the button below to start it."
+msgstr "Παρακαλούμε επιβεβαιώστε ότι θέλετε να λάβετε email όταν η τιμή του %(product_name)s πέσει στα %(target_price)s ή χαμηλότερα. Η ειδοποίησή σας δεν είναι ακόμα ενεργή — πατήστε το παρακάτω κουμπί για να την ενεργοποιήσετε."
+
+#, python-format
 msgid "Please confirm you'd like to subscribe to %(topic_name)s. Your subscription isn't active yet — open the link below to complete it."
 msgstr "Παρακαλούμε επιβεβαιώστε ότι θέλετε να εγγραφείτε στο %(topic_name)s. Η εγγραφή σας δεν είναι ακόμα ενεργή — ανοίξτε τον παρακάτω σύνδεσμο για να την ολοκληρώσετε."
 
@@ -10056,6 +10096,9 @@ msgstr "Ομάδες παραλλαγών προϊόντος"
 
 msgid "Product alert"
 msgstr "Ειδοποίηση προϊόντος"
+
+msgid "Product alert confirmation"
+msgstr "Επιβεβαίωση ειδοποίησης προϊόντος"
 
 msgid "Product alerts"
 msgstr "Ειδοποιήσεις προϊόντος"
@@ -11557,6 +11600,9 @@ msgstr "Αποστέλλεται σε πελάτη που δεν έχει συν
 msgid "Sent to confirm a subscription before it starts (double opt-in)."
 msgstr "Αποστέλλεται για να επιβεβαιωθεί μια εγγραφή πριν ξεκινήσει (διπλή επιβεβαίωση)."
 
+msgid "Sent to the address a guest gave for a restock or price-drop alert, which starts only once the link in it is used (double opt-in)."
+msgstr "Αποστέλλεται στη διεύθυνση που έδωσε ένας επισκέπτης για ειδοποίηση επαναφοράς αποθέματος ή πτώσης τιμής, η οποία ενεργοποιείται μόνο όταν χρησιμοποιηθεί ο σύνδεσμος που περιέχει (διπλή επιβεβαίωση)."
+
 msgid "Sent to the buyer of a gift card once the payment lands."
 msgstr "Αποστέλλεται στον αγοραστή μιας δωροκάρτας μόλις εισπραχθεί η πληρωμή."
 
@@ -12543,6 +12589,9 @@ msgstr "Ειδοποιήσεις Συστήματος"
 msgid "THANK YOU FOR YOUR PURCHASE!"
 msgstr "ΕΥΧΑΡΙΣΤΟΥΜΕ ΓΙΑ ΤΗΝ ΑΓΟΡΑ ΣΑΣ!"
 
+msgid "THE PRODUCT"
+msgstr "ΤΟ ΠΡΟΪΟΝ"
+
 msgid "TOTP Issuer"
 msgstr "Εκδότης TOTP"
 
@@ -13180,6 +13229,9 @@ msgstr "Αυτό δεν μπορεί να αλλάξει μετά την υπο�
 
 msgid "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods."
 msgstr "Η παρούσα επιβεβαίωση δεν αποτελεί φορολογικό παραστατικό. Ο ΦΠΑ χρεώνεται όταν η δωροκάρτα εξαργυρώνεται για αγορά προϊόντων."
+
+msgid "This confirmation link has expired. Please ask for the alert again to get a new one."
+msgstr "Αυτός ο σύνδεσμος επιβεβαίωσης έχει λήξει. Ζητήστε ξανά την ειδοποίηση για να λάβετε νέο σύνδεσμο."
 
 msgid "This confirmation link has expired. Please subscribe again to get a new one."
 msgstr "Αυτός ο σύνδεσμος επιβεβαίωσης έχει λήξει. Κάντε ξανά εγγραφή για να λάβετε νέο σύνδεσμο."
@@ -14266,6 +14318,9 @@ msgstr "Προβολή στο κατάστημα"
 msgid "View store"
 msgstr "Προβολή καταστήματος"
 
+msgid "View the product"
+msgstr "Δείτε το προϊόν"
+
 msgid "View your favourite products"
 msgstr "Προβολή των αγαπημένων σας προϊόντων"
 
@@ -15115,6 +15170,10 @@ msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
 
 #, python-brace-format
+msgid "[{site}] Confirm your alert for {name}"
+msgstr "[{site}] Επιβεβαιώστε την ειδοποίησή σας για το {name}"
+
+#, python-brace-format
 msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Ειδοποίηση χαμηλού αποθέματος — {n} προϊόν(τα)"
 
@@ -15670,9 +15729,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "FEATURED ARTICLES"
 #~ msgstr "ΠΡΟΤΕΙΝΟΜΕΝΑ ΑΡΘΡΑ"
-
-#~ msgid "FEATURED PRODUCTS"
-#~ msgstr "ΠΡΟΤΕΙΝΟΜΕΝΑ ΠΡΟΪΟΝΤΑ"
 
 #, python-format
 #~ msgid "Failed to fetch voucher: %(err)s"

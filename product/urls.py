@@ -1,7 +1,10 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from product.views.alert import ProductAlertViewSet
+from product.views.alert import (
+    ConfirmProductAlertByTokenView,
+    ProductAlertViewSet,
+)
 from product.views.attribute import AttributeViewSet
 from product.views.attribute_value import AttributeValueViewSet
 from product.views.brand import BrandViewSet
@@ -248,6 +251,11 @@ urlpatterns = [
         "product/alert/<int:pk>",
         ProductAlertViewSet.as_view({"get": "retrieve", "delete": "destroy"}),
         name="product-alert-detail",
+    ),
+    path(
+        "product/alert/confirm/<str:token>",
+        ConfirmProductAlertByTokenView.as_view(),
+        name="product-alert-confirm-by-token",
     ),
 ]
 

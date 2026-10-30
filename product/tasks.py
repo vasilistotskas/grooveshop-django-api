@@ -443,6 +443,83 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
 
 @celery_app.task(
     base=MonitoredTask,
+    # The address the visitor typed is the payload; keep it out of the
+    # failure log.
+    sensitive_kwargs=frozenset({"email"}),
+)
+def request_guest_product_alert_task(
+    *,
+    product_id: int,
+    kind: str,
+    email: str,
+    target_price: str | None,
+    target_price_currency: str,
+    language: str,
+) -> dict:
+    """Everything a guest's alert request does that depends on the address.
+
+    ``ProductAlertViewSet.create`` only validates the request, then always
+    enqueues this one task and answers 202, so neither its answer nor its
+    cost tells a new address from a known one. Here: the row lookup,
+    (re-)arming with the cooldown, the insert race, and queuing the
+    confirmation email (which carries its own retry policy).
+    """
+    from product.alerts import request_guest_alert
+    from tenant.celery import dispatch_on_commit
+
+    alert = request_guest_alert(
+        product_id=product_id,
+        kind=kind,
+        email=email,
+        target_price=Decimal(target_price) if target_price else None,
+        target_price_currency=target_price_currency,
+        language=language,
+    )
+    if alert is None:
+        return {"status": "noop"}
+    dispatch_on_commit(
+        send_product_alert_confirmation, kwargs={"alert_id": alert.pk}
+    )
+    return {"status": "armed", "alert_id": alert.pk}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_product_alert_confirmation(alert_id: int) -> dict:
+    """Email the double opt-in link of a guest's pending alert. A no-op
+    once the alert is confirmed or gone, so a retry is safe."""
+    from product.models.alert import ProductAlert
+
+    alert = (
+        ProductAlert.objects.select_related("product")
+        .filter(pk=alert_id)
+        .first()
+    )
+    if alert is None or not alert.awaiting_confirmation:
+        return {"status": "skipped", "reason": "not_pending"}
+    if not was_sent(send_email("product.alert_confirmation", alert)):
+        return {"status": "skipped", "reason": "not_sent"}
+    return {"status": "sent", "alert_id": alert_id}
+
+
+@celery_app.task(base=MonitoredTask)
+def purge_unconfirmed_guest_alerts() -> dict:
+    """Delete guest alerts never confirmed within their link's week.
+    Registered as a periodic beat task, fanned out per tenant."""
+    from product.alerts import purge_unconfirmed_guest_alerts as purge
+
+    deleted = purge()
+    logger.info("purge_unconfirmed_guest_alerts: deleted %s row(s)", deleted)
+    return {"status": "success", "deleted": deleted}
+
+
+@celery_app.task(
+    base=MonitoredTask,
     max_retries=5,
     autoretry_for=SEARCH_TRANSIENT_ERRORS,
     retry_backoff=True,

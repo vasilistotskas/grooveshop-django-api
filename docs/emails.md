@@ -102,6 +102,7 @@ ops mail `emails/product/review_pending` stays where it is until it moves):
 |---|---|---|
 | `product.restock_alert` | a `ProductAlert` (restock) | **marketing**; `FeatureGate("product_alerts")` |
 | `product.price_drop_alert` | a `PriceDrop` (the alert and the price reached) | **marketing**; `FeatureGate("product_alerts")` |
+| `product.alert_confirmation` | a guest's pending `ProductAlert` (its confirmation link) | customer, transactional (it answers the request just made); `FeatureGate("product_alerts")` |
 | `team.low_stock` | a `LowStock` (the products at their threshold) | switchable, store staff; `FeatureGate("catalogue")` |
 
 Declared in `giftcard/emails.py` (`FeatureGate("gift_cards")` on all):
@@ -169,10 +170,26 @@ The blanket link and the admin still only write (`opt_out_of_marketing`).
 
 A product alert made by a signed-in customer whose account address opted
 out of its type is refused with a `409` (`email_opted_out`) instead of a
-`201` that could never be delivered (`product.views.alert`). A guest's alert
-is not checked: answering for a typed-in address would reveal whether its
-owner opted out, so a guest gets the same answer either way (guest double
-opt-in is a separate change).
+`201` that could never be delivered (`product.views.alert`).
+
+A guest's alert is a double opt-in (`product/alerts.py`). Every guest
+request answers the same `202` and a `detail`, whatever the address holds
+(nothing, a live or pending alert, an opt-out), and always enqueues one
+task, `request_guest_product_alert_task`, which does every
+address-dependent step: it stores the alert INACTIVE and sends
+`product.alert_confirmation`, unless the alert is live (and not opted out)
+or a link went out in the last 10 minutes. The link opens the storefront's
+`/alerts/confirm/<token>`, whose button POSTs to
+`POST /api/v1/product/alert/confirm/<token>`; a GET changes nothing, as
+link scanners follow GETs. The token is signed under its own salt, names
+the store's schema and the alert's uuid, and lasts the newsletter's week
+(`CONFIRMATION_TTL`; `410` when expired, `400` for a bad or other-store
+token or an alert no longer pending). Confirming activates the alert and is
+fresh consent from the address's own inbox: it lifts the address's opt-out
+of THAT alert's type only, through `set_marketing_preferences` (a `*` row
+is split; with no account, `account_pk=None`). Pending alerts whose link
+has expired are deleted daily (`purge-unconfirmed-guest-alerts`, every
+store including suspended ones).
 
 A task treats a skip by what it protects. An alert, a delivery or a
 reminder skipped because its type is OFF (gate closed, or switched off)

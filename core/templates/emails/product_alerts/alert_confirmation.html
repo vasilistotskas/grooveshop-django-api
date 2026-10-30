@@ -1,0 +1,32 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Confirm your alert" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Confirm your alert" %}</h1>
+
+<p>{% trans "Hello," %}</p>
+
+<p>{% if kind == "price_drop" %}{% blocktrans with product_name=product_name target_price=target_price %}Please confirm you'd like an email when the price of {{ product_name }} drops to {{ target_price }} or less. Your alert isn't active yet — tap the button below to start it.{% endblocktrans %}{% else %}{% blocktrans with product_name=product_name %}Please confirm you'd like an email when {{ product_name }} is back in stock. Your alert isn't active yet — tap the button below to start it.{% endblocktrans %}{% endif %}</p>
+
+<div class="text-center mt-2 mb-2">
+    <a href="{{ confirmation_url }}" class="email-button">
+        {% trans "Confirm alert" %}
+    </a>
+</div>
+
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "If the button doesn't work, copy and paste this link into your browser:" %}<br>
+    <a href="{{ confirmation_url }}">{{ confirmation_url }}</a>
+</p>
+
+<div class="email-card">
+    <h2>{{ product_name }}</h2>
+    <p><a href="{{ product_url }}">{% trans "View the product" %}</a></p>
+</div>
+
+<p class="mt-3">{% trans "If you didn't ask for this alert, you can safely ignore this email — nothing will happen." %}</p>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thanks,<br>The {{ site_name }} team{% endblocktrans %}</p>
+{% endblock %}

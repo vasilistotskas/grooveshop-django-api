@@ -1,5 +1,6 @@
 """A signed-in customer who opted out cannot make an alert that
-could never be delivered; a guest is told nothing about an address."""
+could never be delivered; a guest is told nothing about an address (the
+double opt-in is ``test_guest_alert_double_opt_in``)."""
 
 from __future__ import annotations
 
@@ -65,24 +66,28 @@ def test_a_guest_gets_the_same_answer_for_an_opted_out_address(product):
     opted_out = _post(APIClient(), _payload(product, email=GUEST))
     not_opted_out = _post(APIClient(), _payload(product, email=other))
 
-    assert opted_out.status_code == status.HTTP_201_CREATED
+    assert opted_out.status_code == status.HTTP_202_ACCEPTED
     assert not_opted_out.status_code == opted_out.status_code
-    assert not_opted_out.data.keys() == opted_out.data.keys()
+    assert not_opted_out.data == opted_out.data
 
 
 def test_the_opt_out_of_one_kind_does_not_block_the_other(product):
+    user = UserAccountFactory(num_addresses=0)
     optout.opt_out(
-        GUEST, "product.restock_alert", source=EmailOptOut.Source.LINK
+        user.email, "product.restock_alert", source=EmailOptOut.Source.LINK
     )
+    client = APIClient()
+    client.force_authenticate(user)
 
-    response = _post(
-        APIClient(), _payload(product, ProductAlertKind.PRICE_DROP, email=GUEST)
-    )
+    response = _post(client, _payload(product, ProductAlertKind.PRICE_DROP))
 
     assert response.status_code == status.HTTP_201_CREATED
 
 
 def test_an_address_that_did_not_opt_out_still_gets_a_201(product):
-    response = _post(APIClient(), _payload(product, email=GUEST))
+    client = APIClient()
+    client.force_authenticate(UserAccountFactory(num_addresses=0))
+
+    response = _post(client, _payload(product))
 
     assert response.status_code == status.HTTP_201_CREATED

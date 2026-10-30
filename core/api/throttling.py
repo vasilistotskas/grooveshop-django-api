@@ -170,6 +170,14 @@ class NewsletterSubscribeThrottle(UserOrIpRateThrottle):
     fail_closed = True
 
 
+class ProductAlertCreateThrottle(UserOrIpRateThrottle):
+    """Per-caller budget for creating product alerts. A guest's request
+    sends a confirmation email to whatever address it is given."""
+
+    scope = "product_alert_create"
+    fail_closed = True
+
+
 class EmailUnsubscribeThrottle(UserOrIpRateThrottle):
     """Per-caller budget for the one-click unsubscribe POST.
 

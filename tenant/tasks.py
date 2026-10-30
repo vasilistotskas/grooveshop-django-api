@@ -264,6 +264,16 @@ def fanout_purge_unconfirmed_guest_subscriptions():
     )
 
 
+# Suspended stores too, for the same reason: a guest's alert left
+# unconfirmed past its link's week is an address kept without consent.
+@celery_app.task(base=TenantTask)
+def fanout_purge_unconfirmed_guest_alerts():
+    return run_for_all_tenants(
+        "product.tasks.purge_unconfirmed_guest_alerts",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_cleanup_expired_data_exports():
     return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")

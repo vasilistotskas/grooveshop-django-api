@@ -1648,8 +1648,11 @@ additive migration; the moment is the proof of when they asked).
   (`PATCH /api/v1/user/email-preferences`, `set_marketing_preferences`: a
   `*` row is split into rows for the other types, and the flag clears when
   no row is left; `docs/emails.md`). A restock or price-drop alert made by a
-  signed-in customer who opted out answers `409 email_opted_out` (a guest's
-  is not checked). Staff may record an
+  signed-in customer who opted out answers `409 email_opted_out`. A
+  guest's is a double opt-in: every guest request answers the same `202`,
+  and the alert starts only when the link emailed to the address is
+  confirmed, which also lifts that address's opt-out of the alert's type
+  (`product/alerts.py`, `docs/emails.md`). Staff may record an
   objection a customer made by phone or email (Loyalty & Engagement tab:
   saving the field writes `EmailOptOut("*")`); once set the field is
   read-only.

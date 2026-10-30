@@ -49,7 +49,7 @@ class TestAlertRemembersTheVisitorsLanguage:
     def test_the_language_header_is_stored(self, product):
         response = _subscribe(product, headers={"X-Language": "en"})
 
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_202_ACCEPTED
         assert ProductAlert.objects.get().language_code == "en"
 
     def test_an_unserved_language_is_not_stored(self, product):

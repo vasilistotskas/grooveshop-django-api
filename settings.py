@@ -553,6 +553,11 @@ REST_FRAMEWORK = {
         # contact form (the confirmation resend also has its own
         # 10-minute cooldown per address).
         "newsletter_subscribe": None if DEBUG else "5/minute",
+        # Creating a product alert: a guest's sends a confirmation email
+        # to the address it is given, so it is budgeted like the
+        # newsletter form (with the same 10-minute resend cooldown per
+        # alert).
+        "product_alert_create": None if DEBUG else "5/minute",
         # One file per request, and each can be tens of megabytes on
         # the pod's disk until it is claimed or reaped - so this is a
         # bandwidth budget, not just an anti-spam one. Generous enough
@@ -1280,6 +1285,15 @@ def get_celery_beat_schedule():
             # signup never confirmed within 30 days is an address and a
             # consent record nobody gave us permission to keep.
             "task": "tenant.tasks.fanout_purge_unconfirmed_guest_subscriptions",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "purge-unconfirmed-guest-alerts": {
+            # Fanout: ProductAlert is per-tenant. A guest's alert never
+            # confirmed within its link's week is an address nobody gave
+            # us permission to keep.
+            "task": "tenant.tasks.fanout_purge_unconfirmed_guest_alerts",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -4040,6 +4054,10 @@ SPECTACULAR_SETTINGS = {
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",
+        # ``ProductAlert.kind`` and the alert confirmation's ``kind``
+        # share one vocabulary: one ``ProductAlertKindEnum``, not a hashed
+        # second name for the same choice set.
+        "ProductAlertKindEnum": "product.models.alert.ProductAlertKind",
         "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
         # Both ``SubscriptionTopic.category`` and ``Notification.category``
         # expose a ``category`` field, and they use different enum sets

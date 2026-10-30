@@ -11,6 +11,7 @@ from .refund_notification import RefundNotification
 from .retail_credit import CreditCounter, RetailCredit
 from .stock_log import StockLog
 from .stock_reservation import StockReservation
+from .vat_line import OrderVatLine
 from .viva_webhook_event import VivaWebhookEvent
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "OrderItem",
     "OrderItemHistory",
     "OrderLegalAcceptance",
+    "OrderVatLine",
     "PaymentTransaction",
     "RefundAttempt",
     "RefundNotification",

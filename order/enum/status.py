@@ -51,6 +51,24 @@ transition (``Order.settle_unpaid_payment``). A paid order is left to
 the refund: REFUNDED is the exit for money that actually moved.
 """
 
+DISPATCHED_STATUSES: frozenset[str] = frozenset(
+    {
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.COMPLETED,
+        OrderStatus.RETURNED,
+        OrderStatus.REFUNDED,
+    }
+)
+"""The order statuses an order only reaches after the parcel left.
+
+The first save into one of them stamps ``Order.shipped_at``: the moment
+the sale is earned (``order.turnover``). REFUNDED belongs here because its
+only way in is RETURNED, a parcel that came back. A paid order canceled
+before it shipped (CANCELED, whose money is refunded on ``payment_status``)
+never reaches one.
+"""
+
 RETURN_HANDLING_STATUSES: frozenset[str] = frozenset(
     {OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.RETURNED}
 )

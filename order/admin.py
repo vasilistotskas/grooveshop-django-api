@@ -920,6 +920,7 @@ class OrderAdmin(BaseModelAdmin):
         "created_at",
         "updated_at",
         "status_updated_at",
+        "shipped_at",
         # Stamped at checkout; the charge/redemption already happened.
         # Editing them here would desync PromotionRedemption rows, the
         # gift-card ledger, and the amount the provider captured.
@@ -968,6 +969,7 @@ class OrderAdmin(BaseModelAdmin):
                     "created_at",
                     "updated_at",
                     "status_updated_at",
+                    "shipped_at",
                 ),
                 "classes": ("tab",),
             },

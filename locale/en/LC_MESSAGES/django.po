@@ -3777,6 +3777,9 @@ msgstr "Dispute opened"
 msgid "Distance from the supplied address in kilometres"
 msgstr "Distance from the supplied address in kilometres"
 
+msgid "Distinctive title"
+msgstr "Distinctive title"
+
 msgid "Divider"
 msgstr "Divider"
 
@@ -10379,6 +10382,9 @@ msgstr "Questions?"
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 
+msgid "RATE YOUR PURCHASE"
+msgstr "RATE YOUR PURCHASE"
+
 msgid "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 msgstr "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 
@@ -10419,6 +10425,9 @@ msgstr "Rate"
 msgctxt "shipping"
 msgid "Rate"
 msgstr "Rate"
+
+msgid "Rate your purchase"
+msgstr "Rate your purchase"
 
 msgid "Rates"
 msgstr "Rates"
@@ -11894,8 +11903,14 @@ msgstr "Show detailed index settings"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Show nothing rather than fewer than this many suggestions."
 
+msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
+
+msgid "Shows the seller's details"
+msgstr "Shows the seller's details"
 
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"
@@ -14747,6 +14762,9 @@ msgstr "Wishlist"
 msgid "Working hours"
 msgstr "Working hours"
 
+msgid "Write a review"
+msgstr "Write a review"
+
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Writes an ADJUST row on the ledger — the card history stays auditable."
 
@@ -14988,6 +15006,9 @@ msgstr "Your gift card expires soon"
 
 msgid "Your legal pages need an update"
 msgstr "Your legal pages need an update"
+
+msgid "Your opinion helps other shoppers. Share how you like your products."
+msgstr "Your opinion helps other shoppers. Share how you like your products."
 
 #, python-format
 msgid "Your order #%(order_id)s has been canceled as requested."

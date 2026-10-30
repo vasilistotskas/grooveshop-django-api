@@ -17,6 +17,13 @@
 {% trans "Order Total" %}: {{ order.calculate_order_total_amount }}
 {% trans "Status" %}: {% trans "Completed" %}
 
+{% if review_links %}{% trans "RATE YOUR PURCHASE" %}
+{% trans "Your opinion helps other shoppers. Share how you like your products." %}
+{% for link in review_links %}
+{{ link.name }}
+{% trans "Write a review" %}: {{ link.url }}
+{% endfor %}
+{% endif %}
 {% trans "What's Next?" %}
 ----------------------------------------
 {% trans "Your order has been delivered and completed. We hope you're enjoying your purchase!" %}

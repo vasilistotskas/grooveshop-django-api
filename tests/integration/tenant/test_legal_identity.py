@@ -164,6 +164,7 @@ class TestEndpoint:
 
     def test_publishes_what_the_merchant_set(self, client, seller_settings):
         seller_settings("INVOICE_SELLER_NAME", "Acme MON IKE")
+        seller_settings("INVOICE_SELLER_DISTINCTIVE_TITLE", "Acme Shop")
         seller_settings("INVOICE_SELLER_LEGAL_FORM", "ΙΚΕ")
         seller_settings("INVOICE_SELLER_REGISTRATION_NUMBER", "123456789000")
         seller_settings("INVOICE_SELLER_VAT_ID", "EL999999999")
@@ -171,6 +172,7 @@ class TestEndpoint:
         body = client.get(reverse("tenant:tenant-legal-identity")).json()
 
         assert body["name"] == "Acme MON IKE"
+        assert body["distinctiveTitle"] == "Acme Shop"
         assert body.get("legalForm", body.get("legal_form")) == "ΙΚΕ"
         assert (
             body.get("registrationNumber", body.get("registration_number"))

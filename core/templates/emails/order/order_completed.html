@@ -26,6 +26,16 @@
     </p>
 </div>
 
+{% if review_links %}
+<div class="email-card">
+    <h2>{% trans "Rate your purchase" %}</h2>
+    <p>{% trans "Your opinion helps other shoppers. Share how you like your products." %}</p>
+    {% for link in review_links %}
+    <p><strong>{{ link.name }}</strong><br><a href="{{ link.url }}">{% trans "Write a review" %}</a></p>
+    {% endfor %}
+</div>
+{% endif %}
+
 <h3>{% trans "What's Next?" %}</h3>
 <p>{% trans "Your order has been delivered and completed. We hope you're enjoying your purchase!" %}</p>
 

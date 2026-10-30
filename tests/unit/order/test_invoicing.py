@@ -361,6 +361,34 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
     @patch(
         "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
     )
+    def test_the_receipt_prints_the_distinctive_title_when_set(
+        self, _mock_render
+    ):
+        """The distinctive title (διακριτικός τίτλος) sits under the legal
+        name; a snapshot taken before the field existed prints none."""
+        from django.template.loader import render_to_string
+
+        from order.invoicing import _build_context, _persist_invoice_row
+
+        order = self._make_order()
+        invoice = generate_invoice(order)
+        invoice, breakdown, totals = _persist_invoice_row(order, invoice)
+
+        def render(seller: dict[str, str]) -> str:
+            invoice.seller_snapshot = seller
+            return render_to_string(
+                "invoices/invoice.html",
+                _build_context(order, invoice, breakdown, totals),
+            )
+
+        named = {"name": "Acme MON IKE", "distinctive_title": "Acme Shop"}
+
+        self.assertIn("Acme Shop", render(named))
+        self.assertNotIn("Acme Shop", render({"name": "Acme MON IKE"}))
+
+    @patch(
+        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+    )
     def test_force_refreshes_snapshots_without_new_row(
         self, _mock_render
     ) -> None:

@@ -3783,6 +3783,9 @@ msgstr "Ανοιχτή αμφισβήτηση"
 msgid "Distance from the supplied address in kilometres"
 msgstr "Απόσταση από τη δεδομένη διεύθυνση σε χιλιόμετρα"
 
+msgid "Distinctive title"
+msgstr "Διακριτικός τίτλος"
+
 msgid "Divider"
 msgstr "Διαχωριστικό"
 
@@ -10389,6 +10392,9 @@ msgstr "Ερωτήσεις;"
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή UserDataExport."
 
+msgid "RATE YOUR PURCHASE"
+msgstr "ΑΞΙΟΛΟΓΗΣΤΕ ΤΗΝ ΑΓΟΡΑ ΣΑΣ"
+
 msgid "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``."
 msgstr "RECEIPT (Α.Λ.Π., Tier A — λιανική) ή INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Η επιλογή INVOICE απαιτεί έγκυρο ``billing_vat_id``."
 
@@ -10429,6 +10435,9 @@ msgstr "Συντελεστής"
 msgctxt "shipping"
 msgid "Rate"
 msgstr "Τιμή αποστολής"
+
+msgid "Rate your purchase"
+msgstr "Αξιολογήστε την αγορά σας"
 
 msgid "Rates"
 msgstr "Τιμές αποστολής"
@@ -11903,8 +11912,14 @@ msgstr "Εμφάνιση λεπτομερών ρυθμίσεων index"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Να μην εμφανίζεται τίποτα αντί για λιγότερες προτάσεις από αυτόν τον αριθμό."
 
+msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+msgstr "Εμφανίζει τα νομικά στοιχεία του καταστήματος (επωνυμία, ΑΦΜ, διεύθυνση) κάτω από τους συνδέσμους αυτής της στήλης. Μόνο μία στήλη του υποσέλιδου μπορεί να το κάνει. Όταν καμία δεν το κάνει, τα στοιχεία μένουν εκεί που τα βάζει από προεπιλογή η βιτρίνα."
+
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
+
+msgid "Shows the seller's details"
+msgstr "Δείχνει τα στοιχεία του πωλητή"
 
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
@@ -14752,6 +14767,9 @@ msgstr "Λίστα επιθυμιών"
 msgid "Working hours"
 msgstr "Ωράριο λειτουργίας"
 
+msgid "Write a review"
+msgstr "Γράψτε κριτική"
+
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Καταχωρεί μια γραμμή ADJUST στο καθολικό — το ιστορικό της κάρτας παραμένει ελέγξιμο."
 
@@ -14993,6 +15011,9 @@ msgstr "Η δωροκάρτα σας λήγει σύντομα"
 
 msgid "Your legal pages need an update"
 msgstr "Οι νομικές σελίδες σας χρειάζονται ενημέρωση"
+
+msgid "Your opinion helps other shoppers. Share how you like your products."
+msgstr "Η γνώμη σας βοηθά άλλους αγοραστές. Πείτε μας πώς σας φάνηκαν τα προϊόντα σας."
 
 #, python-format
 msgid "Your order #%(order_id)s has been canceled as requested."

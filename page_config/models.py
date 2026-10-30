@@ -399,7 +399,8 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
 
         Built from the related columns and links, in the same shape the
         storefront has always received — ``[{label, to|href, icon?}]``
-        for header/mobile and ``[{label, icon?, children}]`` for the
+        for header/mobile and
+        ``[{label, icon?, shows_merchant_identity?, children}]`` for the
         footer — so the relational rewrite needed no storefront change.
 
         A link whose target is unpublished is OMITTED rather than
@@ -469,6 +470,17 @@ class NavigationColumn(
         validators=[validate_icon_name],
         help_text=_("An i-* icon name, e.g. i-heroicons-light-bulb."),
     )
+    shows_merchant_identity = models.BooleanField(
+        _("Shows the seller's details"),
+        default=False,
+        db_default=False,
+        help_text=_(
+            "Show the store's legal details (company name, tax ID, "
+            "address) under this column's links. Only one column of the "
+            "footer can. When none does, the details stay where the "
+            "storefront puts them by default."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Navigation Column")
@@ -480,6 +492,13 @@ class NavigationColumn(
         indexes = [
             *SortableModel.Meta.indexes,
             *TimeStampMixinModel.Meta.indexes,
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["menu"],
+                condition=models.Q(shows_merchant_identity=True),
+                name="navigation_column_one_merchant_identity_per_menu",
+            ),
         ]
 
     def get_ordering_queryset(self):
@@ -505,6 +524,8 @@ class NavigationColumn(
         payload: dict = {"label": label or "", "children": children}
         if self.icon:
             payload["icon"] = self.icon
+        if self.shows_merchant_identity:
+            payload["shows_merchant_identity"] = True
         return payload
 
     def __str__(self) -> str:

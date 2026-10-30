@@ -79,6 +79,7 @@ consumed by tasks and integrations.
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
 | `STICKY_ADD_TO_CART_ENABLED` | (b) `sticky_add_to_cart` | |
 | `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
+| `PRODUCT_ASSURANCES_ENABLED` | (b) `product_assurances` | the product page's delivery / payment / returns box; each row hides itself without data |
 | `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED`, `OPS_ALERT_*_ENABLED` | (s) | never read by a client |

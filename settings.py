@@ -2226,6 +2226,19 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRODUCT_ASSURANCES_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the purchase-assurances box under the buy button on "
+            "product pages: delivery days from the shipping rates, the "
+            "free-shipping threshold, the payment methods and the "
+            "return window. Each row hides itself when the store has "
+            "no data for it. A store UI preference; the storefront "
+            "fails OPEN if this setting cannot be fetched."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,
@@ -2705,6 +2718,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "",
         "description": "Legal company name shown at the top of the invoice.",
+    },
+    {
+        "name": "INVOICE_SELLER_DISTINCTIVE_TITLE",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Distinctive title (διακριτικός τίτλος) the store trades "
+            "under, when it differs from the legal company name. Printed "
+            "under the name on receipts and credit documents, and shown "
+            "on the storefront in place of the legal name when set. "
+            "Blank: the legal name is used everywhere."
+        ),
     },
     {
         "name": "INVOICE_SELLER_LEGAL_FORM",

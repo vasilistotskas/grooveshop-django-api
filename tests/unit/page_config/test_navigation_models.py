@@ -211,3 +211,43 @@ class TestOrdering:
         first_in_b = NavigationLink.objects.create(column=b, route="/blog")
 
         assert first_in_a.sort_order == first_in_b.sort_order
+
+
+class TestMerchantIdentityColumn:
+    """The storefront puts the seller's details under at most one footer
+    column; a second flagged column of the same menu is refused."""
+
+    def test_a_column_does_not_show_it_by_default(self, column, page) -> None:
+        NavigationLink.objects.create(column=column, content_page=page)
+
+        [payload] = column.menu.localized("el")
+
+        assert column.shows_merchant_identity is False
+        assert "shows_merchant_identity" not in payload
+
+    def test_the_flagged_column_says_so_in_the_menu(self, column, page) -> None:
+        NavigationLink.objects.create(column=column, content_page=page)
+        column.shows_merchant_identity = True
+        column.save()
+
+        [payload] = column.menu.localized("el")
+
+        assert payload["shows_merchant_identity"] is True
+
+    def test_a_second_flagged_column_of_a_menu_is_refused(
+        self, footer, column
+    ) -> None:
+        column.shows_merchant_identity = True
+        column.save()
+
+        with pytest.raises(IntegrityError), transaction.atomic():
+            NavigationColumn.objects.create(
+                menu=footer, shows_merchant_identity=True
+            )
+
+    def test_unflagged_columns_are_not_limited(self, footer, column) -> None:
+        column.shows_merchant_identity = True
+        column.save()
+
+        NavigationColumn.objects.create(menu=footer)
+        NavigationColumn.objects.create(menu=footer)

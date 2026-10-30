@@ -34,7 +34,7 @@ env:
   # no Actions secrets), and those runs failed at settings import.
   # Meilisearch's production mode wants at least 16 bytes.
   MEILI_MASTER_KEY: ci-throwaway-meilisearch-key
-  UV_VERSION: '0.12.5'
+  UV_VERSION: '0.13.6'
   FORCE_COLOR: 1
   # oasdiff, pinned by digest; the same image as api-contract.yml and as
   # the deploy gate in grooveshop-infrastructure (prepare-helm values).

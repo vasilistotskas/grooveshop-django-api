@@ -84,7 +84,8 @@ class ProductReview(
 
     @property
     def is_verified_purchase(self) -> bool:
-        """Whether the author has a COMPLETED order containing the product.
+        """Whether the author has a delivered and paid order for the product
+        (``purchase_items``).
 
         Reads the ``verified_purchase`` annotation of ``for_list()`` when
         present; a bare instance falls back to one query.

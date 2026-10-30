@@ -77,7 +77,12 @@ def test_saving_a_feature_setting_unchanged_purges_nothing(
     bind_tenant_and_schema,
 ):
     bind_tenant_and_schema(SimpleNamespace(schema_name="shop_one"))
-    switch_store_settings(PRODUCT_REVIEWS_ENABLED=False)
+
+    # The first save is setup: its purge task would now run in
+    # ``shop_one`` (an eager task binds its dispatching schema), which
+    # has no store row to purge for.
+    with patch(DISPATCH):
+        switch_store_settings(PRODUCT_REVIEWS_ENABLED=False)
 
     with patch(DISPATCH) as dispatch:
         switch_store_settings(PRODUCT_REVIEWS_ENABLED=False)

@@ -20,6 +20,15 @@ class TenantTask(Task):
     explicit hand-off, dispatchers
     fired from worker callbacks or management commands stamp
     ``'public'`` and the worker runs against the wrong schema.
+
+    ``__call__`` reads the header back from ``request.headers``. Celery
+    puts a custom header in two places: a worker flattens the message
+    headers onto the request, and ``Context`` then also collects every
+    non-Celery key into ``request.headers``; an eagerly applied task
+    (``CELERY_TASK_ALWAYS_EAGER``, the test suite) is handed ``headers``
+    as one key and ``Context`` keeps it as given, so the schema is never
+    a request attribute there. ``request.headers`` is the one place both
+    paths agree on.
     """
 
     def apply_async(self, *args: Any, **options: Any) -> Any:
@@ -32,9 +41,8 @@ class TenantTask(Task):
         return super().apply_async(*args, **options)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        schema_name = (
-            self.request.get("_schema_name") if self.request else None
-        ) or "public"
+        headers = self.request.headers if self.request else None
+        schema_name = (headers or {}).get("_schema_name") or "public"
 
         from django_tenants.utils import (
             get_public_schema_name,

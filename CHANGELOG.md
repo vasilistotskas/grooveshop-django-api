@@ -3,6 +3,24 @@
 
 
 
+## v3.164.1 (2026-10-30)
+
+### Performance improvements
+
+* perf(loyalty): preview a cart's points and list products by ids in one request (#366)
+
+The storefront asked Django once per hero product chip and once per cart
+product for its loyalty points. GET /api/v1/loyalty/product/points takes
+productIds (1 to 100) and answers every product at the caller's tier,
+with the per-product view's calculation, in a query count flat in the
+number of ids. The product list gains an id__in filter, so the hero can
+load its products as one page of cards.
+
+Search's comma-separated id parser moves to core.api.query_params so both
+views share it.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cdc84db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cdc84db21109e494f4c908536699f42a7aa13f01))
+
 ## v3.164.0 (2026-10-30)
 
 ### Features

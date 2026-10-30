@@ -21,7 +21,7 @@ from django.utils.translation import gettext
 from djmoney.money import Money
 
 from admin.displays import money
-from admin.turnover import XLSX_CONTENT_TYPE
+from admin.reports import XLSX_CONTENT_TYPE
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from product.factories import ProductFactory

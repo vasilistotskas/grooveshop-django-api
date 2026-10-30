@@ -21,6 +21,7 @@ class TestEmailTemplatePreviewService:
         assert service is not None
         assert hasattr(service, "sample_generator")
 
+    @pytest.mark.django_db
     def test_generate_preview_with_sample_data(self, service):
         """Test generating preview with sample data."""
         preview = service.generate_preview(

@@ -12,11 +12,18 @@ from django.test import RequestFactory
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from tests.utils.staff import stamp_platform_identity
+from tests.utils.store_settings import switch_store_settings
 from user.admin import UserAdmin
 from user.factories.account import UserAccountFactory
 from user.models import UserAccount
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def loyalty_live():
+    # Adjusting points books a ledger row, so it needs the programme live.
+    switch_store_settings(LOYALTY_ENABLED=True)
 
 
 def _post(user, **data):

@@ -3,6 +3,30 @@
 
 
 
+## v3.164.0 (2026-10-30)
+
+### Features
+
+* feat(order): report each month's turnover per store (#363)
+
+Sales -> Turnover in the store admin lists a year's twelve months with
+their sales, returns, net turnover and order count, plus year totals and
+a CSV export, for the store's owners and admins.
+
+A sale is an order whose payment was collected, in the Athens month it
+was placed; canceled and unpaid orders never count. Its value is the
+goods net of VAT at each line's snapshotted rate and discount, the
+receipt's goods lines, without shipping or the payment fee; promotions
+and loyalty discounts reduce it, and selling a gift card is not
+turnover. Returns count in the month they happened: ledger refunds less
+their reversals, gift-card refund credits and chargebacks decided as
+returned goods, the facts the myDATA credit documents are made from. A
+refund reaches goods pro rata to the receipt it repays.
+
+Everything aggregates in SQL: five queries whatever the order count.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`db91246`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db91246b40c2da8c7bb0a0ee042a988b9c510cb3))
+
 ## v3.163.2 (2026-10-29)
 
 ### Performance improvements

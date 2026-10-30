@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest import mock
 from urllib.parse import urlsplit
 
 import pytest
@@ -94,6 +95,21 @@ class TestMarketing:
         url = urlsplit(https.strip("<>"))
         assert (url.scheme, url.netloc) == ("https", "api.shop.example")
         assert url.path.startswith(f"{optout.UNSUBSCRIBE_PATH}/")
+
+    def test_the_exact_headers(self):
+        email_type = probe("cart.checkout_abandoned", kind=Kind.MARKETING)
+
+        with mock.patch.object(optout, "make_token", return_value="TOKEN"):
+            headers = build_headers(email_type, RECIPIENT)
+
+        assert headers == {
+            "List-Unsubscribe": (
+                f"<mailto:{CONTACT}?subject=unsubscribe>, "
+                "<https://api.shop.example/api/v1/emails/unsubscribe/TOKEN>"
+            ),
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-ID": "<cart-checkout_abandoned.shop.example>",
+        }
 
     def test_the_link_opts_this_recipient_out_of_this_type(self, catalogue):
         email_type = probe("cart.checkout_abandoned", kind=Kind.MARKETING)

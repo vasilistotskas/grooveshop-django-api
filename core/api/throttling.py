@@ -170,6 +170,17 @@ class NewsletterSubscribeThrottle(UserOrIpRateThrottle):
     fail_closed = True
 
 
+class EmailUnsubscribeThrottle(UserOrIpRateThrottle):
+    """Per-caller budget for the one-click unsubscribe POST.
+
+    Fails open: an unsubscribe is a legal obligation, so a Redis outage
+    must not stop one. The budget is generous because mailbox providers
+    send every recipient's click from a small pool of addresses.
+    """
+
+    scope = "email_unsubscribe"
+
+
 class ContactAttachmentThrottle(UserOrIpRateThrottle):
     """Tight per-caller budget for the anonymous attachment upload.
 

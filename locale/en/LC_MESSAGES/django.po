@@ -6837,6 +6837,9 @@ msgstr "Invoicing & myDATA"
 msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
 msgstr "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
 
+msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
+msgstr "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
+
 msgid "Is Active"
 msgstr "Is Active"
 
@@ -10260,6 +10263,9 @@ msgstr "RFC 8058 one-click unsubscribe from a topic"
 
 msgid "RFC 8058 one-click unsubscribe from all topics"
 msgstr "RFC 8058 one-click unsubscribe from all topics"
+
+msgid "RFC 8058 one-click unsubscribe from marketing email"
+msgstr "RFC 8058 one-click unsubscribe from marketing email"
 
 msgid "RabbitMQ"
 msgstr "RabbitMQ"

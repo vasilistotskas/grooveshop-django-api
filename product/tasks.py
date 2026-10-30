@@ -360,10 +360,8 @@ def _send_product_alert_email(
     no token we can mint for them — and the email is delivered without
     one-click semantics. Both paths are otherwise identical.
     """
-    from user.utils.subscription import (
-        build_list_unsubscribe_headers,
-        generate_blanket_unsubscribe_link,
-    )
+    from emails.headers import build_list_unsubscribe_headers
+    from user.utils.subscription import generate_blanket_unsubscribe_link
 
     try:
         text_content = render_to_string(

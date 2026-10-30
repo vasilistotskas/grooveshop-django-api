@@ -1625,7 +1625,7 @@ additive migration; the moment is the proof of when they asked).
   (`abandonment_notified`), so the next run does not find it again and a
   lifted opt-out never sends a months-old reminder.
 - **A new marketing send must start from the same filter**, and carry
-  `build_list_unsubscribe_headers` with `generate_blanket_unsubscribe_link`
+  `emails.headers.build_list_unsubscribe_headers` with `generate_blanket_unsubscribe_link`
   (Gmail and Yahoo require one-click unsubscribe on marketing mail;
   RFC 8058 also needs the HTTPS URI to carry a hard-to-forge component,
   which the signed token is, and the message to be DKIM-signed over both

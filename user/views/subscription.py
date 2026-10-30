@@ -30,6 +30,8 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from emails import optout
+from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from user.filters.subscription import (
     SubscriptionTopicFilter,
     UserSubscriptionFilter,
@@ -682,6 +684,9 @@ class UnsubscribeTarget(NamedTuple):
     #: The account the token names, or None for a guest subscription's
     #: token: a guest has no account to opt out of marketing.
     account_pk: int | None
+    #: Where the link was sent: the account's address, or the guest
+    #: row's. Empty when neither has one.
+    address: str
 
 
 def _validate_unsubscribe_token(token: str):
@@ -742,23 +747,37 @@ def _validate_unsubscribe_token(token: str):
                 payload["sid"],
             )
             return None, _("Invalid unsubscribe link")
-        return UnsubscribeTarget(subscriptions, None), None
+        guest = subscriptions.first()
+        return (
+            UnsubscribeTarget(
+                subscriptions, None, guest.recipient_email if guest else ""
+            ),
+            None,
+        )
 
     user_pk = payload.get("pk")
-    if user_pk is None or not User.objects.filter(pk=user_pk).exists():
+    emails = User.objects.filter(pk=user_pk).values_list("email", flat=True)
+    if user_pk is None or not emails:
         logger.warning(
             "unsubscribe: signed user_id=%s no longer exists", user_pk
         )
         return None, _("Invalid unsubscribe link")
     return (
         UnsubscribeTarget(
-            UserSubscription.objects.filter(user_id=user_pk), user_pk
+            UserSubscription.objects.filter(user_id=user_pk),
+            user_pk,
+            emails[0],
         ),
         None,
     )
 
 
-def _apply_unsubscribe(target: UnsubscribeTarget, topic_slug: str | None):
+def _apply_unsubscribe(
+    target: UnsubscribeTarget,
+    topic_slug: str | None,
+    *,
+    source: EmailOptOut.Source,
+):
     """End the subscriptions the token names; for the blanket link of an
     account (no topic), also record that the account no longer wants
     marketing mail.
@@ -791,6 +810,10 @@ def _apply_unsubscribe(target: UnsubscribeTarget, topic_slug: str | None):
             and target.account_pk is not None
             and opt_out_of_marketing(target.account_pk)
         )
+        if not topic_slug and target.address:
+            # The blanket link also covers the email pipeline's marketing
+            # types, which read ``EmailOptOut`` rather than the account.
+            optout.opt_out(target.address, EVERY_MARKETING_TYPE, source=source)
     return count, topic_name, recipient, opted_out
 
 
@@ -806,7 +829,7 @@ def _unsubscribe_get_response(token: str, topic_slug: str | None):
             status=status.HTTP_400_BAD_REQUEST,
         )
     count, topic_name, recipient, opted_out = _apply_unsubscribe(
-        target, topic_slug
+        target, topic_slug, source=EmailOptOut.Source.LINK
     )
     if count == 0 and not opted_out:
         return Response(
@@ -828,7 +851,9 @@ def _unsubscribe_get_response(token: str, topic_slug: str | None):
 def _unsubscribe_post_response(token: str, topic_slug: str | None):
     target, _err = _validate_unsubscribe_token(token)
     if target is not None:
-        _apply_unsubscribe(target, topic_slug)
+        _apply_unsubscribe(
+            target, topic_slug, source=EmailOptOut.Source.ONE_CLICK
+        )
     # RFC 8058: always 200 to avoid leaking token validity to scanners.
     return Response(status=status.HTTP_200_OK)
 

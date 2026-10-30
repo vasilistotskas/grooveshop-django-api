@@ -18,10 +18,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
+from emails.optout import address_hash
 from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.utils.subscription import (
     UNSUBSCRIBE_SALT,
+    _make_guest_unsubscribe_token,
     generate_blanket_unsubscribe_link,
     generate_unsubscribe_link,
 )
@@ -110,6 +113,39 @@ class UnsubscribeLinkViewTestCase(APITestCase):
             other_sub.status,
             UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
         )
+
+    def test_blanket_unsubscribe_also_opts_out_of_every_marketing_type(self):
+        for method in ("get", "post"):
+            EmailOptOut.objects.all().delete()
+            path = generate_blanket_unsubscribe_link(self.user).split(
+                "https://api.test-site.com"
+            )[1]
+
+            getattr(self.client, method)(path)
+
+            row = EmailOptOut.objects.get()
+            assert row.type_key == EVERY_MARKETING_TYPE
+            assert row.address_hash == address_hash(self.user.email)
+
+    def test_a_guests_blanket_link_opts_their_address_out(self):
+        guest = UserSubscription.objects.create(
+            topic=self.topic,
+            email="Guest@Example.test",
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        )
+        token = _make_guest_unsubscribe_token(guest)
+
+        response = self.client.post(self._blanket_url(token))
+
+        assert response.status_code == status.HTTP_200_OK
+        row = EmailOptOut.objects.get()
+        assert row.type_key == EVERY_MARKETING_TYPE
+        assert row.address_hash == address_hash("guest@example.test")
+
+    def test_topic_unsubscribe_leaves_other_marketing_alone(self):
+        self.client.post(self._topic_url(self._token()))
+
+        assert not EmailOptOut.objects.exists()
 
     def test_token_minted_for_other_schema_rejected(self):
         """SECRET_KEY is global and pk sequences repeat per schema — a

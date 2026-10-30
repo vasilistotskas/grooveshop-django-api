@@ -50,6 +50,7 @@ if TYPE_CHECKING:
 #: dependency points this way, not the reverse.
 SELLER_SETTING_KEYS: Mapping[str, str] = {
     "name": "INVOICE_SELLER_NAME",
+    "distinctive_title": "INVOICE_SELLER_DISTINCTIVE_TITLE",
     "legal_form": "INVOICE_SELLER_LEGAL_FORM",
     "vat_id": "INVOICE_SELLER_VAT_ID",
     "tax_office": "INVOICE_SELLER_TAX_OFFICE",
@@ -71,7 +72,9 @@ IN_LIQUIDATION_KEY = "INVOICE_SELLER_IN_LIQUIDATION"
 #: What art. 22 §4 and ECD art. 5 actually require to be published.
 #: ``tax_office`` and ``business_activity`` are invoice concerns, not
 #: disclosure ones, so they are deliberately absent — publishing more
-#: than is required is the merchant's call, not a default.
+#: than is required is the merchant's call, not a default. So is
+#: ``distinctive_title``: it never replaces the legal ``name``, which stays
+#: required, and a blank one is not a gap.
 REQUIRED_DISCLOSURE_FIELDS: tuple[str, ...] = (
     "name",
     "legal_form",

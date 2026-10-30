@@ -2720,6 +2720,18 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": "Legal company name shown at the top of the invoice.",
     },
     {
+        "name": "INVOICE_SELLER_DISTINCTIVE_TITLE",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Distinctive title (διακριτικός τίτλος) the store trades "
+            "under, when it differs from the legal company name. Printed "
+            "under the name on receipts and credit documents, and shown "
+            "on the storefront in place of the legal name when set. "
+            "Blank: the legal name is used everywhere."
+        ),
+    },
+    {
         "name": "INVOICE_SELLER_LEGAL_FORM",
         "type": "string",
         "value": "",

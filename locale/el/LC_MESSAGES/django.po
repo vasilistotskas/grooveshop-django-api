@@ -3783,6 +3783,9 @@ msgstr "Ανοιχτή αμφισβήτηση"
 msgid "Distance from the supplied address in kilometres"
 msgstr "Απόσταση από τη δεδομένη διεύθυνση σε χιλιόμετρα"
 
+msgid "Distinctive title"
+msgstr "Διακριτικός τίτλος"
+
 msgid "Divider"
 msgstr "Διαχωριστικό"
 

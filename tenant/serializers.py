@@ -666,6 +666,7 @@ class MerchantLegalIdentitySerializer(serializers.Serializer):
     """
 
     name = serializers.CharField(read_only=True, allow_blank=True)
+    distinctive_title = serializers.CharField(read_only=True, allow_blank=True)
     legal_form = serializers.CharField(read_only=True, allow_blank=True)
     vat_id = serializers.CharField(read_only=True, allow_blank=True)
     tax_office = serializers.CharField(read_only=True, allow_blank=True)

@@ -99,7 +99,7 @@ class OrderAttributionInputSerializer(serializers.Serializer):
         required=False,
         help_text=_(
             "Set by the agent gateway for an order an AI agent placed "
-            "over UCP or ACP."
+            "over UCP, ACP or MCP."
         ),
     )
 

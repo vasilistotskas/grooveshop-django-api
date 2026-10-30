@@ -315,7 +315,7 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   (`OrderAttributionInputSerializer`, write-only, optional): `utm_source`,
   `utm_medium`, `utm_campaign`, `click_ids` (parameter NAMES from
   `CLICK_ID_PARAMS`, never values), `referrer`, `landing_path`, and
-  `agent_protocol` (`ucp`/`acp`). The agent gateway sets it, and
+  `agent_protocol` (`ucp`/`acp`/`mcp`). The agent gateway sets it, and
   `_attribution_input` believes it only when the request also carries the
   gateway's shared secret, which it sends as `X-Internal-Gateway` on
   every cart and order call (`is_internal_caller`, `tenant/internal.py`); from anyone else it is dropped and the order is
@@ -373,11 +373,16 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
   replacing an earlier fill's; a cart holding lines keeps its own, so a
   second add never overwrites it; the merge carries the guest cart's
   touch over only when it is earlier than the account cart's (or the
-  account cart has none). An add with no `attribution` object records
-  nothing, so the agent gateway's carts and carts from before
-  `0015_cartattribution` simply have no row (a missing row is "unknown",
-  never "direct"). The cart response does not expose it; the storefront
-  never reads it.
+  account cart has none). An add with no `attribution` object is
+  classified like an order with no signal: from the shopper's
+  `User-Agent` (an in-app browser names itself there), else `direct`.
+  So every cart filled since `0015_cartattribution` has a row, the agent
+  gateway's and the storage-blocked storefront's included, and **no row
+  means only** a cart from before that migration (2026-10-17, no
+  backfill: the first touch was never stored) or one that never held a
+  line, never "direct". A guest cart from before it that is merged into
+  an account cart brings no source, so the merged cart has none either.
+  The cart response does not expose it; the storefront never reads it.
 - **Cart source on the order.** The cart is deleted once its lines
   become an order (`_clear_cart_for_order`), so both creation paths copy
   the cart's first touch into `OrderAttribution.cart_source_type` /
@@ -387,12 +392,14 @@ Orders made outside checkout — the demo seed (`devtools/demo_account.py`,
 - **Cart admin.** Carts show an "Order source" column and filters
   (`attribution__source_type`, `CartSourceFilter`), built on the same
   `AcquisitionSourceFilter` (`admin/filters.py`) as `OrderSourceFilter`,
-  and a "Checkout" column / filter ("Checkout started, awaiting
-  payment: order #N", linked) for a live cart whose checkout already
-  created an order in `awaiting_online_payment_q`. The order is found
-  through `metadata["cart_snapshot"]["cart_uuid"]` in one correlated
-  subquery on the changelist queryset. The filter is named apart from
-  the idle "Abandoned" cart type. The order list adds a "Cart source"
+  and a "Checkout" filter ("Checkout started, awaiting payment") for a
+  live cart whose checkout already created an order in
+  `awaiting_online_payment_q`. The order is found through
+  `metadata["cart_snapshot"]["cart_uuid"]` in one correlated subquery on
+  the changelist queryset. There is no column for it: the state lasts
+  only while the hosted payment is open, so a column was blank on
+  nearly every row. The filter is named apart from the idle "Abandoned"
+  cart type. The order list adds a "Cart source"
   column, filters (`attribution__cart_source_type`,
   `OrderCartSourceFilter`) and change-form fields next to the order
   source: conversion by cart source is read from the orders list.

@@ -30,7 +30,6 @@ from unfold.enums import ActionVariant
 from admin.base import BaseModelAdmin
 from admin.displays import (
     ORDER_SOURCE_TYPE_VARIANT,
-    change_link,
     format_dt,
     header_two_line,
     money,
@@ -219,7 +218,6 @@ class CartAdmin(BaseModelAdmin):
         "cart_owner_display",
         "cart_type",
         "cart_source",
-        "checkout_state",
         "activity_state",
         "items_summary",
         "price_summary",
@@ -333,18 +331,6 @@ class CartAdmin(BaseModelAdmin):
         if attribution is None:
             return None
         return source_badge(attribution.source_type, attribution.source)
-
-    @admin.display(description=_("Checkout"))
-    def checkout_state(self, obj):
-        if obj.awaiting_order_id is None:
-            return None
-        return change_link(
-            self.admin_site,
-            Order,
-            obj.awaiting_order_id,
-            _("Checkout started, awaiting payment: order #%(id)s")
-            % {"id": obj.awaiting_order_id},
-        )
 
     @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
     def activity_state(self, obj):

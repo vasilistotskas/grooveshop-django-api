@@ -79,7 +79,7 @@ one and retries. Checked on every use:
 - **Attribution is optional on the token path.** `POST /cart/item`
   takes the same `attribution` object as on the storefront and records
   the cart's first touch from it (`docs/order-system.md` section 3.4).
-  The gateway sends none, so a cart it fills first records nothing.
+  The gateway sends none, so a cart it fills first records `direct`.
 - A new route that should accept the token must be added to the
   allowlist on purpose; reading `X-Cart-Token` anywhere but
   `CartService` defeats the design.

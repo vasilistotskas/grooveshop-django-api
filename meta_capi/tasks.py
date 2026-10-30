@@ -21,11 +21,16 @@ later ``order_paid`` for the same order.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
 from celery import shared_task
+from django.conf import settings
+from django.utils import timezone
 
+from core.retention import delete_in_batches
+from core.retry import TRANSIENT_DB_ERRORS
 from core.tasks import MonitoredTask
 from meta_capi.client import MetaCapiClient
 from meta_capi.events import StandardEvent
@@ -333,3 +338,27 @@ def schedule_initiate_checkout(order_id: int) -> None:
 def schedule_refund(order_id: int, amount: Decimal | None) -> None:
     amount_str = str(amount) if amount is not None else None
     dispatch_on_commit(dispatch_refund_event, [order_id, amount_str])
+
+
+@shared_task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_expired_meta_capi_event_logs() -> dict[str, int]:
+    """Delete delivery rows older than ``META_CAPI_EVENT_LOG_RETENTION_DAYS``.
+
+    Runs per tenant through
+    ``tenant.tasks.fanout_purge_expired_meta_capi_event_logs``.
+    """
+    cutoff = timezone.now() - timedelta(
+        days=settings.META_CAPI_EVENT_LOG_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        MetaCapiEventLog.objects.filter(created_at__lt=cutoff)
+    )
+    if deleted:
+        logger.info("Purged %s Meta CAPI event log rows", deleted)
+    return {"deleted": deleted}

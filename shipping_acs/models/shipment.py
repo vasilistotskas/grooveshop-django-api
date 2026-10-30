@@ -5,29 +5,21 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
-from simple_history.models import HistoricalRecords
 
+from core.history import ChangeOnlyHistoricalRecords
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping.enum import ShippingKind
 from shipping.querysets import ShipmentQuerySet
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
-from shipping_acs.enum.shipment_state import AcsShipmentState
+from shipping_acs.enum.shipment_state import (
+    TERMINAL_STATES,
+    AcsShipmentState,
+)
 from tenant.staff_actors import (
     StaffActor,
     history_user_getter,
     history_user_setter,
-)
-
-# States after which the order is no longer in flight — the polling
-# task skips these to avoid burning ACS rate limits on settled rows.
-_TERMINAL_STATES = frozenset(
-    {
-        AcsShipmentState.DELIVERED,
-        AcsShipmentState.RETURNED,
-        AcsShipmentState.CANCELED,
-        AcsShipmentState.LOST,
-    }
 )
 
 
@@ -303,7 +295,7 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     # ``excluded_fields`` to keep history rows lean — the metadata
     # bag and the polling timestamps churn frequently and aren't
     # part of the audit story.
-    history = HistoricalRecords(
+    history = ChangeOnlyHistoricalRecords(
         excluded_fields=[
             "metadata",
             "last_polled_at",
@@ -350,4 +342,4 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     @property
     def is_active(self) -> bool:
         """Return True when the shipment has not yet reached terminal state."""
-        return self.shipment_state not in _TERMINAL_STATES
+        return self.shipment_state not in TERMINAL_STATES

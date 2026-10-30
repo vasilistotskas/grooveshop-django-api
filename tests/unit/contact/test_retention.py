@@ -12,11 +12,10 @@ from unittest import mock
 
 import pytest
 from django.contrib import admin as django_admin
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from extra_settings.models import Setting
 
-from contact import tasks
 from contact.admin import ContactAdmin, FeedbackAdmin
 from contact.factories import ContactFactory, FeedbackFactory
 from contact.models import Contact, ContactAttachment, Feedback
@@ -113,7 +112,7 @@ class TestPurgeExpiredContactRecords:
         for _ in range(5):
             _aged(Contact, ContactFactory, 90)
 
-        with mock.patch.object(tasks, "RETENTION_BATCH_SIZE", 2):
+        with override_settings(RETENTION_PURGE_BATCH_SIZE=2):
             assert purge_expired_contact_records()["contacts"] == 5
 
         assert Contact.objects.count() == 0

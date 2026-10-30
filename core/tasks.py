@@ -27,9 +27,15 @@ from core.exceptions import (
     ManagementCommandFailed,
     StorePagesPurgeFailed,
 )
+from core.retention import (
+    delete_in_batches,
+    purge_expired_auth_tokens,
+    purge_orphaned_user_sessions,
+)
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     SEARCH_TRANSIENT_ERRORS,
+    TRANSIENT_DB_ERRORS,
     TRANSIENT_ERRORS,
     is_permanent_failure,
 )
@@ -140,8 +146,18 @@ def clear_expired_sessions_task():
 
         with transaction.atomic():
             management.call_command("clearsessions", verbosity=0)
+            # By state, after ``clearsessions`` made the session table the
+            # truth: the rows allauth and knox would only clean when the
+            # same user came back.
+            orphaned_user_sessions = purge_orphaned_user_sessions()
+            expired_tokens = purge_expired_auth_tokens()
 
-        return {"status": "success", "message": "All expired sessions deleted"}
+        return {
+            "status": "success",
+            "message": "All expired sessions deleted",
+            "orphaned_user_sessions": orphaned_user_sessions,
+            "expired_tokens": expired_tokens,
+        }
     except Exception:
         logger.exception("Unexpected error in clear_expired_sessions")
         raise
@@ -371,6 +387,62 @@ def clear_old_history_task(days=365):
     except Exception:
         logger.exception("Unexpected error in clear_old_history")
         raise
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_expired_admin_log_entries() -> dict[str, int]:
+    """Delete ``django_admin_log`` rows older than ``ADMIN_LOG_RETENTION_DAYS``.
+
+    The staff audit trail of the ACTIVE schema: a store's through
+    ``tenant.tasks.fanout_purge_expired_admin_log_entries`` with that
+    store's setting, the platform's own in public with the setting
+    stored there. ``0`` keeps every row.
+    """
+    from django.contrib.admin.models import LogEntry
+
+    days = int(store_setting("ADMIN_LOG_RETENTION_DAYS"))
+    if days <= 0:
+        return {"deleted": 0}
+    cutoff = timezone.now() - timedelta(days=days)
+    deleted = delete_in_batches(LogEntry.objects.filter(action_time__lt=cutoff))
+    if deleted:
+        logger.info(
+            "Purged %s admin log entries older than %s days", deleted, days
+        )
+    return {"deleted": deleted}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_expired_cache_purge_logs() -> dict[str, int]:
+    """Delete ``CachePurgeLog`` rows older than the retention period.
+
+    ``CACHE_PURGE_LOG_RETENTION_DAYS``. The table lives in the public
+    schema only and holds every store's purges (tagged by
+    ``schema_name``), so this runs once from beat, not per tenant.
+    """
+    from core.cache.models import CachePurgeLog
+
+    cutoff = timezone.now() - timedelta(
+        days=settings.CACHE_PURGE_LOG_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        CachePurgeLog.objects.filter(created_at__lt=cutoff)
+    )
+    if deleted:
+        logger.info("Purged %s cache purge log rows", deleted)
+    return {"deleted": deleted}
 
 
 @celery_app.task(

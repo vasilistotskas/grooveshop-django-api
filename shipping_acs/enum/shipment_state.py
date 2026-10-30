@@ -52,7 +52,7 @@ class AcsShipmentState(models.TextChoices):
         vouchers; without this guard a CANCELED shipment could be
         flipped to RETURNED on a noisy response.
         """
-        if current in _TERMINAL_STATES:
+        if current in TERMINAL_STATES:
             return current
 
         delivery = _normalise_flag(payload.get("delivery_flag"))
@@ -106,7 +106,7 @@ class AcsShipmentState(models.TextChoices):
         return current
 
 
-_TERMINAL_STATES: frozenset[AcsShipmentState] = frozenset(
+TERMINAL_STATES: frozenset[AcsShipmentState] = frozenset(
     {
         AcsShipmentState.DELIVERED,
         AcsShipmentState.RETURNED,

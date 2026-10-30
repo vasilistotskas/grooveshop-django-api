@@ -266,6 +266,48 @@ def fanout_purge_unconfirmed_guest_subscriptions():
 
 # Suspended stores too, for the same reason: a guest's alert left
 # unconfirmed past its link's week is an address kept without consent.
+# More retention sweeps, so they reach SUSPENDED tenants too: a store's
+# billing state does not pause a deletion the platform promised.
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_acs_tracking_events():
+    return run_for_all_tenants(
+        "shipping_acs.tasks.purge_expired_acs_tracking_events",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_boxnow_parcel_events():
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.purge_expired_boxnow_parcel_events",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_recommendation_events():
+    return run_for_all_tenants(
+        "recommendation.tasks.purge_expired_recommendation_events",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_meta_capi_event_logs():
+    return run_for_all_tenants(
+        "meta_capi.tasks.purge_expired_meta_capi_event_logs",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_admin_log_entries():
+    return run_for_all_tenants(
+        "core.tasks.purge_expired_admin_log_entries",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_purge_unconfirmed_guest_alerts():
     return run_for_all_tenants(

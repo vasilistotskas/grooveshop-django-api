@@ -181,21 +181,25 @@ class TestSearchAnalyticsMiddleware:
         search_query = SearchQuery.objects.latest("timestamp")
         assert search_query.user_agent == "Mozilla/5.0 Test Browser"
 
-    def test_handles_empty_query(self, request_factory, middleware):
-        """Test that empty queries are tracked."""
-        request = request_factory.get(
-            "/api/v1/search/product", {"query": "", "language_code": "en"}
-        )
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"query": "", "language_code": "en"},
+            {"query": "   ", "language_code": "en"},
+            {"language_code": "en"},
+        ],
+    )
+    def test_a_blank_query_is_a_listing_load_not_a_search(
+        self, request_factory, middleware, params
+    ):
+        """The storefront's listing pages read this endpoint with no text."""
+        request = request_factory.get("/api/v1/search/product", params)
         request.user = Mock(is_authenticated=False)
         request.session = Mock(session_key="test-session")
 
-        initial_count = SearchQuery.objects.count()
         middleware(request)
 
-        assert SearchQuery.objects.count() == initial_count + 1
-
-        search_query = SearchQuery.objects.latest("timestamp")
-        assert search_query.query == ""
+        assert SearchQuery.objects.count() == 0
 
     def test_handles_missing_language_code(self, request_factory, middleware):
         """Test that queries without language_code are tracked."""

@@ -15,9 +15,14 @@ ones, which the engine answers per request.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
 
 from core.celery import celery_app
-from core.retry import TRANSIENT_ERRORS
+from core.retention import delete_in_batches
+from core.retry import TRANSIENT_DB_ERRORS, TRANSIENT_ERRORS
 from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
@@ -179,3 +184,31 @@ def record_recommendation_attach(order_id: int) -> dict[str, int]:
 
     rows = record_attach_events(order_id)
     return {"order_id": order_id, "rows": rows}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_expired_recommendation_events() -> dict[str, int]:
+    """Delete events older than ``RECOMMENDATION_EVENT_RETENTION_DAYS``.
+
+    The setting is validated at startup to outlast every window the
+    engine reads events over, so learning and attribution never see a
+    truncated history. Runs per tenant through
+    ``tenant.tasks.fanout_purge_expired_recommendation_events``.
+    """
+    from recommendation.models import RecommendationEvent
+
+    cutoff = timezone.now() - timedelta(
+        days=settings.RECOMMENDATION_EVENT_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        RecommendationEvent.objects.filter(created_at__lt=cutoff)
+    )
+    if deleted:
+        logger.info("Purged %s recommendation events", deleted)
+    return {"deleted": deleted}

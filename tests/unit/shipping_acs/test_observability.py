@@ -381,10 +381,46 @@ class TestRetention:
         with override_settings(ACS_API_CALL_RETENTION_DAYS=90):
             result = purge_expired_acs_api_calls()
 
-        assert result == {"deleted": 1}
+        assert result == {"deleted": 1, "polls": 0}
         assert list(AcsApiCall.objects.values_list("pk", flat=True)) == [
             fresh.pk
         ]
+
+    @pytest.mark.parametrize(
+        ("alias", "outcome", "age_days", "kept"),
+        [
+            # A successful tracking read: gone after the short period.
+            ("ACS_Trackingsummary", "ok", 15, False),
+            ("ACS_TrackingDetails", "ok", 15, False),
+            ("ACS_Trackingsummary", "ok", 13, True),
+            # A failed poll keeps the full period.
+            ("ACS_Trackingsummary", "business_error", 15, True),
+            ("ACS_Trackingsummary", "transport", 89, True),
+            ("ACS_Trackingsummary", "transport", 91, False),
+            # A write keeps the full period, whatever its outcome.
+            ("ACS_Create_Voucher", "ok", 15, True),
+            ("ACS_Create_Voucher", "ok", 91, False),
+        ],
+    )
+    def test_successful_tracking_reads_have_their_own_period(
+        self, alias, outcome, age_days, kept
+    ):
+        from shipping_acs.tasks import purge_expired_acs_api_calls
+
+        call = AcsApiCall.objects.create(
+            alias=alias, duration_ms=1, outcome=outcome
+        )
+        AcsApiCall.objects.filter(pk=call.pk).update(
+            created_at=timezone.now() - timedelta(days=age_days)
+        )
+
+        with override_settings(
+            ACS_API_CALL_RETENTION_DAYS=90,
+            ACS_API_CALL_POLL_RETENTION_DAYS=14,
+        ):
+            purge_expired_acs_api_calls()
+
+        assert AcsApiCall.objects.filter(pk=call.pk).exists() is kept
 
     def test_fanout_reaches_suspended_stores_and_is_scheduled(self, settings):
         from tenant import tasks as tenant_tasks

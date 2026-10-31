@@ -3,6 +3,64 @@
 
 
 
+## v3.170.0 (2026-10-31)
+
+### Bug fixes
+
+* fix(cache): purge the settings surface when a store setting is saved (#379) ([`dd7642c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd7642cde194d21fb0097befa8bc2a215b5e74f5))
+
+* fix(cache): purge the settings surface when a store setting is saved
+
+The surface owns the storefront settings and the published seller
+identity but declared no model, so a saved setting never reached
+them and the storefront kept the old values for the routes' lifetime.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`dd7642c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd7642cde194d21fb0097befa8bc2a215b5e74f5))
+
+* fix(cache): leave the platform's own rows out of store cache purges
+
+An app that is both shared and per store keeps the platform's rows in
+the public schema. Saving one of those (a platform setting) changes no
+storefront, and a public purge reaches every store, so the receiver now
+skips public writes for those models. Shared-only models still purge.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`dd7642c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd7642cde194d21fb0097befa8bc2a215b5e74f5))
+
+### Documentation
+
+* docs(recommendations): the cart fetches its strip with the basket as seeds
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d70fe6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d70fe6fab8c87d8bfc8403c31d8e1e2e58393003))
+
+### Features
+
+* feat(cart): drop recommendations from the cart and cart item payloads
+
+The cart, the cart item and the add/update response no longer compute
+or send recommendations; the storefront asks the recommendations
+endpoint for them with the line product ids as seeds. CartDetail and
+CartItemDetail were only their base serializer plus that field, so they
+go too. GET cart falls from 38 to 24 queries and add to cart from 59 to
+40 on the budget test's data.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`d70fe6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d70fe6fab8c87d8bfc8403c31d8e1e2e58393003))
+
+### Performance improvements
+
+* perf(cart): drop recommendations from the cart and cart item payloads (#380) ([`d70fe6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d70fe6fab8c87d8bfc8403c31d8e1e2e58393003))
+
 ## v3.169.0 (2026-10-30)
 
 ### Bug fixes

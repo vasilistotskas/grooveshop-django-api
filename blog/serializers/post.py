@@ -138,7 +138,7 @@ class BlogPostFeedSerializer(
 
 
 class BlogPostFeedQuerySerializer(serializers.Serializer):
-    limit = serializers.IntegerField(
+    count = serializers.IntegerField(
         min_value=1,
         max_value=settings.BLOG_FEED_LIMIT,
         default=settings.BLOG_FEED_LIMIT,

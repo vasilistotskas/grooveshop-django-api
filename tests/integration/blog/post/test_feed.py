@@ -65,28 +65,28 @@ def test_newest_first_published_only(client):
     assert not slugs & {"feed-draft", "feed-scheduled"}
 
 
-def test_limit_caps_the_number_of_posts(client):
+def test_count_caps_the_number_of_posts(client):
     for n in range(3):
         BlogPostFactory(slug=f"feed-cap-{n}")
 
-    assert len(_get(client, limit=2).json()) == 2
-    assert len(_get(client, limit=1).json()) == 1
+    assert len(_get(client, count=2).json()) == 2
+    assert len(_get(client, count=1).json()) == 1
     assert len(_get(client).json()) >= 3
 
 
 @pytest.mark.parametrize(
-    "limit",
+    "count",
     ["nonsense", "1.5", "0", "-1", str(settings.BLOG_FEED_LIMIT + 1)],
 )
-def test_an_invalid_limit_is_refused(client, limit):
-    response = _get(client, limit=limit)
+def test_an_invalid_count_is_refused(client, count):
+    response = _get(client, count=count)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "limit" in response.json()["fields"]
+    assert "count" in response.json()["fields"]
 
 
-def test_the_largest_limit_is_accepted(client):
-    response = _get(client, limit=settings.BLOG_FEED_LIMIT)
+def test_the_largest_count_is_accepted(client):
+    response = _get(client, count=settings.BLOG_FEED_LIMIT)
 
     assert response.status_code == status.HTTP_200_OK
 

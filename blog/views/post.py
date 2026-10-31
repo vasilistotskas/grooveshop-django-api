@@ -259,7 +259,7 @@ class BlogPostViewSet(BaseModelViewSet):
         return queryset.visible_to(self.request.user)
 
     def get_filterset_class(self):
-        # The feed takes ``limit`` only: it runs no filter, so the
+        # The feed takes ``count`` only: it runs no filter, so the
         # schema must not advertise the list's.
         if self.action in ("comments", "feed"):
             return None
@@ -448,7 +448,7 @@ class BlogPostViewSet(BaseModelViewSet):
         query.is_valid(raise_exception=True)
         queryset = self.get_queryset().published()
         queryset = queryset.order_by("-published_at", "-id")[
-            : query.validated_data["limit"]
+            : query.validated_data["count"]
         ]
 
         response_serializer_class = self.get_response_serializer()

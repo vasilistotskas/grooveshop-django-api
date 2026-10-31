@@ -12304,6 +12304,9 @@ msgstr "Σταθερός κωδικός για τον λόγο απόρριψη�
 msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Σταθερός κωδικός σφάλματος. Βασιστείτε σε αυτόν, ποτέ στο ``detail``, που είναι στη γλώσσα του αιτήματος."
 
+msgid "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
+msgstr "Σταθερός κωδικός σφάλματος: ``payment_intent_failed`` ή ``checkout_session_failed``."
+
 msgid "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 msgstr "Σταθερό αναγνωριστικό που αντιστοιχεί στον καταχωρημένο προσαρμογέα μεταφορέα (π.χ. 'acs', 'boxnow')."
 
@@ -13246,6 +13249,9 @@ msgstr "Η μέθοδος πληρωμής είναι δωρεάν όταν τα
 
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακόμη, επομένως δεν υπάρχει κάτι προς επιστροφή."
+
+msgid "The payment provider's result for the failed call."
+msgstr "Το αποτέλεσμα του παρόχου πληρωμών για την αποτυχημένη κλήση."
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "Η πληρωμή από την οποία επιστρέφεται αυτό το μερίδιο· καμία για δωροκάρτες και πόντους."

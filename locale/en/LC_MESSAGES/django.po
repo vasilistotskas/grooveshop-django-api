@@ -12295,6 +12295,9 @@ msgstr "Stable code for why the order was refused. Branch on this, never on ``de
 msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 
+msgid "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
+msgstr "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
+
 msgid "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 msgstr "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 
@@ -13241,6 +13244,9 @@ msgstr "The payment method is free once the products, after discounts and exclud
 
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
+
+msgid "The payment provider's result for the failed call."
+msgstr "The payment provider's result for the failed call."
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "The payment this share is refunded against; none for gift cards and points."

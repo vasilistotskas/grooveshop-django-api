@@ -1273,6 +1273,9 @@ msgstr "Agent Stripe Delegated Payments"
 msgid "Agent-delegated payments are not enabled for this store."
 msgstr "Agent-delegated payments are not enabled for this store."
 
+msgid "Alerts when something needs a person"
+msgstr "Alerts when something needs a person"
+
 msgid "All"
 msgstr "All"
 
@@ -3457,6 +3460,9 @@ msgstr "Customer Information"
 msgid "Customer Notes"
 msgstr "Customer Notes"
 
+msgid "Customer accounts"
+msgstr "Customer accounts"
+
 msgid "Customer details associated with the parcel"
 msgstr "Customer details associated with the parcel"
 
@@ -4332,6 +4338,9 @@ msgstr "Events received"
 
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
+
+msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
+msgstr "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 
 msgid "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
 msgstr "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
@@ -8746,6 +8755,10 @@ msgstr "Object ID"
 msgid "Off"
 msgstr "Off"
 
+#, python-format
+msgid "Off: %(reason)s"
+msgstr "Off: %(reason)s"
+
 msgid "Offers"
 msgstr "Offers"
 
@@ -8754,6 +8767,9 @@ msgstr "Offers Preview"
 
 msgid "Office"
 msgstr "Office"
+
+msgid "On"
+msgstr "On"
 
 msgid "On Sale (>0%)"
 msgstr "On Sale (>0%)"
@@ -11235,6 +11251,9 @@ msgstr "Request parameters"
 
 msgid "Requested On"
 msgstr "Requested On"
+
+msgid "Required"
+msgstr "Required"
 
 msgid "Required Level"
 msgstr "Required Level"
@@ -13967,6 +13986,9 @@ msgstr "To product"
 msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 msgstr "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 
+msgid "To your team"
+msgstr "To your team"
+
 msgid "Today"
 msgstr "Today"
 
@@ -15324,6 +15346,9 @@ msgstr "You can only delete your own account."
 
 msgid "You can only reorder your own past orders."
 msgstr "You can only reorder your own past orders."
+
+msgid "You can see these emails but you do not have permission to switch them."
+msgstr "You can see these emails but you do not have permission to switch them."
 
 msgid "You can track your package using the tracking number above on the carrier's website."
 msgstr "You can track your package using the tracking number above on the carrier's website."

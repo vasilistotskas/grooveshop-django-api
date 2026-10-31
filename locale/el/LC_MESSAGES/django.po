@@ -1278,6 +1278,9 @@ msgstr "Εξουσιοδοτημένες Πληρωμές Stripe μέσω AI Π�
 msgid "Agent-delegated payments are not enabled for this store."
 msgstr "Οι εξουσιοδοτημένες πληρωμές μέσω πράκτορα δεν είναι ενεργοποιημένες για αυτό το κατάστημα."
 
+msgid "Alerts when something needs a person"
+msgstr "Ειδοποιήσεις όταν κάτι χρειάζεται άνθρωπο"
+
 msgid "All"
 msgstr "Όλες"
 
@@ -3462,6 +3465,9 @@ msgstr "Στοιχεία Πελάτη"
 msgid "Customer Notes"
 msgstr "Σημειώσεις Πελάτη"
 
+msgid "Customer accounts"
+msgstr "Λογαριασμοί πελατών"
+
 msgid "Customer details associated with the parcel"
 msgstr "Στοιχεία πελάτη που σχετίζονται με το δέμα"
 
@@ -4338,6 +4344,9 @@ msgstr "Συμβάντα που παραλήφθηκαν"
 
 msgid "Every coupon the shopper may be offered — the codes the store advertises publicly, plus the personal coupons assigned to the signed-in customer — each pre-judged against the cart as it stands. ``eligible`` is exactly what applying the code would do, so a disabled row and a refusal at apply time can never disagree; ``reason`` carries the ACP discount vocabulary and ``discountAmount`` what the code would take off right now. Empty when the store has promotions disabled."
 msgstr "Κάθε κουπόνι που μπορεί να προσφερθεί στον αγοραστή — οι κωδικοί που το κατάστημα προβάλλει δημόσια, καθώς και τα προσωπικά κουπόνια που έχουν αντιστοιχιστεί στον συνδεδεμένο πελάτη — το καθένα αξιολογημένο εκ των προτέρων έναντι του καλαθιού όπως είναι τώρα. Το ``eligible`` αντιστοιχεί ακριβώς σε ό,τι θα έκανε η εφαρμογή του κωδικού, ώστε μια απενεργοποιημένη γραμμή και μια άρνηση κατά την εφαρμογή να μη διαφωνούν ποτέ· το ``reason`` φέρει το λεξιλόγιο εκπτώσεων ACP και το ``discountAmount`` το ποσό που θα αφαιρούσε ο κωδικός αυτή τη στιγμή. Κενό όταν το κατάστημα έχει απενεργοποιημένες τις προσφορές."
+
+msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
+msgstr "Όλα τα email που στέλνει το κατάστημά σας. Κλείστε ένα και το κατάστημα σταματά να το στέλνει, μόνο εκείνο. Τα email που χρειάζεται ο πελάτης ή ο νόμος, όπως η επιβεβαίωση παραγγελίας ή η επαναφορά κωδικού, δεν μπορούν να κλείσουν."
 
 msgid "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
 msgstr "Κάθε βράδυ τα βάρη των στρατηγικών υπολογίζονται ξανά από το πόσο συχνά αγοράστηκαν τα προϊόντα που πρότεινε εδώ η καθεμία. Μια στρατηγική χρειάζεται αρκετές πρόσφατες προβολές πριν αλλάξει το βάρος της. Απενεργοποιήστε την για να κρατήσετε βάρη που ορίσατε μόνοι σας."
@@ -8755,6 +8764,10 @@ msgstr "ID αντικειμένου"
 msgid "Off"
 msgstr "Ανενεργό"
 
+#, python-format
+msgid "Off: %(reason)s"
+msgstr "Κλειστό: %(reason)s"
+
 msgid "Offers"
 msgstr "Προσφορές"
 
@@ -8763,6 +8776,9 @@ msgstr "Προεπισκόπηση προσφορών"
 
 msgid "Office"
 msgstr "Γραφείο"
+
+msgid "On"
+msgstr "Ενεργό"
 
 msgid "On Sale (>0%)"
 msgstr "Σε προσφορά (>0%)"
@@ -11245,6 +11261,9 @@ msgstr "Παράμετροι αιτήματος"
 
 msgid "Requested On"
 msgstr "Ημερομηνία αιτήματος"
+
+msgid "Required"
+msgstr "Υποχρεωτικό"
 
 msgid "Required Level"
 msgstr "Απαιτούμενο επίπεδο"
@@ -13972,6 +13991,9 @@ msgstr "Προς προϊόν"
 msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 msgstr "Για ανανέωση, απαντήστε σε αυτό το email ή επικοινωνήστε μαζί μας στο %(email)s. Μόλις καταχωρηθεί η ανανέωση, όλα συνεχίζουν κανονικά."
 
+msgid "To your team"
+msgstr "Προς την ομάδα σας"
+
 msgid "Today"
 msgstr "Σήμερα"
 
@@ -15329,6 +15351,9 @@ msgstr "Μπορείτε να διαγράψετε μόνο τον δικό σα
 
 msgid "You can only reorder your own past orders."
 msgstr "Μπορείτε να επαναλάβετε μόνο τις δικές σας προηγούμενες παραγγελίες."
+
+msgid "You can see these emails but you do not have permission to switch them."
+msgstr "Μπορείτε να δείτε αυτά τα email αλλά δεν έχετε δικαίωμα να τα ανοίξετε ή να τα κλείσετε."
 
 msgid "You can track your package using the tracking number above on the carrier's website."
 msgstr "Μπορείτε να παρακολουθήσετε το δέμα σας χρησιμοποιώντας τον παραπάνω αριθμό παρακολούθησης στην ιστοσελίδα του μεταφορέα."

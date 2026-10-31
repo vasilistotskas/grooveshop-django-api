@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
+from parler_rest.utils import create_translated_fields_serializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -87,6 +88,51 @@ class BlogPostSerializer(
             preview = body[:200]
             return f"{preview}..." if len(body) > 200 else preview
         return ""
+
+
+# What a syndicated item renders: the article in full beside its card.
+FEED_TRANSLATED_FIELDS = ("title", "subtitle", "body")
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(BlogPost, fields=FEED_TRANSLATED_FIELDS)
+)
+class FeedTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
+class BlogPostFeedSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
+):
+    """One item of the RSS feed.
+
+    The feed needs every article's body, so it has its own shape and
+    its own endpoint rather than a request per post for the detail.
+    """
+
+    translations = FeedTranslatedFieldsField(
+        shared_model=BlogPost,
+        serializer_class=create_translated_fields_serializer(
+            BlogPost,
+            related_name="translations",
+            meta={"fields": list(FEED_TRANSLATED_FIELDS)},
+        ),
+    )
+
+    class Meta:
+        model = BlogPost
+        fields = (
+            "id",
+            "uuid",
+            "slug",
+            "translations",
+            "category",
+            "main_image_path",
+            "published_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
 
 
 class BlogPostDetailSerializer(BlogPostSerializer):

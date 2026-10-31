@@ -4396,6 +4396,8 @@ RELATED_POSTS_STRATEGIES = [
     },
 ]
 RELATED_POSTS_LIMIT = 8
+# The most posts the RSS feed endpoint (``/blog/post/feed``) returns.
+BLOG_FEED_LIMIT = 50
 
 # Logging
 IS_KUBERNETES = getenv("KUBERNETES_SERVICE_HOST") is not None

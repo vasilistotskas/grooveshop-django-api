@@ -29,6 +29,11 @@ urlpatterns = [
         name="blog-post-popular",
     ),
     path(
+        "blog/post/feed",
+        BlogPostViewSet.as_view({"get": "feed"}),
+        name="blog-post-feed",
+    ),
+    path(
         "blog/post/featured",
         BlogPostViewSet.as_view({"get": "featured"}),
         name="blog-post-featured",

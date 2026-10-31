@@ -24,6 +24,7 @@ from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import (
     BlogPostDetailSerializer,
+    BlogPostFeedSerializer,
     BlogPostLikedPostsRequestSerializer,
     BlogPostLikedPostsResponseSerializer,
     BlogPostSerializer,
@@ -149,6 +150,27 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Blog Posts"],
     ),
+    "feed": ActionConfig(
+        response=BlogPostFeedSerializer,
+        many=True,
+        paginated=False,
+        operation_id="listBlogPostFeed",
+        summary=_("Get the posts for the RSS feed"),
+        description=_(
+            "The newest published posts with their full body, in one "
+            "response, for the storefront's RSS feed."
+        ),
+        tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="limit",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Most posts to return (capped by the store).",
+                required=False,
+            ),
+        ],
+    ),
     "featured": ActionConfig(
         response=BlogPostSerializer,
         many=True,
@@ -188,7 +210,7 @@ BLOG_POST_ORDERING = ActionOrdering(
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "feed"])
 class BlogPostViewSet(BaseModelViewSet):
     queryset = BlogPost.objects.all()
     serializers_config = serializers_config
@@ -232,7 +254,7 @@ class BlogPostViewSet(BaseModelViewSet):
         Uses BlogPost.objects.for_list() for list views and
         BlogPost.objects.for_detail() for detail views to avoid N+1 queries.
         """
-        if self.action == "list":
+        if self.action in ("list", "feed"):
             queryset = BlogPost.objects.for_list()
         else:
             queryset = BlogPost.objects.for_detail()
@@ -423,6 +445,25 @@ class BlogPostViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(
             queryset, request, serializer_class=response_serializer_class
+        )
+
+    @action(detail=False, methods=["GET"], pagination_class=None)
+    def feed(self, request):
+        cap = settings.BLOG_FEED_LIMIT
+        try:
+            limit = int(request.query_params.get("limit", cap))
+        except ValueError:
+            limit = cap
+        queryset = self.get_queryset().published()
+        queryset = queryset.order_by("-published_at", "-id")[
+            : max(1, min(limit, cap))
+        ]
+
+        response_serializer_class = self.get_response_serializer()
+        return Response(
+            response_serializer_class(
+                queryset, many=True, context=self.get_serializer_context()
+            ).data
         )
 
     @action(detail=False, methods=["GET"])

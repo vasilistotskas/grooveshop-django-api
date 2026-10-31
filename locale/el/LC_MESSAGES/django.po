@@ -9698,6 +9698,12 @@ msgstr "Εκκρεμής δημιουργία"
 msgid "Pending payment"
 msgstr "Εκκρεμεί πληρωμή"
 
+msgid "Pending payment fee"
+msgstr "Προμήθεια πληρωμής σε αναμονή"
+
+msgid "Pending payment fees"
+msgstr "Προμήθειες πληρωμών σε αναμονή"
+
 msgid "Pending render"
 msgstr "Εκκρεμεί δημιουργία"
 
@@ -13288,6 +13294,9 @@ msgstr "Η προσφορά δεν έχει ξεκινήσει ακόμα"
 
 msgid "The provider report the fee was read from."
 msgstr "Η αναφορά του παρόχου από την οποία διαβάστηκε η προμήθεια."
+
+msgid "The provider's own id for the movement the fee is for."
+msgstr "Το δικό του αναγνωριστικό του παρόχου για την κίνηση στην οποία αφορά η προμήθεια."
 
 msgid "The provider's own id for this movement (a Stripe PaymentIntent or refund id, a Viva transaction id, a courier voucher)."
 msgstr "Ο δικός του κωδικός του παρόχου για αυτή την κίνηση (PaymentIntent ή κωδικός επιστροφής του Stripe, κωδικός συναλλαγής της Viva, voucher μεταφορέα)."

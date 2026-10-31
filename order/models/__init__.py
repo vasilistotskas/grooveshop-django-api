@@ -7,6 +7,7 @@ from .item import OrderItem
 from .legal_acceptance import OrderLegalAcceptance
 from .order import Order
 from .payment_transaction import PaymentTransaction
+from .pending_payment_fee import PendingPaymentFee
 from .refund_attempt import RefundAttempt
 from .refund_notification import RefundNotification
 from .retail_credit import CreditCounter, RetailCredit
@@ -29,6 +30,7 @@ __all__ = [
     "OrderLegalAcceptance",
     "OrderVatLine",
     "PaymentTransaction",
+    "PendingPaymentFee",
     "RefundAttempt",
     "RefundNotification",
     "RetailCredit",

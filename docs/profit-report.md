@@ -79,9 +79,29 @@ fee.
   Viva's documentation gives it a negative sign next to a positive total.
   Verified like every Viva event (Retrieve Transaction with the store's
   credentials, one of the order's own order codes), deduplicated on
-  `VivaWebhookEvent`. **Each store must subscribe the event** in its Viva
-  dashboard (Settings > API Access > Webhooks > Create Webhook, one
-  subscription per event type). Not subscribed means "not reported".
+  `VivaWebhookEvent`. Viva does not say whether 1799 comes before or after
+  1796 (the payment webhook that books the charge), so a commission for a
+  payment the ledger does not hold yet is kept in `PendingPaymentFee` and
+  written onto the row when `PaymentLedger` records it (in `_record`, for
+  every path that books a payment). The event is then answered `200` and
+  never needs a retry. A commission whose transaction cannot be verified, or
+  belongs to another order, is kept nowhere. **Each store must subscribe the
+  event** in its Viva dashboard; not subscribed means "not reported".
+
+  Subscribe it once per store that takes Viva payments (Viva's webhook dialog
+  takes one event type per entry; the same URL serves every event):
+
+  1. In the live Viva account, open Settings > API Access > Webhooks.
+  2. Click Create Webhook.
+  3. Enter the store's webhook address, the same one already used for
+     Transaction Payment Created (the store host followed by
+     `/viva-wallet/webhook/`).
+  4. Click Verify and wait for the confirmation.
+  5. Choose the event type Transaction Price Calculated.
+  6. Tick Active and save.
+  7. After the next card payment, open the profit report: that payment shows
+     a Viva fee instead of "fee not reported".
+
   Only the documented payload was available when it was written
   (developer.viva.com/webhooks-for-payments/transaction-price-calculated): check
   the first real 1799 of a store (its `VivaWebhookEvent` row and the logged

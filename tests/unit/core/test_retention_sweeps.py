@@ -20,9 +20,13 @@ from django.apps import apps as django_apps
 from django.conf import settings
 from django.test import override_settings
 from django.utils import timezone
+from djmoney.money import Money
 
 from meta_capi.models import MetaCapiEventLog
 from meta_capi.tasks import purge_expired_meta_capi_event_logs
+from order.enum.payment_transaction import PaymentFeeSource
+from order.models import PendingPaymentFee
+from order.tasks import purge_expired_pending_payment_fees
 from product.factories.product import ProductFactory
 from recommendation.enum import EventKind, StrategyCode, Surface
 from recommendation.models import RecommendationEvent
@@ -95,6 +99,24 @@ class TestRecommendationEventRetention:
         assert run.returncode != 0
         assert "ImproperlyConfigured" in run.stderr
         assert "longest window" in run.stderr
+
+
+class TestPendingPaymentFeeRetention:
+    @pytest.mark.parametrize(("age_days", "kept"), [(91, False), (89, True)])
+    def test_boundary(self, age_days, kept):
+        fee = PendingPaymentFee.objects.create(
+            provider="viva_wallet",
+            provider_reference=str(uuid.uuid4()),
+            fee=Money("0.30", "EUR"),
+            fee_source=PaymentFeeSource.VIVA_TRANSACTION_PRICE,
+        )
+        _backdate(PendingPaymentFee, fee.pk, age_days)
+
+        with override_settings(PENDING_PAYMENT_FEE_RETENTION_DAYS=90):
+            result = purge_expired_pending_payment_fees()
+
+        assert result == {"deleted": 0 if kept else 1}
+        assert PendingPaymentFee.objects.filter(pk=fee.pk).exists() is kept
 
 
 class TestMetaCapiEventLogRetention:
@@ -194,6 +216,11 @@ _FANOUTS = [
         "fanout_purge_expired_recommendation_events",
         "recommendation.tasks.purge_expired_recommendation_events",
         "purge-expired-recommendation-events",
+    ),
+    (
+        "fanout_purge_expired_pending_payment_fees",
+        "order.tasks.purge_expired_pending_payment_fees",
+        "purge-expired-pending-payment-fees",
     ),
     (
         "fanout_purge_expired_meta_capi_event_logs",

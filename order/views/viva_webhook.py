@@ -1568,8 +1568,8 @@ def _handle_transaction_price_calculated(order, event_data, transaction_id):
     with this tenant's credentials and must carry one of the order's own
     order codes, so a forged body, or another store's transaction, records
     nothing (a ``RuntimeError`` answers 500, and the candidate loop moves on).
-    Returns ``OUTCOME_SKIPPED`` when nothing was recorded; ``None`` when a
-    fee was.
+    Returns ``OUTCOME_SKIPPED`` when the report is unusable; ``None`` when the
+    fee was written, or kept for the payment row that does not exist yet.
     """
     from djmoney.money import Money
 
@@ -1620,20 +1620,15 @@ def _handle_transaction_price_calculated(order, event_data, transaction_id):
         )
         return VivaWebhookEvent.OUTCOME_SKIPPED
 
-    row = PaymentLedger.record_fee(
+    # A report that comes before the payment webhook has booked the charge
+    # is kept by the ledger and written when that row is recorded: answering
+    # it with a skip would dedup the event and lose the fee for good.
+    PaymentLedger.record_fee(
         provider=VivaWalletPaymentProvider.code,
         reference=transaction_id,
         fee=Money(commission, currency),
         source=PaymentFeeSource.VIVA_TRANSACTION_PRICE,
     )
-    if row is None:
-        logger.warning(
-            "Viva transaction %s has no payment row on order %s: its "
-            "commission is not recorded",
-            transaction_id,
-            order.id,
-        )
-        return VivaWebhookEvent.OUTCOME_SKIPPED
     return None
 
 

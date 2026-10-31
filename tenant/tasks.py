@@ -293,6 +293,14 @@ def fanout_purge_expired_recommendation_events():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_purge_expired_pending_payment_fees():
+    return run_for_all_tenants(
+        "order.tasks.purge_expired_pending_payment_fees",
+        include_suspended=True,
+    )
+
+
+@celery_app.task(base=TenantTask)
 def fanout_purge_expired_meta_capi_event_logs():
     return run_for_all_tenants(
         "meta_capi.tasks.purge_expired_meta_capi_event_logs",

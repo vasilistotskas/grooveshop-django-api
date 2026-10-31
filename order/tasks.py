@@ -9,8 +9,10 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from core import celery_app
+from core.retention import delete_in_batches
 from core.retry import (
     MAIL_TRANSIENT_ERRORS,
+    TRANSIENT_DB_ERRORS,
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
 )
@@ -31,6 +33,7 @@ from order.models import (
     Order,
     OrderHistory,
     PaymentTransaction,
+    PendingPaymentFee,
     RefundNotification,
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
@@ -1997,3 +2000,29 @@ def push_order_event_to_gateway(self, order_id: int) -> None:
             response.status_code,
             response.text[:200],
         )
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=TRANSIENT_DB_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def purge_expired_pending_payment_fees() -> dict[str, int]:
+    """Delete fees older than ``PENDING_PAYMENT_FEE_RETENTION_DAYS`` whose
+    payment was never booked.
+
+    A fee is deleted as soon as its payment is recorded, so only the fee of
+    a payment that never settled reaches this sweep. Runs per tenant through
+    ``tenant.tasks.fanout_purge_expired_pending_payment_fees``.
+    """
+    cutoff = timezone.now() - timedelta(
+        days=settings.PENDING_PAYMENT_FEE_RETENTION_DAYS
+    )
+    deleted = delete_in_batches(
+        PendingPaymentFee.objects.filter(created_at__lt=cutoff)
+    )
+    if deleted:
+        logger.info("Purged %s pending payment fees", deleted)
+    return {"deleted": deleted}

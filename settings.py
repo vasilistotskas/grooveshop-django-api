@@ -1304,6 +1304,15 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "purge-expired-pending-payment-fees": {
+            # Fanout: PendingPaymentFee is per-tenant. Deletes fees whose
+            # payment was never booked, older than
+            # PENDING_PAYMENT_FEE_RETENTION_DAYS.
+            "task": "tenant.tasks.fanout_purge_expired_pending_payment_fees",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "purge-expired-meta-capi-event-logs": {
             # Fanout: MetaCapiEventLog is per-tenant. Deletes delivery
             # rows older than META_CAPI_EVENT_LOG_RETENTION_DAYS.
@@ -4817,6 +4826,14 @@ if RECOMMENDATION_EVENT_RETENTION_DAYS < _RECOMMENDATION_LONGEST_WINDOW_DAYS:
         "longest window the recommendation engine reads events over "
         f"({_RECOMMENDATION_LONGEST_WINDOW_DAYS} days)."
     )
+
+# Days a ``PendingPaymentFee`` waits for the payment it is for. Viva retries an
+# unanswered webhook hourly for 24 hours, so a fee whose payment is still not
+# booked after this long belongs to a payment that never will be (abandoned,
+# failed): the row is deleted.
+PENDING_PAYMENT_FEE_RETENTION_DAYS = int(
+    getenv("PENDING_PAYMENT_FEE_RETENTION_DAYS", "90")
+)
 
 # ---------- Meta Conversions API ----------
 # Days a ``MetaCapiEventLog`` delivery row (status, trace id) is kept.

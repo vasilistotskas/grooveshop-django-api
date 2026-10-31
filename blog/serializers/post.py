@@ -1,6 +1,8 @@
 from typing import cast
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
@@ -133,6 +135,18 @@ class BlogPostFeedSerializer(
             "updated_at",
         )
         read_only_fields = fields
+
+
+class BlogPostFeedQuerySerializer(serializers.Serializer):
+    limit = serializers.IntegerField(
+        min_value=1,
+        max_value=settings.BLOG_FEED_LIMIT,
+        default=settings.BLOG_FEED_LIMIT,
+        help_text=format_lazy(
+            _("Most posts to return, from 1 to {max} (the default)."),
+            max=settings.BLOG_FEED_LIMIT,
+        ),
+    )
 
 
 class BlogPostDetailSerializer(BlogPostSerializer):

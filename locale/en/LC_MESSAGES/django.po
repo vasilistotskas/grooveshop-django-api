@@ -6093,6 +6093,9 @@ msgstr "Get the current user's review for a specific product. Requires authentic
 msgid "Get the current user's subscribed and available subscription topics."
 msgstr "Get the current user's subscribed and available subscription topics."
 
+msgid "Get the posts for the RSS feed"
+msgstr "Get the posts for the RSS feed"
+
 msgid "Get the sibling products in this product's variant group, plus the variant axes (e.g. Colour, Memory) to render as selectors. Returns just the product itself when it has no variant group."
 msgstr "Get the sibling products in this product's variant group, plus the variant axes (e.g. Colour, Memory) to render as selectors. Returns just the product itself when it has no variant group."
 
@@ -8030,6 +8033,10 @@ msgstr "Money ACS paid out that no shipment explains"
 
 msgid "Month"
 msgstr "Month"
+
+#, python-brace-format
+msgid "Most posts to return, from 1 to {max} (the default)."
+msgstr "Most posts to return, from 1 to {max} (the default)."
 
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
@@ -13205,6 +13212,9 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "The marketing emails this store sends, each with whether your account's address still receives it."
+
+msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
+msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."

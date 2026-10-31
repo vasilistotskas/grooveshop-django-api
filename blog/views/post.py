@@ -24,6 +24,7 @@ from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import (
     BlogPostDetailSerializer,
+    BlogPostFeedQuerySerializer,
     BlogPostFeedSerializer,
     BlogPostLikedPostsRequestSerializer,
     BlogPostLikedPostsResponseSerializer,
@@ -161,15 +162,7 @@ serializers_config: SerializersConfig = {
             "response, for the storefront's RSS feed."
         ),
         tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="limit",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Most posts to return (capped by the store).",
-                required=False,
-            ),
-        ],
+        parameters=[BlogPostFeedQuerySerializer],
     ),
     "featured": ActionConfig(
         response=BlogPostSerializer,
@@ -266,7 +259,9 @@ class BlogPostViewSet(BaseModelViewSet):
         return queryset.visible_to(self.request.user)
 
     def get_filterset_class(self):
-        if self.action == "comments":
+        # The feed takes ``limit`` only: it runs no filter, so the
+        # schema must not advertise the list's.
+        if self.action in ("comments", "feed"):
             return None
         return BlogPostFilter
 
@@ -449,14 +444,11 @@ class BlogPostViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["GET"], pagination_class=None)
     def feed(self, request):
-        cap = settings.BLOG_FEED_LIMIT
-        try:
-            limit = int(request.query_params.get("limit", cap))
-        except ValueError:
-            limit = cap
+        query = BlogPostFeedQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
         queryset = self.get_queryset().published()
         queryset = queryset.order_by("-published_at", "-id")[
-            : max(1, min(limit, cap))
+            : query.validated_data["limit"]
         ]
 
         response_serializer_class = self.get_response_serializer()

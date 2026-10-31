@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from django.test import override_settings
+from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -65,16 +65,30 @@ def test_newest_first_published_only(client):
     assert not slugs & {"feed-draft", "feed-scheduled"}
 
 
-@override_settings(BLOG_FEED_LIMIT=2)
-def test_limit_is_capped_by_the_store(client):
-    for n in range(4):
+def test_limit_caps_the_number_of_posts(client):
+    for n in range(3):
         BlogPostFactory(slug=f"feed-cap-{n}")
 
-    assert len(_get(client).json()) == 2
+    assert len(_get(client, limit=2).json()) == 2
     assert len(_get(client, limit=1).json()) == 1
-    assert len(_get(client, limit=99).json()) == 2
-    assert len(_get(client, limit="nonsense").json()) == 2
-    assert len(_get(client, limit=0).json()) == 1
+    assert len(_get(client).json()) >= 3
+
+
+@pytest.mark.parametrize(
+    "limit",
+    ["nonsense", "1.5", "0", "-1", str(settings.BLOG_FEED_LIMIT + 1)],
+)
+def test_an_invalid_limit_is_refused(client, limit):
+    response = _get(client, limit=limit)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "limit" in response.json()["fields"]
+
+
+def test_the_largest_limit_is_accepted(client):
+    response = _get(client, limit=settings.BLOG_FEED_LIMIT)
+
+    assert response.status_code == status.HTTP_200_OK
 
 
 def test_staff_do_not_see_drafts_in_the_feed(client):

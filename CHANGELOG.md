@@ -3,6 +3,83 @@
 
 
 
+## v3.172.0 (2026-10-31)
+
+### Bug fixes
+
+* fix(blog): refuse an invalid feed limit instead of clamping it
+
+The feed endpoint silently replaced a non-numeric limit with the cap and
+clamped the rest. The query is now a serializer: limit is an integer
+from 1 to BLOG_FEED_LIMIT (default BLOG_FEED_LIMIT) and anything else
+answers 400 with the standard validation error. The action also stops
+advertising the list's filters it never runs, and its new messages are
+in the Greek and English catalogues.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+* fix(blog): name the feed's size parameter count, not limit
+
+limit is a pagination parameter in this API and an unpaginated action
+must not advertise one (test_unpaginated_actions_declare_no_paginator).
+The feed takes count instead: an integer from 1 to BLOG_FEED_LIMIT.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+* fix(blog): tighten the feed query, queryset and visibility rules
+
+- an explicit blank count is a 400; only an omitted one defaults
+- the feed loads posts and translations only, without the likes,
+  comments and tags joins and prefetches of the list queryset
+- undated published posts sort after dated ones
+- the action declares no filter backends, so the schema stops
+  advertising the unused search parameter
+- has_visible_content ignores hidden subtrees and media with no source
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+### Features
+
+* feat(blog, page_config): blog feed endpoint and a content page's written languages (#382) ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+* feat(page-config): name a content page's written languages on the list
+
+The content page list no longer carries the body, so a reader could not
+tell which languages a page exists in. translatedLocales lists the
+languages whose body shows something (text or embedded media), by the
+same rule as the storefront's hasVisibleContent.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+* feat(blog): add a feed endpoint carrying the posts the RSS route renders
+
+The storefront's RSS feed read each article's body from the post list,
+which is being slimmed to a card. GET /blog/post/feed returns the newest
+published posts (up to BLOG_FEED_LIMIT, or ?limit=) with title,
+subtitle and body per language in one cached response, so the feed
+neither depends on the list shape nor requests a detail per post.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
+### Testing
+
+* test(admin): pin the receipt document type where an invoice would change the answer
+
+OrderFactory draws a random document type, so an invoice-typed order
+made the wholesale-filter and receipt-tab tests fail by chance.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`4345970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4345970a299a804b58821aea02944867cae27128))
+
 ## v3.171.0 (2026-10-31)
 
 ### Bug fixes

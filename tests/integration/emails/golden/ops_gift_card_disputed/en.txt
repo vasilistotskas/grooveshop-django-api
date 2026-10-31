@@ -1,0 +1,8 @@
+Gift card payment disputed
+
+The payment for gift card purchase 00000000-0000-4000-8000-0000000000e1 (€50.00) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now.
+
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

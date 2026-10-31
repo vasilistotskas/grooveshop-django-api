@@ -67,7 +67,7 @@ def test_a_transaction_that_states_both_settles_the_order(order):
     ids=["no amount", "unreadable amount", "no currency", "blank currency"],
 )
 def test_a_transaction_missing_either_is_refused_and_flagged(order, overrides):
-    with patch("shipping.alerts.send_ops_alert") as alert:
+    with patch("emails.send.send_email") as alert:
         outcome = _deliver(order, **overrides)
 
     order.refresh_from_db()

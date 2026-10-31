@@ -15,6 +15,10 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
+from django.core import mail
+from django.utils import translation
+from django.utils.translation import gettext
 from djmoney.money import Money
 
 from order.factories.order import OrderFactory
@@ -23,6 +27,15 @@ from shipping_acs.models import AcsCodPayout
 from shipping_acs.services import AcsService
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def operators(open_email_gates):
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["ops@example.com"],
+    ):
+        yield
 
 
 #: What the payout rows below remit, and so what a matching shipment collects.
@@ -165,21 +178,20 @@ def test_reconcile_is_idempotent_on_voucher_date_pair():
     assert rows.get().cod_amount_total.amount == Decimal("200.00")
 
 
-def test_reconcile_skips_and_alerts_on_unmatched_rows(settings):
+def test_reconcile_skips_and_alerts_on_unmatched_rows(operators):
     """A row with no POD and no resolvable reference is counted as
-    skipped and ADMINS are alerted — unmatched payout money must be
-    investigated, not silently dropped."""
-    settings.ADMINS = [("Admin", "admin@example.com")]
+    skipped and the store's operators are alerted — unmatched payout money
+    must be investigated, not silently dropped."""
+    mail.outbox.clear()
 
-    with patch("shipping.alerts.send_mail") as mock_mail:
-        result = _reconcile(
-            [_BASE_ROW, {"Customer_Code": "x", "POD": ""}],
-        )
+    result = _reconcile(
+        [_BASE_ROW, {"Customer_Code": "x", "POD": ""}],
+    )
 
     assert result["upserted"] == 1
     assert result["skipped"] == 1
     assert result["rows"] == 2
-    assert mock_mail.called
+    assert len(mail.outbox) == 1
 
 
 def test_reconcile_fires_order_paid_for_cod_purchase_capi():
@@ -333,15 +345,17 @@ def test_a_rerun_keeps_an_unreadable_rows_reconciliation():
     assert payout.reconciliation_note == "done"
 
 
-def test_the_alert_points_at_the_payout_list_not_the_logs(settings):
-    settings.ADMINS = [("Admin", "admin@example.com")]
+def test_the_alert_points_at_the_payout_list_not_the_logs(operators):
+    mail.outbox.clear()
 
-    with patch("shipping.alerts.send_mail") as mock_mail:
-        _reconcile([_UNREADABLE_ROW])
+    _reconcile([_UNREADABLE_ROW])
 
-    body = mock_mail.call_args.kwargs["message"]
-    assert "celery-worker" not in body
-    assert "Matches no shipment" in body
+    [message] = mail.outbox
+    # Rendered in the store's language.
+    with translation.override(settings.LANGUAGE_CODE):
+        filter_label = gettext("Matches no shipment, not reconciled")
+    assert "celery-worker" not in message.body
+    assert filter_label in message.body
 
 
 # ---------------------------------------------------------------------------

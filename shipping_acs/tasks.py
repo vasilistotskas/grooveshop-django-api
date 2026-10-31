@@ -28,14 +28,14 @@ from celery import shared_task
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from django.utils.translation import gettext
 
 from core.retention import delete_in_batches
 from core.retry import MAIL_TRANSIENT_ERRORS
-from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import storefront_path
+from emails.send import send_email, was_sent
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping_acs.client import TRACKING_ALIASES
+from shipping_acs.emails import StaleShipments, UnremittedCod
 from shipping_acs.enum.shipment_state import TERMINAL_STATES
 from shipping_acs.exceptions import (
     AcsAPIError,
@@ -358,34 +358,12 @@ def alert_unremitted_cod_payouts(self) -> dict[str, Any]:
         rows,
     )
 
-    lines = "\n".join(
-        f"  order {r['order_id']}  voucher {r['voucher_no']}  "
-        f"{r['cod_amount']}  delivered {r['delivered_on']} "
-        f"({r['days_since_delivery']} days ago)"
-        for r in rows
-    )
-    from shipping.alerts import OpsAlertKind, send_ops_alert
-
     try:
-        sent = send_ops_alert(
-            kind=OpsAlertKind.UNREMITTED_COD,
-            subject=gettext(
-                "ACS COD: %(count)d delivered parcel(s) never remitted"
+        sent = was_sent(
+            send_email(
+                "ops.unremitted_cod",
+                UnremittedCod(rows=rows, older_than_days=older_than_days),
             )
-            % {"count": len(rows)},
-            message=(
-                f"{len(rows)} COD parcel(s) were delivered more than "
-                f"{older_than_days} days ago and ACS has still not "
-                f"reported a payout for them:\n\n{lines}\n\n"
-                "Give ACS the voucher numbers and ask for the COD "
-                "remittance status. If a payout HAS been made on a date "
-                "the nightly reconcile never queried, replay it with "
-                "`manage.py reconcile_acs_cod --days N --silent "
-                "--tenant <schema>` — it is idempotent.\n\n"
-                "If the merchant WAS paid for a parcel outside ACS, open "
-                "the shipment in the admin and use 'Record COD received "
-                "outside ACS' to clear it from this alert."
-            ),
         )
     except Exception as exc:
         logger.error(
@@ -697,21 +675,12 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     thereby stops the poller.
 
     The classes are :func:`shipping_acs.attention.stale_shipment_q`, which
-    the dashboard counter reads too. A store that muted
-    ``OpsAlertKind.STALE_SHIPMENTS`` gets no email and no claim, and keeps
+    the dashboard counter reads too. A store that switched off
+    ``ops.stale_shipments`` gets no email and keeps no claim, and keeps
     the count.
     """
-    from django.template.loader import render_to_string
-
-    from shipping.alerts import OpsAlertKind, ops_alert_enabled, send_ops_alert
     from shipping_acs.attention import stale_shipment_q, stale_threshold_days
     from shipping_acs.models import AcsShipment
-
-    # A muted digest claims nothing: the parcels stay unflagged, so they
-    # are all in the first digest after the store turns it back on, and
-    # the dashboard counts them in the meantime.
-    if not ops_alert_enabled(OpsAlertKind.STALE_SHIPMENTS):
-        return {"alerted": 0, "reason": "muted"}
 
     threshold_days = stale_threshold_days()
     now = timezone.now()
@@ -733,46 +702,17 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=True
         )
 
-    shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
-        "order"
+    shipments = list(
+        AcsShipment.objects.filter(id__in=shipment_ids).select_related("order")
     )
-    rows = [
-        {
-            "voucher_no": s.voucher_no or "—",
-            "order_id": s.order_id,
-            "shipment_state": s.get_shipment_state_display(),
-            "last_movement_at": s.last_event_at or s.created_at,
-            "days_stale": (now - (s.last_event_at or s.created_at)).days,
-        }
-        for s in shipments
-    ]
 
-    from django.utils.translation import gettext as _
-    from django.utils.translation import override
-
-    from core.utils.i18n import store_language
-
-    # Merchant-facing: the store's own language, not the worker's.
-    language = store_language()
     try:
-        with override(language):
-            context = build_email_context(
-                language=language,
-                shipments=rows,
-                threshold_days=threshold_days,
-            )
-            sent = send_ops_alert(
-                kind=OpsAlertKind.STALE_SHIPMENTS,
-                subject=_("Stale ACS shipment alert — {n} shipment(s)").format(
-                    n=len(rows)
-                ),
-                message=render_to_string(
-                    "emails/shipping_acs/stale_shipments_alert.txt", context
-                ),
-                html_message=render_to_string(
-                    "emails/shipping_acs/stale_shipments_alert.html", context
-                ),
-            )
+        deliveries = send_email(
+            "ops.stale_shipments",
+            StaleShipments(
+                shipments=shipments, threshold_days=threshold_days, as_of=now
+            ),
+        )
     except Exception as exc:
         logger.exception(
             "check_stale_acs_shipments: failed to send alert email",
@@ -781,15 +721,19 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=False
         )
         return {"alerted": 0, "error": str(exc)}
-    if not sent:
+    if not was_sent(deliveries):
+        # Switched off by the store, nobody to write to, or ACS off: release
+        # the claim, so the parcels are all in the first digest after the
+        # store turns it back on, and the dashboard counts them meanwhile.
+        reason = deliveries[0].status
         logger.warning(
-            "check_stale_acs_shipments: no alert recipients configured — "
-            "rolling back claim"
+            "check_stale_acs_shipments: not sent (%s) — rolling back claim",
+            reason,
         )
         AcsShipment.objects.filter(id__in=shipment_ids).update(
             stale_alert_sent=False
         )
-        return {"alerted": 0, "reason": "no_recipients"}
+        return {"alerted": 0, "reason": reason}
 
     logger.info(
         "Stale ACS shipment alert sent for %s shipment(s): %s",

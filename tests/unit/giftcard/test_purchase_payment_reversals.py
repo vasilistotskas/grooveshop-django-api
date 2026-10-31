@@ -57,7 +57,7 @@ def _gift_cards(enable_gift_cards):
 
 @pytest.fixture
 def alerts():
-    with patch("shipping.alerts.send_ops_alert") as alert:
+    with patch("emails.send.send_email") as alert:
         yield alert
 
 

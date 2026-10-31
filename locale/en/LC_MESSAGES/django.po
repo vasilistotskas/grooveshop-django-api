@@ -38,6 +38,14 @@ msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
 #, python-format
+msgid "%(carrier)s: shipment creation failed"
+msgstr "%(carrier)s: shipment creation failed"
+
+#, python-format
+msgid "%(carrier)s: webhook processing failed"
+msgstr "%(carrier)s: webhook processing failed"
+
+#, python-format
 msgid "%(category)s %(amount)s on %(date)s"
 msgstr "%(category)s %(amount)s on %(date)s"
 
@@ -238,10 +246,22 @@ msgstr[0] "%(count)s scheduled task enabled"
 msgstr[1] "%(count)s scheduled tasks enabled"
 
 #, python-format
+msgid "%(counter)s COD parcel was delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for it:"
+msgid_plural "%(counter)s COD parcels were delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for them:"
+msgstr[0] "%(counter)s COD parcel was delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for it:"
+msgstr[1] "%(counter)s COD parcels were delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for them:"
+
+#, python-format
 msgid "%(counter)s attachment, download it in the admin:"
 msgid_plural "%(counter)s attachments, download them in the admin:"
 msgstr[0] "%(counter)s attachment, download it in the admin:"
 msgstr[1] "%(counter)s attachments, download them in the admin:"
+
+#, python-format
+msgid "%(counter)s payout row for the COD payment date %(date)s could not be tied to an order:"
+msgid_plural "%(counter)s payout rows for the COD payment date %(date)s could not be tied to an order:"
+msgstr[0] "%(counter)s payout row for the COD payment date %(date)s could not be tied to an order:"
+msgstr[1] "%(counter)s payout rows for the COD payment date %(date)s could not be tied to an order:"
 
 #, python-format
 msgctxt "return window"
@@ -421,6 +441,10 @@ msgid "%(provider)s does not support %(kind)s shipments."
 msgstr "%(provider)s does not support %(kind)s shipments."
 
 #, python-format
+msgid "%(provider)s reported that a refund it had accepted FAILED: the money was not paid back to the customer and counts as held again."
+msgstr "%(provider)s reported that a refund it had accepted FAILED: the money was not paid back to the customer and counts as held again."
+
+#, python-format
 msgid "%(query)s (%(type)s) - %(count)s result"
 msgid_plural "%(query)s (%(type)s) - %(count)s results"
 msgstr[0] "%(query)s (%(type)s) - %(count)s result"
@@ -566,6 +590,10 @@ msgstr "7 days"
 msgid "9-series MARK returned by a successful ``CancelInvoice`` call — proves the cancellation registered."
 msgstr "9-series MARK returned by a successful ``CancelInvoice`` call — proves the cancellation registered."
 
+#, python-format
+msgid "A %(provider)s payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically."
+msgstr "A %(provider)s payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically."
+
 msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "A Cloudflare zone ID is 32 lowercase hex characters."
 
@@ -577,6 +605,10 @@ msgstr "A breakdown shows the goods only, before returns, biggest first. The pro
 
 msgid "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
 msgstr "A completed payment needs an amount due, unless discounts, loyalty points or gift cards cover the whole order total."
+
+#, python-format
+msgid "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
+msgstr "A confirmed %(provider)s payment arrived for order #%(order_id)s, which was already canceled. Nothing will ship."
 
 msgid "A content page with this slug already exists."
 msgstr "A content page with this slug already exists."
@@ -649,6 +681,9 @@ msgstr "A promotion discounts a cart line that is not part of the order."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
+
+msgid "A refund failed"
+msgstr "A refund failed"
 
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
@@ -726,6 +761,10 @@ msgstr "A valid postcode shown to shoppers, e.g. 151 24."
 msgid "A valid ΑΦΜ is required when requesting an invoice (document_type=INVOICE)."
 msgstr "A valid ΑΦΜ is required when requesting an invoice (document_type=INVOICE)."
 
+#, python-format
+msgid "A verified %(carrier)s webhook could not be applied."
+msgstr "A verified %(carrier)s webhook could not be applied."
+
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 
@@ -774,14 +813,6 @@ msgstr "ACS COD payout %(voucher)s (%(amount)s)"
 
 msgid "ACS COD payouts"
 msgstr "ACS COD payouts"
-
-#, python-format
-msgid "ACS COD reconcile: %(total)d unattributable payout row(s)"
-msgstr "ACS COD reconcile: %(total)d unattributable payout row(s)"
-
-#, python-format
-msgid "ACS COD: %(count)d delivered parcel(s) never remitted"
-msgstr "ACS COD: %(count)d delivered parcel(s) never remitted"
 
 msgid "ACS Comments field."
 msgstr "ACS Comments field."
@@ -2106,6 +2137,12 @@ msgstr "Bytes."
 msgid "CI"
 msgstr "CI"
 
+msgid "COD PARCELS NEVER REMITTED"
+msgstr "COD PARCELS NEVER REMITTED"
+
+msgid "COD PAYOUTS THAT MATCH NO SHIPMENT"
+msgstr "COD PAYOUTS THAT MATCH NO SHIPMENT"
+
 msgid "COD amount"
 msgstr "COD amount"
 
@@ -2363,6 +2400,9 @@ msgstr "Carrier code matching a registered shipping adapter (e.g. 'acs', 'boxnow
 
 msgid "Carrier handling this order. Null for legacy rows where fulfilment is handled outside any registered provider."
 msgstr "Carrier handling this order. Null for legacy rows where fulfilment is handled outside any registered provider."
+
+msgid "Carrier message"
+msgstr "Carrier message"
 
 msgid "Carrier webhook failed"
 msgstr "Carrier webhook failed"
@@ -2775,6 +2815,9 @@ msgstr "Code used to identify the payment provider in the system (e.g., 'stripe'
 
 msgid "Codes"
 msgstr "Codes"
+
+msgid "Collected"
+msgstr "Collected"
 
 msgid "Collected off-platform"
 msgstr "Collected off-platform"
@@ -3515,6 +3558,9 @@ msgstr "Dates"
 msgid "Day"
 msgstr "Day"
 
+msgid "Days ago"
+msgstr "Days ago"
+
 msgid "Days stale"
 msgstr "Days stale"
 
@@ -3546,6 +3592,9 @@ msgstr "Dear %(first_name)s %(last_name)s,"
 #, python-format
 msgid "Dear %(name)s,"
 msgstr "Dear %(name)s,"
+
+msgid "Decide how to reconcile it (see the purchase in the admin)."
+msgstr "Decide how to reconcile it (see the purchase in the admin)."
 
 msgid "Decided at"
 msgstr "Decided at"
@@ -4292,6 +4341,9 @@ msgstr "Every page the storefront has rendered and cached for this store, and it
 
 msgid "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
 msgstr "Every period the product's consumer price (VAT included, promotions that need nothing from the basket applied) was constant, oldest first. The period in force has no end date."
+
+msgid "Every row is stored (it is real money), it is just not attributed. Open the admin list “ACS COD Payouts” and set the “Shipment” filter to “Matches no shipment, not reconciled”: each row there shows its voucher, amount, receiver and delivery date. Reconcile it against the ACS COD beneficiary report, then use “Mark as reconciled” to clear it from the dashboard."
+msgstr "Every row is stored (it is real money), it is just not attributed. Open the admin list “ACS COD Payouts” and set the “Shipment” filter to “Matches no shipment, not reconciled”: each row there shows its voucher, amount, receiver and delivery date. Reconcile it against the ACS COD beneficiary report, then use “Mark as reconciled” to clear it from the dashboard."
 
 msgid "Every search found something"
 msgstr "Every search found something"
@@ -6201,6 +6253,12 @@ msgstr "Gift card details"
 msgid "Gift card expiry reminder"
 msgstr "Gift card expiry reminder"
 
+msgid "Gift card payment disputed"
+msgstr "Gift card payment disputed"
+
+msgid "Gift card payment problem"
+msgstr "Gift card payment problem"
+
 #, python-format
 msgid "Gift card purchase %(amount)s → %(email)s"
 msgstr "Gift card purchase %(amount)s → %(email)s"
@@ -6210,6 +6268,9 @@ msgstr "Gift card purchase confirmation"
 
 msgid "Gift card purchase is not available for this store."
 msgstr "Gift card purchase is not available for this store."
+
+msgid "Gift card spent before its payment was reversed"
+msgstr "Gift card spent before its payment was reversed"
 
 msgid "Gift card value must be positive."
 msgstr "Gift card value must be positive."
@@ -6239,6 +6300,9 @@ msgstr "Gift cards off from %(start)s"
 
 msgid "Github Profile"
 msgstr "Github Profile"
+
+msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
+msgstr "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
 
 #, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
@@ -6723,6 +6787,9 @@ msgstr "If the term lapses, your store keeps running for a grace period of %(gra
 
 msgid "If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app."
 msgstr "If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app."
+
+msgid "If you WERE paid for a parcel outside ACS, open the shipment in the admin and use “Record COD received outside ACS” to clear it from this alert."
+msgstr "If you WERE paid for a parcel outside ACS, open the shipment in the admin and use “Record COD received outside ACS” to clear it from this alert."
 
 msgid "If you did not request this cancellation or have any questions, please contact our customer service immediately."
 msgstr "If you did not request this cancellation or have any questions, please contact our customer service immediately."
@@ -7459,6 +7526,12 @@ msgstr "List the offers that apply to a product"
 msgid "List trending search queries"
 msgstr "List trending search queries"
 
+msgid "Lists the ACS parcels that have shown no tracking movement for several days."
+msgstr "Lists the ACS parcels that have shown no tracking movement for several days."
+
+msgid "Lists the delivered COD parcels ACS has not paid out, with their voucher numbers to chase."
+msgstr "Lists the delivered COD parcels ACS has not paid out, with their voucher numbers to chase."
+
 msgid "Live"
 msgstr "Live"
 
@@ -7898,6 +7971,9 @@ msgstr "Message Stats"
 
 msgid "Message appears to be spam"
 msgstr "Message appears to be spam"
+
+msgid "Message id"
+msgstr "Message id"
 
 msgid "Message is too long (maximum 5000 characters)"
 msgstr "Message is too long (maximum 5000 characters)"
@@ -8411,6 +8487,9 @@ msgstr "No profit in the same period last year"
 msgid "No provider"
 msgstr "No provider"
 
+msgid "No readable voucher"
+msgstr "No readable voucher"
+
 msgid "No sales in the same period last year"
 msgstr "No sales in the same period last year"
 
@@ -8767,9 +8846,6 @@ msgstr "Operation"
 
 msgid "Operation Type"
 msgstr "Operation Type"
-
-msgid "Operational Alerts"
-msgstr "Operational Alerts"
 
 msgid "Operational note from BoxNow"
 msgstr "Operational note from BoxNow"
@@ -9151,6 +9227,9 @@ msgstr "Order shipped"
 
 msgid "Order source"
 msgstr "Order source"
+
+msgid "Order total"
+msgstr "Order total"
 
 #, python-brace-format
 msgid "Order with ID {order_id} not found"
@@ -9578,6 +9657,13 @@ msgstr "Payment currency does not match order currency."
 msgid "Payment currency mismatch"
 msgstr "Payment currency mismatch"
 
+msgid "Payment does not match its order"
+msgstr "Payment does not match its order"
+
+#, python-format
+msgid "Payment does not match order #%(order_id)s"
+msgstr "Payment does not match order #%(order_id)s"
+
 msgid "Payment failed"
 msgstr "Payment failed"
 
@@ -9639,6 +9725,13 @@ msgstr "Payment rails"
 
 msgid "Payment received for a canceled order"
 msgstr "Payment received for a canceled order"
+
+#, python-format
+msgid "Payment received for canceled order #%(order_id)s"
+msgstr "Payment received for canceled order #%(order_id)s"
+
+msgid "Payment reference"
+msgstr "Payment reference"
 
 msgid "Payment status"
 msgstr "Payment status"
@@ -10332,6 +10425,9 @@ msgstr "Product relation"
 msgid "Product relations"
 msgstr "Product relations"
 
+msgid "Product reviews feature"
+msgstr "Product reviews feature"
+
 msgid "Product whose stock was modified"
 msgstr "Product whose stock was modified"
 
@@ -10912,6 +11008,14 @@ msgstr "Refund attempt %(key)s of %(amount)s"
 msgid "Refund credit"
 msgstr "Refund credit"
 
+#, python-format
+msgid "Refund failed for order #%(order_id)s"
+msgstr "Refund failed for order #%(order_id)s"
+
+#, python-format
+msgid "Refund or reconcile the payment in the %(provider)s dashboard."
+msgstr "Refund or reconcile the payment in the %(provider)s dashboard."
+
 msgid "Refund order"
 msgstr "Refund order"
 
@@ -10922,8 +11026,15 @@ msgstr "Refund processed"
 msgid "Refund processed for order #{order_id}"
 msgstr "Refund processed for order #{order_id}"
 
+msgid "Refund reference"
+msgstr "Refund reference"
+
 msgid "Refund reversal"
 msgstr "Refund reversal"
+
+#, python-format
+msgid "Refund the customer in the %(provider)s dashboard; the provider's refund webhook records it on the order."
+msgstr "Refund the customer in the %(provider)s dashboard; the provider's refund webhook records it on the order."
 
 msgid "Refund this order's payment first."
 msgstr "Refund this order's payment first."
@@ -11400,10 +11511,6 @@ msgstr "Review the application from the store admin — Business Customers."
 
 msgid "Review waiting for approval"
 msgstr "Review waiting for approval"
-
-#, python-brace-format
-msgid "Review waiting for approval: {product}"
-msgstr "Review waiting for approval: {product}"
 
 msgid "Reviewed at"
 msgstr "Reviewed at"
@@ -11994,6 +12101,9 @@ msgstr "Shipment"
 msgid "Shipment Configuration"
 msgstr "Shipment Configuration"
 
+msgid "Shipment creation failed"
+msgstr "Shipment creation failed"
+
 msgid "Shipment dispatched"
 msgstr "Shipment dispatched"
 
@@ -12334,10 +12444,6 @@ msgstr "Staging"
 
 msgid "Stale ACS Shipment Alert"
 msgstr "Stale ACS Shipment Alert"
-
-#, python-brace-format
-msgid "Stale ACS shipment alert — {n} shipment(s)"
-msgstr "Stale ACS shipment alert — {n} shipment(s)"
 
 msgid "Stale ACS shipments"
 msgstr "Stale ACS shipments"
@@ -12892,11 +12998,32 @@ msgstr "Tax office (ΔΟΥ) is required."
 msgid "Team"
 msgstr "Team"
 
+msgid "Tells the store's staff that ACS paid COD money that could not be tied to an order."
+msgstr "Tells the store's staff that ACS paid COD money that could not be tied to an order."
+
+msgid "Tells the store's staff that a carrier refused to create the shipment of an order, and what to do next."
+msgstr "Tells the store's staff that a carrier refused to create the shipment of an order, and what to do next."
+
+msgid "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
+msgstr "Tells the store's staff that a confirmed payment collected a different amount than its order is for."
+
+msgid "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
+msgstr "Tells the store's staff that a customer's review waits for their approval before it shows to shoppers."
+
 msgid "Tells the store's staff that a dispute closed against it."
 msgstr "Tells the store's staff that a dispute closed against it."
 
+msgid "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
+msgstr "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
+
 msgid "Tells the store's staff that a payment was disputed."
 msgstr "Tells the store's staff that a payment was disputed."
+
+msgid "Tells the store's staff that a refund failed after the provider accepted it, so the customer has not been paid back."
+msgstr "Tells the store's staff that a refund failed after the provider accepted it, so the customer has not been paid back."
+
+msgid "Tells the store's staff that a verified carrier webhook could not be applied, so a parcel update may have been missed."
+msgstr "Tells the store's staff that a verified carrier webhook could not be applied, so a parcel update may have been missed."
 
 msgid "Tells the store's staff that an application awaits review."
 msgstr "Tells the store's staff that an application awaits review."
@@ -12909,6 +13036,9 @@ msgstr "Tells the store's staff that someone left feedback."
 
 msgid "Tells the store's staff that someone used the contact form."
 msgstr "Tells the store's staff that someone used the contact form."
+
+msgid "Tells the store's staff that the payment of a gift card purchase was disputed, or reversed after the card was partly spent."
+msgstr "Tells the store's staff that the payment of a gift card purchase was disputed, or reversed after the card was partly spent."
 
 msgid "Tells the store's staff which products have run down to their low-stock threshold."
 msgstr "Tells the store's staff which products have run down to their low-stock threshold."
@@ -13033,6 +13163,10 @@ msgid "That file type is not accepted. Allowed: %(types)s."
 msgstr "That file type is not accepted. Allowed: %(types)s."
 
 #, python-format
+msgid "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
+msgstr "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
+
+#, python-format
 msgid "The %(site_name)s Team"
 msgstr "The %(site_name)s Team"
 
@@ -13127,11 +13261,17 @@ msgstr "The coupon code can no longer be used."
 msgid "The coupon code to apply."
 msgstr "The coupon code to apply."
 
+msgid "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
+msgstr "The customer has already checked out and is waiting. You can also cancel the order and contact the customer."
+
 msgid "The customer is not eligible for this promotion"
 msgstr "The customer is not eligible for this promotion"
 
 msgid "The customer kept the product"
 msgstr "The customer kept the product"
+
+msgid "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay."
+msgstr "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay."
 
 msgid "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
 msgstr "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
@@ -13147,6 +13287,9 @@ msgstr "The dispute closed against you and the money was taken back. Nothing was
 
 msgid "The end is before the start."
 msgstr "The end is before the start."
+
+msgid "The endpoint already acknowledged the webhook (200), so the carrier will not retry. A parcel state transition may have been missed: inspect the parcel and the order and reconcile them manually."
+msgstr "The endpoint already acknowledged the webhook (200), so the carrier will not retry. A parcel state transition may have been missed: inspect the parcel and the order and reconcile them manually."
 
 msgid "The exact consent sentence shown to the subscriber."
 msgstr "The exact consent sentence shown to the subscriber."
@@ -13244,6 +13387,14 @@ msgstr "The page-builder layouts, the navigation menus and the RENDERED pages bu
 
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
+
+#, python-format
+msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
+msgstr "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
+
+#, python-format
+msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) was reversed by the provider. The unspent balance was voided, but %(unrecovered)s of the card had already been spent and cannot be recovered automatically."
+msgstr "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) was reversed by the provider. The unspent balance was voided, but %(unrecovered)s of the card had already been spent and cannot be recovered automatically."
 
 msgid "The payment method is free once the products, after discounts and excluding shipping, reach this amount. Free shipping is judged on the same value."
 msgstr "The payment method is free once the products, after discounts and excluding shipping, reach this amount. Free shipping is judged on the same value."
@@ -14106,6 +14257,9 @@ msgstr "Unknown gift card code."
 msgid "Unknown shipping provider."
 msgstr "Unknown shipping provider."
 
+msgid "Unknown voucher"
+msgstr "Unknown voucher"
+
 #, python-format
 msgid "Unless a renewal is recorded within %(grace)s days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact."
 msgstr "Unless a renewal is recorded within %(grace)s days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact."
@@ -14879,6 +15033,9 @@ msgstr "What the store sells. Selects the recommendation preset the store starts
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 
+msgid "What to do"
+msgstr "What to do"
+
 msgid "What's Next?"
 msgstr "What's Next?"
 
@@ -15498,6 +15655,14 @@ msgid "Zipcode is required."
 msgstr "Zipcode is required."
 
 #, python-brace-format
+msgid "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
+msgstr "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
+
+#, python-brace-format
+msgid "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
+msgstr "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
+
+#, python-brace-format
 msgid "[{site}] Confirm your alert for {name}"
 msgstr "[{site}] Confirm your alert for {name}"
 
@@ -15506,8 +15671,28 @@ msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Low stock alert — {n} product(s)"
 
 #, python-brace-format
+msgid "[{site}] Payment does not match order {order_id}"
+msgstr "[{site}] Payment does not match order {order_id}"
+
+#, python-brace-format
+msgid "[{site}] Payment received for canceled order {order_id}"
+msgstr "[{site}] Payment received for canceled order {order_id}"
+
+#, python-brace-format
 msgid "[{site}] Price drop: {name} is now at your target"
 msgstr "[{site}] Price drop: {name} is now at your target"
+
+#, python-brace-format
+msgid "[{site}] Refund failed for order {order_id}"
+msgstr "[{site}] Refund failed for order {order_id}"
+
+#, python-brace-format
+msgid "[{site}] Review waiting for approval: {product_name}"
+msgstr "[{site}] Review waiting for approval: {product_name}"
+
+#, python-brace-format
+msgid "[{site}] Stale ACS shipment alert — {n} shipment(s)"
+msgstr "[{site}] Stale ACS shipment alert — {n} shipment(s)"
 
 #, python-brace-format
 msgid "[{site}] Update on your business account application"
@@ -15528,6 +15713,18 @@ msgstr "[{site}] Your gift card expires soon"
 #, python-brace-format
 msgid "[{site}] Your gift card purchase"
 msgstr "[{site}] Your gift card purchase"
+
+#, python-brace-format
+msgid "[{site}] {carrier}: shipment creation failed for order {order_id}"
+msgstr "[{site}] {carrier}: shipment creation failed for order {order_id}"
+
+#, python-brace-format
+msgid "[{site}] {carrier}: webhook processing failed (message {message_id})"
+msgstr "[{site}] {carrier}: webhook processing failed (message {message_id})"
+
+#, python-brace-format
+msgid "[{site}] {headline}"
+msgstr "[{site}] {headline}"
 
 #, python-brace-format
 msgid "[{site}] {name} is back in stock"
@@ -15874,6 +16071,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Old (7+ days)"
 #~ msgstr "Old (7+ days)"
+
+#~ msgid "Operational Alerts"
+#~ msgstr "Operational Alerts"
 
 #~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."

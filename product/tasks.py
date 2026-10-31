@@ -4,11 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
-from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.text import Truncator
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import override as translation_override
 
 from core import celery_app
 from core.retry import (
@@ -17,8 +13,6 @@ from core.retry import (
     TRANSIENT_ERRORS,
 )
 from core.tasks import MonitoredTask
-from core.utils.email_context import build_email_context
-from core.utils.i18n import store_language
 from core.utils.tenant_urls import storefront_path
 from emails.send import Status, send_email, was_sent
 from product.emails import ALERTS_GATE, LowStock, PriceDrop
@@ -566,10 +560,6 @@ def reevaluate_price_episodes() -> dict[str, int]:
     return {"products": len(changed)}
 
 
-#: How much of the comment the staff email quotes; the admin page has it all.
-REVIEW_ALERT_COMMENT_CHARS = 300
-
-
 @celery_app.task(
     base=MonitoredTask,
     max_retries=3,
@@ -581,18 +571,14 @@ def send_review_pending_alert(review_id: int) -> dict:
     """Email the store's operators that a review waits for approval.
 
     One mail per entry into ``NEW`` (see
-    ``ProductReviewWriteSerializer.save``), through the operational-alert
-    gate so the store's ``OPS_ALERT_REVIEW_PENDING_ENABLED`` switch and
-    recipients apply. A review that was moderated before this ran is
-    skipped: there is nothing left to approve. Rendered in the store's own
-    language, not the customer's, because staff read it.
+    ``ProductReviewWriteSerializer.save``), as the ``ops.review_pending``
+    email type, so the store's switch and recipients apply. A review that
+    was moderated before this ran is skipped: there is nothing left to
+    approve. The pipeline renders it in the store's own language, not the
+    customer's, because staff read it.
     """
-    from django.urls import reverse
-
-    from core.utils.tenant_urls import get_tenant_api_base_url
     from product.enum.review import ReviewStatus
     from product.models.review import ProductReview
-    from shipping.alerts import OpsAlertKind, send_ops_alert
 
     review = (
         ProductReview.objects.with_translations()
@@ -604,31 +590,5 @@ def send_review_pending_alert(review_id: int) -> dict:
     if review is None:
         return {"status": "skipped", "reason": "not_waiting"}
 
-    language = store_language()
-    with translation_override(language):
-        product_name = review.product.safe_translation_getter(
-            "name", any_language=True
-        ) or str(review.product_id)
-        comment = review.safe_translation_getter("comment", any_language=True)
-        context = build_email_context(
-            language=language,
-            product_name=product_name,
-            stars=review.stars,
-            reviewer=review.reviewer_label,
-            comment=Truncator(comment or "").chars(REVIEW_ALERT_COMMENT_CHARS),
-            admin_url=get_tenant_api_base_url()
-            + reverse("admin:product_productreview_change", args=[review.pk]),
-        )
-        sent = send_ops_alert(
-            kind=OpsAlertKind.REVIEW_PENDING,
-            subject=_("Review waiting for approval: {product}").format(
-                product=product_name
-            ),
-            message=render_to_string(
-                "emails/product/review_pending.txt", context
-            ),
-            html_message=render_to_string(
-                "emails/product/review_pending.html", context
-            ),
-        )
+    sent = was_sent(send_email("ops.review_pending", review))
     return {"status": "sent" if sent else "skipped", "review_id": review.pk}

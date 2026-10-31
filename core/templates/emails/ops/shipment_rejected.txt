@@ -1,0 +1,12 @@
+{% load i18n %}{% blocktrans %}{{ carrier }}: shipment creation failed{% endblocktrans %}
+
+{% blocktrans %}The {{ carrier }} API permanently rejected the shipment for order #{{ order_id }}.{% endblocktrans %}
+
+{% trans "Carrier message" %}: {{ error|safe }}
+{% trans "What to do" %}: {{ remedy|safe }}
+
+{% trans "The customer has already checked out and is waiting. You can also cancel the order and contact the customer." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

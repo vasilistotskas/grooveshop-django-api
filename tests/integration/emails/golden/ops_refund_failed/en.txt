@@ -1,0 +1,14 @@
+Refund failed for order #1234
+
+Stripe reported that a refund it had accepted FAILED: the money was not paid back to the customer and counts as held again.
+
+Order: #1234
+Refund reference: re_3QxExample
+Amount: €45.50
+Reason: expired_or_canceled_card
+
+The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

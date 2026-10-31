@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] Πληρωμή για ακυρωμένη παραγγελία 1234",
+  "to": [
+    "owner@store.test"
+  ]
+}

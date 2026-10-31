@@ -1,0 +1,13 @@
+Payment received for canceled order #1234
+
+A confirmed stripe payment arrived for order #1234, which was already canceled. Nothing will ship.
+
+Order: #1234
+Payment method: stripe
+Payment reference: pi_3QxExample
+
+Refund the customer in the stripe dashboard; the provider's refund webhook records it on the order.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

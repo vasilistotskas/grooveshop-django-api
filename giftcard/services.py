@@ -522,7 +522,8 @@ class GiftCardService:
 
     @classmethod
     def _alert_unrecovered(cls, purchase, unrecovered: Decimal) -> None:
-        from shipping.alerts import OpsAlertKind, send_ops_alert
+        from emails.send import send_email
+        from giftcard.emails import GiftCardReversal
 
         logger.error(
             "Payment for gift card purchase %s was REVERSED but %s of %s was "
@@ -532,17 +533,9 @@ class GiftCardService:
             purchase.amount,
         )
         try:
-            send_ops_alert(
-                kind=OpsAlertKind.GIFT_CARD_REVERSAL,
-                subject="Gift card spent before its payment was reversed",
-                message=(
-                    f"The payment for gift card purchase {purchase.uuid} "
-                    f"({purchase.amount}) was reversed by the provider. The "
-                    "unspent balance was voided, but "
-                    f"{unrecovered} of the card had already been spent and "
-                    "cannot be recovered automatically. Decide how to "
-                    "reconcile it (see the purchase in the admin)."
-                ),
+            send_email(
+                "ops.gift_card_reversal",
+                GiftCardReversal(purchase, unrecovered=unrecovered),
             )
         except Exception:
             logger.exception(
@@ -560,7 +553,8 @@ class GiftCardService:
         announced (a redelivered event, a later status of the same
         dispute). The purchase row must be locked by the caller.
         """
-        from shipping.alerts import OpsAlertKind, send_ops_alert
+        from emails.send import send_email
+        from giftcard.emails import GiftCardReversal
 
         if purchase.dispute_id == dispute_id:
             return False
@@ -571,16 +565,7 @@ class GiftCardService:
             "Payment for gift card purchase %s is DISPUTED", purchase.uuid
         )
         try:
-            send_ops_alert(
-                kind=OpsAlertKind.GIFT_CARD_REVERSAL,
-                subject="Gift card payment disputed",
-                message=(
-                    f"The payment for gift card purchase {purchase.uuid} "
-                    f"({purchase.amount}) is being disputed. The card is "
-                    "voided automatically if the dispute is lost; consider "
-                    "disabling it now."
-                ),
-            )
+            send_email("ops.gift_card_reversal", GiftCardReversal(purchase))
         except Exception:
             logger.exception(
                 "Could not send the gift-card dispute alert for %s",

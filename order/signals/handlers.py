@@ -12,8 +12,10 @@ from djmoney.money import Money
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
+from emails.send import send_email
 from order.credit_documents import request_credit_documents
 from order.disputes import announce_chargeback
+from order.emails import RefundFailed
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -66,7 +68,6 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.enum.settlement import PaySettlement
-from shipping.alerts import OpsAlertKind, send_ops_alert
 from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
@@ -1407,10 +1408,15 @@ def handle_stripe_refund_failed(sender, **kwargs):
         )
         OrderHistory.log_note(order=order, note=note)
         try:
-            send_ops_alert(
-                kind=OpsAlertKind.REFUND_FAILED,
-                subject=f"Refund failed for order {order.id}",
-                message=f"Order {order.id}: {note}",
+            send_email(
+                "ops.refund_failed",
+                RefundFailed(
+                    order_id=order.id,
+                    provider="Stripe",
+                    refund_id=refund_id,
+                    amount=failed,
+                    reason=reason,
+                ),
             )
         except Exception:
             logger.exception(

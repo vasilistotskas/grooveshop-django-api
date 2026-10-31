@@ -2308,39 +2308,18 @@ class AcsService:
         Best-effort: an SMTP failure must not fail the reconcile itself
         (the payout rows are already persisted).
         """
-        from shipping.alerts import OpsAlertKind, send_ops_alert
-
-        parts = []
-        if unmatched:
-            parts.append(f"{unmatched} for a voucher we don't recognise")
-        if skipped:
-            parts.append(f"{skipped} with no readable voucher")
-        total = unmatched + skipped
+        from emails.send import send_email
+        from shipping_acs.emails import UnattributablePayouts
 
         try:
-            sent = send_ops_alert(
-                kind=OpsAlertKind.UNATTRIBUTABLE_COD_PAYOUTS,
-                subject=gettext(
-                    "ACS COD reconcile: %(total)d unattributable payout row(s)"
-                )
-                % {"total": total},
-                message=(
-                    f"{total} payout row(s) for COD_Payment_Date="
-                    f"{cod_payment_date or 'unspecified'} could not be "
-                    f"tied to an order — {', '.join(parts)}.\n\n"
-                    "Every row is stored (it is real money), it is just "
-                    "not attributed. Open the admin list 'ACS COD "
-                    "Payouts' and set the 'Shipment' filter to 'Matches "
-                    "no shipment, not reconciled': each row there shows "
-                    "its voucher, amount, receiver and delivery date. "
-                    "Reconcile it "
-                    "against the ACS COD beneficiary report, then use "
-                    "'Mark as reconciled' to clear it from the "
-                    "dashboard."
+            send_email(
+                "ops.unattributable_cod_payouts",
+                UnattributablePayouts(
+                    unmatched=unmatched,
+                    skipped=skipped,
+                    cod_payment_date=cod_payment_date,
                 ),
             )
-            if not sent:
-                return
         except Exception as exc:
             logger.error(
                 "reconcile_cod_payouts: failed to send unmatched-payout "

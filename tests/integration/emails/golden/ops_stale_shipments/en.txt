@@ -1,0 +1,13 @@
+STALE ACS SHIPMENT ALERT
+
+The following 2 shipments have shown no tracking movement for 3+ days:
+
+- Voucher 9700000001 — order #1201 — New — last movement: 2026-03-09 12:30 (5 days ago)
+- Voucher 9700000002 — order #1188 — In transit — last movement: 2026-03-05 12:30 (9 days ago)
+
+
+Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). A “Pending creation” row means the voucher mint failed — fix the order's address/destination and use the admin action “Issue ACS voucher now”. If a voucher is dead, use “Retire selected shipments” to stop polling it.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

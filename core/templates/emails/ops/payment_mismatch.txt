@@ -1,0 +1,15 @@
+{% load i18n %}{% blocktrans %}Payment does not match order #{{ order_id }}{% endblocktrans %}
+
+{% blocktrans %}A {{ provider }} payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically.{% endblocktrans %}
+
+{% trans "Order" %}: #{{ order_id|safe }}
+{% trans "Payment method" %}: {{ provider|safe }}
+{% trans "Payment reference" %}: {{ payment_id|safe }}
+{% trans "Collected" %}: {{ observed|safe }}
+{% trans "Order total" %}: {{ expected|safe }}
+
+{% blocktrans %}Refund or reconcile the payment in the {{ provider }} dashboard.{% endblocktrans %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

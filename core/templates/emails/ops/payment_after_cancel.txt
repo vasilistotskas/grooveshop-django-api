@@ -1,0 +1,13 @@
+{% load i18n %}{% blocktrans %}Payment received for canceled order #{{ order_id }}{% endblocktrans %}
+
+{% blocktrans %}A confirmed {{ provider }} payment arrived for order #{{ order_id }}, which was already canceled. Nothing will ship.{% endblocktrans %}
+
+{% trans "Order" %}: #{{ order_id|safe }}
+{% trans "Payment method" %}: {{ provider|safe }}
+{% trans "Payment reference" %}: {{ payment_id|safe }}
+
+{% blocktrans %}Refund the customer in the {{ provider }} dashboard; the provider's refund webhook records it on the order.{% endblocktrans %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

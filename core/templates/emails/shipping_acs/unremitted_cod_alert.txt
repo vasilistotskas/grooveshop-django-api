@@ -1,0 +1,13 @@
+{% load i18n %}{% trans "COD PARCELS NEVER REMITTED" %}
+
+{% blocktrans count counter=n %}{{ counter }} COD parcel was delivered more than {{ older_than_days }} days ago and ACS has still not reported a payout for it:{% plural %}{{ counter }} COD parcels were delivered more than {{ older_than_days }} days ago and ACS has still not reported a payout for them:{% endblocktrans %}
+
+{% for row in rows %}- {% trans "Order" %} #{{ row.order_id }} — {% trans "Voucher" %} {{ row.voucher_no }} — {{ row.cod_amount }} — {% trans "Delivered" %} {{ row.delivered_on }} ({{ row.days_since_delivery }} {% trans "days ago" %})
+{% endfor %}
+{% trans "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent." %}
+
+{% trans "If you WERE paid for a parcel outside ACS, open the shipment in the admin and use “Record COD received outside ACS” to clear it from this alert." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

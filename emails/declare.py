@@ -77,6 +77,7 @@ def staff_email(
     sample: Callable[[RenderEnv], Any],
     gates: tuple[Gate, ...] = (),
     reply_to: Callable[[Any], Sequence[str]] | None = None,
+    area: str = "team",
 ) -> EmailType:
     """An alert to the bound store's own staff. Always switchable."""
     return registry.register(
@@ -84,7 +85,7 @@ def staff_email(
             key=key,
             title=title,
             description=description,
-            area="team",
+            area=area,
             audience=Audience.STORE_STAFF,
             kind=Kind.TRANSACTIONAL,
             templates=templates,

@@ -15,12 +15,15 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core import mail
 from django.db import DatabaseError
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone, translation
+from django.utils.translation import gettext
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -44,6 +47,16 @@ from user.factories import UserAccountFactory
 pytestmark = pytest.mark.django_db
 
 VOUCHER = "9772892603"
+
+
+@pytest.fixture(autouse=True)
+def _operators(open_email_gates):
+    mail.outbox.clear()
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["ops@example.com"],
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -248,11 +261,14 @@ def test_the_watcher_skips_a_settled_shipment_and_still_reports_others(
 def test_the_alert_names_the_action_that_clears_a_parcel():
     _shipment()
 
-    with patch("shipping.alerts.send_ops_alert", return_value=True) as alert:
-        alert_unremitted_cod_payouts()
+    mail.outbox.clear()
+    alert_unremitted_cod_payouts()
 
-    message = alert.call_args.kwargs["message"]
-    assert "Record COD received outside ACS" in message
+    [message] = mail.outbox
+    # Rendered in the store's language, naming the admin action as it reads.
+    with translation.override(settings.LANGUAGE_CODE):
+        action = gettext("Record COD received outside ACS")
+    assert action in message.body
 
 
 # ---------------------------------------------------------------------------

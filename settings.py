@@ -1586,11 +1586,10 @@ def get_celery_beat_schedule():
         },
         # Surface non-terminal ACS shipments with no tracking movement
         # for ACS_STALE_SHIPMENT_DAYS days (stuck parcels, dead
-        # vouchers) to the owning store's operators via
-        # ``tenant_admin_recipients()`` — platform ``ADMINS`` is only the
-        # fallback. Daily at 09:00 Athens so the digest
-        # lands at the start of the working day; the claim flag inside
-        # the task dedupes re-alerts.
+        # vouchers) to the owning store's operators (the
+        # ``ops.stale_shipments`` email). Daily at 09:00 Athens so the
+        # digest lands at the start of the working day; the claim flag
+        # inside the task dedupes re-alerts.
         "check-stale-acs-shipments": {
             # Fanout: AcsShipment is per-tenant; beat fires in public.
             "task": "tenant.tasks.fanout_check_stale_acs_shipments",
@@ -2093,113 +2092,6 @@ EXTRA_SETTINGS_DEFAULTS = [
             "placed on day D is flagged from 00:00 on day D+N while it is "
             "still pending, processing or shipped. Online orders that "
             "are not paid yet are never flagged. 0 turns the flag off."
-        ),
-    },
-    # Operational alert emails, one switch per kind (``OpsAlertKind``,
-    # ``shipping/alerts.py``). All default ON: a store opts OUT of a kind,
-    # so a kind added later reaches every store until it mutes it. Each
-    # description says where the work shows when the email is off.
-    {
-        "name": "OPS_ALERT_STALE_SHIPMENTS_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email a daily digest of ACS parcels with no tracking movement "
-            "and vouchers that failed to mint. When off, the same parcels "
-            "stay on the dashboard's 'Needs attention' list."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_UNREMITTED_COD_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when ACS delivered a cash-on-delivery parcel and never "
-            "paid the money out. When off, the parcels stay on the "
-            "dashboard's 'Needs attention' list."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_UNATTRIBUTABLE_COD_PAYOUTS_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when an ACS cash-on-delivery payout matches none of the "
-            "store's shipments. When off, every such payout stays on the "
-            "dashboard's 'Needs attention' list until it is marked "
-            "reconciled."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_SHIPMENT_REJECTED_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email at once when a courier permanently refuses to create a "
-            "shipment (bad address, unacceptable destination). The order "
-            "also gets a note."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_WEBHOOK_FAILED_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when a verified carrier webhook could not be applied, "
-            "so a parcel state change may have been missed."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_PAYMENT_AFTER_CANCEL_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when a payment arrives for an order that was already "
-            "canceled and has to be refunded. When off, such orders stay "
-            "on the dashboard's 'Needs attention' list until refunded."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_REFUND_FAILED_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when Stripe reports a refund it had accepted as failed: "
-            "the customer was told they were refunded and has to be paid "
-            "back another way."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_GIFT_CARD_REVERSAL_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when the payment of a gift-card purchase is disputed, "
-            "or was refunded or charged back after part of the card was "
-            "already spent. The unspent balance is voided automatically; "
-            "the spent part is recorded on the purchase."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_PAYMENT_MISMATCH_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when a provider confirms a payment whose amount does "
-            "not match the order, or that cannot be tied to the order it "
-            "arrived for. The order is not marked paid and is never "
-            "auto-canceled; reconcile it by hand."
-        ),
-    },
-    {
-        "name": "OPS_ALERT_REVIEW_PENDING_ENABLED",
-        "type": "bool",
-        "value": True,
-        "description": (
-            "Email when a customer's review needs approval: a new review, "
-            "or an approved or rejected one the customer edited. When off, "
-            "such reviews stay on the dashboard's 'Needs attention' list "
-            "and the sidebar badge."
         ),
     },
     {

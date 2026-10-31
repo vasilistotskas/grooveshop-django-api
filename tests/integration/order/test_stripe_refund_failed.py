@@ -85,7 +85,7 @@ def _deliver(event: Mock) -> None:
 
 @pytest.fixture
 def alerts():
-    with patch("order.signals.handlers.send_ops_alert") as send:
+    with patch("order.signals.handlers.send_email") as send:
         yield send
 
 
@@ -142,8 +142,10 @@ class TestAFailedRefundIsReversed:
         assert "expired_or_canceled_card" in note
         assert "pay them back another way" in note
         alerts.assert_called_once()
-        assert alerts.call_args.kwargs["kind"].value == "refund_failed"
-        assert "FAILED" in alerts.call_args.kwargs["message"]
+        assert alerts.call_args.args[0] == "ops.refund_failed"
+        alert = alerts.call_args.args[1]
+        assert alert.order_id == order.id
+        assert alert.provider == "Stripe"
 
     def test_a_dashboard_refund_booked_from_the_charge_event_is_reversed(
         self, alerts

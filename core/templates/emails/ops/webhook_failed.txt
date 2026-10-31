@@ -1,0 +1,12 @@
+{% load i18n %}{% blocktrans %}{{ carrier }}: webhook processing failed{% endblocktrans %}
+
+{% blocktrans %}A verified {{ carrier }} webhook could not be applied.{% endblocktrans %}
+
+{% trans "Message id" %}: {{ message_id|safe }}
+{% trans "Error" %}: {{ error|safe }}
+
+{% trans "The endpoint already acknowledged the webhook (200), so the carrier will not retry. A parcel state transition may have been missed: inspect the parcel and the order and reconcile them manually." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

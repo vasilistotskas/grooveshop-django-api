@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db.models import Count, Q
+from django.apps import apps
+from django.db.models import (
+    F,
+    Func,
+    IntegerField,
+    Model,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+)
+from django.db.models.functions import Coalesce
 
 from core.managers import (
     TranslatableOptimizedManager,
@@ -12,6 +23,33 @@ from tenant.membership import is_store_staff
 
 if TYPE_CHECKING:
     from typing import Self
+
+
+def _count(rows: QuerySet) -> Coalesce:
+    """The number of ``rows``, as a correlated subquery.
+
+    A subquery rather than ``Count(..., distinct=True)``: three joined
+    aggregates (likes, comments, tags) multiply into likes x comments x
+    tags rows per post before they are grouped, which a popular post
+    turns into millions. Each subquery reads only its own table.
+    """
+    return Coalesce(
+        Subquery(
+            rows.order_by()
+            .annotate(n=Func(F("pk"), function="COUNT"))
+            .values("n"),
+            output_field=IntegerField(),
+        ),
+        0,
+    )
+
+
+def _through_rows(model: type[Model], field: str, **extra) -> QuerySet:
+    """The rows joining each ``model`` to its ``field`` relation."""
+    relation = model._meta.get_field(field)
+    return relation.remote_field.through._default_manager.filter(
+        **{relation.m2m_field_name(): OuterRef("pk")}, **extra
+    )
 
 
 class BlogPostQuerySet(TranslatableOptimizedQuerySet):
@@ -24,37 +62,35 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
 
     def with_likes_count(self) -> Self:
         """Annotate with likes count."""
-        return self.annotate(likes_count=Count("likes", distinct=True))
+        return self.annotate(
+            likes_count=_count(_through_rows(self.model, "likes"))
+        )
 
     def with_comments_count(
         self,
         approved_only: bool = True,
     ) -> Self:
         """Annotate queryset with comments count."""
+        comments = apps.get_model("blog", "BlogComment")._base_manager
+        rows = comments.filter(post=OuterRef("pk"))
         if approved_only:
-            return self.annotate(
-                comments_count=Count(
-                    "comments",
-                    distinct=True,
-                    filter=Q(comments__approved=True),
-                )
-            )
-        return self.annotate(comments_count=Count("comments", distinct=True))
+            rows = rows.filter(approved=True)
+        return self.annotate(comments_count=_count(rows))
 
     def with_tags_count(
         self,
         active_only: bool = True,
     ) -> Self:
         """Annotate queryset with tags count."""
-        if active_only:
-            return self.annotate(
-                tags_count=Count(
-                    "tags",
-                    distinct=True,
-                    filter=Q(tags__active=True),
-                )
-            )
-        return self.annotate(tags_count=Count("tags", distinct=True))
+        relation = self.model._meta.get_field("tags")
+        extra = (
+            {f"{relation.m2m_reverse_field_name()}__active": True}
+            if active_only
+            else {}
+        )
+        return self.annotate(
+            tags_count=_count(_through_rows(self.model, "tags", **extra))
+        )
 
     def published(self) -> Self:
         """Only posts visible to the public.

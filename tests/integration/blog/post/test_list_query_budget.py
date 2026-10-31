@@ -70,3 +70,57 @@ def test_the_query_count_does_not_grow_with_the_posts(world, route):
     many = _queries(url)
 
     assert many == few
+
+
+def test_the_counts_are_subqueries_not_joined_aggregates():
+    """Likes x comments x tags rows must not multiply before grouping."""
+    from blog.models.post import BlogPost
+
+    sql = str(BlogPost.objects.for_list().query)
+
+    assert "GROUP BY" not in sql
+    assert sql.count("COUNT(") == 3
+
+
+def test_the_counts_count_what_the_property_would():
+    from blog.models.post import BlogPost
+
+    category = BlogCategoryFactory()
+    author = BlogAuthorFactory(user=UserAccountFactory())
+    popular = BlogPostFactory(category=category, author=author)
+    popular.tags.add(
+        *[BlogTagFactory(active=True) for _ in range(3)],
+        BlogTagFactory(active=False),
+    )
+    popular.likes.add(*[UserAccountFactory() for _ in range(4)])
+    for _ in range(3):
+        BlogCommentFactory(post=popular, approved=True)
+    BlogCommentFactory(post=popular, approved=False)
+    quiet = BlogPostFactory(category=category, author=author)
+
+    counted = {
+        post.pk: (post.likes_count, post.comments_count, post.tags_count)
+        for post in BlogPost.objects.for_list()
+    }
+
+    assert counted[popular.pk] == (4, 3, 3)
+    assert counted[quiet.pk] == (0, 0, 0)
+    for post in (popular, quiet):
+        fresh = BlogPost.objects.get(pk=post.pk)
+        assert counted[post.pk] == (
+            fresh.likes_count,
+            fresh.comments_count,
+            fresh.tags_count,
+        )
+    assert (
+        BlogPost.objects.with_comments_count(approved_only=False)
+        .get(pk=popular.pk)
+        .comments_count
+        == 4
+    )
+    assert (
+        BlogPost.objects.with_tags_count(active_only=False)
+        .get(pk=popular.pk)
+        .tags_count
+        == 4
+    )

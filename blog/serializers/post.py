@@ -1,7 +1,6 @@
 from typing import cast
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
@@ -19,22 +18,41 @@ from blog.utils import calculate_reading_time
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 
-User = get_user_model()
-
 
 @extend_schema_field(generate_schema_multi_lang(BlogPost))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
+# What a post card reads of a translation. The body (the whole article,
+# which `content_preview` stands in for) and the SEO copy belong to the
+# post page: a list of posts, and every list a post is embedded in (the
+# author's recent and top posts, a comment's post), used to carry each
+# article in full, 100 to 200 KB a page.
+LIST_TRANSLATED_FIELDS = ("title", "subtitle")
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(BlogPost, fields=LIST_TRANSLATED_FIELDS)
+)
+class ListTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
 class BlogPostSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
 ):
-    likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
     category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
     tags = PrimaryKeyRelatedField(queryset=BlogTag.objects.all(), many=True)
     author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
-    translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
+    translations = ListTranslatedFieldsField(
+        shared_model=BlogPost,
+        serializer_class=create_translated_fields_serializer(
+            BlogPost,
+            related_name="translations",
+            meta={"fields": list(LIST_TRANSLATED_FIELDS)},
+        ),
+    )
 
     reading_time = serializers.SerializerMethodField(required=False)
     content_preview = serializers.SerializerMethodField(required=False)
@@ -45,7 +63,6 @@ class BlogPostSerializer(
             "id",
             "uuid",
             "slug",
-            "likes",
             "translations",
             "author",
             "category",
@@ -163,6 +180,7 @@ class BlogPostFeedQuerySerializer(serializers.Serializer):
 
 
 class BlogPostDetailSerializer(BlogPostSerializer):
+    translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
     likes = PrimaryKeyRelatedField(many=True, read_only=True)
     author = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()

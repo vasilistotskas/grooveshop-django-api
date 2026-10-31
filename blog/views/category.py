@@ -233,7 +233,7 @@ class BlogCategoryViewSet(BaseModelViewSet):
             BlogPost.objects.filter(category__in=categories)
             .visible_to(self.request.user)
             .select_related("category", "author__user")
-            .prefetch_related("likes", "tags")
+            .prefetch_related("tags")
         )
 
     # ``queryset`` names the model this action lists, which is what the

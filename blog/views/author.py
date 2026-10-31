@@ -102,7 +102,7 @@ class BlogAuthorViewSet(BaseModelViewSet):
                 BlogPost.objects.filter(author=author)
                 .visible_to(self.request.user)
                 .select_related("category", "author__user")
-                .prefetch_related("translations", "tags__translations", "likes")
+                .prefetch_related("translations", "tags__translations")
             )
 
         if self.action == "list":

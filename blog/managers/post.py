@@ -127,7 +127,6 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
             .with_category()
             .with_translations()
             .with_tags()
-            .with_likes()
             .with_comments()
             .with_counts()
         )
@@ -146,9 +145,9 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
         """
         Optimized queryset for detail views.
 
-        Same as for_list() since blog posts need all data.
+        for_list() plus the likers: only the detail serializer lists them.
         """
-        return self.for_list()
+        return self.for_list().with_likes()
 
 
 class BlogPostManager(TranslatableOptimizedManager):

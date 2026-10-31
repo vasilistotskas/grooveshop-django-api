@@ -1,0 +1,9 @@
+Λαμβάνετε αυτό το email επειδή ο χρήστης maria πρόσθεσε τη διεύθυνση email σας στον λογαριασμό του στο Acme Gadgets.
+
+Για να επιβεβαιώσετε τη διεύθυνση email σας, ανοίξτε αυτόν τον σύνδεσμο: https://shop.example/account/verify-email/golden-key
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example
+

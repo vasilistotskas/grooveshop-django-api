@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from allauth.core.context import request_context
@@ -245,25 +245,16 @@ def _send_allauth_mail(template_prefix, email, context, *, request_language):
     """Run ``UserAccountAdapter.send_mail`` the way allauth does: inside
     the visitor's request (``AccountMiddleware`` sets
     ``allauth.core.context.request``, which ``BaseAdapter`` reads), and
-    return the context the template would render with."""
-    captured: dict = {}
-
-    def _render(_template_prefix, _email, rendered_context):
-        captured.update(rendered_context)
-        return MagicMock(alternatives=[], to=[_email], reply_to=[])
-
+    return what reached the outbox (the task runs eagerly)."""
     request = RequestFactory().post(
         "/_allauth/app/v1/auth/password/request",
         HTTP_X_LANGUAGE=request_language,
     )
+    mail.outbox.clear()
     with request_context(request):
-        adapter = UserAccountAdapter()
-        with (
-            patch.object(adapter, "render_mail", side_effect=_render),
-            patch("tenant.celery.dispatch_on_commit"),
-        ):
-            adapter.send_mail(template_prefix, email, context)
-    return captured
+        UserAccountAdapter().send_mail(template_prefix, email, context)
+    [message] = mail.outbox
+    return message
 
 
 @pytest.mark.django_db
@@ -279,7 +270,7 @@ class TestAllauthEmails:
         # The visitor browses in the OTHER language: the recipient wins.
         other = "el" if language == "en" else "en"
 
-        captured = _send_allauth_mail(
+        message = _send_allauth_mail(
             "account/email/password_reset_key",
             user.email,
             {
@@ -289,28 +280,33 @@ class TestAllauthEmails:
             request_language=other,
         )
 
-        assert captured["password_reset_url"] == (
-            f"{BASE}{prefix}/account/password/reset/key/1-a"
+        _assert_links(
+            _body(message),
+            f"{BASE}{prefix}/account/password/reset/key/1-a",
+            language,
         )
-        assert captured["SITE_URL"] == f"{BASE}{prefix}"
+        assert f"{BASE}{prefix}\n" in message.body
 
     @LANGUAGES
     def test_unknown_account_link_follows_the_visitor(self, language, prefix):
-        captured = _send_allauth_mail(
+        message = _send_allauth_mail(
             "account/email/unknown_account",
             "nobody@example.com",
             {"signup_url": f"{BASE}/account/signup"},
             request_language=language,
         )
 
-        assert captured["signup_url"] == f"{BASE}{prefix}/account/signup"
-        assert captured["LANGUAGE_CODE"] == language
+        _assert_links(
+            _body(message), f"{BASE}{prefix}/account/signup", language
+        )
+        [(html, _mime)] = message.alternatives
+        assert f'lang="{language}"' in html
 
     @LANGUAGES
     def test_account_already_exists_links_follow_the_visitor(
         self, language, prefix
     ):
-        captured = _send_allauth_mail(
+        message = _send_allauth_mail(
             "account/email/account_already_exists",
             "taken@example.com",
             {
@@ -320,9 +316,10 @@ class TestAllauthEmails:
             request_language=language,
         )
 
-        assert captured["signup_url"] == f"{BASE}{prefix}/account/signup"
-        assert captured["password_reset_url"] == (
-            f"{BASE}{prefix}/account/password/reset"
+        _assert_links(
+            _body(message),
+            f"{BASE}{prefix}/account/password/reset",
+            language,
         )
 
 

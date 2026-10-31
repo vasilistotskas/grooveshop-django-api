@@ -1,0 +1,8 @@
+{% extends "emails/base/security_notice.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Security key removed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block notification_message %}
+<p>{% trans "A security key has been removed." %}</p>
+{% endblock %}

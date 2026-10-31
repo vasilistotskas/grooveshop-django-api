@@ -1,0 +1,7 @@
+{% autoescape off %}{% block content %}{% endblock content %}
+
+---
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}
+{% endautoescape %}

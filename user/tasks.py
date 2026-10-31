@@ -429,6 +429,61 @@ def purge_unconfirmed_guest_subscriptions(self) -> dict:
     retry_backoff_max=600,
     retry_jitter=True,
     max_retries=5,
+    # A password reset link, a login code and a verification code are the
+    # secret: keep the context out of ``MonitoredTask.on_failure``'s log.
+    sensitive_kwargs=frozenset({"context"}),
+)
+def send_allauth_email_task(
+    self,
+    *,
+    type_key: str,
+    address: str,
+    language: str,
+    user_pk: int | None,
+    context: dict[str, str],
+) -> dict[str, object]:
+    """Send one allauth mail through the email pipeline.
+
+    Queued by ``UserAccountAdapter.send_mail`` so allauth's SMTP
+    conversation is not part of the view: a 421 from the mail server is a
+    retry here, not a 500 from sign-up. A transport failure propagates
+    (``send_email`` re-raises it) for the retry policy above.
+
+    An account deleted between the request and this task gets no mail.
+    """
+    from emails.send import send_email, was_sent
+    from user.emails import AllauthMail
+    from user.models.account import UserAccount
+
+    user = None
+    if user_pk is not None:
+        user = UserAccount.objects.filter(pk=user_pk).first()
+        if user is None:
+            logger.warning(
+                "send_allauth_email_task: account %s is gone, %s not sent",
+                user_pk,
+                type_key,
+            )
+            return {"status": "skipped", "reason": "account_deleted"}
+    deliveries = send_email(
+        type_key,
+        AllauthMail(
+            address=address, language=language, user=user, context=context
+        ),
+    )
+    return {"status": "sent" if was_sent(deliveries) else "skipped"}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    # The class decides what MAY retry; ``MonitoredTask.retry`` then
+    # stops on a 5xx reply code (``core.retry.is_permanent_failure``).
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
     # The rendered mail is the payload, and for a password reset or a
     # login code that payload IS the secret. Without this, the one-time
     # link lands in ``MonitoredTask.on_failure``'s ERROR log on exactly
@@ -446,6 +501,10 @@ def send_rendered_email_task(
     reply_to: list[str] | None = None,
 ) -> dict[str, object]:
     """Deliver an ALREADY-RENDERED message, out of the request path.
+
+    Nothing queues it any more (``send_allauth_email_task`` replaced it);
+    it stays one release so a message queued by the previous image during
+    the rollout is still delivered, and is deleted in the next.
 
     Exists because allauth sends its own mail synchronously inside the
     view. On 2026-09-15 smtp.gmail.com answered 421 "Server busy" and

@@ -1,0 +1,8 @@
+{% extends "emails/base/account_message.txt" %}
+{% load account i18n %}
+
+{% block content %}{% user_display user as user_display %}{% blocktrans %}You're receiving this email because {{ user_display }} added your email address to their account on {{ SITE_NAME }}.{% endblocktrans %}
+
+{% if code %}{% trans "Your email verification code is listed below. Please enter it in your open browser window." %}
+
+{{ code }}{% else %}{% trans "To confirm your email address, open this link:" %} {{ activate_url }}{% endif %}{% endblock content %}

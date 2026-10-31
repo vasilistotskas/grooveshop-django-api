@@ -1699,15 +1699,14 @@ the mail only says they exist. A task returns `False` when nothing was sent
 ### 6.7 Account emails (allauth)
 
 `user.adapter.UserAccountAdapter.send_mail` replaces allauth's own
-`send_mail`, so allauth's `current_site` is not in the context and must
-not be (`SITE_ID` is one store's `Site` row: every store would sign as
-it). Every allauth template reads the store from
-`build_email_context` instead: `SITE_NAME`, `SITE_URL`, the logo and
-theme. `core/templates/account/email/base_message.txt` and
-`email_confirmation_message.txt` replace allauth's text layout for that
-reason, and every email allauth can send (`account/email/*`,
-`mfa/email/*`, `socialaccount/email/*`) has an HTML twin under
-`core/templates/`.
+`send_mail`: each of the 19 mails allauth can send (`account/email/*`,
+`mfa/email/*`, `socialaccount/email/*`) is an email type
+(`user.emails.ALLAUTH_TYPES`) sent by `send_email` from a task, so
+allauth's `current_site` is not in the context and must not be
+(`SITE_ID` is one store's `Site` row: every store would sign as it).
+The templates under `core/templates/emails/{account,mfa,social}/` read
+the store from `build_email_context` instead: `SITE_NAME`, `SITE_URL`,
+the logo and theme. See `docs/emails.md` (allauth mail).
 `tests/integration/user/test_allauth_email_store_identity.py` discovers
 the kinds from the installed allauth, so a template a later allauth adds
 fails there until it is covered.

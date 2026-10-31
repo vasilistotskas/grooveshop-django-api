@@ -8,8 +8,8 @@ Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
 **State.** The order, shipping, product, gift card, B2B, contact, account,
-cart and operational alert emails are on the pipeline (see Registered
-types). What is not yet (allauth's account, MFA and social mail, the
+cart, operational alert and allauth (account, MFA and social sign-in)
+emails are on the pipeline (see Registered types). What is not yet (the
 platform's own mail) still goes through its own send path and moves onto it
 one domain at a time, each move keeping the recorded golden files equal
 (see Tests).
@@ -136,6 +136,7 @@ Declared in `user/emails.py` and `cart/emails.py`:
 | `newsletter.confirmation` | the `UserSubscription` (a guest row too) | required (double opt-in); `FeatureGate("newsletter")` |
 | `user.reengagement` | the `UserAccount` | **marketing**; `ScheduleGate("send-inactive-user-notifications")` |
 | `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")` |
+| `account.*` (12), `mfa.*` (5), `social.*` (2) | an `AllauthMail` | required; see allauth mail |
 
 ### Operational alerts (`ops.*`)
 
@@ -181,9 +182,9 @@ Each store's old `OPS_ALERT_<KIND>_ENABLED` setting that was OFF became its
 on needs none: no row is on). The import moves the store's cache generation
 (a bulk insert fires no signal). The setting rows themselves are left in
 place for one release, because the previous image still reads them while a
-release rolls out; a later release deletes them (`contract_of` 0003), and
-until then they are dead rows in the store settings list. The declarations
-and the "Operational Alerts" settings group are gone.
+release rolls out; `emails/0004_drop_ops_alert_settings` (`contract_of`
+0003) then deleted them in every schema. The declarations and the
+"Operational Alerts" settings group are gone.
 
 A marketing type is switchable, honours `EmailOptOut` and carries the
 RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
@@ -468,14 +469,53 @@ backstop: an address with a line break raises `BadHeaderError`. Data-derived
 subject pieces reach the subject through the context builder, never by
 concatenation at a call site.
 
+## allauth mail
+
+allauth builds each of its mails and calls
+`user.adapter.UserAccountAdapter.send_mail(template_prefix, email, context)`.
+The adapter looks the prefix up in `user.emails.ALLAUTH_TYPES` (a prefix it
+does not know raises `KeyError`, so a mail a later allauth adds never goes
+out unbranded) and queues `user.tasks.send_allauth_email_task`; the task calls
+`send_email`, so the mail is rendered, headed and sent like every other. The
+sending is in a task because allauth's own `send_mail` talks SMTP inside the
+view: a 421 from the mail server then failed the sign-up request (production,
+2026-09-15), where in the task it is a retry.
+
+The 19 types are `account.*` (twelve), `mfa.*` (five) and `social.*` (two),
+declared in `user/emails.py` through `_allauth_email`, which also fills the
+prefix map. All are customer mail, transactional and **required**: a store
+cannot switch a sign-in code, a reset link or a security notice off. Their
+templates are `core/templates/emails/{account,mfa,social}/<name>.{html,txt}`;
+the security notices share `emails/base/security_notice.{html,txt}` and the
+plain-text footer `emails/base/account_message.txt`. The two sign-up
+confirmations share one template pair (`email_confirmation`).
+
+What crosses the queue is `AllauthMail`: the address, the language, the
+account's pk and the context keys the templates read
+(`ALLAUTH_CONTEXT_KEYS`), as text. The request, the account row and the
+reset key are dropped; a timestamp travels as ISO text. The language is the
+account's when allauth names one, else the visitor's (an unknown address, a
+notice, a login code). The builder gives the storefront links allauth
+resolved from `HEADLESS_FRONTEND_URLS` that language
+(`localize_storefront_url`). The task's `context` is a sensitive kwarg: a
+reset link or a code never reaches the failure log. An account deleted before
+the task runs gets no mail.
+
+The subject is the type's msgid, as everywhere on the pipeline. allauth's old
+`[<store name>]` subject prefix is gone (the `From` carries the store's
+name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
+`get_from_email` are deleted. `user.tasks.send_rendered_email_task` has no
+caller any more and stays one release, for messages the previous image queued
+during the rollout.
+
 ## Not built yet
 
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
 - The storefront confirm page and the `GET` redirect to it, and the
   storefront's email-preferences UI (the endpoint exists).
-- The other domains' email types (allauth, the platform's own mail) and
-  the rest of the admin page (status, log, preview, test-send); the switches
+- The platform's own mail (billing, staff reset, health and backup
+  alerts) and the rest of the admin page (status, log, preview, test-send); the switches
   are on it already. The preview of every registered type already
   goes through `render`; a real object is chosen only for the order types
   (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
@@ -503,6 +543,12 @@ concatenation at a call site.
   for the product, gift card, B2B, contact, account and cart emails. It
   pins what the rows cannot (the user and product ids, the signer's clock,
   `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
+- `tests/integration/emails/test_golden_render_allauth.py` records the
+  19 allauth mails through the adapter, and fails for a type with no
+  case. `tests/integration/user/test_allauth_flows_use_the_pipeline.py`
+  drives the real headless endpoints (sign-up, password reset, login
+  code), and `test_allauth_email_store_identity.py` discovers the kinds
+  from the installed allauth and fails for one that is not mapped.
 - `tests/integration/emails/test_golden_render_ops.py` records the ten
   operational alerts through the real code that sends them. They had no
   template and no translation before, so the files record what they are now.

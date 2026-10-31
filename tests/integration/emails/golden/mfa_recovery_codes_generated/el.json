@@ -1,0 +1,15 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<mfa-recovery_codes_generated.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Δημιουργήθηκαν νέοι κωδικοί ανάκτησης",
+  "to": [
+    "customer@example.test"
+  ]
+}

@@ -1,0 +1,9 @@
+You're receiving this email because maria added your email address to their account on Acme Gadgets.
+
+To confirm your email address, open this link: https://shop.example/en/account/verify-email/golden-key
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

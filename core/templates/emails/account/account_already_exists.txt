@@ -1,0 +1,8 @@
+{% extends "emails/base/account_message.txt" %}
+{% load i18n %}
+
+{% block content %}{% blocktrans %}You are receiving this email because you, or someone else, tried to sign up for an account using the email address {{ email }}. However, an account using that email address already exists.{% endblocktrans %}
+
+{% trans "In case you have forgotten about this, use the link below to recover your account:" %}
+
+{{ password_reset_url }}{% endblock content %}

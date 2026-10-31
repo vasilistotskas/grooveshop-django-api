@@ -667,6 +667,9 @@ msgstr "A new set of Two-Factor Authentication recovery codes has been generated
 msgid "A note is required."
 msgstr "A note is required."
 
+msgid "A password was set on your account"
+msgstr "A password was set on your account"
+
 msgid "A payment intent is required — the applied discounts do not cover the order total."
 msgstr "A payment intent is required — the applied discounts do not cover the order total."
 
@@ -710,6 +713,12 @@ msgstr "A search query is required."
 msgid "A security key has been removed."
 msgstr "A security key has been removed."
 
+msgid "A security key was added"
+msgstr "A security key was added"
+
+msgid "A security key was removed"
+msgstr "A security key was removed"
+
 msgid "A seed product is required for this surface."
 msgstr "A seed product is required for this surface."
 
@@ -741,6 +750,12 @@ msgstr "A third-party account from %(provider)s has been connected to your accou
 #, python-format
 msgid "A third-party account from %(provider)s has been disconnected from your account."
 msgstr "A third-party account from %(provider)s has been disconnected from your account."
+
+msgid "A third-party account was connected"
+msgstr "A third-party account was connected"
+
+msgid "A third-party account was disconnected"
+msgstr "A third-party account was disconnected"
 
 msgid "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
 msgstr "A token with only Zone → Cache Purge → Purge on that zone. Secret — used to clear the store's pages from Cloudflare's cache after an edit or a deploy."
@@ -1056,6 +1071,9 @@ msgstr "Account email"
 msgid "Account preferences"
 msgstr "Account preferences"
 
+msgid "Account security"
+msgstr "Account security"
+
 msgid "Account security notice"
 msgstr "Account security notice"
 
@@ -1369,6 +1387,9 @@ msgstr "An absolute https URL on another site."
 
 msgid "An email address is required for guest alerts."
 msgstr "An email address is required for guest alerts."
+
+msgid "An email address was removed from your account"
+msgstr "An email address was removed from your account"
 
 msgid "An email type, or * for every marketing type."
 msgstr "An email type, or * for every marketing type."
@@ -4088,8 +4109,20 @@ msgstr "Email address"
 msgid "Email address %(deleted_email)s has been removed from your account."
 msgstr "Email address %(deleted_email)s has been removed from your account."
 
+msgid "Email address changed"
+msgstr "Email address changed"
+
+msgid "Email address removed"
+msgstr "Email address removed"
+
 msgid "Email changed"
 msgstr "Email changed"
+
+msgid "Email confirmation"
+msgstr "Email confirmation"
+
+msgid "Email confirmation at sign-up"
+msgstr "Email confirmation at sign-up"
 
 msgid "Email is required."
 msgstr "Email is required."
@@ -6547,10 +6580,6 @@ msgstr "Height"
 msgid "Hello %(first_name)s,"
 msgstr "Hello %(first_name)s,"
 
-#, python-format
-msgid "Hello from %(site_name)s!"
-msgstr "Hello from %(site_name)s!"
-
 msgid "Hello,"
 msgstr "Hello,"
 
@@ -8321,8 +8350,14 @@ msgstr "New order — #{order_id}"
 msgid "New product"
 msgstr "New product"
 
+msgid "New recovery codes"
+msgstr "New recovery codes"
+
 msgid "New recovery codes generated"
 msgstr "New recovery codes generated"
+
+msgid "New recovery codes were generated"
+msgstr "New recovery codes were generated"
 
 msgid "New sort order value"
 msgstr "New sort order value"
@@ -8394,8 +8429,14 @@ msgstr "No Social Media"
 msgid "No UserAccount exists yet for owner %(email)s — OWNER membership was skipped. Grant it manually once the owner has registered."
 msgstr "No UserAccount exists yet for owner %(email)s — OWNER membership was skipped. Grant it manually once the owner has registered."
 
+msgid "No account for this address"
+msgstr "No account for this address"
+
 msgid "No account found"
 msgstr "No account found"
+
+msgid "No account found for this address"
+msgstr "No account found for this address"
 
 msgid "No attributed orders in this period. Orders are attributed from the visit that placed them."
 msgstr "No attributed orders in this period. Orders are attributed from the visit that placed them."
@@ -9532,8 +9573,17 @@ msgstr "Password changed"
 msgid "Password reset"
 msgstr "Password reset"
 
+msgid "Password reset code"
+msgstr "Password reset code"
+
+msgid "Password reset link"
+msgstr "Password reset link"
+
 msgid "Password set"
 msgstr "Password set"
+
+msgid "Password was reset"
+msgstr "Password was reset"
 
 msgid "Past due"
 msgstr "Past due"
@@ -11907,6 +11957,9 @@ msgstr "Sender Name"
 msgid "Sent"
 msgstr "Sent"
 
+msgid "Sent after sign-up to confirm the address, with a link or a code."
+msgstr "Sent after sign-up to confirm the address, with a link or a code."
+
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Sent once for every refund paid back to the customer."
 
@@ -11928,11 +11981,29 @@ msgstr "Sent to a customer who has not signed in for a long while, a few times a
 msgid "Sent to confirm a subscription before it starts (double opt-in)."
 msgstr "Sent to confirm a subscription before it starts (double opt-in)."
 
+msgid "Sent to confirm an address a customer added to an existing account."
+msgstr "Sent to confirm an address a customer added to an existing account."
+
+msgid "Sent to tell a customer a password was set on their account."
+msgstr "Sent to tell a customer a password was set on their account."
+
+msgid "Sent to tell a customer an address was removed from their account."
+msgstr "Sent to tell a customer an address was removed from their account."
+
+msgid "Sent to tell a customer their password was changed."
+msgstr "Sent to tell a customer their password was changed."
+
+msgid "Sent to tell a customer their password was just reset."
+msgstr "Sent to tell a customer their password was just reset."
+
 msgid "Sent to the address a guest gave for a restock or price-drop alert, which starts only once the link in it is used (double opt-in)."
 msgstr "Sent to the address a guest gave for a restock or price-drop alert, which starts only once the link in it is used (double opt-in)."
 
 msgid "Sent to the buyer of a gift card once the payment lands."
 msgstr "Sent to the buyer of a gift card once the payment lands."
+
+msgid "Sent to the old address when a customer changes their email."
+msgstr "Sent to the old address when a customer changes their email."
 
 msgid "Sent to the person a gift card was given to, with its code."
 msgstr "Sent to the person a gift card was given to, with its code."
@@ -11948,6 +12019,36 @@ msgstr "Sent when a business application is approved."
 
 msgid "Sent when a business application is rejected."
 msgstr "Sent when a business application is rejected."
+
+msgid "Sent when a customer adds a security key or passkey."
+msgstr "Sent when a customer adds a security key or passkey."
+
+msgid "Sent when a customer asks to reset their password."
+msgstr "Sent when a customer asks to reset their password."
+
+msgid "Sent when a customer connects a third-party sign-in to their account."
+msgstr "Sent when a customer connects a third-party sign-in to their account."
+
+msgid "Sent when a customer disconnects a third-party sign-in from their account."
+msgstr "Sent when a customer disconnects a third-party sign-in from their account."
+
+msgid "Sent when a customer generates new two-factor recovery codes."
+msgstr "Sent when a customer generates new two-factor recovery codes."
+
+msgid "Sent when a customer removes a security key or passkey."
+msgstr "Sent when a customer removes a security key or passkey."
+
+msgid "Sent when a customer resets their password with a code."
+msgstr "Sent when a customer resets their password with a code."
+
+msgid "Sent when a customer signs in with a code."
+msgstr "Sent when a customer signs in with a code."
+
+msgid "Sent when a customer turns off their authenticator app."
+msgstr "Sent when a customer turns off their authenticator app."
+
+msgid "Sent when a customer turns on an authenticator app."
+msgstr "Sent when a customer turns on an authenticator app."
 
 msgid "Sent when a delivered, paid order is completed."
 msgstr "Sent when a delivered, paid order is completed."
@@ -11978,6 +12079,12 @@ msgstr "Sent when order is delivered"
 
 msgid "Sent when order is shipped"
 msgstr "Sent when order is shipped"
+
+msgid "Sent when someone signs up with an address that already has an account."
+msgstr "Sent when someone signs up with an address that already has an account."
+
+msgid "Sent when someone tries to sign in with an address that has no account."
+msgstr "Sent when someone tries to sign in with an address that has no account."
 
 msgid "Sent when the archive of a customer's personal data is ready to download."
 msgstr "Sent when the archive of a customer's personal data is ready to download."
@@ -12252,6 +12359,9 @@ msgstr "Shown to shoppers and sent to shopping platforms (Google's item group ti
 msgid "Shows the seller's details"
 msgstr "Shows the seller's details"
 
+msgid "Sign-in code"
+msgstr "Sign-in code"
+
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"
 
@@ -12362,6 +12472,15 @@ msgstr "Social Media Presence"
 #, python-format
 msgid "Social URL must use https://. Got: %(value)s"
 msgstr "Social URL must use https://. Got: %(value)s"
+
+msgid "Social account connected"
+msgstr "Social account connected"
+
+msgid "Social account disconnected"
+msgstr "Social account disconnected"
+
+msgid "Social sign-in"
+msgstr "Social sign-in"
 
 msgid "Software and subscriptions"
 msgstr "Software and subscriptions"
@@ -13129,14 +13248,6 @@ msgstr "Thank you for shopping with %(site_name)s! We look forward to serving yo
 
 msgid "Thank you for shopping with us!"
 msgstr "Thank you for shopping with us!"
-
-#, python-format
-msgid ""
-"Thank you for using %(site_name)s!\n"
-"%(site_domain)s"
-msgstr ""
-"Thank you for using %(site_name)s!\n"
-"%(site_domain)s"
 
 msgid "Thank you for your purchase!"
 msgstr "Thank you for your purchase!"
@@ -13975,9 +14086,8 @@ msgstr "To be issued in timologio"
 msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
 msgstr "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
 
-#, python-format
-msgid "To confirm this is correct, go to %(activate_url)s"
-msgstr "To confirm this is correct, go to %(activate_url)s"
+msgid "To confirm your email address, open this link:"
+msgstr "To confirm your email address, open this link:"
 
 msgid "To issue in timologio"
 msgstr "To issue in timologio"
@@ -14173,6 +14283,9 @@ msgstr "Twitter/X profile URL. Must use https://. Empty → link hidden in store
 
 msgid "Two"
 msgstr "Two"
+
+msgid "Two-factor authentication"
+msgstr "Two-factor authentication"
 
 msgid "Two-step verification"
 msgstr "Two-step verification"
@@ -15316,6 +15429,9 @@ msgstr "Yes, permanently destroy"
 msgid "Yes: the goods came back or were never delivered, so the sale is reversed and the receipt is credited. No: the customer kept the goods and the sale stands."
 msgstr "Yes: the goods came back or were never delivered, so the sale is reversed and the receipt is credited. No: the customer kept the goods and the sale stands."
 
+msgid "You already have an account"
+msgstr "You already have an account"
+
 msgid "You already have an active alert of this kind for this product."
 msgstr "You already have an active alert of this kind for this product."
 
@@ -15408,10 +15524,6 @@ msgstr "You will receive a second email as soon as we confirm your payment."
 msgid "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
 msgstr "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
 
-#, python-format
-msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
-msgstr "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
-
 msgid "You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset."
 msgstr "You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset."
 
@@ -15484,6 +15596,9 @@ msgstr "Your data export is ready"
 #, python-format
 msgid "Your data export is ready — %(site_name)s"
 msgstr "Your data export is ready — %(site_name)s"
+
+msgid "Your email address was changed"
+msgstr "Your email address was changed"
 
 #, python-format
 msgid "Your email has been changed from %(from_email)s to %(to_email)s."
@@ -15577,8 +15692,14 @@ msgstr "Your password reset code"
 msgid "Your password reset code is listed below. Please enter it in your open browser window."
 msgstr "Your password reset code is listed below. Please enter it in your open browser window."
 
+msgid "Your password was changed"
+msgstr "Your password was changed"
+
 msgid "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
 msgstr "Your password was changed. Log in with the new password; if your account uses an authenticator app, you will be asked for a code as usual."
+
+msgid "Your password was reset"
+msgstr "Your password was reset"
 
 msgid "Your payment could not be processed"
 msgstr "Your payment could not be processed"
@@ -16061,6 +16182,10 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Go to Your Account"
 #~ msgstr "Go to Your Account"
 
+#, python-format
+#~ msgid "Hello from %(site_name)s!"
+#~ msgstr "Hello from %(site_name)s!"
+
 #~ msgid "Idle"
 #~ msgstr "Idle"
 
@@ -16166,6 +16291,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Thank you for shopping with us!"
 
+#, python-format
+#~ msgid ""
+#~ "Thank you for using %(site_name)s!\n"
+#~ "%(site_domain)s"
+#~ msgstr ""
+#~ "Thank you for using %(site_name)s!\n"
+#~ "%(site_domain)s"
+
 #~ msgid "Thank you for your order!"
 #~ msgstr "Thank you for your order!"
 
@@ -16174,6 +16307,10 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
 #~ msgstr "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
+
+#, python-format
+#~ msgid "To confirm this is correct, go to %(activate_url)s"
+#~ msgstr "To confirm this is correct, go to %(activate_url)s"
 
 #~ msgid "Total Amount"
 #~ msgstr "Total Amount"
@@ -16199,3 +16336,7 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "You can view your order status by logging into your account on our website."
 #~ msgstr "You can view your order status by logging into your account on our website."
+
+#, python-format
+#~ msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+#~ msgstr "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."

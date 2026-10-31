@@ -1,0 +1,11 @@
+You're receiving this email because maria added your email address to their account on Acme Gadgets.
+
+Your email verification code is listed below. Please enter it in your open browser window.
+
+123456
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

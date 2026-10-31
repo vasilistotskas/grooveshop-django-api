@@ -1,0 +1,11 @@
+You are receiving this email because you, or someone else, tried to sign up for an account using the email address customer@example.test. However, an account using that email address already exists.
+
+In case you have forgotten about this, use the link below to recover your account:
+
+https://shop.example/en/account/password/reset
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

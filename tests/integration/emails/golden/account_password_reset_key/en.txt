@@ -1,0 +1,11 @@
+You're receiving this email because you or someone else has requested a password reset for your account. It can be safely ignored if you did not request a password reset.
+
+Reset my password: https://shop.example/en/account/password/reset/key/1-golden
+
+In case you forgot, your username is maria.
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

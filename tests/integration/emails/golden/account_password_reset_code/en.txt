@@ -1,0 +1,11 @@
+Your password reset code is listed below. Please enter it in your open browser window.
+
+123456
+
+This mail can be safely ignored if you did not initiate this action.
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

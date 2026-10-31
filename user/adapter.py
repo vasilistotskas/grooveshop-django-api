@@ -9,18 +9,11 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest
-from django.utils import translation
-from django.utils.encoding import force_str
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.client_ip import client_ip_or_peer
-from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language, resolve_request_language
-from core.utils.tenant_urls import (
-    get_tenant_frontend_url,
-    localize_storefront_url,
-)
-from tenant.credentials import tenant_from_email, tenant_site_name
+from core.utils.tenant_urls import get_tenant_frontend_url
 from tenant.membership import bound_tenant
 from tenant.middleware import tenant_domain_set
 
@@ -28,14 +21,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
 
 logger = logging.getLogger(__name__)
-
-# The context keys allauth fills with ``HEADLESS_FRONTEND_URLS`` links
-# in the emails it sends (see ``UserAccountAdapter.send_mail``).
-_ALLAUTH_STOREFRONT_URL_KEYS = (
-    "activate_url",
-    "password_reset_url",
-    "signup_url",
-)
 
 
 class UserAccountAdapter(DefaultAccountAdapter):
@@ -47,113 +32,49 @@ class UserAccountAdapter(DefaultAccountAdapter):
         return user
 
     def send_mail(self, template_prefix, email, context):
-        """Merge in the shared branding/theme context before allauth
-        renders ``account/email/<name>_message.{html,txt}``.
+        """Send allauth's mail as the email type its prefix names.
 
-        Allauth builds its own context (``user``, ``code``/``key``,
-        ``activate_url``, etc.) with no knowledge of
-        ``core.utils.email_context.build_email_context`` — every other
-        transactional email routes through it, but allauth's own
-        ``send_mail`` never did, so ``core/templates/account/email/*``
-        would render with unresolved ``SITE_NAME``/``THEME`` variables.
-        allauth's own keys always win on collision (none exist today).
-
-        The storefront links allauth put in ``context`` are localized
-        here, because this is where the email's language is decided.
-        allauth resolves them earlier, from ``HEADLESS_FRONTEND_URLS``,
-        without knowing the recipient: ``request_password_reset`` builds
-        ``password_reset_url`` before ``send_password_reset_mail``;
-        ``send_unknown_account_mail`` and
-        ``send_account_already_exists_mail`` build ``signup_url`` /
-        ``password_reset_url`` from the request alone;
-        ``send_confirmation_mail`` builds ``activate_url``. Every one of
-        them then calls this method (allauth 65.19:
-        ``account/internal/flows/password_reset.py``,
-        ``account/internal/flows/signup.py``, ``account/adapter.py``).
+        allauth builds the mail's context and calls this with the
+        template prefix (``account/email/login_code``); the prefix picks
+        the type (``user.emails.ALLAUTH_TYPES``, a prefix it does not
+        know raises ``KeyError``) and the pipeline renders, brands and
+        sends it like every other mail.
 
         The language is the recipient's when allauth names one, and
         otherwise the visitor's who asked for the email (an unknown
-        address, an address that already has an account).
+        address, an address that already has an account, a notice).
         ``self.request`` is that visitor's request: ``BaseAdapter``
         reads it from ``allauth.core.context.request``, which
         ``AccountMiddleware`` sets for the whole request.
+
+        The mail is sent from a task, not here. allauth's own
+        ``send_mail`` talks SMTP inside the view, so on 2026-09-15 a
+        transient smtp.gmail.com 421 ("Server busy") surfaced as a 500
+        from ``/_allauth/app/v1/auth/signup`` and a real person could not
+        create an account. In a task a 421 is a retry. The context is
+        reduced to text for the queue (``AllauthMail``), and the task is
+        queued after the commit: the confirmation must not go out for a
+        signup whose transaction then rolls back, and the schema has to
+        be pinned at registration rather than read from a connection
+        that has since snapped back to public.
         """
-        user = context.get("user") if isinstance(context, dict) else None
+        from tenant.celery import dispatch_on_commit
+        from user.emails import ALLAUTH_TYPES, AllauthMail
+        from user.tasks import send_allauth_email_task
+
+        type_key = ALLAUTH_TYPES[template_prefix]
+        user = context.get("user")
         language = (
             get_user_language(user)
             if user is not None
             else resolve_request_language(self.request)
         )
-        merged_context = {
-            **build_email_context(language=language),
-            **context,
-            **{
-                key: localize_storefront_url(context[key], language=language)
-                for key in _ALLAUTH_STOREFRONT_URL_KEYS
-                if context.get(key)
-            },
-        }
-        with translation.override(language):
-            msg = self.render_mail(template_prefix, email, merged_context)
-
-        # Render here, SEND out of band. allauth's own send_mail talks
-        # SMTP inside the view, so on 2026-09-15 a transient
-        # smtp.gmail.com 421 ("Server busy") surfaced as a 500 from
-        # /_allauth/app/v1/auth/signup and a real person could not
-        # create an account. Rendering has to stay in the request — it
-        # needs the tenant, the language and allauth's context — but the
-        # SMTP conversation does not, and in a task a 421 is a retry.
-        #
-        # dispatch_on_commit, not .delay(): the confirmation must not go
-        # out for a signup whose transaction then rolls back, and the
-        # schema has to be pinned at registration rather than read from
-        # a connection that has since snapped back to public.
-        from tenant.celery import dispatch_on_commit
-        from user.tasks import send_rendered_email_task
-
-        html_body = next(
-            (
-                content
-                for content, mimetype in getattr(msg, "alternatives", [])
-                if mimetype == "text/html"
-            ),
-            None,
+        mail = AllauthMail.from_allauth(
+            address=email, language=language, context=context
         )
         dispatch_on_commit(
-            send_rendered_email_task,
-            kwargs={
-                "subject": msg.subject,
-                "body": msg.body,
-                "from_email": msg.from_email,
-                "to": list(msg.to),
-                "html_body": html_body,
-                "reply_to": list(msg.reply_to or []),
-            },
+            send_allauth_email_task, kwargs=mail.task_kwargs(type_key)
         )
-
-    def format_email_subject(self, subject: str) -> str:
-        """Prefix the subject with the active tenant's display name.
-
-        ``ACCOUNT_EMAIL_SUBJECT_PREFIX`` is a settings-baked string
-        evaluated once at process start (``f"[{SITE_NAME}] "``), so it
-        can't vary per tenant. This override reads ``tenant_site_name()``
-        at send time instead, so tenant-B users see "[Tenant B] ..."
-        rather than the platform's baked-in ``SITE_NAME``. webside.gr
-        (no active tenant row / empty ``Tenant.name``) falls back to
-        ``settings.SITE_NAME`` inside ``tenant_site_name()``, so this
-        stays byte-identical to the old ``ACCOUNT_EMAIL_SUBJECT_PREFIX``
-        for the platform tenant.
-        """
-        prefix = f"[{tenant_site_name()}] "
-        return prefix + force_str(subject)
-
-    def get_from_email(self) -> str:
-        """Return the deliverability-safe outbound sender for the
-        active tenant: ``"{store name}" <DEFAULT_FROM_EMAIL>`` — see
-        ``tenant.credentials.tenant_from_email`` for the DMARC
-        rationale.
-        """
-        return tenant_from_email()
 
     def get_client_ip(self, request: HttpRequest) -> str:
         """

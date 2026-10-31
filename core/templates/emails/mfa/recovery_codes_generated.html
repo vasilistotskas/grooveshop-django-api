@@ -1,0 +1,8 @@
+{% extends "emails/base/security_notice.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "New recovery codes generated" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block notification_message %}
+<p>{% trans "A new set of Two-Factor Authentication recovery codes has been generated." %}</p>
+{% endblock %}

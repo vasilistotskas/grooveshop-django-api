@@ -3,6 +3,52 @@
 
 
 
+## v3.171.0 (2026-10-31)
+
+### Bug fixes
+
+* fix(search): index a rich-text field's visible text, not its HTML
+
+BlogPostTranslation.body and ProductTranslation.description were sent
+to Meilisearch as raw HTML, and their greeklish shadows were built
+from it, so tag and attribute text (src paths, style, class) was
+searchable. Both now index the words a reader sees: tags stripped,
+entities decoded, a space where each tag was. The search endpoints
+hydrate hits from the database, so what the storefront shows does not
+change. Existing documents keep the HTML until the two indexes are
+synced once.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`807f916`](https://github.com/vasilistotskas/grooveshop-django-api/commit/807f91669af927c05eb7f83c2d3f825cbb065652))
+
+### Features
+
+* feat(blog): record each uploaded image's real size in rich text and index visible text (#381) ([`807f916`](https://github.com/vasilistotskas/grooveshop-django-api/commit/807f91669af927c05eb7f83c2d3f825cbb065652))
+
+* feat(blog): record each uploaded image's real size in rich text
+
+An uploaded editor image carries percentage width and height (the
+author's layout), so nothing in the stored HTML said how many pixels
+the picture has and the storefront had no size to build a responsive
+image from or to reserve space with.
+
+RichTextField.pre_save now reads the file header from the store's own
+media directory and sets data-natural-width / data-natural-height on
+each img (EXIF quarter turns swapped, stale values removed, never a
+network fetch). width/height stay the author's. The pair is allowed on
+img by the sanitiser, which also drops CSS custom properties such as
+Dark Reader's --darkreader-inline-color from style attributes.
+
+record_rich_text_image_sizes backfills existing rows in every tenant
+schema, idempotently, without re-validating or reindexing.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`807f916`](https://github.com/vasilistotskas/grooveshop-django-api/commit/807f91669af927c05eb7f83c2d3f825cbb065652))
+
 ## v3.170.0 (2026-10-31)
 
 ### Bug fixes

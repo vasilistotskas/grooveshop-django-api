@@ -220,15 +220,26 @@ class Client:
         timeout_in_ms: int | None = None,
         interval_in_ms: int = 50,
     ) -> Task | TaskInfo:
-        if timeout_in_ms is not None:
-            task = self.client.wait_for_task(
-                task_uid,
-                timeout_in_ms=timeout_in_ms,
-                interval_in_ms=interval_in_ms,
-            )
-        else:
-            task = self.client.wait_for_task(task_uid)
+        """Wait for a task, for ``timeout_in_ms`` or the configured time.
+
+        The SDK waits five seconds when it is told nothing, so this passes
+        ``MEILISEARCH["TASK_TIMEOUT_MS"]`` whenever the caller names no
+        time.
+        """
+        task = self.client.wait_for_task(
+            task_uid,
+            timeout_in_ms=self._task_timeout_ms(timeout_in_ms),
+            interval_in_ms=interval_in_ms,
+        )
         return self._handle_sync(task)
+
+    @staticmethod
+    def _task_timeout_ms(timeout_in_ms: int | None) -> int:
+        if timeout_in_ms is not None:
+            return timeout_in_ms
+        from django.conf import settings as django_settings
+
+        return django_settings.MEILISEARCH["TASK_TIMEOUT_MS"]
 
     def get_indexes(self) -> list:
         """Every index on the engine, not just its first page.
@@ -318,7 +329,9 @@ class Client:
             else:
                 raise AttributeError("Task object has no uid attribute")
 
-            task = self.client.wait_for_task(uid)
+            task = self.client.wait_for_task(
+                uid, timeout_in_ms=self._task_timeout_ms(None)
+            )
             if task.status == "failed":
                 raise MeiliTaskFailed(task.error, operation="wait_for_task")
         return task

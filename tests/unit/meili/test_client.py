@@ -1,11 +1,26 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
+from django.test import override_settings
 
 from meili._client import Client
 from meili._client import client as global_client
 from meili._settings import _MeiliSettings
 from meili.dataclasses import MeiliIndexSettings
+
+CONFIGURED_TIMEOUT_MS = 234_567
+
+
+@pytest.fixture(autouse=True)
+def _task_timeout():
+    with override_settings(
+        MEILISEARCH={
+            **settings.MEILISEARCH,
+            "TASK_TIMEOUT_MS": CONFIGURED_TIMEOUT_MS,
+        }
+    ):
+        yield
 
 
 class TestMeiliClient:
@@ -393,7 +408,9 @@ class TestMeiliClient:
         result = client.wait_for_task(123)
 
         assert result == mock_task
-        mock_client_instance.wait_for_task.assert_called_once_with(123)
+        mock_client_instance.wait_for_task.assert_called_once_with(
+            123, timeout_in_ms=CONFIGURED_TIMEOUT_MS, interval_in_ms=50
+        )
 
     @patch("meili._client._Client")
     def test_get_indexes(self, mock_client_class):
@@ -594,7 +611,9 @@ class TestMeiliClient:
         result = client._handle_sync(mock_task)
 
         assert result == mock_waited_task
-        mock_client_instance.wait_for_task.assert_called_once_with(123)
+        mock_client_instance.wait_for_task.assert_called_once_with(
+            123, timeout_in_ms=CONFIGURED_TIMEOUT_MS
+        )
 
     @patch("meili._client._Client")
     def test_handle_sync_uid(self, mock_client_class):
@@ -635,7 +654,9 @@ class TestMeiliClient:
             result = client._handle_sync(mock_task)
 
         assert result == mock_waited_task
-        mock_client_instance.wait_for_task.assert_called_once_with(456)
+        mock_client_instance.wait_for_task.assert_called_once_with(
+            456, timeout_in_ms=CONFIGURED_TIMEOUT_MS
+        )
 
     @patch("meili._client._Client")
     def test_handle_sync_no_uid(self, mock_client_class):
@@ -745,3 +766,53 @@ class TestMeiliSettingsSearchKey:
         settings.MEILISEARCH = dict(self._BASE)  # no SEARCH_KEY key at all
         resolved = _MeiliSettings.from_settings()
         assert resolved.search_key == "the_master_key"
+
+
+class TestWaitForTaskTimeout:
+    """A wait that names no time uses the configured one, never the SDK's
+    five seconds."""
+
+    @patch("meili._client._Client")
+    def test_a_named_timeout_wins(self, mock_client_class):
+        sdk = mock_client_class.return_value
+        client = Client(
+            _MeiliSettings(
+                host="localhost",
+                port=7700,
+                https=False,
+                master_key="k",
+                search_key="k",
+                sync=False,
+                timeout=10,
+            )
+        )
+
+        client.wait_for_task(7, timeout_in_ms=5000)
+
+        sdk.wait_for_task.assert_called_once_with(
+            7, timeout_in_ms=5000, interval_in_ms=50
+        )
+
+    @patch("meili._client._Client")
+    def test_the_default_follows_the_setting(self, mock_client_class):
+        sdk = mock_client_class.return_value
+        client = Client(
+            _MeiliSettings(
+                host="localhost",
+                port=7700,
+                https=False,
+                master_key="k",
+                search_key="k",
+                sync=False,
+                timeout=10,
+            )
+        )
+
+        with override_settings(
+            MEILISEARCH={**settings.MEILISEARCH, "TASK_TIMEOUT_MS": 42}
+        ):
+            client.wait_for_task(7)
+
+        sdk.wait_for_task.assert_called_once_with(
+            7, timeout_in_ms=42, interval_in_ms=50
+        )

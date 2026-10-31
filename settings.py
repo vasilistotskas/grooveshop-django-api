@@ -1892,6 +1892,12 @@ MEILISEARCH = {
     "SETTINGS_TASK_TIMEOUT_MS": int(
         getenv("MEILI_SETTINGS_TASK_TIMEOUT_MS", "600000")
     ),
+    # How long a wait for any other index task (document additions and
+    # deletions, index creation and drops) lasts when the caller names no
+    # time. The SDK's own default is five seconds, which a batch of
+    # thousands of documents outlasts on a busy engine: a bulk sync then
+    # failed with a timeout the engine went on to finish.
+    "TASK_TIMEOUT_MS": int(getenv("MEILI_TASK_TIMEOUT_MS", "300000")),
 }
 
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "10"))

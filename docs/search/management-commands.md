@@ -64,6 +64,8 @@ exits non-zero if any failed. Each settings task is awaited for
 default), because a changed filterable or sortable attribute makes the engine rebuild
 that index. See [index settings](index-settings.md) for what is applied and why.
 
+Every other wait for an index task (the document additions of `meilisearch_sync_index` and `meilisearch_sync_all_indexes`, clears, drops) lasts `MEILISEARCH["TASK_TIMEOUT_MS"]` (`MEILI_TASK_TIMEOUT_MS`, 5 minutes by default) unless the caller names a time. The SDK's own default of five seconds failed a bulk sync of a large index with a timeout the engine went on to finish. The one-document index and remove tasks keep a short fixed wait on purpose: a timeout there is retried with backoff, which frees the worker.
+
 | Option | Description |
 |---|---|
 | `--index {ProductTranslation,BlogPostTranslation}` | Limit to one index |

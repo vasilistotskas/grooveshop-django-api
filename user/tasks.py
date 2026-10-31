@@ -128,14 +128,18 @@ def subscribe_to_newsletter_task(
     the consent, then always enqueues this one task and answers 202 — so
     the request's cost cannot tell a new address from a confirmed one.
     Here: the row lookup, the verified-owner attach, (re-)arming with the
-    cooldown, the insert race, and queuing the confirmation email (which
-    carries its own retry policy). Runs in the requesting tenant's schema
+    cooldown, the insert race, and queuing the email that answers the
+    submission: the confirmation link, or, for an address that is already
+    confirmed, the notice that says so (each carries its own retry
+    policy). Runs in the requesting tenant's schema
     (``dispatch_on_commit`` pins it; ``TenantTask`` enters it).
     """
     from datetime import datetime
 
     from user.models.subscription import SubscriptionTopic
     from user.services.subscription import (
+        NewsletterFormOutcome,
+        dispatch_already_subscribed_notice,
         dispatch_confirmation,
         subscribe_email_to_newsletter,
     )
@@ -154,7 +158,7 @@ def subscribe_to_newsletter_task(
         )
         return {"status": "skipped", "reason": "topic_unavailable"}
 
-    subscription = subscribe_email_to_newsletter(
+    result = subscribe_email_to_newsletter(
         topic=topic,
         email=email,
         consent_text=consent_text,
@@ -163,10 +167,69 @@ def subscribe_to_newsletter_task(
         language=language,
         consented_at=datetime.fromisoformat(consented_at),
     )
-    if subscription is None:
+    if result is None:
         return {"status": "noop"}
-    dispatch_confirmation(subscription)
-    return {"status": "armed", "subscription_id": subscription.id}
+    match result.outcome:
+        case NewsletterFormOutcome.ARMED:
+            dispatch_confirmation(result.subscription)
+            return {
+                "status": "armed",
+                "subscription_id": result.subscription.id,
+            }
+        case NewsletterFormOutcome.ALREADY_SUBSCRIBED:
+            dispatch_already_subscribed_notice(result.subscription)
+            return {
+                "status": "already_subscribed",
+                "subscription_id": result.subscription.id,
+            }
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_newsletter_already_subscribed_email_task(
+    self, subscription_id: int
+) -> bool:
+    """Tell the owner of a confirmed subscription that it already exists.
+
+    Serves account and guest (newsletter form) rows alike. The cooldown
+    was claimed when the task was queued, so a retry re-sends the same
+    notice and nothing else. A permanent refusal of every recipient (the
+    address cannot receive mail) marks the row BOUNCED, as for the
+    confirmation: nothing more is written to it, and a new submission
+    starts over with a fresh confirmation link.
+    """
+    from user.models.subscription import UserSubscription
+    from user.utils.subscription import send_already_subscribed_notice
+
+    try:
+        subscription = UserSubscription.objects.select_related(
+            "user", "topic"
+        ).get(id=subscription_id)
+    except UserSubscription.DoesNotExist:
+        logger.error(
+            "Subscription %s not found for the already-subscribed notice",
+            subscription_id,
+        )
+        return False
+    try:
+        return send_already_subscribed_notice(subscription)
+    except Exception as exc:
+        if not is_recipient_refused(exc):
+            raise
+        logger.warning(
+            "Already-subscribed notice for subscription %s refused by the "
+            "mail server: %s",
+            subscription_id,
+            exc,
+        )
+        subscription.mark_bounced()
+        return False
 
 
 @celery_app.task(

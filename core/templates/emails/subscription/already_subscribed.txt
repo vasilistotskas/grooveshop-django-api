@@ -1,0 +1,20 @@
+{% load i18n %}{% trans "YOU'RE ALREADY SUBSCRIBED" %}
+{{ SITE_NAME }}
+================================================================================
+
+{% if user %}{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}
+
+{% blocktrans with topic_name=topic.name %}Someone, most likely you, just asked to subscribe this address to {{ topic_name }}. It is already subscribed, so there is nothing more to do.{% endblocktrans %}
+
+{% if manage_url %}{% trans "MANAGE YOUR SUBSCRIPTIONS" %}
+--------------------------------------------------------------------------------
+{{ manage_url }}
+{% else %}{% trans "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it." %}
+{% endif %}
+{% trans "If you didn't ask for this, you can safely ignore this email — nothing has changed." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thanks,
+The {{ site_name }} team{% endblocktrans %}
+
+================================================================================
+{{ SITE_NAME }} - {{ SITE_URL }}

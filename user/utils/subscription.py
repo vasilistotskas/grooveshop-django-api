@@ -84,6 +84,32 @@ def send_subscription_confirmation(subscription: UserSubscription) -> bool:
     return True
 
 
+def send_already_subscribed_notice(subscription: UserSubscription) -> bool:
+    """Email the owner of a confirmed subscription that it already exists.
+
+    The answer to a newsletter-form submission for an address that is
+    already ACTIVE: the form answers every visitor the same way, so this
+    mail is the only place the address's owner learns it.
+
+    Returns False when there is nothing to send (the row is no longer
+    active, or the type is off for the store); a failure to SEND is
+    raised for the task's retry policy.
+    """
+    if subscription.status != UserSubscription.SubscriptionStatus.ACTIVE:
+        logger.warning(
+            "Attempted to send the already-subscribed notice for "
+            "non-active subscription %s",
+            subscription.id,
+        )
+        return False
+    if not was_sent(send_email("newsletter.already_subscribed", subscription)):
+        return False
+    logger.info(
+        "Sent already-subscribed notice for subscription %s", subscription.id
+    )
+    return True
+
+
 def claim_guest_subscriptions(user: User, email: str) -> int:
     """Attach the guest subscriptions made with ``email`` to ``user``.
 

@@ -1102,6 +1102,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         "consent_user_agent",
         "consented_at",
         "confirmation_sent_at",
+        "already_subscribed_notice_sent_at",
         "confirmed_at",
         "confirmed_ip",
     ]
@@ -1133,6 +1134,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
                     "consent_user_agent",
                     "consented_at",
                     "confirmation_sent_at",
+                    "already_subscribed_notice_sent_at",
                     "confirmed_at",
                     "confirmed_ip",
                 ),

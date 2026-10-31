@@ -37,6 +37,7 @@ from user.filters.subscription import (
 )
 from user.models.subscription import (
     ConfirmOutcome,
+    NewsletterSubscribeStatus,
     SubscriptionTopic,
     UserSubscription,
 )
@@ -44,6 +45,7 @@ from user.serializers.subscription import (
     BulkSubscriptionResultSerializer,
     BulkSubscriptionSerializer,
     NewsletterAvailabilitySerializer,
+    NewsletterSubscribeResponseSerializer,
     NewsletterSubscribeSerializer,
     SubscriptionTopicDetailSerializer,
     SubscriptionTopicSerializer,
@@ -54,6 +56,7 @@ from user.serializers.subscription import (
 )
 from user.services.subscription import (
     SubscribeOutcome,
+    holds_active_newsletter_subscription,
     opt_out_of_marketing,
     subscribe_account,
 )
@@ -490,6 +493,15 @@ class NewsletterSubscribeView(APIView):
     storefront server, which renders it), the visitor's IP as far as it
     can be proven (``core.client_ip.trusted_client_ip``), the user agent,
     the request language and the time.
+
+    One exception to the uniform answer, and it is not a leak: a SIGNED-IN
+    account that submits one of its own verified addresses while already
+    confirmed is told so (``status`` ``already_subscribed``) and nothing
+    is queued, since the data is its own. Every other submission, signed
+    in or not, answers ``pending_confirmation``. An anonymous request
+    never reaches that check, so its cost is unchanged; an address that
+    is already confirmed gets its answer by email (the task sends the
+    "already subscribed" notice).
     """
 
     permission_classes = [AllowAny]
@@ -536,14 +548,20 @@ class NewsletterSubscribeView(APIView):
         summary=_("Subscribe an email address to the newsletter"),
         description=_(
             "Subscribes an email address to the store's default "
-            "newsletter topic. Always answers 202: a confirmation email "
-            "is sent unless the address is already confirmed or one was "
-            "sent in the last 10 minutes."
+            "newsletter topic. Always answers 202 with a ``status``. "
+            "``pending_confirmation`` is the answer to every visitor: an "
+            "email may follow but is never promised: the confirmation link "
+            "(at most one in 10 minutes since the last link) or, for a "
+            "subscription that is already confirmed, a notice that says "
+            "so (at most one in 10 minutes since the last notice). "
+            "``already_subscribed`` is given only to a signed-in account "
+            "that submitted one of its own verified addresses while its "
+            "own subscription is already confirmed; no email is sent."
         ),
         tags=["User Subscriptions"],
         request=NewsletterSubscribeSerializer,
         responses={
-            202: DetailSerializer,
+            202: NewsletterSubscribeResponseSerializer,
             400: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
             429: ErrorResponseSerializer,
@@ -565,6 +583,20 @@ class NewsletterSubscribeView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        email = serializer.validated_data["email"]
+        if request.user.is_authenticated and (
+            holds_active_newsletter_subscription(request.user, topic, email)
+        ):
+            return Response(
+                {
+                    "detail": _(
+                        "You are already subscribed to the newsletter."
+                    ),
+                    "status": NewsletterSubscribeStatus.ALREADY_SUBSCRIBED,
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
         from tenant.celery import dispatch_on_commit
         from user.tasks import subscribe_to_newsletter_task
 
@@ -572,7 +604,7 @@ class NewsletterSubscribeView(APIView):
             subscribe_to_newsletter_task,
             kwargs={
                 "topic_id": topic.pk,
-                "email": serializer.validated_data["email"],
+                "email": email,
                 "consent_text": serializer.validated_data["consent_text"],
                 "consent_ip": trusted_client_ip(request),
                 "consent_user_agent": request.headers.get("User-Agent", "")[
@@ -587,7 +619,8 @@ class NewsletterSubscribeView(APIView):
                 "detail": _(
                     "Thank you. Check your inbox for a link to confirm "
                     "your subscription."
-                )
+                ),
+                "status": NewsletterSubscribeStatus.PENDING_CONFIRMATION,
             },
             status=status.HTTP_202_ACCEPTED,
         )

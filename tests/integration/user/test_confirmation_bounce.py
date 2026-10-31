@@ -11,6 +11,7 @@ import smtplib
 from unittest.mock import patch
 
 import pytest
+from django.utils import timezone
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.tasks import send_subscription_confirmation_email_task
@@ -90,8 +91,61 @@ class TestPermanentRefusal:
 
 class TestResubscribingAfterABounce:
     def test_a_new_request_starts_over_with_a_fresh_link(self, row):
-        from user.services.subscription import _needs_arming
+        from user.services.subscription import (
+            NewsletterFormOutcome,
+            subscribe_email_to_newsletter,
+        )
 
         row.mark_bounced()
 
-        assert _needs_arming(row) is True
+        result = subscribe_email_to_newsletter(
+            topic=row.topic,
+            email=row.email,
+            consent_text="I agree.",
+            consent_ip=None,
+            consent_user_agent="",
+            language="en",
+            consented_at=timezone.now(),
+        )
+
+        assert result is not None
+        assert result.outcome is NewsletterFormOutcome.ARMED
+        row.refresh_from_db()
+        assert row.status == Status.PENDING
+
+
+class TestAlreadySubscribedNoticeRefusal:
+    def _active(self, row):
+        UserSubscription.objects.filter(pk=row.pk).update(status=Status.ACTIVE)
+        row.refresh_from_db()
+        return row
+
+    def test_a_permanent_refusal_marks_the_active_row_bounced(self, row):
+        from user.tasks import send_newsletter_already_subscribed_email_task
+
+        row = self._active(row)
+        with patch(
+            "user.utils.subscription.send_already_subscribed_notice",
+            side_effect=_refused(550),
+        ):
+            sent = send_newsletter_already_subscribed_email_task.run(row.id)
+
+        assert sent is False
+        row.refresh_from_db()
+        assert row.status == Status.BOUNCED
+
+    def test_a_temporary_refusal_is_raised_and_leaves_the_row_active(self, row):
+        from user.tasks import send_newsletter_already_subscribed_email_task
+
+        row = self._active(row)
+        with (
+            patch(
+                "user.utils.subscription.send_already_subscribed_notice",
+                side_effect=_refused(450),
+            ),
+            pytest.raises(smtplib.SMTPRecipientsRefused),
+        ):
+            send_newsletter_already_subscribed_email_task.run(row.id)
+
+        row.refresh_from_db()
+        assert row.status == Status.ACTIVE

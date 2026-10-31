@@ -5,7 +5,11 @@ from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
-from user.models.subscription import SubscriptionTopic, UserSubscription
+from user.models.subscription import (
+    NewsletterSubscribeStatus,
+    SubscriptionTopic,
+    UserSubscription,
+)
 
 
 @extend_schema_field(generate_schema_multi_lang(SubscriptionTopic))
@@ -331,5 +335,19 @@ class NewsletterAvailabilitySerializer(serializers.Serializer):
         help_text=_(
             "Whether the store has a default newsletter topic the form "
             "can subscribe to."
+        ),
+    )
+
+
+class NewsletterSubscribeResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    status = serializers.ChoiceField(
+        choices=NewsletterSubscribeStatus.choices,
+        help_text=_(
+            "``pending_confirmation`` for every visitor: an email may "
+            "follow, never promised. ``already_subscribed`` only when "
+            "the signed-in account submitted one of its own verified "
+            "addresses and the account's subscription to the newsletter "
+            "is already confirmed; no email is sent then."
         ),
     )

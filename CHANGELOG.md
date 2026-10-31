@@ -3,6 +3,46 @@
 
 
 
+## v3.174.0 (2026-10-31)
+
+### Chores
+
+* chore(emails): delete the OPS_ALERT setting rows (emails/0004)
+
+emails/0003 moved every muted ops alert into EmailSwitch and left the
+OPS_ALERT_<KIND>_ENABLED setting rows for the release that still read
+them. That release is gone, so 0004 deletes the rows in every schema,
+declared as the contract step of 0003.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`8e92a79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e92a79243d24f67acdf3a7dd1cbcd1c158ca51d))
+
+### Features
+
+* feat(emails): allauth mail becomes 19 email types; emails/0004 deletes the OPS_ALERT setting rows (#392) ([`8e92a79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e92a79243d24f67acdf3a7dd1cbcd1c158ca51d))
+
+* feat(emails): allauth mail becomes 19 email types
+
+Every mail allauth sends (account, MFA and social sign-in) is now an email
+type declared in user/emails.py and sent through send_email, so it gets the
+store's From, list headers and branded HTML and text. The adapter maps
+allauth's template prefix to the type (an unmapped prefix raises) and queues
+send_allauth_email_task, keeping the SMTP conversation out of the view.
+
+The seven MFA and social mails had no branded template and the account mails
+rendered allauth's unbranded text part; all 19 now have an HTML and a text
+template under emails/{account,mfa,social}. Subjects are msgids with Greek
+translations; the [store name] subject prefix, ACCOUNT_EMAIL_SUBJECT_PREFIX,
+format_email_subject and get_from_email are removed. send_rendered_email_task
+has no caller and stays one release for messages queued during the rollout.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`8e92a79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e92a79243d24f67acdf3a7dd1cbcd1c158ca51d))
+
 ## v3.173.0 (2026-10-31)
 
 ### Bug fixes

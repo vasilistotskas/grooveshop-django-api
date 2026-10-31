@@ -36,6 +36,7 @@ from core.models import (
 )
 from core.units import DistanceUnits, WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
+from core.utils.html_text import visible_text
 from core.weight import zero_weight
 from meili.models import IndexMixin
 from product.managers.image import ORDERED_IMAGES
@@ -883,11 +884,14 @@ class ProductTranslation(
             "name_greeklish": lambda obj: greeklish_shadow(obj.name),
             "name_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.name),
             "name_greeklish_variants": lambda obj: greeklish_variants(obj.name),
+            # The description is HTML: the index holds the words a
+            # reader sees, never the tag and attribute text around them.
+            "description": lambda obj: visible_text(obj.description),
             "description_greeklish": lambda obj: greeklish_shadow(
-                obj.description
+                visible_text(obj.description)
             ),
             "description_greeklish_alt": lambda obj: greeklish_shadow_alt(
-                obj.description
+                visible_text(obj.description)
             ),
             "likes_count": lambda obj: (
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count

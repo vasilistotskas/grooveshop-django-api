@@ -7,6 +7,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from tinymce.models import HTMLField
 
+from core.utils.rich_text_images import record_natural_sizes
 from core.utils.sanitize import lost_content, sanitize_html
 
 # What TinyMCE's media dialog inserts for a video it cannot turn into an
@@ -59,7 +60,8 @@ class RichTextField(HTMLField):
       validate (a shell session, a management command, a seed), refuses
       the same content, and only then stores the sanitised value — which
       normalises (entities, link ``rel``) and drops only markup no reader
-      sees, such as a paste's ``data-*`` attributes.
+      sees, such as a paste's ``data-*`` attributes. It then records
+      each uploaded image's real size (``record_natural_sizes``).
 
     ``pre_save`` used to strip instead of refuse. That is how 29 embedded
     videos in 20 blog posts disappeared between 2026-08-14 and
@@ -77,6 +79,6 @@ class RichTextField(HTMLField):
                 validate_rich_text(value)
             except ValidationError as exc:
                 raise ValidationError({self.name: exc.error_list}) from exc
-            value = sanitize_html(value)
+            value = record_natural_sizes(sanitize_html(value))
             setattr(model_instance, self.attname, value)
         return value

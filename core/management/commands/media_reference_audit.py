@@ -58,8 +58,8 @@ class SchemaAudit:
     cleared: int = 0
 
 
-def tenant_file_fields() -> list[tuple[type[models.Model], list]]:
-    """Every concrete TENANT_APPS model that stores a file, with fields.
+def tenant_models() -> list[type[models.Model]]:
+    """Every concrete TENANT_APPS model.
 
     Resolved through the app registry: an app config's ``label`` is not
     always the last dotted segment of its ``name`` (it can be set
@@ -72,13 +72,19 @@ def tenant_file_fields() -> list[tuple[type[models.Model], list]]:
         for config in apps.get_app_configs()
         if config.name in tenant_names
     }
+    return [
+        model
+        for model in apps.get_models()
+        if not model._meta.abstract
+        and not model._meta.proxy
+        and model._meta.app_label in labels
+    ]
 
+
+def tenant_file_fields() -> list[tuple[type[models.Model], list]]:
+    """Every concrete TENANT_APPS model that stores a file, with fields."""
     pairs = []
-    for model in apps.get_models():
-        if model._meta.abstract or model._meta.proxy:
-            continue
-        if model._meta.app_label not in labels:
-            continue
+    for model in tenant_models():
         file_fields = [
             f
             for f in model._meta.get_fields()

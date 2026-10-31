@@ -57,10 +57,33 @@ uv run python manage.py record_rich_text_image_sizes --all-tenants [--dry-run]
 
 (`--tenant <schema>` for one store). It discovers the `RichTextField` columns
 from the app registry, writes the column directly (no re-validation, history
-or reindex, since no text a reader or the search index sees changes) and is
-idempotent. The storefront serves its cached pages until they expire; run
-`purge_edge_cache` afterwards to use the sizes at once.
+or reindex) and is idempotent. The search index holds visible text only (next
+section), so the sizes cannot change a document. The storefront serves its
+cached pages until they expire; run `purge_edge_cache` afterwards to use the
+sizes at once.
+
+## Search
+
+A rich-text field is indexed as the words a reader sees, not as HTML:
+`core.utils.html_text.visible_text` strips the tags, decodes entities and puts
+a space where each tag was. `BlogPostTranslation` (`body`, `body_greeklish*`)
+and `ProductTranslation` (`description`, `description_greeklish*`) do this in
+`get_additional_meili_fields`, which overrides the raw column. Before, tag and
+attribute text (`src` paths, `style`, `class`) was searchable. The search
+endpoints hydrate hits from the database, so what the storefront shows is
+unchanged.
+
+Documents indexed before this keep the raw HTML until reindexed. Once, after
+deploying it, per store:
+
+```bash
+uv run python manage.py meilisearch_sync_index blog.BlogPostTranslation
+uv run python manage.py meilisearch_sync_index product.ProductTranslation
+```
+
+(`--tenant`/`--all-tenants` as that command accepts; the index settings do not
+change.)
 
 Source: `core/fields/rich_text.py`, `core/utils/sanitize.py`,
-`core/utils/rich_text_images.py`,
+`core/utils/rich_text_images.py`, `core/utils/html_text.py`,
 `core/management/commands/record_rich_text_image_sizes.py`.

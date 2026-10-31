@@ -16,6 +16,7 @@ from core.models import (
     UUIDModel,
 )
 from core.utils.generators import SlugifyConfig, unique_slugify
+from core.utils.html_text import visible_text
 from meili.models import IndexMixin
 from search.transliteration import (
     greeklish_shadow,
@@ -302,8 +303,15 @@ class BlogPostTranslation(
             "subtitle_greeklish_variants": lambda obj: greeklish_variants(
                 obj.subtitle
             ),
-            "body_greeklish": lambda obj: greeklish_shadow(obj.body),
-            "body_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.body),
+            # The body is HTML: the index holds the words a reader sees,
+            # never the tag and attribute text around them.
+            "body": lambda obj: visible_text(obj.body),
+            "body_greeklish": lambda obj: greeklish_shadow(
+                visible_text(obj.body)
+            ),
+            "body_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                visible_text(obj.body)
+            ),
             "likes_count": lambda obj: (
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count
             ),

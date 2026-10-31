@@ -8,9 +8,11 @@ already carry the right size is left alone.
 It writes the column directly rather than saving the row. A save
 re-validates the whole body and would refuse one the policy has since
 tightened over, and it re-indexes and records history for a change that
-touches no text a reader or the search index sees. The storefront keeps
-serving a cached page until it expires, so run ``purge_edge_cache``
-afterwards to have the sizes used at once.
+touches no text. The search index holds a rich-text field's visible text
+only (``core.utils.html_text``), never its attributes, so the sizes
+cannot change a document and nothing needs reindexing after this run.
+The storefront keeps serving a cached page until it expires, so run
+``purge_edge_cache`` afterwards to have the sizes used at once.
 
 Fields come from the app registry, so a model that gains a rich-text
 column is covered without touching this command.

@@ -190,7 +190,6 @@ def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
     return value
 
 
-_NBSP_ENTITY = re.compile(r"&(?:nbsp|#160|#x0*a0);", re.IGNORECASE)
 _VOID_ELEMENTS = frozenset(
     {
         "area",
@@ -235,7 +234,7 @@ class _VisibleContent(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
         hidden = "hidden" in attributes
-        if not self._hidden:
+        if not hidden and not self._hidden:
             source = _SOURCE_ATTRIBUTES.get(tag)
             if tag == "svg" or (
                 source and (attributes.get(source) or "").strip()
@@ -254,7 +253,9 @@ class _VisibleContent(HTMLParser):
             self._open.pop()
 
     def handle_data(self, data):
-        if not self._hidden and _NBSP_ENTITY.sub(" ", data).strip():
+        # ``data`` is already decoded (``convert_charrefs``), so a space
+        # written ``&#x20;`` or ``&nbsp;`` is whitespace here.
+        if not self._hidden and data.strip():
             self.visible = True
 
 

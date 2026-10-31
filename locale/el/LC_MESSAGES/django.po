@@ -8872,6 +8872,9 @@ msgstr "Λειτουργία"
 msgid "Operation Type"
 msgstr "Τύπος λειτουργίας"
 
+msgid "Operational alerts"
+msgstr "Λειτουργικές ειδοποιήσεις"
+
 msgid "Operational note from BoxNow"
 msgstr "Λειτουργική σημείωση από BoxNow"
 
@@ -16580,9 +16583,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Only superusers may adjust loyalty points directly."
 #~ msgstr "Μόνο οι υπερχρήστες μπορούν να προσαρμόσουν απευθείας τους πόντους επιβράβευσης."
-
-#~ msgid "Operational Alerts"
-#~ msgstr "Λειτουργικές ειδοποιήσεις"
 
 #~ msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."

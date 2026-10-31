@@ -8863,6 +8863,9 @@ msgstr "Operation"
 msgid "Operation Type"
 msgstr "Operation Type"
 
+msgid "Operational alerts"
+msgstr "Operational alerts"
+
 msgid "Operational note from BoxNow"
 msgstr "Operational note from BoxNow"
 
@@ -16096,9 +16099,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Old (7+ days)"
 #~ msgstr "Old (7+ days)"
-
-#~ msgid "Operational Alerts"
-#~ msgstr "Operational Alerts"
 
 #~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."

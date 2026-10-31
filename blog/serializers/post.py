@@ -1,10 +1,13 @@
 from typing import cast
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
+from parler_rest.utils import create_translated_fields_serializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -87,6 +90,76 @@ class BlogPostSerializer(
             preview = body[:200]
             return f"{preview}..." if len(body) > 200 else preview
         return ""
+
+
+# What a syndicated item renders: the article in full beside its card.
+FEED_TRANSLATED_FIELDS = ("title", "subtitle", "body")
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(BlogPost, fields=FEED_TRANSLATED_FIELDS)
+)
+class FeedTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
+class BlogPostFeedSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
+):
+    """One item of the RSS feed.
+
+    The feed needs every article's body, so it has its own shape and
+    its own endpoint rather than a request per post for the detail.
+    """
+
+    translations = FeedTranslatedFieldsField(
+        shared_model=BlogPost,
+        serializer_class=create_translated_fields_serializer(
+            BlogPost,
+            related_name="translations",
+            meta={"fields": list(FEED_TRANSLATED_FIELDS)},
+        ),
+    )
+
+    class Meta:
+        model = BlogPost
+        fields = (
+            "id",
+            "uuid",
+            "slug",
+            "translations",
+            "category",
+            "main_image_path",
+            "published_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class _CountField(serializers.IntegerField):
+    """An integer with a default for an omitted value, never a blank one.
+
+    DRF reads ``?count=`` as an omitted value whenever the field has a
+    default, so a typo in the query was answered with the default feed.
+    """
+
+    def get_value(self, dictionary):
+        if dictionary.get(self.field_name) == "":
+            return ""
+        return super().get_value(dictionary)
+
+
+class BlogPostFeedQuerySerializer(serializers.Serializer):
+    count = _CountField(
+        min_value=1,
+        max_value=settings.BLOG_FEED_LIMIT,
+        default=settings.BLOG_FEED_LIMIT,
+        help_text=format_lazy(
+            _("Most posts to return, from 1 to {max} (the default)."),
+            max=settings.BLOG_FEED_LIMIT,
+        ),
+    )
 
 
 class BlogPostDetailSerializer(BlogPostSerializer):

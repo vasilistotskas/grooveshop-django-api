@@ -6100,6 +6100,9 @@ msgstr "Λήψη της αξιολόγησης του τρέχοντος χρή�
 msgid "Get the current user's subscribed and available subscription topics."
 msgstr "Λήψη των θεμάτων εγγραφής στα οποία είναι εγγεγραμμένος και των διαθέσιμων θεμάτων για τον τρέχοντα χρήστη."
 
+msgid "Get the posts for the RSS feed"
+msgstr "Λήψη των άρθρων για το RSS feed"
+
 msgid "Get the sibling products in this product's variant group, plus the variant axes (e.g. Colour, Memory) to render as selectors. Returns just the product itself when it has no variant group."
 msgstr "Λήψη των αδερφών προϊόντων στην ομάδα παραλλαγών αυτού του προϊόντος, καθώς και των αξόνων παραλλαγής (π.χ. Χρώμα, Μνήμη) προς εμφάνιση ως επιλογείς. Επιστρέφει μόνο το ίδιο το προϊόν όταν δεν έχει ομάδα παραλλαγών."
 
@@ -8040,6 +8043,10 @@ msgstr "Χρήματα που απέδωσε η ACS και καμία αποστ
 
 msgid "Month"
 msgstr "Μήνας"
+
+#, python-brace-format
+msgid "Most posts to return, from 1 to {max} (the default)."
+msgstr "Μέγιστος αριθμός άρθρων προς επιστροφή, από 1 έως {max} (η προεπιλογή)."
 
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Αριθμοί θυγατρικών vouchers πολλαπλών δεμάτων, τελευταία απόκριση δημιουργίας voucher, τελευταίος φάκελος σφάλματος, URL POD σε cache."
@@ -13210,6 +13217,9 @@ msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από �
 
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη."
+
+msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
+msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."

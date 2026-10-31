@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import RequiredDefaultTranslationMixin
+from core.utils.sanitize import has_visible_content
 from core.utils.serializers import TranslatedFieldExtended
 from page_config.legal_guard import (
     body_error,
@@ -270,6 +271,7 @@ class ContentPageTranslatedFieldsField(TranslatedFieldExtended):
 class ContentPageSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ContentPage]
 ):
+    translated_locales = serializers.SerializerMethodField()
     translations = ContentPageTranslatedFieldsField(shared_model=ContentPage)
 
     class Meta:
@@ -279,6 +281,7 @@ class ContentPageSerializer(
             "uuid",
             "slug",
             "translations",
+            "translated_locales",
             "is_published",
             "published_at",
             "created_at",
@@ -290,6 +293,18 @@ class ContentPageSerializer(
             "published_at",
             "created_at",
             "updated_at",
+        )
+
+    def get_translated_locales(self, obj: ContentPage) -> list[str]:
+        """The languages the page is written in: its body shows something.
+
+        A translation row is no evidence of a document (an emptied body
+        is still a row), so this is what hreflang and the sitemap read.
+        """
+        return sorted(
+            translation.language_code
+            for translation in obj.translations.all()
+            if has_visible_content(translation.body)
         )
 
 

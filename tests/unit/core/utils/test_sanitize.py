@@ -1,6 +1,10 @@
 import unittest
 
-from core.utils.sanitize import is_allowed_embed_url, sanitize_html
+from core.utils.sanitize import (
+    has_visible_content,
+    is_allowed_embed_url,
+    sanitize_html,
+)
 
 
 class TestSanitizeHtmlEmbeds(unittest.TestCase):
@@ -86,3 +90,48 @@ class TestSanitizeHtmlStyleResidue(unittest.TestCase):
         html = '<p style="text-align: center">x</p>'
 
         self.assertEqual(sanitize_html(html), html)
+
+
+class TestHasVisibleContent(unittest.TestCase):
+    def test_empty_markup_shows_nothing(self):
+        for html in (None, "", "<p></p>", "<p>&nbsp;</p>", "<p> &#160; </p>"):
+            with self.subTest(html=html):
+                self.assertFalse(has_visible_content(html))
+
+    def test_text_or_embedded_media_shows_something(self):
+        for html in ("<p>a</p>", "text", '<p><img src="a.png"></p>'):
+            with self.subTest(html=html):
+                self.assertTrue(has_visible_content(html))
+
+    def test_hidden_content_shows_nothing(self):
+        for html in (
+            "<p hidden>Draft</p>",
+            '<div hidden=""><p>a</p><img src="a.png"></div>',
+            "<div hidden><div>x</div></div><p>&nbsp;</p>",
+        ):
+            with self.subTest(html=html):
+                self.assertFalse(has_visible_content(html))
+
+    def test_visible_content_beside_hidden_content_counts(self):
+        self.assertTrue(has_visible_content("<p hidden>a</p><p>b</p>"))
+        self.assertTrue(
+            has_visible_content('<div hidden><p>a</p></div><img src="a.png">')
+        )
+
+    def test_media_without_a_source_shows_nothing(self):
+        for html in (
+            "<img>",
+            '<img src="" alt="a">',
+            "<iframe></iframe>",
+            '<p><iframe width="560"></iframe></p>',
+        ):
+            with self.subTest(html=html):
+                self.assertFalse(has_visible_content(html))
+
+    def test_media_with_a_source_shows_something(self):
+        for html in (
+            '<iframe src="https://www.youtube.com/embed/x"></iframe>',
+            '<img src="a.png">',
+        ):
+            with self.subTest(html=html):
+                self.assertTrue(has_visible_content(html))

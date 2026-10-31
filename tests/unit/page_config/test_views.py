@@ -448,6 +448,26 @@ class TestContentPageViewSet(TestCase):
         assert "terms" in slugs
         assert "privacy" not in slugs
 
+    def test_list_names_the_languages_a_page_is_written_in(self):
+        self.published.set_current_language("en")
+        self.published.title = "Terms of Use"
+        self.published.body = "<p>&nbsp;</p>"
+        self.published.save()
+
+        response = self.client.get("/api/v1/content-page")
+
+        page = next(
+            item
+            for item in response.json()["results"]
+            if item["slug"] == "terms"
+        )
+        assert page["translatedLocales"] == ["el"]
+
+    def test_detail_names_them_too(self):
+        data = self.client.get("/api/v1/content-page/terms").json()
+
+        assert data["translatedLocales"] == ["el"]
+
     def test_staff_sees_unpublished_in_list(self):
         staff = UserAccountFactory(is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=staff)

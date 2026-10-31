@@ -24,6 +24,8 @@ from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import (
     BlogPostDetailSerializer,
+    BlogPostFeedQuerySerializer,
+    BlogPostFeedSerializer,
     BlogPostLikedPostsRequestSerializer,
     BlogPostLikedPostsResponseSerializer,
     BlogPostSerializer,
@@ -149,6 +151,19 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Blog Posts"],
     ),
+    "feed": ActionConfig(
+        response=BlogPostFeedSerializer,
+        many=True,
+        paginated=False,
+        operation_id="listBlogPostFeed",
+        summary=_("Get the posts for the RSS feed"),
+        description=_(
+            "The newest published posts with their full body, in one "
+            "response, for the storefront's RSS feed."
+        ),
+        tags=["Blog Posts"],
+        parameters=[BlogPostFeedQuerySerializer],
+    ),
     "featured": ActionConfig(
         response=BlogPostSerializer,
         many=True,
@@ -188,7 +203,7 @@ BLOG_POST_ORDERING = ActionOrdering(
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "feed"])
 class BlogPostViewSet(BaseModelViewSet):
     queryset = BlogPost.objects.all()
     serializers_config = serializers_config
@@ -234,6 +249,8 @@ class BlogPostViewSet(BaseModelViewSet):
         """
         if self.action == "list":
             queryset = BlogPost.objects.for_list()
+        elif self.action == "feed":
+            queryset = BlogPost.objects.for_feed()
         else:
             queryset = BlogPost.objects.for_detail()
 
@@ -423,6 +440,26 @@ class BlogPostViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(
             queryset, request, serializer_class=response_serializer_class
+        )
+
+    # ``filter_backends=[]``: the feed takes ``count`` only and runs no
+    # filter, search or ordering, so the schema must not advertise them.
+    @action(
+        detail=False, methods=["GET"], pagination_class=None, filter_backends=[]
+    )
+    def feed(self, request):
+        query = BlogPostFeedQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        queryset = self.get_queryset().published()
+        queryset = queryset.order_by(
+            F("published_at").desc(nulls_last=True), "-id"
+        )[: query.validated_data["count"]]
+
+        response_serializer_class = self.get_response_serializer()
+        return Response(
+            response_serializer_class(
+                queryset, many=True, context=self.get_serializer_context()
+            ).data
         )
 
     @action(detail=False, methods=["GET"])

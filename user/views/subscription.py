@@ -550,11 +550,13 @@ class NewsletterSubscribeView(APIView):
             "Subscribes an email address to the store's default "
             "newsletter topic. Always answers 202 with a ``status``. "
             "``pending_confirmation`` is the answer to every visitor: an "
-            "email follows (the confirmation link, or a notice that the "
-            "address is already subscribed), at most one in 10 minutes. "
+            "email may follow but is never promised: the confirmation link "
+            "(at most one in 10 minutes since the last link) or, for a "
+            "subscription that is already confirmed, a notice that says "
+            "so (at most one in 10 minutes since the last notice). "
             "``already_subscribed`` is given only to a signed-in account "
-            "that submitted one of its own verified, already confirmed "
-            "addresses; no email is sent."
+            "that submitted one of its own verified addresses while its "
+            "own subscription is already confirmed; no email is sent."
         ),
         tags=["User Subscriptions"],
         request=NewsletterSubscribeSerializer,

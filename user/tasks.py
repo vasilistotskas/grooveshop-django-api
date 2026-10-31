@@ -199,7 +199,10 @@ def send_newsletter_already_subscribed_email_task(
 
     Serves account and guest (newsletter form) rows alike. The cooldown
     was claimed when the task was queued, so a retry re-sends the same
-    notice and nothing else.
+    notice and nothing else. A permanent refusal of every recipient (the
+    address cannot receive mail) marks the row BOUNCED, as for the
+    confirmation: nothing more is written to it, and a new submission
+    starts over with a fresh confirmation link.
     """
     from user.models.subscription import UserSubscription
     from user.utils.subscription import send_already_subscribed_notice
@@ -214,7 +217,19 @@ def send_newsletter_already_subscribed_email_task(
             subscription_id,
         )
         return False
-    return send_already_subscribed_notice(subscription)
+    try:
+        return send_already_subscribed_notice(subscription)
+    except Exception as exc:
+        if not is_recipient_refused(exc):
+            raise
+        logger.warning(
+            "Already-subscribed notice for subscription %s refused by the "
+            "mail server: %s",
+            subscription_id,
+            exc,
+        )
+        subscription.mark_bounced()
+        return False
 
 
 @celery_app.task(

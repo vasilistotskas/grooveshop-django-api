@@ -112,3 +112,40 @@ class TestResubscribingAfterABounce:
         assert result.outcome is NewsletterFormOutcome.ARMED
         row.refresh_from_db()
         assert row.status == Status.PENDING
+
+
+class TestAlreadySubscribedNoticeRefusal:
+    def _active(self, row):
+        UserSubscription.objects.filter(pk=row.pk).update(status=Status.ACTIVE)
+        row.refresh_from_db()
+        return row
+
+    def test_a_permanent_refusal_marks_the_active_row_bounced(self, row):
+        from user.tasks import send_newsletter_already_subscribed_email_task
+
+        row = self._active(row)
+        with patch(
+            "user.utils.subscription.send_already_subscribed_notice",
+            side_effect=_refused(550),
+        ):
+            sent = send_newsletter_already_subscribed_email_task.run(row.id)
+
+        assert sent is False
+        row.refresh_from_db()
+        assert row.status == Status.BOUNCED
+
+    def test_a_temporary_refusal_is_raised_and_leaves_the_row_active(self, row):
+        from user.tasks import send_newsletter_already_subscribed_email_task
+
+        row = self._active(row)
+        with (
+            patch(
+                "user.utils.subscription.send_already_subscribed_notice",
+                side_effect=_refused(450),
+            ),
+            pytest.raises(smtplib.SMTPRecipientsRefused),
+        ):
+            send_newsletter_already_subscribed_email_task.run(row.id)
+
+        row.refresh_from_db()
+        assert row.status == Status.ACTIVE

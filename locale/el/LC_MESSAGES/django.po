@@ -12975,8 +12975,8 @@ msgstr "Συνδρομητής"
 msgid "Subscribers"
 msgstr "Συνδρομητές"
 
-msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
-msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202 με ένα ``status``. Το ``pending_confirmation`` είναι η απάντηση σε κάθε επισκέπτη: ακολουθεί email (ο σύνδεσμος επιβεβαίωσης ή ειδοποίηση ότι η διεύθυνση είναι ήδη εγγεγραμμένη), το πολύ ένα ανά 10 λεπτά. Το ``already_subscribed`` δίνεται μόνο σε συνδεδεμένο λογαριασμό που υπέβαλε δική του επαληθευμένη, ήδη επιβεβαιωμένη διεύθυνση· δεν στέλνεται email."
+msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email may follow but is never promised: the confirmation link (at most one in 10 minutes since the last link) or, for a subscription that is already confirmed, a notice that says so (at most one in 10 minutes since the last notice). ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified addresses while its own subscription is already confirmed; no email is sent."
+msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202 με ένα ``status``. Το ``pending_confirmation`` είναι η απάντηση σε κάθε επισκέπτη: μπορεί να ακολουθήσει email, χωρίς υπόσχεση: ο σύνδεσμος επιβεβαίωσης (το πολύ ένας ανά 10 λεπτά από τον προηγούμενο σύνδεσμο) ή, για συνδρομή που είναι ήδη επιβεβαιωμένη, ειδοποίηση που το λέει (το πολύ μία ανά 10 λεπτά από την προηγούμενη ειδοποίηση). Το ``already_subscribed`` δίνεται μόνο σε συνδεδεμένο λογαριασμό που υπέβαλε δική του επαληθευμένη διεύθυνση ενώ η δική του συνδρομή είναι ήδη επιβεβαιωμένη· δεν στέλνεται email."
 
 msgid "Subscription"
 msgstr "Συνδρομή"
@@ -15945,8 +15945,8 @@ msgstr "Μόνο για ``invalid_coupon`` / ``invalid_gift_card``."
 msgid "``invalid_coupon`` only."
 msgstr "Μόνο για ``invalid_coupon``."
 
-msgid "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
-msgstr "``pending_confirmation`` για κάθε επισκέπτη: ένας σύνδεσμος επιβεβαίωσης είναι καθ' οδόν, εκτός αν η διεύθυνση δεν τον χρειάζεται. ``already_subscribed`` μόνο όταν ο συνδεδεμένος λογαριασμός υπέβαλε δική του επαληθευμένη διεύθυνση και είναι ήδη επιβεβαιωμένος· τότε δεν στέλνεται email."
+msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
+msgstr "``pending_confirmation`` για κάθε επισκέπτη: μπορεί να ακολουθήσει email, χωρίς υπόσχεση. ``already_subscribed`` μόνο όταν ο συνδεδεμένος λογαριασμός υπέβαλε δική του επαληθευμένη διεύθυνση και η συνδρομή του λογαριασμού στο newsletter είναι ήδη επιβεβαιωμένη· τότε δεν στέλνεται email."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστώνει αυτό το παραστατικό, παγωμένες κατά την έκδοση."

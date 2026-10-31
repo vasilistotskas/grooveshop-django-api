@@ -12969,8 +12969,8 @@ msgstr "Subscriber"
 msgid "Subscribers"
 msgstr "Subscribers"
 
-msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
-msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
+msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email may follow but is never promised: the confirmation link (at most one in 10 minutes since the last link) or, for a subscription that is already confirmed, a notice that says so (at most one in 10 minutes since the last notice). ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified addresses while its own subscription is already confirmed; no email is sent."
+msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email may follow but is never promised: the confirmation link (at most one in 10 minutes since the last link) or, for a subscription that is already confirmed, a notice that says so (at most one in 10 minutes since the last notice). ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified addresses while its own subscription is already confirmed; no email is sent."
 
 msgid "Subscription"
 msgstr "Subscription"
@@ -15940,8 +15940,8 @@ msgstr "``invalid_coupon`` / ``invalid_gift_card`` only."
 msgid "``invalid_coupon`` only."
 msgstr "``invalid_coupon`` only."
 
-msgid "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
-msgstr "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
+msgid "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
+msgstr "``pending_confirmation`` for every visitor: an email may follow, never promised. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and the account's subscription to the newsletter is already confirmed; no email is sent then."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."

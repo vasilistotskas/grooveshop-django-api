@@ -159,6 +159,9 @@ lock before the mail is queued, so concurrent submissions send one; the
 confirmation keeps using `confirmation_sent_at`, which dates a link an active
 row no longer has. A PENDING row inside the cooldown sends nothing: the link
 that went out is the answer.
+A mail server that permanently refuses every recipient of either mail marks the
+row BOUNCED (the same rule, `is_recipient_refused`), so the notice is not queued
+again for a dead address; a new submission re-arms it with a fresh link.
 
 The one synchronous exception is about the caller's own data. A signed-in
 account that submits one of its own VERIFIED addresses while already confirmed

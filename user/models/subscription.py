@@ -341,9 +341,11 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
     def mark_bounced(self):
         """The address cannot receive mail: stop writing to it.
 
-        Only a PENDING row has anything to lose (its confirmation never
-        arrived); a new request for the address starts over with a fresh
-        link (``user.services.subscription``).
+        Called when the mail server permanently refuses every recipient:
+        for a PENDING row its confirmation never arrived, for an ACTIVE
+        one a mail to it cannot arrive either. A new request for the
+        address starts over with a fresh link
+        (``user.services.subscription``).
         """
         self.status = self.SubscriptionStatus.BOUNCED
         self.save(update_fields=["status", "updated_at"])

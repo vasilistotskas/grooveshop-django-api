@@ -344,10 +344,10 @@ class NewsletterSubscribeResponseSerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=NewsletterSubscribeStatus.choices,
         help_text=_(
-            "``pending_confirmation`` for every visitor: a confirmation "
-            "link is on its way unless the address needs none. "
-            "``already_subscribed`` only when the signed-in account "
-            "submitted one of its own verified addresses and is already "
-            "confirmed; no email is sent then."
+            "``pending_confirmation`` for every visitor: an email may "
+            "follow, never promised. ``already_subscribed`` only when "
+            "the signed-in account submitted one of its own verified "
+            "addresses and the account's subscription to the newsletter "
+            "is already confirmed; no email is sent then."
         ),
     )

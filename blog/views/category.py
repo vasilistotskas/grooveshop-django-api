@@ -229,11 +229,12 @@ class BlogCategoryViewSet(BaseModelViewSet):
         # accessor) so the queryset carries ``visible_to`` — the accessor
         # returns a plain QuerySet that bypasses BlogPostManager, which is
         # how drafts reached this public listing.
+        # ``for_list``: the cards read each post's counts, translations,
+        # tags, author and category.
         return (
-            BlogPost.objects.filter(category__in=categories)
+            BlogPost.objects.for_list()
+            .filter(category__in=categories)
             .visible_to(self.request.user)
-            .select_related("category", "author__user")
-            .prefetch_related("tags")
         )
 
     # ``queryset`` names the model this action lists, which is what the

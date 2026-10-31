@@ -178,7 +178,9 @@ serializers_config: SerializersConfig = {
 
 
 # The actions whose response is a list of posts in the list shape.
-LIST_SHAPED_ACTIONS = frozenset({"list", "trending", "popular", "featured"})
+LIST_SHAPED_ACTIONS = frozenset(
+    {"list", "trending", "popular", "featured", "related_posts"}
+)
 
 # The sort contract of a list of posts. Shared with the author and
 # category ``posts`` actions, which paginate BlogPost rows from another

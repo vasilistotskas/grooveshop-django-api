@@ -338,6 +338,7 @@ EXEMPT: dict[str, str] = {
     "recommendation.RecommendationSlot": "one row per surface, seeded",
     "page_config.NavigationMenu": "one row per menu slot, seeded",
     "django_celery_beat.SolarSchedule": "one row per solar event and place",
+    "emails.EmailSwitch": "a page of the registry's types, not a list of rows",
 }
 
 

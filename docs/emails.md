@@ -358,6 +358,27 @@ request or task sees it. A request that already holds the store row keeps
 the old list until it ends. The public schema has no generation and reads
 the table directly.
 
+### The store's email page (`emails/admin.py`, `emails/switches.py`)
+
+`Settings -> Emails` in the store admin. One dedicated page, like the text
+editor, not a changelist: `EmailSwitchAdmin.changelist_view` lists every
+`Owner.STORE` type grouped by `EmailType.area` (`switches.AREA_TITLES`, one
+title per area; `tests/unit/emails/test_switches.py` fails when a type is
+declared in an area with none), with its title and description from the
+declaration. A required type shows a "Required" label and no switch; a type
+whose gate is closed also shows "Off: <gate label>", whatever the switch
+says. A switch posts to `toggle/` (htmx), which calls `set_switch` and
+answers with the row; a required or unknown type is a 400 or 404 and writes
+nothing. The page reads `EmailSwitch` directly, not the pipeline's cached
+list, so it shows what was just written.
+
+Permission: `emails` is in `STORE_SETTINGS_APP_LABELS` and
+`STORE_SHARED_APP_LABELS` (`tenant/role_scopes.py`), so ADMIN and OWNER hold
+`emails.view_emailswitch` and `change_emailswitch`; STAFF hold neither and
+the page answers 403 and is not in their sidebar. The audit is the
+simple-history row with the staff member (`EmailSwitch.history`). Platform
+types (`Owner.PLATFORM`) are not on this page.
+
 ## Opt-out (`optout.py`)
 
 Only marketing types honour an opt-out; a receipt or a security mail is not
@@ -454,7 +475,8 @@ concatenation at a call site.
 - The storefront confirm page and the `GET` redirect to it, and the
   storefront's email-preferences UI (the endpoint exists).
 - The other domains' email types (allauth, the platform's own mail) and
-  the admin page. The preview of every registered type already
+  the rest of the admin page (status, log, preview, test-send); the switches
+  are on it already. The preview of every registered type already
   goes through `render`; a real object is chosen only for the order types
   (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
 
@@ -484,6 +506,10 @@ concatenation at a call site.
 - `tests/integration/emails/test_golden_render_ops.py` records the ten
   operational alerts through the real code that sends them. They had no
   template and no translation before, so the files record what they are now.
+- `tests/integration/emails/test_switch_admin.py`: the page's permissions
+  (ADMIN and OWNER yes, STAFF 403 and no sidebar entry), toggling changes
+  what `send_email` does, history, the cache generation, and a required or
+  unknown type refused.
 - `tests/integration/emails/test_ops_alerts.py`: each real sender honours
   its switch and keeps its bookkeeping, a store with nobody to write to skips
   the mail, and carrier code imports no `send_mail`.

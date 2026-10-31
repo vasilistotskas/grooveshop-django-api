@@ -1,0 +1,32 @@
+{% load i18n unfold %}
+<article id="email-{{ row.email_type.key }}">
+    {% component "unfold/components/card.html" with size="md" %}
+        <div class="flex flex-wrap gap-3 items-start justify-between">
+            <div class="flex flex-col flex-1 min-w-[12rem]">
+                <h3 class="font-semibold text-important text-sm">{{ row.email_type.title }}</h3>
+                <span class="text-subtle text-xs">{{ row.email_type.description }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center shrink-0">
+                {% if row.closed_gate %}
+                    {% blocktrans trimmed with reason=row.closed_gate asvar gate_label %}Off: {{ reason }}{% endblocktrans %}
+                    {% include "unfold/helpers/label.html" with text=gate_label variant="warning" %}
+                {% endif %}
+                {% if row.switchable %}
+                    <form hx-post="{% url 'admin:emails_emailswitch_toggle' %}"
+                          hx-trigger="change"
+                          hx-target="closest article"
+                          hx-swap="outerHTML">
+                        <input type="hidden" name="type_key" value="{{ row.email_type.key }}">
+                        <label class="flex gap-2 items-center text-sm" for="switch-{{ row.email_type.key }}">
+                            {% if row.enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}
+                            {{ control }}
+                        </label>
+                    </form>
+                {% else %}
+                    {% trans "Required" as required_label %}
+                    {% include "unfold/helpers/label.html" with text=required_label variant="info" icon="lock" %}
+                {% endif %}
+            </div>
+        </div>
+    {% endcomponent %}
+</article>

@@ -473,6 +473,8 @@ def store_sidebar(request: Any) -> list[Item]:
             )
             if user.has_perm("order.view_order")
             else None,
+            # Which emails the store sends; one page, not a model list.
+            page("emails.EmailSwitch", _("Emails"), "mail"),
             _tool(
                 _("Translations"),
                 "translate",

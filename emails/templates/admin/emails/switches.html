@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        {% component "unfold/components/text.html" %}
+            {% blocktrans trimmed %}
+                Every email your store sends. Switch one off and your store
+                stops sending it, and only that one. Emails that a customer or
+                the law needs, such as an order confirmation or a password
+                reset, cannot be switched off.
+            {% endblocktrans %}
+        {% endcomponent %}
+
+        {% if not perms.emails.change_emailswitch %}
+            {% blocktrans trimmed asvar read_only_message %}
+                You can see these emails but you do not have permission to
+                switch them.
+            {% endblocktrans %}
+            {% include "unfold/helpers/messages/info.html" with message=read_only_message %}
+        {% endif %}
+
+        {% for group, rows in groups %}
+            <section class="flex flex-col gap-3" aria-labelledby="area-{{ group.area }}">
+                <h2 id="area-{{ group.area }}" class="font-semibold text-important text-base">{{ group.title }}</h2>
+                {% for item in rows %}
+                    {% include "admin/emails/_row.html" with row=item.row control=item.control %}
+                {% endfor %}
+            </section>
+        {% endfor %}
+    </div>
+{% endblock %}

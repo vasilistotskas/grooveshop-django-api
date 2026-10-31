@@ -29,6 +29,11 @@ on:
         type: boolean
         default: true
 
+# Least privilege for every job: the Docker Hub prune only checks out the
+# script. The GHCR job below sets its own scope to delete versions.
+permissions:
+  contents: read
+
 jobs:
   dockerhub:
     name: Prune Docker Hub tags

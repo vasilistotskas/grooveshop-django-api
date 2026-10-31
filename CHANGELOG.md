@@ -3,6 +3,68 @@
 
 
 
+## v3.172.2 (2026-10-31)
+
+### Bug fixes
+
+* fix(blog): list category and author posts through for_list
+
+The two posts actions built their own querysets and relied on the likers
+prefetch for the likes count. With the likers gone from the card, each
+post cost a query for likes_count (and one each for comments and tags,
+which were never annotated): the category route took 22 queries for 3 posts
+and 47 for 8; the author route 15 and 30. Both now start from for_list(), which annotates
+the counts and prefetches the translations, tags and comments, so the
+count no longer grows with the posts (11 and 8 in the tests).
+related_posts joins the list-shaped actions, so the anchor post it
+fetches does not prefetch its likers.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6aace2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aace2a3cde5c1433dd6b20e41cfdd1c5bf2979a))
+
+### Performance improvements
+
+* perf(blog): slim the post and content page lists to what a card reads (#386) ([`6aace2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aace2a3cde5c1433dd6b20e41cfdd1c5bf2979a))
+
+* perf(blog): slim the post and content page lists to what a card reads
+
+A list of blog posts, and every list a post is embedded in (related,
+the author's recent and top posts, a comment's post), carried each
+article's full body, its SEO copy and the ids of every user who liked
+it. A post page's payload held 100 to 200 KB of other posts' articles,
+and a category or author page more. The footer's content page list
+carried every legal document in full on every page.
+
+BlogPostSerializer now emits title and subtitle per language and no
+likes list; BlogPostDetailSerializer keeps every translated field and
+likes. ContentPageSerializer emits the title only; the detail tier
+keeps the rest. The list querysets stop prefetching the likers, which
+only the detail reads.
+
+Removes response fields: the storefront must stop requiring them
+before this ships.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6aace2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aace2a3cde5c1433dd6b20e41cfdd1c5bf2979a))
+
+* perf(blog): count a post's likes, comments and tags with subqueries
+
+with_likes_count, with_comments_count and with_tags_count joined all
+three relations and aggregated with Count(distinct=True), so each post
+produced likes x comments x tags rows before grouping: a popular post
+with 1,000 likes, 500 comments and 10 tags, five million. Each count is
+now a correlated subquery over its own table, the pattern the product
+list uses, so for_list() has no GROUP BY. The counts are unchanged
+(approved comments and active tags by default) and the filters, the
+trending score and the admin keep annotating the same names.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6aace2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aace2a3cde5c1433dd6b20e41cfdd1c5bf2979a))
+
 ## v3.172.1 (2026-10-31)
 
 ### Bug fixes

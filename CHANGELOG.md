@@ -3,6 +3,77 @@
 
 
 
+## v3.172.1 (2026-10-31)
+
+### Bug fixes
+
+* fix(meili): wait for index tasks with the configured timeout (#383) ([`f9232ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9232bae1f754806d0f579593eae923afe9c723d))
+
+* fix(meili): wait for index tasks with the configured timeout
+
+Client.wait_for_task passed no timeout to the SDK when the caller named
+none, so every bulk wait (meilisearch_sync_index, sync_all_indexes,
+drop, the startup and tenant-provisioning paths, sync_index_task, and
+the synchronous mode inside the client itself) inherited the SDK's five
+seconds. A bulk sync of a large index failed with MeilisearchTimeoutError
+for a task the engine then finished.
+
+MEILISEARCH["TASK_TIMEOUT_MS"] (env MEILI_TASK_TIMEOUT_MS, 5 minutes) is
+now the default. The one-document index and remove tasks keep their short
+wait on purpose, named SINGLE_DOCUMENT_WAIT_MS: a timeout there is retried
+with backoff and frees the worker.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`f9232ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9232bae1f754806d0f579593eae923afe9c723d))
+
+* fix(meili): settings tasks wait the settings timeout, removals retry
+
+In synchronous mode the client waited a settings task for
+TASK_TIMEOUT_MS (5 minutes) while update_meili_settings waits it for
+SETTINGS_TASK_TIMEOUT_MS (10 minutes), so a 5 to 10 minute reindex
+raised. _handle_sync now takes the timeout, and with_settings and the
+displayed, searchable, filterable and sortable updates pass the
+settings one.
+
+index_document_task also caught every error from removing a filtered-out
+document and reported it removed, so a timeout or lost connection never
+reached MeiliTask.autoretry_for and the document stayed searchable. It
+now re-raises the transient errors and logs only the failures a retry
+cannot fix.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f9232ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9232bae1f754806d0f579593eae923afe9c723d))
+
+* fix(sanitize): hidden media and encoded spaces are not written content (#384)
+
+has_visible_content checked only a media element's ancestors for the
+hidden attribute, so an <img hidden> or <iframe hidden> still counted as
+written content; it now checks the element's own attribute first. Text
+is read after the parser has decoded character references, so the
+separate nbsp pattern was dead code; it is removed and whitespace
+written as numeric or named references (&#x20;, &#32;, &#xa0;, &nbsp;)
+is tested as empty.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b4ee3b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4ee3b6430530f4313342e54fd112b45eddbbd7c))
+
+* fix(deps): pypdf 6.21.4 for seven denial-of-service advisories (#385)
+
+CVE-2026-119203..119209 (crafted PDFs looping or exhausting memory)
+are fixed in 6.21.3 and 6.21.4. The floor moves to 6.21.4 so no install
+can resolve to a vulnerable release.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6e9c5a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e9c5a8c604f849ccd426b2e7d09ae2226dae466))
+
 ## v3.172.0 (2026-10-31)
 
 ### Bug fixes

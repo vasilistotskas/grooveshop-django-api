@@ -3,6 +3,71 @@
 
 
 
+## v3.175.0 (2026-10-31)
+
+### Bug fixes
+
+* fix(newsletter): give a guest no link in the already-subscribed notice
+
+The guest variant linked to the topic unsubscribe URL, which acts on
+GET, so a mail scanner's prefetch could unsubscribe someone the mail
+says is subscribed. A guest has no login and no safe link, so the notice
+now says every newsletter carries an unsubscribe link at the bottom. The
+account variant keeps the link to its subscriptions page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c8f0a55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8f0a55db0cfbd284f4f28ed8394d0f779d4ed95))
+
+* fix(newsletter): bounce a refused notice, describe the subscription state
+
+A permanent recipient refusal of the already-subscribed notice left the
+row ACTIVE, so every later submission queued the same undeliverable mail
+again. The task now marks the row BOUNCED exactly as the confirmation
+task does; a new submission re-arms it with a fresh link.
+
+The already_subscribed answer is about the account's own subscription
+being confirmed, not the typed address (the account mails its own
+address), and the two cooldowns are independent: confirmation_sent_at for
+a pending row, already_subscribed_notice_sent_at for an active one. The
+API descriptions say so and promise no delivery.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c8f0a55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8f0a55db0cfbd284f4f28ed8394d0f779d4ed95))
+
+### Features
+
+* feat(newsletter): tell an already subscribed address it is subscribed (#393) ([`c8f0a55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8f0a55db0cfbd284f4f28ed8394d0f779d4ed95))
+
+* feat(newsletter): tell an already subscribed address it is subscribed
+
+A newsletter-form submission for an address that is already ACTIVE sent
+nothing, so its owner waited for a confirmation email that never came.
+
+The form still answers every visitor the same 202 and does every
+address-dependent step in the task, so the answer and the cost cannot
+tell a known address from a new one. The task now sends the new required
+customer email newsletter.already_subscribed for an ACTIVE row: a link to
+the account's subscriptions page, or the topic's unsubscribe link for a
+guest row that has no login. It follows the newsletter feature gate and
+the resend cooldown; the cooldown is claimed under the row lock in
+UserSubscription.already_subscribed_notice_sent_at (a nullable column),
+because confirmation_sent_at dates a link an active row no longer has. A
+PENDING row inside the cooldown still sends nothing: its link just went
+out.
+
+A signed-in account that submits one of its own verified addresses while
+already confirmed is answered synchronously and truthfully: the 202 body
+gains a status field (pending_confirmation for every other answer,
+already_subscribed for that one) and nothing is queued. An anonymous
+request never reaches that check. The field is additive.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c8f0a55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8f0a55db0cfbd284f4f28ed8394d0f779d4ed95))
+
 ## v3.174.0 (2026-10-31)
 
 ### Chores

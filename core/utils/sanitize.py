@@ -190,6 +190,28 @@ def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
     return value
 
 
+_EMBEDDED_MEDIA = re.compile(
+    r"<(?:img|picture|video|audio|iframe|embed|object|svg)\b", re.IGNORECASE
+)
+_NBSP_ENTITY = re.compile(r"&(?:nbsp|#160|#x0*a0);", re.IGNORECASE)
+_TAG = re.compile(r"<[^>]*>")
+
+
+def has_visible_content(html: str | None) -> bool:
+    """Whether ``html`` shows something: text, or an embedded image or video.
+
+    An editor saves an emptied field as ``""``, ``<p></p>`` or
+    ``<p>&nbsp;</p>``, so a stored row is no evidence of a document. The
+    same rule as the storefront's ``hasVisibleContent``
+    (``shared/utils/translations.ts``); change them together.
+    """
+    if not html:
+        return False
+    if _EMBEDDED_MEDIA.search(html):
+        return True
+    return any(_NBSP_ENTITY.sub(" ", text).strip() for text in _TAG.split(html))
+
+
 def sanitize_html(html: str) -> str:
     """Return ``html`` reduced to the rich-text policy."""
     if not html:

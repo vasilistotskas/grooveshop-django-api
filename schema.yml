@@ -37741,6 +37741,16 @@ components:
                   type: string
                 body:
                   type: string
+        translatedLocales:
+          type: array
+          items:
+            type: string
+          description: |-
+            The languages the page is written in: its body shows something.
+
+            A translation row is no evidence of a document (an emptied body
+            is still a row), so this is what hreflang and the sitemap read.
+          readOnly: true
         isPublished:
           type: boolean
           title: Δημοσιευμένο
@@ -37765,6 +37775,7 @@ components:
       - id
       - publishedAt
       - slug
+      - translatedLocales
       - translations
       - updatedAt
       - uuid
@@ -37814,6 +37825,16 @@ components:
                   type: string
                 body:
                   type: string
+        translatedLocales:
+          type: array
+          items:
+            type: string
+          description: |-
+            The languages the page is written in: its body shows something.
+
+            A translation row is no evidence of a document (an emptied body
+            is still a row), so this is what hreflang and the sitemap read.
+          readOnly: true
         isPublished:
           type: boolean
           title: Δημοσιευμένο
@@ -37838,6 +37859,7 @@ components:
       - id
       - publishedAt
       - slug
+      - translatedLocales
       - translations
       - updatedAt
       - uuid

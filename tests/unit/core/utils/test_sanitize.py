@@ -1,6 +1,10 @@
 import unittest
 
-from core.utils.sanitize import is_allowed_embed_url, sanitize_html
+from core.utils.sanitize import (
+    has_visible_content,
+    is_allowed_embed_url,
+    sanitize_html,
+)
 
 
 class TestSanitizeHtmlEmbeds(unittest.TestCase):
@@ -86,3 +90,15 @@ class TestSanitizeHtmlStyleResidue(unittest.TestCase):
         html = '<p style="text-align: center">x</p>'
 
         self.assertEqual(sanitize_html(html), html)
+
+
+class TestHasVisibleContent(unittest.TestCase):
+    def test_empty_markup_shows_nothing(self):
+        for html in (None, "", "<p></p>", "<p>&nbsp;</p>", "<p> &#160; </p>"):
+            with self.subTest(html=html):
+                self.assertFalse(has_visible_content(html))
+
+    def test_text_or_embedded_media_shows_something(self):
+        for html in ("<p>a</p>", "text", '<p><img src="a.png"></p>'):
+            with self.subTest(html=html):
+                self.assertTrue(has_visible_content(html))

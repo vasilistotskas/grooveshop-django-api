@@ -99,6 +99,7 @@ from order.serializers.order import (
     OrderDetailSerializer,
     OrderSerializer,
     OrderWriteSerializer,
+    PaymentProviderErrorSerializer,
     PaymentStatusResponseSerializer,
     ReorderResponseSerializer,
     UpdateStatusSerializer,
@@ -223,7 +224,10 @@ serializers_config: SerializersConfig = {
         request=CreatePaymentIntentRequestSerializer,
         response=CreatePaymentIntentResponseSerializer,
         # The order changed while the provider call was in flight.
-        responses={409: ErrorResponseSerializer},
+        responses={
+            400: PaymentProviderErrorSerializer,
+            409: ErrorResponseSerializer,
+        },
         operation_id="createOrderPaymentIntent",
         summary=_("Create a payment intent for an order"),
         description=_(
@@ -235,6 +239,7 @@ serializers_config: SerializersConfig = {
     "create_checkout_session": ActionConfig(
         request=CreateCheckoutSessionRequestSerializer,
         response=CreateCheckoutSessionResponseSerializer,
+        responses={400: PaymentProviderErrorSerializer},
         operation_id="createOrderCheckoutSession",
         summary=_("Create a hosted checkout session for an order"),
         description=_(
@@ -247,6 +252,7 @@ serializers_config: SerializersConfig = {
     "confirm_agent_payment": ActionConfig(
         request=ConfirmAgentPaymentRequestSerializer,
         response=ConfirmAgentPaymentResponseSerializer,
+        responses={400: PaymentProviderErrorSerializer},
         operation_id="confirmAgentPaymentForOrder",
         summary=_("Complete payment with an agent-granted Stripe token"),
         description=_(
@@ -273,7 +279,10 @@ serializers_config: SerializersConfig = {
         request=CreatePaymentIntentRequestSerializer,
         response=CreatePaymentIntentResponseSerializer,
         # The order changed while the provider call was in flight.
-        responses={409: ErrorResponseSerializer},
+        responses={
+            400: PaymentProviderErrorSerializer,
+            409: ErrorResponseSerializer,
+        },
         operation_id="retryOrderPayment",
         summary=_("Retry payment for a failed or pending order"),
         description=_(

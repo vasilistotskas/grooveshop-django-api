@@ -78,5 +78,8 @@ def test_success_response_is_a_named_component(openapi_schema, endpoint):
 
 def test_validation_error_response_is_declared(openapi_schema, endpoint):
     assert _json_schema(_get(openapi_schema, endpoint)["responses"]["400"]) == {
-        "$ref": "#/components/schemas/ErrorResponse"
+        "anyOf": [
+            {"$ref": "#/components/schemas/ApiValidationError"},
+            {"$ref": "#/components/schemas/ApiError"},
+        ]
     }

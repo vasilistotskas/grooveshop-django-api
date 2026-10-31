@@ -918,3 +918,32 @@ def trust_intent_binding():
 
     with patch.object(OrderService, "_verify_intent_binding"):
         yield
+
+
+@pytest.fixture(scope="session")
+def generated_schema():
+    """The OpenAPI document the code generates, built once per worker."""
+    from drf_spectacular.generators import SchemaGenerator
+
+    return SchemaGenerator().get_schema(request=None, public=True)
+
+
+@pytest.fixture
+def documented(generated_schema):
+    """Check a real response body against what its operation documents.
+
+    ``documented(response, "/api/v1/product/{id}", "get")`` validates the
+    JSON body against the schema declared for the response's status code.
+    """
+    from jsonschema import Draft202012Validator
+
+    def check(response, path, method):
+        responses = generated_schema["paths"][path][method]["responses"]
+        declared = responses[str(response.status_code)]["content"][
+            "application/json"
+        ]["schema"]
+        Draft202012Validator(
+            {**declared, "components": generated_schema["components"]}
+        ).validate(response.json())
+
+    return check

@@ -3,6 +3,139 @@
 
 
 
+## v3.173.0 (2026-10-31)
+
+### Bug fixes
+
+* fix(emails): head the ops template directory in the admin preview registry
+
+The ops alert templates live in emails/ops, a directory the template preview
+registry had no heading for, so six of them were invisible to the admin
+preview page.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+### Documentation
+
+* docs(order): describe the order-create flows by settlement (#390) ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* docs(order): describe the order-create flows by settlement
+
+OrderCreateFromCartSerializer's docstring, which is published as the
+schema description, still named the removed is_online_payment column.
+It now describes the flows by pay way settlement. Description-only
+schema change.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* docs(order): state when payment_intent_id is needed
+
+The balance left after deductions is what a Stripe intent covers; an
+order whose deductions cover the whole total is created without one.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* docs(order): describe the order-create flows by settlement (#390) ([`694a24d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/694a24d33baa5ccde147322bb064e00cda5659a9))
+
+* docs(order): describe the order-create flows by settlement
+
+OrderCreateFromCartSerializer's docstring, which is published as the
+schema description, still named the removed is_online_payment column.
+It now describes the flows by pay way settlement. Description-only
+schema change.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`694a24d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/694a24d33baa5ccde147322bb064e00cda5659a9))
+
+* docs(order): state when payment_intent_id is needed
+
+The balance left after deductions is what a Stripe intent covers; an
+order whose deductions cover the whole total is created without one.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`694a24d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/694a24d33baa5ccde147322bb064e00cda5659a9))
+
+### Features
+
+* feat(emails): ops alerts become email types; emails/0003 imports the OPS_ALERT switches (#391) ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* feat(emails): ops alerts become email types, switches imported
+
+The ten operational alerts (stale shipments, unremitted and unattributable
+COD, shipment rejected, webhook failed, payment after cancel, payment
+mismatch, refund failed, gift card reversal, review pending) are declared
+through emails/declare.py and sent through send_email, so a store's
+EmailSwitch, the gates and store_operators() apply. Each has a template pair,
+translated subjects and a golden file. emails/0003 copies every
+OPS_ALERT_<KIND>_ENABLED setting that was off into its EmailSwitch row and
+moves the store's cache generation.
+
+Removed: OpsAlertKind, send_ops_alert, ops_alert_enabled, the OPS_ALERT_*
+declarations and settings group, tenant_admin_recipients and its ADMINS
+fallback. A store with no contact or owner address now skips the mail.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* feat(emails): store admin page to switch emails on and off
+
+Settings -> Emails lists every store email type from the registry, grouped by
+area with the title and description of its declaration. A required type shows
+as Required with no switch; a closed gate shows as Off with its reason. A
+switch posts to a toggle endpoint that goes through set_switch (permission,
+validation, history with the actor, the store's cache generation). ADMIN and
+OWNER hold the permissions through the store-settings app labels; STAFF hold
+none. Replaces the OPS_ALERT_* store settings as the way to mute an alert.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* feat(emails): ops alerts become email types, switches imported
+
+The ten operational alerts (stale shipments, unremitted and unattributable
+COD, shipment rejected, webhook failed, payment after cancel, payment
+mismatch, refund failed, gift card reversal, review pending) are declared
+through emails/declare.py and sent through send_email, so a store's
+EmailSwitch, the gates and store_operators() apply. Each has a template pair,
+translated subjects and a golden file. emails/0003 copies every
+OPS_ALERT_<KIND>_ENABLED setting that was off into its EmailSwitch row and
+moves the store's cache generation.
+
+Removed: OpsAlertKind, send_ops_alert, ops_alert_enabled, the OPS_ALERT_*
+declarations and settings group, tenant_admin_recipients and its ADMINS
+fallback. A store with no contact or owner address now skips the mail.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
+* feat(emails): store admin page to switch emails on and off
+
+Settings -> Emails lists every store email type from the registry, grouped by
+area with the title and description of its declaration. A required type shows
+as Required with no switch; a closed gate shows as Off with its reason. A
+switch posts to a toggle endpoint that goes through set_switch (permission,
+validation, history with the actor, the store's cache generation). ADMIN and
+OWNER hold the permissions through the store-settings app labels; STAFF hold
+none. Replaces the OPS_ALERT_* store settings as the way to mute an alert.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1f265e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f265e8c796fbdcc0b7a2cb1ec14e6288fd74c6b))
+
 ## v3.172.5 (2026-10-31)
 
 ### Bug fixes

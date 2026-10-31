@@ -1,0 +1,15 @@
+You are receiving this email because the following change was made to your account:
+
+A new security key has been added.
+
+If you do not recognize this change then please take proper security precautions immediately. The change to your account originates from:
+
+- IP address: 203.0.113.7
+- Browser: Mozilla/5.0 (golden browser)
+- Date: March 14, 2026, 12:30 p.m.
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example/en
+

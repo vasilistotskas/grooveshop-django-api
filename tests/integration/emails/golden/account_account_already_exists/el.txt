@@ -1,0 +1,11 @@
+Λαμβάνετε αυτό το email επειδή εσείς ή κάποιος άλλος προσπάθησε να εγγραφεί με τη διεύθυνση email customer@example.test. Ωστόσο, υπάρχει ήδη λογαριασμός με αυτή τη διεύθυνση email.
+
+Σε περίπτωση που το ξεχάσατε, χρησιμοποιήστε τον παρακάτω σύνδεσμο για να ανακτήσετε τον λογαριασμό σας:
+
+https://shop.example/account/password/reset
+
+---
+Acme Gadgets
+owner@store.test
+https://shop.example
+

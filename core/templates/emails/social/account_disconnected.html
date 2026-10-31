@@ -1,0 +1,8 @@
+{% extends "emails/base/security_notice.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Third-party account disconnected" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block notification_message %}
+<p>{% blocktrans %}A third-party account from {{ provider }} has been disconnected from your account.{% endblocktrans %}</p>
+{% endblock %}

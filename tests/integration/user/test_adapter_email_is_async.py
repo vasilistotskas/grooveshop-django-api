@@ -6,9 +6,8 @@ propagated out of ``/_allauth/app/v1/auth/signup`` as a 500. A real
 person could not create an account because the mail provider was
 briefly rate limiting us.
 
-Rendering stays in the request — it needs the tenant, the language and
-allauth's own context — but the SMTP conversation moves to Celery,
-where a 421 is a retry rather than a 500.
+The adapter queues ``send_allauth_email_task`` and the pipeline renders
+and sends from it, where a 421 is a retry rather than a 500.
 """
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ from django.test import RequestFactory
 
 from user.adapter import UserAccountAdapter
 from user.factories.account import UserAccountFactory
+from user.tasks import send_allauth_email_task
 
 
 def _send(user):
@@ -46,7 +46,7 @@ class TestAllauthMailIsDispatched:
         user = UserAccountFactory()
 
         with (
-            patch("user.tasks.send_rendered_email_task.apply_async") as queued,
+            patch("user.tasks.send_allauth_email_task.apply_async") as queued,
             patch.object(mail.EmailMultiAlternatives, "send") as direct,
         ):
             _send(user)
@@ -74,31 +74,58 @@ class TestAllauthMailIsDispatched:
         ):
             _send(user)
 
-    def test_subject_and_both_bodies_survive_the_hand_off(self):
-        """A blank email is a worse outcome than a slow one."""
+    def test_the_hand_off_carries_what_the_mail_needs(self):
         user = UserAccountFactory()
 
-        with patch("user.tasks.send_rendered_email_task.apply_async") as queued:
+        with patch("user.tasks.send_allauth_email_task.apply_async") as queued:
             _send(user)
 
         kwargs = queued.call_args.kwargs["kwargs"]
-        assert kwargs["to"] == [user.email]
-        assert kwargs["subject"].strip(), "subject lost in the hand-off"
-        assert kwargs["body"].strip(), "text body lost in the hand-off"
-        assert kwargs["html_body"], (
-            "the themed HTML alternative was dropped — customers would get "
-            "the unbranded plain-text fallback"
-        )
+        assert kwargs["type_key"] == "account.login_code"
+        assert kwargs["address"] == user.email
+        assert kwargs["user_pk"] == user.pk
+        assert kwargs["context"] == {"code": "123456"}
 
     def test_only_primitives_cross_the_wire(self):
-        """An EmailMessage does not belong on a Celery queue; the
-        project's convention is primitives only."""
+        """The project's convention for a Celery payload: no model row,
+        no message, no request."""
         user = UserAccountFactory()
 
-        with patch("user.tasks.send_rendered_email_task.apply_async") as queued:
+        with patch("user.tasks.send_allauth_email_task.apply_async") as queued:
             _send(user)
 
         for key, value in queued.call_args.kwargs["kwargs"].items():
-            assert isinstance(value, (str, list, type(None))), (
+            assert isinstance(value, (str, int, dict, type(None))), (
                 f"{key} queued as {type(value).__name__}"
             )
+        assert all(
+            isinstance(text, str)
+            for text in queued.call_args.kwargs["kwargs"]["context"].values()
+        )
+
+    def test_an_unmapped_prefix_is_refused(self):
+        user = UserAccountFactory()
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+
+        with request_context(request), pytest.raises(KeyError):
+            UserAccountAdapter(request).send_mail(
+                "account/email/not_an_email_type", user.email, {}
+            )
+
+    def test_an_account_deleted_before_the_task_runs_gets_no_mail(self):
+        user = UserAccountFactory()
+        kwargs = {
+            "type_key": "account.login_code",
+            "address": user.email,
+            "language": "en",
+            "user_pk": user.pk,
+            "context": {"code": "123456"},
+        }
+        user.delete()
+        mail.outbox.clear()
+
+        result = send_allauth_email_task(**kwargs)
+
+        assert result["status"] == "skipped"
+        assert mail.outbox == []

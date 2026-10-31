@@ -797,11 +797,6 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 ACCOUNT_REAUTHENTICATION_TIMEOUT = int(
     getenv("ACCOUNT_REAUTHENTICATION_TIMEOUT", "300")
 )
-# Baked at import time, so it can't vary per tenant — superseded at
-# send time by UserAccountAdapter.format_email_subject() (per-tenant
-# via tenant_site_name()). Kept as the settings-declared fallback in
-# case a caller ever calls allauth's DefaultAccountAdapter directly.
-ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True

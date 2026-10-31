@@ -68,6 +68,9 @@ class EmailTemplateConfig:
         "product_alerts": _("Product alerts"),
         "shipping_acs": _("ACS Shipping"),
         "ops": _("Operational alerts"),
+        "account": _("Account security"),
+        "mfa": _("Two-factor authentication"),
+        "social": _("Social sign-in"),
     }
 
     CATEGORIES: dict[str, TemplateCategory] = {

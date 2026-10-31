@@ -1,14 +1,9 @@
 """Multipart HTML rendering for django-allauth account emails.
 
-``UserAccountAdapter.send_mail`` merges in the project's shared email
-theme context (``core.utils.email_context.build_email_context``)
-before delegating to allauth's own ``render_mail``, so
-``core/templates/account/email/*_message.html`` templates (added
-alongside allauth's own ``.txt`` originals) now render and attach as
-the ``text/html`` alternative on the outbound multipart message —
-previously ``core/templates/account/`` didn't exist at all, so every
-allauth account email (login code, password reset, email
-confirmation, ...) went out as unbranded plain text.
+Every allauth mail is an email type (``user.emails.ALLAUTH_TYPES``) with an
+HTML and a text template under ``core/templates/emails/``, rendered through
+the shared theme context, so each attaches as the ``text/html`` alternative
+of the outbound multipart message.
 """
 
 from __future__ import annotations

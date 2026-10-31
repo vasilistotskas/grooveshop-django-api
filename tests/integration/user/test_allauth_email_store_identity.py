@@ -1,27 +1,25 @@
 """Every allauth email names the STORE that sends it, text and HTML.
 
-allauth's stock text templates (``account/email/base_message.txt`` and the
-confirmation message) print ``current_site.name`` and ``current_site.domain``,
-which allauth's own ``send_mail`` fills with ``get_current_site(request)``.
-``UserAccountAdapter.send_mail`` replaces that method and merges the tenant's
-``build_email_context`` instead, so on production webside's account emails
-read "Γεια σας από το !" and "Ευχαριστούμε που χρησιμοποιείτε το !": the
-text part of every account email, and the whole body of the MFA and
-social-account notifications, which had no HTML twin at all.
+allauth's stock text templates print ``current_site.name`` and
+``current_site.domain`` (``get_current_site(request)``), which on production
+webside's account emails rendered as "Γεια σας από το !": the text part of
+every account email, and the whole body of the MFA and social-account
+notifications, which had no HTML twin at all.
 
 ``get_current_site`` is not the fix: ``SITE_ID`` points at one ``Site`` row
-(Webside), so every store would introduce itself as Webside. The templates
-read the tenant's ``SITE_NAME`` / ``SITE_URL`` instead.
+(Webside), so every store would introduce itself as Webside. Each allauth mail
+is an email type (``user.emails.ALLAUTH_TYPES``) with its own templates, which
+read the tenant's ``SITE_NAME`` / ``SITE_URL``.
 
 The email kinds are DISCOVERED from the installed allauth, not listed here:
-a kind a future allauth adds is rendered by this test the day it ships.
+a kind a future allauth adds fails ``TestEveryKindIsAnEmailType`` the day it
+ships, instead of going out unbranded.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from types import SimpleNamespace
 
 import allauth
 import pytest
@@ -29,9 +27,17 @@ from allauth.core.context import request_context
 from django.contrib.auth.models import AnonymousUser
 from django.core import mail
 from django.test import RequestFactory
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.translation import gettext
 
+from emails.registry import registry
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
 from user.adapter import UserAccountAdapter
+from user.emails import ALLAUTH_TYPES
 from user.factories.account import UserAccountFactory
 
 STORE_NAME = "Acme Gadgets"
@@ -99,10 +105,16 @@ EMPTY_NAME_PHRASES = (
 
 
 @pytest.fixture(autouse=True)
-def _store(settings, bind_tenant):
+def _store(settings, db):
+    """A real store row, bound: the mail is sent from a task, which enters
+    the store's schema and reads the row back by its name."""
     settings.NUXT_BASE_URL = STORE_URL
-    bind_tenant(SimpleNamespace(schema_name="acme", store_name=STORE_NAME))
+    previous = bind_store_tenant(
+        store_tenant("acme", store_name=STORE_NAME, default_locale="en")
+    )
     mail.outbox = []
+    yield
+    unbind_store_tenant(previous)
 
 
 def _send(prefix: str, language: str):
@@ -160,8 +172,17 @@ class TestAllauthEmailsNameTheStore:
         for phrase in EMPTY_NAME_PHRASES:
             assert phrase not in html
 
-    def test_subject_carries_the_store_name_too(self, prefix, language):
-        assert _send(prefix, language).subject.startswith(f"[{STORE_NAME}]")
+    def test_subject_is_the_types_subject_in_the_recipients_language(
+        self, prefix, language
+    ):
+        msgid = registry.get(ALLAUTH_TYPES[prefix]).subject
+        with translation.override(language):
+            expected = gettext(msgid)
+
+        assert _send(prefix, language).subject == expected
+
+    def test_the_from_names_the_store(self, prefix, language):
+        assert STORE_NAME in _send(prefix, language).from_email
 
 
 @pytest.mark.django_db
@@ -171,4 +192,18 @@ def test_text_part_does_not_borrow_the_site_row(db):
     message = _send("account/email/login_code", "en")
 
     assert "Webside" not in message.body
-    assert re.search(rf"Hello from {STORE_NAME}!", message.body)
+    assert re.search(rf"^{STORE_NAME}$", message.body, re.MULTILINE)
+
+
+class TestEveryKindIsAnEmailType:
+    def test_every_kind_allauth_sends_is_mapped(self):
+        """An unmapped prefix raises ``KeyError`` in the adapter: this
+        fails the build before a new allauth mail goes out unbranded."""
+        assert set(ALLAUTH_EMAIL_PREFIXES) <= set(ALLAUTH_TYPES)
+
+    def test_no_mapping_is_left_for_a_kind_allauth_no_longer_sends(self):
+        assert set(ALLAUTH_TYPES) <= set(ALLAUTH_EMAIL_PREFIXES)
+
+    def test_every_mapped_type_is_registered_and_required(self):
+        for key in ALLAUTH_TYPES.values():
+            assert registry.get(key).required

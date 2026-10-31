@@ -1,0 +1,10 @@
+{% extends "emails/base/account_message.txt" %}
+{% load i18n %}
+
+{% block content %}{% blocktrans %}You are receiving this email because you, or someone else, tried to access an account with email {{ email }}. However, we do not have any record of such an account.{% endblocktrans %}
+
+{% trans "This mail can be safely ignored if you did not initiate this action." %}
+
+{% trans "If it was you, you can sign up for an account using the link below." %}
+
+{{ signup_url }}{% endblock content %}

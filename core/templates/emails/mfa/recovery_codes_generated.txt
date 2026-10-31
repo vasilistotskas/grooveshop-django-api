@@ -1,0 +1,4 @@
+{% extends "emails/base/security_notice.txt" %}
+{% load i18n %}
+
+{% block notification_message %}{% trans "A new set of Two-Factor Authentication recovery codes has been generated." %}{% endblock %}

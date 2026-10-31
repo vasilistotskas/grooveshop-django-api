@@ -24,7 +24,6 @@ from cart.models import Cart
 from cart.serializers.cart import (
     CartAgentTokenResponseSerializer,
     CartCreatePaymentIntentRequestSerializer,
-    CartDetailSerializer,
     CartPaymentIntentResponseSerializer,
     CartSerializer,
     CartWriteSerializer,
@@ -107,7 +106,7 @@ serializers_config: SerializersConfig = {
         parameters=GUEST_CART_HEADERS,
     ),
     "retrieve": ActionConfig(
-        response=CartDetailSerializer,
+        response=CartSerializer,
         operation_id="retrieveCart",
         summary=_("Get cart"),
         description=_(
@@ -118,7 +117,7 @@ serializers_config: SerializersConfig = {
     ),
     "update": ActionConfig(
         request=CartWriteSerializer,
-        response=CartDetailSerializer,
+        response=CartSerializer,
         operation_id="updateCart",
         summary=_("Update cart"),
         description=_(
@@ -129,7 +128,7 @@ serializers_config: SerializersConfig = {
     ),
     "partial_update": ActionConfig(
         request=CartWriteSerializer,
-        response=CartDetailSerializer,
+        response=CartSerializer,
         operation_id="partialUpdateCart",
         summary=_("Update cart"),
         description=_(
@@ -194,7 +193,7 @@ serializers_config: SerializersConfig = {
     ),
     "apply_coupon": ActionConfig(
         request=CouponApplyRequestSerializer,
-        response=CartDetailSerializer,
+        response=CartSerializer,
         responses={400: CouponErrorResponseSerializer},
         operation_id="applyCartCoupon",
         summary=_("Apply a coupon code to the cart"),
@@ -207,7 +206,7 @@ serializers_config: SerializersConfig = {
         parameters=CART_TOKEN_HEADERS,
     ),
     "remove_coupon": ActionConfig(
-        response=CartDetailSerializer,
+        response=CartSerializer,
         operation_id="removeCartCoupon",
         summary=_("Remove the applied coupon code from the cart"),
         tags=["Cart"],
@@ -457,7 +456,7 @@ class CartViewSet(BaseModelViewSet):
         """Serialize the cart the same way ``retrieve`` does (optimized
         reload so items are prefetched and totals annotated)."""
         cart = CartService.load_for_detail(cart)
-        response_serializer = CartDetailSerializer(
+        response_serializer = CartSerializer(
             cart, context=self.get_serializer_context()
         )
         return Response(response_serializer.data, status=status_code)

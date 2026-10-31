@@ -4,13 +4,12 @@ from django.conf import settings
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
-from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cart.models import Cart
-from cart.serializers.item import CartItemDetailSerializer, CartItemSerializer
+from cart.serializers.item import CartItemSerializer
 from cart.services import CartService
 from promotion.enum import BenefitType, CouponRejectionReason
 from promotion.serializers import (
@@ -644,43 +643,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         )
 
 
-class CartDetailSerializer(CartSerializer):
-    recommendations = serializers.SerializerMethodField(
-        help_text=_("Product recommendations based on cart contents")
-    )
-
-    @extend_schema_field(
-        lazy_serializer("product.serializers.product.ProductSerializer")(
-            many=True
-        )
-    )
-    def get_recommendations(self, obj: Cart):
-        # The whole basket is the seed set, so the engine's basket
-        # bonus favours a product several lines point at — "complete
-        # the order", not "more of the same". Same field, same shape
-        # as before (plain products); only the source changed from an
-        # inline same-category query to the recommendation engine.
-        # See docs/recommendations-engine.md.
-        from recommendation.engine import SuggestionContext, suggest
-        from recommendation.enum import Surface
-        from recommendation.hydrate import hydrate_products
-
-        seed_ids = tuple(obj.items.values_list("product_id", flat=True))
-        if not seed_ids:
-            return []
-        suggestions = suggest(
-            SuggestionContext(surface=Surface.CART, seed_ids=seed_ids)
-        )
-        return hydrate_products(suggestions, context=self.context)
-
-    class Meta(CartSerializer.Meta):
-        fields = (
-            *CartSerializer.Meta.fields,
-            "recommendations",
-        )
-
-
-class CartItemMutationResponseSerializer(CartItemDetailSerializer):
+class CartItemMutationResponseSerializer(CartItemSerializer):
     """The line an add or a quantity change wrote, plus the whole cart it
     now sits in, so a client shows the new state without a second ``GET``.
 
@@ -692,13 +655,13 @@ class CartItemMutationResponseSerializer(CartItemDetailSerializer):
         help_text=_("The updated cart, as returned by the cart detail endpoint")
     )
 
-    @extend_schema_field(CartDetailSerializer)
+    @extend_schema_field(CartSerializer)
     def get_cart(self, obj) -> dict:
         cart = CartService.load_for_detail(self.context["cart"])
-        return CartDetailSerializer(cart, context=self.context).data
+        return CartSerializer(cart, context=self.context).data
 
-    class Meta(CartItemDetailSerializer.Meta):
-        fields = (*CartItemDetailSerializer.Meta.fields, "cart")
+    class Meta(CartItemSerializer.Meta):
+        fields = (*CartItemSerializer.Meta.fields, "cart")
 
 
 # A reservation exists per cart line, and this endpoint does database

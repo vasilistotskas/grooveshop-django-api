@@ -10313,9 +10313,6 @@ msgstr "Product price spells"
 msgid "Product recommendations"
 msgstr "Product recommendations"
 
-msgid "Product recommendations based on cart contents"
-msgstr "Product recommendations based on cart contents"
-
 msgid "Product relation"
 msgstr "Product relation"
 
@@ -11013,9 +11010,6 @@ msgstr "Related product"
 
 msgid "Related products"
 msgstr "Related products"
-
-msgid "Related products that might interest the customer"
-msgstr "Related products that might interest the customer"
 
 msgid "Relation type"
 msgstr "Relation type"

@@ -10323,9 +10323,6 @@ msgstr "Περίοδοι τιμής προϊόντων"
 msgid "Product recommendations"
 msgstr "Συστάσεις προϊόντων"
 
-msgid "Product recommendations based on cart contents"
-msgstr "Προτάσεις προϊόντων βάσει περιεχομένου καλαθιού"
-
 msgid "Product relation"
 msgstr "Σχέση προϊόντος"
 
@@ -11023,9 +11020,6 @@ msgstr "Σχετικό προϊόν"
 
 msgid "Related products"
 msgstr "Σχετικά προϊόντα"
-
-msgid "Related products that might interest the customer"
-msgstr "Σχετικά προϊόντα που ίσως ενδιαφέρουν τον πελάτη"
 
 msgid "Relation type"
 msgstr "Τύπος σχέσης"

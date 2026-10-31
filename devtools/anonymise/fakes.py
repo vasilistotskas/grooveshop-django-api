@@ -40,9 +40,7 @@ def _rng(key: str, purpose: str = "") -> random.Random:
 
 
 def _digest(key: str, length: int = 10) -> str:
-    return hashlib.sha1(
-        f"{SEED}|{key}".encode(), usedforsecurity=False
-    ).hexdigest()[:length]
+    return hashlib.sha256(f"{SEED}|{key}".encode()).hexdigest()[:length]
 
 
 @dataclass(frozen=True)

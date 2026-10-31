@@ -457,10 +457,10 @@ strip for every surface. The product page and the out-of-stock slot
 fetch through `server/api/products/[id]/recommendations.get.ts`, a
 Nitro-cached tenant proxy (`name: 'productRecommendations'`, 5-minute
 SWR, keyed by seed · surface · limit · locale — the `recommendations`
-cache surface purges it); the empty cart, which has no seed, fetches
-through `server/api/recommendations.get.ts`, cached under the same
-handler name so the same purge reaches it; the cart renders the
-basket-seeded list its own payload already carries. **The read endpoint
+cache surface purges it); the cart fetches through
+`server/api/recommendations.get.ts` — `surface=cart` with the basket's
+product ids as `seeds`, or no seed for an empty cart — cached under the
+same handler name so the same purge reaches it. **The read endpoint
 writes no event.**
 `impressionId` is a correlation id; the strip posts the impression
 from its own `onMounted`, which under `hydrate-on-visible` fires when

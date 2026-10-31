@@ -2,8 +2,8 @@
 
 Each rule is one queryset, read by two surfaces that must agree: the
 operational email (``shipping_acs.tasks``) and the dashboard's "Needs
-attention" counter (``admin.dashboard.store.queries``). A store that mutes
-an email (``shipping.alerts.OpsAlertKind``) therefore loses nothing: the
+attention" counter (``admin.dashboard.store.queries``). A store that
+switches an email off (``ops.*`` email types) therefore loses nothing: the
 same parcels or payouts stay counted until someone handles them.
 """
 

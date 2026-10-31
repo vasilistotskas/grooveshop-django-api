@@ -1,0 +1,10 @@
+Gift card spent before its payment was reversed
+
+The payment for gift card purchase 00000000-0000-4000-8000-0000000000e1 (€50.00) was reversed by the provider. The unspent balance was voided, but €20.00 of the card had already been spent and cannot be recovered automatically.
+
+Decide how to reconcile it (see the purchase in the admin).
+
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

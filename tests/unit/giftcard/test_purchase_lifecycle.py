@@ -62,7 +62,7 @@ class TestPurchaseReversal:
             amount=Decimal(-10),
         )
 
-        with patch("shipping.alerts.send_ops_alert") as alert:
+        with patch("emails.send.send_email") as alert:
             GiftCardService.handle_purchase_reversal(purchase)
 
         card.refresh_from_db()

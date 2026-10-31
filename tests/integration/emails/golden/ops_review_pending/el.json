@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] Κριτική σε αναμονή έγκρισης: Ασύρματα ακουστικά",
+  "to": [
+    "owner@store.test"
+  ]
+}

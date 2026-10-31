@@ -12,7 +12,6 @@ from emails.recipients import (
     platform_operators,
     store_operators,
 )
-from tenant.credentials import tenant_admin_recipients
 
 pytestmark = pytest.mark.django_db
 
@@ -79,18 +78,6 @@ class TestStoreOperators:
         bind_store(bind_tenant, contact_email="", owner_email="")
 
         assert store_operators() == []
-
-    def test_the_platform_fallback_stays_with_its_old_callers(
-        self, bind_tenant, settings
-    ):
-        """``tenant_admin_recipients`` keeps its ``ADMINS`` fallback until
-        its callers move onto the pipeline; both read the same fields."""
-        settings.ADMINS = ["platform@example.test"]
-        bind_store(bind_tenant, contact_email="", owner_email="")
-        assert tenant_admin_recipients() == ["platform@example.test"]
-
-        bind_store(bind_tenant, contact_email="c@store.test", owner_email="")
-        assert tenant_admin_recipients() == ["c@store.test"]
 
 
 class TestPlatformOperators:

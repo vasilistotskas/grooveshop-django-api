@@ -1,0 +1,17 @@
+A review is waiting for approval
+Acme Gadgets
+================================================================================
+
+It stays hidden from shoppers until you approve it.
+
+Wireless earbuds
+Rating: 4/5
+Customer: Maria P.
+Comment: Great sound, the battery lasts all week.
+
+Review it in the admin
+--------------------------------------------------------------------------------
+https://api.shop.example/en/admin/product/productreview/900001/change/
+
+================================================================================
+Acme Gadgets

@@ -56,6 +56,7 @@ from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
 from pay_way.enum.settlement import PaySettlement
 from recommendation.order_email import EmailStrip, order_email_strip
+from tenant.credentials import tenant_site_name
 from tenant.features import feature_on
 
 if TYPE_CHECKING:
@@ -434,8 +435,6 @@ def _dispute_notification(
 ) -> dict[str, Any]:
     """The store's alert that a provider dispute opened, or (``lost``)
     closed against the store and was recorded as a chargeback."""
-    from tenant.credentials import tenant_site_name
-
     order = dispute.order
     reason = (order.metadata or {}).get("dispute_reason", "unknown")
     chargeback = (
@@ -958,4 +957,127 @@ _staff_email(
         dispute, env, lost=True
     ),
     sample=_sample_dispute,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentAfterCancel:
+    """A confirmed payment that arrived for an order already canceled."""
+
+    order_id: int
+    payment_id: str
+    payment_method: str
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentMismatch:
+    """A confirmed charge whose amount is not the order's."""
+
+    order_id: int
+    payment_id: str
+    provider: str
+    observed: object
+    expected: object
+
+
+@dataclass(frozen=True, slots=True)
+class RefundFailed:
+    """A refund the provider accepted and later failed."""
+
+    order_id: int
+    provider: str
+    refund_id: str
+    amount: object
+    reason: str
+
+
+def _payment_after_cancel(
+    alert: PaymentAfterCancel, env: RenderEnv
+) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "order_id": alert.order_id,
+        "payment_id": alert.payment_id,
+        "provider": alert.payment_method,
+    }
+
+
+def _payment_mismatch(alert: PaymentMismatch, env: RenderEnv) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "order_id": alert.order_id,
+        "payment_id": alert.payment_id,
+        "provider": alert.provider,
+        "observed": alert.observed,
+        "expected": alert.expected,
+    }
+
+
+def _refund_failed(alert: RefundFailed, env: RenderEnv) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "order_id": alert.order_id,
+        "provider": alert.provider,
+        "refund_id": alert.refund_id,
+        "amount": alert.amount,
+        "reason": alert.reason,
+    }
+
+
+OPS_TEMPLATE_DIR = "emails/ops"
+
+staff_email(
+    "ops.payment_after_cancel",
+    area="ops",
+    title=_("Payment received for a canceled order"),
+    description=_(
+        "Tells the store's staff that a payment arrived for an order that "
+        "was already canceled, so the customer must be refunded."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/payment_after_cancel",
+    subject=gettext_noop(
+        "[{site}] Payment received for canceled order {order_id}"
+    ),
+    build_context=_payment_after_cancel,
+    sample=lambda env: PaymentAfterCancel(
+        order_id=1234, payment_id="pi_3QxExample", payment_method="stripe"
+    ),
+)
+staff_email(
+    "ops.payment_mismatch",
+    area="ops",
+    title=_("Payment that does not match its order"),
+    description=_(
+        "Tells the store's staff that a confirmed payment collected a "
+        "different amount than its order is for."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/payment_mismatch",
+    subject=gettext_noop("[{site}] Payment does not match order {order_id}"),
+    build_context=_payment_mismatch,
+    sample=lambda env: PaymentMismatch(
+        order_id=1234,
+        payment_id="pi_3QxExample",
+        provider="Stripe",
+        observed=Money(Decimal("40.00"), "EUR"),
+        expected=Money(Decimal("45.50"), "EUR"),
+    ),
+)
+staff_email(
+    "ops.refund_failed",
+    area="ops",
+    title=_("A refund the provider accepted failed"),
+    description=_(
+        "Tells the store's staff that a refund failed after the provider "
+        "accepted it, so the customer has not been paid back."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/refund_failed",
+    subject=gettext_noop("[{site}] Refund failed for order {order_id}"),
+    build_context=_refund_failed,
+    sample=lambda env: RefundFailed(
+        order_id=1234,
+        provider="Stripe",
+        refund_id="re_3QxExample",
+        amount=Money(Decimal("45.50"), "EUR"),
+        reason="expired_or_canceled_card",
+    ),
 )

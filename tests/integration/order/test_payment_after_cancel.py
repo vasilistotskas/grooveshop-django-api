@@ -65,7 +65,7 @@ class TestVivaChargeOnACanceledOrder:
 
         with (
             self._verified(order),
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,
@@ -88,7 +88,8 @@ class TestVivaChargeOnACanceledOrder:
         assert record["payment_method"] == "viva_wallet"
         assert order.metadata["viva_transaction_id"] == "viva_txn_9"
         alert.assert_called_once()
-        assert str(order.id) in alert.call_args.kwargs["subject"]
+        assert alert.call_args.args[0] == "ops.payment_after_cancel"
+        assert alert.call_args.args[1].order_id == order.id
         assert any("after the order was canceled" in n for n in _notes(order))
         dispatch.assert_not_called()
         # No "we received your order" email for a canceled order.
@@ -99,7 +100,7 @@ class TestVivaChargeOnACanceledOrder:
 
         with (
             self._verified(order),
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
         ):
             _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
             order.refresh_from_db()
@@ -119,7 +120,7 @@ class TestVivaChargeOnACanceledOrder:
 
         with (
             self._verified(order),
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
         ):
             _handle_payment_created(order, {"StatusId": "F"}, "viva_txn_9")
 
@@ -134,7 +135,7 @@ class TestStripeChargeOnACanceledOrder:
         order = _canceled_order(payment_id="pi_after_cancel")
 
         with (
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
             patch(
                 "order.services.OrderService._dispatch_shipment_creation_task"
             ) as dispatch,
@@ -169,7 +170,7 @@ class TestStripeChargeOnACanceledOrder:
         }
 
         with (
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,

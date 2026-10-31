@@ -1,0 +1,12 @@
+COD PAYOUTS THAT MATCH NO SHIPMENT
+
+3 payout rows for the COD payment date 2026-03-13 could not be tied to an order:
+
+- Unknown voucher: 2
+- No readable voucher: 1
+
+Every row is stored (it is real money), it is just not attributed. Open the admin list “ACS COD Payouts” and set the “Shipment” filter to “Matches no shipment, not reconciled”: each row there shows its voucher, amount, receiver and delivery date. Reconcile it against the ACS COD beneficiary report, then use “Mark as reconciled” to clear it from the dashboard.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

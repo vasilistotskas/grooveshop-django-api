@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import RequestFactory
 from django.utils import timezone
 
@@ -231,6 +232,7 @@ class TestAdminButtons:
         assert response.status_code == 302
 
 
+@pytest.mark.usefixtures("open_email_gates")
 class TestStaleDigest:
     def test_an_unpaid_card_order_is_not_a_stranded_mint(
         self, acs_configured_tenant
@@ -249,13 +251,11 @@ class TestStaleDigest:
             created_at=timezone.now() - timedelta(hours=30)
         )
 
-        with (
-            patch(
-                "tenant.credentials.tenant_admin_recipients",
-                return_value=["ops@example.com"],
-            ),
-            patch("shipping.alerts.send_mail") as mail,
+        with patch(
+            "emails.recipients.tenant_operator_addresses",
+            return_value=["ops@example.com"],
         ):
+            mail.outbox.clear()
             result = check_stale_acs_shipments.run()
 
         assert result["alerted"] == 1
@@ -263,7 +263,8 @@ class TestStaleDigest:
         cod.refresh_from_db()
         assert unpaid.stale_alert_sent is False
         assert cod.stale_alert_sent is True
-        assert str(cod.order_id) in mail.call_args.kwargs["message"]
+        [message] = mail.outbox
+        assert str(cod.order_id) in message.body
 
     def test_a_refunded_card_order_is_not_waiting_for_its_payment(
         self, acs_configured_tenant
@@ -283,13 +284,11 @@ class TestStaleDigest:
             created_at=timezone.now() - timedelta(hours=30)
         )
 
-        with (
-            patch(
-                "tenant.credentials.tenant_admin_recipients",
-                return_value=["ops@example.com"],
-            ),
-            patch("shipping.alerts.send_mail"),
+        with patch(
+            "emails.recipients.tenant_operator_addresses",
+            return_value=["ops@example.com"],
         ):
+            mail.outbox.clear()
             result = check_stale_acs_shipments.run()
 
         assert result["ids"] == [refunded.pk]

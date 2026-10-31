@@ -786,7 +786,7 @@ class TestALatePaymentAfterTheHoldIsBookedSafely:
                     verified_payment(order, "OC9"),
                 ),
             ),
-            patch("shipping.alerts.send_ops_alert") as alert,
+            patch("emails.send.send_email") as alert,
             patch(
                 "shipping.services.ShippingService.dispatch_create_shipment_task"
             ) as dispatch,

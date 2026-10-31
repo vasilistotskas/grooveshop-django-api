@@ -221,7 +221,6 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "CONTACT_",
         ),
     ),
-    (gettext_noop("Operational Alerts"), ("OPS_ALERT_",)),
     (gettext_noop("Agent Commerce"), ("AGENT_", "PRODUCT_FEEDS_")),
     (gettext_noop("Analytics"), ("META_CAPI_",)),
     (gettext_noop("Search"), ("SEARCH_",)),

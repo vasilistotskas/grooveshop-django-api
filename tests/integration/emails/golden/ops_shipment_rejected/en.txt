@@ -1,0 +1,12 @@
+ACS: shipment creation failed
+
+The ACS API permanently rejected the shipment for order #1234.
+
+Carrier message: ACS [ACS_Create_Voucher]: fill data error
+What to do: Fix the address on the order, then press “Issue ACS voucher now” on the order's ACS shipment.
+
+The customer has already checked out and is waiting. You can also cancel the order and contact the customer.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

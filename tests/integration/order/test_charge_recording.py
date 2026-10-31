@@ -135,7 +135,7 @@ class TestStripePaymentIntentSucceeded:
             payment_status=PaymentStatus.CANCELED,
         )
 
-        with patch("shipping.alerts.send_ops_alert"):
+        with patch("emails.send.send_email"):
             OrderService.handle_payment_succeeded("pi_rec_4", captured=CAPTURED)
 
         [charge] = _charges(order)

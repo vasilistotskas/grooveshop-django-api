@@ -1,0 +1,14 @@
+{% load i18n %}{% blocktrans %}Refund failed for order #{{ order_id }}{% endblocktrans %}
+
+{% blocktrans %}{{ provider }} reported that a refund it had accepted FAILED: the money was not paid back to the customer and counts as held again.{% endblocktrans %}
+
+{% trans "Order" %}: #{{ order_id|safe }}
+{% trans "Refund reference" %}: {{ refund_id|safe }}
+{% trans "Amount" %}: {{ amount|safe }}
+{% trans "Reason" %}: {{ reason|default:"—"|safe }}
+
+{% trans "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

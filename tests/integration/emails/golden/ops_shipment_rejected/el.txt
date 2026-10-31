@@ -1,0 +1,12 @@
+ACS: αποτυχία δημιουργίας αποστολής
+
+Το API του ACS απέρριψε οριστικά την αποστολή για την παραγγελία #1234.
+
+Μήνυμα μεταφορέα: ACS [ACS_Create_Voucher]: fill data error
+Τι να κάνετε: Fix the address on the order, then press “Issue ACS voucher now” on the order's ACS shipment.
+
+Ο πελάτης έχει ήδη ολοκληρώσει την παραγγελία και περιμένει. Μπορείτε επίσης να ακυρώσετε την παραγγελία και να επικοινωνήσετε μαζί του.
+
+Acme Gadgets
+owner@store.test
+https://shop.example

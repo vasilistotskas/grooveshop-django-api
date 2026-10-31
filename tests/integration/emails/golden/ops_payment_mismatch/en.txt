@@ -1,0 +1,15 @@
+Payment does not match order #1234
+
+A Stripe payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically.
+
+Order: #1234
+Payment method: Stripe
+Payment reference: pi_3QxExample
+Collected: €40.00
+Order total: €45.50
+
+Refund or reconcile the payment in the Stripe dashboard.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

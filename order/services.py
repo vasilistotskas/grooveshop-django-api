@@ -4473,8 +4473,9 @@ class OrderService:
 
         Called with the order row locked by the payment handler.
         """
+        from emails.send import send_email
+        from order.emails import PaymentAfterCancel
         from order.models.history import OrderHistory
-        from shipping.alerts import OpsAlertKind, send_ops_alert
 
         recorded = (order.metadata or {}).get("payment_after_cancel") or {}
         if recorded.get("payment_id") == payment_id:
@@ -4510,15 +4511,12 @@ class OrderService:
             ),
         )
         try:
-            send_ops_alert(
-                kind=OpsAlertKind.PAYMENT_AFTER_CANCEL,
-                subject=f"Payment received for canceled order {order.id}",
-                message=(
-                    f"A confirmed {payment_method} payment ({payment_id}) "
-                    f"arrived for order {order.id}, which was already "
-                    "canceled. Nothing will ship. Refund the customer in "
-                    f"the {payment_method} dashboard; the provider's "
-                    "refund webhook records it on the order."
+            send_email(
+                "ops.payment_after_cancel",
+                PaymentAfterCancel(
+                    order_id=order.id,
+                    payment_id=payment_id,
+                    payment_method=payment_method,
                 ),
             )
         except Exception:
@@ -4545,9 +4543,10 @@ class OrderService:
         the order with ``refund_payment=False``; a human reconciles it.
         Called with the order row locked by the payment handler.
         """
+        from emails.send import send_email
+        from order.emails import PaymentMismatch
         from order.models.history import OrderHistory
         from order.models.order import AMOUNT_MISMATCH_FLAG
-        from shipping.alerts import OpsAlertKind, send_ops_alert
 
         if not order.metadata:
             order.metadata = {}
@@ -4577,15 +4576,14 @@ class OrderService:
             ),
         )
         try:
-            send_ops_alert(
-                kind=OpsAlertKind.PAYMENT_MISMATCH,
-                subject=f"Payment does not match order {order.id}",
-                message=(
-                    f"{provider} payment {payment_id} collected {observed} "
-                    f"for order {order.id}, which is for {expected}. The "
-                    "order was not marked paid and will not be auto-"
-                    "canceled. Refund or reconcile it in the "
-                    f"{provider} dashboard."
+            send_email(
+                "ops.payment_mismatch",
+                PaymentMismatch(
+                    order_id=order.id,
+                    payment_id=str(payment_id),
+                    provider=provider,
+                    observed=observed,
+                    expected=expected,
                 ),
             )
         except Exception:

@@ -9688,6 +9688,12 @@ msgstr "Pending creation"
 msgid "Pending payment"
 msgstr "Pending payment"
 
+msgid "Pending payment fee"
+msgstr "Pending payment fee"
+
+msgid "Pending payment fees"
+msgstr "Pending payment fees"
+
 msgid "Pending render"
 msgstr "Pending render"
 
@@ -13283,6 +13289,9 @@ msgstr "The promotion has not started yet"
 
 msgid "The provider report the fee was read from."
 msgstr "The provider report the fee was read from."
+
+msgid "The provider's own id for the movement the fee is for."
+msgstr "The provider's own id for the movement the fee is for."
 
 msgid "The provider's own id for this movement (a Stripe PaymentIntent or refund id, a Viva transaction id, a courier voucher)."
 msgstr "The provider's own id for this movement (a Stripe PaymentIntent or refund id, a Viva transaction id, a courier voucher)."

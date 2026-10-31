@@ -112,6 +112,24 @@ class TestNoTransactionIsOpenWhileTheProviderAnswers:
         assert canceled.status == OrderStatus.CANCELED
         assert stripe_api.in_transaction == [False]
 
+    def test_a_cancel_whose_refund_fails_is_not_marked_refunded(self):
+        # Orders canceled in April 2026 were marked REFUNDED with no refund
+        # id and nothing refunded at the provider: the status is derived
+        # from the ledger now, and a refund the provider did not make writes
+        # no row.
+        order = _order(status=OrderStatus.PROCESSING)
+
+        with FakeStripeRefunds(status="failed"):
+            canceled, refund_info = OrderService.cancel_order(
+                order, reason="changed mind", customer_initiated=False
+            )
+
+        assert refund_info["refunded"] is False
+        assert canceled.status == OrderStatus.CANCELED
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert not _rows(order)
+
 
 class TestTheAttemptHoldsItsAmountBack:
     def test_a_claimed_share_cannot_be_refunded_twice(self):

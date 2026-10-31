@@ -540,6 +540,7 @@ NOT_PERSONAL: dict[str, str] = {
         "order.OrderVatLine",
         "order.RefundNotification",
         "order.VivaWebhookEvent",
+        "order.PendingPaymentFee",
         "cart.CartAttribution",
         "cart.CartItem",
     ),

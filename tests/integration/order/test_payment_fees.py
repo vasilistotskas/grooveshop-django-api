@@ -21,7 +21,7 @@ from djstripe.models import Event
 from order.enum.payment_transaction import PaymentFeeSource
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
-from order.models import PaymentTransaction
+from order.models import PaymentTransaction, PendingPaymentFee
 from order.models.viva_webhook_event import VivaWebhookEvent
 from order.payment import VivaWalletPaymentProvider
 from order.payment_fees import (
@@ -78,16 +78,89 @@ class TestRecordFee:
         row.refresh_from_db()
         assert row.fee == Money(D("1.80"), "EUR")
 
-    def test_a_payment_the_ledger_does_not_hold_records_nothing(self):
-        assert (
+    def test_a_fee_for_a_payment_the_ledger_lacks_waits_for_it(self):
+        order = OrderFactory(num_order_items=0)
+
+        result = PaymentLedger.record_fee(
+            provider="stripe",
+            reference="pi_early",
+            fee=Money(D("1.00"), "EUR"),
+            source=PaymentFeeSource.STRIPE_BALANCE_TRANSACTION,
+        )
+
+        assert result is None
+        assert PendingPaymentFee.objects.get().fee == Money(D("1.00"), "EUR")
+        row, created = PaymentLedger.record_charge(
+            order,
+            amount=Money(D("50.00"), "EUR"),
+            provider="stripe",
+            reference="pi_early",
+        )
+        assert created
+        row.refresh_from_db()
+        assert row.fee == Money(D("1.00"), "EUR")
+        assert row.fee_source == PaymentFeeSource.STRIPE_BALANCE_TRANSACTION
+        assert not PendingPaymentFee.objects.exists()
+
+    def test_a_waiting_fee_is_replaced_by_a_later_figure(self):
+        order = OrderFactory(num_order_items=0)
+        for fee in ("1.00", "1.20"):
             PaymentLedger.record_fee(
                 provider="stripe",
-                reference="pi_unknown",
-                fee=Money(D("1.00"), "EUR"),
+                reference="pi_early_2",
+                fee=Money(D(fee), "EUR"),
                 source=PaymentFeeSource.STRIPE_BALANCE_TRANSACTION,
             )
-            is None
+
+        assert PendingPaymentFee.objects.count() == 1
+        row, _created = PaymentLedger.record_charge(
+            order,
+            amount=Money(D("50.00"), "EUR"),
+            provider="stripe",
+            reference="PI_EARLY_2",
         )
+        row.refresh_from_db()
+        assert row.fee == Money(D("1.20"), "EUR")
+
+    def test_a_waiting_fee_in_another_currency_is_dropped_not_converted(self):
+        order = OrderFactory(num_order_items=0)
+        PaymentLedger.record_fee(
+            provider="stripe",
+            reference="pi_early_usd",
+            fee=Money(D("1.00"), "USD"),
+            source=PaymentFeeSource.STRIPE_BALANCE_TRANSACTION,
+        )
+
+        row, _created = PaymentLedger.record_charge(
+            order,
+            amount=Money(D("50.00"), "EUR"),
+            provider="stripe",
+            reference="pi_early_usd",
+        )
+
+        row.refresh_from_db()
+        assert row.fee is None
+        assert not PendingPaymentFee.objects.exists()
+
+    def test_a_waiting_fee_is_for_its_own_provider_only(self):
+        order = OrderFactory(num_order_items=0)
+        PaymentLedger.record_fee(
+            provider="viva_wallet",
+            reference="shared_ref",
+            fee=Money(D("1.00"), "EUR"),
+            source=PaymentFeeSource.VIVA_TRANSACTION_PRICE,
+        )
+
+        row, _created = PaymentLedger.record_charge(
+            order,
+            amount=Money(D("50.00"), "EUR"),
+            provider="stripe",
+            reference="shared_ref",
+        )
+
+        row.refresh_from_db()
+        assert row.fee is None
+        assert PendingPaymentFee.objects.count() == 1
 
     def test_a_fee_in_another_currency_is_not_recorded(self):
         row = PaymentTransactionFactory(provider_reference="pi_fee_usd")
@@ -239,7 +312,7 @@ class TestVivaTransactionPriceCalculated:
         row.refresh_from_db()
         assert row.fee is None
 
-    def test_a_payment_the_ledger_lacks_is_skipped_not_invented(self):
+    def test_a_commission_before_the_payment_is_booked_is_kept(self):
         order, row = _viva_order()
         row.delete()
 
@@ -248,7 +321,88 @@ class TestVivaTransactionPriceCalculated:
                 order, _event_data(), TRANSACTION_ID
             )
 
+        assert outcome is None
+        assert not PaymentTransaction.objects.filter(order=order).exists()
+        assert PendingPaymentFee.objects.get().fee == Money(D("0.30"), "EUR")
+
+    def test_the_payment_booked_after_its_commission_carries_it(self):
+        # 1799 first, then 1796: both go through the webhook dispatch, so the
+        # 1799 is recorded as handled and Viva never has to resend it.
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+            metadata={"viva_order_codes": [ORDER_CODE]},
+        )
+        with _retrieved():
+            response = _process_event_in_tenant(
+                order_code=ORDER_CODE,
+                event_type_id=VIVA_TRANSACTION_PRICE_CALCULATED,
+                event_data=_event_data(),
+                transaction_id=TRANSACTION_ID,
+                status_id="",
+                txn_hash="",
+            )
+        assert response.status_code == 200
+        [event] = VivaWebhookEvent.objects.filter(transaction_id=TRANSACTION_ID)
+        assert event.outcome == VivaWebhookEvent.OUTCOME_PROCESSED
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(
+                PaymentStatus.COMPLETED,
+                {
+                    "order_code": ORDER_CODE,
+                    "amount": float(order.total_price.amount),
+                    "currency": "EUR",
+                },
+            ),
+        ):
+            response = _process_event_in_tenant(
+                order_code=ORDER_CODE,
+                event_type_id=1796,
+                event_data={"TransactionId": TRANSACTION_ID},
+                transaction_id=TRANSACTION_ID,
+                status_id="F",
+                txn_hash="",
+            )
+        assert response.status_code == 200
+
+        charge = PaymentTransaction.objects.get(
+            order=order, provider_reference=TRANSACTION_ID
+        )
+        assert charge.fee == Money(D("0.30"), "EUR")
+        assert charge.fee_source == PaymentFeeSource.VIVA_TRANSACTION_PRICE
+        assert not PendingPaymentFee.objects.exists()
+
+    def test_a_commission_for_an_unknown_transaction_is_kept_nowhere(self):
+        order, row = _viva_order()
+        row.delete()
+
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(None, {}),
+            ),
+            pytest.raises(RuntimeError),
+        ):
+            _handle_transaction_price_calculated(
+                order, _event_data(), TRANSACTION_ID
+            )
+
+        assert not PendingPaymentFee.objects.exists()
+
+    def test_a_commission_of_another_orders_transaction_is_kept_nowhere(self):
+        order, row = _viva_order()
+        row.delete()
+
+        with _retrieved(order_code="9999999999999999"):
+            outcome = _handle_transaction_price_calculated(
+                order, _event_data(), TRANSACTION_ID
+            )
+
         assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
+        assert not PendingPaymentFee.objects.exists()
 
     def test_the_event_goes_through_the_webhook_dispatch_once(self):
         _order, row = _viva_order()

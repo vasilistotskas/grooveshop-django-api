@@ -44,6 +44,7 @@ from order.enum.payment_transaction import (
 )
 from order.enum.status import PaymentStatus
 from order.models.payment_transaction import PaymentTransaction
+from order.models.pending_payment_fee import PendingPaymentFee
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
@@ -583,7 +584,31 @@ class PaymentLedger:
                 row.order_id,
                 order.pk,
             )
+        if created:
+            PaymentLedger._apply_pending_fee(row)
         return row, created
+
+    @staticmethod
+    def _apply_pending_fee(row: PaymentTransaction) -> None:
+        """Move a fee the provider reported before *row* existed onto it."""
+        with transaction.atomic():
+            pending = (
+                PendingPaymentFee.objects.select_for_update()
+                .filter(
+                    provider=row.provider,
+                    provider_reference__iexact=row.provider_reference,
+                )
+                .first()
+            )
+            if pending is None:
+                return
+            PaymentLedger.record_fee(
+                provider=pending.provider,
+                reference=pending.provider_reference,
+                fee=pending.fee,
+                source=PaymentFeeSource(pending.fee_source),
+            )
+            pending.delete()
 
     @classmethod
     def record_charge(
@@ -608,9 +633,11 @@ class PaymentLedger:
         source: PaymentFeeSource,
     ) -> PaymentTransaction | None:
         """Write the fee *provider* reported for the movement it knows as
-        *reference*, onto that ledger row. ``None`` when the ledger holds no
-        such row (yet), or holds it in another currency than the fee is
-        reported in: nothing is invented or converted.
+        *reference*, onto that ledger row. A fee for a movement the ledger
+        does not hold yet is kept (``PendingPaymentFee``) and written when
+        the row is recorded, so a report that arrives first is not lost.
+        ``None`` when no row carries the fee now: nothing is invented or
+        converted, and a fee in another currency than the row is not written.
 
         The provider's latest figure replaces an earlier one, so a
         redelivered or corrected report cannot add up twice. It is the only
@@ -627,6 +654,26 @@ class PaymentLedger:
                 .first()
             )
             if row is None:
+                pending = (
+                    PendingPaymentFee.objects.select_for_update()
+                    .filter(
+                        provider=provider, provider_reference__iexact=reference
+                    )
+                    .first()
+                )
+                if pending is None:
+                    PendingPaymentFee.objects.create(
+                        provider=provider,
+                        provider_reference=reference,
+                        fee=fee,
+                        fee_source=source,
+                    )
+                else:
+                    pending.fee = fee
+                    pending.fee_source = source
+                    pending.save(
+                        update_fields=["fee", "fee_currency", "fee_source"]
+                    )
                 return None
             if row.amount.currency != fee.currency:
                 logger.error(

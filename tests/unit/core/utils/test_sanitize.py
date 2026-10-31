@@ -94,12 +94,27 @@ class TestSanitizeHtmlStyleResidue(unittest.TestCase):
 
 class TestHasVisibleContent(unittest.TestCase):
     def test_empty_markup_shows_nothing(self):
-        for html in (None, "", "<p></p>", "<p>&nbsp;</p>", "<p> &#160; </p>"):
+        for html in (
+            None,
+            "",
+            "<p></p>",
+            "<p>&nbsp;</p>",
+            "<p> &#160; </p>",
+            "<p>&#x20;</p>",
+            "<p>&#32;&#32;</p>",
+            "<p>&#x0A;&#9;&nbsp;&#xa0;</p>",
+            "<p>&#x20;<br>&#x20;</p>",
+        ):
             with self.subTest(html=html):
                 self.assertFalse(has_visible_content(html))
 
     def test_text_or_embedded_media_shows_something(self):
-        for html in ("<p>a</p>", "text", '<p><img src="a.png"></p>'):
+        for html in (
+            "<p>a</p>",
+            "text",
+            "<p>&#x41;</p>",
+            '<p><img src="a.png"></p>',
+        ):
             with self.subTest(html=html):
                 self.assertTrue(has_visible_content(html))
 
@@ -111,6 +126,21 @@ class TestHasVisibleContent(unittest.TestCase):
         ):
             with self.subTest(html=html):
                 self.assertFalse(has_visible_content(html))
+
+    def test_a_hidden_element_does_not_count_itself(self):
+        for html in (
+            '<img hidden src="a.png">',
+            '<img hidden="" src="a.png">',
+            '<iframe hidden src="https://www.youtube.com/embed/x"></iframe>',
+            '<p><img hidden src="a.png"></p>',
+        ):
+            with self.subTest(html=html):
+                self.assertFalse(has_visible_content(html))
+
+    def test_an_unhidden_sibling_of_a_hidden_element_counts(self):
+        self.assertTrue(
+            has_visible_content('<img hidden src="a.png"><img src="b.png">')
+        )
 
     def test_visible_content_beside_hidden_content_counts(self):
         self.assertTrue(has_visible_content("<p hidden>a</p><p>b</p>"))

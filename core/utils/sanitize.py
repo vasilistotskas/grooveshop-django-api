@@ -25,6 +25,7 @@ file, an embed from another host, a ``javascript:`` link — is refused by
 residue (``data-*``, ``aria-*``, event handlers) is normalised away.
 """
 
+import re
 from collections import Counter
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -45,6 +46,12 @@ EMBED_IFRAME_ORIGINS = frozenset(
         "https://player.vimeo.com",
     }
 )
+
+# The real pixel size of an uploaded image, written on save by
+# ``core.utils.rich_text_images`` and read by the storefront. Allowed
+# here so a later save keeps what it recomputes anyway.
+NATURAL_WIDTH_ATTR = "data-natural-width"
+NATURAL_HEIGHT_ATTR = "data-natural-height"
 
 ALLOWED_TAGS = {
     "a",
@@ -115,7 +122,15 @@ ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
         "loading",
         "referrerpolicy",
     },
-    "img": {"src", "alt", "width", "height", "loading"},
+    "img": {
+        "src",
+        "alt",
+        "width",
+        "height",
+        "loading",
+        NATURAL_WIDTH_ATTR,
+        NATURAL_HEIGHT_ATTR,
+    },
     # The lists plugin's "List properties": numbering that starts, runs
     # backwards or jumps is the author's content, not formatting.
     "li": {"value"},
@@ -149,12 +164,29 @@ def is_allowed_embed_url(src: str) -> bool:
     return f"{parts.scheme}://{parts.netloc.lower()}" in EMBED_IFRAME_ORIGINS
 
 
+# A CSS custom property declaration inside a ``style`` attribute. An
+# author never writes one: it is the residue of a browser extension (Dark
+# Reader's ``--darkreader-inline-color``, on most of webside's blog
+# posts) that was running when the text was copied into the editor, and
+# it stays in the stored HTML for no reader but that extension.
+_CUSTOM_PROPERTY = re.compile(r"(^|;)\s*--[\w-]+\s*:[^;]*")
+
+
+def _without_custom_properties(style: str) -> str | None:
+    if "--" not in style:
+        return style
+    cleaned = _CUSTOM_PROPERTY.sub("", style).strip(" ;")
+    return f"{cleaned};" if cleaned else None
+
+
 def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
     # nh3 cannot drop an element from an attribute filter, so an iframe
     # pointing elsewhere keeps only its inert attributes and renders
     # ``about:blank``. Validation refuses it before it gets that far.
     if tag == "iframe" and attr == "src" and not is_allowed_embed_url(value):
         return None
+    if attr == "style":
+        return _without_custom_properties(value)
     return value
 
 

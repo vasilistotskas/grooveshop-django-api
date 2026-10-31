@@ -54,3 +54,35 @@ class TestIsAllowedEmbedUrl(unittest.TestCase):
 
     def test_accepts_listed_origin_case_insensitively(self):
         self.assertTrue(is_allowed_embed_url("https://WWW.YouTube.com/embed/x"))
+
+
+class TestSanitizeHtmlStyleResidue(unittest.TestCase):
+    def test_drops_custom_properties_a_browser_extension_left(self):
+        cleaned = sanitize_html(
+            '<span style="color: #3364ff; --darkreader-inline-color: #75a0ff;'
+            ' text-decoration: underline;" data-darkreader-inline-color="">'
+            "x</span>"
+        )
+
+        self.assertEqual(
+            cleaned,
+            '<span style="color: #3364ff; text-decoration: underline;">x'
+            "</span>",
+        )
+
+    def test_a_style_of_only_custom_properties_is_dropped(self):
+        self.assertEqual(
+            sanitize_html('<p style="--darkreader-inline-color: red;">x</p>'),
+            "<p>x</p>",
+        )
+
+    def test_a_leading_custom_property_is_dropped_too(self):
+        self.assertEqual(
+            sanitize_html('<p style="--a: 1; margin: 0">x</p>'),
+            '<p style="margin: 0;">x</p>',
+        )
+
+    def test_a_style_without_one_is_left_as_written(self):
+        html = '<p style="text-align: center">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)

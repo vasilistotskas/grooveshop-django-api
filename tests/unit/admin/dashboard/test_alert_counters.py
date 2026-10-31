@@ -1,9 +1,9 @@
 """The "Needs attention" counters behind the operational alert emails.
 
-A store may mute an alert email (``shipping.alerts.OpsAlertKind``). That is
+A store may switch an alert email off (the ``ops.*`` email types). That is
 only safe because the work each email reports stays counted on the
 dashboard by the very rule the email uses, so every counter here is
-compared with its email's rule, and a muted email still shows its count.
+compared with its email's rule, and a switched-off email still shows its count.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.cache import cache
 from django.test import Client, RequestFactory
 from django.urls import reverse
@@ -21,12 +22,12 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from admin.dashboard.store import queries, widgets
+from emails.models import EmailSwitch
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
 from pay_way.factories import PayWayFactory
-from shipping.alerts import OpsAlertKind
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
@@ -38,7 +39,6 @@ from shipping_acs.tasks import (
 )
 from tests.utils.orders import courier_cash_order
 from tests.utils.staff import stamp_platform_identity
-from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -47,9 +47,14 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 
 @pytest.fixture(autouse=True)
-def _operators(settings):
-    settings.ADMINS = [("Ops", "ops@example.com")]
+def _operators(open_email_gates):
     cache.clear()
+    mail.outbox.clear()
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["ops@example.com"],
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -112,8 +117,8 @@ class TestStaleShipments:
             created_at=timezone.now() - timedelta(days=2)
         )
 
-        with patch("shipping.alerts.send_mail"):
-            alerted = check_stale_acs_shipments.run()["alerted"]
+        mail.outbox.clear()
+        alerted = check_stale_acs_shipments.run()["alerted"]
 
         assert alerted == 3
         assert _counts()["stale_shipments"] == alerted
@@ -138,16 +143,15 @@ class TestStaleShipments:
 
         assert _counts()["stale_shipments"] == 0
 
-    def test_a_muted_digest_leaves_the_count(self):
+    def test_a_switched_off_digest_leaves_the_count(self):
         _shipment()
-        switch_store_settings(
-            **{OpsAlertKind.STALE_SHIPMENTS.setting_name: False}
-        )
+        EmailSwitch.objects.create(type_key="ops.stale_shipments")
+        cache.clear()  # the cached switches predate the row
 
-        with patch("shipping.alerts.send_mail") as mail:
-            check_stale_acs_shipments.run()
+        mail.outbox.clear()
+        check_stale_acs_shipments.run()
 
-        mail.assert_not_called()
+        assert mail.outbox == []
         assert _counts()["stale_shipments"] == 1
 
 
@@ -163,23 +167,22 @@ class TestUnremittedCod:
             cod_received_outside_acs_at=timezone.now()
         )
 
-        with patch("shipping.alerts.send_ops_alert", return_value=True):
-            listed = alert_unremitted_cod_payouts.run()["unremitted"]
+        mail.outbox.clear()
+        listed = alert_unremitted_cod_payouts.run()["unremitted"]
 
         assert listed == 2
         assert len(_unremitted_cod_rows(10)) == 2
         assert _counts()["unremitted_cod"] == 2
 
-    def test_a_muted_alert_leaves_the_count(self):
+    def test_a_switched_off_alert_leaves_the_count(self):
         _cod_shipment(days_ago=30, voucher="9772892603")
-        switch_store_settings(
-            **{OpsAlertKind.UNREMITTED_COD.setting_name: False}
-        )
+        EmailSwitch.objects.create(type_key="ops.unremitted_cod")
+        cache.clear()  # the cached switches predate the row
 
-        with patch("shipping.alerts.send_mail") as mail:
-            alert_unremitted_cod_payouts.run()
+        mail.outbox.clear()
+        alert_unremitted_cod_payouts.run()
 
-        mail.assert_not_called()
+        assert mail.outbox == []
         assert _counts()["unremitted_cod"] == 1
 
 
@@ -244,15 +247,12 @@ class TestCanceledStillPaid:
         )
         assert _counts()["canceled_still_paid"] == 0
 
-        switch_store_settings(
-            **{OpsAlertKind.PAYMENT_AFTER_CANCEL.setting_name: False}
+        EmailSwitch.objects.create(type_key="ops.payment_after_cancel")
+        OrderService.record_payment_after_cancel(
+            order, payment_id="pi_late", payment_method="stripe"
         )
-        with patch("shipping.alerts.send_mail") as mail:
-            OrderService.record_payment_after_cancel(
-                order, payment_id="pi_late", payment_method="stripe"
-            )
 
-        mail.assert_not_called()
+        assert [m for m in mail.outbox if "canceled order" in m.subject] == []
         assert _counts()["canceled_still_paid"] == 1
 
         Order.objects.filter(pk=order.pk).update(

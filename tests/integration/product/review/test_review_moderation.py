@@ -8,7 +8,7 @@ The rules under test:
 * ``is_published`` / ``published_at`` follow ``status`` on every path
   that changes it (instance save, bulk moderate, the admin);
 * one operational email per entry into ``NEW`` (create and the reset),
-  after commit, behind ``OPS_ALERT_REVIEW_PENDING_ENABLED``.
+  after commit, behind the store's ``ops.review_pending`` switch.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from django.utils import timezone, translation
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from emails.models import EmailSwitch
 from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
@@ -39,8 +40,6 @@ from product.factories.review import ProductReviewFactory
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.tasks import send_review_pending_alert
-from shipping.alerts import OpsAlertKind
-from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -53,8 +52,12 @@ OPERATORS = "ops@example.com"
 
 
 @pytest.fixture(autouse=True)
-def _operators(settings):
-    settings.ADMINS = [OPERATORS]
+def _operators(open_email_gates):
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=[OPERATORS],
+    ):
+        yield
 
 
 @pytest.fixture
@@ -386,8 +389,13 @@ class TestTheBackfill:
 
 
 def _pending_mails():
-    # The orders the setup places mail their customers too.
-    return [m for m in mail.outbox if m.to == [OPERATORS]]
+    # The orders the setup places mail their customers and the store too:
+    # the alert is the one that links the review's admin page.
+    return [
+        m
+        for m in mail.outbox
+        if m.to == [OPERATORS] and "/admin/product/productreview/" in m.body
+    ]
 
 
 class TestTheStaffEmail:
@@ -426,7 +434,10 @@ class TestTheStaffEmail:
 
         assert result == {"status": "sent", "review_id": review.pk}
         [message] = mail.outbox
-        name = product.safe_translation_getter("name", any_language=True)
+        # The alert names the product in the store's language.
+        name = product.safe_translation_getter(
+            "name", language_code=settings.LANGUAGE_CODE, any_language=True
+        )
         html = message.alternatives[0][0]
         # The store's language, not the test's: the task renders in it.
         with translation.override(settings.LANGUAGE_CODE):
@@ -478,10 +489,10 @@ class TestTheStaffEmail:
 
         assert mail.outbox == []
 
-    def test_a_muted_store_sends_nothing(self, api, owner, product):
-        switch_store_settings(
-            **{OpsAlertKind.REVIEW_PENDING.setting_name: False}
-        )
+    def test_a_store_that_switched_it_off_sends_nothing(
+        self, api, owner, product
+    ):
+        EmailSwitch.objects.create(type_key="ops.review_pending")
         review = _review(owner, product, ReviewStatus.TRUE, rate=6)
 
         _patch(api, review, rate=5)

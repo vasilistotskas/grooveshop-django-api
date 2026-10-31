@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] Stale ACS shipment alert — 2 shipment(s)",
+  "to": [
+    "owner@store.test"
+  ]
+}

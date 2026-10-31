@@ -461,10 +461,9 @@ def attention_counts() -> dict[str, int]:
         "follow_up_orders": model("order.Order")
         .objects.needing_follow_up(now)
         .count(),
-        # The operational alert emails (``shipping.alerts.OpsAlertKind``)
-        # as work: a store may mute an email, so each kind that carries
-        # money or a stuck parcel is counted here by the very rule the
-        # email uses.
+        # The operational alert emails (``ops.*`` email types) as work: a
+        # store may switch an email off, so each kind that carries money or
+        # a stuck parcel is counted here by the very rule the email uses.
         "stale_shipments": acs.stale_shipments(now).count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
         "unattributed_cod_payouts": acs.unattributed_payouts().count(),

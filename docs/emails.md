@@ -7,11 +7,12 @@ Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `transport.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
-**State.** The order, shipping, product, gift card, B2B, contact, account
-and cart emails are on the pipeline (see Registered types). What is not yet
-(ops alerts, allauth's account, MFA and social mail, the platform's own
-mail) still goes through its own send path and moves onto it one domain at
-a time, each move keeping the recorded golden files equal (see Tests).
+**State.** The order, shipping, product, gift card, B2B, contact, account,
+cart and operational alert emails are on the pipeline (see Registered
+types). What is not yet (allauth's account, MFA and social mail, the
+platform's own mail) still goes through its own send path and moves onto it
+one domain at a time, each move keeping the recorded golden files equal
+(see Tests).
 
 ## The pieces
 
@@ -96,7 +97,7 @@ Declared in `order/emails.py`, next to the builders that read the order:
 | `team.dispute_opened`, `team.dispute_lost` | an `OrderDispute` (order, dispute id, provider) | switchable, store staff |
 
 Declared in `product/emails.py` (templates in `emails/product_alerts/`; the
-ops mail `emails/product/review_pending` stays where it is until it moves):
+ops alert `ops.review_pending` is under Operational alerts below):
 
 | Key | About | Requirement / gates |
 |---|---|---|
@@ -135,6 +136,54 @@ Declared in `user/emails.py` and `cart/emails.py`:
 | `newsletter.confirmation` | the `UserSubscription` (a guest row too) | required (double opt-in); `FeatureGate("newsletter")` |
 | `user.reengagement` | the `UserAccount` | **marketing**; `ScheduleGate("send-inactive-user-notifications")` |
 | `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")` |
+
+### Operational alerts (`ops.*`)
+
+Ten mails to the store's own staff, for work that needs a person. They were
+`OpsAlertKind` and `send_ops_alert` (`shipping/alerts.py`); each is now an
+email type declared with `staff_email(..., area="ops")`, so the store's
+`EmailSwitch`, the gates and `store_operators()` apply. All are switchable,
+store staff, with no list headers. A store with no contact or owner address
+gets `SKIPPED_NO_RECIPIENT` (the old `ADMINS` fallback is gone with
+`tenant_admin_recipients`); the work still shows on the dashboard counter or
+the order note, whatever the switch says.
+
+| Key | About | Declared in | Gate |
+|---|---|---|---|
+| `ops.shipment_rejected` | a `ShipmentRejected` (order id, carrier, its error, the remedy) | `shipping/emails.py` | |
+| `ops.webhook_failed` | a `WebhookFailed` (carrier, message id, error) | `shipping/emails.py` | |
+| `ops.stale_shipments` | a `StaleShipments` (the `AcsShipment` rows, threshold, clock) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.unremitted_cod` | an `UnremittedCod` (the rows of `_unremitted_cod_rows`) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.unattributable_cod_payouts` | an `UnattributablePayouts` (counts, payment date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.payment_after_cancel` | a `PaymentAfterCancel` | `order/emails.py` | |
+| `ops.payment_mismatch` | a `PaymentMismatch` | `order/emails.py` | |
+| `ops.refund_failed` | a `RefundFailed` | `order/emails.py` | |
+| `ops.gift_card_reversal` | a `GiftCardReversal` (the purchase, and what was already spent, or none when only disputed) | `giftcard/emails.py` | none |
+| `ops.review_pending` | the `ProductReview` | `product/emails.py` | `FeatureGate("product_reviews")` |
+
+`ops.gift_card_reversal` is not behind the gift cards feature, unlike the
+other gift card mail: a store that switched the feature off can still have a
+sold card whose payment is reversed or disputed, and that alert must not
+vanish. The two outcomes share one type, one switch and one template (the
+headline is chosen in the builder, under the recipient's language).
+
+A task treats a skip by what it protects. The stale digest claims its rows
+(`stale_alert_sent`), sends, and releases the claim when nothing was sent
+(switched off, nobody to write to, ACS off): the parcels are in the first
+digest after the store turns it back on. The order-bound alerts
+(`payment_after_cancel`, `payment_mismatch`, `refund_failed`,
+`shipment_rejected`) write their `OrderHistory` note first, whatever the
+switch. Every sender is best-effort: a mail failure never fails the task or
+masks the error it reports.
+
+Each store's old `OPS_ALERT_<KIND>_ENABLED` setting that was OFF became its
+`EmailSwitch` row in `emails/0003_import_ops_alert_switches` (a setting still
+on needs none: no row is on). The import moves the store's cache generation
+(a bulk insert fires no signal). The setting rows themselves are left in
+place for one release, because the previous image still reads them while a
+release rolls out; a later release deletes them (`contract_of` 0003), and
+until then they are dead rows in the store settings list. The declarations
+and the "Operational Alerts" settings group are gone.
 
 A marketing type is switchable, honours `EmailOptOut` and carries the
 RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
@@ -267,9 +316,9 @@ else the store's), `store_operators` (the store's), `platform_operators`
 `contact_email` then `owner_email` and nothing else: a store with neither
 has nobody to write to, and `settings.ADMINS` is never used for it. When
 both exist and differ, each gets its own mail. `team.new_order` and the
-dispute mails changed to this from `tenant_admin_recipients()` (contact
-address only, in practice); other callers of `tenant_admin_recipients()`
-are unchanged.
+dispute mails and the ops alerts changed to this from
+`tenant_admin_recipients()` (contact address only, in practice, for the
+dispute mails), which is deleted.
 
 ### Sender
 
@@ -308,6 +357,27 @@ The list of switched-off keys is cached as
 request or task sees it. A request that already holds the store row keeps
 the old list until it ends. The public schema has no generation and reads
 the table directly.
+
+### The store's email page (`emails/admin.py`, `emails/switches.py`)
+
+`Settings -> Emails` in the store admin. One dedicated page, like the text
+editor, not a changelist: `EmailSwitchAdmin.changelist_view` lists every
+`Owner.STORE` type grouped by `EmailType.area` (`switches.AREA_TITLES`, one
+title per area; `tests/unit/emails/test_switches.py` fails when a type is
+declared in an area with none), with its title and description from the
+declaration. A required type shows a "Required" label and no switch; a type
+whose gate is closed also shows "Off: <gate label>", whatever the switch
+says. A switch posts to `toggle/` (htmx), which calls `set_switch` and
+answers with the row; a required or unknown type is a 400 or 404 and writes
+nothing. The page reads `EmailSwitch` directly, not the pipeline's cached
+list, so it shows what was just written.
+
+Permission: `emails` is in `STORE_SETTINGS_APP_LABELS` and
+`STORE_SHARED_APP_LABELS` (`tenant/role_scopes.py`), so ADMIN and OWNER hold
+`emails.view_emailswitch` and `change_emailswitch`; STAFF hold neither and
+the page answers 403 and is not in their sidebar. The audit is the
+simple-history row with the staff member (`EmailSwitch.history`). Platform
+types (`Owner.PLATFORM`) are not on this page.
 
 ## Opt-out (`optout.py`)
 
@@ -404,8 +474,9 @@ concatenation at a call site.
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
 - The storefront confirm page and the `GET` redirect to it, and the
   storefront's email-preferences UI (the endpoint exists).
-- The other domains' email types (ops alerts, allauth, the platform's own
-  mail) and the admin page. The preview of every registered type already
+- The other domains' email types (allauth, the platform's own mail) and
+  the rest of the admin page (status, log, preview, test-send); the switches
+  are on it already. The preview of every registered type already
   goes through `render`; a real object is chosen only for the order types
   (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
 
@@ -432,6 +503,18 @@ concatenation at a call site.
   for the product, gift card, B2B, contact, account and cart emails. It
   pins what the rows cannot (the user and product ids, the signer's clock,
   `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
+- `tests/integration/emails/test_golden_render_ops.py` records the ten
+  operational alerts through the real code that sends them. They had no
+  template and no translation before, so the files record what they are now.
+- `tests/integration/emails/test_switch_admin.py`: the page's permissions
+  (ADMIN and OWNER yes, STAFF 403 and no sidebar entry), toggling changes
+  what `send_email` does, history, the cache generation, and a required or
+  unknown type refused.
+- `tests/integration/emails/test_ops_alerts.py`: each real sender honours
+  its switch and keeps its bookkeeping, a store with nobody to write to skips
+  the mail, and carrier code imports no `send_mail`.
+  `test_import_ops_alert_switches.py` runs `emails/0003` over the settings a
+  store is in.
 - `tests/integration/emails/test_every_type.py` is parametrised over
   `registry.all_types()`, so a type added to any `<app>/emails.py` is covered
   without editing a test: its sample sends, a closed gate stops it with the

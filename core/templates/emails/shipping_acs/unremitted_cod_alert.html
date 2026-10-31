@@ -1,0 +1,35 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "COD parcels never remitted" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "COD parcels never remitted" %}</h1>
+<p>{% blocktrans count counter=n %}{{ counter }} COD parcel was delivered more than {{ older_than_days }} days ago and ACS has still not reported a payout for it:{% plural %}{{ counter }} COD parcels were delivered more than {{ older_than_days }} days ago and ACS has still not reported a payout for them:{% endblocktrans %}</p>
+
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Order" %}</th>
+            <th>{% trans "Voucher" %}</th>
+            <th>{% trans "COD amount" %}</th>
+            <th>{% trans "Delivered" %}</th>
+            <th>{% trans "Days ago" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>#{{ row.order_id }}</td>
+            <td>{{ row.voucher_no }}</td>
+            <td>{{ row.cod_amount }}</td>
+            <td>{{ row.delivered_on }}</td>
+            <td style="font-weight: bold; color: #991b1b;">{{ row.days_since_delivery }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p class="mt-3">{% trans "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent." %}</p>
+<p>{% trans "If you WERE paid for a parcel outside ACS, open the shipment in the admin and use “Record COD received outside ACS” to clear it from this alert." %}</p>
+{% endblock %}

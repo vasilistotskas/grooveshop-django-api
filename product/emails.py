@@ -18,11 +18,16 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
+from django.urls import reverse
+from django.utils.text import Truncator
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
-from core.utils.tenant_urls import get_tenant_frontend_url
+from core.utils.tenant_urls import (
+    get_tenant_api_base_url,
+    get_tenant_frontend_url,
+)
 from emails.declare import customer_email, marketing_email, staff_email
 from emails.gates import FeatureGate
 from emails.recipients import Recipient
@@ -33,10 +38,16 @@ from tenant.credentials import tenant_site_name
 if TYPE_CHECKING:
     from product.models import Product
     from product.models.alert import ProductAlert
+    from product.models.review import ProductReview
 
 TEMPLATE_DIR = "emails/product_alerts"
 
 SAMPLE_PRODUCT_ID = 12345
+SAMPLE_REVIEW_ID = 6789
+
+#: How much of a review's comment the staff alert quotes; the admin page
+#: has it all.
+REVIEW_ALERT_COMMENT_CHARS = 300
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +187,42 @@ def _sample_low_stock(env: RenderEnv) -> LowStock:
     )
 
 
+def _review_pending(review: ProductReview, env: RenderEnv) -> dict[str, Any]:
+    # parler fixes a row's language when it is loaded: state it here.
+    review.set_current_language(env.language)
+    review.product.set_current_language(env.language)
+    comment = review.safe_translation_getter("comment", any_language=True)
+    return {
+        "site": tenant_site_name(),
+        "product_name": review.product.safe_translation_getter(
+            "name", any_language=True
+        )
+        or str(review.product_id),
+        "stars": review.stars,
+        "reviewer": review.reviewer_label,
+        "comment": Truncator(comment or "").chars(REVIEW_ALERT_COMMENT_CHARS),
+        "admin_url": get_tenant_api_base_url()
+        + reverse("admin:product_productreview_change", args=[review.pk]),
+    }
+
+
+def _sample_review(env: RenderEnv) -> ProductReview:
+    from product.models.review import ProductReview
+    from user.models.account import UserAccount
+
+    review = ProductReview(
+        id=SAMPLE_REVIEW_ID,
+        product=_sample_product(env, "Wireless headphones"),
+        user=UserAccount(first_name="Maria", last_name="Papadopoulou"),
+        rate=8,
+    )
+    for code, _label in settings.LANGUAGES:
+        review.set_current_language(code)
+        review.comment = "Great sound, the battery lasts all week."
+    review.set_current_language(env.language)
+    return review
+
+
 ALERTS_GATE = FeatureGate(
     feature="product_alerts", label=_("Product alerts feature")
 )
@@ -244,4 +291,25 @@ staff_email(
     build_context=_low_stock,
     sample=_sample_low_stock,
     gates=(FeatureGate(feature="catalogue", label=_("Catalogue feature")),),
+)
+
+staff_email(
+    "ops.review_pending",
+    area="ops",
+    title=_("Review waiting for approval"),
+    description=_(
+        "Tells the store's staff that a customer's review waits for their "
+        "approval before it shows to shoppers."
+    ),
+    templates="emails/product/review_pending",
+    subject=gettext_noop(
+        "[{site}] Review waiting for approval: {product_name}"
+    ),
+    build_context=_review_pending,
+    sample=_sample_review,
+    gates=(
+        FeatureGate(
+            feature="product_reviews", label=_("Product reviews feature")
+        ),
+    ),
 )

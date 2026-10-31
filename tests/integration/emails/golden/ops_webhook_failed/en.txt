@@ -1,0 +1,12 @@
+BoxNow: webhook processing failed
+
+A verified BoxNow webhook could not be applied.
+
+Message id: 3f1c2a90-5b7e-4c1d-9d1e-0a6c1f2b7e11
+Error: KeyError: 'parcelId'
+
+The endpoint already acknowledged the webhook (200), so the carrier will not retry. A parcel state transition may have been missed: inspect the parcel and the order and reconcile them manually.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

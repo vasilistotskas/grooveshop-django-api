@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] BoxNow: αποτυχία επεξεργασίας webhook (μήνυμα 3f1c2a90-5b7e-4c1d-9d1e-0a6c1f2b7e11)",
+  "to": [
+    "owner@store.test"
+  ]
+}

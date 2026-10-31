@@ -25,6 +25,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.core import mail
 from django.core.management import call_command
 from django.utils import timezone
 from djmoney.money import Money
@@ -172,15 +173,26 @@ def test_an_undelivered_parcel_is_not_reported():
     assert _unremitted_cod_rows(older_than_days=10) == []
 
 
+@pytest.fixture(autouse=True)
+def _operators(open_email_gates):
+    mail.outbox.clear()
+    with patch(
+        "emails.recipients.tenant_operator_addresses",
+        return_value=["ops@example.com"],
+    ):
+        yield
+
+
 def test_the_task_alerts_and_names_every_parcel():
     _cod_shipment(days_ago=30, voucher="9772892603")
     _cod_shipment(days_ago=20, voucher="9775922531", amount="24.97")
 
-    with patch("shipping.alerts.send_ops_alert", return_value=True) as alert:
-        result = alert_unremitted_cod_payouts()
+    mail.outbox.clear()
+    result = alert_unremitted_cod_payouts()
 
     assert result["unremitted"] == 2
-    body = alert.call_args.kwargs["message"]
+    [message] = mail.outbox
+    body = message.body
     assert "9772892603" in body
     assert "9775922531" in body
     # An operator needs the replay recipe, not just the bad news.
@@ -188,11 +200,11 @@ def test_the_task_alerts_and_names_every_parcel():
 
 
 def test_the_task_says_nothing_when_everything_is_remitted():
-    with patch("shipping.alerts.send_ops_alert") as alert:
-        result = alert_unremitted_cod_payouts()
+    mail.outbox.clear()
+    result = alert_unremitted_cod_payouts()
 
     assert result == {"status": "ok", "unremitted": 0}
-    assert not alert.called
+    assert mail.outbox == []
 
 
 def test_a_mail_failure_does_not_lose_the_finding():
@@ -200,11 +212,10 @@ def test_a_mail_failure_does_not_lose_the_finding():
     _cod_shipment(days_ago=30, voucher="9772892603")
 
     with (
-        patch(
-            "shipping.alerts.send_ops_alert", side_effect=RuntimeError("smtp")
-        ),
+        patch("emails.transport.deliver", side_effect=RuntimeError("smtp")),
         patch("shipping_acs.tasks.logger") as log,
     ):
+        mail.outbox.clear()
         result = alert_unremitted_cod_payouts()
 
     assert result["unremitted"] == 1

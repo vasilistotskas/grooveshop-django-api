@@ -67,6 +67,7 @@ class EmailTemplateConfig:
         "product": _("Product"),
         "product_alerts": _("Product alerts"),
         "shipping_acs": _("ACS Shipping"),
+        "ops": _("Operational alerts"),
     }
 
     CATEGORIES: dict[str, TemplateCategory] = {

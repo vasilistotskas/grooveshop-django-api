@@ -1,0 +1,16 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "COD payouts that match no shipment" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "COD payouts that match no shipment" %}</h1>
+<p>{% blocktrans with date=cod_payment_date|date:"Y-m-d"|default:"—" count counter=total %}{{ counter }} payout row for the COD payment date {{ date }} could not be tied to an order:{% plural %}{{ counter }} payout rows for the COD payment date {{ date }} could not be tied to an order:{% endblocktrans %}</p>
+
+<div class="email-card">
+    {% if unmatched %}<p><strong>{% trans "Unknown voucher" %}:</strong> {{ unmatched }}</p>{% endif %}
+    {% if skipped %}<p><strong>{% trans "No readable voucher" %}:</strong> {{ skipped }}</p>{% endif %}
+</div>
+
+<p class="mt-3">{% trans "Every row is stored (it is real money), it is just not attributed. Open the admin list “ACS COD Payouts” and set the “Shipment” filter to “Matches no shipment, not reconciled”: each row there shows its voucher, amount, receiver and delivery date. Reconcile it against the ACS COD beneficiary report, then use “Mark as reconciled” to clear it from the dashboard." %}</p>
+{% endblock %}

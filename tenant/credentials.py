@@ -208,40 +208,11 @@ def tenant_reply_to() -> list[str]:
     return [email] if email else []
 
 
-def tenant_admin_recipients() -> list[str]:
-    """Return merchant-operations alert recipients for the active tenant.
-
-    Operational alerts (failed shipment creation, stale-shipment
-    digests, unmatched COD payouts) concern the TENANT's store
-    operators — the people who can fix an address or reconcile a
-    payout — not the platform owner. Priority:
-      1. ``Tenant.contact_email`` + ``Tenant.owner_email`` (deduped)
-      2. ``settings.ADMINS`` addresses — platform fallback, which is
-         also the public-schema / no-tenant behaviour.
-
-    ``ADMINS`` holds plain address strings. That is Django 6's format —
-    ``mail_admins`` warns ``RemovedInDjango70Warning`` on the old
-    ``(name, address)`` pairs and this project's setting is built as
-    ``[email for email in [getenv("ADMIN_EMAIL", "")] if email]``. The
-    fallback used to unpack each entry into ``(_name, email)``, which
-    walks the CHARACTERS of a string and raised ``ValueError: too many
-    values to unpack`` for any address longer than two characters.
-    Verified in production 2026-09-08: all four tenants have their own
-    contact/owner email and returned early, so only the platform
-    fallback was affected — and every caller wraps this in try/except to
-    keep a mail failure from masking the carrier error it was reporting,
-    so the alert was swallowed rather than surfaced.
-    """
-    return tenant_operator_addresses() or [
-        str(address) for address in getattr(settings, "ADMINS", [])
-    ]
-
-
 def tenant_operator_addresses() -> list[str]:
     """The bound tenant's own operator addresses: ``Tenant.contact_email``
     then ``Tenant.owner_email``, deduped, and ``[]`` for a tenant with
-    neither. No platform fallback: ``tenant_admin_recipients`` adds one for
-    its callers, ``emails.recipients.store_operators`` never does."""
+    neither. There is no platform fallback: ``emails.recipients.
+    store_operators`` skips the mail instead."""
     recipients: list[str] = []
     for field in ("contact_email", "owner_email"):
         value = _get_tenant_field(field)

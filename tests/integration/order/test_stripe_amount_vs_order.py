@@ -20,7 +20,6 @@ from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.models.payment_transaction import PaymentTransaction
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_checkout_completed
-from shipping.alerts import OpsAlertKind
 
 pytestmark = pytest.mark.django_db
 
@@ -40,7 +39,7 @@ def order():
 
 @pytest.fixture
 def alerts():
-    with patch("shipping.alerts.send_ops_alert") as alert:
+    with patch("emails.send.send_email") as alert:
         yield alert
 
 
@@ -70,7 +69,7 @@ class TestPaymentIntentSucceeded:
         assert PaymentTransaction.objects.filter(
             order=order, provider_reference=PAYMENT_ID
         ).exists(), "the money moved: the charge is on the ledger"
-        assert alerts.call_args.kwargs["kind"] == OpsAlertKind.PAYMENT_MISMATCH
+        assert alerts.call_args.args[0] == "ops.payment_mismatch"
 
     def test_another_currency_does_not_pay_the_order(self, order, alerts):
         owed = order.calculate_order_total_amount()

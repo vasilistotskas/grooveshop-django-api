@@ -1,0 +1,14 @@
+COD PARCELS NEVER REMITTED
+
+2 COD parcels were delivered more than 10 days ago and ACS has still not reported a payout for them:
+
+- Order #1201 — Voucher 9772892603 — 24,48 € — Delivered 2026-02-12 (30 days ago)
+- Order #1188 — Voucher 9772892710 — 61,00 € — Delivered 2026-02-14 (28 days ago)
+
+Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent.
+
+If you WERE paid for a parcel outside ACS, open the shipment in the admin and use “Record COD received outside ACS” to clear it from this alert.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

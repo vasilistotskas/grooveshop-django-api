@@ -45,7 +45,7 @@ def _cod_order():
 def test_the_alert_notes_the_error_and_the_remedy_on_the_order():
     order = _cod_order()
 
-    with patch("shipping.alerts.send_ops_alert", return_value=True) as mail:
+    with patch("shipping.alerts.send_email") as mail:
         alert_admins_shipment_creation_failed(
             order_id=order.id,
             carrier="ACS",
@@ -56,7 +56,8 @@ def test_the_alert_notes_the_error_and_the_remedy_on_the_order():
     [note] = [n for n in _notes(order.id) if "shipment creation failed" in n]
     assert "fill data error" in note
     assert "Fix the address on the order, then press X." in note
-    assert "Fix the address on the order" in mail.call_args.kwargs["message"]
+    assert mail.call_args.args[0] == "ops.shipment_rejected"
+    assert "Fix the address on the order" in mail.call_args.args[1].remedy
 
 
 def test_a_note_failure_never_blocks_the_email():
@@ -67,7 +68,7 @@ def test_a_note_failure_never_blocks_the_email():
             "order.models.history.OrderHistory.log_note",
             side_effect=RuntimeError("db down"),
         ),
-        patch("shipping.alerts.send_ops_alert", return_value=True) as mail,
+        patch("shipping.alerts.send_email") as mail,
     ):
         alert_admins_shipment_creation_failed(
             order_id=order.id, carrier="ACS", error="e", remedy="r"
@@ -92,7 +93,7 @@ def test_acs_business_error_tells_staff_to_fix_the_address(
 
     with (
         patch("shipping_acs.services.AcsClient", client),
-        patch("shipping.alerts.send_ops_alert", return_value=True),
+        patch("shipping.alerts.send_email"),
     ):
         result = create_acs_voucher_for_order.run(order.id)
 
@@ -120,7 +121,7 @@ def test_boxnow_business_error_points_at_the_parcel_button(
 
     with (
         patch("shipping_boxnow.services.BoxNowClient", client),
-        patch("shipping.alerts.send_ops_alert", return_value=True),
+        patch("shipping.alerts.send_email"),
     ):
         result = create_boxnow_shipment_for_order.run(order.id)
 

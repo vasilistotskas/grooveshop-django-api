@@ -7,16 +7,18 @@ reminder claims and the bookkeeping after a send.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
+from django.utils.translation import gettext, gettext_noop
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import gettext_noop
 from djmoney.money import Money
 
 from core.utils.i18n import get_user_language
-from emails.declare import customer_email
+from emails.declare import customer_email, staff_email
 from emails.gates import FeatureGate
 from emails.recipients import Recipient
 from emails.types import RenderEnv
@@ -26,6 +28,20 @@ if TYPE_CHECKING:
     from giftcard.models import GiftCard, GiftCardPurchase
 
 TEMPLATE_DIR = "emails/giftcard"
+
+
+@dataclass(frozen=True, slots=True)
+class GiftCardReversal:
+    """A gift card purchase whose payment went wrong. *unrecovered* is the
+    value of the card already spent when the provider reversed the payment;
+    ``None`` means the payment is only disputed, and nothing is voided yet."""
+
+    purchase: GiftCardPurchase
+    unrecovered: Decimal | None = None
+
+    @property
+    def disputed(self) -> bool:
+        return self.unrecovered is None
 
 
 def _card(card: GiftCard, env: RenderEnv) -> dict[str, Any]:
@@ -94,6 +110,40 @@ def _sample_purchase(env: RenderEnv) -> GiftCardPurchase:
     )
 
 
+def _reversal(alert: GiftCardReversal, env: RenderEnv) -> dict[str, Any]:
+    purchase = alert.purchase
+    disputed = alert.disputed
+    return {
+        "site": tenant_site_name(),
+        "disputed": disputed,
+        # The two outcomes share one type, one switch and one template.
+        "headline": (
+            gettext("Gift card payment disputed")
+            if disputed
+            else gettext("Gift card spent before its payment was reversed")
+        ),
+        "purchase_uuid": purchase.uuid,
+        "amount": purchase.amount,
+        "unrecovered": (
+            None
+            if disputed
+            else Money(alert.unrecovered, purchase.amount.currency)
+        ),
+    }
+
+
+def _sample_reversal(env: RenderEnv) -> GiftCardReversal:
+    from giftcard.models import GiftCardPurchase
+
+    return GiftCardReversal(
+        purchase=GiftCardPurchase(
+            uuid=UUID("00000000-0000-4000-8000-0000000000e1"),
+            amount=Money(Decimal("50.00"), "EUR"),
+        ),
+        unrecovered=Decimal("20.00"),
+    )
+
+
 _gift_cards = FeatureGate(feature="gift_cards", label=_("Gift cards feature"))
 
 customer_email(
@@ -134,4 +184,19 @@ customer_email(
     recipients=_card_recipient,
     required=False,
     gates=(_gift_cards,),
+)
+staff_email(
+    "ops.gift_card_reversal",
+    area="ops",
+    title=_("Gift card whose payment was reversed or disputed"),
+    description=_(
+        "Tells the store's staff that the payment of a gift card purchase "
+        "was disputed, or reversed after the card was partly spent."
+    ),
+    templates="emails/ops/gift_card_reversal",
+    subject=gettext_noop("[{site}] {headline}"),
+    build_context=_reversal,
+    sample=_sample_reversal,
+    # Not gated on the gift cards feature: a store that switched it off
+    # can still have a sold card whose payment is reversed or disputed.
 )

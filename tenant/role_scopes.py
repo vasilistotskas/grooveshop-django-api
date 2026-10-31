@@ -91,12 +91,14 @@ REFERENCE_DATA_APP_LABELS: frozenset[str] = frozenset({"country", "region"})
 # tenant host these admin pages show that store's own rows:
 #   user         -> that store's CUSTOMERS
 #   extra_settings -> that store's settings
+#   emails         -> that store's email switches
 # (``usersessions`` is per-schema too, but a customer's sessions are
 # their sign-in identity: it is in PLATFORM_ONLY_APP_LABELS above.)
 STORE_SHARED_APP_LABELS: frozenset[str] = frozenset(
     {
         "user",
         "extra_settings",
+        "emails",
     }
 )
 
@@ -130,8 +132,11 @@ def selectable_roles(
 #
 # ``texts``: the wording of the storefront is the store's presentation, so
 # ADMIN and OWNER edit it. STAFF only see it (``STAFF_READ_ONLY_APP_LABELS``).
+#
+# ``emails``: which emails the store sends is a decision about the store
+# itself, so ADMIN and OWNER make it and STAFF do not even see the page.
 STORE_SETTINGS_APP_LABELS: frozenset[str] = frozenset(
-    {"extra_settings", "texts"}
+    {"extra_settings", "texts", "emails"}
 )
 
 # Store-settings apps STAFF may still LOOK at, never change: their pages

@@ -199,6 +199,7 @@ _MigrateSchemasCommand.handle = _migrate_the_public_schema_only
 
 # Migration-seeded rows survive every ``flush`` — see the module.
 from tests import migration_seed  # noqa: E402
+from tests.utils.emails import open_email_gates  # noqa: E402, F401
 
 migration_seed.connect()
 

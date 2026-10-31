@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Acme Gadgets] Δωροκάρτα που ξοδεύτηκε πριν ανατραπεί η πληρωμή της",
+  "to": [
+    "owner@store.test"
+  ]
+}

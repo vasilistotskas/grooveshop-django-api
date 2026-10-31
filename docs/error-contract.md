@@ -43,6 +43,12 @@ where the serializer nests:
 - The schema publishes the shapes as `ApiError`, `ApiValidationError` and
   `ApiFieldError`; plain-error response serializers carry an optional
   `code`.
+- A 400 is documented as `ApiValidationError` or `ApiError` (`anyOf`), never
+  as `ErrorResponse`, which requires `detail` and a validation body has none.
+  `core.api.schema.publish_error_schemas` rewrites every generic 400 once, so
+  a view keeps declaring `ErrorResponseSerializer` and a view with its own
+  400 body (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
+  `tests/unit/core/api/test_error_schema.py` checks real bodies against it.
 
 ## Raising one
 

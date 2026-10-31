@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Sequence
 from typing import Any
 
@@ -144,10 +145,9 @@ def postprocess_schema_parameters_to_accept_strings(
     return result
 
 
-#: The error body every API error carries (``core.api.exception_handler``).
-#: Published as components because no operation references them: an error
-#: response is never declared per operation, and a client types its error
-#: handling from these.
+#: The error bodies the handler produces (``core.api.exception_handler``).
+#: ``publish_error_schemas`` adds them as components and points every
+#: generic 400 at ``ApiValidationError`` or ``ApiError``.
 ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
     "ApiFieldError": {
         "type": "object",
@@ -221,9 +221,44 @@ ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 
+#: A 400 is either a validation error (field keys, ``code``, ``fields``)
+#: or a plain one (``ParseError``, ``{"detail", "code"}``): the handler
+#: answers both with this status, so the operation documents the choice.
+#: ``ErrorResponse`` requires ``detail``, which a validation body lacks.
+VALIDATION_OR_PLAIN_ERROR: dict[str, Any] = {
+    "anyOf": [
+        {"$ref": "#/components/schemas/ApiValidationError"},
+        {"$ref": "#/components/schemas/ApiError"},
+    ]
+}
+
+_GENERIC_ERROR_REF = "#/components/schemas/ErrorResponse"
+
+
+def _document_validation_errors(result: dict[str, Any]) -> None:
+    """Document every generic 400 as the handler's two bodies.
+
+    The views declare ``ErrorResponseSerializer`` for every error status
+    (``create_schema_view_config``), which suits a plain error but not a
+    validation one. Rewriting here, once, keeps the schema equal to
+    ``core.api.exception_handler`` for all operations; a view that names
+    its own 400 body (``B2BErrorResponse``, ``CouponErrorResponse``) is
+    left alone.
+    """
+    for operations in result.get("paths", {}).values():
+        for operation in operations.values():
+            if not isinstance(operation, dict):
+                continue
+            response = operation.get("responses", {}).get("400")
+            for media in (response or {}).get("content", {}).values():
+                if media.get("schema", {}).get("$ref") == _GENERIC_ERROR_REF:
+                    media["schema"] = copy.deepcopy(VALIDATION_OR_PLAIN_ERROR)
+
+
 def publish_error_schemas(
     result: dict[str, Any], generator: Any, request: Any, public: bool
 ) -> dict[str, Any]:
     schemas = result.setdefault("components", {}).setdefault("schemas", {})
     schemas.update(ERROR_SCHEMAS)
+    _document_validation_errors(result)
     return result

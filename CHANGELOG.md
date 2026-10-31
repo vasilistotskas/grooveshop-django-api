@@ -3,6 +3,20 @@
 
 
 
+## v3.172.3 (2026-10-31)
+
+### Bug fixes
+
+* fix(security): resolve the open CodeQL findings (#387)
+
+Derive the staging anonymiser digests with SHA-256 instead of SHA-1,
+and give the registry-cleanup workflow a read-only default token scope.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1094c3e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1094c3e5358d49ad7ece324c525b367d96c0a834))
+
 ## v3.172.2 (2026-10-31)
 
 ### Bug fixes

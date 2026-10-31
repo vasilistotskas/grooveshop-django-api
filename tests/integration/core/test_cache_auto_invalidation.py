@@ -360,7 +360,9 @@ class TestIgnoredUpdateFields:
 
         with mock.patch.object(invalidation, "_mark_stale") as mark:
             receiver = invalidation._make_receiver(
-                "products", frozenset({"stock", "updated_at"})
+                "products",
+                frozenset({"stock", "updated_at"}),
+                platform_rows_in_public=False,
             )
             receiver(sender=None, update_fields=frozenset({"stock"}))
             receiver(
@@ -373,7 +375,9 @@ class TestIgnoredUpdateFields:
 
         with mock.patch.object(invalidation, "_mark_stale") as mark:
             receiver = invalidation._make_receiver(
-                "products", frozenset({"stock", "updated_at"})
+                "products",
+                frozenset({"stock", "updated_at"}),
+                platform_rows_in_public=False,
             )
             receiver(sender=None, update_fields=frozenset({"stock", "price"}))
             receiver(sender=None, update_fields=None)
@@ -384,6 +388,69 @@ class TestIgnoredUpdateFields:
 
         assert get_surface("products").ignored_update_fields == frozenset(
             {"stock", "updated_at"}
+        )
+
+
+class TestPublicSchemaWrites:
+    """An app that is both shared and per store keeps the platform's own
+    rows in the public schema; writing one changes no storefront, while a
+    shared-only model (the tenant rows every store reads) still purges."""
+
+    def test_a_store_model_written_in_public_marks_nothing(self):
+        from core.cache import invalidation
+
+        with (
+            mock.patch.object(
+                invalidation, "_in_public_schema", return_value=True
+            ),
+            mock.patch.object(invalidation, "_mark_stale") as mark,
+        ):
+            invalidation._make_receiver(
+                "settings", frozenset(), platform_rows_in_public=True
+            )(sender=None)
+        mark.assert_not_called()
+
+    def test_a_store_model_written_in_a_store_schema_marks_the_surface(self):
+        from core.cache import invalidation
+
+        with (
+            mock.patch.object(
+                invalidation, "_in_public_schema", return_value=False
+            ),
+            mock.patch.object(invalidation, "_mark_stale") as mark,
+        ):
+            invalidation._make_receiver(
+                "settings", frozenset(), platform_rows_in_public=True
+            )(sender=None)
+        mark.assert_called_once_with("settings")
+
+    def test_a_shared_model_written_in_public_still_marks_the_surface(self):
+        from core.cache import invalidation
+
+        with (
+            mock.patch.object(
+                invalidation, "_in_public_schema", return_value=True
+            ),
+            mock.patch.object(invalidation, "_mark_stale") as mark,
+        ):
+            invalidation._make_receiver(
+                "tenant_config", frozenset(), platform_rows_in_public=False
+            )(sender=None)
+        mark.assert_called_once_with("tenant_config")
+
+    def test_only_shared_and_per_store_apps_have_platform_rows(self):
+        from django.apps import apps
+
+        from core.cache import invalidation
+
+        assert invalidation._has_platform_rows(
+            apps.get_model("extra_settings.Setting")
+        )
+        assert not invalidation._has_platform_rows(
+            apps.get_model("tenant.Tenant")
+        )
+        assert not invalidation._has_platform_rows(
+            apps.get_model("pay_way.PayWay")
         )
 
 

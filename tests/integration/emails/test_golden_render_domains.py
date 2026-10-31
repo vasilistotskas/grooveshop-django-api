@@ -75,7 +75,10 @@ from user.models.account import UserAccount
 from user.models.data_export import UserDataExport
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.tasks import export_user_data_task
-from user.utils.subscription import send_subscription_confirmation
+from user.utils.subscription import (
+    send_already_subscribed_notice,
+    send_subscription_confirmation,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -86,6 +89,7 @@ CUSTOMER_INBOX = "customer@example.test"
 NOW = datetime(2026, 3, 14, 10, 30, tzinfo=UTC)
 CART_UUID = UUID("00000000-0000-4000-8000-0000000000c1")
 ALERT_UUID = UUID("00000000-0000-4000-8000-0000000000a1")
+SUBSCRIPTION_UUID = UUID("00000000-0000-4000-8000-0000000000b1")
 TOKEN_STAMP = "1AbCdE"
 BEAT_ENTRY = "send-inactive-user-notifications"
 
@@ -445,6 +449,36 @@ class TestAccountEmails:
         assert send_subscription_confirmation(subscription) is True
 
         assert_sent("newsletter_confirmation", language)
+
+    @pytest.mark.parametrize("as_guest", [False, True])
+    def test_newsletter_already_subscribed(self, language, as_guest):
+        topic = SubscriptionTopicFactory(
+            slug="weekly-news",
+            category=SubscriptionTopic.TopicCategory.MARKETING,
+        )
+        for code, name in (("el", "Εβδομαδιαία νέα"), ("en", "Weekly news")):
+            topic.set_current_language(code)
+            topic.name = name
+            topic.description = f"{name} digest"
+            topic.save()
+        subscription = UserSubscription.objects.create(
+            user=None if as_guest else customer(language),
+            email=CUSTOMER_INBOX if as_guest else "",
+            topic=topic,
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+            language=language,
+            uuid=SUBSCRIPTION_UUID,
+        )
+        mail.outbox.clear()
+
+        assert send_already_subscribed_notice(subscription) is True
+
+        assert_sent(
+            "newsletter_already_subscribed_guest"
+            if as_guest
+            else "newsletter_already_subscribed",
+            language,
+        )
 
 
 class TestMarketingEmails:

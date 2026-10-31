@@ -31,6 +31,7 @@ from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
 from user.utils.subscription import (
     generate_blanket_unsubscribe_link,
+    generate_unsubscribe_link,
     subscription_confirmation_url,
 )
 
@@ -58,7 +59,7 @@ def _data_export(export: UserDataExport, env: RenderEnv) -> dict[str, Any]:
     }
 
 
-def _confirmation(
+def _subscription_context(
     subscription: UserSubscription, env: RenderEnv
 ) -> dict[str, Any]:
     # parler fixes a model's language when it is loaded: state it, so the
@@ -70,10 +71,34 @@ def _confirmation(
         "topic": topic,
         "topic_name": topic.safe_translation_getter("name", any_language=True),
         "subscription": subscription,
+    }
+
+
+def _confirmation(
+    subscription: UserSubscription, env: RenderEnv
+) -> dict[str, Any]:
+    return {
+        **_subscription_context(subscription, env),
         "confirmation_url": subscription_confirmation_url(
             subscription.confirmation_token, language=env.language
         ),
     }
+
+
+def _already_subscribed(
+    subscription: UserSubscription, env: RenderEnv
+) -> dict[str, Any]:
+    # An account manages its subscriptions where it signs in; a guest has
+    # no login, so the link is the topic-scoped unsubscribe one.
+    if subscription.user_id:
+        link = {
+            "manage_url": get_tenant_frontend_url(
+                "/account/subscriptions/", language=env.language
+            )
+        }
+    else:
+        link = {"unsubscribe_url": generate_unsubscribe_link(subscription)}
+    return {**_subscription_context(subscription, env), **link}
 
 
 def _reengagement(user: UserAccount, env: RenderEnv) -> dict[str, Any]:
@@ -168,6 +193,21 @@ customer_email(
     templates="emails/subscription/confirmation",
     subject=gettext_noop("Confirm your subscription to {topic_name}"),
     build_context=_confirmation,
+    sample=_sample_subscription,
+    recipients=_subscriber,
+    gates=(FeatureGate(feature="newsletter", label=_("Newsletter feature")),),
+)
+customer_email(
+    "newsletter.already_subscribed",
+    title=_("Newsletter: already subscribed"),
+    description=_(
+        "Sent when the newsletter form is submitted with an address that "
+        "is already subscribed, at most once in ten minutes."
+    ),
+    area="account",
+    templates="emails/subscription/already_subscribed",
+    subject=gettext_noop("You're already subscribed to {topic_name}"),
+    build_context=_already_subscribed,
     sample=_sample_subscription,
     recipients=_subscriber,
     gates=(FeatureGate(feature="newsletter", label=_("Newsletter feature")),),

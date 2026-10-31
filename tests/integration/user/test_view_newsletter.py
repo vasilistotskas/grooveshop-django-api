@@ -9,6 +9,7 @@ link does that), and keep the consent evidence it was given.
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -197,7 +198,7 @@ class TestSubscribe:
         # A forgeable header without proof of edge is not evidence.
         assert row.consent_ip is None
 
-    def test_active_address_is_a_silent_noop(
+    def test_active_address_gets_the_already_subscribed_notice_only(
         self, client, topic, django_capture_on_commit_callbacks
     ):
         row = UserSubscription.objects.create(
@@ -205,6 +206,7 @@ class TestSubscribe:
             email="guest@example.com",
             status=Status.ACTIVE,
             consent_text="original",
+            language="en",
         )
 
         with django_capture_on_commit_callbacks(execute=True):
@@ -212,9 +214,102 @@ class TestSubscribe:
 
         assert response.status_code == status.HTTP_202_ACCEPTED
         row.refresh_from_db()
+        # Nothing about the subscription itself changed.
         assert row.status == Status.ACTIVE
         assert row.consent_text == "original"
+        assert row.confirmation_token == ""
+        assert row.already_subscribed_notice_sent_at is not None
+        assert len(mail.outbox) == 1
+        message = mail.outbox[0]
+        assert message.to == ["guest@example.com"]
+        assert "already subscribed" in message.subject
+        # A guest has no login: the link is the topic's unsubscribe one.
+        assert "/api/v1/user/unsubscribe/" in message.body
+        assert "/account/subscriptions" not in message.body
+
+    def test_second_submission_inside_the_cooldown_sends_nothing(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        UserSubscription.objects.create(
+            topic=topic, email="guest@example.com", status=Status.ACTIVE
+        )
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client)
+        with django_capture_on_commit_callbacks(execute=True):
+            response = _post(client, email="GUEST@example.com")
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert len(mail.outbox) == 1
+
+    def test_submission_after_the_cooldown_sends_another_notice(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        row = UserSubscription.objects.create(
+            topic=topic, email="guest@example.com", status=Status.ACTIVE
+        )
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client)
+        UserSubscription.objects.filter(pk=row.pk).update(
+            already_subscribed_notice_sent_at=timezone.now()
+            - timedelta(minutes=11)
+        )
+
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client)
+
+        assert len(mail.outbox) == 2
+
+    def test_the_notice_is_off_with_the_newsletter_feature(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        UserSubscription.objects.create(
+            topic=topic, email="guest@example.com", status=Status.ACTIVE
+        )
+
+        with (
+            patch("emails.gates.feature_on", return_value=False),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            response = _post(client)
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
         assert mail.outbox == []
+
+    def test_an_account_row_is_mailed_the_manage_link_not_an_unsubscribe_link(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        """An account row, reached by an anonymous submission of an
+        address the account owns: the task mails it."""
+        user = UserAccountFactory(email="owner@example.com")
+        EmailAddress.objects.update_or_create(
+            user=user,
+            email="owner@example.com",
+            defaults={"verified": True, "primary": True},
+        )
+        UserSubscription.objects.create(
+            user=user, topic=topic, status=Status.ACTIVE
+        )
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = _post(client, email="owner@example.com")
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == ["owner@example.com"]
+        assert "/account/subscriptions" in mail.outbox[0].body
+        assert "/api/v1/user/unsubscribe/" not in mail.outbox[0].body
+
+    def test_pending_row_inside_the_cooldown_sends_no_notice(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        """A confirmation link was just sent: it is the answer."""
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client)
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client)
+
+        assert len(mail.outbox) == 1
+        assert "already subscribed" not in mail.outbox[0].subject
 
     def test_resubmission_inside_the_cooldown_resends_nothing(
         self, client, topic, django_capture_on_commit_callbacks
@@ -599,3 +694,132 @@ class TestRequestPathIsAddressIndependent:
         ).result
         assert result == {"status": "skipped", "reason": "topic_unavailable"}
         assert not UserSubscription.objects.exists()
+
+
+def _verified_user(email="owner@example.com"):
+    user = UserAccountFactory(email=email)
+    EmailAddress.objects.update_or_create(
+        user=user, email=email, defaults={"verified": True, "primary": True}
+    )
+    return user
+
+
+class TestAnswerStatus:
+    """The answer says ``pending_confirmation`` to every visitor, and
+    ``already_subscribed`` only to an account about its OWN data."""
+
+    def test_an_anonymous_answer_is_pending_confirmation_for_every_address(
+        self, client, topic
+    ):
+        UserSubscription.objects.create(
+            topic=topic, email="active@example.com", status=Status.ACTIVE
+        )
+        owner = _verified_user("owner@example.com")
+        UserSubscription.objects.create(
+            user=owner, topic=topic, status=Status.ACTIVE
+        )
+
+        bodies = [
+            _post(client, email=email).json()
+            for email in (
+                "new@example.com",
+                "active@example.com",
+                "owner@example.com",
+            )
+        ]
+
+        assert len({str(body) for body in bodies}) == 1
+        assert set(bodies[0]) == {"detail", "status"}
+        assert bodies[0]["status"] == "pending_confirmation"
+
+    def test_a_signed_in_owner_of_an_active_address_is_told_so(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        user = _verified_user("owner@example.com")
+        UserSubscription.objects.create(
+            user=user, topic=topic, status=Status.ACTIVE
+        )
+        client.force_authenticate(user=user)
+
+        with django_capture_on_commit_callbacks(execute=True) as callbacks:
+            response = _post(client, email="Owner@Example.com")
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        body = response.json()
+        assert body["status"] == "already_subscribed"
+        assert body["detail"]
+        # The data is theirs and the answer says it: no email, no task.
+        assert callbacks == []
+        assert mail.outbox == []
+
+    def test_the_owner_of_a_second_verified_address_is_told_so_too(
+        self, client, topic
+    ):
+        user = _verified_user("owner@example.com")
+        EmailAddress.objects.create(
+            user=user, email="second@example.com", verified=True
+        )
+        UserSubscription.objects.create(
+            user=user, topic=topic, status=Status.ACTIVE
+        )
+        client.force_authenticate(user=user)
+
+        response = _post(client, email="second@example.com")
+
+        assert response.json()["status"] == "already_subscribed"
+
+    def test_a_signed_in_user_submitting_another_address_gets_the_generic_answer(
+        self, client, topic, django_capture_on_commit_callbacks
+    ):
+        user = _verified_user("owner@example.com")
+        UserSubscription.objects.create(
+            user=user, topic=topic, status=Status.ACTIVE
+        )
+        UserSubscription.objects.create(
+            topic=topic, email="other@example.com", status=Status.ACTIVE
+        )
+        client.force_authenticate(user=user)
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = _post(client, email="other@example.com")
+
+        assert response.json()["status"] == "pending_confirmation"
+        # The address is someone else's: its owner gets the notice.
+        assert [m.to for m in mail.outbox] == [["other@example.com"]]
+
+    def test_an_unverified_own_address_gets_the_generic_answer(
+        self, client, topic
+    ):
+        user = _verified_user("owner@example.com")
+        EmailAddress.objects.create(
+            user=user, email="unverified@example.com", verified=False
+        )
+        UserSubscription.objects.create(
+            user=user, topic=topic, status=Status.ACTIVE
+        )
+        client.force_authenticate(user=user)
+
+        response = _post(client, email="unverified@example.com")
+
+        assert response.json()["status"] == "pending_confirmation"
+
+    @pytest.mark.parametrize(
+        "state", [Status.PENDING, Status.UNSUBSCRIBED, Status.BOUNCED, None]
+    )
+    def test_an_own_address_that_is_not_confirmed_is_not_already_subscribed(
+        self, client, topic, state, django_capture_on_commit_callbacks
+    ):
+        user = _verified_user("owner@example.com")
+        if state is not None:
+            UserSubscription.objects.create(
+                user=user, topic=topic, status=state
+            )
+        client.force_authenticate(user=user)
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = _post(client, email="owner@example.com")
+
+        assert response.json()["status"] == "pending_confirmation"
+        row = UserSubscription.objects.get(user=user, topic=topic)
+        assert row.status == Status.PENDING
+        assert len(mail.outbox) == 1

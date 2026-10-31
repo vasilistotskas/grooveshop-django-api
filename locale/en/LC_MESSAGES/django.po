@@ -1346,6 +1346,9 @@ msgstr "Already subscribed to this topic."
 msgid "Already unsubscribed"
 msgstr "Already unsubscribed"
 
+msgid "Already-Subscribed Notice Sent At"
+msgstr "Already-Subscribed Notice Sent At"
+
 msgid "Alt Text"
 msgstr "Alt Text"
 
@@ -6838,6 +6841,9 @@ msgstr "If you did not request this export, please contact support right away."
 msgid "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
 msgstr "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
 
+msgid "If you didn't ask for this, you can safely ignore this email — nothing has changed."
+msgstr "If you didn't ask for this, you can safely ignore this email — nothing has changed."
+
 msgid "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 msgstr "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 
@@ -6861,6 +6867,9 @@ msgstr "If you have any questions, please contact our customer service team."
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "If you have any questions, please contact our customer service."
+
+msgid "If you no longer want to receive it, you can unsubscribe here:"
+msgstr "If you no longer want to receive it, you can unsubscribe here:"
 
 msgid "Image"
 msgstr "Image"
@@ -7791,6 +7800,9 @@ msgstr "Loyalty tier promotion"
 msgid "Luxury (€500+)"
 msgstr "Luxury (€500+)"
 
+msgid "MANAGE YOUR SUBSCRIPTIONS"
+msgstr "MANAGE YOUR SUBSCRIPTIONS"
+
 msgid "MARK"
 msgstr "MARK"
 
@@ -7829,6 +7841,9 @@ msgstr "Manage your email preferences"
 
 msgid "Manage your preferences"
 msgstr "Manage your preferences"
+
+msgid "Manage your subscriptions"
+msgstr "Manage your subscriptions"
 
 msgid "Manual"
 msgstr "Manual"
@@ -8385,6 +8400,9 @@ msgstr "Newsletter feature"
 
 msgid "Newsletter form"
 msgstr "Newsletter form"
+
+msgid "Newsletter: already subscribed"
+msgstr "Newsletter: already subscribed"
 
 msgid "Next"
 msgstr "Next"
@@ -12092,6 +12110,9 @@ msgstr "Sent when the archive of a customer's personal data is ready to download
 msgid "Sent when the carrier reports the parcel delivered."
 msgstr "Sent when the carrier reports the parcel delivered."
 
+msgid "Sent when the newsletter form is submitted with an address that is already subscribed, at most once in ten minutes."
+msgstr "Sent when the newsletter form is submitted with an address that is already subscribed, at most once in ten minutes."
+
 msgid "Sent when the parcel arrives at the locker to be collected."
 msgstr "Sent when the parcel arrives at the locker to be collected."
 
@@ -12497,6 +12518,10 @@ msgstr "Some of what these figures need is not recorded: goods sold without a co
 #, python-format
 msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
 msgstr "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
+
+#, python-format
+msgid "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
+msgstr "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
 
 msgid "Sort Order"
 msgstr "Sort Order"
@@ -12944,8 +12969,8 @@ msgstr "Subscriber"
 msgid "Subscribers"
 msgstr "Subscribers"
 
-msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
-msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
+msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
+msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
 
 msgid "Subscription"
 msgstr "Subscription"
@@ -14302,6 +14327,9 @@ msgstr "Type cannot be changed after creation"
 msgid "Type of stock operation performed"
 msgstr "Type of stock operation performed"
 
+msgid "UNSUBSCRIBE"
+msgstr "UNSUBSCRIBE"
+
 msgid "URL"
 msgstr "URL"
 
@@ -15234,6 +15262,9 @@ msgstr "When the schema and non-retained data were erased."
 msgid "When the subscriber submitted the consent."
 msgstr "When the subscriber submitted the consent."
 
+msgid "When the visitor was last told, by email, that this confirmed subscription already exists. A resubmission of the newsletter form inside the resend cooldown sends nothing."
+msgstr "When the visitor was last told, by email, that this confirmed subscription already exists. A resubmission of the newsletter form inside the resend cooldown sends nothing."
+
 msgid "When true, only products on offer: carrying a markdown (discount_percent > 0) or covered by a live automatic promotion on specific products or categories (free shipping, order-wide and coupon-code promotions do not count)."
 msgstr "When true, only products on offer: carrying a markdown (discount_percent > 0) or covered by a live automatic promotion on specific products or categories (free shipping, order-wide and coupon-code promotions do not count)."
 
@@ -15396,6 +15427,9 @@ msgstr "YOU MIGHT ALSO LIKE"
 msgid "YOU RECEIVED A GIFT CARD!"
 msgstr "YOU RECEIVED A GIFT CARD!"
 
+msgid "YOU'RE ALREADY SUBSCRIBED"
+msgstr "YOU'RE ALREADY SUBSCRIBED"
+
 msgid "YOUR CART"
 msgstr "YOUR CART"
 
@@ -15438,6 +15472,9 @@ msgstr "You already have an active alert of this kind for this product."
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
+
+msgid "You are already subscribed to the newsletter."
+msgstr "You are already subscribed to the newsletter."
 
 msgid "You are already subscribed to this topic."
 msgstr "You are already subscribed to this topic."
@@ -15519,6 +15556,13 @@ msgstr "You received a gift card!"
 
 msgid "You will receive a second email as soon as we confirm your payment."
 msgstr "You will receive a second email as soon as we confirm your payment."
+
+msgid "You're already subscribed"
+msgstr "You're already subscribed"
+
+#, python-brace-format
+msgid "You're already subscribed to {topic_name}"
+msgstr "You're already subscribed to {topic_name}"
 
 #, python-format
 msgid "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
@@ -15898,6 +15942,9 @@ msgstr "``invalid_coupon`` / ``invalid_gift_card`` only."
 
 msgid "``invalid_coupon`` only."
 msgstr "``invalid_coupon`` only."
+
+msgid "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
+msgstr "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
@@ -16286,6 +16333,9 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Setting '%(key)s' not found"
+
+#~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
+#~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"

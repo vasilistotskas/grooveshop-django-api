@@ -1351,6 +1351,9 @@ msgstr "Ήδη εγγεγραμμένος σε αυτό το θέμα."
 msgid "Already unsubscribed"
 msgstr "Ήδη έχει γίνει απεγγραφή"
 
+msgid "Already-Subscribed Notice Sent At"
+msgstr "Ειδοποίηση «ήδη εγγεγραμμένος» στάλθηκε στις"
+
 msgid "Alt Text"
 msgstr "Εναλλακτικό κείμενο"
 
@@ -6846,6 +6849,9 @@ msgstr "Εάν δεν ζητήσατε αυτή την εξαγωγή, παρα�
 msgid "If you didn't ask for this alert, you can safely ignore this email — nothing will happen."
 msgstr "Εάν δεν ζητήσατε αυτή την ειδοποίηση, μπορείτε να αγνοήσετε αυτό το email με ασφάλεια — δεν θα γίνει καμία ενέργεια."
 
+msgid "If you didn't ask for this, you can safely ignore this email — nothing has changed."
+msgstr "Αν δεν το ζητήσατε εσείς, μπορείτε να αγνοήσετε αυτό το email — δεν έχει αλλάξει τίποτα."
+
 msgid "If you didn't request this subscription, you can safely ignore this email — nothing will happen."
 msgstr "Εάν δεν ζητήσατε αυτή την εγγραφή, μπορείτε να αγνοήσετε αυτό το email με ασφάλεια — δεν θα γίνει καμία ενέργεια."
 
@@ -6869,6 +6875,9 @@ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρα�
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
+
+msgid "If you no longer want to receive it, you can unsubscribe here:"
+msgstr "Αν δεν θέλετε πλέον να το λαμβάνετε, μπορείτε να διαγραφείτε εδώ:"
 
 msgid "Image"
 msgstr "Εικόνα"
@@ -7801,6 +7810,9 @@ msgstr "Αναβάθμιση βαθμίδας πιστότητας"
 msgid "Luxury (€500+)"
 msgstr "Πολυτελές (€500+)"
 
+msgid "MANAGE YOUR SUBSCRIPTIONS"
+msgstr "ΔΙΑΧΕΙΡΙΣΗ ΤΩΝ ΕΓΓΡΑΦΩΝ ΣΑΣ"
+
 msgid "MARK"
 msgstr "Μ.ΑΡ.Κ"
 
@@ -7839,6 +7851,9 @@ msgstr "Διαχείριση προτιμήσεων email"
 
 msgid "Manage your preferences"
 msgstr "Διαχειριστείτε τις προτιμήσεις σας"
+
+msgid "Manage your subscriptions"
+msgstr "Διαχείριση των εγγραφών σας"
 
 msgid "Manual"
 msgstr "Χειροκίνητη"
@@ -8395,6 +8410,9 @@ msgstr "Λειτουργία newsletter"
 
 msgid "Newsletter form"
 msgstr "Φόρμα newsletter"
+
+msgid "Newsletter: already subscribed"
+msgstr "Newsletter: ήδη εγγεγραμμένος"
 
 msgid "Next"
 msgstr "Επόμενη"
@@ -12101,6 +12119,9 @@ msgstr "Αποστέλλεται όταν το αρχείο με τα προσω
 msgid "Sent when the carrier reports the parcel delivered."
 msgstr "Αποστέλλεται όταν ο μεταφορέας δηλώνει το δέμα παραδομένο."
 
+msgid "Sent when the newsletter form is submitted with an address that is already subscribed, at most once in ten minutes."
+msgstr "Αποστέλλεται όταν η φόρμα newsletter υποβάλλεται με διεύθυνση που είναι ήδη εγγεγραμμένη, το πολύ μία φορά ανά δέκα λεπτά."
+
 msgid "Sent when the parcel arrives at the locker to be collected."
 msgstr "Αποστέλλεται όταν το δέμα φτάνει στο locker για παραλαβή."
 
@@ -12506,6 +12527,10 @@ msgstr "Κάποια από όσα χρειάζονται αυτά τα ποσά
 #, python-format
 msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
 msgstr "Κάποιος ζήτησε επαναφορά του κωδικού πρόσβασης του λογαριασμού προσωπικού σας. Ανοίξτε τον παρακάτω σύνδεσμο για να επιλέξετε νέο. Λειτουργεί μία φορά και λήγει σε %(valid_minutes)s λεπτά."
+
+#, python-format
+msgid "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
+msgstr "Κάποιος, πιθανότατα εσείς, ζήτησε μόλις να εγγραφεί αυτή η διεύθυνση στο %(topic_name)s. Είναι ήδη εγγεγραμμένη, οπότε δεν χρειάζεται να κάνετε κάτι άλλο."
 
 msgid "Sort Order"
 msgstr "Σειρά ταξινόμησης"
@@ -12950,8 +12975,8 @@ msgstr "Συνδρομητής"
 msgid "Subscribers"
 msgstr "Συνδρομητές"
 
-msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
-msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."
+msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202 with a ``status``. ``pending_confirmation`` is the answer to every visitor: an email follows (the confirmation link, or a notice that the address is already subscribed), at most one in 10 minutes. ``already_subscribed`` is given only to a signed-in account that submitted one of its own verified, already confirmed addresses; no email is sent."
+msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202 με ένα ``status``. Το ``pending_confirmation`` είναι η απάντηση σε κάθε επισκέπτη: ακολουθεί email (ο σύνδεσμος επιβεβαίωσης ή ειδοποίηση ότι η διεύθυνση είναι ήδη εγγεγραμμένη), το πολύ ένα ανά 10 λεπτά. Το ``already_subscribed`` δίνεται μόνο σε συνδεδεμένο λογαριασμό που υπέβαλε δική του επαληθευμένη, ήδη επιβεβαιωμένη διεύθυνση· δεν στέλνεται email."
 
 msgid "Subscription"
 msgstr "Συνδρομή"
@@ -14307,6 +14332,9 @@ msgstr "Ο τύπος δεν μπορεί να αλλάξει μετά τη δη
 msgid "Type of stock operation performed"
 msgstr "Τύπος λειτουργίας αποθέματος που εκτελέστηκε"
 
+msgid "UNSUBSCRIBE"
+msgstr "ΔΙΑΓΡΑΦΗ"
+
 msgid "URL"
 msgstr "URL"
 
@@ -15239,6 +15267,9 @@ msgstr "Πότε διαγράφηκαν το schema και τα δεδομένα
 msgid "When the subscriber submitted the consent."
 msgstr "Πότε υπέβαλε ο συνδρομητής τη συγκατάθεση."
 
+msgid "When the visitor was last told, by email, that this confirmed subscription already exists. A resubmission of the newsletter form inside the resend cooldown sends nothing."
+msgstr "Πότε ενημερώθηκε τελευταία φορά ο επισκέπτης, με email, ότι αυτή η επιβεβαιωμένη εγγραφή υπάρχει ήδη. Μια νέα υποβολή της φόρμας newsletter μέσα στο διάστημα αναμονής δεν στέλνει τίποτα."
+
 msgid "When true, only products on offer: carrying a markdown (discount_percent > 0) or covered by a live automatic promotion on specific products or categories (free shipping, order-wide and coupon-code promotions do not count)."
 msgstr "Όταν είναι true, μόνο προϊόντα σε προσφορά: με έκπτωση (discount_percent > 0) ή που καλύπτονται από ενεργή αυτόματη προσφορά σε συγκεκριμένα προϊόντα ή κατηγορίες (δεν μετρούν η δωρεάν αποστολή, οι προσφορές για όλη την παραγγελία και οι προσφορές με κωδικό κουπονιού)."
 
@@ -15401,6 +15432,9 @@ msgstr "ΜΠΟΡΕΙ ΝΑ ΣΑΣ ΕΝΔΙΑΦΕΡΟΥΝ"
 msgid "YOU RECEIVED A GIFT CARD!"
 msgstr "ΛΑΒΑΤΕ ΜΙΑ ΔΩΡΟΚΑΡΤΑ!"
 
+msgid "YOU'RE ALREADY SUBSCRIBED"
+msgstr "ΕΙΣΤΕ ΗΔΗ ΕΓΓΕΓΡΑΜΜΕΝΟΣ/Η"
+
 msgid "YOUR CART"
 msgstr "ΤΟ ΚΑΛΑΘΙ ΣΑΣ"
 
@@ -15443,6 +15477,9 @@ msgstr "Έχετε ήδη ενεργή ειδοποίηση αυτού του τ
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "Έχετε ήδη {count} παραγγελίες που περιμένουν πληρωμή. Πληρώστε ή ακυρώστε μία πριν κάνετε άλλη."
+
+msgid "You are already subscribed to the newsletter."
+msgstr "Είστε ήδη εγγεγραμμένος/η στο newsletter."
 
 msgid "You are already subscribed to this topic."
 msgstr "Είστε ήδη εγγεγραμμένος/η σε αυτό το θέμα."
@@ -15524,6 +15561,13 @@ msgstr "Λάβατε μια δωροκάρτα!"
 
 msgid "You will receive a second email as soon as we confirm your payment."
 msgstr "Θα λάβετε ένα δεύτερο email μόλις επιβεβαιώσουμε την πληρωμή σας."
+
+msgid "You're already subscribed"
+msgstr "Είστε ήδη εγγεγραμμένος/η"
+
+#, python-brace-format
+msgid "You're already subscribed to {topic_name}"
+msgstr "Είστε ήδη εγγεγραμμένος/η στο {topic_name}"
 
 #, python-format
 msgid "You're receiving this email because %(user_display)s added your email address to their account on %(SITE_NAME)s."
@@ -15903,6 +15947,9 @@ msgstr "Μόνο για ``invalid_coupon`` / ``invalid_gift_card``."
 
 msgid "``invalid_coupon`` only."
 msgstr "Μόνο για ``invalid_coupon``."
+
+msgid "``pending_confirmation`` for every visitor: a confirmation link is on its way unless the address needs none. ``already_subscribed`` only when the signed-in account submitted one of its own verified addresses and is already confirmed; no email is sent then."
+msgstr "``pending_confirmation`` για κάθε επισκέπτη: ένας σύνδεσμος επιβεβαίωσης είναι καθ' οδόν, εκτός αν η διεύθυνση δεν τον χρειάζεται. ``already_subscribed`` μόνο όταν ο συνδεδεμένος λογαριασμός υπέβαλε δική του επαληθευμένη διεύθυνση και είναι ήδη επιβεβαιωμένος· τότε δεν στέλνεται email."
 
 msgid "``{rate, subtotal, vat, gross}`` rows of what this document credits, frozen when it was issued."
 msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστώνει αυτό το παραστατικό, παγωμένες κατά την έκδοση."
@@ -17002,6 +17049,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Stock Reservation IDs"
 #~ msgstr "ID Δεσμεύσεων Αποθέματος"
+
+#~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
+#~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."
 
 #~ msgid "Subscription Summary"
 #~ msgstr "Σύνοψη Συνδρομής"

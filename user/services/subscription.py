@@ -18,6 +18,7 @@ form subscribes to.
 
 from __future__ import annotations
 
+import enum
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -57,6 +58,22 @@ class SubscribeResult:
     outcome: SubscribeOutcome
     #: True when the row did not exist before this call.
     created: bool
+
+
+class NewsletterFormOutcome(enum.Enum):
+    """What a newsletter-form submission asks the caller to send."""
+
+    #: The row was created or re-armed: send its confirmation link.
+    ARMED = enum.auto()
+    #: The address is already confirmed and the cooldown allows a notice.
+    ALREADY_SUBSCRIBED = enum.auto()
+
+
+@dataclass(frozen=True)
+class NewsletterFormResult:
+    outcome: NewsletterFormOutcome
+    #: The row to mail about.
+    subscription: UserSubscription
 
 
 def opt_out_of_marketing(
@@ -249,20 +266,44 @@ def subscribe_account(
         )
 
 
-def _needs_arming(subscription: UserSubscription) -> bool:
+def _cooldown_over(sent_at: datetime | None) -> bool:
+    return sent_at is None or timezone.now() - sent_at >= (
+        NEWSLETTER_RESEND_COOLDOWN
+    )
+
+
+def _resolve_submission(
+    subscription: UserSubscription,
+) -> NewsletterFormOutcome | None:
+    """What a submission for an EXISTING row asks for, claiming the
+    cooldown when it asks for a mail; ``None`` when a mail already went
+    out inside the cooldown. The caller holds the row's lock."""
     match subscription.status:
         case Status.ACTIVE:
-            return False
-        case Status.PENDING:
-            sent_at = subscription.confirmation_sent_at
-            return (
-                sent_at is None
-                or timezone.now() - sent_at >= NEWSLETTER_RESEND_COOLDOWN
+            # The already-subscribed notice has its own timestamp:
+            # ``confirmation_sent_at`` dates a confirmation link, which an
+            # active row no longer has.
+            if not _cooldown_over(
+                subscription.already_subscribed_notice_sent_at
+            ):
+                return None
+            subscription.already_subscribed_notice_sent_at = timezone.now()
+            subscription.save(
+                update_fields=[
+                    "already_subscribed_notice_sent_at",
+                    "updated_at",
+                ]
             )
+            return NewsletterFormOutcome.ALREADY_SUBSCRIBED
+        case Status.PENDING:
+            # A link went out inside the cooldown: it is the answer.
+            if not _cooldown_over(subscription.confirmation_sent_at):
+                return None
         case _:
-            # UNSUBSCRIBED / BOUNCED: a new, explicit request — a fresh
+            # UNSUBSCRIBED / BOUNCED: a new, explicit request: a fresh
             # link and a fresh consent record.
-            return True
+            pass
+    return NewsletterFormOutcome.ARMED
 
 
 def subscribe_email_to_newsletter(
@@ -274,16 +315,19 @@ def subscribe_email_to_newsletter(
     consent_user_agent: str,
     language: str,
     consented_at: datetime,
-) -> UserSubscription | None:
-    """Create or re-arm the PENDING row for a newsletter-form submission.
+) -> NewsletterFormResult | None:
+    """Handle a newsletter-form submission for *email*.
 
-    Returns the armed row (its confirmation email is the caller's to
-    send), or ``None`` when there is nothing to send: the address is
-    already confirmed, a link went out inside the cooldown, or a
-    concurrent submission for the same address won the insert.
+    ``ARMED``: the PENDING row was created or re-armed; its confirmation
+    email is the caller's to send. ``ALREADY_SUBSCRIBED``: the address is
+    confirmed, so the caller sends the notice that says so (the cooldown
+    is claimed here, under the row lock, so concurrent submissions send
+    one). ``None``: nothing to send, because a mail already went out
+    inside the cooldown or a concurrent submission for the same address
+    won the insert.
 
     An address that a VERIFIED account owns is subscribed as that
-    account — still double opt-in. The ``consent_*`` values are the
+    account, still double opt-in. The ``consent_*`` values are the
     snapshot the request took; they replace the row's evidence only
     when the row is (re-)armed, since only then was consent asked for.
     """
@@ -301,9 +345,13 @@ def subscribe_email_to_newsletter(
                 rows = rows.filter(user__isnull=True, email__iexact=email)
             subscription = rows.filter(topic=topic).first()
 
-            if subscription is not None and not _needs_arming(subscription):
-                return None
-            if subscription is None:
+            if subscription is not None:
+                outcome = _resolve_submission(subscription)
+                if outcome is None:
+                    return None
+                if outcome is NewsletterFormOutcome.ALREADY_SUBSCRIBED:
+                    return NewsletterFormResult(outcome, subscription)
+            else:
                 subscription = UserSubscription(user_id=owner, topic=topic)
 
             subscription.arm_confirmation()
@@ -315,7 +363,9 @@ def subscribe_email_to_newsletter(
             subscription.consent_user_agent = consent_user_agent
             subscription.consented_at = consented_at
             subscription.save()
-            return subscription
+            return NewsletterFormResult(
+                NewsletterFormOutcome.ARMED, subscription
+            )
     except IntegrityError:
         # A concurrent submission for the same address created the row
         # between our read and our insert; its email covers this one.
@@ -323,6 +373,39 @@ def subscribe_email_to_newsletter(
             "newsletter: concurrent signup for topic %s collapsed", topic.pk
         )
         return None
+
+
+def dispatch_already_subscribed_notice(
+    subscription: UserSubscription,
+) -> None:
+    """Queue the already-subscribed notice, after commit, in the row's own
+    schema (``dispatch_on_commit`` pins it now)."""
+    from tenant.celery import dispatch_on_commit
+    from user.tasks import send_newsletter_already_subscribed_email_task
+
+    dispatch_on_commit(
+        send_newsletter_already_subscribed_email_task, [subscription.id]
+    )
+
+
+def holds_active_newsletter_subscription(
+    user, topic: SubscriptionTopic, email: str
+) -> bool:
+    """Whether *email* is one of *user*'s own VERIFIED addresses and *user*
+    is confirmed on *topic*.
+
+    The one fact a signed-in submitter may be told synchronously: it is
+    about their own data. An address that is not theirs answers False
+    exactly as an unsubscribed one does.
+    """
+    return (
+        EmailAddress.objects.filter(
+            user=user, email__iexact=email, verified=True
+        ).exists()
+        and UserSubscription.objects.filter(
+            user=user, topic=topic, status=Status.ACTIVE
+        ).exists()
+    )
 
 
 #: The topic a store starts with, so the newsletter band that the

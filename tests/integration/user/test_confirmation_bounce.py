@@ -11,6 +11,7 @@ import smtplib
 from unittest.mock import patch
 
 import pytest
+from django.utils import timezone
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.tasks import send_subscription_confirmation_email_task
@@ -90,8 +91,24 @@ class TestPermanentRefusal:
 
 class TestResubscribingAfterABounce:
     def test_a_new_request_starts_over_with_a_fresh_link(self, row):
-        from user.services.subscription import _needs_arming
+        from user.services.subscription import (
+            NewsletterFormOutcome,
+            subscribe_email_to_newsletter,
+        )
 
         row.mark_bounced()
 
-        assert _needs_arming(row) is True
+        result = subscribe_email_to_newsletter(
+            topic=row.topic,
+            email=row.email,
+            consent_text="I agree.",
+            consent_ip=None,
+            consent_user_agent="",
+            language="en",
+            consented_at=timezone.now(),
+        )
+
+        assert result is not None
+        assert result.outcome is NewsletterFormOutcome.ARMED
+        row.refresh_from_db()
+        assert row.status == Status.PENDING

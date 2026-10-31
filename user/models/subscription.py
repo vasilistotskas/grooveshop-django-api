@@ -235,6 +235,17 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
             "expires a week later."
         ),
     )
+    already_subscribed_notice_sent_at = models.DateTimeField(
+        _("Already-Subscribed Notice Sent At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the visitor was last told, by email, that this "
+            "confirmed subscription already exists. A resubmission of "
+            "the newsletter form inside the resend cooldown sends "
+            "nothing."
+        ),
+    )
     confirmed_at = models.DateTimeField(
         _("Confirmed At"), null=True, blank=True
     )
@@ -384,3 +395,16 @@ class ConfirmOutcome(models.TextChoices):
     CONFIRMED = "confirmed", _("Confirmed")
     INVALID = "invalid", _("Invalid")
     EXPIRED = "expired", _("Expired")
+
+
+class NewsletterSubscribeStatus(models.TextChoices):
+    """What the newsletter form's answer says about the submitted address.
+
+    ``PENDING_CONFIRMATION`` is the answer to every visitor, so it does
+    not tell a new address from a known one. ``ALREADY_SUBSCRIBED`` is
+    given only to a signed-in account for one of its own verified
+    addresses: it is a fact about the account's own data.
+    """
+
+    PENDING_CONFIRMATION = "pending_confirmation", _("Pending confirmation")
+    ALREADY_SUBSCRIBED = "already_subscribed", _("Already subscribed")

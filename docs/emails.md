@@ -134,9 +134,36 @@ Declared in `user/emails.py` and `cart/emails.py`:
 |---|---|---|
 | `user.data_export_ready` | the `UserDataExport` | required (GDPR) |
 | `newsletter.confirmation` | the `UserSubscription` (a guest row too) | required (double opt-in); `FeatureGate("newsletter")` |
+| `newsletter.already_subscribed` | the `UserSubscription` (a guest row too) | required (the answer to the visitor's own form submission); `FeatureGate("newsletter")` |
 | `user.reengagement` | the `UserAccount` | **marketing**; `ScheduleGate("send-inactive-user-notifications")` |
 | `cart.checkout_abandoned` | the `Cart` | **marketing**; `FeatureGate("cart")` |
 | `account.*` (12), `mfa.*` (5), `social.*` (2) | an `AllauthMail` | required; see allauth mail |
+
+### The newsletter form's answer
+
+`POST /api/v1/user/subscription/newsletter` answers every visitor the same
+`202` and does every address-dependent step in `subscribe_to_newsletter_task`,
+so neither the body nor the cost tells a known address from a new one. What the
+address's owner learns arrives by email: a new, expired-pending, unsubscribed or
+bounced address gets `newsletter.confirmation`; an address that is already
+ACTIVE gets `newsletter.already_subscribed`. A guest row's notice carries the
+topic's unsubscribe link (a guest has no login); an account row's carries the
+link to `/account/subscriptions/`.
+
+Both mails share the resend cooldown (`NEWSLETTER_RESEND_COOLDOWN`, ten
+minutes). The cooldown of the notice lives in
+`UserSubscription.already_subscribed_notice_sent_at`, claimed under the row's
+lock before the mail is queued, so concurrent submissions send one; the
+confirmation keeps using `confirmation_sent_at`, which dates a link an active
+row no longer has. A PENDING row inside the cooldown sends nothing: the link
+that went out is the answer.
+
+The one synchronous exception is about the caller's own data. A signed-in
+account that submits one of its own VERIFIED addresses while already confirmed
+(`holds_active_newsletter_subscription`) gets `status: "already_subscribed"`
+in the same `202` and nothing is queued. Every other answer, signed in or not,
+carries `status: "pending_confirmation"`. An anonymous request never runs that
+check.
 
 ### Operational alerts (`ops.*`)
 

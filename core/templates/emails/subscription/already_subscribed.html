@@ -1,0 +1,33 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "You're already subscribed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "You're already subscribed" %}</h1>
+
+<p>{% if user %}{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}</p>
+
+<p>{% blocktrans with topic_name=topic.name %}Someone, most likely you, just asked to subscribe this address to {{ topic_name }}. It is already subscribed, so there is nothing more to do.{% endblocktrans %}</p>
+
+{% if manage_url %}
+<div class="text-center mt-2 mb-2">
+    <a href="{{ manage_url }}" class="email-button">
+        {% trans "Manage your subscriptions" %}
+    </a>
+</div>
+
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "If the button doesn't work, copy and paste this link into your browser:" %}<br>
+    <a href="{{ manage_url }}">{{ manage_url }}</a>
+</p>
+{% else %}
+<p>{% trans "If you no longer want to receive it, you can unsubscribe here:" %}<br>
+    <a href="{{ unsubscribe_url }}">{% trans "Unsubscribe" %}</a>
+</p>
+{% endif %}
+
+<p class="mt-3">{% trans "If you didn't ask for this, you can safely ignore this email — nothing has changed." %}</p>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thanks,<br>The {{ site_name }} team{% endblocktrans %}</p>
+{% endblock %}

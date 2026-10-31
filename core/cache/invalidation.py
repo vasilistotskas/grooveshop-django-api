@@ -195,11 +195,23 @@ def mark_surface_stale(code: str) -> None:
     _mark_stale(code)
 
 
-def _make_receiver(code: str, ignored_update_fields: frozenset[str]):
+def _make_receiver(
+    code: str,
+    ignored_update_fields: frozenset[str],
+    *,
+    platform_rows_in_public: bool,
+):
     def receiver(sender, **kwargs):
         # ``raw`` is a loaddata/fixture load. The cache is irrelevant
         # mid-fixture and the surrounding transaction is not a real edit.
         if kwargs.get("raw"):
+            return
+        # A model of an app that is both shared and per store also has a
+        # table in the public schema, whose rows are the platform's own
+        # (its settings, its staff), never a store's. A write there
+        # changes no storefront, and a public purge would reach every
+        # store.
+        if platform_rows_in_public and _in_public_schema():
             return
         update_fields = kwargs.get("update_fields")
         if update_fields and set(update_fields) <= ignored_update_fields:
@@ -213,6 +225,29 @@ def _make_receiver(code: str, ignored_update_fields: frozenset[str]):
 # holds receivers weakly, so a closure that nothing else references is
 # garbage collected and the signal silently stops firing.
 _receivers: list[object] = []
+
+
+def _in_public_schema() -> bool:
+    from django.db import connection
+    from django_tenants.utils import get_public_schema_name
+
+    return connection.schema_name == get_public_schema_name()
+
+
+def _has_platform_rows(model) -> bool:
+    """Whether ``model``'s app is both shared and per store: it then has a
+    table in the public schema too, holding the platform's own rows."""
+
+    from django.conf import settings
+
+    app_config = model._meta.app_config
+    names = {
+        app_config.name,
+        f"{type(app_config).__module__}.{type(app_config).__name__}",
+    }
+    return bool(names & set(settings.SHARED_APPS)) and bool(
+        names & set(settings.TENANT_APPS)
+    )
 
 
 def _dispatch_uid(code: str, label: str) -> str:
@@ -270,7 +305,11 @@ def connect_surface_invalidation(*, force: bool = False) -> None:
         return
 
     for surface, label, model in _iter_declared_models():
-        receiver = _make_receiver(surface.code, surface.ignored_update_fields)
+        receiver = _make_receiver(
+            surface.code,
+            surface.ignored_update_fields,
+            platform_rows_in_public=_has_platform_rows(model),
+        )
         _receivers.append(receiver)
         uid = _dispatch_uid(surface.code, label)
         post_save.connect(receiver, sender=model, dispatch_uid=uid, weak=False)

@@ -605,6 +605,11 @@ def register_default_surfaces() -> None:
             # (the route was ``settingsGet``), so purging this surface
             # never reached the storefront's settings cache.
             nuxt_patterns=_nuxt("settingsPublic", "tenantLegalIdentity"),
+            # Every store setting lives in an ``extra_settings.Setting``
+            # row: a save from the admin, a shell or a migration has to
+            # purge the caches above, or the storefront keeps the old
+            # settings and seller identity for the routes' lifetime.
+            invalidated_by=("extra_settings.Setting",),
             invalidates_tenant_config=True,
             related=("pay_way", "shipping", "loyalty"),
             icon="tune",

@@ -4378,6 +4378,9 @@ msgstr "Every coupon the shopper may be offered — the codes the store advertis
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 
+msgid "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
+msgstr "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
+
 msgid "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
 msgstr "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
 
@@ -6867,9 +6870,6 @@ msgstr "If you have any questions, please contact our customer service team."
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "If you have any questions, please contact our customer service."
-
-msgid "If you no longer want to receive it, you can unsubscribe here:"
-msgstr "If you no longer want to receive it, you can unsubscribe here:"
 
 msgid "Image"
 msgstr "Image"
@@ -14326,9 +14326,6 @@ msgstr "Type cannot be changed after creation"
 
 msgid "Type of stock operation performed"
 msgstr "Type of stock operation performed"
-
-msgid "UNSUBSCRIBE"
-msgstr "UNSUBSCRIBE"
 
 msgid "URL"
 msgstr "URL"

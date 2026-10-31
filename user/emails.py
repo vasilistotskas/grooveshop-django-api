@@ -31,7 +31,6 @@ from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
 from user.utils.subscription import (
     generate_blanket_unsubscribe_link,
-    generate_unsubscribe_link,
     subscription_confirmation_url,
 )
 
@@ -88,17 +87,16 @@ def _confirmation(
 def _already_subscribed(
     subscription: UserSubscription, env: RenderEnv
 ) -> dict[str, Any]:
-    # An account manages its subscriptions where it signs in; a guest has
-    # no login, so the link is the topic-scoped unsubscribe one.
+    # An account manages its subscriptions where it signs in. A guest has
+    # no login and gets no link: the only unsubscribe route that works
+    # without one acts on GET, and a mail scanner's prefetch must not
+    # unsubscribe someone this mail tells they ARE subscribed.
+    context = _subscription_context(subscription, env)
     if subscription.user_id:
-        link = {
-            "manage_url": get_tenant_frontend_url(
-                "/account/subscriptions/", language=env.language
-            )
-        }
-    else:
-        link = {"unsubscribe_url": generate_unsubscribe_link(subscription)}
-    return {**_subscription_context(subscription, env), **link}
+        context["manage_url"] = get_tenant_frontend_url(
+            "/account/subscriptions/", language=env.language
+        )
+    return context
 
 
 def _reengagement(user: UserAccount, env: RenderEnv) -> dict[str, Any]:

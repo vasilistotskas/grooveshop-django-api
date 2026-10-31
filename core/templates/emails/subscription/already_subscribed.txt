@@ -9,10 +9,7 @@
 {% if manage_url %}{% trans "MANAGE YOUR SUBSCRIPTIONS" %}
 --------------------------------------------------------------------------------
 {{ manage_url }}
-{% else %}{% trans "UNSUBSCRIBE" %}
---------------------------------------------------------------------------------
-{% trans "If you no longer want to receive it, you can unsubscribe here:" %}
-{{ unsubscribe_url }}
+{% else %}{% trans "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it." %}
 {% endif %}
 {% trans "If you didn't ask for this, you can safely ignore this email — nothing has changed." %}
 

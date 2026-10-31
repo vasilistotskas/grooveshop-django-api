@@ -6,10 +6,7 @@ Hello,
 
 Someone, most likely you, just asked to subscribe this address to Weekly news. It is already subscribed, so there is nothing more to do.
 
-UNSUBSCRIBE
---------------------------------------------------------------------------------
-If you no longer want to receive it, you can unsubscribe here:
-https://api.shop.example/api/v1/user/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwic2lkIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGIxIn0:1AbCdE:3M_5DcMg-uxzeog04SLu1rMY8yhvcsfUpszKhzgkV6A/weekly-news
+Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it.
 
 If you didn't ask for this, you can safely ignore this email — nothing has changed.
 

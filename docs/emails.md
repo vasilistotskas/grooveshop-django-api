@@ -146,9 +146,11 @@ Declared in `user/emails.py` and `cart/emails.py`:
 so neither the body nor the cost tells a known address from a new one. What the
 address's owner learns arrives by email: a new, expired-pending, unsubscribed or
 bounced address gets `newsletter.confirmation`; an address that is already
-ACTIVE gets `newsletter.already_subscribed`. A guest row's notice carries the
-topic's unsubscribe link (a guest has no login); an account row's carries the
-link to `/account/subscriptions/`.
+ACTIVE gets `newsletter.already_subscribed`. An account row's notice carries the
+link to `/account/subscriptions/`. A guest row's carries no link: the only
+unsubscribe route that works without a login acts on GET, and a scanner's
+prefetch must not unsubscribe someone the mail says IS subscribed; the copy
+points at the unsubscribe link every newsletter carries.
 
 Both mails share the resend cooldown (`NEWSLETTER_RESEND_COOLDOWN`, ten
 minutes). The cooldown of the notice lives in

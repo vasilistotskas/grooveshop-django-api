@@ -4384,6 +4384,9 @@ msgstr "Κάθε κουπόνι που μπορεί να προσφερθεί σ
 msgid "Every email your store sends. Switch one off and your store stops sending it, and only that one. Emails that a customer or the law needs, such as an order confirmation or a password reset, cannot be switched off."
 msgstr "Όλα τα email που στέλνει το κατάστημά σας. Κλείστε ένα και το κατάστημα σταματά να το στέλνει, μόνο εκείνο. Τα email που χρειάζεται ο πελάτης ή ο νόμος, όπως η επιβεβαίωση παραγγελίας ή η επαναφορά κωδικού, δεν μπορούν να κλείσουν."
 
+msgid "Every newsletter we send has an unsubscribe link at the bottom, if you ever want to stop receiving it."
+msgstr "Κάθε newsletter που στέλνουμε έχει στο κάτω μέρος έναν σύνδεσμο απεγγραφής, αν ποτέ θελήσετε να σταματήσετε να το λαμβάνετε."
+
 msgid "Every night, re-weight the strategies by how often the products each one suggested here were then bought. A strategy needs enough recent impressions before its weight moves. Turn off to keep weights you set by hand."
 msgstr "Κάθε βράδυ τα βάρη των στρατηγικών υπολογίζονται ξανά από το πόσο συχνά αγοράστηκαν τα προϊόντα που πρότεινε εδώ η καθεμία. Μια στρατηγική χρειάζεται αρκετές πρόσφατες προβολές πριν αλλάξει το βάρος της. Απενεργοποιήστε την για να κρατήσετε βάρη που ορίσατε μόνοι σας."
 
@@ -6875,9 +6878,6 @@ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρα�
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
-
-msgid "If you no longer want to receive it, you can unsubscribe here:"
-msgstr "Αν δεν θέλετε πλέον να το λαμβάνετε, μπορείτε να διαγραφείτε εδώ:"
 
 msgid "Image"
 msgstr "Εικόνα"
@@ -14331,9 +14331,6 @@ msgstr "Ο τύπος δεν μπορεί να αλλάξει μετά τη δη
 
 msgid "Type of stock operation performed"
 msgstr "Τύπος λειτουργίας αποθέματος που εκτελέστηκε"
-
-msgid "UNSUBSCRIBE"
-msgstr "ΔΙΑΓΡΑΦΗ"
 
 msgid "URL"
 msgstr "URL"

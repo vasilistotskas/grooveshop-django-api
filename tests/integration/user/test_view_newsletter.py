@@ -223,8 +223,8 @@ class TestSubscribe:
         message = mail.outbox[0]
         assert message.to == ["guest@example.com"]
         assert "already subscribed" in message.subject
-        # A guest has no login: the link is the topic's unsubscribe one.
-        assert "/api/v1/user/unsubscribe/" in message.body
+        # A guest has no login and no link: nothing a scanner can act on.
+        assert "/api/v1/user/unsubscribe/" not in message.body
         assert "/account/subscriptions" not in message.body
 
     def test_second_submission_inside_the_cooldown_sends_nothing(

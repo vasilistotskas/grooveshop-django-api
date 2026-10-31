@@ -377,7 +377,10 @@ class TestAnOrdersTabs:
             invoice_number="INV-2026-000001",
             issue_date="2026-03-15",
         )
-        other = OrderFactory(num_order_items=0)
+        other = OrderFactory(
+            num_order_items=0,
+            document_type=OrderDocumentTypeEnum.RECEIPT.value,
+        )
         request = _request(_superuser())
 
         assert "InvoiceInline" in self._inlines(request, order)
@@ -424,7 +427,12 @@ class TestAnOrdersTabs:
 
         store(b2b_enabled=False)
         switch_store_settings(B2B_INVOICING_ENABLED=False)
-        OrderFactory(num_order_items=0)
+        # The factory draws a random document type; an invoice would be a
+        # record that rightly keeps the filter.
+        OrderFactory(
+            num_order_items=0,
+            document_type=OrderDocumentTypeEnum.RECEIPT.value,
+        )
         request = _request(_superuser())
         filters = [
             entry[0] if isinstance(entry, tuple) else entry

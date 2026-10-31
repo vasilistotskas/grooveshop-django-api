@@ -165,18 +165,8 @@ class DetailSerializer(serializers.Serializer):
     )
 
 
-@extend_schema_field(
-    {
-        "type": "object",
-        "properties": {
-            "detail": {"type": "string"},
-            "error": {"type": "string", "required": False},
-        },
-        "example": {"detail": "Error message", "error": "Error code"},
-    }
-)
 class ErrorResponseSerializer(DetailSerializer):
-    error = serializers.CharField(required=False)
+    """A plain error: ``detail`` and its stable ``code``."""
 
 
 @extend_schema_field(

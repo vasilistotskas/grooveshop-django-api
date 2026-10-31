@@ -43,12 +43,20 @@ where the serializer nests:
 - The schema publishes the shapes as `ApiError`, `ApiValidationError` and
   `ApiFieldError`; plain-error response serializers carry an optional
   `code`.
-- A 400 is documented as `ApiValidationError` or `ApiError` (`anyOf`), never
-  as `ErrorResponse`, which requires `detail` and a validation body has none.
-  `core.api.schema.publish_error_schemas` rewrites every generic 400 once, so
-  a view keeps declaring `ErrorResponseSerializer` and a view with its own
-  400 body (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
-  `tests/unit/core/api/test_error_schema.py` checks real bodies against it.
+- A 400 is documented as `ApiValidationError` or a plain body (`anyOf`),
+  never as the plain body alone: a validation body has no `detail`.
+  `core.api.schema.publish_error_schemas` adds the validation variant to every
+  400 whose view declares a plain body (`PLAIN_400_BODIES`: `ErrorResponse`
+  becomes `ApiError`, `PaymentProviderError` stays itself), so a view keeps
+  declaring `ErrorResponseSerializer` and a view with its own 400 body
+  (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
+- `ErrorResponse` is `{detail, code}` only. The one plain body that carries
+  more is `PaymentProviderError` (`error`: the provider call's result), sent
+  by the four order actions that call the payment provider.
+- `tests/unit/core/api/test_error_schema.py` checks real 400, 401, 403, 404,
+  409 and 429 bodies against what their operation documents (the `documented`
+  fixture in `tests/conftest.py`). No operation documents a 405 or 415; the
+  handler sends the same `{detail, code}` for them.
 
 ## Raising one
 

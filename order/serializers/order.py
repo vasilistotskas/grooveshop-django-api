@@ -1908,6 +1908,25 @@ class OrderCancelErrorSerializer(serializers.Serializer):
     error = OrderCancelErrorDetailSerializer(required=False)
 
 
+class PaymentProviderErrorSerializer(serializers.Serializer):
+    """The plain 400 body of an order action that calls the payment provider.
+
+    ``error`` is the provider call's own result (its keys vary by
+    provider). The schema hook adds the validation-error variant.
+    """
+
+    detail = serializers.CharField()
+    code = serializers.CharField(
+        help_text=_(
+            "Stable error code: ``payment_intent_failed`` or "
+            "``checkout_session_failed``."
+        ),
+    )
+    error = serializers.DictField(
+        help_text=_("The payment provider's result for the failed call."),
+    )
+
+
 class OrderCreateErrorDetailSerializer(serializers.Serializer):
     type = serializers.ChoiceField(
         choices=OrderCreateErrorType.choices,

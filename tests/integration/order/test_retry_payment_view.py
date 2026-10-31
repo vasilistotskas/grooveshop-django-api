@@ -333,7 +333,9 @@ class TestRetryPaymentRefusals:
             "code": "payment_retry_stripe_only",
         }
 
-    def test_provider_failure_returns_400_and_leaves_order_untouched(self):
+    def test_provider_failure_returns_400_and_leaves_order_untouched(
+        self, documented
+    ):
         user = UserAccountFactory()
         order = _stripe_order(user=user)
         provider = _provider(result=(False, {"error": "card_declined"}))
@@ -347,6 +349,7 @@ class TestRetryPaymentRefusals:
             "error": {"error": "card_declined"},
             "code": "payment_intent_failed",
         }
+        documented(response, "/api/v1/order/{id}/retry-payment", "post")
         order.refresh_from_db()
         assert order.payment_id == "pi_old_failed"
         assert order.payment_status == PaymentStatus.FAILED

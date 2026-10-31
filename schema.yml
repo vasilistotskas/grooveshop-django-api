@@ -16239,7 +16239,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
           content:
@@ -16318,7 +16318,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
           content:
@@ -16394,7 +16394,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
           content:
@@ -16746,7 +16746,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
           content:
@@ -38976,6 +38976,7 @@ components:
       - types
     ErrorResponse:
       type: object
+      description: 'A plain error: ``detail`` and its stable ``code``.'
       properties:
         detail:
           type: string
@@ -38983,8 +38984,6 @@ components:
           type: string
           description: Σταθερός κωδικός σφάλματος. Βασιστείτε σε αυτόν, ποτέ στο ``detail``,
             που είναι στη γλώσσα του αιτήματος.
-        error:
-          type: string
       required:
       - detail
     FacetStats:
@@ -44914,6 +44913,27 @@ components:
       description: |-
         * `stripe` - stripe
         * `viva_wallet` - viva_wallet
+    PaymentProviderError:
+      type: object
+      description: |-
+        The plain 400 body of an order action that calls the payment provider.
+
+        ``error`` is the provider call's own result (its keys vary by
+        provider). The schema hook adds the validation-error variant.
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+          description: 'Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``.'
+        error:
+          type: object
+          additionalProperties: {}
+          description: The payment provider's result for the failed call.
+      required:
+      - code
+      - detail
+      - error
     PaymentStatusEnum:
       enum:
       - PENDING

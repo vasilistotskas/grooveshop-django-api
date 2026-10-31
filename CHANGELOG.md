@@ -3,6 +3,65 @@
 
 
 
+## v3.172.5 (2026-10-31)
+
+### Bug fixes
+
+* fix(api): document each error status with the body the handler returns (#388) ([`865e295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865e295d5c67360ed9630239c6337ebc7d580ca1))
+
+* fix(api): document a 400 as the body the exception handler sends
+
+Every operation declared its 400 as ErrorResponse, which requires
+detail, but a validation error carries the field keys plus code and
+fields and no detail. publish_error_schemas now rewrites every generic
+400 to anyOf ApiValidationError / ApiError once, from the handler's two
+envelopes; views with their own 400 body are untouched.
+
+Tests check real validation and parse-error bodies against the published
+schema and that no generated operation keeps the generic 400.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`865e295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865e295d5c67360ed9630239c6337ebc7d580ca1))
+
+* fix(api): document each error status with the body the handler returns
+
+ErrorResponse no longer declares an `error` string nothing sends. The four
+order actions that call the payment provider do send `error`, the
+provider's result object, so they declare PaymentProviderError, and the
+schema hook adds the validation variant to it as it does to ErrorResponse.
+
+The error tests now validate real 400, 401, 403, 404, 409 and 429 bodies
+and the provider-failure 400 against the operation's documented schema,
+through a shared `documented` fixture.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`865e295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865e295d5c67360ed9630239c6337ebc7d580ca1))
+
+* fix(api): add the payment provider error texts to the catalogues
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`865e295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865e295d5c67360ed9630239c6337ebc7d580ca1))
+
+* fix(api): document the plain 400s of the payment provider actions
+
+The four order actions that call the payment provider also refuse with a
+plain {detail, code} (order_not_stripe, payment_retry_not_allowed,
+pay_way_unavailable, delegated_payments_disabled), so their 400 is
+anyOf ApiValidationError, ApiError and PaymentProviderError, and the
+provider code help text lists delegated_charge_failed. The search schema
+test expects the validation variant.
+
+BrandFactory names are a sequence: a repeated random name made
+get_or_create return the earlier row, so the changelist growth test
+sometimes built fewer rows than it asked for.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`865e295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865e295d5c67360ed9630239c6337ebc7d580ca1))
+
 ## v3.172.4 (2026-10-31)
 
 ### Bug fixes

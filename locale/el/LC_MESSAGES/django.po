@@ -12304,8 +12304,8 @@ msgstr "Σταθερός κωδικός για τον λόγο απόρριψη�
 msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Σταθερός κωδικός σφάλματος. Βασιστείτε σε αυτόν, ποτέ στο ``detail``, που είναι στη γλώσσα του αιτήματος."
 
-msgid "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
-msgstr "Σταθερός κωδικός σφάλματος: ``payment_intent_failed`` ή ``checkout_session_failed``."
+msgid "Stable error code: ``payment_intent_failed``, ``checkout_session_failed`` or ``delegated_charge_failed``."
+msgstr "Σταθερός κωδικός σφάλματος: ``payment_intent_failed``, ``checkout_session_failed`` ή ``delegated_charge_failed``."
 
 msgid "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 msgstr "Σταθερό αναγνωριστικό που αντιστοιχεί στον καταχωρημένο προσαρμογέα μεταφορέα (π.χ. 'acs', 'boxnow')."

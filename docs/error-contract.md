@@ -47,7 +47,7 @@ where the serializer nests:
   never as the plain body alone: a validation body has no `detail`.
   `core.api.schema.publish_error_schemas` adds the validation variant to every
   400 whose view declares a plain body (`PLAIN_400_BODIES`: `ErrorResponse`
-  becomes `ApiError`, `PaymentProviderError` stays itself), so a view keeps
+  becomes `ApiError`; `PaymentProviderError` is listed beside `ApiError`), so a view keeps
   declaring `ErrorResponseSerializer` and a view with its own 400 body
   (`B2BErrorResponse`, `CouponErrorResponse`) is left alone.
 - `ErrorResponse` is `{detail, code}` only. The one plain body that carries

@@ -320,7 +320,7 @@ class TestRetryPaymentRefusals:
         order.refresh_from_db()
         assert order.payment_id == "pi_old_failed"
 
-    def test_order_without_pay_way_is_refused(self):
+    def test_order_without_pay_way_is_refused(self, documented):
         user = UserAccountFactory()
         order = _stripe_order(user=user)
         Order.objects.filter(pk=order.pk).update(pay_way=None)
@@ -332,6 +332,7 @@ class TestRetryPaymentRefusals:
             "detail": "Retry is only supported for Stripe payments.",
             "code": "payment_retry_stripe_only",
         }
+        documented(response, "/api/v1/order/{id}/retry-payment", "post")
 
     def test_provider_failure_returns_400_and_leaves_order_untouched(
         self, documented

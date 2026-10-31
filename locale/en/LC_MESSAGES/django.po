@@ -12295,8 +12295,8 @@ msgstr "Stable code for why the order was refused. Branch on this, never on ``de
 msgid "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 msgstr "Stable error code. Branch on this, never on ``detail``, which is in the request's language."
 
-msgid "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
-msgstr "Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``."
+msgid "Stable error code: ``payment_intent_failed``, ``checkout_session_failed`` or ``delegated_charge_failed``."
+msgstr "Stable error code: ``payment_intent_failed``, ``checkout_session_failed`` or ``delegated_charge_failed``."
 
 msgid "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."
 msgstr "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow')."

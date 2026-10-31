@@ -16239,6 +16239,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
                 - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
@@ -16318,6 +16319,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
                 - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
@@ -16394,6 +16396,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
                 - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
@@ -16746,6 +16749,7 @@ paths:
               schema:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
                 - $ref: '#/components/schemas/PaymentProviderError'
           description: ''
         '401':
@@ -44916,20 +44920,22 @@ components:
     PaymentProviderError:
       type: object
       description: |-
-        The plain 400 body of an order action that calls the payment provider.
+        The 400 body of an order action when the payment provider fails.
 
         ``error`` is the provider call's own result (its keys vary by
-        provider). The schema hook adds the validation-error variant.
+        provider). The same actions also refuse with a plain error and a
+        field-error map; the schema hook adds both variants.
       properties:
         detail:
           type: string
         code:
           type: string
-          description: 'Stable error code: ``payment_intent_failed`` or ``checkout_session_failed``.'
+          description: 'Σταθερός κωδικός σφάλματος: ``payment_intent_failed``, ``checkout_session_failed``
+            ή ``delegated_charge_failed``.'
         error:
           type: object
           additionalProperties: {}
-          description: The payment provider's result for the failed call.
+          description: Το αποτέλεσμα του παρόχου πληρωμών για την αποτυχημένη κλήση.
       required:
       - code
       - detail

@@ -52,6 +52,28 @@ def test_a_generic_400_becomes_the_validation_or_plain_error():
     )
 
 
+def test_a_provider_400_also_documents_the_plain_error():
+    result = {
+        "paths": {
+            "/a": {
+                "post": _operation(
+                    {"$ref": "#/components/schemas/PaymentProviderError"}
+                )
+            }
+        }
+    }
+
+    publish_error_schemas(result, None, None, True)
+
+    assert _documented_400(result, "/a", "post") == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/ApiValidationError"},
+            {"$ref": "#/components/schemas/ApiError"},
+            {"$ref": "#/components/schemas/PaymentProviderError"},
+        ]
+    }
+
+
 def test_a_400_a_view_names_itself_is_left_alone():
     result = {"paths": {"/a": {"get": _operation(copy.deepcopy(SPECIFIC))}}}
 

@@ -146,7 +146,7 @@ def postprocess_schema_parameters_to_accept_strings(
 
 #: The error bodies the handler produces (``core.api.exception_handler``).
 #: ``publish_error_schemas`` adds them as components and points every
-#: plain 400 at ``ApiValidationError`` or its plain body.
+#: plain 400 at ``ApiValidationError`` or its plain bodies.
 ERROR_SCHEMAS: dict[str, dict[str, Any]] = {
     "ApiFieldError": {
         "type": "object",
@@ -226,20 +226,21 @@ _SCHEMA_REF = "#/components/schemas/"
 #: or a plain one (``ParseError``, ``{"detail", "code"}``): the handler
 #: answers both with this status, so the operation documents the choice.
 #: The views declare their plain 400 body, and this maps each one to the
-#: plain variant it stands for: the generic ``ErrorResponse`` is
-#: ``ApiError`` (its ``code`` is always set by the handler), and a view's
-#: own plain body (``PaymentProviderError``) is itself.
-PLAIN_400_BODIES: dict[str, str] = {
-    "ErrorResponse": "ApiError",
-    "PaymentProviderError": "PaymentProviderError",
+#: plain variants it stands for: the generic ``ErrorResponse`` is
+#: ``ApiError`` (its ``code`` is always set by the handler), and the
+#: provider actions' ``PaymentProviderError`` sits beside ``ApiError``
+#: because those views also refuse with a plain ``{detail, code}``.
+PLAIN_400_BODIES: dict[str, tuple[str, ...]] = {
+    "ErrorResponse": ("ApiError",),
+    "PaymentProviderError": ("ApiError", "PaymentProviderError"),
 }
 
 
-def _validation_or_plain(plain: str) -> dict[str, Any]:
+def _validation_or_plain(plain: tuple[str, ...]) -> dict[str, Any]:
     return {
         "anyOf": [
-            {"$ref": f"{_SCHEMA_REF}ApiValidationError"},
-            {"$ref": f"{_SCHEMA_REF}{plain}"},
+            {"$ref": f"{_SCHEMA_REF}{name}"}
+            for name in ("ApiValidationError", *plain)
         ]
     }
 

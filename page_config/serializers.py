@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
+from parler_rest.utils import create_translated_fields_serializer
 from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
@@ -268,11 +269,33 @@ class ContentPageTranslatedFieldsField(TranslatedFieldExtended):
     pass
 
 
+# What a link to a page reads of a translation: both footers, the
+# checkout's legal strip and the sitemap list the pages and never show
+# one. The body (a whole legal document) and the SEO copy are the page's
+# own, and a list of them used to put every document in every page's
+# payload.
+LIST_TRANSLATED_FIELDS = ("title",)
+
+
+@extend_schema_field(
+    generate_schema_multi_lang(ContentPage, fields=LIST_TRANSLATED_FIELDS)
+)
+class ContentPageListTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
 class ContentPageSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ContentPage]
 ):
     translated_locales = serializers.SerializerMethodField()
-    translations = ContentPageTranslatedFieldsField(shared_model=ContentPage)
+    translations = ContentPageListTranslatedFieldsField(
+        shared_model=ContentPage,
+        serializer_class=create_translated_fields_serializer(
+            ContentPage,
+            related_name="translations",
+            meta={"fields": list(LIST_TRANSLATED_FIELDS)},
+        ),
+    )
 
     class Meta:
         model = ContentPage
@@ -309,8 +332,10 @@ class ContentPageSerializer(
 
 
 class ContentPageDetailSerializer(ContentPageSerializer):
-    """The detail tier. Its SEO travels in ``translations`` like every
-    other translated field, so it adds nothing to the list shape."""
+    """The detail tier: every translated field, the body and the SEO
+    copy included."""
+
+    translations = ContentPageTranslatedFieldsField(shared_model=ContentPage)
 
 
 def _stored_body(page: ContentPage | None, language: str) -> str | None:

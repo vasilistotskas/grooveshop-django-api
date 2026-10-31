@@ -448,24 +448,35 @@ class TestContentPageViewSet(TestCase):
         assert "terms" in slugs
         assert "privacy" not in slugs
 
+    def _terms_in_list(self):
+        response = self.client.get("/api/v1/content-page")
+        return next(
+            item
+            for item in response.json()["results"]
+            if item["slug"] == "terms"
+        )
+
+    def test_list_carries_the_title_and_not_the_document(self):
+        self.published.set_current_language("el")
+        self.published.seo_title = "Όροι Χρήσης | Κατάστημα"
+        self.published.save()
+
+        page = self._terms_in_list()
+
+        assert page["translations"]["el"] == {"title": "Όροι Χρήσης"}
+
     def test_list_names_the_languages_a_page_is_written_in(self):
         self.published.set_current_language("en")
         self.published.title = "Terms of Use"
         self.published.body = "<p>&nbsp;</p>"
         self.published.save()
 
-        response = self.client.get("/api/v1/content-page")
+        assert self._terms_in_list()["translatedLocales"] == ["el"]
 
-        page = next(
-            item
-            for item in response.json()["results"]
-            if item["slug"] == "terms"
-        )
-        assert page["translatedLocales"] == ["el"]
-
-    def test_detail_names_them_too(self):
+    def test_detail_carries_the_whole_document(self):
         data = self.client.get("/api/v1/content-page/terms").json()
 
+        assert data["translations"]["el"]["body"] == "<p>Body</p>"
         assert data["translatedLocales"] == ["el"]
 
     def test_staff_sees_unpublished_in_list(self):

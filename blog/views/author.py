@@ -98,11 +98,12 @@ class BlogAuthorViewSet(BaseModelViewSet):
             # queryset carries ``visible_to``: the reverse accessor returns
             # a plain QuerySet that bypasses BlogPostManager, which listed
             # this author's drafts to anonymous callers.
+            # ``for_list``: the cards read each post's counts, translations,
+            # tags, author and category.
             return (
-                BlogPost.objects.filter(author=author)
+                BlogPost.objects.for_list()
+                .filter(author=author)
                 .visible_to(self.request.user)
-                .select_related("category", "author__user")
-                .prefetch_related("translations", "tags__translations", "likes")
             )
 
         if self.action == "list":

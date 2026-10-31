@@ -177,6 +177,11 @@ serializers_config: SerializersConfig = {
 }
 
 
+# The actions whose response is a list of posts in the list shape.
+LIST_SHAPED_ACTIONS = frozenset(
+    {"list", "trending", "popular", "featured", "related_posts"}
+)
+
 # The sort contract of a list of posts. Shared with the author and
 # category ``posts`` actions, which paginate BlogPost rows from another
 # viewset and therefore cannot inherit that viewset's ``ordering_fields``.
@@ -244,10 +249,11 @@ class BlogPostViewSet(BaseModelViewSet):
         """
         Return optimized queryset based on action.
 
-        Uses BlogPost.objects.for_list() for list views and
-        BlogPost.objects.for_detail() for detail views to avoid N+1 queries.
+        Uses BlogPost.objects.for_list() for the actions that answer with
+        the list serializer and BlogPost.objects.for_detail() for the rest
+        (the likers are prefetched for those alone) to avoid N+1 queries.
         """
-        if self.action == "list":
+        if self.action in LIST_SHAPED_ACTIONS:
             queryset = BlogPost.objects.for_list()
         elif self.action == "feed":
             queryset = BlogPost.objects.for_feed()

@@ -162,7 +162,8 @@ class Client:
 
         self.tasks.append(
             self._handle_sync(
-                self.client.index(index_name).update_settings(settings_payload)
+                self.client.index(index_name).update_settings(settings_payload),
+                timeout_in_ms=self._settings_task_timeout_ms(),
             )
         )
         return self
@@ -284,7 +285,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_displayed_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -296,7 +298,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_searchable_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -308,7 +311,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_filterable_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -316,11 +320,29 @@ class Client:
         if attributes is None:
             return self
         self._handle_sync(
-            self.client.index(index_name).update_sortable_attributes(attributes)
+            self.client.index(index_name).update_sortable_attributes(
+                attributes
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
-    def _handle_sync(self, task: Task | TaskInfo) -> Task | TaskInfo:
+    @staticmethod
+    def _settings_task_timeout_ms() -> int:
+        """How long a settings task may take: a filterable or sortable
+        change reindexes every document of the index."""
+        from django.conf import settings as django_settings
+
+        return django_settings.MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]
+
+    def _handle_sync(
+        self, task: Task | TaskInfo, *, timeout_in_ms: int | None = None
+    ) -> Task | TaskInfo:
+        """In synchronous mode, wait for ``task`` before returning it.
+
+        A settings task is passed ``_settings_task_timeout_ms()``; any
+        other waits ``MEILISEARCH["TASK_TIMEOUT_MS"]``.
+        """
         if self.is_sync:
             if hasattr(task, "task_uid"):
                 uid = task.task_uid
@@ -330,7 +352,7 @@ class Client:
                 raise AttributeError("Task object has no uid attribute")
 
             task = self.client.wait_for_task(
-                uid, timeout_in_ms=self._task_timeout_ms(None)
+                uid, timeout_in_ms=self._task_timeout_ms(timeout_in_ms)
             )
             if task.status == "failed":
                 raise MeiliTaskFailed(task.error, operation="wait_for_task")

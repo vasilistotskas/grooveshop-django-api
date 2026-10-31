@@ -816,3 +816,82 @@ class TestWaitForTaskTimeout:
         sdk.wait_for_task.assert_called_once_with(
             7, timeout_in_ms=42, interval_in_ms=50
         )
+
+
+class TestSettingsTasksWaitTheSettingsTimeout:
+    """A settings task (a filterable change reindexes the index) waits
+    ``SETTINGS_TASK_TIMEOUT_MS`` in synchronous mode, any other task
+    ``TASK_TIMEOUT_MS``; the first is the longer one."""
+
+    SETTINGS_MS = 600_000
+
+    def _client(self, mock_client_class):
+        sdk = mock_client_class.return_value
+        sdk.wait_for_task.return_value = MagicMock(status="succeeded")
+        return sdk, Client(
+            _MeiliSettings(
+                host="localhost",
+                port=7700,
+                https=False,
+                master_key="k",
+                search_key="k",
+                sync=True,
+                timeout=10,
+            )
+        )
+
+    @pytest.fixture(autouse=True)
+    def _timeouts(self):
+        with override_settings(
+            MEILISEARCH={
+                **settings.MEILISEARCH,
+                "TASK_TIMEOUT_MS": 1_000,
+                "SETTINGS_TASK_TIMEOUT_MS": self.SETTINGS_MS,
+            }
+        ):
+            yield
+
+    @patch("meili._client._Client")
+    def test_with_settings(self, mock_client_class):
+        sdk, client = self._client(mock_client_class)
+        sdk.index.return_value.update_settings.return_value = MagicMock(
+            task_uid=1
+        )
+
+        client.with_settings("idx", MeiliIndexSettings())
+
+        sdk.wait_for_task.assert_called_once_with(
+            1, timeout_in_ms=self.SETTINGS_MS
+        )
+
+    @pytest.mark.parametrize(
+        ("method", "sdk_call"),
+        [
+            ("update_display", "update_displayed_attributes"),
+            ("update_searchable", "update_searchable_attributes"),
+            ("update_filterable", "update_filterable_attributes"),
+            ("update_sortable", "update_sortable_attributes"),
+        ],
+    )
+    @patch("meili._client._Client")
+    def test_attribute_updates(self, mock_client_class, method, sdk_call):
+        sdk, client = self._client(mock_client_class)
+        getattr(sdk.index.return_value, sdk_call).return_value = MagicMock(
+            task_uid=2
+        )
+
+        getattr(client, method)("idx", ["a"])
+
+        sdk.wait_for_task.assert_called_once_with(
+            2, timeout_in_ms=self.SETTINGS_MS
+        )
+
+    @patch("meili._client._Client")
+    def test_other_tasks_keep_the_shorter_timeout(self, mock_client_class):
+        sdk, client = self._client(mock_client_class)
+        sdk.get_indexes.return_value = {"results": [], "total": 0}
+        sdk.create_index.return_value = MagicMock(task_uid=3)
+
+        client.create_index("idx", "id")
+
+        sdk.wait_for_task.assert_called_once_with(3, timeout_in_ms=1_000)

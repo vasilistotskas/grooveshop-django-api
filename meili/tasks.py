@@ -114,7 +114,14 @@ def index_document_task(
                 _client.wait_for_task(
                     task.task_uid, timeout_in_ms=SINGLE_DOCUMENT_WAIT_MS
                 )
+            except SEARCH_TRANSIENT_ERRORS:
+                # The document may still be searchable: let ``MeiliTask``
+                # retry with backoff instead of reporting it removed.
+                raise
             except Exception as exc:
+                # Not a failure a retry fixes (the index is gone, the
+                # engine rejected the request): nothing to retry, and the
+                # document is not reachable through a missing index.
                 logger.warning(
                     f"Failed to remove filtered-out document {document_pk} "
                     f"from {index_name}: {exc}"

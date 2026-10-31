@@ -162,7 +162,8 @@ class Client:
 
         self.tasks.append(
             self._handle_sync(
-                self.client.index(index_name).update_settings(settings_payload)
+                self.client.index(index_name).update_settings(settings_payload),
+                timeout_in_ms=self._settings_task_timeout_ms(),
             )
         )
         return self
@@ -220,15 +221,26 @@ class Client:
         timeout_in_ms: int | None = None,
         interval_in_ms: int = 50,
     ) -> Task | TaskInfo:
-        if timeout_in_ms is not None:
-            task = self.client.wait_for_task(
-                task_uid,
-                timeout_in_ms=timeout_in_ms,
-                interval_in_ms=interval_in_ms,
-            )
-        else:
-            task = self.client.wait_for_task(task_uid)
+        """Wait for a task, for ``timeout_in_ms`` or the configured time.
+
+        The SDK waits five seconds when it is told nothing, so this passes
+        ``MEILISEARCH["TASK_TIMEOUT_MS"]`` whenever the caller names no
+        time.
+        """
+        task = self.client.wait_for_task(
+            task_uid,
+            timeout_in_ms=self._task_timeout_ms(timeout_in_ms),
+            interval_in_ms=interval_in_ms,
+        )
         return self._handle_sync(task)
+
+    @staticmethod
+    def _task_timeout_ms(timeout_in_ms: int | None) -> int:
+        if timeout_in_ms is not None:
+            return timeout_in_ms
+        from django.conf import settings as django_settings
+
+        return django_settings.MEILISEARCH["TASK_TIMEOUT_MS"]
 
     def get_indexes(self) -> list:
         """Every index on the engine, not just its first page.
@@ -273,7 +285,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_displayed_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -285,7 +298,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_searchable_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -297,7 +311,8 @@ class Client:
         self._handle_sync(
             self.client.index(index_name).update_filterable_attributes(
                 attributes
-            )
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
@@ -305,11 +320,29 @@ class Client:
         if attributes is None:
             return self
         self._handle_sync(
-            self.client.index(index_name).update_sortable_attributes(attributes)
+            self.client.index(index_name).update_sortable_attributes(
+                attributes
+            ),
+            timeout_in_ms=self._settings_task_timeout_ms(),
         )
         return self
 
-    def _handle_sync(self, task: Task | TaskInfo) -> Task | TaskInfo:
+    @staticmethod
+    def _settings_task_timeout_ms() -> int:
+        """How long a settings task may take: a filterable or sortable
+        change reindexes every document of the index."""
+        from django.conf import settings as django_settings
+
+        return django_settings.MEILISEARCH["SETTINGS_TASK_TIMEOUT_MS"]
+
+    def _handle_sync(
+        self, task: Task | TaskInfo, *, timeout_in_ms: int | None = None
+    ) -> Task | TaskInfo:
+        """In synchronous mode, wait for ``task`` before returning it.
+
+        A settings task is passed ``_settings_task_timeout_ms()``; any
+        other waits ``MEILISEARCH["TASK_TIMEOUT_MS"]``.
+        """
         if self.is_sync:
             if hasattr(task, "task_uid"):
                 uid = task.task_uid
@@ -318,7 +351,9 @@ class Client:
             else:
                 raise AttributeError("Task object has no uid attribute")
 
-            task = self.client.wait_for_task(uid)
+            task = self.client.wait_for_task(
+                uid, timeout_in_ms=self._task_timeout_ms(timeout_in_ms)
+            )
             if task.status == "failed":
                 raise MeiliTaskFailed(task.error, operation="wait_for_task")
         return task

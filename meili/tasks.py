@@ -18,6 +18,13 @@ from tenant.celery import TenantTask
 
 logger = logging.getLogger(__name__)
 
+# How long the one-document tasks (index, remove) wait for the engine.
+# Deliberately short and not ``MEILISEARCH["TASK_TIMEOUT_MS"]``: a timeout
+# here raises and ``MeiliTask`` retries with backoff, which frees the
+# Celery worker slot while the engine's queue is backlogged. The bulk
+# paths (sync commands, ``sync_index_task``) wait the configured time.
+SINGLE_DOCUMENT_WAIT_MS = 5_000
+
 
 class MeiliTask(TenantTask):
     """Base task class for Meilisearch operations.
@@ -104,8 +111,17 @@ def index_document_task(
                 task = _client.get_index(index_name).delete_document(
                     document_pk
                 )
-                _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
+                _client.wait_for_task(
+                    task.task_uid, timeout_in_ms=SINGLE_DOCUMENT_WAIT_MS
+                )
+            except SEARCH_TRANSIENT_ERRORS:
+                # The document may still be searchable: let ``MeiliTask``
+                # retry with backoff instead of reporting it removed.
+                raise
             except Exception as exc:
+                # Not a failure a retry fixes (the index is gone, the
+                # engine rejected the request): nothing to retry, and the
+                # document is not reachable through a missing index.
                 logger.warning(
                     f"Failed to remove filtered-out document {document_pk} "
                     f"from {index_name}: {exc}"
@@ -136,7 +152,9 @@ def index_document_task(
         # when Meilisearch queues are backlogged. A timeout here raises,
         # which MeiliTask.autoretry_for catches and reschedules with
         # exponential backoff.
-        finished = _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
+        finished = _client.wait_for_task(
+            task.task_uid, timeout_in_ms=SINGLE_DOCUMENT_WAIT_MS
+        )
 
         if finished.status == "failed":
             raise MeiliTaskFailed(finished.error, operation="index")
@@ -182,7 +200,9 @@ def delete_document_task(
         task = _client.get_index(index_name).delete_document(document_pk)
 
         # Bounded wait — consistent with index_document_task timeout.
-        finished = _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
+        finished = _client.wait_for_task(
+            task.task_uid, timeout_in_ms=SINGLE_DOCUMENT_WAIT_MS
+        )
 
         if finished.status == "failed":
             # Document not found is not an error

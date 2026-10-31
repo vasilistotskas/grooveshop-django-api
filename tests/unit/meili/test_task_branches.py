@@ -13,6 +13,10 @@ from itertools import chain, count, repeat
 from unittest.mock import MagicMock, patch
 
 import pytest
+from meilisearch.errors import (
+    MeilisearchCommunicationError,
+    MeilisearchTimeoutError,
+)
 
 from meili.exceptions import MeiliTaskFailed
 from meili.tasks import (
@@ -114,10 +118,44 @@ class TestIndexDocumentTask:
         ):
             index_document_task("product", "producttranslation", translation.pk)
 
-    def test_failed_removal_of_filtered_out_document_is_swallowed(self):
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ConnectionError("engine down"),
+            MeilisearchTimeoutError("timeout of 5000ms"),
+            MeilisearchCommunicationError("unreachable"),
+        ],
+    )
+    def test_a_transient_failure_removing_a_filtered_out_document_is_retried(
+        self, error
+    ):
+        # The document may still be searchable, so the task must raise for
+        # ``MeiliTask.autoretry_for`` and not report it removed.
         translation = _product_translation(active=False)
         client, index = _client()
-        index.delete_document.side_effect = ConnectionError("engine down")
+        index.delete_document.side_effect = error
+
+        with (
+            patch("meili._client.client", client),
+            pytest.raises(type(error)),
+        ):
+            index_document_task("product", "producttranslation", translation.pk)
+
+    def test_a_transient_wait_failure_is_retried_too(self):
+        translation = _product_translation(active=False)
+        client, _index = _client()
+        client.wait_for_task.side_effect = MeilisearchTimeoutError("5000ms")
+
+        with (
+            patch("meili._client.client", client),
+            pytest.raises(MeilisearchTimeoutError),
+        ):
+            index_document_task("product", "producttranslation", translation.pk)
+
+    def test_a_failure_no_retry_fixes_is_logged_not_raised(self):
+        translation = _product_translation(active=False)
+        client, index = _client()
+        index.delete_document.side_effect = ValueError("index is gone")
 
         with patch("meili._client.client", client):
             result = index_document_task(

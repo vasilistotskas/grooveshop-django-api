@@ -14,6 +14,7 @@ class MeiliSettings(TypedDict):
     ASYNC_INDEXING: bool | None
     DEFAULT_BATCH_SIZE: int
     SETTINGS_TASK_TIMEOUT_MS: int
+    TASK_TIMEOUT_MS: int
 
 
 @dataclass(frozen=True, slots=True)

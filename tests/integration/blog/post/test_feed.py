@@ -6,6 +6,8 @@ from datetime import timedelta
 
 import pytest
 from django.conf import settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -76,7 +78,7 @@ def test_count_caps_the_number_of_posts(client):
 
 @pytest.mark.parametrize(
     "count",
-    ["nonsense", "1.5", "0", "-1", str(settings.BLOG_FEED_LIMIT + 1)],
+    ["nonsense", "1.5", "", "0", "-1", str(settings.BLOG_FEED_LIMIT + 1)],
 )
 def test_an_invalid_count_is_refused(client, count):
     response = _get(client, count=count)
@@ -100,3 +102,29 @@ def test_staff_do_not_see_drafts_in_the_feed(client):
     slugs = {i["slug"] for i in _get(client).json()}
 
     assert "feed-staff-draft" not in slugs
+
+
+def test_undated_published_posts_come_after_dated_ones(client):
+    now = timezone.now()
+    dated = BlogPostFactory(slug="feed-dated", published_at=now)
+    undated = BlogPostFactory(slug="feed-undated")
+    type(undated).objects.filter(pk=undated.pk).update(published_at=None)
+
+    ids = [i["id"] for i in _get(client).json()]
+    assert ids.index(dated.id) < ids.index(undated.id)
+    assert [i["id"] for i in _get(client, count=1).json()] == [dated.id]
+
+
+def test_the_feed_loads_no_likes_comments_or_tags(client):
+    BlogPostFactory(slug="feed-lean")
+
+    with CaptureQueriesContext(connection) as queries:
+        _get(client)
+
+    sql = " ".join(q["sql"] for q in queries)
+    for table in (
+        "blog_blogpost_likes",
+        "blog_blogcomment",
+        "blog_blogpost_tags",
+    ):
+        assert table not in sql

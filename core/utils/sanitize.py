@@ -190,26 +190,91 @@ def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
     return value
 
 
-_EMBEDDED_MEDIA = re.compile(
-    r"<(?:img|picture|video|audio|iframe|embed|object|svg)\b", re.IGNORECASE
-)
 _NBSP_ENTITY = re.compile(r"&(?:nbsp|#160|#x0*a0);", re.IGNORECASE)
-_TAG = re.compile(r"<[^>]*>")
+_VOID_ELEMENTS = frozenset(
+    {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "source",
+        "track",
+        "wbr",
+    }
+)
+# Media that shows something only when it has something to load.
+_SOURCE_ATTRIBUTES = {
+    "img": "src",
+    "iframe": "src",
+    "embed": "src",
+    "video": "src",
+    "audio": "src",
+    "source": "src",
+    "object": "data",
+}
+
+
+class _VisibleContent(HTMLParser):
+    """Whether any text or loadable media sits outside a hidden subtree."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.visible = False
+        self._open: list[bool] = []
+
+    @property
+    def _hidden(self) -> bool:
+        return any(self._open)
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        hidden = "hidden" in attributes
+        if not self._hidden:
+            source = _SOURCE_ATTRIBUTES.get(tag)
+            if tag == "svg" or (
+                source and (attributes.get(source) or "").strip()
+            ):
+                self.visible = True
+        if tag not in _VOID_ELEMENTS:
+            self._open.append(hidden)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in _VOID_ELEMENTS:
+            self._open.pop()
+
+    def handle_endtag(self, tag):
+        if tag not in _VOID_ELEMENTS and self._open:
+            self._open.pop()
+
+    def handle_data(self, data):
+        if not self._hidden and _NBSP_ENTITY.sub(" ", data).strip():
+            self.visible = True
 
 
 def has_visible_content(html: str | None) -> bool:
-    """Whether ``html`` shows something: text, or an embedded image or video.
+    """Whether ``html`` shows something: text, or media with a source.
 
     An editor saves an emptied field as ``""``, ``<p></p>`` or
-    ``<p>&nbsp;</p>``, so a stored row is no evidence of a document. The
-    same rule as the storefront's ``hasVisibleContent``
-    (``shared/utils/translations.ts``); change them together.
+    ``<p>&nbsp;</p>``, so a stored row is no evidence of a document. An
+    element carrying the ``hidden`` attribute (the policy keeps it) shows
+    nothing, nor does its content, and an image or frame with no source
+    loads nothing. The same rule as the storefront's
+    ``hasVisibleContent`` (``shared/utils/translations.ts``); change them
+    together.
     """
     if not html:
         return False
-    if _EMBEDDED_MEDIA.search(html):
-        return True
-    return any(_NBSP_ENTITY.sub(" ", text).strip() for text in _TAG.split(html))
+    parser = _VisibleContent()
+    parser.feed(html)
+    parser.close()
+    return parser.visible
 
 
 def sanitize_html(html: str) -> str:

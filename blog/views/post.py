@@ -247,8 +247,10 @@ class BlogPostViewSet(BaseModelViewSet):
         Uses BlogPost.objects.for_list() for list views and
         BlogPost.objects.for_detail() for detail views to avoid N+1 queries.
         """
-        if self.action in ("list", "feed"):
+        if self.action == "list":
             queryset = BlogPost.objects.for_list()
+        elif self.action == "feed":
+            queryset = BlogPost.objects.for_feed()
         else:
             queryset = BlogPost.objects.for_detail()
 
@@ -259,9 +261,7 @@ class BlogPostViewSet(BaseModelViewSet):
         return queryset.visible_to(self.request.user)
 
     def get_filterset_class(self):
-        # The feed takes ``count`` only: it runs no filter, so the
-        # schema must not advertise the list's.
-        if self.action in ("comments", "feed"):
+        if self.action == "comments":
             return None
         return BlogPostFilter
 
@@ -442,14 +442,18 @@ class BlogPostViewSet(BaseModelViewSet):
             queryset, request, serializer_class=response_serializer_class
         )
 
-    @action(detail=False, methods=["GET"], pagination_class=None)
+    # ``filter_backends=[]``: the feed takes ``count`` only and runs no
+    # filter, search or ordering, so the schema must not advertise them.
+    @action(
+        detail=False, methods=["GET"], pagination_class=None, filter_backends=[]
+    )
     def feed(self, request):
         query = BlogPostFeedQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         queryset = self.get_queryset().published()
-        queryset = queryset.order_by("-published_at", "-id")[
-            : query.validated_data["count"]
-        ]
+        queryset = queryset.order_by(
+            F("published_at").desc(nulls_last=True), "-id"
+        )[: query.validated_data["count"]]
 
         response_serializer_class = self.get_response_serializer()
         return Response(

@@ -132,6 +132,16 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
             .with_counts()
         )
 
+    def for_feed(self) -> Self:
+        """The posts with their translations and nothing else.
+
+        The feed renders each post's own columns and translations. The
+        likes, comments and tags ``for_list`` joins to count them would
+        multiply into millions of rows for a popular post, and nothing
+        reads them here.
+        """
+        return self.with_translations()
+
     def for_detail(self) -> Self:
         """
         Optimized queryset for detail views.
@@ -164,6 +174,10 @@ class BlogPostManager(TranslatableOptimizedManager):
     def for_list(self) -> BlogPostQuerySet:
         """Return optimized queryset for list views."""
         return self.get_queryset().for_list()
+
+    def for_feed(self) -> BlogPostQuerySet:
+        """Return the posts with their translations only, for the feed."""
+        return self.get_queryset().for_feed()
 
     def for_detail(self) -> BlogPostQuerySet:
         """Return optimized queryset for detail views."""

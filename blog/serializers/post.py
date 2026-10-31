@@ -137,8 +137,21 @@ class BlogPostFeedSerializer(
         read_only_fields = fields
 
 
+class _CountField(serializers.IntegerField):
+    """An integer with a default for an omitted value, never a blank one.
+
+    DRF reads ``?count=`` as an omitted value whenever the field has a
+    default, so a typo in the query was answered with the default feed.
+    """
+
+    def get_value(self, dictionary):
+        if dictionary.get(self.field_name) == "":
+            return ""
+        return super().get_value(dictionary)
+
+
 class BlogPostFeedQuerySerializer(serializers.Serializer):
-    count = serializers.IntegerField(
+    count = _CountField(
         min_value=1,
         max_value=settings.BLOG_FEED_LIMIT,
         default=settings.BLOG_FEED_LIMIT,

@@ -3,6 +3,45 @@
 
 
 
+## v3.172.4 (2026-10-31)
+
+### Bug fixes
+
+* fix(order): keep a Viva fee reported before its payment is booked (#389) ([`0aba1b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aba1b629d74079eadbdf7bc48b22134e34f67b4))
+
+* fix(order): keep a Viva commission reported before its payment is booked
+
+Viva does not say whether Transaction Price Calculated (1799) arrives
+before or after the payment webhook that books the charge. A 1799 that
+came first found no ledger row, was recorded as skipped and answered 200,
+so that payment stayed "fee not reported" for good.
+
+PaymentLedger.record_fee now keeps a fee for a movement it does not hold
+yet in PendingPaymentFee, and every row the ledger records takes the
+waiting fee for its provider and reference. The event is handled once and
+needs no retry. A transaction that cannot be verified, or belongs to
+another order, is still kept nowhere.
+
+A canceled order whose refund the provider declines stays COMPLETED with
+no ledger row; a test pins it.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`0aba1b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aba1b629d74079eadbdf7bc48b22134e34f67b4))
+
+* fix(order): sweep pending payment fees whose payment never settles
+
+A fee kept for a payment that is never booked (abandoned or failed) would
+stay for good. A daily per-store sweep deletes it after
+PENDING_PAYMENT_FEE_RETENTION_DAYS (90), well past Viva's 24 hour webhook
+retry window, in the batched retention helper.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0aba1b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aba1b629d74079eadbdf7bc48b22134e34f67b4))
+
 ## v3.172.3 (2026-10-31)
 
 ### Bug fixes

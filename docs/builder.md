@@ -78,10 +78,10 @@ The storefront declares each block once and serves the result per store:
 `{hash, blocks: [...]}` with `ETag: "<hash>"` (`builder/storefront.py`; the
 base URL helper and `StorefrontUnavailable` are `core/storefront.py`, shared
 with `texts`). A process keeps its copy and revalidates with `If-None-Match`
-every `BUILDER_CATALOGUE_REVALIDATE_SECONDS`. **When no catalogue can be
-fetched and none is held, nothing is saved** (`503 storefront_unavailable`).
-A copy already held outlives a failed revalidation: a deploy of the
-storefront is the only thing that changes it.
+every `BUILDER_CATALOGUE_REVALIDATE_SECONDS`. **When the storefront does not
+answer, nothing is saved** (`503 storefront_unavailable`): the same rule as
+the texts catalogue, whether or not a copy is held, so a save is never
+checked against a build the storefront may no longer serve.
 
 Each block carries `type`, `version`, `accepts`, `schema` (a closed JSON
 Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
@@ -279,9 +279,11 @@ The editor runs on the store's own host, where nobody is signed in as staff
 
 Security properties, each with a test:
 
-- **Single use.** The ticket is consumed with Redis `GETDEL`, one round trip:
-  of two requests with the same ticket one wins. Intercepting it after use
-  gains nothing, and unused it dies in a minute.
+- **Single use.** The ticket is minted and spent by `core/tickets.py`, the
+  helper the WebSocket ticket uses too: Redis `GETDEL`, one round trip, so of
+  two requests with the same ticket one wins. Tickets live under the `strict:`
+  cache namespace, so an unreachable Redis raises instead of failing open.
+  Intercepting it after use gains nothing, and unused it dies in a minute.
 - **Checked when spent, not when minted.** The person must still be an
   active staff account with the right to change this store's pages (the role
   backend, through the provenance stamp), so a role lost in between is

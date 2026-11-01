@@ -15,23 +15,18 @@ Why tickets instead of passing the Knox token directly as a URL param:
 from __future__ import annotations
 
 import logging
-import secrets
 
-from django.core.cache import cache
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core import tickets
+
 logger = logging.getLogger(__name__)
 
-WS_TICKET_CACHE_PREFIX = "ws:ticket:"
 WS_TICKET_TTL_SECONDS = 60
-
-
-def build_ticket_cache_key(ticket: str) -> str:
-    return f"{WS_TICKET_CACHE_PREFIX}{ticket}"
 
 
 # `@extend_schema` over `@api_view` is drf-spectacular's own documented
@@ -84,11 +79,8 @@ def create_websocket_ticket(request):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
-    ticket = secrets.token_urlsafe(32)
-    cache.set(
-        build_ticket_cache_key(ticket),
-        request.user.pk,
-        WS_TICKET_TTL_SECONDS,
+    ticket = tickets.mint(
+        tickets.WEBSOCKET, request.user.pk, WS_TICKET_TTL_SECONDS
     )
     return Response(
         {"ticket": ticket, "expires_in": WS_TICKET_TTL_SECONDS},

@@ -29,12 +29,14 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import (
     SoftDeleteManager,
     SoftDeleteModel,
     TimeStampMixinModel,
 )
+from core.utils.files import sanitize_filename
 from tenant.staff_actors import StaffActor
 
 
@@ -296,3 +298,76 @@ class BuilderReference(models.Model):
 
     def __str__(self) -> str:
         return f"{self.kind}:{self.target} in {self.document}"
+
+
+def asset_upload_path(instance: MediaAsset, filename: str) -> str:
+    """``uploads/builder/<name>`` in the store's media directory, which
+    media-stream serves like every other upload."""
+    return f"uploads/builder/{sanitize_filename(filename)}"
+
+
+class MediaAsset(TranslatableModel, TimeStampMixinModel):
+    """An image in the store's media library.
+
+    A block's image setting stores this row's id (``ref:media``), never a
+    URL, so the storefront knows the size to reserve before the file
+    arrives (and to size ``srcset`` for), a translated ``alt``, and the
+    focal point to crop around; and a used asset cannot disappear unseen.
+
+    ``alt`` is a parler translation: the row stands alone and its text is
+    one plain field, unlike a block's settings (a JSON overlay, because
+    structure must not vary per language). Written only through
+    ``builder.media_services``, which measures the file.
+    """
+
+    file = models.ImageField(
+        _("File"), upload_to=asset_upload_path, max_length=255
+    )
+    width = models.PositiveIntegerField(
+        _("Width"), editable=False, help_text=_("As a browser shows it, in px.")
+    )
+    height = models.PositiveIntegerField(
+        _("Height"),
+        editable=False,
+        help_text=_("As a browser shows it, in px."),
+    )
+    mime = models.CharField(_("Type"), max_length=32, editable=False)
+    size_bytes = models.PositiveIntegerField(_("Size (bytes)"), editable=False)
+    focal_x = models.FloatField(
+        _("Focal point X"),
+        default=0.5,
+        db_default=0.5,
+        help_text=_("0 is the left edge, 1 the right."),
+    )
+    focal_y = models.FloatField(
+        _("Focal point Y"),
+        default=0.5,
+        db_default=0.5,
+        help_text=_("0 is the top edge, 1 the bottom."),
+    )
+    uploaded_by_staff_id = models.BigIntegerField(
+        _("Uploaded by (staff)"), null=True, blank=True
+    )
+    uploaded_by_staff = StaffActor()
+
+    translations = TranslatedFields(
+        alt=models.CharField(
+            _("Alt text"), max_length=255, blank=True, default=""
+        )
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Media asset")
+        verbose_name_plural = _("Media assets")
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(focal_x__gte=0, focal_x__lte=1)
+                & models.Q(focal_y__gte=0, focal_y__lte=1),
+                name="builder_asset_focal_in_unit_square",
+            ),
+        ]
+        indexes = [*TimeStampMixinModel.Meta.indexes]
+
+    def __str__(self) -> str:
+        return self.file.name.rsplit("/", 1)[-1]

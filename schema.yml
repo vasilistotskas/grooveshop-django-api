@@ -9121,6 +9121,235 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/media:
+    get:
+      operationId: api_v1_builder_media_list
+      description: 'Staff: the library, and an upload into it.'
+      parameters:
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field(s) to use when ordering the results. Multiple fields
+          can be combined with commas (e.g. ``-isMain,-createdAt``). Available fields:
+          createdAt, -createdAt, sizeBytes, -sizeBytes'
+        schema:
+          type: string
+          pattern: ^(?:createdAt|\-createdAt|sizeBytes|\-sizeBytes)(?:,(?:createdAt|\-createdAt|sizeBytes|\-sizeBytes))*$
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Builder media
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAssetList'
+          description: ''
+    post:
+      operationId: api_v1_builder_media_create
+      description: 'Upload an image (multipart): `file`, optionally `focalX`, `focalY`
+        (0 to 1) and `alt` (a JSON object, language to text). The size recorded is
+        the one a browser shows.'
+      tags:
+      - Builder media
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetUploadRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/media/{id}:
+    get:
+      operationId: api_v1_builder_media_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder media
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+          description: ''
+    patch:
+      operationId: api_v1_builder_media_partial_update
+      description: Change the focal point and the alt text of the languages named;
+        the file never changes. A used asset's change reaches the storefront at once.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder media
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetUpdateRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetUpdateRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    delete:
+      operationId: api_v1_builder_media_destroy
+      description: Delete an asset no published page uses; otherwise 409 `media_in_use`
+        with `usedBy`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder media
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/media/resolve:
+    get:
+      operationId: api_v1_builder_media_resolve_retrieve
+      description: '`path` is what media-stream serves (`media/<schema>/uploads/...`).
+        An id that is unknown, or that no released document uses, is left out: the
+        storefront shows that block empty.'
+      parameters:
+      - in: query
+        name: ids
+        schema:
+          type: string
+        description: Comma-separated asset ids (`media` references).
+        required: true
+      - in: query
+        name: locale
+        schema:
+          type: string
+        description: Language of the alt text; default if unknown.
+      tags:
+      - Builder media
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvedMedia'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
   /api/v1/builder/publish:
     post:
       operationId: api_v1_builder_publish_create
@@ -35106,6 +35335,102 @@ components:
         * `ucp` - ucp
         * `acp` - acp
         * `mcp` - mcp
+    Asset:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        path:
+          type: string
+          readOnly: true
+        width:
+          type: integer
+          readOnly: true
+          title: Πλάτος
+          description: Όπως το εμφανίζει ο φυλλομετρητής, σε px.
+        height:
+          type: integer
+          readOnly: true
+          title: Ύψος
+          description: Όπως το εμφανίζει ο φυλλομετρητής, σε px.
+        mime:
+          type: string
+          readOnly: true
+          title: Τύπος
+        sizeBytes:
+          type: integer
+          readOnly: true
+          title: Μέγεθος (bytes)
+        focalX:
+          type: number
+          format: double
+          readOnly: true
+          title: Σημείο εστίασης X
+          description: Το 0 είναι η αριστερή άκρη, το 1 η δεξιά.
+        focalY:
+          type: number
+          format: double
+          readOnly: true
+          title: Σημείο εστίασης Y
+          description: Το 0 είναι η πάνω άκρη, το 1 η κάτω.
+        alt:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
+        uploadedBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        usedBy:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Ενημερώθηκε στις
+      required:
+      - alt
+      - createdAt
+      - focalX
+      - focalY
+      - height
+      - id
+      - mime
+      - path
+      - sizeBytes
+      - updatedAt
+      - uploadedBy
+      - usedBy
+      - width
+    AssetUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        focalX:
+          type: number
+          format: double
+          nullable: true
+        focalY:
+          type: number
+          format: double
+          nullable: true
+        alt:
+          description: '{language: text}; a language not named keeps its text.'
+      required:
+      - file
     Attribute:
       type: object
       description: Serializer for Attribute with translations.
@@ -42793,6 +43118,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AcsStation'
+    PaginatedAssetList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
     PaginatedAttributeList:
       type: object
       required:
@@ -44351,6 +44714,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VersionList'
+    PatchedAssetUpdateRequest:
+      type: object
+      properties:
+        focalX:
+          type: number
+          format: double
+          nullable: true
+        focalY:
+          type: number
+          format: double
+          nullable: true
+        alt:
+          description: '{language: text}; a language not named keeps its text.'
     PatchedBlogAuthorWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -49353,6 +49729,62 @@ components:
       required:
       - message
       - reservationIds
+    ResolvedAsset:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        path:
+          type: string
+          readOnly: true
+        width:
+          type: integer
+          readOnly: true
+          title: Πλάτος
+          description: Όπως το εμφανίζει ο φυλλομετρητής, σε px.
+        height:
+          type: integer
+          readOnly: true
+          title: Ύψος
+          description: Όπως το εμφανίζει ο φυλλομετρητής, σε px.
+        mime:
+          type: string
+          readOnly: true
+          title: Τύπος
+        focalX:
+          type: number
+          format: double
+          readOnly: true
+          title: Σημείο εστίασης X
+          description: Το 0 είναι η αριστερή άκρη, το 1 η δεξιά.
+        focalY:
+          type: number
+          format: double
+          readOnly: true
+          title: Σημείο εστίασης Y
+          description: Το 0 είναι η πάνω άκρη, το 1 η κάτω.
+        alt:
+          type: string
+          readOnly: true
+      required:
+      - alt
+      - focalX
+      - focalY
+      - height
+      - id
+      - mime
+      - path
+      - width
+    ResolvedMedia:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResolvedAsset'
+      required:
+      - results
     ResultTypeEnum:
       enum:
       - product

@@ -40,7 +40,7 @@ def an_import() -> BuilderRelease:
             document=document, kind=VersionKind.PUBLISH, number=1
         )
         versions[key] = version.pk
-    return BuilderReleaseFactory(number=1, versions=versions)
+    return BuilderReleaseFactory.create(number=1, versions=versions)
 
 
 @pytest.fixture

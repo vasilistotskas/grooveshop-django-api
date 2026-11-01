@@ -576,3 +576,51 @@ class TestBlogCategoryReference:
             services.publish(admin, keys=[HOME])
 
         assert issue_codes(caught.value) == {(HOME, "reference_not_found")}
+
+
+class TestPageReferences:
+    def test_a_page_is_named_by_the_key_of_a_page_or_a_template(
+        self, admin, catalogue, features_on
+    ):
+        banner = document(("b", section("banner@1", {"text": "x"})))
+        save(admin, "template:about", draft=banner)
+        save(admin, HOME, draft=document(("a", hero(pageSlug="about"))))
+
+        services.publish(admin, keys=[HOME])
+
+        assert BuilderReference.objects.get().target == "about"
+
+    def test_a_page_that_has_no_document_is_refused(
+        self, admin, catalogue, features_on
+    ):
+        save(admin, HOME, draft=document(("a", hero(pageSlug="nowhere"))))
+
+        with pytest.raises(DocumentInvalid) as caught:
+            services.publish(admin, keys=[HOME])
+
+        assert issue_codes(caught.value) == {(HOME, "reference_not_found")}
+
+    def test_a_content_page_exists_in_any_state(
+        self, admin, catalogue, features_on
+    ):
+        from page_config.models import ContentPage
+
+        ContentPage.objects.create(slug="privacy-policy", is_published=False)
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(contentSlug="privacy-policy"))),
+        )
+        services.publish(admin, keys=[HOME])
+        assert BuilderReference.objects.get().kind == "contentPage"
+
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(contentSlug="no-such-page"))),
+            revision=1,
+        )
+        with pytest.raises(DocumentInvalid) as caught:
+            services.publish(admin, keys=[HOME])
+
+        assert issue_codes(caught.value) == {(HOME, "reference_not_found")}

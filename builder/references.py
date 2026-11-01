@@ -87,21 +87,36 @@ def _existing_blog_categories(targets: set[str]) -> set[str]:
 
 
 def _existing_pages(targets: set[str]) -> set[str]:
-    """A page is a published content page or a page the store built."""
+    """A page is named by its key: the store's ``page:<key>`` document or
+    the ``template:<key>`` of a fixed page type (home, about, ...), draft
+    or released. Whether it is released is the storefront's to check when
+    it renders the link."""
+    keys = {
+        key
+        for target in targets
+        for key in (
+            f"{DocumentKind.PAGE}:{target}",
+            f"{DocumentKind.TEMPLATE}:{target}",
+        )
+    }
+    return {
+        key.partition(":")[2]
+        for key in BuilderDocument.objects.filter(key__in=keys).values_list(
+            "key", flat=True
+        )
+    }
+
+
+def _existing_content_pages(targets: set[str]) -> set[str]:
+    """A content page (a policy, an info page) by slug, in any state: a
+    store can import its menus before it publishes the page."""
     from page_config.models import ContentPage
 
-    found = set(
-        ContentPage.objects.published()
-        .filter(slug__in=targets)
-        .values_list("slug", flat=True)
+    return set(
+        ContentPage.objects.filter(slug__in=targets).values_list(
+            "slug", flat=True
+        )
     )
-    built = {
-        key.removeprefix(f"{DocumentKind.PAGE}:")
-        for key in BuilderDocument.objects.filter(
-            key__in=[f"{DocumentKind.PAGE}:{t}" for t in targets]
-        ).values_list("key", flat=True)
-    }
-    return found | built
 
 
 def _existing_menus(targets: set[str]) -> set[str]:
@@ -130,6 +145,7 @@ _EXISTS: dict[str, Callable[[set[str]], set[str]]] = {
     ReferenceKind.CATEGORY: _existing_categories,
     ReferenceKind.BLOG_CATEGORY: _existing_blog_categories,
     ReferenceKind.PAGE: _existing_pages,
+    ReferenceKind.CONTENT_PAGE: _existing_content_pages,
     ReferenceKind.MENU: _existing_menus,
     ReferenceKind.MEDIA: _existing_media,
 }

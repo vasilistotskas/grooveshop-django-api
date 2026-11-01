@@ -46,6 +46,7 @@ def default_blocks() -> list[dict[str, Any]]:
                 productId={"type": "integer"},
                 categoryId={"type": "integer"},
                 pageSlug={"type": "string"},
+                contentSlug={"type": "string"},
                 mediaId={"type": "integer"},
                 blogCategoryId={"type": "integer"},
                 bullets={
@@ -59,6 +60,7 @@ def default_blocks() -> list[dict[str, Any]]:
                 "/productId": "product",
                 "/categoryId": "category",
                 "/pageSlug": "page",
+                "/contentSlug": "contentPage",
                 "/mediaId": "media",
                 "/blogCategoryId": "blogCategory",
             },

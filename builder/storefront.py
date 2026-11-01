@@ -37,7 +37,15 @@ KIND_SECTION = "section"
 KIND_BLOCK = "block"
 
 REFERENCE_KINDS = frozenset(
-    {"product", "category", "page", "media", "menu", "blogCategory"}
+    {
+        "product",
+        "category",
+        "page",
+        "media",
+        "menu",
+        "blogCategory",
+        "contentPage",
+    }
 )
 
 

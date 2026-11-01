@@ -145,9 +145,10 @@ schema over the merged settings, and reported at the overlay's pointer.
 ## References, not copies
 
 Settings the catalogue marks as `refs` hold ids: `product` and `category`
-(active, numeric id), `page` (a published content page slug, or a page
-document of the store), `blogCategory` (a blog category id), `menu` (a navigation slot), `media` (a
-`MediaAsset` id). A draft may point at something
+(active, numeric id), `page` (a page key: the store's `page:<key>` document or the
+`template:<key>` of a fixed page type, draft or released), `contentPage` (a
+ContentPage slug, in any state), `blogCategory` (a blog category id), `menu`
+(a navigation slot), `media` (a `MediaAsset` id). A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a

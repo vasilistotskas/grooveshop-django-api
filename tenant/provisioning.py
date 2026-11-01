@@ -327,15 +327,19 @@ def _seed_extra_settings(tenant: Tenant) -> bool:
         return False
 
 
-def _seed_page_layouts(tenant: Tenant) -> bool:
+def _seed_builder_documents(tenant: Tenant) -> bool:
     try:
-        from page_config.defaults import seed_page_layouts
+        from builder.seeding import seed_store
 
-        seed_page_layouts()
-        logger.info("Seeded page layouts for %s", tenant.schema_name)
+        release = seed_store()
+        logger.info(
+            "Seeded page builder documents for %s (release %s)",
+            tenant.schema_name,
+            release.number if release else "kept",
+        )
         return True
     except Exception:
-        logger.warning("Could not seed page layouts", exc_info=True)
+        logger.warning("Could not seed page builder documents", exc_info=True)
         return False
 
 
@@ -473,7 +477,7 @@ def _create_meili_indexes(tenant: Tenant) -> bool:
 
 
 def seed_tenant_defaults(tenant: Tenant) -> list[str]:
-    """Seed extra_settings, default page layouts/content pages, and
+    """Seed extra_settings, default page builder documents/content pages, and
     Meilisearch indexes.
 
     Runs inside ``schema_context(tenant.schema_name)`` — every tenant
@@ -493,7 +497,7 @@ def seed_tenant_defaults(tenant: Tenant) -> list[str]:
 
     steps = (
         ("extra settings", _seed_extra_settings),
-        ("page layouts", _seed_page_layouts),
+        ("page builder", _seed_builder_documents),
         ("content pages", _seed_content_pages),
         ("default carrier", _activate_default_carrier),
         ("newsletter topic", _seed_newsletter_topic),

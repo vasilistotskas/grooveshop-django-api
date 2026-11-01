@@ -201,7 +201,7 @@ class TestSeedTenantDefaults:
 
         tenant = store_tenant("seed_defaults_reports")
         monkeypatch.setattr(
-            provisioning, "_seed_page_layouts", lambda _t: False
+            provisioning, "_seed_builder_documents", lambda _t: False
         )
         monkeypatch.setattr(
             provisioning, "_create_meili_indexes", lambda _t: False
@@ -215,7 +215,7 @@ class TestSeedTenantDefaults:
 
         failed = provisioning.seed_tenant_defaults(tenant)
 
-        assert failed == ["page layouts", "Meilisearch indexes"]
+        assert failed == ["page builder", "Meilisearch indexes"]
 
     def test_a_clean_seed_reports_nothing(self, db, monkeypatch):
         from tenant import provisioning
@@ -223,7 +223,7 @@ class TestSeedTenantDefaults:
         tenant = store_tenant("seed_defaults_clean")
         for name in (
             "_seed_extra_settings",
-            "_seed_page_layouts",
+            "_seed_builder_documents",
             "_seed_content_pages",
             "_create_meili_indexes",
         ):

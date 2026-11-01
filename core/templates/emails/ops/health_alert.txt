@@ -1,0 +1,10 @@
+{% load i18n %}{% trans "System health check failed" %}
+
+{% trans "These system components failed their health checks:" %}
+
+{% for error in errors %}{{ error|safe }}
+{% endfor %}
+{% trans "The run is recorded as a failure. Fix the component, then check the next scheduled run." %}
+
+---
+{{ SITE_NAME }}

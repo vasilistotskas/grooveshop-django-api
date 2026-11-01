@@ -10,7 +10,6 @@ from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import mail_admins
 from django.db import connections, transaction
 from django.db.models import F
 
@@ -22,6 +21,7 @@ from core import celery_app
 from core.cache import edge as edge_cache
 from core.cache import invalidation as cache_invalidation
 from core.cache.edge import EdgePurgeError
+from core.emails import BackupFailed, HealthAlert
 from core.exceptions import (
     HealthCheckFailed,
     ManagementCommandFailed,
@@ -890,14 +890,9 @@ def monitor_system_health():
     # a read-only media volume loses every upload.
     if not all_passed:
         try:
-            mail_admins(
-                subject=(
-                    f"CRITICAL: System Health Check Failed "
-                    f"({', '.join(failed)})"
-                ),
-                message="These system components failed their health "
-                "checks:\n\n" + "\n".join(errors),
-                fail_silently=False,
+            send_email(
+                "platform.health_alert",
+                HealthAlert(failed=tuple(failed), errors=tuple(errors)),
             )
         except Exception as e:
             logger.error(f"Failed to send health check alert email: {e}")
@@ -1070,12 +1065,7 @@ def scheduled_database_backup():
         logger.error(f"Scheduled backup failed: {e}")
 
         try:
-            mail_admins(
-                subject="ALERT: Scheduled Database Backup Failed",
-                message=f"The scheduled database backup failed with error: {e!s}\n\n"
-                f"Please check the system logs and ensure the backup system is working properly.",
-                fail_silently=True,
-            )
+            send_email("platform.backup_failed", BackupFailed(error=str(e)))
         except Exception as mail_error:
             logger.error(
                 f"Failed to send backup failure alert email: {mail_error}"

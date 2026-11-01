@@ -351,11 +351,15 @@ protect the Django admin login either.
   changes; it expires after `PASSWORD_RESET_TIMEOUT` (an hour by default).
   Django swaps the token for a session marker on the first visit, so it does
   not leak in a `Referer`.
-- **Mail.** Rendered in the task from the store's `default_locale` (the
-  project default on the platform host), sent from `tenant_from_email()` (the
-  store's verified sender, else the platform envelope under the store's name).
-  The link points at the host the request came in on, which the tenant
-  middleware already matched to one of the store's own domains.
+- **Mail.** `platform.staff_password_reset` (`tenant/emails.py`, see
+  `docs/emails.md`): the PLATFORM sends it, from `"{SITE_NAME}"
+  <DEFAULT_FROM_EMAIL>` under `public`, in the store's `default_locale` (the
+  project default on the platform host). The subject and the heading name the
+  store, read in its schema before the send (the mail is built under
+  `public`, which knows only the platform); the logo, footer and contact
+  address are the platform's. The link points at the host the request came
+  in on, which the tenant middleware already matched to one of the store's
+  own domains.
 - **MFA is not bypassed.** The reset sets a password and nothing else:
   `post_reset_login` stays off, so nobody is signed in, and the authenticators
   are untouched, so a platform superuser still meets the code (or the

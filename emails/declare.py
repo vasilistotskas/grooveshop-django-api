@@ -14,9 +14,9 @@ from typing import Any
 from django_stubs_ext import StrOrPromise
 
 from emails.gates import Gate
-from emails.recipients import Recipient, store_operators
+from emails.recipients import Recipient, platform_operators, store_operators
 from emails.registry import registry
-from emails.types import Audience, EmailType, Kind, RenderEnv
+from emails.types import Audience, EmailType, Kind, Owner, RenderEnv
 
 BuildContext = Callable[[Any, RenderEnv], Mapping[str, object]]
 
@@ -96,4 +96,65 @@ def staff_email(
             gates=gates,
             reply_to=reply_to,
         )
+    )
+
+
+def platform_email(
+    key: str,
+    *,
+    title: StrOrPromise,
+    description: StrOrPromise,
+    audience: Audience,
+    templates: str,
+    subject: str,
+    build_context: BuildContext,
+    sample: Callable[[RenderEnv], Any],
+    recipients: Callable[[Any], Sequence[Recipient]],
+    area: str = "platform",
+) -> EmailType:
+    """Mail the platform itself sends, from the platform's sender and
+    under ``public``: never listed on a store's email page. Always
+    *required*: the platform has no switch page, and a billing notice, a
+    password reset or an alert to the operators must not be mutable."""
+    return registry.register(
+        EmailType(
+            key=key,
+            title=title,
+            description=description,
+            area=area,
+            audience=audience,
+            kind=Kind.TRANSACTIONAL,
+            owner=Owner.PLATFORM,
+            required=True,
+            templates=templates,
+            subject=subject,
+            build_context=build_context,
+            sample=sample,
+            recipients=recipients,
+        )
+    )
+
+
+def operator_alert(
+    key: str,
+    *,
+    title: StrOrPromise,
+    description: StrOrPromise,
+    templates: str,
+    subject: str,
+    build_context: BuildContext,
+    sample: Callable[[RenderEnv], Any],
+) -> EmailType:
+    """An alert to the platform's operators (``settings.ADMINS``), in the
+    platform's language."""
+    return platform_email(
+        key,
+        title=title,
+        description=description,
+        audience=Audience.PLATFORM_OPERATOR,
+        templates=templates,
+        subject=subject,
+        build_context=build_context,
+        sample=sample,
+        recipients=lambda obj: platform_operators(),
     )

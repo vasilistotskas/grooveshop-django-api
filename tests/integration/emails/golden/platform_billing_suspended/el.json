@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Grooveshop <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "Acme Gadgets — το κατάστημά σας έχει ανασταλεί",
+  "to": [
+    "owner@store.test"
+  ]
+}

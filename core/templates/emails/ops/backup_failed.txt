@@ -1,0 +1,10 @@
+{% load i18n %}{% trans "Scheduled database backup failed" %}
+
+{% trans "The scheduled database backup failed with this error:" %}
+
+{{ error|safe }}
+
+{% trans "Check the system logs and make sure the backup system is working properly." %}
+
+---
+{{ SITE_NAME }}

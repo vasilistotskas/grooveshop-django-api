@@ -10,20 +10,18 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
 from django.core.cache import cache
-from django_tenants.utils import get_public_schema_name, schema_context
 
 from emails import optout, sender, transport
 from emails.headers import build_headers
 from emails.models import EmailSwitch
 from emails.recipients import Recipient
 from emails.registry import registry
-from emails.render import render
+from emails.render import owner_schema, render
 from emails.transport import Attachment
 from emails.types import EmailType, Owner, RenderEnv
 from tenant.membership import bound_tenant
@@ -97,13 +95,9 @@ def send_email(
     or has nobody to write to. A transport failure is logged and re-raised.
     """
     email_type = registry.get(type_key)
-    if email_type.owner is Owner.PLATFORM:
-        schema = schema_context(get_public_schema_name())
-    elif bound_tenant() is None:
+    if email_type.owner is Owner.STORE and bound_tenant() is None:
         raise StoreRequired(type_key)
-    else:
-        schema = nullcontext()
-    with schema:
+    with owner_schema(email_type):
         return _send(email_type, obj, recipient, attachments)
 
 

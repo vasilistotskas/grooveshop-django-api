@@ -1,0 +1,11 @@
+Your plan for Acme Gadgets has expired
+
+Your Pro plan term ended on Aug. 1, 2026. Your store is still running, but not for long.
+
+Unless a renewal is recorded within 7 days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact.
+
+To renew, reply to this email or contact us at info@platform.test. As soon as the renewal is recorded, everything continues as normal.
+
+---
+Grooveshop
+https://platform.example/en

@@ -31,3 +31,13 @@ def test_every_store_type_is_listed_once():
     assert sorted(listed) == sorted(
         t.key for t in registry.types_for(Owner.STORE)
     )
+
+
+def test_a_platform_type_is_never_on_the_stores_page():
+    platform = {t.key for t in registry.types_for(Owner.PLATFORM)}
+    listed = {
+        row.email_type.key for group in switch_groups() for row in group.rows
+    }
+
+    assert platform
+    assert platform.isdisjoint(listed)

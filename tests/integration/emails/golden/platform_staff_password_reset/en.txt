@@ -1,0 +1,10 @@
+Choose a new password for Acme Gadgets
+
+Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in 60 minutes.
+
+https://admin.store.test/admin/reset/NzAwMQ/fixed-token/
+
+If this was not you, ignore this email: your password stays as it is. Resetting a password does not change your authenticator app.
+
+---
+Grooveshop

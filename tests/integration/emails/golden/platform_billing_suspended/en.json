@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Grooveshop <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "Acme Gadgets — your store has been suspended",
+  "to": [
+    "owner@store.test"
+  ]
+}

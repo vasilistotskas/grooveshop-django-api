@@ -201,16 +201,6 @@ class TestThePreviewRendersTheRealContext:
         assert english == f"Your Order #{order.id} Has Shipped"
         assert greek == f"Η παραγγελία σας #{order.id} έχει αποσταλεί"
 
-    def test_no_subject_is_made_up_for_an_email_without_a_type(self):
-        """A template no registered email type sends shows NO subject,
-        not "Email from {store}"."""
-        preview = EmailTemplatePreviewService().generate_preview(
-            "expiring", language="en"
-        )
-
-        assert preview.error is None
-        assert preview.subject == ""
-
     def test_a_sample_preview_still_shows_the_real_subject(self):
         preview = EmailTemplatePreviewService().generate_preview(
             "order_shipped", language="en"

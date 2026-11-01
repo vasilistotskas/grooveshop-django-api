@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Grooveshop <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Grooveshop] CRITICAL: System Health Check Failed (database)",
+  "to": [
+    "ops@platform.test"
+  ]
+}

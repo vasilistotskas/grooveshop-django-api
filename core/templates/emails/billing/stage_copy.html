@@ -1,0 +1,18 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% blocktrans %}Billing stage {{ stage }}: {{ schema }}{% endblocktrans %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% blocktrans with store=store_name %}{{ store }} reached billing stage {{ stage }}{% endblocktrans %}</h1>
+
+<div class="email-card">
+    <p><strong>{% trans "Store" %}:</strong> {{ store_name }}</p>
+    <p><strong>{% trans "Schema" %}:</strong> <code>{{ schema }}</code></p>
+    <p><strong>{% trans "Plan" %}:</strong> {{ plan }}</p>
+    <p><strong>{% trans "Term ended" %}:</strong> {{ paid_until|date:"DATE_FORMAT" }}</p>
+    <p><strong>{% trans "Stage" %}:</strong> {{ stage }} ({{ slug }})</p>
+</div>
+
+<p>{% trans "The store's owner received the matching notice." %}</p>
+{% endblock %}

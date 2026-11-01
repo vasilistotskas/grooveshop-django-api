@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Grooveshop <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "Choose a new password for Acme Gadgets",
+  "to": [
+    "staff@store.test"
+  ]
+}

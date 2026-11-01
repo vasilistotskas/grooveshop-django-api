@@ -1,0 +1,12 @@
+Acme Gadgets reached billing stage 2
+
+Store: Acme Gadgets
+Schema: acme
+Plan: pro
+Term ended: Aug. 1, 2026
+Stage: 2 (expired)
+
+The store's owner received the matching notice.
+
+---
+Grooveshop

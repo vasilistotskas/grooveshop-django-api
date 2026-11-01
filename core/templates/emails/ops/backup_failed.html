@@ -1,0 +1,15 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Scheduled database backup failed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Scheduled database backup failed" %}</h1>
+<p>{% trans "The scheduled database backup failed with this error:" %}</p>
+
+<div class="email-card" style="border-left: 4px solid #dc2626;">
+    <p><code>{{ error }}</code></p>
+</div>
+
+<p class="mt-3">{% trans "Check the system logs and make sure the backup system is working properly." %}</p>
+{% endblock %}

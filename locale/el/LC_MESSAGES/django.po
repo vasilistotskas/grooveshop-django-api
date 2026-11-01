@@ -472,16 +472,8 @@ msgid "%(slot)s navigation"
 msgstr "Πλοήγηση: %(slot)s"
 
 #, python-format
-msgid "%(store)s — your plan expires on %(date)s"
-msgstr "%(store)s — το πλάνο σας λήγει στις %(date)s"
-
-#, python-format
-msgid "%(store)s — your plan has expired"
-msgstr "%(store)s — το πλάνο σας έληξε"
-
-#, python-format
-msgid "%(store)s — your store has been suspended"
-msgstr "%(store)s — το κατάστημά σας έχει ανασταλεί"
+msgid "%(store)s reached billing stage %(stage)s"
+msgstr "Το %(store)s έφτασε στο στάδιο χρέωσης %(stage)s"
 
 #, python-format
 msgid "%(store)s: Stripe provisioning failed — %(error)s"
@@ -1827,6 +1819,13 @@ msgstr "Η πόλη τιμολόγησης είναι υποχρεωτική."
 msgid "Billing code"
 msgstr "Κωδικός χρέωσης"
 
+#, python-format
+msgid "Billing stage %(stage)s: %(schema)s"
+msgstr "Στάδιο χρέωσης %(stage)s: %(schema)s"
+
+msgid "Billing stage reached"
+msgstr "Επίτευξη σταδίου χρέωσης"
+
 msgid "Billing status"
 msgstr "Κατάσταση χρέωσης"
 
@@ -2711,6 +2710,9 @@ msgstr "Ελέγξτε κάθε voucher με την ACS (λάθος διεύθυ
 msgid "Check the health status of database, Redis, and Celery"
 msgstr "Έλεγχος κατάστασης υγείας βάσης δεδομένων, Redis και Celery"
 
+msgid "Check the system logs and make sure the backup system is working properly."
+msgstr "Ελέγξτε τα αρχεία καταγραφής του συστήματος και βεβαιωθείτε ότι το σύστημα αντιγράφων ασφαλείας λειτουργεί σωστά."
+
 msgid "Check these details carefully — the store issues your invoice with exactly what is shown here."
 msgstr "Έλεγξε προσεκτικά αυτά τα στοιχεία — το κατάστημα εκδίδει το τιμολόγιό σου με ακριβώς ό,τι εμφανίζεται εδώ."
 
@@ -2772,6 +2774,10 @@ msgstr "Επιλέξτε νέο κωδικό πρόσβασης"
 #, python-format
 msgid "Choose a new password for %(store)s"
 msgstr "Νέος κωδικός πρόσβασης για %(store)s"
+
+#, python-brace-format
+msgid "Choose a new password for {store_name}"
+msgstr "Νέος κωδικός πρόσβασης για {store_name}"
 
 msgid "City"
 msgstr "Πόλη"
@@ -10040,6 +10046,12 @@ msgstr "Πλάνο & Χρεώσεις"
 msgid "Plan and Paid Until are platform-only. They are excluded from the public tenant-resolve payload, and the merchant self-service allowlist withholds every commercial term — a store admin can edit branding and their own credentials, never their plan, term, flags or lifecycle state."
 msgstr "Το Πλάνο και το «Πληρωμένο έως» είναι ορατά μόνο στην πλατφόρμα. Εξαιρούνται από το δημόσιο payload του tenant-resolve, και η λίστα self-service του εμπόρου παρακρατεί κάθε εμπορικό όρο — ο διαχειριστής καταστήματος μπορεί να επεξεργαστεί branding και τα δικά του διαπιστευτήρια, ποτέ το πλάνο, την περίοδο, τα flags ή την κατάσταση κύκλου ζωής."
 
+msgid "Plan expired"
+msgstr "Το πλάνο έληξε"
+
+msgid "Plan expiring"
+msgstr "Το πλάνο λήγει"
+
 msgid "Plans"
 msgstr "Πλάνα"
 
@@ -11768,6 +11780,12 @@ msgstr "Σαρώθηκε στις"
 msgid "Scheduled"
 msgstr "Προγραμματισμένο"
 
+msgid "Scheduled backup failed"
+msgstr "Αποτυχία προγραμματισμένου αντιγράφου ασφαλείας"
+
+msgid "Scheduled database backup failed"
+msgstr "Απέτυχε το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων"
+
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
 msgstr "Προγραμματίστηκε ακύρωση στο myDATA για %(count)d πιστωτικά παραστατικά."
@@ -12604,9 +12622,15 @@ msgstr "Μέλος του προσωπικού που άλλαξε τελευτ�
 msgid "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Μέλος του προσωπικού που έλεγξε την εταιρεία. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
+msgid "Staff password reset"
+msgstr "Επαναφορά κωδικού προσωπικού"
+
 #, python-format
 msgid "Staff token %(key)s: %(user)s"
 msgstr "Token προσωπικού %(key)s: %(user)s"
+
+msgid "Stage"
+msgstr "Στάδιο"
 
 msgid "Staging"
 msgstr "Staging"
@@ -12786,6 +12810,9 @@ msgstr "Αναζήτηση καταστήματος"
 
 msgid "Store staff"
 msgstr "Προσωπικό καταστήματος"
+
+msgid "Store suspended"
+msgstr "Αναστολή καταστήματος"
 
 msgid "Store vertical"
 msgstr "Κλάδος καταστήματος"
@@ -13087,6 +13114,9 @@ msgstr "Πληροφορίες συστήματος"
 msgid "System Notifications"
 msgstr "Ειδοποιήσεις Συστήματος"
 
+msgid "System health check failed"
+msgstr "Αποτυχία ελέγχου υγείας συστήματος"
+
 msgid "THANK YOU FOR YOUR PURCHASE!"
 msgstr "ΕΥΧΑΡΙΣΤΟΥΜΕ ΓΙΑ ΤΗΝ ΑΓΟΡΑ ΣΑΣ!"
 
@@ -13159,6 +13189,24 @@ msgstr "Η ΔΟΥ είναι υποχρεωτική."
 
 msgid "Team"
 msgstr "Ομάδα"
+
+msgid "Tells a store's owner that the plan term ends soon, before the grace period starts."
+msgstr "Ενημερώνει τον ιδιοκτήτη του καταστήματος ότι η περίοδος του πλάνου λήγει σύντομα, πριν ξεκινήσει η περίοδος χάριτος."
+
+msgid "Tells a store's owner that the plan term has ended and when the store will be suspended."
+msgstr "Ενημερώνει τον ιδιοκτήτη του καταστήματος ότι η περίοδος του πλάνου έληξε και πότε θα ανασταλεί το κατάστημα."
+
+msgid "Tells a store's owner that the store was suspended for an unpaid plan and how to bring it back."
+msgstr "Ενημερώνει τον ιδιοκτήτη του καταστήματος ότι το κατάστημα ανεστάλη λόγω απλήρωτου πλάνου και πώς να επανέλθει."
+
+msgid "Tells the platform's operators that a store reached the expired or the suspended billing stage."
+msgstr "Ενημερώνει τους διαχειριστές της πλατφόρμας ότι ένα κατάστημα έφτασε στο στάδιο χρέωσης «έληξε» ή «ανεστάλη»."
+
+msgid "Tells the platform's operators that the database, the cache or the media storage failed its health check."
+msgstr "Ενημερώνει τους διαχειριστές της πλατφόρμας ότι η βάση δεδομένων, η προσωρινή μνήμη ή ο χώρος αποθήκευσης αρχείων απέτυχε στον έλεγχο υγείας."
+
+msgid "Tells the platform's operators that the scheduled database backup failed."
+msgstr "Ενημερώνει τους διαχειριστές της πλατφόρμας ότι το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε."
 
 msgid "Tells the store's staff that ACS paid COD money that could not be tied to an order."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι το ACS απέδωσε χρήματα αντικαταβολής που δεν μπόρεσαν να συνδεθούν με παραγγελία."
@@ -13239,6 +13287,9 @@ msgstr "Το κατάστημα δημιουργήθηκε, αλλά το αυτ
 
 msgid "Tenants"
 msgstr "Καταστήματα"
+
+msgid "Term ended"
+msgstr "Λήξη περιόδου"
 
 # Email Template Translations
 msgid "Testimonials"
@@ -13512,6 +13563,9 @@ msgstr "Η νομική υποχρέωση στην οποία βασίζετα�
 msgid "The line a goods row was taken from; empty otherwise."
 msgstr "Η γραμμή από την οποία προήλθε μια γραμμή προϊόντων· κενό σε κάθε άλλη περίπτωση."
 
+msgid "The link a store's staff member asked for to choose a new admin password."
+msgstr "Ο σύνδεσμος που ζήτησε ένα μέλος του προσωπικού του καταστήματος για να επιλέξει νέο κωδικό πρόσβασης διαχείρισης."
+
 #, python-format
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από αυτό μπορείτε να ζητήσετε νέα εξαγωγή από τη σελίδα ρυθμίσεων απορρήτου."
@@ -13668,11 +13722,17 @@ msgstr "Η κριτική εγκρίθηκε."
 msgid "The review was rejected."
 msgstr "Η κριτική απορρίφθηκε."
 
+msgid "The run is recorded as a failure. Fix the component, then check the next scheduled run."
+msgstr "Η εκτέλεση καταγράφεται ως αποτυχία. Διορθώστε το στοιχείο και ελέγξτε την επόμενη προγραμματισμένη εκτέλεση."
+
 msgid "The same value as ``error.type``."
 msgstr "Η ίδια τιμή με το ``error.type``."
 
 msgid "The same value as ``reason``."
 msgstr "Η ίδια τιμή με το ``reason``."
+
+msgid "The scheduled database backup failed with this error:"
+msgstr "Το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων απέτυχε με αυτό το σφάλμα:"
 
 msgid "The selected locker is not in the delivery country."
 msgstr "Το επιλεγμένο locker δεν βρίσκεται στη χώρα παράδοσης."
@@ -13695,6 +13755,9 @@ msgstr "Η γραμμή του καταστήματος στις υπόλοιπ�
 #, python-format
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "Το κατάστημα δημιουργήθηκε, αλλά οι παρακάτω προεπιλογές δεν αρχικοποιήθηκαν: %(steps)s. Είναι λειτουργικό, αλλά ελέγξτε το log του server — ένα ευρετήριο Meilisearch που λείπει κάνει ΚΑΘΕ αναζήτηση σε αυτό το κατάστημα να επιστρέφει σφάλμα μέχρι να το επιδιορθώσει ο νυχτερινός συγχρονισμός."
+
+msgid "The store's owner received the matching notice."
+msgstr "Ο ιδιοκτήτης του καταστήματος έλαβε την αντίστοιχη ειδοποίηση."
 
 msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
@@ -13776,6 +13839,9 @@ msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο καν
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "Αυτά τα κλειδιά είναι δεσμευμένα και δεν μπορούν να σταλούν: %(keys)s"
+
+msgid "These system components failed their health checks:"
+msgstr "Αυτά τα στοιχεία του συστήματος απέτυχαν στους ελέγχους υγείας:"
 
 msgid "Third Floor"
 msgstr "3ος όροφος"
@@ -15849,6 +15915,14 @@ msgid "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
 msgstr "[{site}] Αντικαταβολή ACS: {n} παραδομένα δέματα χωρίς απόδοση"
 
 #, python-brace-format
+msgid "[{site}] ALERT: Scheduled Database Backup Failed"
+msgstr "[{site}] ΕΙΔΟΠΟΙΗΣΗ: Απέτυχε το προγραμματισμένο αντίγραφο ασφαλείας της βάσης"
+
+#, python-brace-format
+msgid "[{site}] CRITICAL: System Health Check Failed ({components})"
+msgstr "[{site}] ΚΡΙΣΙΜΟ: Απέτυχε ο έλεγχος υγείας του συστήματος ({components})"
+
+#, python-brace-format
 msgid "[{site}] Confirm your alert for {name}"
 msgstr "[{site}] Επιβεβαιώστε την ειδοποίησή σας για το {name}"
 
@@ -15879,6 +15953,10 @@ msgstr "[{site}] Κριτική σε αναμονή έγκρισης: {product_n
 #, python-brace-format
 msgid "[{site}] Stale ACS shipment alert — {n} shipment(s)"
 msgstr "[{site}] Ειδοποίηση ακινητοποιημένων αποστολών ACS — {n} αποστολή/ές"
+
+#, python-brace-format
+msgid "[{site}] Tenant billing stage {stage}: {schema}"
+msgstr "[{site}] Στάδιο χρέωσης καταστήματος {stage}: {schema}"
 
 #, python-brace-format
 msgid "[{site}] Update on your business account application"
@@ -16139,6 +16217,18 @@ msgstr "εβδομάδα"
 
 msgid "without voucher"
 msgstr "χωρίς voucher"
+
+#, python-brace-format
+msgid "{store} — your plan expires on {date}"
+msgstr "{store} — το πλάνο σας λήγει στις {date}"
+
+#, python-brace-format
+msgid "{store} — your plan has expired"
+msgstr "{store} — το πλάνο σας έληξε"
+
+#, python-brace-format
+msgid "{store} — your store has been suspended"
+msgstr "{store} — το κατάστημά σας έχει ανασταλεί"
 
 msgid "© 2026"
 msgstr "© 2026"
@@ -16958,9 +17048,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "SPECIAL OFFERS"
 #~ msgstr "ΕΙΔΙΚΕΣ ΠΡΟΣΦΟΡΕΣ"
-
-#~ msgid "Scheduled Tasks"
-#~ msgstr "Προγραμματισμένες Εργασίες"
 
 #~ msgid "Scheduled tasks"
 #~ msgstr "Προγραμματισμένες εργασίες"

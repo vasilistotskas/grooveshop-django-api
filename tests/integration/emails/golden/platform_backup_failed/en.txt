@@ -1,0 +1,10 @@
+Scheduled database backup failed
+
+The scheduled database backup failed with this error:
+
+Broker unreachable
+
+Check the system logs and make sure the backup system is working properly.
+
+---
+Grooveshop

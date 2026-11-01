@@ -12,7 +12,7 @@
                 {% component "unfold/components/title.html" %}{{ email_type.title }}{% endcomponent %}
                 {% component "unfold/components/text.html" with class="max-w-3xl" %}{{ email_type.description }}{% endcomponent %}
             </div>
-            <div class="flex flex-wrap gap-2 items-center shrink-0">
+            <div class="flex flex-wrap gap-2 items-center">
                 {% if not item.row.switchable %}
                     {% trans "Required" as required_label %}
                     {% include "unfold/helpers/label.html" with text=required_label variant="info" icon="lock" %}
@@ -81,9 +81,8 @@
         {% trans "Latest sends" as recent_title %}
         {% component "unfold/components/card.html" with title=recent_title %}
             {% if table.rows %}
-                <div class="overflow-x-auto">
-                    {% component "unfold/components/table.html" with table=table card_included=1 %}{% endcomponent %}
-                </div>
+                {# Unfold's table scrolls sideways inside the card by itself; a wrapper of ours would clip its negative margins. #}
+                {% component "unfold/components/table.html" with table=table card_included=1 %}{% endcomponent %}
             {% else %}
                 {% trans "Nothing has been sent yet." as empty_label %}
                 {% component "unfold/components/text.html" %}{{ empty_label }}{% endcomponent %}

@@ -16,7 +16,7 @@
                     reset, cannot be switched off.
                 {% endblocktrans %}
             {% endcomponent %}
-            <div class="flex flex-wrap gap-2 shrink-0">
+            <div class="flex flex-wrap gap-2">
                 {% if log_url %}
                     {% trans "Email log" as log_label %}
                     {% component "unfold/components/button.html" with href=log_url icon="history" variant="default" %}{{ log_label }}{% endcomponent %}

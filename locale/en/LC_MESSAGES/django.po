@@ -34,6 +34,10 @@ msgid "%(active)d/%(total)d active"
 msgstr "%(active)d/%(total)d active"
 
 #, python-format
+msgid "%(ago)s ago"
+msgstr "%(ago)s ago"
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
@@ -16811,6 +16815,9 @@ msgstr "surfaces"
 
 msgid "target_price is required for price-drop alerts."
 msgstr "target_price is required for price-drop alerts."
+
+msgid "test"
+msgstr "test"
 
 msgid "threshold"
 msgstr "threshold"

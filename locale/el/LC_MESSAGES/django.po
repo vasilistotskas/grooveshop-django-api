@@ -39,6 +39,10 @@ msgid "%(active)d/%(total)d active"
 msgstr "%(active)d/%(total)d ενεργά"
 
 #, python-format
+msgid "%(ago)s ago"
+msgstr "πριν από %(ago)s"
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
@@ -16816,6 +16820,9 @@ msgstr "επιφάνειες"
 
 msgid "target_price is required for price-drop alerts."
 msgstr "Το target_price είναι υποχρεωτικό για ειδοποιήσεις πτώσης τιμής."
+
+msgid "test"
+msgstr "δοκιμή"
 
 msgid "threshold"
 msgstr "όριο"

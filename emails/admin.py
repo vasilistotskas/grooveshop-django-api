@@ -365,9 +365,14 @@ class EmailSwitchAdmin(BaseModelAdmin):
                 event.type.removeprefix("email.")
                 for event in entry.events.all()
             )
+            when = gettext("%(ago)s ago") % {
+                "ago": relative_time(entry.created_at)
+            }
+            if entry.is_test:
+                when = f"{when} · {gettext('test')}"
             rows.append(
                 [
-                    relative_time(entry.created_at),
+                    when,
                     entry.recipient_masked or "—",
                     label_cell(
                         Status(entry.status).label,
@@ -580,11 +585,13 @@ class EmailEventInline(TabularInline):
 class EmailLogAdmin(HashedAddressSearch, BaseModelAdmin):
     """Every email the store sent, skipped or failed to send; read-only."""
 
+    # The email and its status first: on a phone the table scrolls sideways,
+    # and those are the two columns a reader came for.
     list_display = (
-        "created_at",
         "email",
-        "recipient_masked",
         "state",
+        "recipient_masked",
+        "created_at",
         "subject",
         "provider",
     )

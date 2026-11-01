@@ -703,7 +703,12 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         )
 
     shipments = list(
-        AcsShipment.objects.filter(id__in=shipment_ids).select_related("order")
+        AcsShipment.objects.filter(id__in=shipment_ids)
+        .select_related("order")
+        # Explicit: parcels created in the same instant would otherwise
+        # come out of the database in any order, so the digest differed
+        # from one run to the next.
+        .order_by("-created_at", "id")
     )
 
     try:

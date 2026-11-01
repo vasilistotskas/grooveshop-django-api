@@ -179,6 +179,23 @@ def bump_generation_on_text_override_change(sender, instance, **kwargs):
 
 
 @receiver(
+    post_save,
+    sender="builder.BuilderRelease",
+    dispatch_uid="tenant.bump_generation_on_builder_release",
+)
+def bump_generation_on_builder_release(sender, instance, **kwargs):
+    """Move the tenant's cached entries on when a release is published or
+    rolled back.
+
+    The public read of the current release (``builder.published``) keeps
+    the current release number under the generation, so a new release is
+    served at once. A release is immutable and never deleted, so only a
+    save counts. The bump rides the release's own transaction.
+    """
+    _bump_generation_for_current_schema()
+
+
+@receiver(
     [post_save, post_delete],
     sender="emails.EmailSwitch",
     dispatch_uid="tenant.bump_generation_on_email_switch_change",

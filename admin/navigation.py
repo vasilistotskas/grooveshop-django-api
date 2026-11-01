@@ -399,6 +399,19 @@ def store_sidebar(request: Any) -> list[Item]:
             # The wording of the storefront itself (buttons, labels, notices),
             # one editor page rather than a model list.
             page("texts.TextOverride", _("Storefront Texts"), "translate"),
+            # What the page builder holds, read only: the editor itself is
+            # the storefront's.
+            _menu(
+                _("Page builder"),
+                "web",
+                [
+                    page("builder.BuilderDocument", _("Builder documents")),
+                    page("builder.BuilderRelease", _("Releases")),
+                    page(
+                        "builder.BuilderReference", _("Where things are used")
+                    ),
+                ],
+            ),
             _menu(
                 _("Blog"),
                 "article",

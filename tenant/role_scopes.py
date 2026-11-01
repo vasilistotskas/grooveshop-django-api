@@ -135,14 +135,18 @@ def selectable_roles(
 #
 # ``emails``: which emails the store sends is a decision about the store
 # itself, so ADMIN and OWNER make it and STAFF do not even see the page.
+#
+# ``builder``: the storefront's pages are its presentation, so ADMIN and
+# OWNER edit and publish them (``page_config`` still lets STAFF edit a
+# layout until the builder replaces it) and STAFF only see them.
 STORE_SETTINGS_APP_LABELS: frozenset[str] = frozenset(
-    {"extra_settings", "texts", "emails"}
+    {"extra_settings", "texts", "emails", "builder"}
 )
 
 # Store-settings apps STAFF may still LOOK at, never change: their pages
 # open read-only. Each must also be in ``STORE_SETTINGS_APP_LABELS``, which
 # is what withholds the change permission.
-STAFF_READ_ONLY_APP_LABELS: frozenset[str] = frozenset({"texts"})
+STAFF_READ_ONLY_APP_LABELS: frozenset[str] = frozenset({"texts", "builder"})
 
 
 # What the store OWNER holds back from ADMIN: the store's profit and the

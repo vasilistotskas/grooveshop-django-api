@@ -1,0 +1,366 @@
+"""The builder's HTTP surface.
+
+Staff routes (``StoreStaffModelPermissions``: the role in this store
+decides, so ADMIN and OWNER edit and publish and STAFF only look) and one
+public read of the current release. All of it is a thin layer over
+``builder.services`` (the only writer) and ``builder.published``.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
+from rest_framework import status
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import AllowAny
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from builder import published, services
+from builder.errors import (
+    BuilderError,
+    NotFoundError,
+    PreconditionRequired,
+)
+from builder.models import (
+    BuilderDocument,
+    BuilderRelease,
+    BuilderVersion,
+    DocumentKind,
+)
+from builder.rendering import BuilderJSONParser, BuilderJSONRenderer
+from builder.serializers import (
+    CheckpointWriteSerializer,
+    DocumentDetailSerializer,
+    DocumentListSerializer,
+    DraftWriteSerializer,
+    PublishWriteSerializer,
+    ReleaseSerializer,
+    RollbackWriteSerializer,
+    VersionDetailSerializer,
+    VersionListSerializer,
+)
+from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from page_config.localization import LOCALE_PARAM, requested_locale
+
+TAGS = ["Builder"]
+ERRORS = {
+    400: OpenApiResponse(response=ErrorResponseSerializer),
+    409: OpenApiResponse(response=ErrorResponseSerializer),
+}
+
+
+def expected_revision(request: Request) -> int:
+    """The revision named in ``If-Match`` (``"3"``, ``W/"3"`` or ``3``)."""
+    raw = request.headers.get("If-Match")
+    if raw is None:
+        raise PreconditionRequired()
+    value = raw.strip().removeprefix("W/").strip('"')
+    if not value.isdigit():
+        raise BuilderError(
+            _("If-Match must be a revision number."), code="invalid_revision"
+        )
+    return int(value)
+
+
+def _etagged(response: Response, document: BuilderDocument) -> Response:
+    response["ETag"] = f'"{document.draft_revision}"'
+    return response
+
+
+class StaffView(APIView):
+    """Common to every staff route."""
+
+    renderer_classes = [BuilderJSONRenderer]
+    parser_classes = [BuilderJSONParser]
+    permission_classes = [StoreStaffModelPermissions]
+    queryset: QuerySet[Any] = BuilderDocument.objects.none()
+
+
+class StaffListView(ListAPIView):
+    renderer_classes = [BuilderJSONRenderer]
+    permission_classes = [StoreStaffModelPermissions]
+
+
+_IF_MATCH = OpenApiParameter(
+    name="If-Match",
+    location=OpenApiParameter.HEADER,
+    required=True,
+    type=str,
+    description=(
+        "The draft revision this change is made against, as read from the "
+        "document (`draftRevision`, or the ETag). `0` creates a document "
+        "that does not exist. A stale revision answers 409 "
+        "`revision_conflict` with the current one and who saved it."
+    ),
+)
+
+
+@extend_schema(tags=TAGS)
+class DocumentListView(StaffListView):
+    queryset = BuilderDocument.objects.all()
+    serializer_class = DocumentListSerializer
+
+    def get_queryset(self) -> QuerySet[BuilderDocument]:
+        queryset = BuilderDocument.objects.prefetch_related("updated_by_staff")
+        kind = self.request.query_params.get("kind")
+        if kind in DocumentKind.values:
+            queryset = queryset.filter(kind=kind)
+        return queryset.order_by("key")
+
+    def get_serializer_context(self) -> dict[str, Any]:
+        return {
+            **super().get_serializer_context(),
+            "published_numbers": services.published_numbers(),
+        }
+
+
+class DocumentView(StaffView):
+    @extend_schema(tags=TAGS, responses=DocumentDetailSerializer)
+    def get(self, request: Request, key: str) -> Response:
+        document = get_object_or_404(BuilderDocument, key=key)
+        return _etagged(
+            Response(
+                DocumentDetailSerializer(
+                    document,
+                    context={"published_numbers": services.published_numbers()},
+                ).data
+            ),
+            document,
+        )
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[_IF_MATCH],
+        responses={204: None, **ERRORS},
+        description="Delete a page. A released page leaves the store with a "
+        "new release; a page another released document links to is refused "
+        "(`page_in_use`).",
+    )
+    def delete(self, request: Request, key: str) -> Response:
+        services.delete_page(
+            request.user, key=key, expected_revision=expected_revision(request)
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DraftView(StaffView):
+    @extend_schema(
+        tags=TAGS,
+        parameters=[_IF_MATCH],
+        request=DraftWriteSerializer,
+        responses={200: DocumentDetailSerializer, **ERRORS},
+        description=(
+            "Autosave. The document is validated in full against the "
+            "storefront's catalogue; the answer is 503 "
+            "`storefront_unavailable` when it cannot be checked, and 400 "
+            "`invalid_document` with every problem as `{path, code, "
+            "message}` (a JSON pointer into what was sent)."
+        ),
+    )
+    def put(self, request: Request, key: str) -> Response:
+        body = DraftWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        document = services.save_draft(
+            request.user,
+            key=key,
+            draft=body.validated_data["draft"],
+            i18n=body.validated_data["i18n"],
+            expected_revision=expected_revision(request),
+        )
+        return _etagged(
+            Response(DocumentDetailSerializer(document).data), document
+        )
+
+
+class DiscardView(StaffView):
+    @extend_schema(
+        tags=TAGS,
+        parameters=[_IF_MATCH],
+        request=None,
+        responses={200: DocumentDetailSerializer, **ERRORS},
+    )
+    def post(self, request: Request, key: str) -> Response:
+        document = services.discard_draft(
+            request.user, key=key, expected_revision=expected_revision(request)
+        )
+        return _etagged(
+            Response(DocumentDetailSerializer(document).data), document
+        )
+
+
+class VersionListView(StaffListView):
+    serializer_class = VersionListSerializer
+    queryset = BuilderVersion.objects.all()
+
+    def get_queryset(self) -> QuerySet[BuilderVersion]:
+        document = get_object_or_404(BuilderDocument, key=self.kwargs["key"])
+        return document.versions.prefetch_related("created_by_staff").order_by(
+            "-number"
+        )
+
+    @extend_schema(tags=TAGS)
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        return super().get(request, *args, **kwargs)
+
+
+class CheckpointView(StaffView):
+    queryset = BuilderVersion.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=CheckpointWriteSerializer,
+        responses={201: VersionListSerializer, **ERRORS},
+        description="A named save: freeze the current draft as a version.",
+    )
+    def post(self, request: Request, key: str) -> Response:
+        body = CheckpointWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        version = services.create_checkpoint(
+            request.user, key=key, note=body.validated_data["note"]
+        )
+        return Response(
+            VersionListSerializer(version).data, status=status.HTTP_201_CREATED
+        )
+
+
+class VersionView(StaffView):
+    queryset = BuilderVersion.objects.none()
+
+    @extend_schema(tags=TAGS, responses=VersionDetailSerializer)
+    def get(self, request: Request, key: str, number: int) -> Response:
+        version = get_object_or_404(
+            BuilderVersion, document__key=key, number=number
+        )
+        return Response(VersionDetailSerializer(version).data)
+
+
+class RestoreView(StaffView):
+    @extend_schema(
+        tags=TAGS,
+        parameters=[_IF_MATCH],
+        request=None,
+        responses={200: DocumentDetailSerializer, **ERRORS},
+        description=(
+            "Put a version back as the DRAFT. It is not checked against "
+            "the catalogue (the editor upgrades old blocks); publishing "
+            "validates."
+        ),
+    )
+    def post(self, request: Request, key: str, number: int) -> Response:
+        document = services.restore_version(
+            request.user,
+            key=key,
+            number=number,
+            expected_revision=expected_revision(request),
+        )
+        return _etagged(
+            Response(DocumentDetailSerializer(document).data), document
+        )
+
+
+class PublishView(StaffView):
+    queryset = BuilderRelease.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=PublishWriteSerializer,
+        responses={201: ReleaseSerializer, **ERRORS},
+        description=(
+            "Release the drafts of the named documents together, or none "
+            "of them. Every draft is validated in full, references "
+            "included; the answer lists every problem with its `document`."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        body = PublishWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        result = services.publish(
+            request.user,
+            keys=body.validated_data["documents"],
+            note=body.validated_data["note"],
+        )
+        return Response(
+            ReleaseSerializer(result.release).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RollbackView(StaffView):
+    queryset = BuilderRelease.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=RollbackWriteSerializer,
+        responses={201: ReleaseSerializer, **ERRORS},
+        description=("A new release pointing at the versions of an older one."),
+    )
+    def post(self, request: Request) -> Response:
+        body = RollbackWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        release = services.rollback(
+            request.user,
+            release_id=body.validated_data["release"],
+            note=body.validated_data["note"],
+        )
+        return Response(
+            ReleaseSerializer(release).data, status=status.HTTP_201_CREATED
+        )
+
+
+@extend_schema(tags=TAGS)
+class ReleaseListView(StaffListView):
+    queryset = BuilderRelease.objects.all()
+    serializer_class = ReleaseSerializer
+
+    def get_queryset(self) -> QuerySet[BuilderRelease]:
+        return BuilderRelease.objects.select_related(
+            "rolled_back_from"
+        ).prefetch_related("published_by_staff")
+
+
+class PublishedPageView(APIView):
+    """The current release's theme, groups and page, for one locale."""
+
+    renderer_classes = [BuilderJSONRenderer]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[
+            OpenApiParameter(
+                name=LOCALE_PARAM,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+                description=(
+                    "Language to resolve the content in; unknown or "
+                    "omitted means the store's default language."
+                ),
+            )
+        ],
+        responses={200: dict, 404: OpenApiResponse(ErrorResponseSerializer)},
+        description=(
+            "`{release, locale, theme, groups, page}`: the documents of "
+            "the CURRENT release resolved for the locale (overlay merged, "
+            "disabled nodes dropped). `page` is the page of that key, else "
+            "the template of that name. Never reads a draft and never "
+            "calls the storefront; the content keys are the storefront's "
+            "own and are not camelCased."
+        ),
+    )
+    def get(self, request: Request, page_key: str) -> Response:
+        payload = published.published_page(page_key, requested_locale(request))
+        if payload is None:
+            raise NotFoundError(code="page_not_published")
+        return Response(payload)

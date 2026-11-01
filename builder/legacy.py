@@ -83,7 +83,8 @@ def export_layout(layout: PageLayout) -> dict[str, Any]:
                 "title": section.title,
                 "isVisible": section.is_visible,
                 "props": section.props,
-                "i18n": section.i18n,
+                # Only what a section has: an empty overlay is left out.
+                **({"i18n": section.i18n} if section.i18n else {}),
             }
             for section in layout.sections.order_by("sort_order", "pk")
         ],
@@ -115,8 +116,12 @@ def _column(column: NavigationColumn, locales: list[str]) -> dict[str, Any]:
     return {
         "id": str(column.uuid),
         "labels": {code: held[code] for code in locales if held.get(code)},
-        "icon": column.icon,
-        "showsMerchantIdentity": column.shows_merchant_identity,
+        **({"icon": column.icon} if column.icon else {}),
+        **(
+            {"showsMerchantIdentity": True}
+            if column.shows_merchant_identity
+            else {}
+        ),
         "links": [
             _link(link, locales)
             for link in column.links.order_by("sort_order", "pk")
@@ -125,7 +130,7 @@ def _column(column: NavigationColumn, locales: list[str]) -> dict[str, Any]:
 
 
 def export_menu(menu: NavigationMenu, locales: list[str]) -> dict[str, Any]:
-    legacy: dict[str, Any] = {"slot": menu.slot}
+    legacy: dict[str, Any] = {"slot": menu.slot, "id": str(menu.uuid)}
     if menu.columns.exists():
         legacy["columns"] = [
             _column(column, locales)

@@ -1,0 +1,72 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block content %}
+    <div class="gap-6 grid grid-cols-1 lg:grid-cols-3" x-data="{ selected: '', query: '' }">
+        {% trans "Emails" as list_title %}
+        {% component "unfold/components/card.html" with title=list_title %}
+            <div class="mb-4">{{ form.search }}</div>
+
+            {% for group in groups %}
+                <section class="mb-4">
+                    {% component "unfold/components/title.html" with class="mb-2 text-sm" %}{{ group.title }}{% endcomponent %}
+
+                    <ul class="flex flex-col gap-1">
+                        {% for row in group.rows %}
+                            {% with email_type=row.email_type %}
+                                <li x-show="!query || $el.dataset.search.includes(query.toLowerCase())"
+                                    data-search="{{ email_type.key|lower }} {{ email_type.title|lower }} {{ email_type.description|lower }}">
+                                    <button type="button"
+                                            class="cursor-pointer flex flex-col gap-1 px-3 py-2 rounded-default text-left w-full hover:bg-base-100 dark:hover:bg-base-800"
+                                            x-bind:class="selected === $el.dataset.type && 'bg-base-100 dark:bg-base-800'"
+                                            data-type="{{ email_type.key }}"
+                                            x-on:click="selected = $el.dataset.type; $nextTick(() => htmx.trigger($refs.preview, 'submit'))">
+                                        <span class="flex gap-2 items-center">
+                                            <strong class="text-important">{{ email_type.title }}</strong>
+                                            {% if row.enabled and not row.closed_gate %}
+                                                {% trans "Sent" as sent %}
+                                                {% include "unfold/helpers/label.html" with text=sent variant="success" %}
+                                            {% else %}
+                                                {% trans "Not sent" as not_sent %}
+                                                {% include "unfold/helpers/label.html" with text=not_sent %}
+                                            {% endif %}
+                                        </span>
+                                        {% component "unfold/components/text.html" %}{{ email_type.description }}{% endcomponent %}
+                                    </button>
+                                </li>
+                            {% endwith %}
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endfor %}
+        {% endcomponent %}
+
+        <div class="lg:col-span-2">
+            {% trans "Preview" as preview_title %}
+            {% component "unfold/components/card.html" with title=preview_title %}
+                <form x-ref="preview"
+                      hx-post="{% url 'admin:emails_emailswitch_preview_render' %}"
+                      hx-target="#email-preview"
+                      hx-trigger="submit, change"
+                      x-on:submit.prevent
+                      class="flex flex-wrap gap-4 items-end mb-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="{{ form.type_key.html_name }}" x-model="selected">
+                    {% include "unfold/helpers/field.html" with field=form.language %}
+                    {% include "unfold/helpers/field.html" with field=form.order %}
+                    {% include "unfold/helpers/field.html" with field=form.format %}
+                </form>
+
+                <div id="email-preview">
+                    {% component "unfold/components/text.html" %}
+                        {% trans "Select an email to preview" %}
+                    {% endcomponent %}
+                </div>
+            {% endcomponent %}
+        </div>
+    </div>
+{% endblock %}

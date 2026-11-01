@@ -1,14 +1,14 @@
 """When a mail send fails, retry only what a retry could fix.
 
-`send_rendered_email_task` moved the SMTP conversation out of the
-request so a transient 421 stops being a 500 on signup. That left two
+`send_allauth_email_task` moves the SMTP conversation out of the
+request so a transient 421 stops being a 500 on signup. That leaves two
 things to get right, and RFC 5321 decides the first: 4xx means "try
 again", 5xx means "do not". The exception CLASS cannot express it —
 `SMTPConnectError(421)` and `SMTPAuthenticationError(535)` are both
 `SMTPResponseException`.
 
-The second is what reaches the logs. The task's payload is a rendered
-email, and for a password reset or a login code that payload IS the
+The second is what reaches the logs. The task's payload is the context of
+the mail, and for a password reset or a login code that payload IS the
 secret.
 """
 
@@ -23,14 +23,14 @@ from celery.exceptions import Retry
 from django.core import mail
 
 from core.retry import is_permanent_smtp_failure, smtp_codes
-from user.tasks import send_rendered_email_task
+from user.tasks import send_allauth_email_task
 
 MESSAGE = {
-    "subject": "Reset your password",
-    "body": "Open https://example.test/reset/key/ONE-TIME-TOKEN/ to continue",
-    "from_email": "noreply@example.test",
-    "to": ["person@example.test"],
-    "html_body": "<a href='https://example.test/reset/key/ONE-TIME-TOKEN/'>go</a>",
+    "type_key": "account.login_code",
+    "address": "person@example.test",
+    "language": "en",
+    "user_pk": None,
+    "context": {"code": "ONE-TIME-TOKEN"},
 }
 
 
@@ -89,11 +89,11 @@ class TestRetryBehaviour:
             # a bare mock returns one instead, and ``raise`` then fails
             # on a non-exception.
             patch.object(
-                send_rendered_email_task, "retry", side_effect=Retry()
+                send_allauth_email_task, "retry", side_effect=Retry()
             ) as retry,
             pytest.raises(Retry),
         ):
-            send_rendered_email_task(**MESSAGE)
+            send_allauth_email_task(**MESSAGE)
 
         assert retry.called, "a 421 must be retried — that is the whole fix"
 
@@ -113,16 +113,16 @@ class TestRetryBehaviour:
             patch.object(Task, "retry") as retry,
             pytest.raises(smtplib.SMTPSenderRefused),
         ):
-            send_rendered_email_task(**MESSAGE)
+            send_allauth_email_task(**MESSAGE)
 
         assert not retry.called, "a 5xx was retried"
 
 
-class TestTheRenderedBodyNeverReachesTheLogs:
-    def test_body_and_html_body_are_masked_on_failure(self, caplog):
-        """The failure path logs the task's kwargs. For a password
-        reset that kwarg is the one-time link."""
-        send_rendered_email_task.on_failure(
+class TestTheContextNeverReachesTheLogs:
+    def test_the_context_is_masked_on_failure(self, caplog):
+        """The failure path logs the task's kwargs. For a login code or a
+        password reset that kwarg carries the one-time secret."""
+        send_allauth_email_task.on_failure(
             smtplib.SMTPConnectError(421, b"Server busy"),
             "task-id",
             [],
@@ -132,9 +132,9 @@ class TestTheRenderedBodyNeverReachesTheLogs:
 
         logged = caplog.text
         assert "ONE-TIME-TOKEN" not in logged, (
-            "the rendered reset link reached the log"
+            "the one-time code reached the log"
         )
-        assert "***" in logged, "the body was not masked"
+        assert "***" in logged, "the context was not masked"
         # The recipient stays: it is what makes a delivery failure
         # actionable, and it is not a credential.
         assert "person@example.test" in logged

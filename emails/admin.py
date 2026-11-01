@@ -2,7 +2,9 @@
 
 One dedicated page, not a changelist: ``EmailSwitchAdmin.changelist_view``
 lists every email the store may switch, by area, and ``toggle_view`` is the
-small htmx endpoint a switch talks to. Every write goes through
+small htmx endpoint a switch talks to. ``preview_view`` is the second page,
+the preview of any registered email (``emails.preview``), and
+``preview_render_view`` the htmx endpoint its form talks to. Every write goes through
 ``emails.services.set_switch`` (permission, validation, history with the
 actor, the store's cache generation); the model has no add or change form,
 because a form would bypass the rule that a required email stays on.
@@ -24,6 +26,7 @@ from unfold.widgets import UnfoldBooleanSwitchWidget
 from admin.base import BaseModelAdmin
 from emails import switches
 from emails.models import EmailSwitch
+from emails.preview import EmailPreviewForm, build_preview
 from emails.registry import UnknownEmailType, registry
 from emails.services import CHANGE_PERMISSION, set_switch
 from emails.types import Owner
@@ -55,6 +58,16 @@ class EmailSwitchAdmin(BaseModelAdmin):
                 "toggle/",
                 self.admin_site.admin_view(self.toggle_view),
                 name=f"{info[0]}_{info[1]}_toggle",
+            ),
+            path(
+                "preview/",
+                self.admin_site.admin_view(self.preview_view),
+                name=f"{info[0]}_{info[1]}_preview",
+            ),
+            path(
+                "preview/render/",
+                self.admin_site.admin_view(self.preview_render_view),
+                name=f"{info[0]}_{info[1]}_preview_render",
             ),
             *super().get_urls(),
         ]
@@ -100,6 +113,59 @@ class EmailSwitchAdmin(BaseModelAdmin):
             "row": row,
             "control": self._control(request, row) if row.switchable else "",
         }
+
+    # ------------------------------------------------------------- preview
+
+    @staticmethod
+    def _require_preview_access(request: HttpRequest) -> None:
+        # The preview can render a real order, so it needs the order
+        # permission on top of the admin site's own tenant-membership gate.
+        if not request.user.has_perm("order.view_order"):
+            raise PermissionDenied
+
+    def preview_view(self, request: HttpRequest) -> HttpResponse:
+        """Every email the store sends; pick one to see it."""
+        self._require_preview_access(request)
+        return TemplateResponse(
+            request,
+            "admin/emails/preview.html",
+            {
+                **self.admin_site.each_context(request),
+                "title": _("Email Templates"),
+                "opts": self.opts,
+                "form": EmailPreviewForm(),
+                "groups": switches.switch_groups(),
+            },
+        )
+
+    @method_decorator(require_http_methods(["POST"]))
+    def preview_render_view(self, request: HttpRequest) -> HttpResponse:
+        """The preview panel's fragment, posted by htmx from the form."""
+        self._require_preview_access(request)
+        form = EmailPreviewForm(request.POST)
+        if not form.is_valid():
+            return TemplateResponse(
+                request,
+                "admin/emails/_preview.html",
+                {"error": _("Select an email to preview.")},
+            )
+        data = form.cleaned_data
+        preview = build_preview(
+            registry.get(data["type_key"]),
+            order_id=data["order"],
+            language=data["language"],
+        )
+        return TemplateResponse(
+            request,
+            "admin/emails/_preview.html",
+            {
+                "error": preview.error,
+                "format": data["format"],
+                "subject": preview.subject,
+                "html": preview.html,
+                "text": preview.text,
+            },
+        )
 
     # -------------------------------------------------------------- endpoint
 

@@ -1,13 +1,8 @@
 """The admin preview of an order email IS the email that order is sent.
 
-The preview used to keep its own copy of everything: an English subject
-typed into ``core/email/config.py`` for nine templates and "Email from
-{store}" for the rest, and a reduced context rebuilt by hand from the
-order (prices pre-formatted into strings, no pay way, no items queryset,
-no tracking context), so it showed a message nobody received. The subject
-and the context are now built by the registered email type
+The subject and the context are built by the registered email type
 (``order.emails``) and rendered by ``emails.render.render``, the function
-the sending pipeline and the preview both call.
+the sending pipeline and the preview (``emails.preview``) both call.
 
 Each test sends the real email through its real task, previews the same
 order, and compares what a customer would read.
@@ -18,7 +13,7 @@ from __future__ import annotations
 import pytest
 from django.core import mail
 
-from core.email.preview_service import EmailTemplatePreviewService
+from emails.preview import build_preview
 from emails.registry import registry
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
@@ -67,19 +62,18 @@ def _html(message) -> str:
     return html
 
 
-def _preview(template: str, order, language: str):
-    preview = EmailTemplatePreviewService().generate_preview(
-        template, order_id=order.id, language=language
+def _preview(key: str, order, language: str):
+    preview = build_preview(
+        registry.get(key), order_id=order.id, language=language
     )
     assert preview.error is None
-    assert preview.is_sample_data is False
     return preview
 
 
 def _assert_same_email(preview, sent) -> None:
     assert preview.subject == sent.subject
-    assert preview.text_content == sent.body
-    assert preview.html_content == _html(sent)
+    assert preview.text == sent.body
+    assert preview.html == _html(sent)
 
 
 @pytest.mark.parametrize("language", ["en", "el"])
@@ -104,7 +98,7 @@ class TestPreviewEqualsTheSentEmail:
 
         sent = self._confirmation_sent(order)
 
-        _assert_same_email(_preview("order_received", order, language), sent)
+        _assert_same_email(_preview("order.received", order, language), sent)
 
     def test_order_payment_confirmed(self, language):
         order = OrderFactory(
@@ -117,7 +111,7 @@ class TestPreviewEqualsTheSentEmail:
         sent = self._confirmation_sent(order)
 
         _assert_same_email(
-            _preview("order_payment_confirmed", order, language), sent
+            _preview("order.payment_confirmed", order, language), sent
         )
 
     def test_order_shipped(self, language):
@@ -133,7 +127,7 @@ class TestPreviewEqualsTheSentEmail:
         assert send_shipping_notification_email.run(order.id) is True
 
         sent = mail.outbox[-1]
-        _assert_same_email(_preview("order_shipped", order, language), sent)
+        _assert_same_email(_preview("order.shipped", order, language), sent)
 
     def test_payment_failed(self, language):
         order = OrderFactory(num_order_items=1, language_code=language)
@@ -142,7 +136,9 @@ class TestPreviewEqualsTheSentEmail:
         assert send_payment_failed_email.run(order.id) is True
 
         sent = mail.outbox[-1]
-        _assert_same_email(_preview("payment_failed", order, language), sent)
+        _assert_same_email(
+            _preview("order.payment_failed", order, language), sent
+        )
 
     def test_status_update(self, language):
         order = OrderFactory(
@@ -155,7 +151,7 @@ class TestPreviewEqualsTheSentEmail:
         assert send_order_status_update_email.run(order.id, "CANCELED")
 
         sent = mail.outbox[-1]
-        _assert_same_email(_preview("order_canceled", order, language), sent)
+        _assert_same_email(_preview("order.canceled", order, language), sent)
 
     def test_refund(self, language):
         order = OrderFactory(num_order_items=1, language_code=language)
@@ -165,7 +161,7 @@ class TestPreviewEqualsTheSentEmail:
         assert send_refund_confirmation_email.run(refund.id) is True
 
         sent = mail.outbox[-1]
-        _assert_same_email(_preview("order_refunded", order, language), sent)
+        _assert_same_email(_preview("order.refunded", order, language), sent)
 
     def test_the_stores_new_order_alert(self, language):
         """Staff mail is in the STORE's language whatever the order's."""
@@ -175,60 +171,36 @@ class TestPreviewEqualsTheSentEmail:
         assert send_admin_new_order_email.run(order.id) is True
 
         sent = mail.outbox[-1]
-        _assert_same_email(_preview("admin_new_order", order, "en"), sent)
+        _assert_same_email(_preview("team.new_order", order, "en"), sent)
 
 
 class TestThePreviewRendersTheRealContext:
-    def test_the_order_is_the_model_not_a_reduced_copy(self):
-        order = OrderFactory(num_order_items=1)
-
-        preview = _preview("order_received", order, "en")
-
-        context = preview.context_data
-        assert isinstance(context["order"], Order)
-        assert context["order"].pk == order.pk
-        # What the sender passes and the hand-built copy never had.
-        assert {"pay_way", "is_paid", "payment_reference_needed"} <= set(
-            context
-        )
-
     def test_the_subject_is_translated_into_the_chosen_language(self):
         order = OrderFactory(num_order_items=0)
 
-        english = _preview("order_shipped", order, "en").subject
-        greek = _preview("order_shipped", order, "el").subject
+        english = _preview("order.shipped", order, "en").subject
+        greek = _preview("order.shipped", order, "el").subject
 
         assert english == f"Your Order #{order.id} Has Shipped"
         assert greek == f"Η παραγγελία σας #{order.id} έχει αποσταλεί"
 
-    def test_no_subject_is_made_up_for_an_email_without_a_type(self):
-        """A template no registered email type sends shows NO subject,
-        not "Email from {store}"."""
-        preview = EmailTemplatePreviewService().generate_preview(
-            "expiring", language="en"
-        )
-
-        assert preview.error is None
-        assert preview.subject == ""
-
     def test_a_sample_preview_still_shows_the_real_subject(self):
-        preview = EmailTemplatePreviewService().generate_preview(
-            "order_shipped", language="en"
+        preview = build_preview(
+            registry.get("order.shipped"), order_id=None, language="en"
         )
 
-        assert preview.is_sample_data is True
         assert preview.subject.startswith("Your Order #")
         assert preview.subject.endswith(" Has Shipped")
 
     def test_an_order_with_nothing_to_describe_is_reported(self):
         order = OrderFactory(num_order_items=0)
 
-        preview = EmailTemplatePreviewService().generate_preview(
-            "order_refunded", order_id=order.id, language="en"
+        preview = build_preview(
+            registry.get("order.refunded"), order_id=order.id, language="en"
         )
 
         assert preview.error == "This order has no refund to describe."
-        assert preview.html_content == ""
+        assert preview.html == ""
 
     def test_every_order_email_template_is_sent_by_a_registered_type(self):
         """A template added to ``emails/order/`` is previewable only through
@@ -290,15 +262,10 @@ class TestEveryRegisteredTypePreviewsFromItsSample:
     def test_the_sample_renders_with_its_real_subject(
         self, email_type, language
     ):
-        template = email_type.templates.rpartition("/")[2]
-
-        preview = EmailTemplatePreviewService().generate_preview(
-            template, language=language
-        )
+        preview = build_preview(email_type, order_id=None, language=language)
 
         assert preview.error is None
-        assert preview.is_sample_data is True
         assert preview.subject
         assert "{" not in preview.subject
-        assert preview.html_content
-        assert preview.text_content
+        assert preview.html
+        assert preview.text

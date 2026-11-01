@@ -106,8 +106,9 @@ class TestThePermissions:
         admin_html = admin[0].get(reverse("admin:index")).content.decode()
         staff_html = staff[0].get(reverse("admin:index")).content.decode()
 
-        assert url() in admin_html
-        assert url() not in staff_html
+        # The link itself: the preview page's address starts with it.
+        assert f'href="{url()}"' in admin_html
+        assert f'href="{url()}"' not in staff_html
 
 
 class TestThePage:

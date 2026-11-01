@@ -1068,9 +1068,6 @@ msgstr "Email λογαριασμού"
 msgid "Account preferences"
 msgstr "Προτιμήσεις λογαριασμού"
 
-msgid "Account security"
-msgstr "Ασφάλεια λογαριασμού"
-
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
 
@@ -1640,9 +1637,6 @@ msgstr "Αναμένεται απόφαση"
 
 msgid "Awaiting collection"
 msgstr "Αναμένεται είσπραξη"
-
-msgid "B2B"
-msgstr "B2B"
 
 msgid "B2B Enabled"
 msgstr "Ενεργοποιημένο B2B"
@@ -4114,9 +4108,6 @@ msgstr "Διεύθυνση Email"
 msgid "Email Addresses"
 msgstr "Διευθύνσεις email"
 
-msgid "Email Template Management"
-msgstr "Διαχείριση Προτύπων Email"
-
 msgid "Email Templates"
 msgstr "Πρότυπα Email"
 
@@ -4162,9 +4153,6 @@ msgstr "Διακόπτης email"
 
 msgid "Email switches"
 msgstr "Διακόπτες email"
-
-msgid "Email template"
-msgstr "Πρότυπο email"
 
 msgid "Email type"
 msgstr "Τύπος email"
@@ -6958,9 +6946,6 @@ msgstr "Ανενεργές ετικέτες"
 msgid "Inactive Users"
 msgstr "Ανενεργοί χρήστες"
 
-msgid "Inactive user notification"
-msgstr "Ειδοποίηση ανενεργού χρήστη"
-
 msgid "Include related surfaces"
 msgstr "Συμπερίληψη σχετικών επιφανειών"
 
@@ -8937,9 +8922,6 @@ msgstr "Λειτουργία"
 msgid "Operation Type"
 msgstr "Τύπος λειτουργίας"
 
-msgid "Operational alerts"
-msgstr "Λειτουργικές ειδοποιήσεις"
-
 msgid "Operational note from BoxNow"
 msgstr "Λειτουργική σημείωση από BoxNow"
 
@@ -9210,9 +9192,6 @@ msgstr "Πληροφορίες Είδους Παραγγελίας"
 
 msgid "Order Items"
 msgstr "Προϊόντα Παραγγελίας"
-
-msgid "Order Lifecycle"
-msgstr "Κύκλος ζωής παραγγελίας"
 
 msgid "Order Number"
 msgstr "Αριθμός Παραγγελίας"
@@ -11867,6 +11846,9 @@ msgstr "Αναζήτηση με κείμενο, κλειδί ή σελίδα, σ
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Αναζήτηση με τίτλο, υπότιτλο, slug, κείμενο ή email/όνομα συντάκτη."
 
+msgid "Search emails..."
+msgstr "Αναζήτηση email..."
+
 msgid "Search index"
 msgstr "Ευρετήριο αναζήτησης"
 
@@ -11878,9 +11860,6 @@ msgstr "Αναζήτηση προϊόντων με προηγμένα φίλτρ
 
 msgid "Search query string"
 msgstr "String αναζήτησης"
-
-msgid "Search templates..."
-msgstr "Αναζήτηση προτύπων..."
 
 msgid "Search timeout in milliseconds (searchCutoffMs)"
 msgstr "Χρονικό όριο αναζήτησης σε χιλιοστά του δευτερολέπτου (searchCutoffMs)"
@@ -11939,12 +11918,6 @@ msgstr "Επιλέξτε περιοχή για την επιλεγμένη χώ�
 msgid "Select a region that belongs to the selected country."
 msgstr "Επιλέξτε μια περιοχή που ανήκει στην επιλεγμένη χώρα."
 
-msgid "Select a template to preview"
-msgstr "Επιλέξτε πρότυπο για προεπισκόπηση"
-
-msgid "Select a template to preview."
-msgstr "Επιλέξτε πρότυπο για προεπισκόπηση."
-
 msgid "Select a valid country."
 msgstr "Επιλέξτε έγκυρη χώρα."
 
@@ -11953,6 +11926,12 @@ msgstr "Επιλογή όλων"
 
 msgid "Select an ACS Smartpoint locker before placing an order with locker delivery."
 msgstr "Επιλέξτε ένα locker ACS Smartpoint πριν την υποβολή παραγγελίας με παράδοση σε locker."
+
+msgid "Select an email to preview"
+msgstr "Επιλέξτε email για προεπισκόπηση"
+
+msgid "Select an email to preview."
+msgstr "Επιλέξτε email για προεπισκόπηση."
 
 msgid "Select at least one cache surface to purge."
 msgstr "Επίλεξε τουλάχιστον μία περιοχή cache για εκκαθάριση."
@@ -12109,15 +12088,6 @@ msgstr "Αποστέλλεται όταν μια παραγγελία επιστ
 
 msgid "Sent when an order's payment fails, with a link to retry."
 msgstr "Αποστέλλεται όταν αποτυγχάνει η πληρωμή μιας παραγγελίας, με σύνδεσμο για νέα προσπάθεια."
-
-msgid "Sent when order is canceled"
-msgstr "Αποστέλλεται όταν η παραγγελία ακυρωθεί"
-
-msgid "Sent when order is delivered"
-msgstr "Αποστέλλεται όταν η παραγγελία παραδοθεί"
-
-msgid "Sent when order is shipped"
-msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
 
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Αποστέλλεται όταν κάποιος κάνει εγγραφή με διεύθυνση που έχει ήδη λογαριασμό."
@@ -12521,9 +12491,6 @@ msgstr "Συνδέθηκε κοινωνικός λογαριασμός"
 msgid "Social account disconnected"
 msgstr "Αποσυνδέθηκε κοινωνικός λογαριασμός"
 
-msgid "Social sign-in"
-msgstr "Σύνδεση μέσω τρίτων"
-
 msgid "Software and subscriptions"
 msgstr "Λογισμικό και συνδρομές"
 
@@ -12688,15 +12655,6 @@ msgstr "Αναγνωριστικό κατάστασης"
 
 msgid "Status Updated At"
 msgstr "Κατάσταση ενημερώθηκε στις"
-
-msgid "Status update for completed orders"
-msgstr "Ενημέρωση κατάστασης για ολοκληρωμένες παραγγελίες"
-
-msgid "Status update for refunded orders"
-msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή χρημάτων"
-
-msgid "Status update for returned orders"
-msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή προϊόντων"
 
 #, python-format
 msgid "Step %(current)s of %(total)s"
@@ -13014,9 +12972,6 @@ msgstr "Θέμα Συνδρομής"
 msgid "Subscription Topics"
 msgstr "Θέματα Συνδρομών"
 
-msgid "Subscription confirmation email"
-msgstr "Email επιβεβαίωσης συνδρομής"
-
 msgid "Subscription pending confirmation."
 msgstr "Η εγγραφή εκκρεμεί επιβεβαίωσης."
 
@@ -13252,9 +13207,6 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 
 msgid "Tells the store's staff which products have run down to their low-stock threshold."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ποια προϊόντα έφτασαν στο όριο χαμηλού αποθέματος."
-
-msgid "Templates"
-msgstr "Πρότυπα"
 
 msgid "Ten"
 msgstr "Δέκα"
@@ -14374,9 +14326,6 @@ msgstr "URL προφίλ Twitter/X. Πρέπει να χρησιμοποιεί h
 msgid "Two"
 msgstr "Δύο"
 
-msgid "Two-factor authentication"
-msgstr "Διπλή επαλήθευση"
-
 msgid "Two-step verification"
 msgstr "Επαλήθευση σε δύο βήματα"
 
@@ -14588,9 +14537,6 @@ msgstr "Χωρίς τίτλο"
 msgid "Untitled Product"
 msgstr "Προϊόν χωρίς τίτλο"
 
-msgid "Unused"
-msgstr "Δεν χρησιμοποιείται"
-
 msgid "Unused Tags"
 msgstr "Μη χρησιμοποιημένες ετικέτες"
 
@@ -14736,9 +14682,6 @@ msgstr "ID χρήστη"
 
 msgid "User ID. Leave empty for guest orders."
 msgstr "ID χρήστη. Αφήστε κενό για παραγγελίες επισκεπτών."
-
-msgid "User Management"
-msgstr "Διαχείριση χρηστών"
 
 msgid "User Sessions"
 msgstr "Συνεδρίες χρήστη"
@@ -16023,9 +15966,6 @@ msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστών
 msgid "admin/"
 msgstr "admin/"
 
-msgid "admin/email-templates/"
-msgstr "admin/email-templates/"
-
 msgid "cart"
 msgstr "καλάθι"
 
@@ -16342,6 +16282,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
+#~ msgid "Account security"
+#~ msgstr "Ασφάλεια λογαριασμού"
+
 #~ msgid "Activate selected subscriptions"
 #~ msgstr "Ενεργοποίηση επιλεγμένων συνδρομών"
 
@@ -16409,6 +16352,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Awaiting payment"
 #~ msgstr "Σε αναμονή πληρωμής"
+
+#~ msgid "B2B"
+#~ msgstr "B2B"
 
 #~ msgid "Back to Admin"
 #~ msgstr "Επιστροφή στο Admin"
@@ -16518,6 +16464,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Edge cache — Cloudflare"
 #~ msgstr "Cache στο Cloudflare"
+
+#~ msgid "Email Template Management"
+#~ msgstr "Διαχείριση Προτύπων Email"
+
+#~ msgid "Email template"
+#~ msgstr "Πρότυπο email"
 
 #~ msgid "End date for export (ISO format: YYYY-MM-DD)"
 #~ msgstr "Ημερομηνία λήξης για την εξαγωγή (μορφή ISO: YYYY-MM-DD)"
@@ -16655,6 +16607,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "In Fulfillment (Shipped/Delivered)"
 #~ msgstr "Σε Διεκπεραίωση (Απεσταλμένες/Παραδομένες)"
+
+#~ msgid "Inactive user notification"
+#~ msgstr "Ειδοποίηση ανενεργού χρήστη"
 
 #~ msgid "Include click data in export"
 #~ msgstr "Συμπερίληψη click data στην εξαγωγή"
@@ -16840,6 +16795,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Only superusers may adjust loyalty points directly."
 #~ msgstr "Μόνο οι υπερχρήστες μπορούν να προσαρμόσουν απευθείας τους πόντους επιβράβευσης."
 
+#~ msgid "Operational alerts"
+#~ msgstr "Λειτουργικές ειδοποιήσεις"
+
 #~ msgid "Operator who reconciled the payout. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Ο χειριστής που συμφώνησε την απόδοση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
 
@@ -16859,6 +16817,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Order Analytics"
 #~ msgstr "Αναλυτικά παραγγελιών"
+
+#~ msgid "Order Lifecycle"
+#~ msgstr "Κύκλος ζωής παραγγελίας"
 
 #~ msgid "Order Reminder"
 #~ msgstr "Υπενθύμιση Παραγγελίας"
@@ -17070,6 +17031,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Sender address for outbound email from this tenant (e.g. 'no-reply@myshop.com'). Empty falls back to settings.DEFAULT_FROM_EMAIL."
 #~ msgstr "Διεύθυνση αποστολέα για εξερχόμενα email από αυτό το κατάστημα (π.χ. 'no-reply@myshop.com'). Κενό → χρησιμοποιείται η τιμή settings.DEFAULT_FROM_EMAIL."
 
+#~ msgid "Sent when order is canceled"
+#~ msgstr "Αποστέλλεται όταν η παραγγελία ακυρωθεί"
+
+#~ msgid "Sent when order is delivered"
+#~ msgstr "Αποστέλλεται όταν η παραγγελία παραδοθεί"
+
+#~ msgid "Sent when order is shipped"
+#~ msgstr "Αποστέλλεται όταν η παραγγελία αποσταλεί"
+
 #, python-format
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Δεν βρέθηκε η ρύθμιση '%(key)s'"
@@ -17107,6 +17077,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Social Media & Website"
 #~ msgstr "Μέσα Κοινωνικής Δικτύωσης & Ιστότοπος"
 
+#~ msgid "Social sign-in"
+#~ msgstr "Σύνδεση μέσω τρίτων"
+
 #, python-format
 #~ msgid "Sort order has been reset for %(count)d payment methods."
 #~ msgstr "Η σειρά ταξινόμησης επαναφέρθηκε για %(count)d μεθόδους πληρωμής."
@@ -17125,6 +17098,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Status Age"
 #~ msgstr "Διάρκεια κατάστασης"
+
+#~ msgid "Status update for completed orders"
+#~ msgstr "Ενημέρωση κατάστασης για ολοκληρωμένες παραγγελίες"
+
+#~ msgid "Status update for refunded orders"
+#~ msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή χρημάτων"
+
+#~ msgid "Status update for returned orders"
+#~ msgstr "Ενημέρωση κατάστασης για παραγγελίες με επιστροφή προϊόντων"
 
 #~ msgid "Stock Activity Logs (Recent 20)"
 #~ msgstr "Αρχεία δραστηριότητας (πρόσφατα 20)"
@@ -17146,6 +17128,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Subscription Summary"
 #~ msgstr "Σύνοψη Συνδρομής"
 
+#~ msgid "Subscription confirmation email"
+#~ msgstr "Email επιβεβαίωσης συνδρομής"
+
 #~ msgid "Subscription is not pending confirmation."
 #~ msgstr "Η εγγραφή δεν εκκρεμεί επιβεβαίωσης."
 
@@ -17160,6 +17145,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Template Preview"
 #~ msgstr "Προεπισκόπηση προτύπου"
+
+#~ msgid "Templates"
+#~ msgstr "Πρότυπα"
 
 #~ msgid "Test federated search functionality with sample queries"
 #~ msgstr "Δοκιμή λειτουργίας ομοσπονδιακής αναζήτησης με δείγματα ερωτημάτων"
@@ -17227,11 +17215,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "True"
 #~ msgstr "Ναι"
 
+#~ msgid "Two-factor authentication"
+#~ msgstr "Διπλή επαλήθευση"
+
 #~ msgid "Unable to process refund for this order."
 #~ msgstr "Δεν ήταν δυνατή η επεξεργασία επιστροφής χρημάτων για αυτή την παραγγελία."
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"
+
+#~ msgid "Unused"
+#~ msgstr "Δεν χρησιμοποιείται"
 
 #, python-format
 #~ msgid "Updated sort order for %(count)d countries."
@@ -17247,6 +17241,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Usage Analytics"
 #~ msgstr "Αναλυτικά χρήσης"
+
+#~ msgid "User Management"
+#~ msgstr "Διαχείριση χρηστών"
 
 #~ msgid "User is already subscribed to this topic."
 #~ msgstr "Ο χρήστης είναι ήδη εγγεγραμμένος σε αυτό το θέμα."
@@ -17329,6 +17326,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Zero VAT (0%)"
 #~ msgstr "Μηδενικός ΦΠΑ (0%)"
+
+#~ msgid "admin/email-templates/"
+#~ msgstr "admin/email-templates/"
 
 #~ msgid "allowed_csp_sources must be a list of strings."
 #~ msgstr "Το allowed_csp_sources πρέπει να είναι λίστα από strings."

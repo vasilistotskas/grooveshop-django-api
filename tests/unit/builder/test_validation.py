@@ -444,3 +444,19 @@ class TestTranslations:
         assert issues == []
         assert validated is not None
         assert validated.i18n["en"]["a"]["/body"] == "<p>en</p>"
+
+
+def test_an_older_version_is_outdated_even_when_accepts_names_only_the_current():
+    blocks = default_blocks()
+    blocks[0]["accepts"] = [blocks[0]["version"]]
+    catalogue = parse_catalogue({"hash": HASH, "blocks": blocks})
+
+    issues, _ = validate_document(
+        key="template:home",
+        data=document(("a", section("hero@1", {"title": "x"}))),
+        i18n={},
+        catalogue=catalogue,
+        feature_on=lambda name: True,
+    )
+
+    assert codes(issues) == {"/sections/a/type": "block_version_outdated"}

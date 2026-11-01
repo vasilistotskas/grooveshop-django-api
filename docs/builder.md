@@ -382,7 +382,8 @@ settings); Django never converts:
   released one, and ONE release (number 1, no staff, note "Imported from page
   layouts"). A problem anywhere, including a reference to nothing, writes
   nothing. A store that already has builder data is refused. `--dry-run` does
-  everything and rolls it back. The legacy tables are not touched.
+  everything and rolls it back; the `--json` report also gives each document's
+  `counts` (`sections` and `blocks` at every depth). The legacy tables are not touched.
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
 

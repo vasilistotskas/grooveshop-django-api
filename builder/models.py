@@ -24,7 +24,7 @@ import re
 from typing import Any
 
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -338,7 +338,10 @@ class BuilderScheduledPublish(TimeStampMixinModel):
         verbose_name_plural = _("Scheduled publishes")
         ordering = ["scheduled_for"]
         indexes = [
-            *TimeStampMixinModel.Meta.indexes,
+            # The mixin's ``%(class)s`` names are 37 characters here, past
+            # the 32 an index name may have (models.E034).
+            BTreeIndex(fields=["created_at"], name="builder_sched_created_ix"),
+            BTreeIndex(fields=["updated_at"], name="builder_sched_updated_ix"),
             models.Index(
                 fields=["status", "scheduled_for"],
                 name="builder_sched_due_ix",

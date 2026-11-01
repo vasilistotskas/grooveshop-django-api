@@ -1639,16 +1639,17 @@ and the abandoned-cart reminder
 subscription topic, so there is no `UserSubscription` row for the
 unsubscribe link to end. The customer's refusal is therefore kept on the
 **account**: `UserAccount.marketing_opted_out_at` (nullable timestamp,
-additive migration; the moment is the proof of when they asked).
+additive migration; the moment is the proof of when they asked), beside the
+`EmailOptOut` row that is the gate.
 
-- The blanket link (`generate_blanket_unsubscribe_link`, the
-  `List-Unsubscribe` URL of both emails) sets it, in the same
-  transaction that ends the account's active topic subscriptions
-  (`user.views.subscription._apply_unsubscribe`,
-  `user.services.subscription.opt_out_of_marketing`). The one-click POST
-  (RFC 8058: `List-Unsubscribe=One-Click`, no cookies, always 200) and the
-  GET link do the same. A topic link (`/unsubscribe/<token>/<topic>`) ends
-  that topic only; a guest subscription's link touches no account.
+- The unsubscribe link (`emails.optout`: the `List-Unsubscribe` URL of both
+  emails is the endpoint, `POST /api/v1/emails/unsubscribe/<token>`, RFC 8058
+  `List-Unsubscribe=One-Click`, no cookies) writes the `EmailOptOut` row.
+  The re-engagement body links to the storefront confirm page
+  (`optout.confirm_url`), whose button POSTs the same token; a `GET` on the
+  endpoint only redirects there, because a link scanner must not opt anyone
+  out. `marketing_opted_out_at` is set only by
+  `user.services.subscription.opt_out_of_marketing` (the customer admin).
 - **`EmailOptOut` is the one gate.** Every marketing send is a
   `Kind.MARKETING` email type (`emails.declare.marketing_email`), and
   `send_email` skips a recipient with an `EmailOptOut` row for the type or

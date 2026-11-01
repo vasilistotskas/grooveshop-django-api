@@ -24,4 +24,3 @@ https://shop.example/products/700001/wireless-earbuds
 
 ================================================================================
 Acme Gadgets - https://shop.example
-

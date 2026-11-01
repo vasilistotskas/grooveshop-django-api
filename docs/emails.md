@@ -147,10 +147,9 @@ so neither the body nor the cost tells a known address from a new one. What the
 address's owner learns arrives by email: a new, expired-pending, unsubscribed or
 bounced address gets `newsletter.confirmation`; an address that is already
 ACTIVE gets `newsletter.already_subscribed`. An account row's notice carries the
-link to `/account/subscriptions/`. A guest row's carries no link: the only
-unsubscribe route that works without a login acts on GET, and a scanner's
-prefetch must not unsubscribe someone the mail says IS subscribed; the copy
-points at the unsubscribe link every newsletter carries.
+link to `/account/subscriptions/`. A guest row's carries no link: the mail
+says the address IS subscribed, so it offers no unsubscribe; the copy points
+at the unsubscribe link every newsletter carries.
 
 Both mails share the resend cooldown (`NEWSLETTER_RESEND_COOLDOWN`, ten
 minutes). The cooldown of the notice lives in
@@ -221,8 +220,8 @@ release rolls out; `emails/0004_drop_ops_alert_settings` (`contract_of`
 A marketing type is switchable, honours `EmailOptOut` and carries the
 RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
 no task filters on `UserAccount.marketing_opted_out_at` any more. That
-field stays as account state (the admin shows it, the blanket link sets
-it), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
+field stays as account state (the admin shows it and is the only writer
+that sets it; the unsubscribe link writes `EmailOptOut` alone), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
 for every account that opted out before the link also wrote `EmailOptOut`
 (#368). In the customer admin staff may RECORD an objection a customer made
 by phone or email (setting the field writes `EmailOptOut("*")`,
@@ -248,7 +247,7 @@ type's own row and, when a `*` row covers it, replaces the `*` with one row
 for every OTHER marketing type (the `*` row's source is kept), so the
 customer's other choices stand. When no row is left for the address,
 `marketing_opted_out_at` is cleared too; while any row remains it stays.
-The blanket link and the admin still only write (`opt_out_of_marketing`).
+The admin still only writes (`opt_out_of_marketing`).
 
 A product alert made by a signed-in customer whose account address opted
 out of its type is refused with a `409` (`email_opted_out`) instead of a
@@ -429,7 +428,15 @@ something a person can decline.
   signature, an expired token (365 days), another store, an unknown type or
   a type that takes no opt-out.
 - `unsubscribe_url` builds `<api host>/api/v1/emails/unsubscribe/<token>`
-  (`UNSUBSCRIBE_PATH`); `EmailUnsubscribeView` serves it (below).
+  (`UNSUBSCRIBE_PATH`); `EmailUnsubscribeView` serves it (below). It is the
+  URL of the `List-Unsubscribe` header, for mailbox providers.
+- `confirm_url(address, email_type, *, language)` builds the storefront page
+  a link in a mail BODY opens: `<storefront>[/<locale>]/email/unsubscribe/<token>`
+  (`CONFIRM_PATH`, through `get_tenant_frontend_url`), carrying the same
+  token. The page shows a button that POSTs the token to the endpoint
+  (through the storefront proxy). `confirm_url_for_token` is the same URL for
+  a token already in hand. A body link never points at the API URL: a link
+  scanner would follow it.
 
 ### The unsubscribe endpoint
 
@@ -447,13 +454,17 @@ named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
   the POST body is not read, so the `List-Unsubscribe=One-Click` form, in
   any encoding, is accepted. Throttled per client address by
   `EmailUnsubscribeThrottle` (`email_unsubscribe`, fail open).
-- **There is no `GET`** (it answers `405`). A link scanner follows every URL
-  in a mail, so a GET must never opt anyone out. The plan's GET redirect to
-  the storefront confirm page waits for that page; until it ships, no mail
-  body links to this URL, only the header does.
-- The blanket newsletter link (`UnsubscribeAllView`, `/user/unsubscribe/<token>`)
-  also writes `EmailOptOut(type_key="*")` for the address the link was sent
-  to, beside the account-level `marketing_opted_out_at` (state, not a gate).
+- **A `GET` never opts anyone out.** A link scanner follows every URL in a
+  mail, and some mail clients open the `List-Unsubscribe` URL with a GET, so
+  it answers `302` to the storefront confirm page (`confirm_url_for_token`,
+  in the store's default language: a header GET carries none) without
+  reading the token. An invalid token shows on the page, from the POST's
+  `400`. Throttled like the POST.
+- Source: the page and a mailbox provider POST the same URL, so both are
+  recorded as `one_click`; `EmailOptOut.Source.LINK` is no longer written
+  (rows from `emails/0002_import_marketing_opt_outs` keep it).
+- The old `/api/v1/user/unsubscribe/<token>[/<topic>]` routes, which opted out
+  on GET, are gone with their token (`user.unsubscribe` salt).
 
 ### `EMAIL_HASH_KEY`
 
@@ -486,9 +497,9 @@ customers:
 `build_list_unsubscribe_headers(url, *, list_id)` and
 `build_transactional_list_headers(list_id=...)` live in `headers.py`, under
 `build_headers`; nothing else calls them. The one-click URL is the
-pipeline's own (`/api/v1/emails/unsubscribe/<token>`), never the blanket
-link of `user.utils.subscription`, which only the re-engagement body still
-prints.
+pipeline's own (`/api/v1/emails/unsubscribe/<token>`). The re-engagement
+body links to the confirm page of the same type (`optout.confirm_url`), and
+the product-alert bodies carry no unsubscribe link.
 
 ## Header safety
 
@@ -544,8 +555,7 @@ during the rollout.
 
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
-- The storefront confirm page and the `GET` redirect to it, and the
-  storefront's email-preferences UI (the endpoint exists).
+- The storefront's email-preferences UI (the endpoint exists).
 - The platform's own mail (billing, staff reset, health and backup
   alerts) and the rest of the admin page (status, log, preview, test-send); the switches
   are on it already. The preview of every registered type already

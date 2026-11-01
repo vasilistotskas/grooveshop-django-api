@@ -1,15 +1,13 @@
 from unittest.mock import patch
 
 import pytest
-from django.core import mail, signing
+from django.core import mail
 from django.test import override_settings
 
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.utils.subscription import (
-    UNSUBSCRIBE_SALT,
-    generate_unsubscribe_link,
     send_subscription_confirmation,
 )
 
@@ -146,90 +144,6 @@ class TestSubscriptionUtils:
             pytest.raises(Exception, match="Email sending failed"),
         ):
             send_subscription_confirmation(subscription)
-
-    @patch("user.utils.subscription._make_unsubscribe_token")
-    @patch("user.utils.subscription.get_tenant_api_base_url")
-    def test_generate_unsubscribe_link_uses_tenant_api_base_url(
-        self, mock_api_base, mock_token
-    ):
-        """The unsubscribe URL must use the TENANT's API host, not the
-        platform-wide API_BASE_URL — the token bakes in the tenant's
-        schema and a platform-host link is rejected on every
-        non-platform tenant (RFC 8058 one-click unsubscribe break)."""
-        mock_token.return_value = "signed-token"
-        mock_api_base.return_value = "https://api.tenant-b.example"
-        subscription = UserSubscription.objects.create(
-            user=self.user, topic=self.topic
-        )
-
-        result = generate_unsubscribe_link(subscription)
-
-        expected_url = (
-            "https://api.tenant-b.example/api/v1/user/unsubscribe/"
-            "signed-token/test-newsletter"
-        )
-        assert result == expected_url
-        mock_api_base.assert_called_once()
-
-    @override_settings(API_BASE_URL="https://api.test-site.com")
-    @patch("user.utils.subscription._make_unsubscribe_token")
-    def test_generate_unsubscribe_link(self, mock_token):
-        mock_token.return_value = "signed-token"
-        subscription = UserSubscription.objects.create(
-            user=self.user, topic=self.topic
-        )
-
-        result = generate_unsubscribe_link(subscription)
-
-        # Points directly at the Django API so List-Unsubscribe headers work
-        # without a Nuxt frontend page. The signed token is a single path
-        # segment (no uidb64 — the token already carries the user pk).
-        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/signed-token/test-newsletter"
-        assert result == expected_url
-        mock_token.assert_called_once_with(self.user)
-
-    @override_settings(API_BASE_URL="https://api.test-site.com/")
-    @patch("user.utils.subscription._make_unsubscribe_token")
-    def test_generate_unsubscribe_link_strips_trailing_slash(self, mock_token):
-        """Trailing slash on API_BASE_URL must not produce a double slash."""
-        mock_token.return_value = "signed-token"
-        subscription = UserSubscription.objects.create(
-            user=self.user, topic=self.topic
-        )
-
-        result = generate_unsubscribe_link(subscription)
-
-        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/signed-token/test-newsletter"
-        assert result == expected_url
-
-    @override_settings(API_BASE_URL="https://api.test-site.com")
-    def test_unsubscribe_token_round_trips_to_user_pk(self):
-        """The generated token is a signing value that decodes back to the
-        user's pk under the dedicated salt — independent of the user's
-        password/last_login (unlike the old password-reset token)."""
-        subscription = UserSubscription.objects.create(
-            user=self.user, topic=self.topic
-        )
-        url = generate_unsubscribe_link(subscription)
-        token = url.rsplit("/", 2)[1]
-
-        assert signing.loads(token, salt=UNSUBSCRIBE_SALT) == {
-            "schema": "public",
-            "pk": self.user.pk,
-        }
-
-    @override_settings(API_BASE_URL="https://api.test-site.com")
-    def test_guest_unsubscribe_token_names_the_subscription(self):
-        """A guest has no account pk: the token signs the row's uuid
-        (``sid``) and the owning schema."""
-        subscription = self._guest()
-        url = generate_unsubscribe_link(subscription)
-        token = url.rsplit("/", 2)[1]
-
-        assert signing.loads(token, salt=UNSUBSCRIBE_SALT) == {
-            "schema": "public",
-            "sid": str(subscription.uuid),
-        }
 
     @patch("user.utils.subscription.logger")
     def test_send_subscription_confirmation_logs_warning_not_pending(

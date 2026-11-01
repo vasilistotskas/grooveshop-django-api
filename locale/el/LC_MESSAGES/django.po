@@ -1348,9 +1348,6 @@ msgstr "Υπάρχει ήδη εγγραφή"
 msgid "Already subscribed to this topic."
 msgstr "Ήδη εγγεγραμμένος σε αυτό το θέμα."
 
-msgid "Already unsubscribed"
-msgstr "Ήδη έχει γίνει απεγγραφή"
-
 msgid "Already-Subscribed Notice Sent At"
 msgstr "Ειδοποίηση «ήδη εγγεγραμμένος» στάλθηκε στις"
 
@@ -2639,6 +2636,9 @@ msgstr "Άλλαξε από (προσωπικό)"
 
 msgid "Changed only"
 msgstr "Μόνο όσα άλλαξαν"
+
+msgid "Changes nothing: redirects to the storefront page where the recipient confirms the unsubscribe with a button."
+msgstr "Δεν αλλάζει τίποτα: ανακατευθύνει στη σελίδα του καταστήματος όπου ο παραλήπτης επιβεβαιώνει την απεγγραφή με ένα κουμπί."
 
 msgid "Channel"
 msgstr "Κανάλι"
@@ -7082,9 +7082,6 @@ msgstr "Μη έγκυρη παράμετρος ids."
 msgid "Invalid language code."
 msgstr "Μη έγκυρος κωδικός γλώσσας."
 
-msgid "Invalid or expired unsubscribe link"
-msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος απεγγραφής"
-
 msgid "Invalid or inactive topic IDs: {}"
 msgstr "Μη έγκυρα ή ανενεργά ID θεμάτων: {}"
 
@@ -7144,9 +7141,6 @@ msgstr "Αίτημα τιμολογίου"
 
 msgid "Invoicing & myDATA"
 msgstr "Τιμολόγηση & myDATA"
-
-msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
-msgstr "Καλείται από προγράμματα email που τηρούν το List-Unsubscribe-Post=One-Click. Επιστρέφει 200 OK ανεξάρτητα από την εγκυρότητα του token (σιωπηλά, κατά RFC 8058)."
 
 msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
 msgstr "Καλείται από πελάτες αλληλογραφίας που υποστηρίζουν το List-Unsubscribe-Post=One-Click. Το διακριτικό ορίζει τον τύπο email, ή όλους τους τύπους προωθητικών μηνυμάτων, και ισχύει μόνο για το κατάστημα που το έστειλε. Η επανάληψη της κλήσης δεν αλλάζει τίποτα."
@@ -8912,6 +8906,9 @@ msgstr "Ανοίξτε την παραγγελία και επιλέξτε «Δ�
 
 msgid "Open the shipment timeline"
 msgstr "Άνοιγμα χρονολογίου της αποστολής"
+
+msgid "Open the unsubscribe confirmation page"
+msgstr "Άνοιγμα της σελίδας επιβεβαίωσης απεγγραφής"
 
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "Αναγνωριστικό pixel μετατροπών OpenAI / ChatGPT Ads (π.χ. '8MktrqpXN1MRdD2NUfkXmU'). Μόνο αλφαριθμητικοί χαρακτήρες. Κενό → το pixel ChatGPT Ads απενεργοποιείται για αυτό το κατάστημα και το origin του εξαιρείται από το CSP."
@@ -10781,12 +10778,6 @@ msgstr "ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ"
 
 msgid "RETAIL RECEIPT"
 msgstr "ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ ΠΩΛΗΣΗΣ"
-
-msgid "RFC 8058 one-click unsubscribe from a topic"
-msgstr "Απεγγραφή με ένα κλικ από θέμα κατά RFC 8058"
-
-msgid "RFC 8058 one-click unsubscribe from all topics"
-msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
 
 msgid "RFC 8058 one-click unsubscribe from marketing email"
 msgstr "Απεγγραφή με ένα κλικ από προωθητικά email κατά RFC 8058"
@@ -13023,9 +13014,6 @@ msgstr "Μήνυμα επιτυχίας"
 msgid "Success message for username update"
 msgstr "Μήνυμα επιτυχίας για ενημέρωση ονόματος χρήστη"
 
-msgid "Successfully unsubscribed"
-msgstr "Επιτυχής απεγγραφή"
-
 msgid "Successfully unsubscribed."
 msgstr "Επιτυχής απεγγραφή."
 
@@ -13720,6 +13708,9 @@ msgstr "Το κατάστημα δεν έχει τη γλώσσα %(language)s."
 
 msgid "The storefront has no text in this language."
 msgstr "Το κατάστημα δεν έχει κείμενο σε αυτή τη γλώσσα."
+
+msgid "The storefront unsubscribe confirmation page."
+msgstr "Η σελίδα επιβεβαίωσης απεγγραφής του καταστήματος."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."
@@ -14485,12 +14476,6 @@ msgstr "Απεγγραφή"
 
 msgid "Unsubscribe from a topic"
 msgstr "Απεγγραφή από θέμα"
-
-msgid "Unsubscribe from a topic via email link (GET)"
-msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"
-
-msgid "Unsubscribe from all topics via email link (GET)"
-msgstr "Απεγγραφή από όλα τα θέματα μέσω συνδέσμου email (GET)"
 
 msgid "Unsubscribe here"
 msgstr "Απεγγραφή εδώ"
@@ -16301,6 +16286,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "African Countries"
 #~ msgstr "Αφρικανικές χώρες"
 
+#~ msgid "Already unsubscribed"
+#~ msgstr "Ήδη έχει γίνει απεγγραφή"
+
 #~ msgid "American Countries"
 #~ msgstr "Αμερικανικές χώρες"
 
@@ -16584,9 +16572,15 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Invalid or expired confirmation link."
 #~ msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος επιβεβαίωσης."
 
+#~ msgid "Invalid or expired unsubscribe link"
+#~ msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος απεγγραφής"
+
 #, python-format
 #~ msgid "Invalid points amount: %(val)s"
 #~ msgstr "Μη έγκυρο ποσό πόντων: %(val)s"
+
+#~ msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
+#~ msgstr "Καλείται από προγράμματα email που τηρούν το List-Unsubscribe-Post=One-Click. Επιστρέφει 200 OK ανεξάρτητα από την εγκυρότητα του token (σιωπηλά, κατά RFC 8058)."
 
 #~ msgid "Is Online Payment"
 #~ msgstr "Είναι online πληρωμή"
@@ -16900,6 +16894,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Public contact email shown in storefront footer and contact page. Empty falls back to settings.INFO_EMAIL."
 #~ msgstr "Δημόσιο email επικοινωνίας που εμφανίζεται στο footer του storefront και στη σελίδα επικοινωνίας. Κενό → χρησιμοποιείται η τιμή settings.INFO_EMAIL."
 
+#~ msgid "RFC 8058 one-click unsubscribe from a topic"
+#~ msgstr "Απεγγραφή με ένα κλικ από θέμα κατά RFC 8058"
+
+#~ msgid "RFC 8058 one-click unsubscribe from all topics"
+#~ msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
+
 #~ msgid "Ready Status"
 #~ msgstr "Κατάσταση Ετοιμότητας"
 
@@ -17059,6 +17059,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Subscriptions & Engagement"
 #~ msgstr "Συνδρομές & Αλληλεπίδραση"
 
+#~ msgid "Successfully unsubscribed"
+#~ msgstr "Επιτυχής απεγγραφή"
+
 #~ msgid "Tag Analytics"
 #~ msgstr "Αναλυτικά ετικετών"
 
@@ -17133,6 +17136,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Unable to process refund for this order."
 #~ msgstr "Δεν ήταν δυνατή η επεξεργασία επιστροφής χρημάτων για αυτή την παραγγελία."
+
+#~ msgid "Unsubscribe from a topic via email link (GET)"
+#~ msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"
+
+#~ msgid "Unsubscribe from all topics via email link (GET)"
+#~ msgstr "Απεγγραφή από όλα τα θέματα μέσω συνδέσμου email (GET)"
 
 #, python-format
 #~ msgid "Updated sort order for %(count)d countries."

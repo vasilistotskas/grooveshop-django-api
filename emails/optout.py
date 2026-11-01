@@ -8,8 +8,13 @@ The unsubscribe link carries a signed token naming the owning schema, the
 address hash and the type (or ``*`` for every marketing type). It is signed
 under a salt of its own, so it cannot be replayed as another kind of token,
 and it names the schema because ``SECRET_KEY`` is global: a token minted for
-one store must not verify on another's host (the same rule as
-``user.utils.subscription._make_unsubscribe_token``).
+one store must not verify on another's host.
+
+Two URLs carry that one token. :func:`unsubscribe_url` is the API endpoint
+named in the RFC 8058 ``List-Unsubscribe`` header, which a mailbox provider
+POSTs. :func:`confirm_url` is the storefront page a person reaches from a
+link in a mail body: it shows a button that POSTs the same token, because a
+link scanner that follows a body link must not opt anyone out.
 """
 
 from __future__ import annotations
@@ -23,7 +28,10 @@ from django.conf import settings
 from django.core import signing
 from django.db import connection
 
-from core.utils.tenant_urls import get_tenant_api_base_url
+from core.utils.tenant_urls import (
+    get_tenant_api_base_url,
+    get_tenant_frontend_url,
+)
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from emails.registry import UnknownEmailType, registry
 from emails.types import EmailType
@@ -34,6 +42,8 @@ TOKEN_SALT = "emails.optout"
 TOKEN_MAX_AGE = timedelta(days=365)
 #: The unsubscribe endpoint, on the API host: it has no storefront proxy.
 UNSUBSCRIBE_PATH = "/api/v1/emails/unsubscribe"
+#: The storefront page that confirms by button and POSTs to the endpoint.
+CONFIRM_PATH = "/email/unsubscribe"
 
 
 class InvalidToken(Exception):
@@ -102,6 +112,19 @@ def unsubscribe_url(address: str, email_type: EmailType) -> str:
     return (
         f"{get_tenant_api_base_url()}{UNSUBSCRIBE_PATH}/"
         f"{make_token(address, email_type.key)}"
+    )
+
+
+def confirm_url_for_token(token: str, *, language: str) -> str:
+    """The storefront confirm page for an existing *token*."""
+    return get_tenant_frontend_url(f"{CONFIRM_PATH}/{token}", language=language)
+
+
+def confirm_url(address: str, email_type: EmailType, *, language: str) -> str:
+    """The storefront confirm page for a link in a mail body, in the
+    language the mail is rendered in."""
+    return confirm_url_for_token(
+        make_token(address, email_type.key), language=language
     )
 
 

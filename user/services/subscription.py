@@ -87,8 +87,8 @@ def opt_out_of_marketing(
     Writes ``EmailOptOut`` for every marketing type, which is what stops the
     mail, and, for an account, ``marketing_opted_out_at`` (account state the
     admin shows), in one transaction. A guest has no account: *account_pk*
-    is None. Both the blanket unsubscribe link and the customer admin come
-    here, so neither half is ever written alone.
+    is None. The customer admin comes here, so neither half is ever written
+    alone.
 
     Returns True when this call recorded the account's flag, False when it
     was already set (the first time stands), there is no account, or the

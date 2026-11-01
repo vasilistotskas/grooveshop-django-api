@@ -1,35 +1,18 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
-from django.core import signing
-from django.db import connection, transaction
+from django.db import transaction
 
-from core.utils.tenant_urls import (
-    get_tenant_api_base_url,
-    get_tenant_frontend_url,
-)
+from core.utils.tenant_urls import get_tenant_frontend_url
 from emails.send import send_email, was_sent
 from user.models.subscription import UserSubscription
 
 logger = logging.getLogger(__name__)
 
-# Unsubscribe links are signed with ``django.core.signing`` under a
-# dedicated salt (NOT the password-reset generator) so the token is
-# purpose-scoped, tamper-proof, and — crucially — does NOT invalidate when
-# the user logs in or changes their password. ``UNSUBSCRIBE_MAX_AGE`` gives
-# the link a long life so a newsletter that sits in an inbox for months
-# still honours one-click unsubscribe (RFC 8058), while still bounding the
-# validity of a leaked token.
-UNSUBSCRIBE_SALT = "user.unsubscribe"
-UNSUBSCRIBE_MAX_AGE = timedelta(days=365)
-
 if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractBaseUser
-
     from user.models.account import UserAccount as User
 else:
     User = get_user_model()
@@ -147,74 +130,3 @@ def claim_guest_subscriptions(user: User, email: str) -> int:
             "Claimed %s guest subscription(s) for user %s", claimed, user.pk
         )
     return claimed
-
-
-def _make_unsubscribe_token(user: AbstractBaseUser) -> str:
-    """Sign the user's pk + owning schema into a tamper-proof token.
-
-    The schema is baked in because ``SECRET_KEY`` is global and the
-    user table exists in every tenant schema — a pk-only token minted
-    for tenant A's user 42 would verify on tenant B's domain and
-    silently unsubscribe tenant B's user 42. The verifier rejects any
-    token whose schema does not match ``connection.schema_name``.
-    """
-    return signing.dumps(
-        {"schema": connection.schema_name, "pk": user.pk},
-        salt=UNSUBSCRIBE_SALT,
-    )
-
-
-def _make_guest_unsubscribe_token(subscription: UserSubscription) -> str:
-    """Sign a guest subscription's uuid + owning schema.
-
-    A guest has no account, so the token names the subscription row
-    itself (``sid``). Schema-scoped for the same reason as
-    ``_make_unsubscribe_token``: the verifier rejects a token minted
-    for another tenant.
-    """
-    return signing.dumps(
-        {"schema": connection.schema_name, "sid": str(subscription.uuid)},
-        salt=UNSUBSCRIBE_SALT,
-    )
-
-
-def generate_unsubscribe_link(subscription: UserSubscription) -> str:
-    """Topic-scoped unsubscribe URL for one subscription's recipient.
-
-    An account row signs the account (the link then unsubscribes that
-    account from the topic); a guest row signs the row itself. The URL
-    targets a Django API endpoint that has no Nuxt proxy, so the
-    tenant's API origin is the correct base.
-    """
-    token = (
-        _make_unsubscribe_token(subscription.user)
-        if subscription.user_id
-        else _make_guest_unsubscribe_token(subscription)
-    )
-    base_url = get_tenant_api_base_url()
-    return (
-        f"{base_url}/api/v1/user/unsubscribe/{token}/{subscription.topic.slug}"
-    )
-
-
-def generate_blanket_unsubscribe_link(
-    user: AbstractBaseUser,
-) -> str:
-    """Build the blanket (no-topic) unsubscribe URL for ``user``.
-
-    Mirrors ``generate_unsubscribe_link`` but emits the URL form that
-    ``UnsubscribeAllView`` accepts — drops every active subscription
-    when the recipient hits one-click unsubscribe in Gmail/Outlook.
-
-    Use this in marketing/notification emails that aren't bound to a
-    single topic (re-engagement, product alerts) so the email still
-    carries an RFC 8058-compliant ``List-Unsubscribe`` header.
-
-    Accepts ``AbstractBaseUser`` so callers with a generic FK
-    (e.g. ``ProductAlert.user``) can pass it directly — only ``pk`` is
-    required.
-    """
-    # Django API endpoint — see note on ``generate_unsubscribe_link``.
-    token = _make_unsubscribe_token(user)
-    base_url = get_tenant_api_base_url()
-    return f"{base_url}/api/v1/user/unsubscribe/{token}"

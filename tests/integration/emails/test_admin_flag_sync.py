@@ -90,7 +90,7 @@ class TestTheOneWriter:
         user = UserAccountFactory(num_addresses=0)
 
         recorded = opt_out_of_marketing(
-            user.email,
+            optout.address_hash(user.email),
             account_pk=user.pk,
             source=EmailOptOut.Source.LINK,
         )
@@ -104,7 +104,7 @@ class TestTheOneWriter:
         from user.services.subscription import opt_out_of_marketing
 
         recorded = opt_out_of_marketing(
-            "guest@example.test",
+            optout.address_hash("guest@example.test"),
             account_pk=None,
             source=EmailOptOut.Source.LINK,
         )
@@ -119,13 +119,17 @@ class TestTheOneWriter:
 
         user = UserAccountFactory(num_addresses=0)
         opt_out_of_marketing(
-            user.email, account_pk=user.pk, source=EmailOptOut.Source.LINK
+            optout.address_hash(user.email),
+            account_pk=user.pk,
+            source=EmailOptOut.Source.LINK,
         )
         user.refresh_from_db()
         first = user.marketing_opted_out_at
 
         again = opt_out_of_marketing(
-            user.email, account_pk=user.pk, source=EmailOptOut.Source.LINK
+            optout.address_hash(user.email),
+            account_pk=user.pk,
+            source=EmailOptOut.Source.LINK,
         )
 
         assert again is False

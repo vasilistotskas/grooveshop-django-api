@@ -3,7 +3,7 @@
   "from": "Acme Gadgets <noreply@platform.test>",
   "headers": {
     "List-ID": "<abandoned-cart.shop.example>",
-    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0IjoiY2FydC5jaGVja291dF9hYmFuZG9uZWQifQ:1AbCdE:2oGCylVMtM9p3bBdAA5YZueaep8E6m5kPhXz0YUJLUo>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0IjoiY2FydC5jaGVja291dF9hYmFuZG9uZWQiLCJhIjo1MDAwMDF9:1AbCdE:jlST3LIxyo0vLWkmV5DWNvpttdts5Lb_3ZRixZ0Lc70>",
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
   },
   "reply_to": [

@@ -2266,6 +2266,9 @@ msgstr "Υπολογισμοί"
 msgid "Call to Action Banner"
 msgstr "Banner παρότρυνσης για δράση"
 
+msgid "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
+msgstr "Καλείται από τη σελίδα επιβεβαίωσης του καταστήματος. Το token αναφέρει οποιονδήποτε τύπο email του καταστήματος· όλοι οι τύποι μάρκετινγκ απενεργοποιούνται και, για λογαριασμό, λήγουν οι ενεργές συνδρομές του. Idempotent: η επανάληψη δεν αλλάζει τίποτα."
+
 msgctxt "order source type"
 msgid "Campaign"
 msgstr "Καμπάνια"
@@ -14477,6 +14480,9 @@ msgstr "Απεγγραφή"
 msgid "Unsubscribe from a topic"
 msgstr "Απεγγραφή από θέμα"
 
+msgid "Unsubscribe from all marketing email of the store"
+msgstr "Απεγγραφή από όλα τα email μάρκετινγκ του καταστήματος"
+
 msgid "Unsubscribe here"
 msgstr "Απεγγραφή εδώ"
 
@@ -17139,9 +17145,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"
-
-#~ msgid "Unsubscribe from all topics via email link (GET)"
-#~ msgstr "Απεγγραφή από όλα τα θέματα μέσω συνδέσμου email (GET)"
 
 #, python-format
 #~ msgid "Updated sort order for %(count)d countries."

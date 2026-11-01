@@ -220,8 +220,8 @@ release rolls out; `emails/0004_drop_ops_alert_settings` (`contract_of`
 A marketing type is switchable, honours `EmailOptOut` and carries the
 RFC 8058 headers. `EmailOptOut` is the ONE gate for every marketing type:
 no task filters on `UserAccount.marketing_opted_out_at` any more. That
-field stays as account state (the admin shows it and is the only writer
-that sets it; the unsubscribe link writes `EmailOptOut` alone), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
+field stays as account state (the admin and the storefront page's "stop all"
+button set it; the type-scoped unsubscribe writes `EmailOptOut` alone), and `emails/0002_import_marketing_opt_outs` copied it into a `*` row
 for every account that opted out before the link also wrote `EmailOptOut`
 (#368). In the customer admin staff may RECORD an objection a customer made
 by phone or email (setting the field writes `EmailOptOut("*")`,
@@ -421,7 +421,9 @@ something a person can decline.
   for every marketing type.
 - `address_hash(address)` is HMAC-SHA256 of the stripped, lower-cased
   address under `settings.EMAIL_HASH_KEY`: the table holds no address.
-- `make_token(address, type_key)` signs `{schema, h, t}` with
+- `make_token(address, type_key)` signs `{schema, h, t}` (plus `a`, the
+  account pk, when the address belongs to an account: the hash cannot be
+  turned back into an account and the address must not travel in a URL) with
   `django.core.signing` under the salt `emails.optout`. It names the schema
   because `SECRET_KEY` is global: a token from one store does not verify on
   another. `read_token` / `opt_out_by_token` raise `InvalidToken` for a bad
@@ -460,9 +462,19 @@ named by `List-Unsubscribe` and flagged by `List-Unsubscribe-Post`.
   in the store's default language: a header GET carries none) without
   reading the token. An invalid token shows on the page, from the POST's
   `400`. Throttled like the POST.
-- Source: the page and a mailbox provider POST the same URL, so both are
-  recorded as `one_click`; `EmailOptOut.Source.LINK` is no longer written
-  (rows from `emails/0002_import_marketing_opt_outs` keep it).
+- The type-scoped POST stays type-only: the confirm page's main button and a
+  mailbox provider's one-click both use it and are recorded as `one_click`.
+- `POST /api/v1/emails/unsubscribe/<token>/all`
+  (`EmailUnsubscribeAllView`, operation `unsubscribeFromAllMarketingEmail`) is
+  the page's second button, "stop all marketing emails from the store". Same
+  auth, throttle, `400 unsubscribe_token_invalid` and bodyless idempotent
+  `200`; any valid token of the store will do, whatever its type. Source
+  `link`. `user.services.subscription.unsubscribe_from_all_marketing` writes,
+  in one transaction: `EmailOptOut("*")` and, for an account (the token's
+  `a`), `marketing_opted_out_at` and the end of its ACTIVE topic subscriptions,
+  all through `opt_out_of_marketing`, the one writer (it takes the address
+  HASH, which is all a token holds). A guest's token (no `a`) records the
+  `EmailOptOut` row only.
 - The old `/api/v1/user/unsubscribe/<token>[/<topic>]` routes, which opted out
   on GET, are gone with their token (`user.unsubscribe` salt).
 

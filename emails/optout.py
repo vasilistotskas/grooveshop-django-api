@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection
 
@@ -92,20 +93,42 @@ def opt_out(
 ) -> EmailOptOut:
     """Record the opt-out (once). Raises ``UnknownEmailType`` for an
     unknown type and ``ValueError`` for one that takes no opt-out."""
+    return opt_out_hashed(address_hash(address), type_key, source=source)
+
+
+def opt_out_hashed(
+    hashed: str, type_key: str, *, source: EmailOptOut.Source
+) -> EmailOptOut:
+    """:func:`opt_out` for a caller that holds the address hash only, such
+    as the claims of a token."""
     if not _takes_opt_out(type_key):
         raise ValueError(f"Email type {type_key!r} takes no opt-out.")
-    return _record(address_hash(address), type_key, source)
+    return _record(hashed, type_key, source)
+
+
+def _account_pk(address: str) -> int | None:
+    """The pk of the account that owns *address*, or None for a guest."""
+    return (
+        get_user_model()
+        .objects.filter(email__iexact=address.strip())
+        .values_list("pk", flat=True)
+        .first()
+    )
 
 
 def make_token(address: str, type_key: str) -> str:
-    return signing.dumps(
-        {
-            "schema": connection.schema_name,
-            "h": address_hash(address),
-            "t": type_key,
-        },
-        salt=TOKEN_SALT,
-    )
+    """Sign the schema, the address hash and the type; for an account's
+    address also its pk (``a``), because the hash cannot be turned back
+    into an account and the address must not travel in a URL."""
+    payload = {
+        "schema": connection.schema_name,
+        "h": address_hash(address),
+        "t": type_key,
+    }
+    account_pk = _account_pk(address)
+    if account_pk is not None:
+        payload["a"] = account_pk
+    return signing.dumps(payload, salt=TOKEN_SALT)
 
 
 def unsubscribe_url(address: str, email_type: EmailType) -> str:
@@ -132,6 +155,9 @@ def confirm_url(address: str, email_type: EmailType, *, language: str) -> str:
 class TokenClaims:
     address_hash: str
     type_key: str
+    #: The account the address belonged to when the mail was sent; None
+    #: for a guest.
+    account_pk: int | None = None
 
 
 def read_token(token: str) -> TokenClaims:
@@ -144,7 +170,11 @@ def read_token(token: str) -> TokenClaims:
             raise InvalidToken("The type takes no opt-out.")
     except (signing.BadSignature, KeyError, UnknownEmailType) as error:
         raise InvalidToken(str(error)) from error
-    return TokenClaims(address_hash=claims["h"], type_key=claims["t"])
+    return TokenClaims(
+        address_hash=claims["h"],
+        type_key=claims["t"],
+        account_pk=claims.get("a"),
+    )
 
 
 def opt_out_by_token(token: str, *, source: EmailOptOut.Source) -> EmailOptOut:

@@ -127,7 +127,9 @@ def test_declining_records_a_per_type_row(client, user):
 
 def test_enabling_under_the_every_type_row_keeps_the_others_off(client, user):
     opt_out_of_marketing(
-        user.email, account_pk=user.pk, source=EmailOptOut.Source.ONE_CLICK
+        optout.address_hash(user.email),
+        account_pk=user.pk,
+        source=EmailOptOut.Source.ONE_CLICK,
     )
 
     response = _patch(client, **{RESTOCK: True})
@@ -146,7 +148,9 @@ def test_enabling_under_the_every_type_row_keeps_the_others_off(client, user):
 
 def test_enabling_every_type_in_one_request_clears_the_flag(client, user):
     opt_out_of_marketing(
-        user.email, account_pk=user.pk, source=EmailOptOut.Source.LINK
+        optout.address_hash(user.email),
+        account_pk=user.pk,
+        source=EmailOptOut.Source.LINK,
     )
 
     response = _patch(client, **dict.fromkeys(_marketing_keys(), True))
@@ -159,7 +163,9 @@ def test_enabling_every_type_in_one_request_clears_the_flag(client, user):
 
 def test_enabling_the_last_row_clears_the_flag(client, user):
     opt_out_of_marketing(
-        user.email, account_pk=user.pk, source=EmailOptOut.Source.LINK
+        optout.address_hash(user.email),
+        account_pk=user.pk,
+        source=EmailOptOut.Source.LINK,
     )
     _patch(client, **dict.fromkeys(_marketing_keys() - {RESTOCK}, True))
     user.refresh_from_db()
@@ -185,12 +191,16 @@ def test_declining_under_the_every_type_row_adds_nothing(client, user):
 
 def test_a_lifted_opt_out_can_be_recorded_again_by_staff(client, user):
     opt_out_of_marketing(
-        user.email, account_pk=user.pk, source=EmailOptOut.Source.LINK
+        optout.address_hash(user.email),
+        account_pk=user.pk,
+        source=EmailOptOut.Source.LINK,
     )
     _patch(client, **dict.fromkeys(_marketing_keys(), True))
 
     recorded = opt_out_of_marketing(
-        user.email, account_pk=user.pk, source=EmailOptOut.Source.STAFF
+        optout.address_hash(user.email),
+        account_pk=user.pk,
+        source=EmailOptOut.Source.STAFF,
     )
 
     assert recorded is True

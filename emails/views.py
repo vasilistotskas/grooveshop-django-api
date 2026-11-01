@@ -30,10 +30,25 @@ from core.api.throttling import EmailUnsubscribeThrottle
 from core.utils.i18n import store_language
 from emails import optout
 from emails.models import EmailOptOut
+from user.services.subscription import unsubscribe_from_all_marketing
 
 logger = logging.getLogger(__name__)
 
 INVALID_TOKEN_CODE = "unsubscribe_token_invalid"
+
+
+def _invalid_token_response(error: optout.InvalidToken) -> Response:
+    # The reason stays in the log; the caller learns only that the link is
+    # not valid, never whether it was forged, expired or minted for another
+    # store.
+    logger.warning("email unsubscribe refused: %s", error)
+    return Response(
+        {
+            "detail": str(_("Invalid unsubscribe link")),
+            "code": INVALID_TOKEN_CODE,
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 class EmailUnsubscribeView(APIView):
@@ -86,15 +101,40 @@ class EmailUnsubscribeView(APIView):
         try:
             optout.opt_out_by_token(token, source=EmailOptOut.Source.ONE_CLICK)
         except optout.InvalidToken as error:
-            # The reason stays in the log; the caller learns only that the
-            # link is not valid, never whether it was forged, expired or
-            # minted for another store.
-            logger.warning("email unsubscribe refused: %s", error)
-            return Response(
-                {
-                    "detail": str(_("Invalid unsubscribe link")),
-                    "code": INVALID_TOKEN_CODE,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return _invalid_token_response(error)
+        return Response(status=status.HTTP_200_OK)
+
+
+class EmailUnsubscribeAllView(APIView):
+    """``POST /api/v1/emails/unsubscribe/<token>/all``: the storefront
+    page's second button, "stop all marketing emails from the store".
+
+    Any valid token of this store will do, whatever type it names. Only the
+    storefront page calls it (a mailbox provider's one-click POST goes to
+    the type-scoped URL of the header), hence the source ``link``.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [EmailUnsubscribeThrottle]
+
+    @extend_schema(
+        operation_id="unsubscribeFromAllMarketingEmail",
+        summary=_("Unsubscribe from all marketing email of the store"),
+        description=_(
+            "Called by the storefront confirmation page. The token names "
+            "any email type of the store; every marketing type is opted "
+            "out and, for an account, its active subscriptions end. "
+            "Idempotent: repeating it changes nothing."
+        ),
+        tags=["Emails"],
+        request=None,
+        responses={200: None, 400: ErrorResponseSerializer},
+    )
+    def post(self, request, token: str):
+        try:
+            claims = optout.read_token(token)
+        except optout.InvalidToken as error:
+            return _invalid_token_response(error)
+        unsubscribe_from_all_marketing(claims, source=EmailOptOut.Source.LINK)
         return Response(status=status.HTTP_200_OK)

@@ -12040,6 +12040,35 @@ paths:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
           description: ''
+  /api/v1/emails/unsubscribe/{token}/all:
+    post:
+      operationId: unsubscribeFromAllMarketingEmail
+      description: 'Καλείται από τη σελίδα επιβεβαίωσης του καταστήματος. Το token
+        αναφέρει οποιονδήποτε τύπο email του καταστήματος· όλοι οι τύποι μάρκετινγκ
+        απενεργοποιούνται και, για λογαριασμό, λήγουν οι ενεργές συνδρομές του. Idempotent:
+        η επανάληψη δεν αλλάζει τίποτα.'
+      summary: Απεγγραφή από όλα τα email μάρκετινγκ του καταστήματος
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - Emails
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
   /api/v1/feedback:
     post:
       operationId: createFeedback

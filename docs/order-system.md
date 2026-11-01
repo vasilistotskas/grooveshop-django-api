@@ -1648,8 +1648,12 @@ additive migration; the moment is the proof of when they asked), beside the
   The re-engagement body links to the storefront confirm page
   (`optout.confirm_url`), whose button POSTs the same token; a `GET` on the
   endpoint only redirects there, because a link scanner must not opt anyone
-  out. `marketing_opted_out_at` is set only by
-  `user.services.subscription.opt_out_of_marketing` (the customer admin).
+  out. The page's second button, "stop all marketing emails", POSTs
+  `/api/v1/emails/unsubscribe/<token>/all`: `EmailOptOut("*")` plus, for an
+  account, `marketing_opted_out_at` and the end of its active topic
+  subscriptions. `marketing_opted_out_at` is written only by
+  `user.services.subscription.opt_out_of_marketing` (that route and the
+  customer admin).
 - **`EmailOptOut` is the one gate.** Every marketing send is a
   `Kind.MARKETING` email type (`emails.declare.marketing_email`), and
   `send_email` skips a recipient with an `EmailOptOut` row for the type or

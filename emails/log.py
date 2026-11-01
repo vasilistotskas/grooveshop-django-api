@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 import requests
+from django.db import Error, transaction
 from django.utils import timezone
 
 from emails import optout
@@ -56,57 +57,77 @@ def record_skip(
     reason: str = "",
     *,
     recipient: Recipient | None = None,
-) -> EmailLog:
-    return EmailLog.objects.create(
-        type_key=type_key,
-        status=status,
-        reason=reason[: EmailLog._meta.get_field("reason").max_length],
-        **_recipient_fields(recipient),
+) -> None:
+    _write(
+        EmailLog(
+            type_key=type_key,
+            status=status,
+            reason=reason[: EmailLog._meta.get_field("reason").max_length],
+            **_recipient_fields(recipient),
+        )
     )
 
 
 def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
-    """The row of a message about to be sent."""
-    return EmailLog.objects.create(
+    """The row of a message about to be sent. When it cannot be written the
+    message is sent anyway and the row stays unsaved."""
+    entry = EmailLog(
         type_key=type_key,
         status=Status.QUEUED,
         subject=subject,
         **_recipient_fields(recipient),
     )
+    _write(entry)
+    return entry
 
 
 def mark_sent(
     log: EmailLog, *, provider: EmailProvider, message_id: str | None
 ) -> None:
-    """Record the send. The mail has already left, so a failure to write
-    this is logged and swallowed: raising would make the task retry and send
-    it twice."""
     log.status = Status.SENT
     log.provider = provider
     log.provider_message_id = message_id
     log.sent_at = timezone.now()
-    try:
-        log.save(
-            update_fields=[
-                "status",
-                "provider",
-                "provider_message_id",
-                "sent_at",
-                "updated_at",
-            ]
-        )
-    except Exception:
-        logger.exception(
-            "Email %s sent but its log row was not updated",
-            log.type_key,
-            extra={"email_type": log.type_key, "email_log": str(log.uuid)},
-        )
+    _write(
+        log,
+        update_fields=[
+            "status",
+            "provider",
+            "provider_message_id",
+            "sent_at",
+            "updated_at",
+        ],
+    )
 
 
 def mark_failed(log: EmailLog, error: BaseException) -> None:
     log.status = Status.FAILED
     log.error = describe_failure(error)
-    log.save(update_fields=["status", "error", "updated_at"])
+    _write(log, update_fields=["status", "error", "updated_at"])
+
+
+def _write(log: EmailLog, *, update_fields: list[str] | None = None) -> None:
+    """Insert the row, or update *update_fields* of a saved one.
+
+    The log records a send; it never decides one. A write that fails is
+    reported and swallowed, because raising would stop an alert about a
+    failing database from going out, and would make a task retry, and so
+    send again, a mail that has already left.
+    """
+    if update_fields is not None and log._state.adding:
+        return  # the insert failed: there is no row to update
+    try:
+        with transaction.atomic():
+            if update_fields is None:
+                log.save(force_insert=True)
+            else:
+                log.save(update_fields=update_fields)
+    except Error:
+        logger.exception(
+            "Email %s is not logged",
+            log.type_key,
+            extra={"email_type": log.type_key, "email_log": str(log.uuid)},
+        )
 
 
 def _recipient_fields(recipient: Recipient | None) -> dict[str, str]:

@@ -13,6 +13,7 @@ from unittest import mock
 import pytest
 import requests
 from django.core import mail
+from django.db import OperationalError
 from django.test import override_settings
 from django.utils import timezone
 from extra_settings.models import Setting
@@ -143,7 +144,7 @@ class TestWrites:
 
         def save(self, *args, **kwargs):
             if kwargs.get("update_fields"):
-                raise RuntimeError("db gone")
+                raise OperationalError("db gone")
             return real_save(self, *args, **kwargs)
 
         with mock.patch.object(EmailLog, "save", save):
@@ -151,6 +152,50 @@ class TestWrites:
 
         assert deliveries[0].status is Status.SENT
         assert len(mail.outbox) == 1
+
+    def test_a_row_that_cannot_be_written_never_stops_the_send(
+        self, catalogue, caplog
+    ):
+        """An alert about a failing database must still go out, and a
+        send must not wait on, or be retried because of, its own log."""
+        catalogue(probe())
+
+        with mock.patch.object(
+            EmailLog, "save", side_effect=OperationalError("db gone")
+        ):
+            deliveries = send_email("probe.notice", probe_object())
+
+        assert deliveries[0].status is Status.SENT
+        assert len(mail.outbox) == 1
+        assert "is not logged" in caplog.text
+        assert not EmailLog.objects.exists()
+
+    def test_a_failed_send_with_no_row_raises_the_transports_error(
+        self, catalogue
+    ):
+        catalogue(probe())
+
+        with (
+            mock.patch.object(
+                EmailLog, "save", side_effect=OperationalError("db gone")
+            ),
+            mock.patch(
+                "emails.transport.EmailMultiAlternatives.send",
+                side_effect=SMTPServerDisconnected("relay down"),
+            ),
+            pytest.raises(SMTPServerDisconnected),
+        ):
+            send_email("probe.notice", probe_object())
+
+    def test_a_skip_that_cannot_be_logged_is_still_a_skip(self, catalogue):
+        catalogue(probe(recipients=lambda obj: []))
+
+        with mock.patch.object(
+            EmailLog, "save", side_effect=OperationalError("db gone")
+        ):
+            [delivery] = send_email("probe.notice", probe_object())
+
+        assert delivery.status is Status.SKIPPED_NO_RECIPIENT
 
 
 class TestPrivacy:

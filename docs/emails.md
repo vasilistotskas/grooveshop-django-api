@@ -639,8 +639,11 @@ keyed hash of the address (`optout.address_hash`) and a masked form
 re-rendered from the type and its object, and `error` is the failure's class
 and SMTP or HTTP code, never its message (a relay's text can quote the
 recipient). `tests/integration/emails/test_email_log.py` scans every column.
-If the update after a successful send fails, it is logged and swallowed:
-raising would make the task retry and send the mail twice.
+**The log never stops or changes a send.** A write that fails (the insert
+before the send, the update after it, a skip) is reported as `Email <type> is
+not logged` and swallowed: raising would keep an alert about a failing
+database from going out, and would make the task retry, and so send twice, a
+mail that has already left. The send then simply has no row.
 
 `EmailEvent` (the provider timeline of one row, unique on the provider's
 event id) and `EmailSuppression` (an address hash with a reason and a scope,

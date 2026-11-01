@@ -4172,6 +4172,10 @@ msgstr "Duplicate category IDs are not allowed."
 msgid "Duration (ms)"
 msgstr "Duration (ms)"
 
+#, python-format
+msgid "EMAIL_TRANSPORT is 'resend' but these stores send from their own verified domain and have no Resend API key: %(stores)s."
+msgstr "EMAIL_TRANSPORT is 'resend' but these stores send from their own verified domain and have no Resend API key: %(stores)s."
+
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 
@@ -4260,8 +4264,14 @@ msgstr "Email event"
 msgid "Email events"
 msgstr "Email events"
 
+msgid "Email goes through Resend and these stores send from their own verified domain, which only their own Resend key can sign for. Open each store, tab Email & Security:"
+msgstr "Email goes through Resend and these stores send from their own verified domain, which only their own Resend key can sign for. Open each store, tab Email & Security:"
+
 msgid "Email is required."
 msgstr "Email is required."
+
+msgid "Email is sent through Resend and this store sends from its own verified domain: save its Resend API key, or untick From Email verified."
+msgstr "Email is sent through Resend and this store sends from its own verified domain: save its Resend API key, or untick From Email verified."
 
 msgid "Email log"
 msgstr "Email log"
@@ -4301,6 +4311,13 @@ msgstr "Emails"
 
 msgid "Emails & Engagement"
 msgstr "Emails & Engagement"
+
+#, python-format
+msgid "Emails can't be sent from %(domain)s until its Resend key is saved"
+msgstr "Emails can't be sent from %(domain)s until its Resend key is saved"
+
+msgid "Emails cannot be sent until a Resend key is saved"
+msgstr "Emails cannot be sent until a Resend key is saved"
 
 msgid "Empty cart"
 msgstr "Empty cart"
@@ -9440,6 +9457,10 @@ msgstr "Order VAT Line"
 msgid "Order VAT Lines"
 msgstr "Order VAT Lines"
 
+#, python-format
+msgid "Order and account emails from %(domain)s cannot reach your customers until the email service connection for your domain is finished. Contact support: the platform completes it."
+msgstr "Order and account emails from %(domain)s cannot reach your customers until the email service connection for your domain is finished. Contact support: the platform completes it."
+
 msgid "Order associated with this stock operation (if applicable)"
 msgstr "Order associated with this stock operation (if applicable)"
 
@@ -11585,11 +11606,17 @@ msgstr "Requires Confirmation"
 msgid "Resend"
 msgstr "Resend"
 
+msgid "Resend API key"
+msgstr "Resend API key"
+
 msgid "Resend confirmation"
 msgstr "Resend confirmation"
 
 msgid "Resend delivery email"
 msgstr "Resend delivery email"
+
+msgid "Resend webhook signing secret"
+msgstr "Resend webhook signing secret"
 
 msgid "Reservation"
 msgstr "Reservation"
@@ -11975,6 +12002,9 @@ msgstr "Sanitised request body (PII fields are hashed by the facebook_business S
 
 msgid "Save"
 msgstr "Save"
+
+msgid "Save each store's key in the platform admin (Email & Security) first, or set EMAIL_TRANSPORT back to 'smtp'."
+msgstr "Save each store's key in the platform admin (Email & Security) first, or set EMAIL_TRANSPORT back to 'smtp'."
 
 msgid "Save your recovery codes"
 msgstr "Save your recovery codes"
@@ -14056,6 +14086,12 @@ msgstr "The selected shipping method is not available for the selected country."
 
 msgid "The selected shipping provider is currently unavailable."
 msgstr "The selected shipping provider is currently unavailable."
+
+msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+msgstr "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+
+msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
@@ -16227,6 +16263,9 @@ msgstr "Your store has been suspended"
 #, python-format
 msgid "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
 msgstr "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
+
+msgid "Your store's emails are not being sent"
+msgstr "Your store's emails are not being sent"
 
 msgid "Your subscription to this topic is pending confirmation."
 msgstr "Your subscription to this topic is pending confirmation."

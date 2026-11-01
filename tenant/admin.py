@@ -573,6 +573,8 @@ class TenantAdmin(BaseModelAdmin):
                 "fields": [
                     "from_email",
                     "from_email_verified",
+                    "resend_api_key",
+                    "resend_webhook_secret",
                     "contact_email",
                     "totp_issuer",
                     "allowed_csp_sources",

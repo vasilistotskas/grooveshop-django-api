@@ -4178,6 +4178,10 @@ msgstr "Δεν επιτρέπονται διπλότυπα ID κατηγοριώ
 msgid "Duration (ms)"
 msgstr "Διάρκεια (ms)"
 
+#, python-format
+msgid "EMAIL_TRANSPORT is 'resend' but these stores send from their own verified domain and have no Resend API key: %(stores)s."
+msgstr "Το EMAIL_TRANSPORT είναι 'resend', αλλά αυτά τα καταστήματα στέλνουν από δικό τους επαληθευμένο domain και δεν έχουν κλειδί API του Resend: %(stores)s."
+
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "Τιμή αναφοράς Omnibus της ΕΕ: η χαμηλότερη τιμή με ΦΠΑ των 30 ημερών πριν από την έναρξη της τρέχουσας μείωσης, σταθερή από την έναρξή της. Κενή όταν δεν επιτρέπεται να ανακοινωθεί μείωση."
 
@@ -4266,8 +4270,14 @@ msgstr "Συμβάν email"
 msgid "Email events"
 msgstr "Συμβάντα email"
 
+msgid "Email goes through Resend and these stores send from their own verified domain, which only their own Resend key can sign for. Open each store, tab Email & Security:"
+msgstr "Τα email περνούν από το Resend και αυτά τα καταστήματα στέλνουν από δικό τους επαληθευμένο domain, το οποίο μπορεί να υπογράψει μόνο το δικό τους κλειδί Resend. Ανοίξτε κάθε κατάστημα, καρτέλα Email & Security:"
+
 msgid "Email is required."
 msgstr "Το email είναι υποχρεωτικό."
+
+msgid "Email is sent through Resend and this store sends from its own verified domain: save its Resend API key, or untick From Email verified."
+msgstr "Τα email στέλνονται μέσω Resend και αυτό το κατάστημα στέλνει από δικό του επαληθευμένο domain: αποθηκεύστε το κλειδί API του Resend ή αποεπιλέξτε το From Email verified."
 
 msgid "Email log"
 msgstr "Αρχείο email"
@@ -4307,6 +4317,13 @@ msgstr "Email"
 
 msgid "Emails & Engagement"
 msgstr "Email & Δέσμευση πελατών"
+
+#, python-format
+msgid "Emails can't be sent from %(domain)s until its Resend key is saved"
+msgstr "Δεν μπορούν να σταλούν email από το %(domain)s μέχρι να αποθηκευτεί το κλειδί Resend του"
+
+msgid "Emails cannot be sent until a Resend key is saved"
+msgstr "Τα email δεν μπορούν να σταλούν μέχρι να αποθηκευτεί κλειδί Resend"
 
 msgid "Empty cart"
 msgstr "Άδειο καλάθι"
@@ -9450,6 +9467,10 @@ msgstr "Γραμμή ΦΠΑ παραγγελίας"
 msgid "Order VAT Lines"
 msgstr "Γραμμές ΦΠΑ παραγγελίας"
 
+#, python-format
+msgid "Order and account emails from %(domain)s cannot reach your customers until the email service connection for your domain is finished. Contact support: the platform completes it."
+msgstr "Τα email παραγγελιών και λογαριασμού από το %(domain)s δεν φτάνουν στους πελάτες σας μέχρι να ολοκληρωθεί η σύνδεση της υπηρεσίας email για το domain σας. Επικοινωνήστε με την υποστήριξη: την ολοκληρώνει η πλατφόρμα."
+
 msgid "Order associated with this stock operation (if applicable)"
 msgstr "Παραγγελία που σχετίζεται με αυτή τη λειτουργία αποθέματος (αν υπάρχει)"
 
@@ -11595,11 +11616,17 @@ msgstr "Απαιτείται Επιβεβαίωση"
 msgid "Resend"
 msgstr "Resend"
 
+msgid "Resend API key"
+msgstr "Κλειδί API του Resend"
+
 msgid "Resend confirmation"
 msgstr "Επαναποστολή επιβεβαίωσης"
 
 msgid "Resend delivery email"
 msgstr "Επαναποστολή email παράδοσης"
+
+msgid "Resend webhook signing secret"
+msgstr "Μυστικό υπογραφής webhook του Resend"
 
 msgid "Reservation"
 msgstr "Δέσμευση"
@@ -11984,6 +12011,9 @@ msgstr "Καθαρισμένο σώμα αιτήματος (τα πεδία PII 
 
 msgid "Save"
 msgstr "Αποθήκευση"
+
+msgid "Save each store's key in the platform admin (Email & Security) first, or set EMAIL_TRANSPORT back to 'smtp'."
+msgstr "Αποθηκεύστε πρώτα το κλειδί κάθε καταστήματος στο platform admin (Email & Security) ή επαναφέρετε το EMAIL_TRANSPORT σε 'smtp'."
 
 msgid "Save your recovery codes"
 msgstr "Αποθηκεύστε τους κωδικούς ανάκτησης"
@@ -14061,6 +14091,12 @@ msgstr "Η επιλεγμένη μέθοδος αποστολής δεν είν�
 
 msgid "The selected shipping provider is currently unavailable."
 msgstr "Ο επιλεγμένος μεταφορέας δεν είναι διαθέσιμος αυτή τη στιγμή."
+
+msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+msgstr "Το κλειδί αποστολής της δικής σας ομάδας Resend, περιορισμένο στο επαληθευμένο domain. Μυστικό. Χρησιμοποιείται μόνο όσο το From Email είναι επαληθευμένο· ένα κατάστημα χωρίς δικό του domain στέλνει μέσω της ομάδας της πλατφόρμας. ΔΕΝ υπάρχει εναλλακτική από την πλατφόρμα για κατάστημα με επαληθευμένο domain: αν είναι κενό, τα email του δεν στέλνονται."
+
+msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
 
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "Η γραμμή του καταστήματος στις υπόλοιπες γλώσσες του storefront, ανά γλώσσα, π.χ. {\"en\": \"...\"}. Η γραμμή της προεπιλεγμένης γλώσσας είναι η Περιγραφή Καταστήματος· μια γλώσσα που λείπει χρησιμοποιεί αυτήν."
@@ -16232,6 +16268,9 @@ msgstr "Το κατάστημά σας έχει ανασταλεί"
 #, python-format
 msgid "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
 msgstr "Το κατάστημά σας έχει ανασταλεί: η περίοδός του έληξε στις %(date)s και δεν καταχωρήθηκε ανανέωση εντός της περιόδου χάριτος των %(grace)s ημερών. Το storefront είναι εκτός λειτουργίας και δεν μπορούν να γίνουν παραγγελίες."
+
+msgid "Your store's emails are not being sent"
+msgstr "Τα email του καταστήματός σας δεν στέλνονται"
 
 msgid "Your subscription to this topic is pending confirmation."
 msgstr "Η εγγραφή σας σε αυτό το θέμα εκκρεμεί επιβεβαίωσης."

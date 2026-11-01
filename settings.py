@@ -3068,13 +3068,33 @@ EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
 EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
-if EMAIL_HOST_PASSWORD == "changeme" and PRODUCTION_PROFILE:
+# Which transport carries the pipeline's mail (``emails.transport``): the
+# SMTP relay above, or Resend's HTTP API. Production stays on SMTP until the
+# platform's Resend team exists and one live send is verified.
+EMAIL_TRANSPORT = getenv("EMAIL_TRANSPORT", "smtp")
+if EMAIL_TRANSPORT not in ("smtp", "resend"):
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
-        "EMAIL_HOST_PASSWORD must be set in production "
-        "(current value is the insecure default 'changeme')."
+        f"EMAIL_TRANSPORT must be 'smtp' or 'resend', not {EMAIL_TRANSPORT!r}."
     )
+# The platform's Resend team: carries the platform's own mail and every store
+# without its own verified domain. A store with its own domain has its key on
+# its Tenant row and never falls back to this one.
+RESEND_API_KEY = getenv("RESEND_API_KEY", "")
+if PRODUCTION_PROFILE:
+    from django.core.exceptions import ImproperlyConfigured
+
+    if EMAIL_TRANSPORT == "smtp" and EMAIL_HOST_PASSWORD == "changeme":
+        raise ImproperlyConfigured(
+            "EMAIL_HOST_PASSWORD must be set in production "
+            "(current value is the insecure default 'changeme')."
+        )
+    if EMAIL_TRANSPORT == "resend" and not RESEND_API_KEY:
+        raise ImproperlyConfigured(
+            "RESEND_API_KEY must be set in production when "
+            "EMAIL_TRANSPORT is 'resend'."
+        )
 # STARTTLS (upgrade a plaintext connection, conventionally port 587)
 # versus implicit TLS (the socket is encrypted from the first byte,
 # conventionally port 465). Django treats these as mutually exclusive and

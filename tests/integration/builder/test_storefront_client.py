@@ -108,12 +108,27 @@ def test_a_reference_kind_the_platform_does_not_know_is_a_bad_shape(catalogue):
         storefront.fetch_catalogue("shop")
 
 
-def test_a_held_copy_outlives_a_failed_revalidation(catalogue, settings):
+def test_a_failed_revalidation_refuses_even_with_a_copy_held(
+    catalogue, settings
+):
+    # The rule of the texts catalogue: when the storefront does not answer,
+    # nothing is saved. A copy already held is not a reason to guess.
     settings.BUILDER_CATALOGUE_REVALIDATE_SECONDS = 0
-    held = storefront.fetch_catalogue("shop")
+    storefront.fetch_catalogue("shop")
     catalogue.failure = requests.ConnectionError("down")
 
-    assert storefront.fetch_catalogue("shop") is held
+    with pytest.raises(StorefrontUnavailable):
+        storefront.fetch_catalogue("shop")
+
+
+def test_a_bad_status_on_revalidation_refuses_too(catalogue, settings):
+    settings.BUILDER_CATALOGUE_REVALIDATE_SECONDS = 0
+    storefront.fetch_catalogue("shop")
+    catalogue.status = 503
+    catalogue.hash = "changed"
+
+    with pytest.raises(StorefrontUnavailable):
+        storefront.fetch_catalogue("shop")
 
 
 def test_no_base_url_is_unavailable_not_a_crash(settings):

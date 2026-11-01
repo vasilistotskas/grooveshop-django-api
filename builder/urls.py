@@ -88,6 +88,11 @@ urlpatterns = [
         name="release-list",
     ),
     path(
+        "builder/published",
+        views.PublishedIndexView.as_view(),
+        name="published-index",
+    ),
+    path(
         "builder/published/<slug:page_key>",
         views.PublishedPageView.as_view(),
         name="published",

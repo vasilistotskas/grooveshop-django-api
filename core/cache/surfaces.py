@@ -527,7 +527,8 @@ def register_default_surfaces() -> None:
             # every cached page of the store at once, as for
             # ``store_texts``.
             django_patterns=(),
-            nuxt_patterns=_nuxt("builderPage") + (f"{NUXT_ROUTE_PREFIX}_:*",),
+            nuxt_patterns=_nuxt("builderPage", "builderChrome")
+            + (f"{NUXT_ROUTE_PREFIX}_:*",),
             invalidates_tenant_config=True,
             invalidated_by=("builder.BuilderRelease",),
             icon="web",

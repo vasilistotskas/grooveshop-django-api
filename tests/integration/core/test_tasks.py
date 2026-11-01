@@ -35,9 +35,13 @@ from core.tasks import (
 )
 from emails import optout
 from emails.gates import ScheduleGate
-from emails.models import EmailOptOut
+from emails.models import EmailOptOut, EmailProvider
+from emails.transport import Receipt
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
+
+#: What the transport answers for a message it sent (a mocked ``deliver``).
+SMTP_RECEIPT = Receipt(provider=EmailProvider.SMTP)
 
 
 class TestMonitoredTask:
@@ -662,7 +666,7 @@ class TestSendInactiveUserNotificationsTask:
 
         with patch(
             "emails.send.transport.deliver",
-            side_effect=[Exception("SMTP error"), None],
+            side_effect=[Exception("SMTP error"), SMTP_RECEIPT],
         ):
             result = send_inactive_user_notifications()
 
@@ -720,7 +724,9 @@ class TestSendInactiveUserNotificationsTask:
                 email=f"slow{i}@example.com",
             )
 
-        deliver = Mock(side_effect=[None, SoftTimeLimitExceeded(), None])
+        deliver = Mock(
+            side_effect=[SMTP_RECEIPT, SoftTimeLimitExceeded(), SMTP_RECEIPT]
+        )
         with patch("emails.send.transport.deliver", deliver):
             result = send_inactive_user_notifications()
 
@@ -770,6 +776,7 @@ class TestSendInactiveUserNotificationsTask:
         assert mail.outbox == []
 
 
+@pytest.mark.django_db
 class TestMonitorSystemHealthTask:
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
@@ -1056,6 +1063,7 @@ class TestBackupDatabaseTask:
         assert result["backup_file"] is None
 
 
+@pytest.mark.django_db
 class TestScheduledDatabaseBackupTask:
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.cleanup_old_backups")

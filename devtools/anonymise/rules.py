@@ -407,6 +407,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "notification.NotificationTranslation": Delete(),
     "order.StockReservation": Delete(),
     "emails.EmailOptOut": Delete(),
+    "emails.EmailLog": Delete(),
+    "emails.EmailEvent": Delete(),
+    "emails.EmailSuppression": Delete(),
     "admin.LogEntry": Delete(),
 }
 

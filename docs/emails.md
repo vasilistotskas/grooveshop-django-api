@@ -4,7 +4,8 @@ The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
 Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
-`transport.py`, `preview.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
+`transport.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `models.py`,
+`services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
 **State.** The order, shipping, product, gift card, B2B, contact, account,
@@ -29,9 +30,11 @@ equal (see Tests).
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
 | `preview.py` | `build_preview`, the admin preview of any registered type, and its form. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`; `owner_schema`, the schema a type is read and sent under. |
-| `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it; the pipeline's only sender. |
+| `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it, returning a `Receipt` (provider and its message id); the pipeline's only sender. |
 | `send.py` | `send_email`: the whole envelope. |
-| `models.py`, `services.py` | `EmailSwitch`, `EmailOptOut`; `set_switch`, the only writer of switches. |
+| `status.py` | `Status`: what became of one recipient's send, shared by `Delivery` and `EmailLog`. |
+| `log.py`, `tasks.py` | The `EmailLog` writes of `send_email`, and the retention sweep. |
+| `models.py`, `services.py` | `EmailSwitch`, `EmailOptOut`, `EmailLog`, `EmailEvent`, `EmailSuppression`; `set_switch`, the only writer of switches. |
 
 `emails` is in both `SHARED_APPS` and `TENANT_APPS`: a store's switches and
 opt-outs live in its schema, the platform's own in `public`. It imports no
@@ -356,8 +359,9 @@ skip. `was_sent(deliveries)` says whether any recipient was sent. In order:
 5. **Recipients**: `recipient`, else `email_type.recipients(obj)`. None
    gives `SKIPPED_NO_RECIPIENT`.
 6. Per recipient: **opt-out** (marketing only, `SKIPPED_OPTED_OUT`), then
-   `render` in `recipient.language`, `build_headers`, and
-   `transport.deliver`.
+   `render` in `recipient.language`, the `EmailLog` row (`QUEUED`),
+   `build_headers`, and `transport.deliver`; the row becomes `SENT` (with
+   the transport's `Receipt`) or `FAILED`.
 
 A transport failure is logged (no address in the line) and re-raised, so the
 calling task's own `autoretry_for=MAIL_TRANSIENT_ERRORS` applies. The
@@ -374,8 +378,9 @@ HTML alternative. The `content` bytes are `repr=False` and nothing logs them.
 The caller reads the file (a receipt PDF) before calling, so a send that is
 skipped still reads it.
 
-The skips are logged as a structured line (`email_type`, `status`,
-`reason`). There is no log table yet.
+Every outcome is also a row of `EmailLog` (see The email log); a skip is a
+row with its status and `reason` and no recipient work, and is still a
+structured log line (`email_type`, `status`, `reason`).
 
 ### Language
 
@@ -618,10 +623,42 @@ name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
 `get_from_email` are deleted, and so is `user.tasks.send_rendered_email_task`
 (nothing has queued it since `send_allauth_email_task` replaced it).
 
+## The email log (`EmailLog`, `log.py`)
+
+One row per recipient's delivery, in the schema the mail is sent under: a
+store's rows in its schema, a platform type's in `public`. `send_email`
+creates it before the transport runs (`QUEUED`), so its `uuid` can travel
+with the message (the idempotency key and hidden tag of the Resend
+transport), then sets `SENT` (`sent_at`, `provider`, `provider_message_id`;
+SMTP returns no id, so it stays null there) or `FAILED` (`error`). A skip is
+one row with its status and, for a closed gate, the gate's label in `reason`.
+
+What a row holds: type key, status, language, the subject that went out, a
+keyed hash of the address (`optout.address_hash`) and a masked form
+(`j***@e***.com`). **It holds no address and no body**: a body is
+re-rendered from the type and its object, and `error` is the failure's class
+and SMTP or HTTP code, never its message (a relay's text can quote the
+recipient). `tests/integration/emails/test_email_log.py` scans every column.
+If the update after a successful send fails, it is logged and swallowed:
+raising would make the task retry and send the mail twice.
+
+`EmailEvent` (the provider timeline of one row, unique on the provider's
+event id) and `EmailSuppression` (an address hash with a reason and a scope,
+kept until removed) exist for the webhook that fills them.
+
+**Retention.** `EMAIL_LOG_RETENTION_DAYS` (store setting, default 90, `0`
+keeps everything, validator `emails.log.validate_retention_days_setting`).
+`emails.tasks.purge_expired_email_logs` deletes through
+`core.retention.delete_in_batches`, in public from beat and per store through
+`tenant.tasks.fanout_purge_expired_email_logs` (`include_suspended=True`);
+events cascade, suppressions stay. Staging anonymisation deletes all three
+tables (`devtools/anonymise/rules.py`).
+
 ## Not built yet
 
-- `EmailLog`, provider events, suppression and a deferred (`defer`) send;
-  skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
+- The webhook that fills `EmailEvent` and `EmailSuppression`, the send-time
+  suppression check, and a deferred (`defer`) send; there is no
+  `X-Entity-Ref-ID`.
 - The platform admin's own page for the platform types (they have no
   switches, so it would be a listing and the log); the rest of the store's
   admin page (status, log, test-send); the switches and the preview are on
@@ -637,6 +674,10 @@ name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
   contents for the test and restores them. Never register a probe type in
   production code. A test that runs a store email (an order task) needs a
   store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
+- `tests/integration/emails/test_email_log.py`: a row for every outcome, no
+  raw address in any column, a failure never reaches the row, the retention
+  sweep. `tests_mt/test_email_isolation.py` proves a platform type's row is in
+  `public` and a store's in its own schema.
 - `tests/integration/emails/test_golden_render.py` records every order
   email as it is sent today (subject, recipients, From, Reply-To, headers,
   attachment names, HTML and text, in Greek and English) under

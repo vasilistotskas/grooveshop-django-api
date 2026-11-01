@@ -11,17 +11,17 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any
 
 from django.core.cache import cache
 
-from emails import optout, sender, transport
+from emails import log, optout, sender, transport
 from emails.headers import build_headers
 from emails.models import EmailSwitch
 from emails.recipients import Recipient
 from emails.registry import registry
 from emails.render import owner_schema, render
+from emails.status import Status
 from emails.transport import Attachment
 from emails.types import EmailType, Owner, RenderEnv
 from tenant.membership import bound_tenant
@@ -36,14 +36,6 @@ class StoreRequired(RuntimeError):
     """A store type was sent with no store bound: it has no schema to
     read its switch, its gates or its sender from, and falling back to the
     platform's would send one store's mail as another's."""
-
-
-class Status(StrEnum):
-    SENT = "sent"
-    SKIPPED_FEATURE_OFF = "skipped_feature_off"
-    SKIPPED_SWITCHED_OFF = "skipped_switched_off"
-    SKIPPED_NO_RECIPIENT = "skipped_no_recipient"
-    SKIPPED_OPTED_OUT = "skipped_opted_out"
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,8 +125,9 @@ def _send_to(
         obj,
         RenderEnv(language=recipient.language, recipient=recipient),
     )
+    entry = log.start(email_type.key, recipient, rendered.subject)
     try:
-        transport.deliver(
+        receipt = transport.deliver(
             rendered,
             from_email=sender.from_address(),
             to=[recipient.address],
@@ -142,7 +135,8 @@ def _send_to(
             headers=build_headers(email_type, recipient),
             attachments=attachments,
         )
-    except Exception:
+    except Exception as error:
+        log.mark_failed(entry, error)
         logger.warning(
             "Email %s failed",
             email_type.key,
@@ -150,6 +144,9 @@ def _send_to(
             exc_info=True,
         )
         raise
+    log.mark_sent(
+        entry, provider=receipt.provider, message_id=receipt.message_id
+    )
     logger.info(
         "Email %s sent",
         email_type.key,
@@ -180,4 +177,5 @@ def _skip(
             "reason": reason,
         },
     )
+    log.record_skip(email_type.key, status, reason, recipient=recipient)
     return Delivery(email_type.key, status, reason, recipient)

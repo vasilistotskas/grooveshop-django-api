@@ -20,11 +20,15 @@ from django.utils.translation import gettext
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.utils.email_context import build_email_context
-from emails.types import EmailType, Owner, RenderEnv, subject_fields
+from emails.types import (
+    SUBJECT_MAX_LENGTH,
+    EmailType,
+    Owner,
+    RenderEnv,
+    subject_fields,
+)
 
 logger = logging.getLogger(__name__)
-
-SUBJECT_MAX_LENGTH = 200
 
 
 @dataclass(frozen=True, slots=True)

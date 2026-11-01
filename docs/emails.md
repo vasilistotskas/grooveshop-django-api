@@ -695,6 +695,17 @@ transport), then sets `SENT` (`sent_at`, `provider`, `provider_message_id`;
 SMTP returns no id, so it stays null there) or `FAILED` (`error`). A skip is
 one row with its status and, for a closed gate, the gate's label in `reason`.
 
+**Delivery identity across retries.** `EmailLog.uuid` is the delivery's identity (`log.delivery_id`). Inside a Celery
+task it is derived from the task id, which `retry()` keeps, plus the type, the
+recipient hash and the subject; outside a task it is a fresh uuid4. A retry of
+a send that failed (or whose response was lost) therefore finds the row its
+earlier attempt wrote, moves it back to `QUEUED` and sends under the same
+uuid, so one row and, on Resend, one idempotency key cover the whole chain. A
+recipient whose row is already `SENT` is returned as sent without a second
+send: a task that mails two recipients and fails on the second does not mail
+the first again. Two different mails of one type to one recipient in one task
+differ in their subject, so they stay two deliveries.
+
 What a row holds: type key, status, language, the subject that went out, a
 keyed hash of the address (`optout.address_hash`) and a masked form
 (`j***@e***.com`). **It holds no address and no body**: a body is

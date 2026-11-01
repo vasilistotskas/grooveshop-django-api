@@ -10,8 +10,10 @@ a body: the recipient is a keyed hash and a masked form.
 from __future__ import annotations
 
 import logging
+import uuid
 
 import requests
+from celery import current_task
 from django.db import Error, transaction
 from django.utils import timezone
 
@@ -21,6 +23,28 @@ from emails.recipients import Recipient
 from emails.status import Status
 
 logger = logging.getLogger(__name__)
+
+_DELIVERY_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL, "grooveshop:email-delivery"
+)
+
+
+def delivery_id(type_key: str, recipient_hash: str, subject: str) -> uuid.UUID:
+    """The identity of one delivery: the row's uuid and the provider's
+    idempotency key.
+
+    Inside a Celery task it is derived from the task id, which every
+    ``retry()`` keeps, plus the type, the recipient and the subject, so the
+    retry of a send whose response was lost is the same delivery and reuses
+    its row and key. Outside a task (a synchronous send) it is fresh.
+    """
+    task_id = getattr(getattr(current_task, "request", None), "id", None)
+    if not task_id:
+        return uuid.uuid4()
+    return uuid.uuid5(
+        _DELIVERY_NAMESPACE,
+        f"{task_id}|{type_key}|{recipient_hash}|{subject}",
+    )
 
 
 def validate_retention_days_setting(value: object) -> bool:
@@ -69,16 +93,31 @@ def record_skip(
 
 
 def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
-    """The row of a message about to be sent. When it cannot be written the
-    message is sent anyway and the row stays unsaved."""
+    """The row of a message about to be sent. The retry of a task finds the
+    row its earlier attempt wrote (same delivery id): a ``SENT`` one is
+    returned as it is, so the caller does not send it again, any other goes
+    back to ``QUEUED``. When the row cannot be written the message is sent
+    anyway and the row stays unsaved."""
+    fields = _recipient_fields(recipient)
     entry = EmailLog(
+        uuid=delivery_id(type_key, fields["recipient_hash"], subject),
         type_key=type_key,
         status=Status.QUEUED,
         subject=subject,
-        **_recipient_fields(recipient),
+        **fields,
     )
-    _write(entry)
-    return entry
+    try:
+        earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
+    except Error:
+        earlier = None
+    if earlier is None:
+        _write(entry)
+        return entry
+    if earlier.status != Status.SENT:
+        earlier.status = Status.QUEUED
+        earlier.error = ""
+        _write(earlier, update_fields=["status", "error", "updated_at"])
+    return earlier
 
 
 def mark_sent(

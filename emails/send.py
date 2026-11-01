@@ -126,6 +126,15 @@ def _send_to(
         RenderEnv(language=recipient.language, recipient=recipient),
     )
     entry = log.start(email_type.key, recipient, rendered.subject)
+    if entry.status == Status.SENT:
+        # An earlier attempt of this task already sent it (a retry after a
+        # later recipient failed): never send it twice.
+        return Delivery(
+            email_type.key,
+            Status.SENT,
+            recipient=recipient,
+            subject=rendered.subject,
+        )
     try:
         receipt = transport.deliver(
             rendered,

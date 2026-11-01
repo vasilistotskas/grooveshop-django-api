@@ -3,6 +3,209 @@
 
 
 
+## v3.182.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(builder): an older block version is outdated whatever accepts says
+
+The storefront serves accepts as the current version only, so judging
+outdated by membership of accepts made every old version unknown. A lower
+version is block_version_outdated, a higher one unknown_block_version.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* fix(builder): name the scheduled publish's timestamp indexes within 32 characters
+
+The mixin's %(class)s index names are 37 characters for BuilderScheduledPublish,
+past the 32 an index name may have (models.E034), as for PayWayShippingExclusion.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* fix(builder): an older block version is outdated whatever accepts says
+
+The storefront serves accepts as the current version only, so judging
+outdated by membership of accepts made every old version unknown. A lower
+version is block_version_outdated, a higher one unknown_block_version.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+* fix(tenant): make the staff token scope migration follow the Resend credentials
+
+0066 still depended on 0064, which left two leaf migrations in the tenant
+app (0065_tenant_resend_credentials and 0066).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+### Features
+
+* feat(builder): schedule a publish for a time, and tell the store when one fails (#405) ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* feat(builder): versioned page documents, releases and the staff API
+
+A new tenant app holds a store's theme, section groups, templates and
+pages as documents: a draft with a per-language overlay and a revision
+(If-Match, a stale save is a 409 naming who saved), immutable versions
+(named saves and publishes only), and immutable releases that map
+document key to version. A publish validates every named draft and
+creates one release in one transaction; a rollback is a new release over
+older versions. The reference index of the current release is derived.
+
+The block catalogue is the storefront's, fetched per store with ETag
+revalidation (builder.storefront, sharing core.storefront with texts):
+every save is validated against it with jsonschema plus the checks only
+Django can make (references exist, feature gates, store limits, rich text
+through the sanitiser), each problem a JSON pointer and a stable code, and
+nothing is saved when no catalogue is available.
+
+A release moves Tenant.cache_generation and the builder cache surface; a
+draft save purges nothing. The public read resolves the current release
+for a locale (overlay merged, disabled nodes dropped) and is cached under
+the release number. builder joins STORE_SETTINGS_APP_LABELS and
+STAFF_READ_ONLY_APP_LABELS: ADMIN and OWNER edit and publish, STAFF look.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* feat(builder): a media library with measured images and alt text per language
+
+MediaAsset is an image in the store's library: the file under the store's
+media directory (served by media-stream like every upload), the size a
+browser shows it at (EXIF orientation applied), a focal point and an alt
+text per language (a parler translation: the row stands alone). A block's
+image setting is a media reference to its id, so the storefront can reserve
+space, size srcset and translate the alt, and publishing refuses an asset
+that does not exist.
+
+Uploads are checked before they are stored: raster formats only, a byte and
+a pixel limit from settings. A used asset cannot be deleted (409
+media_in_use, from the reference index of the current release), and
+changing a used asset's alt text or focal point moves the cache generation
+and the builder surface. The public resolve answers only for assets the
+current release uses. displayed_size is extracted from natural_size so the
+rich text image sizes and the library measure the same way.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* feat(builder): schedule a publish for a time
+
+POST builder/schedules checks what a publish checks (every draft valid,
+references existing, something to change) at scheduling time and freezes
+the drafts as versions held by the schedule, so the release made later is
+what the merchant checked. A naive time is read in the store's timezone.
+Schedules can be listed, moved and cancelled while pending.
+
+A beat task fans out per store every minute and releases each due schedule
+in its own transaction under the per-store release lock, with
+select_for_update and the status change inside it: a retry, an overlapping
+sweep or a second worker finds the row spent. At execution the references
+are checked again and a schedule that can no longer be released is marked
+failed with the problems recorded, never half done. The release is the
+ordinary one, made by who scheduled it, so the cache generation and the
+builder surface move when it happens. Frozen versions are protected from
+checkpoint retention while pending.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* feat(builder): tell the store when a scheduled publish fails
+
+When the sweep marks a schedule failed it sends the store-staff alert
+ops.builder_schedule_failed (pages, scheduled time in the store's
+timezone, the problems in plain words, Greek and English, switchable like
+the other ops alerts) after the commit that records the failure; a mail
+that cannot go out never undoes it. The problem sentences are re-read from
+the stored code and params in the language of the mail. The store
+dashboard shows an alert to whoever may publish while a failed schedule is
+unacknowledged; it is acknowledged through the API or the read-only
+admin list. The migration follows the media library's.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* feat(builder): sign the storefront editor in with a single-use ticket (#404) ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+* feat(builder): versioned page documents, releases and the staff API
+
+A new tenant app holds a store's theme, section groups, templates and
+pages as documents: a draft with a per-language overlay and a revision
+(If-Match, a stale save is a 409 naming who saved), immutable versions
+(named saves and publishes only), and immutable releases that map
+document key to version. A publish validates every named draft and
+creates one release in one transaction; a rollback is a new release over
+older versions. The reference index of the current release is derived.
+
+The block catalogue is the storefront's, fetched per store with ETag
+revalidation (builder.storefront, sharing core.storefront with texts):
+every save is validated against it with jsonschema plus the checks only
+Django can make (references exist, feature gates, store limits, rich text
+through the sanitiser), each problem a JSON pointer and a stable code, and
+nothing is saved when no catalogue is available.
+
+A release moves Tenant.cache_generation and the builder cache surface; a
+draft save purges nothing. The public read resolves the current release
+for a locale (overlay merged, disabled nodes dropped) and is cached under
+the release number. builder joins STORE_SETTINGS_APP_LABELS and
+STAFF_READ_ONLY_APP_LABELS: ADMIN and OWNER edit and publish, STAFF look.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+* feat(builder): sign the storefront editor in with a single-use ticket
+
+The editor runs on the store's own host, where nobody is signed in as
+staff: staff identities live in the public schema, a storefront session is
+a customer's. The store admin's "Edit storefront" (ADMIN and OWNER) stores
+the staff id in Redis under a random key for a minute and redirects to
+/_builder?ticket=. The storefront's server posts the ticket to
+POST builder/staff-session, which spends it with GETDEL (one round trip, so
+two requests cannot both win), checks again that the person may change this
+store's pages, and mints a PlatformStaffToken.
+
+That token has its own scope. knox's auto-refresh would push any token to
+its seven-day lifetime and the authenticator would accept it on every staff
+route, so a builder token is not renewed (it ends after
+BUILDER_STAFF_SESSION_TTL_SECONDS) and is refused outside the builder's URL
+namespace. The role and is_staff are re-checked on every request, so losing
+either ends a session at once; DELETE builder/staff-session ends it.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+### Testing
+
+* test(builder): an older version is outdated when accepts is the current only
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`c5d49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5d49b2576a51994ae772255072102baf5484c18))
+
+* test(builder): an older version is outdated when accepts is the current only
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
+* test(core): allow the builder staff session in the is_staff guard
+
+builder/staff_session.py trades a single-use ticket for a builder
+PlatformStaffToken and reads the public-schema identity to do it, the same
+job tenant/staff_api.py does when it mints a staff token.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`b695a35`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b695a355f6a575df990708a8a089b271d4a9522f))
+
 ## v3.181.0 (2026-11-01)
 
 ### Bug fixes

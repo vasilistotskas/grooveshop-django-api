@@ -385,6 +385,14 @@ settings); Django never converts:
   layouts"). A problem anywhere, including a reference to nothing, writes
   nothing. A store that already has builder data is refused. `--dry-run` does
   everything and rolls it back. The legacy tables are not touched.
+- The storefront's golden fixtures (`{request, response}` per section type,
+  and the menus) are copied under `tests/fixtures/builder/legacy/` and
+  replayed by `tests/integration/builder/test_converter_fixtures.py`. The copy
+  is pinned to a storefront commit by its git tree id
+  (`legacy.source.json`); only `.github/scripts/sync_converter_fixtures.py`
+  writes it, a unit test fails if the copy is not the pinned tree, and a
+  weekly workflow (`converter-fixtures.yml`) fails when the storefront's
+  `main` has moved on.
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
 

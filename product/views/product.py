@@ -25,6 +25,7 @@ from core.utils.serializers import (
     crud_config,
 )
 from product.filters.product import ProductFilter
+from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.image import ProductImageSerializer
@@ -428,7 +429,10 @@ class ProductViewSet(BaseModelViewSet):
     )
     def images(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
-        images = product.images.all()
+        # ``for_detail`` prefetches the image and product translations the
+        # serializer reads and orders by ``sort_order``: one query each,
+        # however many images the product has.
+        images = ProductImage.objects.for_detail().filter(product=product)
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

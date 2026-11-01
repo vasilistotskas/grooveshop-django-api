@@ -7,6 +7,8 @@ or one of the store's recent orders, through ``emails.render``.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
@@ -116,7 +118,9 @@ class TestAccess:
         # A crafted order id is not read: the sample is rendered.
         rendered = post(client, type_key=KEY, order=order.pk)
         assert rendered.status_code == 200
-        assert f"#{order.pk}" not in rendered.content.decode()
+        # "#12345" is the sample's own order number, so the order's id must
+        # not be matched as a prefix of it.
+        assert not re.search(rf"#{order.pk}(?!\d)", rendered.content.decode())
 
     def test_an_admin_is_admitted(self, admin):
         assert admin.get(type_url()).status_code == 200

@@ -408,6 +408,45 @@ settings); Django never converts:
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
 
+## Run sheet: importing a live environment
+
+Every command is `kubectl --context grooveshop -n <namespace> exec
+deploy/backend -- /home/app/.venv/bin/python manage.py ...` (`grooveshop` is
+production, `grooveshop-staging` staging; from Git Bash prefix
+`MSYS_NO_PATHCONV=1`, or the path is rewritten). The import only writes builder
+tables: `page_config` and every storefront read stay as they are, so nothing
+changes for a visitor until the storefront switch.
+
+1. **Before.** The backend carries the builder import and the storefront
+   serves the strict converter (`POST /api/builder/convert-legacy` answers; the
+   storefront image is the one the staging run used).
+2. **Pre-check, on that environment's data.**
+   `builder_import_legacy --all-tenants --dry-run --json`. Every store must
+   show `problems: []` and `applied: false`. Read each `warnings` entry
+   (`dropped_title` is expected, anything else is a decision). A store
+   reporting `already_imported` has builder data already: stop and look at it.
+3. **Import.** The same command without `--dry-run`. One transaction per
+   store; a store with a problem is skipped and reported, nothing of it is
+   written, and the command exits non-zero. Each store ends at release 1,
+   note "Imported from page layouts", no staff.
+4. **Verify (read only).** Per store: the release is 1; each document key and
+   kind is the dry run's; every released document has one version (number 1)
+   and `published_revision` 1; a draft layout has no version and is not in
+   the release. Then `GET /api/v1/builder/published/home?locale=el` and
+   `?locale=en` answer 200 with the layout's sections, and the English
+   overlay is there where the legacy layout had English text. A second
+   `--dry-run` answers `already_imported` for every store.
+5. **Rollback, before the storefront reads the builder.**
+   `builder_reset --tenant <schema>` reports what it would delete;
+   `--confirm` deletes it (documents, versions, the release, the reference
+   index; cached reads of the release go with it). It refuses, and says why,
+   unless the data is exactly what an import leaves: one release, no staff
+   behind a release or version, no edited draft, named save, deleted document
+   or schedule. It cannot see whether the storefront already reads the
+   builder: that is the storefront deployment, so a reset belongs before it,
+   never after. The media library and `page_config` are never touched.
+   Afterwards the import can be run again.
+
 ## Not here yet
 
 The `builder_block_usage` command that will gate removing a block type is its

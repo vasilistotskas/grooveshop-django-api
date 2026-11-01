@@ -29,7 +29,6 @@ from emails import optout
 from emails.declare import customer_email, marketing_email
 from emails.gates import FeatureGate, ScheduleGate
 from emails.recipients import Recipient, customer_of
-from emails.registry import registry
 from emails.types import RenderEnv
 from user.utils.subscription import subscription_confirmation_url
 
@@ -106,9 +105,7 @@ def _reengagement(user: UserAccount, env: RenderEnv) -> dict[str, Any]:
             "email": user.email,
         },
         "unsubscribe_url": optout.confirm_url(
-            user.email,
-            registry.get("user.reengagement"),
-            language=env.language,
+            env.recipient.address, REENGAGEMENT, language=env.language
         ),
     }
 
@@ -212,7 +209,7 @@ customer_email(
     recipients=_subscriber,
     gates=(FeatureGate(feature="newsletter", label=_("Newsletter feature")),),
 )
-marketing_email(
+REENGAGEMENT = marketing_email(
     "user.reengagement",
     title=_("We miss you"),
     description=_(

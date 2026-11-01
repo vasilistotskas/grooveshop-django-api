@@ -3,6 +3,81 @@
 
 
 
+## v3.181.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(builder): an older block version is outdated whatever accepts says
+
+The storefront serves accepts as the current version only, so judging
+outdated by membership of accepts made every old version unknown. A lower
+version is block_version_outdated, a higher one unknown_block_version.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`667445b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667445bacbd2b906726b17cf85623e31b22f09e3))
+
+### Features
+
+* feat(builder): a media library with measured images and alt text per language (#403) ([`667445b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667445bacbd2b906726b17cf85623e31b22f09e3))
+
+* feat(builder): versioned page documents, releases and the staff API
+
+A new tenant app holds a store's theme, section groups, templates and
+pages as documents: a draft with a per-language overlay and a revision
+(If-Match, a stale save is a 409 naming who saved), immutable versions
+(named saves and publishes only), and immutable releases that map
+document key to version. A publish validates every named draft and
+creates one release in one transaction; a rollback is a new release over
+older versions. The reference index of the current release is derived.
+
+The block catalogue is the storefront's, fetched per store with ETag
+revalidation (builder.storefront, sharing core.storefront with texts):
+every save is validated against it with jsonschema plus the checks only
+Django can make (references exist, feature gates, store limits, rich text
+through the sanitiser), each problem a JSON pointer and a stable code, and
+nothing is saved when no catalogue is available.
+
+A release moves Tenant.cache_generation and the builder cache surface; a
+draft save purges nothing. The public read resolves the current release
+for a locale (overlay merged, disabled nodes dropped) and is cached under
+the release number. builder joins STORE_SETTINGS_APP_LABELS and
+STAFF_READ_ONLY_APP_LABELS: ADMIN and OWNER edit and publish, STAFF look.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`667445b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667445bacbd2b906726b17cf85623e31b22f09e3))
+
+* feat(builder): a media library with measured images and alt text per language
+
+MediaAsset is an image in the store's library: the file under the store's
+media directory (served by media-stream like every upload), the size a
+browser shows it at (EXIF orientation applied), a focal point and an alt
+text per language (a parler translation: the row stands alone). A block's
+image setting is a media reference to its id, so the storefront can reserve
+space, size srcset and translate the alt, and publishing refuses an asset
+that does not exist.
+
+Uploads are checked before they are stored: raster formats only, a byte and
+a pixel limit from settings. A used asset cannot be deleted (409
+media_in_use, from the reference index of the current release), and
+changing a used asset's alt text or focal point moves the cache generation
+and the builder surface. The public resolve answers only for assets the
+current release uses. displayed_size is extracted from natural_size so the
+rich text image sizes and the library measure the same way.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`667445b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667445bacbd2b906726b17cf85623e31b22f09e3))
+
+### Testing
+
+* test(builder): an older version is outdated when accepts is the current only
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`667445b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667445bacbd2b906726b17cf85623e31b22f09e3))
+
 ## v3.180.0 (2026-11-01)
 
 ### Bug fixes

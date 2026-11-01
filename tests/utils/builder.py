@@ -205,7 +205,7 @@ class FakeCatalogue:
             "hash": self.hash,
             "blocks": self.blocks,
             "documentKinds": self.document_kinds,
-            "templates": ["home", "about", "contact"],
+            "templates": ["home", "about", "contact", "product"],
         }
         return response
 

@@ -14189,6 +14189,10 @@ msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατ�
 msgid "The storefront has no language %(language)s."
 msgstr "Το κατάστημα δεν έχει τη γλώσσα %(language)s."
 
+#, python-format
+msgid "The storefront has no page type called %(name)s."
+msgstr "Το κατάστημα δεν έχει τύπο σελίδας με όνομα %(name)s."
+
 msgid "The storefront has no text in this language."
 msgstr "Το κατάστημα δεν έχει κείμενο σε αυτή τη γλώσσα."
 

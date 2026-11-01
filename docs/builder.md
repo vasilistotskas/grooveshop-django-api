@@ -97,7 +97,7 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `path` being a JSON pointer into what was sent. Codes are stable:
 
 - shape: `invalid_document`, `order_mismatch`, `invalid_node_id`,
-  `duplicate_node_id`, `invalid_key`, `document_too_large`,
+  `duplicate_node_id`, `invalid_key`, `unknown_template` (a `template:<name>` the catalogue's `templates` does not list), `document_too_large`,
   `too_many_sections`, `too_many_blocks`, `max_depth_exceeded`;
 - the catalogue: `invalid_block_type`, `unknown_block_type`,
   `unknown_block_version`, `block_version_outdated`, `not_a_section`,

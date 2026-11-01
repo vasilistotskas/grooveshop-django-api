@@ -14184,6 +14184,10 @@ msgstr "The storefront could not be reached, so the list of texts is not availab
 msgid "The storefront has no language %(language)s."
 msgstr "The storefront has no language %(language)s."
 
+#, python-format
+msgid "The storefront has no page type called %(name)s."
+msgstr "The storefront has no page type called %(name)s."
+
 msgid "The storefront has no text in this language."
 msgstr "The storefront has no text in this language."
 

@@ -140,6 +140,20 @@ class TestWhatIsSent:
         assert second["target"] == {"type": "route", "route": "/products"}
         assert second["labels"]["el"] == "Προϊόντα"
 
+    def test_a_content_page_link_with_no_english_label_carries_the_greek_title(
+        self,
+    ):
+        # The legacy menu shows another language's title when a page has
+        # none in the one asked for, so the import keeps the render.
+        page = ContentPage.objects.create(slug="terms", is_published=True)
+        page.create_translation("el", title="Όροι χρήσης")
+        menu = NavigationMenu.objects.create(slot="header")
+        NavigationLink.objects.create(menu=menu, content_page=page)
+
+        (link,) = legacy.export_menu(menu, ["el", "en"])["links"]
+
+        assert link["labels"] == {"el": "Όροι χρήσης", "en": "Όροι χρήσης"}
+
     def test_a_footer_menu_sends_its_columns(self):
         menu = NavigationMenu.objects.create(slot="footer")
         column = NavigationColumn.objects.create(

@@ -65,6 +65,21 @@ urlpatterns = [
         session_api.StaffSessionView.as_view(),
         name="staff-session",
     ),
+    path(
+        "builder/schedules",
+        views.ScheduleListView.as_view(),
+        name="schedule-list",
+    ),
+    path(
+        "builder/schedules/<int:pk>",
+        views.ScheduleView.as_view(),
+        name="schedule-detail",
+    ),
+    path(
+        "builder/schedules/<int:pk>/acknowledge",
+        views.ScheduleAcknowledgeView.as_view(),
+        name="schedule-acknowledge",
+    ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),
     path(

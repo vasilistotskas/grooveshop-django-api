@@ -65,6 +65,7 @@ OPS_KEYS = {
     "ops.review_pending",
     "ops.gift_card_reversal",
     "ops.payment_mismatch",
+    "ops.builder_schedule_failed",
 }
 
 
@@ -96,7 +97,7 @@ def switch_off(tenant, key: str) -> None:
 
 
 class TestTheCatalogue:
-    def test_the_ten_alerts_are_registered(self):
+    def test_the_alerts_are_registered(self):
         keys = {t.key for t in registry.all_types() if t.key.startswith("ops.")}
 
         assert keys == OPS_KEYS

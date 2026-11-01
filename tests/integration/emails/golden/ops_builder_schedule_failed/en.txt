@@ -1,0 +1,17 @@
+A scheduled publish failed
+
+The changes scheduled for March 14, 2026, 12:29 p.m. did not go live. Nothing was published and your live pages are unchanged.
+
+Pages:
+- Template: home
+
+Note: Spring sale
+
+Why:
+- product 424242 does not exist in this store.
+
+Fix the cause in the storefront editor and schedule the publish again, or publish it now.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

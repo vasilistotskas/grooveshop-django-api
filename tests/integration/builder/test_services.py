@@ -409,6 +409,7 @@ class TestPublish:
                 "code": "reference_not_found",
                 "message": errors[0]["message"],
                 "document": HOME,
+                "params": {"kind": "product", "target": "987654"},
             }
         ]
 

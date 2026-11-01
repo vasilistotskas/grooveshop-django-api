@@ -16,6 +16,7 @@ from rest_framework import serializers
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
+    BuilderScheduledPublish,
     BuilderVersion,
     DocumentKind,
     VersionKind,
@@ -156,3 +157,49 @@ class RollbackWriteSerializer(serializers.Serializer):
     note = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
+
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+    scheduled_by = serializers.SerializerMethodField()
+    release = serializers.SlugRelatedField(slug_field="number", read_only=True)
+
+    class Meta:
+        model = BuilderScheduledPublish
+        fields = (
+            "id",
+            "scheduled_for",
+            "status",
+            "documents",
+            "note",
+            "scheduled_by",
+            "executed_at",
+            "release",
+            "failure",
+            "acknowledged_at",
+        )
+        read_only_fields = fields
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_documents(self, obj: BuilderScheduledPublish) -> list[str]:
+        return sorted(obj.versions)
+
+    @extend_schema_field(StaffSerializer(allow_null=True))
+    def get_scheduled_by(
+        self, obj: BuilderScheduledPublish
+    ) -> dict[str, Any] | None:
+        return staff_summary(obj.created_by_staff)
+
+
+class ScheduleWriteSerializer(serializers.Serializer):
+    documents = serializers.ListField(
+        child=serializers.CharField(max_length=80), allow_empty=False
+    )
+    scheduled_for = serializers.DateTimeField()
+    note = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+
+class RescheduleSerializer(serializers.Serializer):
+    scheduled_for = serializers.DateTimeField()

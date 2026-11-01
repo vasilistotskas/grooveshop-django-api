@@ -81,12 +81,40 @@ class Issue:
     code: str
     message: str
     document: str | None = None
+    params: dict[str, str] | None = None
 
-    def as_dict(self) -> dict[str, str]:
-        body = {"path": self.path, "code": self.code, "message": self.message}
+    def as_dict(self) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "path": self.path,
+            "code": self.code,
+            "message": self.message,
+        }
         if self.document is not None:
             body["document"] = self.document
+        if self.params is not None:
+            body["params"] = self.params
         return body
+
+
+#: The sentences of the problems a scheduled publish can be left with, by
+#: code. The message is written when the sweep runs, in whatever language
+#: that process has; the email re-reads it from the code and the params in
+#: the language it is sent in (``message_for``).
+FAILURE_MESSAGES = {
+    "reference_not_found": _(
+        "%(kind)s %(target)s does not exist in this store."
+    ),
+    "document_gone": _("%(key)s no longer exists."),
+    "nothing_to_publish": _("Nothing has changed since the last release."),
+}
+
+
+def message_for(code: str, params: dict[str, str] | None, fallback: str) -> str:
+    """The sentence for *code* in the active language, else *fallback*."""
+    template = FAILURE_MESSAGES.get(code)
+    if template is None or (params is None and "%(" in str(template)):
+        return fallback
+    return str(template) % (params or {})
 
 
 class DocumentInvalid(BuilderError):

@@ -1,9 +1,11 @@
 import factory
+from django.utils import timezone
 
 from builder.models import (
     BuilderDocument,
     BuilderReference,
     BuilderRelease,
+    BuilderScheduledPublish,
     BuilderVersion,
     DocumentKind,
     ReferenceKind,
@@ -46,3 +48,12 @@ class BuilderReferenceFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = BuilderReference
+
+
+class BuilderScheduledPublishFactory(factory.django.DjangoModelFactory):
+    scheduled_for = factory.LazyFunction(timezone.now)
+    versions = factory.LazyFunction(dict)
+    revisions = factory.LazyFunction(dict)
+
+    class Meta:
+        model = BuilderScheduledPublish

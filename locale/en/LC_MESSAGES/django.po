@@ -222,6 +222,10 @@ msgstr[0] "%(count)d tag was deactivated."
 msgstr[1] "%(count)d tags were deactivated."
 
 #, python-format
+msgid "%(count)s failure(s) acknowledged."
+msgstr "%(count)s failure(s) acknowledged."
+
+#, python-format
 msgid "%(count)s item, qty %(qty)s — %(total)s"
 msgid_plural "%(count)s items, qty %(qty)s — %(total)s"
 msgstr[0] "%(count)s item, qty %(qty)s — %(total)s"
@@ -289,6 +293,10 @@ msgstr "%(final)s each — total %(total)s"
 #, python-format
 msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → product %(product)s: %(price)s"
+
+#, python-format
+msgid "%(key)s no longer exists."
+msgstr "%(key)s no longer exists."
 
 #, python-format
 msgid "%(kind)s %(amount)s on gift card %(card)s"
@@ -723,6 +731,10 @@ msgstr "A post with this slug already exists."
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "A promotion discounts a cart line that is not part of the order."
 
+#, python-format
+msgid "A publish can be scheduled at most %(days)s days ahead."
+msgstr "A publish can be scheduled at most %(days)s days ahead."
+
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 
@@ -747,6 +759,9 @@ msgstr "A retail receipt is issued for a receipt order once it has shipped. Orde
 
 msgid "A review is waiting for approval"
 msgstr "A review is waiting for approval"
+
+msgid "A scheduled publish failed"
+msgstr "A scheduled publish failed"
 
 msgid "A search query is required."
 msgstr "A search query is required."
@@ -1121,6 +1136,15 @@ msgstr "Account preferences"
 
 msgid "Account security notice"
 msgstr "Account security notice"
+
+msgid "Acknowledge the failure"
+msgstr "Acknowledge the failure"
+
+msgid "Acknowledged at"
+msgstr "Acknowledged at"
+
+msgid "Acknowledged by (staff)"
+msgstr "Acknowledged by (staff)"
 
 msgid "Acs_Station_Branch_Destination value."
 msgstr "Acs_Station_Branch_Destination value."
@@ -1591,6 +1615,10 @@ msgstr "At most %(count)s files."
 #, python-format
 msgid "At most %(limit)s blocks fit here."
 msgstr "At most %(limit)s blocks fit here."
+
+#, python-format
+msgid "At most %(limit)s publishes can wait at once."
+msgstr "At most %(limit)s publishes can wait at once."
 
 #, python-format
 msgid "At most %(limit)s sections fit in a document."
@@ -2448,6 +2476,9 @@ msgstr "Canceled in myDATA"
 msgid "Canceled orders to refund"
 msgstr "Canceled orders to refund"
 
+msgid "Cancelled"
+msgstr "Cancelled"
+
 msgid "Cancelled but still paid"
 msgstr "Cancelled but still paid"
 
@@ -2883,6 +2914,9 @@ msgstr "Choose a new password for %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
+
+msgid "Choose a time in the future."
+msgstr "Choose a time in the future."
 
 msgid "Choose at least one document to publish."
 msgstr "Choose at least one document to publish."
@@ -4589,6 +4623,9 @@ msgstr "Excluded Categories"
 msgid "Excluded Products"
 msgstr "Excluded Products"
 
+msgid "Executed at"
+msgstr "Executed at"
+
 msgid "Expense"
 msgstr "Expense"
 
@@ -4725,6 +4762,9 @@ msgstr "Failed to retrieve settings"
 
 msgid "Failed to start the payment."
 msgstr "Failed to start the payment."
+
+msgid "Failure"
+msgstr "Failure"
 
 msgid "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
 msgstr "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
@@ -5984,6 +6024,9 @@ msgstr "Five"
 
 msgid "Fix in settings"
 msgstr "Fix in settings"
+
+msgid "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
+msgstr "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
 
 msgid "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
 msgstr "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
@@ -9099,6 +9142,9 @@ msgstr "Only a cash-on-delivery shipment with an amount due can be settled."
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Only a delivered shipment can be settled (this one is %(state)s)."
 
+msgid "Only a failed schedule needs acknowledging."
+msgstr "Only a failed schedule needs acknowledging."
+
 msgid "Only a page can be deleted."
 msgstr "Only a page can be deleted."
 
@@ -9131,6 +9177,9 @@ msgstr "Opaque cursor (cursor pagination strategy)"
 
 msgid "Open full stock history chart"
 msgstr "Open full stock history chart"
+
+msgid "Open the failed publishes"
+msgstr "Open the failed publishes"
 
 msgid "Open the myDATA settings"
 msgstr "Open the myDATA settings"
@@ -11900,6 +11949,9 @@ msgstr "Reviews"
 msgid "Reviews to approve"
 msgstr "Reviews to approve"
 
+msgid "Revisions"
+msgstr "Revisions"
+
 msgid "Reward Products"
 msgstr "Reward Products"
 
@@ -12063,8 +12115,14 @@ msgstr "Scheduled"
 msgid "Scheduled backup failed"
 msgstr "Scheduled backup failed"
 
+msgid "Scheduled by (staff)"
+msgstr "Scheduled by (staff)"
+
 msgid "Scheduled database backup failed"
 msgstr "Scheduled database backup failed"
+
+msgid "Scheduled for"
+msgstr "Scheduled for"
 
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
@@ -12077,6 +12135,12 @@ msgstr "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
+
+msgid "Scheduled publish"
+msgstr "Scheduled publish"
+
+msgid "Scheduled publishes"
+msgstr "Scheduled publishes"
 
 msgid "Scheduled re-engagement run"
 msgstr "Scheduled re-engagement run"
@@ -13522,6 +13586,9 @@ msgstr "Tells the store's staff that a customer's review waits for their approva
 msgid "Tells the store's staff that a dispute closed against it."
 msgstr "Tells the store's staff that a dispute closed against it."
 
+msgid "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+msgstr "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+
 msgid "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 msgstr "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 
@@ -13746,6 +13813,10 @@ msgstr "The cart's free_threshold_value: the products after discounts, excluding
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+
+#, python-format
+msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
+msgstr "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
@@ -14159,6 +14230,9 @@ msgstr "The text must keep the same placeholders as the original."
 msgid "The ticket is not valid."
 msgstr "The ticket is not valid."
 
+msgid "The time needs a timezone."
+msgstr "The time needs a timezone."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
 
@@ -14217,8 +14291,14 @@ msgstr "There is no such document: %(keys)s."
 msgid "There is no such release."
 msgstr "There is no such release."
 
+msgid "There is no such schedule."
+msgstr "There is no such schedule."
+
 msgid "There is no such version."
 msgstr "There is no such version."
+
+msgid "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
+msgstr "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -14407,6 +14487,9 @@ msgstr "This range would show more than %(rows)s rows: choose longer periods, or
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "This receipt is your proof of purchase — please keep it for your records."
+
+msgid "This schedule has already run or been cancelled."
+msgstr "This schedule has already run or been cancelled."
 
 msgid "This setting is the same in every language."
 msgstr "This setting is the same in every language."
@@ -15695,6 +15778,9 @@ msgstr "When set, only checkouts with this email can redeem the code — covers 
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "When set, only this customer can redeem the code (personal coupon)"
 
+msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+msgstr "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 
@@ -15845,8 +15931,14 @@ msgstr "Wholesale pricing"
 msgid "Wholesale-priced"
 msgstr "Wholesale-priced"
 
+msgid "Why"
+msgstr "Why"
+
 msgid "Why Microlearning"
 msgstr "Why Microlearning"
+
+msgid "Why it could not be released: [{path, code, message}]"
+msgstr "Why it could not be released: [{path, code, message}]"
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
@@ -16323,6 +16415,10 @@ msgid "Zipcode is required."
 msgstr "Zipcode is required."
 
 #, python-brace-format
+msgid "[{site}] A scheduled publish failed"
+msgstr "[{site}] A scheduled publish failed"
+
+#, python-brace-format
 msgid "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
 msgstr "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
 
@@ -16642,6 +16738,9 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+msgid "{document key: draft revision it was taken from}"
+msgstr "{document key: draft revision it was taken from}"
 
 msgid "{document key: version id}"
 msgstr "{document key: version id}"

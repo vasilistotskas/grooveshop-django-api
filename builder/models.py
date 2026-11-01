@@ -24,7 +24,7 @@ import re
 from typing import Any
 
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -261,6 +261,104 @@ class BuilderRelease(_Immutable):
 
     def __str__(self) -> str:
         return f"#{self.number}"
+
+
+class ScheduleStatus(models.TextChoices):
+    PENDING = "pending", _("Pending")
+    PUBLISHED = "published", _("Published")
+    CANCELLED = "cancelled", _("Cancelled")
+    FAILED = "failed", _("Failed")
+
+
+class BuilderScheduledPublish(TimeStampMixinModel):
+    """A publish waiting for its time.
+
+    What will go live is frozen when it is scheduled: the drafts were
+    validated then and are held as versions (``versions``), so the release
+    made at ``scheduled_for`` is what the merchant previewed, whatever is
+    edited meanwhile. At that time the references are checked again (a
+    product can be deleted in between) and a schedule that can no longer be
+    released is marked ``failed`` with the problems in ``failure``, never
+    half done. Written only through ``builder.scheduling``.
+    """
+
+    scheduled_for = models.DateTimeField(_("Scheduled for"))
+    status = models.CharField(
+        _("Status"),
+        max_length=16,
+        choices=ScheduleStatus.choices,
+        default=ScheduleStatus.PENDING,
+        db_default=ScheduleStatus.PENDING,
+    )
+    versions = models.JSONField(
+        _("Versions"), help_text=_("{document key: version id}")
+    )
+    revisions = models.JSONField(
+        _("Revisions"),
+        help_text=_("{document key: draft revision it was taken from}"),
+    )
+    note = models.CharField(_("Note"), max_length=255, blank=True, default="")
+    created_by_staff_id = models.BigIntegerField(
+        _("Scheduled by (staff)"), null=True, blank=True
+    )
+    created_by_staff = StaffActor()
+    executed_at = models.DateTimeField(_("Executed at"), null=True, blank=True)
+    release = models.ForeignKey(
+        BuilderRelease,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="schedules",
+        verbose_name=_("Release"),
+    )
+    failure = models.JSONField(
+        _("Failure"),
+        default=list,
+        db_default=[],
+        blank=True,
+        help_text=_("Why it could not be released: [{path, code, message}]"),
+    )
+
+    acknowledged_at = models.DateTimeField(
+        _("Acknowledged at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When someone saw that it failed. A failed schedule shows on the "
+            "store dashboard until then."
+        ),
+    )
+    acknowledged_by_staff_id = models.BigIntegerField(
+        _("Acknowledged by (staff)"), null=True, blank=True
+    )
+    acknowledged_by_staff = StaffActor()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Scheduled publish")
+        verbose_name_plural = _("Scheduled publishes")
+        ordering = ["scheduled_for"]
+        indexes = [
+            # The mixin's ``%(class)s`` names are 37 characters here, past
+            # the 32 an index name may have (models.E034).
+            BTreeIndex(fields=["created_at"], name="builder_sched_created_ix"),
+            BTreeIndex(fields=["updated_at"], name="builder_sched_updated_ix"),
+            models.Index(
+                fields=["status", "scheduled_for"],
+                name="builder_sched_due_ix",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.scheduled_for:%Y-%m-%d %H:%M} ({self.status})"
+
+
+def document_label(key: str) -> str:
+    """``Template: home`` for ``template:home``: what a person reads."""
+    kind = kind_of_key(key)
+    if kind is None:
+        return key
+    name = key.partition(":")[2]
+    return f"{kind.label}: {name}" if name else str(kind.label)
 
 
 class ReferenceKind(models.TextChoices):

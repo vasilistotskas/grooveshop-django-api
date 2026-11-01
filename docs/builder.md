@@ -296,7 +296,50 @@ Security properties, each with a test:
   platform login does not fit; a ticket is 256 random bits, so the limit
   bounds load, not guessing.
 
+## Scheduled publishing
+
+`builder/scheduling.py`, `builder/tasks.py`, `BuilderScheduledPublish`. A
+publish can wait for a time:
+
+- `POST schedules` `{documents, scheduledFor, note}` checks exactly what a
+  publish checks (every draft valid, references existing, something to
+  change) **now**, and **freezes** the drafts as versions held by the
+  schedule. What goes live is what was checked, whatever is edited meanwhile.
+  `scheduledFor` is an ISO 8601 time; one without an offset is read in the
+  store's timezone (`settings.TIME_ZONE`, Europe/Athens). Refused:
+  `schedule_in_the_past`, `schedule_too_far` (`BUILDER_SCHEDULE_MAX_DAYS`),
+  `invalid_schedule_time`, `too_many_schedules`
+  (`BUILDER_MAX_PENDING_SCHEDULES`), `nothing_to_publish`. Frozen versions
+  are protected from checkpoint retention while the schedule is pending.
+- `GET schedules` (`?status=pending|published|cancelled|failed`),
+  `GET/PATCH/DELETE schedules/<id>`: `PATCH {scheduledFor}` moves it,
+  `DELETE` cancels it (it stays listed as `cancelled`); once it has run or
+  been cancelled, `409 schedule_not_pending`.
+- The sweep `builder.tasks.run_due_publishes` runs every minute per store
+  (`tenant.tasks.fanout_run_due_builder_publishes`, beat entry
+  `run-due-builder-publishes`). Each due schedule is one transaction under
+  the per-store release lock with `select_for_update`; the status change is
+  inside it, so a retry, an overlapping sweep or a second worker finds it
+  spent, and a cancel racing the sweep wins or loses cleanly.
+- At execution the references are checked again and the documents must still
+  exist. A schedule that can no longer be released (`reference_not_found`,
+  `document_gone`, `nothing_to_publish`: something else already released
+  those versions) is `failed` with the problems in `failure`, never half
+  done. Otherwise it is the ordinary release (made by who scheduled it): the
+  cache generation and the `builder` surface move at that moment.
+- **A failure reaches a person.** When the sweep marks a schedule `failed`,
+  after that commit it sends the store-staff email `ops.builder_schedule_failed`
+  (`builder/emails.py`, area `ops`, switchable on the store's Emails page like
+  the other `ops.*` alerts; Greek and English) naming the pages, the scheduled
+  time (store timezone) and the problems in plain words. The problem sentences
+  are re-read from the stored code and params in the language of the email
+  (`errors.message_for`), not the language the sweep ran in. A mail that cannot
+  go out never undoes the failure. The store dashboard shows a danger alert to
+  anyone who may publish while a failed schedule is unacknowledged;
+  `POST schedules/<id>/acknowledge` or the **Acknowledge the failure** action of
+  Content, Page builder, Scheduled publishes (read-only admin) takes it away.
+
 ## Not here yet
 
-Scheduled publishing and the `builder_block_usage` command that will gate
-removing a block type: each is its own change.
+The `builder_block_usage` command that will gate removing a block type is its
+own change.

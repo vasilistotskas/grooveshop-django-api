@@ -227,6 +227,10 @@ msgstr[0] "%(count)d ετικέτα απενεργοποιήθηκε."
 msgstr[1] "%(count)d ετικέτες απενεργοποιήθηκαν."
 
 #, python-format
+msgid "%(count)s failure(s) acknowledged."
+msgstr "%(count)s αποτυχία(-ες) επιβεβαιώθηκαν."
+
+#, python-format
 msgid "%(count)s item, qty %(qty)s — %(total)s"
 msgid_plural "%(count)s items, qty %(qty)s — %(total)s"
 msgstr[0] "%(count)s είδος, ποσότητα %(qty)s — %(total)s"
@@ -294,6 +298,10 @@ msgstr "%(final)s το τεμάχιο — σύνολο %(total)s"
 #, python-format
 msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → προϊόν %(product)s: %(price)s"
+
+#, python-format
+msgid "%(key)s no longer exists."
+msgstr "Το έγγραφο %(key)s δεν υπάρχει πια."
 
 #, python-format
 msgid "%(kind)s %(amount)s on gift card %(card)s"
@@ -728,6 +736,10 @@ msgstr "Υπάρχει ήδη άρθρο με αυτό το slug."
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "Μια προσφορά εκπτώνει γραμμή του καλαθιού που δεν ανήκει στην παραγγελία."
 
+#, python-format
+msgid "A publish can be scheduled at most %(days)s days ahead."
+msgstr "Μια δημοσίευση μπορεί να προγραμματιστεί το πολύ %(days)s ημέρες μπροστά."
+
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "Ένα ρεαλιστικό παράδειγμα αριθμού κινητού σε εθνική μορφή (π.χ. GR «6912345678», CY «96123456»)."
 
@@ -752,6 +764,9 @@ msgstr "Η απόδειξη λιανικής εκδίδεται για παρα�
 
 msgid "A review is waiting for approval"
 msgstr "Μια κριτική περιμένει έγκριση"
+
+msgid "A scheduled publish failed"
+msgstr "Μια προγραμματισμένη δημοσίευση απέτυχε"
 
 msgid "A search query is required."
 msgstr "Η αναζήτηση είναι υποχρεωτική."
@@ -1126,6 +1141,15 @@ msgstr "Προτιμήσεις λογαριασμού"
 
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
+
+msgid "Acknowledge the failure"
+msgstr "Επιβεβαίωση της αποτυχίας"
+
+msgid "Acknowledged at"
+msgstr "Επιβεβαιώθηκε στις"
+
+msgid "Acknowledged by (staff)"
+msgstr "Επιβεβαιώθηκε από (προσωπικό)"
 
 msgid "Acs_Station_Branch_Destination value."
 msgstr "Τιμή Acs_Station_Branch_Destination."
@@ -1596,6 +1620,10 @@ msgstr "Έως %(count)s αρχεία."
 #, python-format
 msgid "At most %(limit)s blocks fit here."
 msgstr "Εδώ χωράνε το πολύ %(limit)s μπλοκ."
+
+#, python-format
+msgid "At most %(limit)s publishes can wait at once."
+msgstr "Το πολύ %(limit)s δημοσιεύσεις μπορούν να περιμένουν ταυτόχρονα."
 
 #, python-format
 msgid "At most %(limit)s sections fit in a document."
@@ -2454,6 +2482,9 @@ msgstr "Ακυρώθηκε στο myDATA"
 msgid "Canceled orders to refund"
 msgstr "Ακυρωμένες παραγγελίες προς επιστροφή χρημάτων"
 
+msgid "Cancelled"
+msgstr "Ακυρώθηκε"
+
 msgid "Cancelled but still paid"
 msgstr "Ακυρωμένες αλλά πληρωμένες"
 
@@ -2890,6 +2921,9 @@ msgstr "Νέος κωδικός πρόσβασης για %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Νέος κωδικός πρόσβασης για {store_name}"
+
+msgid "Choose a time in the future."
+msgstr "Διάλεξε μια ώρα στο μέλλον."
 
 msgid "Choose at least one document to publish."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
@@ -4595,6 +4629,9 @@ msgstr "Εξαιρούμενες κατηγορίες"
 msgid "Excluded Products"
 msgstr "Εξαιρούμενα προϊόντα"
 
+msgid "Executed at"
+msgstr "Εκτελέστηκε στις"
+
 msgid "Expense"
 msgstr "Έξοδο"
 
@@ -4731,6 +4768,9 @@ msgstr "Αποτυχία ανάκτησης ρυθμίσεων"
 
 msgid "Failed to start the payment."
 msgstr "Αποτυχία έναρξης της πληρωμής."
+
+msgid "Failure"
+msgstr "Αποτυχία"
 
 msgid "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
 msgstr "False = διαπιστευτήρια sandbox / δοκιμής. Χρησιμοποιείται από το UI διαχείρισης για να προειδοποιεί τους χειριστές ότι τα vouchers δεν θα αποσταλούν πραγματικά."
@@ -5990,6 +6030,9 @@ msgstr "Πέντε"
 
 msgid "Fix in settings"
 msgstr "Διόρθωση στις ρυθμίσεις"
+
+msgid "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
+msgstr "Διόρθωσε την αιτία στον επεξεργαστή του καταστήματος και προγραμμάτισε ξανά τη δημοσίευση, ή δημοσίευσέ την τώρα."
 
 msgid "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
 msgstr "Σταθερή καθαρή (προ ΦΠΑ) τιμή για αυτή την ομάδα. Υπερισχύει του ποσοστού έκπτωσης της ομάδας."
@@ -9108,6 +9151,9 @@ msgstr "Μόνο αποστολή με αντικαταβολή και οφει�
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Μόνο μια παραδομένη αποστολή μπορεί να εκκαθαριστεί (αυτή είναι: %(state)s)."
 
+msgid "Only a failed schedule needs acknowledging."
+msgstr "Επιβεβαίωση χρειάζεται μόνο ένας προγραμματισμός που απέτυχε."
+
 msgid "Only a page can be deleted."
 msgstr "Μόνο μια σελίδα μπορεί να διαγραφεί."
 
@@ -9140,6 +9186,9 @@ msgstr "Αδιαφανής δείκτης (στρατηγική σελιδοπο
 
 msgid "Open full stock history chart"
 msgstr "Άνοιγμα πλήρους ιστορικού αποθέματος →"
+
+msgid "Open the failed publishes"
+msgstr "Άνοιγμα των δημοσιεύσεων που απέτυχαν"
 
 msgid "Open the myDATA settings"
 msgstr "Άνοιγμα ρυθμίσεων myDATA"
@@ -11909,6 +11958,9 @@ msgstr "Κριτικές"
 msgid "Reviews to approve"
 msgstr "Κριτικές προς έγκριση"
 
+msgid "Revisions"
+msgstr "Αναθεωρήσεις"
+
 msgid "Reward Products"
 msgstr "Προϊόντα ανταμοιβής"
 
@@ -12072,8 +12124,14 @@ msgstr "Προγραμματισμένο"
 msgid "Scheduled backup failed"
 msgstr "Αποτυχία προγραμματισμένου αντιγράφου ασφαλείας"
 
+msgid "Scheduled by (staff)"
+msgstr "Προγραμματίστηκε από (προσωπικό)"
+
 msgid "Scheduled database backup failed"
 msgstr "Απέτυχε το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων"
+
+msgid "Scheduled for"
+msgstr "Προγραμματισμένο για"
 
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
@@ -12086,6 +12144,12 @@ msgstr "Προγραμματίστηκε ακύρωση στο myDATA για τ�
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Προγραμματίστηκε υποβολή στο myDATA για το τιμολόγιο %(num)s (παραγγελία #%(order_id)s). Ανανεώστε τη διαχείριση Τιμολογίων για να δείτε το MARK μόλις απαντήσει η ΑΑΔΕ."
+
+msgid "Scheduled publish"
+msgstr "Προγραμματισμένη δημοσίευση"
+
+msgid "Scheduled publishes"
+msgstr "Προγραμματισμένες δημοσιεύσεις"
 
 msgid "Scheduled re-engagement run"
 msgstr "Προγραμματισμένη αποστολή επανασύνδεσης"
@@ -13527,6 +13591,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Tells the store's staff that a dispute closed against it."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια αμφισβήτηση έκλεισε εις βάρος του."
 
+msgid "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια δημοσίευση σελίδων που είχε προγραμματιστεί για κάποια ώρα δεν μπόρεσε να γίνει, με τις σελίδες και τους λόγους."
+
 msgid "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι έφτασε πληρωμή για παραγγελία που είχε ήδη ακυρωθεί, οπότε ο πελάτης πρέπει να πάρει πίσω τα χρήματά του."
 
@@ -13751,6 +13818,10 @@ msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
+
+#, python-format
+msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
+msgstr "Οι αλλαγές που είχαν προγραμματιστεί για τις %(scheduled_for)s δεν δημοσιεύτηκαν. Δεν δημοσιεύτηκε τίποτα και οι ζωντανές σελίδες σου δεν άλλαξαν."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
@@ -14164,6 +14235,9 @@ msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημε�
 msgid "The ticket is not valid."
 msgstr "Το εισιτήριο δεν είναι έγκυρο."
 
+msgid "The time needs a timezone."
+msgstr "Η ώρα χρειάζεται ζώνη ώρας."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
 
@@ -14222,8 +14296,14 @@ msgstr "Δεν υπάρχει τέτοιο έγγραφο: %(keys)s."
 msgid "There is no such release."
 msgstr "Δεν υπάρχει τέτοια δημοσίευση."
 
+msgid "There is no such schedule."
+msgstr "Δεν υπάρχει τέτοιος προγραμματισμός."
+
 msgid "There is no such version."
 msgstr "Δεν υπάρχει τέτοια έκδοση."
+
+msgid "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
+msgstr "Αυτές οι αλλαγές δεν δημοσιεύτηκαν στην ώρα τους και οι ζωντανές σελίδες σου δεν άλλαξαν. Άνοιξε μία για να δεις γιατί."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -14412,6 +14492,9 @@ msgstr "Αυτό το εύρος θα εμφάνιζε περισσότερες 
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "Αυτή η απόδειξη αποδεικνύει την αγορά σου — κράτησέ την για το αρχείο σου."
+
+msgid "This schedule has already run or been cancelled."
+msgstr "Αυτός ο προγραμματισμός έχει ήδη εκτελεστεί ή ακυρωθεί."
 
 msgid "This setting is the same in every language."
 msgstr "Αυτή η ρύθμιση είναι ίδια σε όλες τις γλώσσες."
@@ -15700,6 +15783,9 @@ msgstr "Όταν ορίζεται, μόνο αγορές με αυτό το emai
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "Όταν ορίζεται, μόνο αυτός ο πελάτης μπορεί να εξαργυρώσει τον κωδικό (προσωπικό κουπόνι)"
 
+msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+msgstr "Πότε είδε κάποιος ότι απέτυχε. Ένας προγραμματισμός που απέτυχε εμφανίζεται στον πίνακα ελέγχου του καταστήματος μέχρι τότε."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
 
@@ -15850,8 +15936,14 @@ msgstr "Τιμολόγηση χονδρικής"
 msgid "Wholesale-priced"
 msgstr "Με τιμές χονδρικής"
 
+msgid "Why"
+msgstr "Γιατί"
+
 msgid "Why Microlearning"
 msgstr "Γιατί μικρομάθηση"
+
+msgid "Why it could not be released: [{path, code, message}]"
+msgstr "Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]"
 
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Γιατί απορρίπτεται ο κωδικός, από το λεξιλόγιο εκπτώσεων του ACP (discount_code_expired, discount_code_minimum_not_met, …). Null όταν ο κωδικός είναι επιλέξιμος."
@@ -16328,6 +16420,10 @@ msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
 
 #, python-brace-format
+msgid "[{site}] A scheduled publish failed"
+msgstr "[{site}] Μια προγραμματισμένη δημοσίευση απέτυχε"
+
+#, python-brace-format
 msgid "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
 msgstr "[{site}] Συμφωνία αντικαταβολών ACS: {total} εγγραφές απόδοσης χωρίς αντιστοίχιση"
 
@@ -16647,6 +16743,9 @@ msgstr "εβδομάδα"
 
 msgid "without voucher"
 msgstr "χωρίς voucher"
+
+msgid "{document key: draft revision it was taken from}"
+msgstr "{κλειδί εγγράφου: αναθεώρηση του πρόχειρου από την οποία ελήφθη}"
 
 msgid "{document key: version id}"
 msgstr "{κλειδί εγγράφου: αναγνωριστικό έκδοσης}"
@@ -16975,9 +17074,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "European Countries"
 #~ msgstr "Ευρωπαϊκές χώρες"
-
-#~ msgid "Expiry date must be in the future."
-#~ msgstr "Η ημερομηνία λήξης πρέπει να είναι στο μέλλον."
 
 #~ msgid "Export search analytics data to JSON format"
 #~ msgstr "Εξαγωγή δεδομένων αναλυτικών αναζήτησης σε μορφή JSON"
@@ -17505,9 +17601,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "SPECIAL OFFERS"
 #~ msgstr "ΕΙΔΙΚΕΣ ΠΡΟΣΦΟΡΕΣ"
-
-#~ msgid "Scheduled tasks"
-#~ msgstr "Προγραμματισμένες εργασίες"
 
 #~ msgid "Search failed. Please try again later."
 #~ msgstr "Η αναζήτηση απέτυχε. Παρακαλούμε δοκιμάστε ξανά αργότερα."

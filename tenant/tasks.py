@@ -103,6 +103,12 @@ def fanout_process_points_expiration():
     return run_for_all_tenants("loyalty.tasks.process_points_expiration")
 
 
+# A publish the store scheduled: it goes live in the minute it is due.
+@celery_app.task(base=TenantTask)
+def fanout_run_due_builder_publishes():
+    return run_for_all_tenants("builder.tasks.run_due_publishes")
+
+
 @celery_app.task(base=TenantTask)
 def fanout_expire_gift_cards():
     return run_for_all_tenants("giftcard.tasks.expire_gift_cards")

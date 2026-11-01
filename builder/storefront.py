@@ -10,8 +10,9 @@ build, so a process keeps its copy and revalidates with ``If-None-Match``
 (a 304 carries no body). Django validates every save against that copy and
 adds only what it alone can check (``builder.validation``).
 
-Nothing is saved on a guess: when no catalogue can be fetched or is held,
-:class:`StorefrontUnavailable` is raised and the caller refuses.
+Nothing is saved on a guess: when the storefront does not answer (a fetch or
+a revalidation), :class:`StorefrontUnavailable` is raised and the caller
+refuses, a copy held or not. The rule of ``texts.storefront``.
 """
 
 from __future__ import annotations
@@ -222,10 +223,11 @@ def fetch_catalogue(schema: str) -> Catalogue:
     """The catalogue of what store *schema* renders.
 
     Held per process and revalidated by ETag once
-    ``BUILDER_CATALOGUE_REVALIDATE_SECONDS`` have passed. When the
-    revalidation itself fails the copy already held is used (a deploy of
-    the storefront is the only thing that changes it, and the next
-    successful answer corrects it); with no copy held, the caller refuses.
+    ``BUILDER_CATALOGUE_REVALIDATE_SECONDS`` have passed, so the hot paths
+    cost a dict lookup and a deploy of the storefront is picked up within
+    that window. Exactly the rule of ``texts``: when the storefront does not
+    answer a revalidation, nothing is checked and the caller refuses, held
+    copy or not.
     """
     now = time.monotonic()
     held = _held.get(schema)
@@ -246,30 +248,22 @@ def fetch_catalogue(schema: str) -> Catalogue:
             headers=headers,
             timeout=settings.BUILDER_STOREFRONT_TIMEOUT_SECONDS,
         )
-        if response.status_code == 304 and held is not None:
-            held.checked_at = now
-            return held.catalogue
-        if response.status_code != 200:
-            raise StorefrontUnavailable(
-                f"catalogue answered {response.status_code}"
-            )
-        catalogue = parse_catalogue(response.json())
-    except (
-        requests.RequestException,
-        StorefrontUnavailable,
-        ValueError,
-    ) as exc:
-        if held is None:
-            logger.warning("Builder catalogue unavailable: %s", exc)
-            if isinstance(exc, StorefrontUnavailable):
-                raise
-            raise StorefrontUnavailable(str(exc)) from exc
-        logger.warning(
-            "Builder catalogue not revalidated, keeping build %s: %s",
-            held.catalogue.hash,
-            exc,
-        )
+    except requests.RequestException as exc:
+        logger.warning("Builder catalogue unavailable: %s", exc)
+        raise StorefrontUnavailable(str(exc)) from exc
+
+    if response.status_code == 304 and held is not None:
+        held.checked_at = now
         return held.catalogue
+    if response.status_code != 200:
+        logger.warning("Builder catalogue answered %s", response.status_code)
+        raise StorefrontUnavailable(
+            f"catalogue answered {response.status_code}"
+        )
+    try:
+        catalogue = parse_catalogue(response.json())
+    except ValueError as exc:
+        raise StorefrontUnavailable("catalogue is not JSON") from exc
 
     with _lock:
         _held[schema] = _Held(

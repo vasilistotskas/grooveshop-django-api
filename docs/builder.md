@@ -78,10 +78,10 @@ The storefront declares each block once and serves the result per store:
 `{hash, blocks: [...]}` with `ETag: "<hash>"` (`builder/storefront.py`; the
 base URL helper and `StorefrontUnavailable` are `core/storefront.py`, shared
 with `texts`). A process keeps its copy and revalidates with `If-None-Match`
-every `BUILDER_CATALOGUE_REVALIDATE_SECONDS`. **When no catalogue can be
-fetched and none is held, nothing is saved** (`503 storefront_unavailable`).
-A copy already held outlives a failed revalidation: a deploy of the
-storefront is the only thing that changes it.
+every `BUILDER_CATALOGUE_REVALIDATE_SECONDS`. **When the storefront does not
+answer, nothing is saved** (`503 storefront_unavailable`): the same rule as
+the texts catalogue, whether or not a copy is held, so a save is never
+checked against a build the storefront may no longer serve.
 
 Each block carries `type`, `version`, `accepts`, `schema` (a closed JSON
 Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
@@ -211,6 +211,16 @@ per release, never purged. The current release number is kept under the
 store's cache generation, so a warm read touches neither the database nor
 anything else.
 
+`GET published?locale=` (AllowAny) is the page-less read: what every page needs
+and none owns. `{release, locale, theme, groups, pages}`: the theme and groups
+resolved like the page read, and `pages` listing every `page:` and `template:`
+document of the current release as `{key, kind, updatedAt}` (`key` the
+suffix, `updatedAt` when its version was made, for the sitemap's `lastmod`).
+A store with no release answers `{release: 0, theme: null, groups: {}, pages:
+[]}`, not 404. Cached under `builder:<schema>:r<release>:chrome:<locale>`,
+immutable per release; the `builder` surface purges the storefront's
+`builderPage` and `builderChrome` handlers.
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an
@@ -279,9 +289,11 @@ The editor runs on the store's own host, where nobody is signed in as staff
 
 Security properties, each with a test:
 
-- **Single use.** The ticket is consumed with Redis `GETDEL`, one round trip:
-  of two requests with the same ticket one wins. Intercepting it after use
-  gains nothing, and unused it dies in a minute.
+- **Single use.** The ticket is minted and spent by `core/tickets.py`, the
+  helper the WebSocket ticket uses too: Redis `GETDEL`, one round trip, so of
+  two requests with the same ticket one wins. Tickets live under the `strict:`
+  cache namespace, so an unreachable Redis raises instead of failing open.
+  Intercepting it after use gains nothing, and unused it dies in a minute.
 - **Checked when spent, not when minted.** The person must still be an
   active staff account with the right to change this store's pages (the role
   backend, through the provenance stamp), so a role lost in between is
@@ -383,7 +395,16 @@ settings); Django never converts:
   layouts"). A problem anywhere, including a reference to nothing, writes
   nothing. A store that already has builder data is refused. `--dry-run` does
   everything and rolls it back; the `--json` report also gives each document's
-  `counts` (`sections` and `blocks` at every depth). The legacy tables are not touched.
+  `counts` (`sections` and `blocks` at every depth). The legacy tables are not
+  touched.
+- The storefront's golden fixtures (`{request, response}` per section type,
+  and the menus) are copied under `tests/fixtures/builder/legacy/` and
+  replayed by `tests/integration/builder/test_converter_fixtures.py`. The copy
+  is pinned to a storefront commit by its git tree id
+  (`legacy.source.json`); only `.github/scripts/sync_converter_fixtures.py`
+  writes it, a unit test fails if the copy is not the pinned tree, and a
+  weekly workflow (`converter-fixtures.yml`) fails when the storefront's
+  `main` has moved on.
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
 

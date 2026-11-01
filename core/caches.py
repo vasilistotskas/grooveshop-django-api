@@ -48,10 +48,11 @@ STRICT_NAMESPACE = "strict:"
 #:   ``device_code[`` — the OAuth IdP's single-use codes
 #:   (``allauth/idp/oidc/internal/oauthlib/``): a lost ``delete`` leaves a
 #:   redeemed code redeemable until its TTL.
-#: - ``ws:ticket:`` — the single-use WebSocket ticket
-#:   (``notification/views/websocket.py``): a lost ``set`` hands the
-#:   browser a ticket that can never be redeemed, so the mint must fail
-#:   visibly instead.
+#:
+#: The single-use tickets (``core.tickets``: the WebSocket's, the page
+#: builder editor's) live under ``strict:`` too, for the same reason: a lost
+#: ``set`` hands out a ticket nobody can redeem, a lost ``GETDEL`` leaves
+#: one redeemable.
 #:
 #: These are third-party or fixed keys — allauth reads the default alias
 #: directly and offers no setting to point it elsewhere — so the match is
@@ -63,7 +64,6 @@ STRICT_KEY_PREFIXES: tuple[str, ...] = (
     "allauth.idp.oidc.authorization_code[",
     "allauth.idp.oidc.user_code[",
     "allauth.idp.oidc.device_code[",
-    "ws:ticket:",
 )
 
 
@@ -410,6 +410,16 @@ class CustomCache(RedisCache):
         except Exception as exc:
             logger.warning("Error deleting raw cache keys: %s", str(exc))
             return 0
+
+    def getdel(self, key: str, version: int | None = None) -> Any:
+        """Atomically read and delete ``key`` (Redis ``GETDEL``): of two
+        concurrent callers one gets the value and the other ``None``. A
+        ``get`` then ``delete`` has a window between them. Raises on a Redis
+        error, like ``add``: the callers spend single-use credentials
+        (``core.tickets``), where "nothing there" must not be a guess."""
+        name = self.make_and_validate_key(key, version=version)
+        value = self._cache.get_client(name, write=True).getdel(name)
+        return None if value is None else self._cache._serializer.loads(value)
 
     def add_to_set(self, key: str, members: list[str], timeout: int) -> None:
         """Add ``members`` to the Redis set at ``key``, renewing its expiry.

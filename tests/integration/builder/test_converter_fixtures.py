@@ -12,9 +12,12 @@ Django's side of the same contract:
 * the response parses through ``builder.convert`` into what the importer
   validates and stores.
 
-To refresh the copies: copy the directory from the storefront repository and
-run this file; a failing case is a contract change to agree on, not to paper
-over.
+The copies are PINNED to a storefront commit (``tests/fixtures/builder/
+legacy.source.json``, checked by ``tests/unit/builder/
+test_converter_fixture_pin.py``) and refreshed only by
+``python .github/scripts/sync_converter_fixtures.py``, which a weekly
+workflow (``converter-fixtures.yml``) reminds us to run. After a refresh, a
+failing case here is a contract change to agree on, not to paper over.
 """
 
 from __future__ import annotations

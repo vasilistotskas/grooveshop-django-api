@@ -5,9 +5,8 @@ from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.core.cache import cache
 
-from notification.views.websocket import build_ticket_cache_key
+from core import tickets
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +33,9 @@ def authenticate_ticket(ticket: str, tenant=None):
     replayed — a legitimate client never sends the same ticket twice
     because tickets map 1:1 to connection attempts.
 
-    Uses an atomic Redis GETDEL so that concurrent connection attempts
-    using the same ticket value can never both succeed (compare-and-delete
-    has a TOCTOU window; GETDEL is a single round-trip).
+    The ticket is spent by ``core.tickets``: an atomic Redis GETDEL, so
+    concurrent connection attempts with the same value can never both
+    succeed.
 
     Also verifies that at least one live Knox token exists for the user.
     If Knox tokens were revoked (e.g. password/email change) between
@@ -58,28 +57,8 @@ def authenticate_ticket(ticket: str, tenant=None):
 def _authenticate_ticket_inner(ticket: str, token_model):
     """Ticket consumption proper — always called with the tenant's
     schema already bound by the caller."""
-    raw_key = build_ticket_cache_key(ticket)
-    # Resolve the Django-prefixed Redis key that the cache layer stored.
-    prefixed_key = cache.make_and_validate_key(raw_key)
-
-    # ``cache._cache.get_client`` is Django's built-in RedisCacheClient
-    # public API (since 4.0) — calling ``getdel`` on it is the atomic
-    # single round-trip we want here. Direct ``cache.get`` + ``cache.
-    # delete`` would race under concurrent connect attempts.
-    raw_value: bytes | None = cache._cache.get_client(
-        prefixed_key, write=True
-    ).getdel(prefixed_key)
-
-    if raw_value is None:
-        return AnonymousUser()
-
-    # Django's RedisSerializer stores plain ints without pickling them.
-    try:
-        user_id = int(raw_value)
-    except ValueError, TypeError:
-        logger.warning(
-            "WS ticket cache value is not a valid user PK: %r", raw_value
-        )
+    user_id = tickets.spend(tickets.WEBSOCKET, ticket)
+    if user_id is None:
         return AnonymousUser()
 
     try:

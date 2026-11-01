@@ -27,12 +27,12 @@
                                             x-on:click="selected = $el.dataset.type; $nextTick(() => htmx.trigger($refs.preview, 'submit'))">
                                         <span class="flex gap-2 items-center">
                                             <strong class="text-important">{{ email_type.title }}</strong>
-                                            {% if row.enabled and not row.closed_gate %}
-                                                {% trans "Sent" as sent %}
-                                                {% include "unfold/helpers/label.html" with text=sent variant="success" %}
-                                            {% else %}
-                                                {% trans "Not sent" as not_sent %}
-                                                {% include "unfold/helpers/label.html" with text=not_sent %}
+                                            {% if row.closed_gate %}
+                                                {% blocktrans trimmed with reason=row.closed_gate asvar gate_label %}Off: {{ reason }}{% endblocktrans %}
+                                                {% include "unfold/helpers/label.html" with text=gate_label variant="warning" %}
+                                            {% elif not row.enabled %}
+                                                {% trans "Off" as off_label %}
+                                                {% include "unfold/helpers/label.html" with text=off_label %}
                                             {% endif %}
                                         </span>
                                         {% component "unfold/components/text.html" %}{{ email_type.description }}{% endcomponent %}

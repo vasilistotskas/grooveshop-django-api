@@ -452,7 +452,7 @@ types (`Owner.PLATFORM`) are not on this page.
 ### The preview (`emails/preview.py`, `Settings -> Email Templates`)
 
 `EmailSwitchAdmin.preview_view` (`preview/`) lists every `Owner.STORE` type
-by area with whether it is sent, and a panel that an htmx form fills
+by area (marked "Off" or "Off: <gate label>" when the store does not send it), and a panel that an htmx form fills
 (`preview/render/`, POST only): the type, a language, the data (sample data,
 or one of the store's ten most recent orders) and HTML or text. HTML is shown
 in a sandboxed `srcdoc` frame, text in a `pre`. Both views need

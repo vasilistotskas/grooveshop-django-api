@@ -9500,6 +9500,193 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/schedules:
+    get:
+      operationId: api_v1_builder_schedules_list
+      description: Scheduled publishes, soonest first; ``?status=`` narrows.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedScheduleList'
+          description: ''
+    post:
+      operationId: api_v1_builder_schedules_create
+      description: 'Release the drafts of the named documents together at `scheduledFor`
+        (an ISO 8601 time; one without an offset is read in the store''s timezone).
+        Validated in full now, references included, and frozen: what goes live is
+        what was checked.'
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScheduleWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScheduleWriteRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/schedules/{id}:
+    get:
+      operationId: api_v1_builder_schedules_retrieve
+      description: Common to every staff route.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+    patch:
+      operationId: api_v1_builder_schedules_partial_update
+      description: Move a pending schedule; 409 `schedule_not_pending` otherwise.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRescheduleRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    delete:
+      operationId: api_v1_builder_schedules_destroy
+      description: Cancel a pending schedule (it stays listed as `cancelled`); 409
+        `schedule_not_pending` once it has run.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/cart:
     get:
       operationId: retrieveCart
@@ -44410,6 +44597,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Release'
+    PaginatedScheduleList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schedule'
     PaginatedSubscriptionTopicList:
       type: object
       required:
@@ -45492,6 +45717,12 @@ components:
           type: string
           minLength: 1
           title: Κωδικός Χώρας (Alpha 2)
+    PatchedRescheduleRequest:
+      type: object
+      properties:
+        scheduledFor:
+          type: string
+          format: date-time
     PatchedSubscriptionTopicWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -49829,6 +50060,93 @@ components:
         * `INFECTED` - Μολυσμένο
         * `ERROR` - Η σάρωση απέτυχε
         * `SKIPPED` - Δεν σαρώθηκε
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        scheduledFor:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Προγραμματισμένο για
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ScheduleStatusEnum'
+          readOnly: true
+          title: Κατάσταση
+        documents:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        note:
+          type: string
+          readOnly: true
+          title: Σημείωση
+        scheduledBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        executedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Εκτελέστηκε στις
+        release:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Αριθμός
+          readOnly: true
+        failure:
+          readOnly: true
+          title: Αποτυχία
+          description: 'Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]'
+      required:
+      - documents
+      - executedAt
+      - failure
+      - id
+      - note
+      - release
+      - scheduledBy
+      - scheduledFor
+      - status
+    ScheduleStatusEnum:
+      enum:
+      - pending
+      - published
+      - cancelled
+      - failed
+      type: string
+      description: |-
+        * `pending` - Εκκρεμεί
+        * `published` - Δημοσιευμένο
+        * `cancelled` - Ακυρώθηκε
+        * `failed` - Απέτυχε
+    ScheduleWriteRequest:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        scheduledFor:
+          type: string
+          format: date-time
+        note:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - documents
+      - scheduledFor
     SearchAnalyticsResponse:
       type: object
       description: Serializer for search analytics response.

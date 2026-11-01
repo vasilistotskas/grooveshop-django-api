@@ -953,6 +953,12 @@ BUILDER_MEDIA_MAX_PIXELS = int(
 BUILDER_MEDIA_RESOLVE_MAX_IDS = int(
     getenv("BUILDER_MEDIA_RESOLVE_MAX_IDS", "100")
 )
+# Scheduled publishing: how far ahead a publish may be set, and how many may
+# wait at once (``builder.scheduling``).
+BUILDER_SCHEDULE_MAX_DAYS = int(getenv("BUILDER_SCHEDULE_MAX_DAYS", "365"))
+BUILDER_MAX_PENDING_SCHEDULES = int(
+    getenv("BUILDER_MAX_PENDING_SCHEDULES", "20")
+)
 # How long a resolved published page is kept. The key names the release,
 # so a new release reads a new key and nothing is ever purged.
 BUILDER_PUBLISHED_CACHE_SECONDS = int(
@@ -1406,6 +1412,13 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+        },
+        "run-due-builder-publishes": {
+            # Fanout: a publish scheduled in the page builder goes live
+            # within the minute it is due (``builder.scheduling``). Cheap
+            # when idle: one indexed query per store.
+            "task": "tenant.tasks.fanout_run_due_builder_publishes",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
         },
         "purge-expired-contact-records": {
             # Fanout: Contact and Feedback are per-tenant. Deletes the

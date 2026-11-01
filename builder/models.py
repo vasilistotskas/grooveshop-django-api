@@ -263,6 +263,78 @@ class BuilderRelease(_Immutable):
         return f"#{self.number}"
 
 
+class ScheduleStatus(models.TextChoices):
+    PENDING = "pending", _("Pending")
+    PUBLISHED = "published", _("Published")
+    CANCELLED = "cancelled", _("Cancelled")
+    FAILED = "failed", _("Failed")
+
+
+class BuilderScheduledPublish(TimeStampMixinModel):
+    """A publish waiting for its time.
+
+    What will go live is frozen when it is scheduled: the drafts were
+    validated then and are held as versions (``versions``), so the release
+    made at ``scheduled_for`` is what the merchant previewed, whatever is
+    edited meanwhile. At that time the references are checked again (a
+    product can be deleted in between) and a schedule that can no longer be
+    released is marked ``failed`` with the problems in ``failure``, never
+    half done. Written only through ``builder.scheduling``.
+    """
+
+    scheduled_for = models.DateTimeField(_("Scheduled for"))
+    status = models.CharField(
+        _("Status"),
+        max_length=16,
+        choices=ScheduleStatus.choices,
+        default=ScheduleStatus.PENDING,
+        db_default=ScheduleStatus.PENDING,
+    )
+    versions = models.JSONField(
+        _("Versions"), help_text=_("{document key: version id}")
+    )
+    revisions = models.JSONField(
+        _("Revisions"),
+        help_text=_("{document key: draft revision it was taken from}"),
+    )
+    note = models.CharField(_("Note"), max_length=255, blank=True, default="")
+    created_by_staff_id = models.BigIntegerField(
+        _("Scheduled by (staff)"), null=True, blank=True
+    )
+    created_by_staff = StaffActor()
+    executed_at = models.DateTimeField(_("Executed at"), null=True, blank=True)
+    release = models.ForeignKey(
+        BuilderRelease,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="schedules",
+        verbose_name=_("Release"),
+    )
+    failure = models.JSONField(
+        _("Failure"),
+        default=list,
+        db_default=[],
+        blank=True,
+        help_text=_("Why it could not be released: [{path, code, message}]"),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Scheduled publish")
+        verbose_name_plural = _("Scheduled publishes")
+        ordering = ["scheduled_for"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            models.Index(
+                fields=["status", "scheduled_for"],
+                name="builder_sched_due_ix",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.scheduled_for:%Y-%m-%d %H:%M} ({self.status})"
+
+
 class ReferenceKind(models.TextChoices):
     PRODUCT = "product", _("Product")
     CATEGORY = "category", _("Category")

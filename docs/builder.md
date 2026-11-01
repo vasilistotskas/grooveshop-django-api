@@ -250,3 +250,40 @@ storefront shows that block empty.
 Scheduled publishing, the storefront staff session, and the
 `builder_block_usage` command that will gate removing a block type: each is
 its own change.
+## Scheduled publishing
+
+`builder/scheduling.py`, `builder/tasks.py`, `BuilderScheduledPublish`. A
+publish can wait for a time:
+
+- `POST schedules` `{documents, scheduledFor, note}` checks exactly what a
+  publish checks (every draft valid, references existing, something to
+  change) **now**, and **freezes** the drafts as versions held by the
+  schedule. What goes live is what was checked, whatever is edited meanwhile.
+  `scheduledFor` is an ISO 8601 time; one without an offset is read in the
+  store's timezone (`settings.TIME_ZONE`, Europe/Athens). Refused:
+  `schedule_in_the_past`, `schedule_too_far` (`BUILDER_SCHEDULE_MAX_DAYS`),
+  `invalid_schedule_time`, `too_many_schedules`
+  (`BUILDER_MAX_PENDING_SCHEDULES`), `nothing_to_publish`. Frozen versions
+  are protected from checkpoint retention while the schedule is pending.
+- `GET schedules` (`?status=pending|published|cancelled|failed`),
+  `GET/PATCH/DELETE schedules/<id>`: `PATCH {scheduledFor}` moves it,
+  `DELETE` cancels it (it stays listed as `cancelled`); once it has run or
+  been cancelled, `409 schedule_not_pending`.
+- The sweep `builder.tasks.run_due_publishes` runs every minute per store
+  (`tenant.tasks.fanout_run_due_builder_publishes`, beat entry
+  `run-due-builder-publishes`). Each due schedule is one transaction under
+  the per-store release lock with `select_for_update`; the status change is
+  inside it, so a retry, an overlapping sweep or a second worker finds it
+  spent, and a cancel racing the sweep wins or loses cleanly.
+- At execution the references are checked again and the documents must still
+  exist. A schedule that can no longer be released (`reference_not_found`,
+  `document_gone`, `nothing_to_publish`: something else already released
+  those versions) is `failed` with the problems in `failure`, never half
+  done. Otherwise it is the ordinary release (made by who scheduled it): the
+  cache generation and the `builder` surface move at that moment.
+
+## Not here yet
+
+The media library, the storefront staff session and the
+`builder_block_usage` command that will gate removing a block type are their
+own changes.

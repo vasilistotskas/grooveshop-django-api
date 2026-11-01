@@ -291,6 +291,10 @@ msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → product %(product)s: %(price)s"
 
 #, python-format
+msgid "%(key)s no longer exists."
+msgstr "%(key)s no longer exists."
+
+#, python-format
 msgid "%(kind)s %(amount)s on gift card %(card)s"
 msgstr "%(kind)s %(amount)s on gift card %(card)s"
 
@@ -722,6 +726,10 @@ msgstr "A post with this slug already exists."
 
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "A promotion discounts a cart line that is not part of the order."
+
+#, python-format
+msgid "A publish can be scheduled at most %(days)s days ahead."
+msgstr "A publish can be scheduled at most %(days)s days ahead."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
@@ -1590,6 +1598,10 @@ msgid "At most %(limit)s blocks fit here."
 msgstr "At most %(limit)s blocks fit here."
 
 #, python-format
+msgid "At most %(limit)s publishes can wait at once."
+msgstr "At most %(limit)s publishes can wait at once."
+
+#, python-format
 msgid "At most %(limit)s sections fit in a document."
 msgstr "At most %(limit)s sections fit in a document."
 
@@ -2445,6 +2457,9 @@ msgstr "Canceled in myDATA"
 msgid "Canceled orders to refund"
 msgstr "Canceled orders to refund"
 
+msgid "Cancelled"
+msgstr "Cancelled"
+
 msgid "Cancelled but still paid"
 msgstr "Cancelled but still paid"
 
@@ -2880,6 +2895,9 @@ msgstr "Choose a new password for %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
+
+msgid "Choose a time in the future."
+msgstr "Choose a time in the future."
 
 msgid "Choose at least one document to publish."
 msgstr "Choose at least one document to publish."
@@ -4566,6 +4584,9 @@ msgstr "Excluded Categories"
 msgid "Excluded Products"
 msgstr "Excluded Products"
 
+msgid "Executed at"
+msgstr "Executed at"
+
 msgid "Expense"
 msgstr "Expense"
 
@@ -4702,6 +4723,9 @@ msgstr "Failed to retrieve settings"
 
 msgid "Failed to start the payment."
 msgstr "Failed to start the payment."
+
+msgid "Failure"
+msgstr "Failure"
 
 msgid "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
 msgstr "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
@@ -11864,6 +11888,9 @@ msgstr "Reviews"
 msgid "Reviews to approve"
 msgstr "Reviews to approve"
 
+msgid "Revisions"
+msgstr "Revisions"
+
 msgid "Reward Products"
 msgstr "Reward Products"
 
@@ -12024,8 +12051,14 @@ msgstr "Scheduled"
 msgid "Scheduled backup failed"
 msgstr "Scheduled backup failed"
 
+msgid "Scheduled by (staff)"
+msgstr "Scheduled by (staff)"
+
 msgid "Scheduled database backup failed"
 msgstr "Scheduled database backup failed"
+
+msgid "Scheduled for"
+msgstr "Scheduled for"
 
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
@@ -12038,6 +12071,12 @@ msgstr "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
+
+msgid "Scheduled publish"
+msgstr "Scheduled publish"
+
+msgid "Scheduled publishes"
+msgstr "Scheduled publishes"
 
 msgid "Scheduled re-engagement run"
 msgstr "Scheduled re-engagement run"
@@ -14111,6 +14150,9 @@ msgstr "The text is too long: %(length)s of %(max)s characters."
 msgid "The text must keep the same placeholders as the original."
 msgstr "The text must keep the same placeholders as the original."
 
+msgid "The time needs a timezone."
+msgstr "The time needs a timezone."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
 
@@ -14168,6 +14210,9 @@ msgstr "There is no such document: %(keys)s."
 
 msgid "There is no such release."
 msgstr "There is no such release."
+
+msgid "There is no such schedule."
+msgstr "There is no such schedule."
 
 msgid "There is no such version."
 msgstr "There is no such version."
@@ -14359,6 +14404,9 @@ msgstr "This range would show more than %(rows)s rows: choose longer periods, or
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "This receipt is your proof of purchase — please keep it for your records."
+
+msgid "This schedule has already run or been cancelled."
+msgstr "This schedule has already run or been cancelled."
 
 msgid "This setting is the same in every language."
 msgstr "This setting is the same in every language."
@@ -15797,6 +15845,9 @@ msgstr "Wholesale-priced"
 msgid "Why Microlearning"
 msgstr "Why Microlearning"
 
+msgid "Why it could not be released: [{path, code, message}]"
+msgstr "Why it could not be released: [{path, code, message}]"
+
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 
@@ -16588,6 +16639,9 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+msgid "{document key: draft revision it was taken from}"
+msgstr "{document key: draft revision it was taken from}"
 
 msgid "{document key: version id}"
 msgstr "{document key: version id}"

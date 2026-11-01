@@ -32,9 +32,11 @@ from builder.errors import (
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
+    BuilderScheduledPublish,
     BuilderVersion,
     DocumentKind,
     ReferenceKind,
+    ScheduleStatus,
     VersionKind,
     empty_document,
     kind_of_key,
@@ -281,6 +283,13 @@ def prune_unreleased_checkpoints(document: BuilderDocument) -> int:
         )
         for version_id in versions.values()
     }
+    released |= {
+        int(version_id)
+        for versions in BuilderScheduledPublish.objects.filter(
+            status=ScheduleStatus.PENDING
+        ).values_list("versions", flat=True)
+        for version_id in versions.values()
+    }
     stale = list(
         BuilderVersion.objects.filter(
             document=document, kind=VersionKind.CHECKPOINT
@@ -380,7 +389,7 @@ def _lock_release_sequence() -> None:
 
 
 def _create_release(
-    user: Any,
+    staff: int | None,
     versions: dict[str, int],
     *,
     note: str,
@@ -390,7 +399,7 @@ def _create_release(
         number=(BuilderRelease.objects.aggregate(top=Max("number"))["top"] or 0)
         + 1,
         versions=versions,
-        published_by_staff_id=staff_id(user),
+        published_by_staff_id=staff,
         note=note,
         rolled_back_from=rolled_back_from,
     )
@@ -421,6 +430,31 @@ def _publish_documents(
     return documents
 
 
+def validated_drafts(
+    keys: Sequence[str], catalogue: storefront.Catalogue
+) -> tuple[list[BuilderDocument], dict[str, validation.Validated]]:
+    """The locked documents of *keys* with every draft validated in full,
+    references included. One problem anywhere is a ``DocumentInvalid``
+    listing every problem with its document. The caller holds the
+    transaction."""
+    documents = _publish_documents(keys)
+    problems: list[Issue] = []
+    checked: dict[str, validation.Validated] = {}
+    for document in documents:
+        issues, validated = _issues(
+            document.key, document.draft, document.draft_i18n, catalogue
+        )
+        if validated is not None:
+            issues = validation.check_references(validated.refs)
+            checked[document.key] = validated
+        problems.extend(
+            replace(issue, document=document.key) for issue in issues
+        )
+    if problems:
+        raise DocumentInvalid(problems)
+    return documents, checked
+
+
 def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:
     """Release the drafts of *keys* together, or none of them.
 
@@ -444,21 +478,7 @@ def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:
     catalogue = _catalogue()
     with transaction.atomic():
         _lock_release_sequence()
-        documents = _publish_documents(wanted)
-        problems: list[Issue] = []
-        checked: dict[str, validation.Validated] = {}
-        for document in documents:
-            issues, validated = _issues(
-                document.key, document.draft, document.draft_i18n, catalogue
-            )
-            if validated is not None:
-                issues = validation.check_references(validated.refs)
-                checked[document.key] = validated
-            problems.extend(
-                replace(issue, document=document.key) for issue in issues
-            )
-        if problems:
-            raise DocumentInvalid(problems)
+        documents, checked = validated_drafts(wanted, catalogue)
 
         previous = published_versions()
         versions = dict(previous)
@@ -487,7 +507,7 @@ def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:
                     )
                 ]
             )
-        release = _create_release(user, versions, note=note)
+        release = _create_release(staff_id(user), versions, note=note)
         for document in documents:
             document.published_revision = document.draft_revision
             document.save(update_fields=["published_revision"])
@@ -515,7 +535,7 @@ def rollback(user: Any, *, release_id: int, note: str = "") -> BuilderRelease:
                 ]
             )
         release = _create_release(
-            user,
+            staff_id(user),
             dict(target.versions),
             note=note,
             rolled_back_from=target,
@@ -566,7 +586,7 @@ def delete_page(user: Any, *, key: str, expected_revision: int) -> None:
         document.delete()
         if key in previous:
             _create_release(
-                user,
+                staff_id(user),
                 {k: v for k, v in previous.items() if k != key},
                 note=_("Page deleted"),
             )

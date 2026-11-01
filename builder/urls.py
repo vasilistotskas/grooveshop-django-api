@@ -60,6 +60,16 @@ urlpatterns = [
         media_api.AssetDetailView.as_view(),
         name="media-detail",
     ),
+    path(
+        "builder/schedules",
+        views.ScheduleListView.as_view(),
+        name="schedule-list",
+    ),
+    path(
+        "builder/schedules/<int:pk>",
+        views.ScheduleView.as_view(),
+        name="schedule-detail",
+    ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),
     path(

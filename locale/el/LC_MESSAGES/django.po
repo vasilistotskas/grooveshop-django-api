@@ -296,6 +296,10 @@ msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → προϊόν %(product)s: %(price)s"
 
 #, python-format
+msgid "%(key)s no longer exists."
+msgstr "Το έγγραφο %(key)s δεν υπάρχει πια."
+
+#, python-format
 msgid "%(kind)s %(amount)s on gift card %(card)s"
 msgstr "%(kind)s %(amount)s στη δωροκάρτα %(card)s"
 
@@ -727,6 +731,10 @@ msgstr "Υπάρχει ήδη άρθρο με αυτό το slug."
 
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "Μια προσφορά εκπτώνει γραμμή του καλαθιού που δεν ανήκει στην παραγγελία."
+
+#, python-format
+msgid "A publish can be scheduled at most %(days)s days ahead."
+msgstr "Μια δημοσίευση μπορεί να προγραμματιστεί το πολύ %(days)s ημέρες μπροστά."
 
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "Ένα ρεαλιστικό παράδειγμα αριθμού κινητού σε εθνική μορφή (π.χ. GR «6912345678», CY «96123456»)."
@@ -1595,6 +1603,10 @@ msgid "At most %(limit)s blocks fit here."
 msgstr "Εδώ χωράνε το πολύ %(limit)s μπλοκ."
 
 #, python-format
+msgid "At most %(limit)s publishes can wait at once."
+msgstr "Το πολύ %(limit)s δημοσιεύσεις μπορούν να περιμένουν ταυτόχρονα."
+
+#, python-format
 msgid "At most %(limit)s sections fit in a document."
 msgstr "Ένα έγγραφο χωράει το πολύ %(limit)s ενότητες."
 
@@ -2451,6 +2463,9 @@ msgstr "Ακυρώθηκε στο myDATA"
 msgid "Canceled orders to refund"
 msgstr "Ακυρωμένες παραγγελίες προς επιστροφή χρημάτων"
 
+msgid "Cancelled"
+msgstr "Ακυρώθηκε"
+
 msgid "Cancelled but still paid"
 msgstr "Ακυρωμένες αλλά πληρωμένες"
 
@@ -2887,6 +2902,9 @@ msgstr "Νέος κωδικός πρόσβασης για %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Νέος κωδικός πρόσβασης για {store_name}"
+
+msgid "Choose a time in the future."
+msgstr "Διάλεξε μια ώρα στο μέλλον."
 
 msgid "Choose at least one document to publish."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
@@ -4572,6 +4590,9 @@ msgstr "Εξαιρούμενες κατηγορίες"
 msgid "Excluded Products"
 msgstr "Εξαιρούμενα προϊόντα"
 
+msgid "Executed at"
+msgstr "Εκτελέστηκε στις"
+
 msgid "Expense"
 msgstr "Έξοδο"
 
@@ -4708,6 +4729,9 @@ msgstr "Αποτυχία ανάκτησης ρυθμίσεων"
 
 msgid "Failed to start the payment."
 msgstr "Αποτυχία έναρξης της πληρωμής."
+
+msgid "Failure"
+msgstr "Αποτυχία"
 
 msgid "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
 msgstr "False = διαπιστευτήρια sandbox / δοκιμής. Χρησιμοποιείται από το UI διαχείρισης για να προειδοποιεί τους χειριστές ότι τα vouchers δεν θα αποσταλούν πραγματικά."
@@ -11873,6 +11897,9 @@ msgstr "Κριτικές"
 msgid "Reviews to approve"
 msgstr "Κριτικές προς έγκριση"
 
+msgid "Revisions"
+msgstr "Αναθεωρήσεις"
+
 msgid "Reward Products"
 msgstr "Προϊόντα ανταμοιβής"
 
@@ -12033,8 +12060,14 @@ msgstr "Προγραμματισμένο"
 msgid "Scheduled backup failed"
 msgstr "Αποτυχία προγραμματισμένου αντιγράφου ασφαλείας"
 
+msgid "Scheduled by (staff)"
+msgstr "Προγραμματίστηκε από (προσωπικό)"
+
 msgid "Scheduled database backup failed"
 msgstr "Απέτυχε το προγραμματισμένο αντίγραφο ασφαλείας της βάσης δεδομένων"
+
+msgid "Scheduled for"
+msgstr "Προγραμματισμένο για"
 
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
@@ -12047,6 +12080,12 @@ msgstr "Προγραμματίστηκε ακύρωση στο myDATA για τ�
 #, python-format
 msgid "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr "Προγραμματίστηκε υποβολή στο myDATA για το τιμολόγιο %(num)s (παραγγελία #%(order_id)s). Ανανεώστε τη διαχείριση Τιμολογίων για να δείτε το MARK μόλις απαντήσει η ΑΑΔΕ."
+
+msgid "Scheduled publish"
+msgstr "Προγραμματισμένη δημοσίευση"
+
+msgid "Scheduled publishes"
+msgstr "Προγραμματισμένες δημοσιεύσεις"
 
 msgid "Scheduled re-engagement run"
 msgstr "Προγραμματισμένη αποστολή επανασύνδεσης"
@@ -14116,6 +14155,9 @@ msgstr "Το κείμενο είναι πολύ μεγάλο: %(length)s από 
 msgid "The text must keep the same placeholders as the original."
 msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημεία αντικατάστασης με το αρχικό."
 
+msgid "The time needs a timezone."
+msgstr "Η ώρα χρειάζεται ζώνη ώρας."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
 
@@ -14173,6 +14215,9 @@ msgstr "Δεν υπάρχει τέτοιο έγγραφο: %(keys)s."
 
 msgid "There is no such release."
 msgstr "Δεν υπάρχει τέτοια δημοσίευση."
+
+msgid "There is no such schedule."
+msgstr "Δεν υπάρχει τέτοιος προγραμματισμός."
 
 msgid "There is no such version."
 msgstr "Δεν υπάρχει τέτοια έκδοση."
@@ -14364,6 +14409,9 @@ msgstr "Αυτό το εύρος θα εμφάνιζε περισσότερες 
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "Αυτή η απόδειξη αποδεικνύει την αγορά σου — κράτησέ την για το αρχείο σου."
+
+msgid "This schedule has already run or been cancelled."
+msgstr "Αυτός ο προγραμματισμός έχει ήδη εκτελεστεί ή ακυρωθεί."
 
 msgid "This setting is the same in every language."
 msgstr "Αυτή η ρύθμιση είναι ίδια σε όλες τις γλώσσες."
@@ -15802,6 +15850,9 @@ msgstr "Με τιμές χονδρικής"
 msgid "Why Microlearning"
 msgstr "Γιατί μικρομάθηση"
 
+msgid "Why it could not be released: [{path, code, message}]"
+msgstr "Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]"
+
 msgid "Why the code is refused, from the ACP discount vocabulary (discount_code_expired, discount_code_minimum_not_met, …). Null when the code is eligible."
 msgstr "Γιατί απορρίπτεται ο κωδικός, από το λεξιλόγιο εκπτώσεων του ACP (discount_code_expired, discount_code_minimum_not_met, …). Null όταν ο κωδικός είναι επιλέξιμος."
 
@@ -16594,6 +16645,9 @@ msgstr "εβδομάδα"
 msgid "without voucher"
 msgstr "χωρίς voucher"
 
+msgid "{document key: draft revision it was taken from}"
+msgstr "{κλειδί εγγράφου: αναθεώρηση του πρόχειρου από την οποία ελήφθη}"
+
 msgid "{document key: version id}"
 msgstr "{κλειδί εγγράφου: αναγνωριστικό έκδοσης}"
 
@@ -16921,9 +16975,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "European Countries"
 #~ msgstr "Ευρωπαϊκές χώρες"
-
-#~ msgid "Expiry date must be in the future."
-#~ msgstr "Η ημερομηνία λήξης πρέπει να είναι στο μέλλον."
 
 #~ msgid "Export search analytics data to JSON format"
 #~ msgstr "Εξαγωγή δεδομένων αναλυτικών αναζήτησης σε μορφή JSON"
@@ -17451,9 +17502,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "SPECIAL OFFERS"
 #~ msgstr "ΕΙΔΙΚΕΣ ΠΡΟΣΦΟΡΕΣ"
-
-#~ msgid "Scheduled tasks"
-#~ msgstr "Προγραμματισμένες εργασίες"
 
 #~ msgid "Search failed. Please try again later."
 #~ msgstr "Η αναζήτηση απέτυχε. Παρακαλούμε δοκιμάστε ξανά αργότερα."

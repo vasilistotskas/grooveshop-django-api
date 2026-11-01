@@ -474,3 +474,133 @@ class TestRootSettingsInThePublishedRead:
 
         assert el["settings"] == {"seoTitle": "Σπίτι", "seoKeywords": "κλειδί"}
         assert en["settings"] == {"seoTitle": "Home", "seoKeywords": "κλειδί"}
+
+
+class TestPublishedIndex:
+    @pytest.fixture
+    def released(self, admin, catalogue, features_on):
+        cache.clear()
+        client = api_as(admin)
+
+        def put(key, body):
+            client.put(
+                draft_url(key),
+                body,
+                format="json",
+                headers={"If-Match": "0"},
+            )
+
+        banner = section("banner@1", {"text": "Μπάνερ"})
+        put(
+            HOME,
+            body_of(
+                ("a", banner),
+                i18n={"en": {"a": {"/text": "Banner"}}},
+            ),
+        )
+        put("page:about", body_of(("b", banner)))
+        put(
+            "group:header",
+            body_of(("n", section("announcement@1", {"text": "Sale"}))),
+        )
+        put("theme", body_of(("t", section("theme@1", {"radius": "lg"}))))
+        client.post(
+            reverse("builder:publish"),
+            {"documents": [HOME, "page:about", "group:header", "theme"]},
+            format="json",
+        )
+        # A draft nobody released.
+        put("template:contact", body_of(("c", banner)))
+        return client
+
+    def read(self, locale=None):
+        return APIClient().get(
+            reverse("builder:published-index"),
+            {"locale": locale} if locale else {},
+        )
+
+    def test_it_answers_the_chrome_and_the_pages_of_the_release(self, released):
+        response = self.read("el")
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["release"] == 1
+        assert body["locale"] == "el"
+        assert body["theme"]["sections"]["t"]["settings"] == {"radius": "lg"}
+        assert list(body["groups"]) == ["header"]
+        assert [(p["key"], p["kind"]) for p in body["pages"]] == [
+            ("about", "page"),
+            ("home", "template"),
+        ]
+        assert all(p["updatedAt"].startswith("20") for p in body["pages"])
+        assert "page" not in body
+
+    def test_a_draft_is_not_a_page_of_the_release(self, released):
+        keys = [p["key"] for p in self.read().json()["pages"]]
+
+        assert "contact" not in keys
+
+    def test_the_groups_are_resolved_for_the_locale(self, released):
+        released.put(
+            draft_url("group:header"),
+            body_of(
+                ("n", section("announcement@1", {"text": "Έκπτωση"})),
+                i18n={"en": {"n": {"/text": "Sale"}}},
+            ),
+            format="json",
+            headers={"If-Match": "1"},
+        )
+        released.post(
+            reverse("builder:publish"),
+            {"documents": ["group:header"]},
+            format="json",
+        )
+
+        en = self.read("en").json()["groups"]["header"]["sections"]["n"]
+        el = self.read("el").json()["groups"]["header"]["sections"]["n"]
+
+        assert en["settings"]["text"] == "Sale"
+        assert el["settings"]["text"] == "Έκπτωση"
+
+    def test_a_store_with_no_release_is_an_empty_answer_not_a_404(
+        self, catalogue, features_on
+    ):
+        cache.clear()
+
+        response = self.read()
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == {
+            "release": 0,
+            "locale": "el",
+            "theme": None,
+            "groups": {},
+            "pages": [],
+        }
+
+    def test_a_warm_read_does_not_touch_the_database(
+        self, released, django_assert_num_queries
+    ):
+        self.read("el")
+
+        with django_assert_num_queries(0):
+            response = self.read("el")
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_a_new_release_is_served_at_once(self, released, tenant):
+        self.read("el")
+        released.put(
+            draft_url("page:about"),
+            body_of(("b", section("banner@1", {"text": "v2"}))),
+            format="json",
+            headers={"If-Match": "1"},
+        )
+        released.post(
+            reverse("builder:publish"),
+            {"documents": ["page:about"]},
+            format="json",
+        )
+        tenant.refresh_from_db()
+
+        assert self.read("el").json()["release"] == 2

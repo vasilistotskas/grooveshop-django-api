@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone, translation
@@ -14,6 +14,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from builder import staff_session
+from core import tickets
 from tenant.models import (
     PlatformStaffToken,
     StaffTokenScope,
@@ -61,7 +62,7 @@ class TestMinting:
         (ticket,) = parse_qs(target.query)["ticket"]
         assert len(ticket) >= 40
         assert "no-store" in response["Cache-Control"]
-        assert staff_session._consume_ticket(ticket) == admin.pk
+        assert tickets.spend(tickets.BUILDER_EDITOR, ticket) == admin.pk
 
     def test_staff_who_may_not_edit_are_refused(self, staff, tenant):
         client = Client()
@@ -83,16 +84,23 @@ class TestMinting:
         assert sidebar(admin) is True
         assert sidebar(staff) is False
 
-    def test_a_ticket_expires_with_its_ttl(self, admin, settings):
-        settings.BUILDER_STAFF_TICKET_TTL_SECONDS = 1
-        ticket = staff_session.mint_ticket(admin)
-        key = cache.make_and_validate_key(
-            f"{staff_session.TICKET_CACHE_PREFIX}{ticket}"
-        )
+    def test_a_ticket_lives_as_long_as_the_setting_says(self, admin, settings):
+        settings.BUILDER_STAFF_TICKET_TTL_SECONDS = 7
 
-        ttl = cache._cache.get_client(key).ttl(key)
+        with mock.patch("builder.staff_session.tickets.mint") as mint:
+            staff_session.mint_ticket(admin)
 
-        assert 0 < ttl <= 1
+        mint.assert_called_once_with(tickets.BUILDER_EDITOR, admin.pk, 7)
+
+    def test_only_a_staff_identity_gets_a_ticket(self, tenant):
+        from django.core.exceptions import PermissionDenied
+
+        from user.factories.account import UserAccountFactory
+
+        shopper = UserAccountFactory()
+
+        with pytest.raises(PermissionDenied):
+            staff_session.mint_ticket(shopper)
 
 
 class TestOpening:

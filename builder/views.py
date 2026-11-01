@@ -432,6 +432,43 @@ class ScheduleAcknowledgeView(StaffView):
         )
 
 
+class PublishedIndexView(APIView):
+    """The current release's theme, groups and page list, for one locale."""
+
+    renderer_classes = [BuilderJSONRenderer]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        operation_id="builder_published_index",
+        tags=TAGS,
+        parameters=[
+            OpenApiParameter(
+                name=LOCALE_PARAM,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+                description=(
+                    "Language to resolve the content in; unknown or "
+                    "omitted means the store's default language."
+                ),
+            )
+        ],
+        responses={200: dict},
+        description=(
+            "`{release, locale, theme, groups, pages}`: what every page "
+            "needs and none owns. `theme` and `groups` are resolved like "
+            "the page read's; `pages` lists every `page:` and `template:` "
+            "document of the CURRENT release as `{key, kind, updatedAt}` "
+            "(`key` is the suffix, `updatedAt` when its version was "
+            "made). A store with no release answers `{release: 0, theme: "
+            "null, groups: {}, pages: []}`, not 404. Never reads a draft "
+            "and never calls the storefront."
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response(published.published_index(requested_locale(request)))
+
+
 class PublishedPageView(APIView):
     """The current release's theme, groups and page, for one locale."""
 

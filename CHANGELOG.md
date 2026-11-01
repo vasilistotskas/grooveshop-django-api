@@ -3,6 +3,106 @@
 
 
 
+## v3.186.0 (2026-11-01)
+
+### Features
+
+* feat(builder): count each imported document's sections and blocks in the report (#414)
+
+The import report (and --json) now gives, per document, how many sections it
+has and how many blocks at every depth, so a dry run says what would be
+imported and not only which documents.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`07cbd1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07cbd1cc955fc36935fb2f4e6c714cb05b5469fe))
+
+### Refactoring
+
+* refactor(emails): verify the Resend webhook with the Standard Webhooks library (#415)
+
+The Svix signature check was hand-written. Signature verification is
+security code, so it is now the maintained reference implementation: the
+standardwebhooks package, which the svix client itself delegates to and
+which has no dependencies of its own (the svix package would add httpx and
+the whole API client for the same verifier).
+
+A thin adapter in emails.webhooks renames Resend svix-* headers to the
+webhook-* names the library reads and turns everything it can raise for a
+request that is not a delivery (missing header, malformed signature or
+secret, non UTF-8 body) into one InvalidSignature, so a forged request is a
+400, never a 500; tests cover each. The five minute replay window is the
+library, so RESEND_WEBHOOK_TOLERANCE_SECONDS is removed. emails/svix.py is
+deleted; the real-svix signature vector is kept.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5021399`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5021399763ae6d303d4e617fc342e3ad4884c502))
+
+## v3.185.0 (2026-11-01)
+
+### Chores
+
+* chore(builder): pin the storefront's converter fixtures and check them for drift (#411)
+
+tests/fixtures/builder/legacy/ is a copy of the storefront's golden
+converter fixtures, and a copy can drift silently. It is now pinned to a
+storefront commit by its git tree id (legacy.source.json). A unit test
+recomputes the tree id of the copy, with no network, and fails when it is
+not the pinned one, so the copy cannot be edited by hand or half refreshed.
+.github/scripts/sync_converter_fixtures.py is the only thing that writes the
+copy and the pin (the tree id is read from GitHub, every file is checked
+against its blob id), and a weekly workflow runs it with --check, going red
+when the storefront's main has moved, without blocking unrelated pull
+requests. The tree hashing is tested against git itself.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`92e05a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92e05a7164ea1ae3591655444b32bf01715fbfee))
+
+### Features
+
+* feat(builder): a page-less published read for the chrome and the sitemap (#412)
+
+GET /api/v1/builder/published?locale= answers what every page needs and
+none owns: the theme and section groups resolved for the locale, and the
+page: and template: documents of the current release as key, kind and when
+the version was made (the sitemap's lastmod). A store with no release is a
+valid empty answer, not a 404. It is cached per release like the page read,
+and the builder cache surface purges the storefront's builderChrome handler
+beside builderPage.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0aeed9d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aeed9d693da7c3ca9d34aad91f5d43ec26676c9))
+
+### Refactoring
+
+* refactor: one single-use ticket helper; the builder catalogue refuses when the storefront is silent (#410)
+
+core.tickets mints and spends the single-use tickets of the WebSocket and
+of the page builder's editor sign-in, which each had their own copy of the
+Redis GETDEL. Spending goes through CustomCache.getdel. Every ticket now
+lives under the strict: cache namespace, so an unreachable Redis raises
+instead of failing open: the builder's ticket was not under a strict
+prefix, so a lost write would have handed out a ticket nobody could redeem.
+The WebSocket middleware tests use the helper instead of mocking the raw
+cache client, and the helper has its own tests against real Redis,
+including a concurrent spend.
+
+The builder catalogue no longer outlives a failed revalidation: like the
+texts catalogue, when the storefront does not answer nothing is saved,
+whether or not a copy is held.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e7d99f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7d99f4b856d2ea9171e799b589bf670fbc6853e))
+
 ## v3.184.0 (2026-11-01)
 
 ### Bug fixes

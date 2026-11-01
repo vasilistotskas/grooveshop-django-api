@@ -1,5 +1,5 @@
 [project]
-version = "3.184.0"
+version = "3.186.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -67,6 +67,7 @@ dependencies = [
   "cryptography==50.0.2",
   "openpyxl>=3.1.5",
   "babel>=2.18.0",
+  "standardwebhooks==1.1.0",
 ]
 
 [project.urls]

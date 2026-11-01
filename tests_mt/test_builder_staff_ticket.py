@@ -8,10 +8,10 @@ is spent on store B: replay across stores is structural, not a check.
 from __future__ import annotations
 
 import pytest
-from django.core.cache import cache
 from django_tenants.utils import schema_context
 
 from builder import staff_session
+from core import tickets
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 
 
@@ -28,22 +28,8 @@ def test_a_ticket_cannot_be_spent_on_another_store(mt_tenant, mt_tenant_b):
         ticket = staff_session.mint_ticket(_Staff())
 
     with schema_context(mt_tenant_b.schema_name):
-        assert staff_session._consume_ticket(ticket) is None
+        assert tickets.spend(tickets.BUILDER_EDITOR, ticket) is None
 
     with schema_context(mt_tenant.schema_name):
-        assert staff_session._consume_ticket(ticket) == _Staff.pk
-        assert staff_session._consume_ticket(ticket) is None
-
-
-@pytest.mark.django_db
-def test_the_key_names_the_store(mt_tenant, mt_tenant_b):
-    keys = []
-    for tenant in (mt_tenant, mt_tenant_b):
-        with schema_context(tenant.schema_name):
-            keys.append(
-                cache.make_and_validate_key(
-                    f"{staff_session.TICKET_CACHE_PREFIX}same"
-                )
-            )
-
-    assert keys[0] != keys[1]
+        assert tickets.spend(tickets.BUILDER_EDITOR, ticket) == _Staff.pk
+        assert tickets.spend(tickets.BUILDER_EDITOR, ticket) is None

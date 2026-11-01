@@ -43,6 +43,8 @@ class StoreReport:
     documents: list[str] = field(default_factory=list)
     published: list[str] = field(default_factory=list)
     drafts: list[str] = field(default_factory=list)
+    #: ``{document key: {"sections": n, "blocks": n}}``; blocks at every depth.
+    counts: dict[str, dict[str, int]] = field(default_factory=dict)
     warnings: list[dict[str, str]] = field(default_factory=list)
     problems: list[dict[str, Any]] = field(default_factory=list)
     release: int | None = None
@@ -82,6 +84,21 @@ def _convert_all(
         report.warnings += [{**w, "document": key} for w in result.warnings]
         converted.append((key, published, result))
     return converted
+
+
+def count_nodes(data: dict[str, Any]) -> dict[str, int]:
+    """How many sections a document has and how many blocks inside them, at
+    every depth."""
+
+    def blocks(node: dict[str, Any]) -> int:
+        children = node.get("blocks") or {}
+        return len(children) + sum(blocks(child) for child in children.values())
+
+    sections = data["sections"]
+    return {
+        "sections": len(sections),
+        "blocks": sum(blocks(section) for section in sections.values()),
+    }
 
 
 def import_store(*, dry_run: bool = False) -> StoreReport:
@@ -169,6 +186,7 @@ def _store_documents(
             published_revision=1 if published else None,
         )
         report.documents.append(key)
+        report.counts[key] = count_nodes(validated.data)
         (report.published if published else report.drafts).append(key)
         stored.append((key, published, validated))
     # References last: a menu points at a page document that is created in

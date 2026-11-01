@@ -3,7 +3,7 @@
 The ``access_token`` / ``authenticate_token`` / ``_renew_token`` /
 ``_cleanup_token`` path was removed in favour of the ticket-only flow.
 These tests cover:
-- ``authenticate_ticket``: atomic GETDEL, Knox live-token check, user
+- ``authenticate_ticket``: the ticket helper's answer, Knox live-token check, user
   active/inactive, missing user, empty/missing ticket.
 - ``TokenAuthMiddleware.__call__``: ticket path, no-ticket → AnonymousUser.
 - ``TokenAuthMiddlewareStack``.
@@ -32,30 +32,16 @@ Token = get_token_model()
 # ---------------------------------------------------------------------------
 
 
-def _make_getdel_patcher(return_value):
-    """Return a context manager that patches the raw Redis GETDEL call.
-
-    The suite's default cache is Redis-backed in every test
-    (``tests/settings.py``), so ``_cache.get_client`` always exists.
-    """
-    mock_redis = MagicMock()
-    mock_redis.getdel.return_value = return_value
-    return patch(
-        "core.middleware.channels.cache._cache.get_client",
-        return_value=mock_redis,
-    )
+def _spends(user_id):
+    """The ticket helper answering with *user_id* (``None``: no such
+    ticket). ``core.tickets`` has its own tests against real Redis; here the
+    middleware is tested on what it does with the answer."""
+    return patch("core.middleware.channels.tickets.spend", return_value=user_id)
 
 
 # ---------------------------------------------------------------------------
 # authenticate_ticket unit tests
 # ---------------------------------------------------------------------------
-
-
-def _patch_prefixed_key(key="ws:ticket:abc"):
-    return patch(
-        "core.middleware.channels.cache.make_and_validate_key",
-        return_value=key,
-    )
 
 
 class TestAuthenticateTicketWithoutUser(TransactionTestCase):
@@ -78,14 +64,7 @@ class TestAuthenticateTicketWithoutUser(TransactionTestCase):
     # -- GETDEL returns None (ticket not in cache or already consumed) -------
 
     async def test_missing_cache_entry_returns_anonymous(self):
-        with _patch_prefixed_key(), _make_getdel_patcher(None):
-            result = await authenticate_ticket("abc")
-        self.assertIsInstance(result, AnonymousUser)
-
-    # -- GETDEL returns garbled value ----------------------------------------
-
-    async def test_invalid_cache_value_returns_anonymous(self):
-        with _patch_prefixed_key(), _make_getdel_patcher(b"not-an-int"):
+        with _spends(None):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
@@ -115,7 +94,7 @@ class TestAuthenticateTicket(TransactionTestCase):
     # -- user does not exist -------------------------------------------------
 
     async def test_nonexistent_user_returns_anonymous(self):
-        with _patch_prefixed_key(), _make_getdel_patcher(b"99999999"):
+        with _spends(99999999):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
@@ -125,10 +104,7 @@ class TestAuthenticateTicket(TransactionTestCase):
         user = await self._create_user(active=False)
         await self._create_token(user)
 
-        with (
-            _patch_prefixed_key(),
-            _make_getdel_patcher(str(user.pk).encode()),
-        ):
+        with _spends(user.pk):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
@@ -137,10 +113,7 @@ class TestAuthenticateTicket(TransactionTestCase):
     async def test_no_knox_token_returns_anonymous(self):
         user = await self._create_user()
         # Deliberately do NOT create a Knox token.
-        with (
-            _patch_prefixed_key(),
-            _make_getdel_patcher(str(user.pk).encode()),
-        ):
+        with _spends(user.pk):
             result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
@@ -150,15 +123,11 @@ class TestAuthenticateTicket(TransactionTestCase):
         user = await self._create_user()
         await self._create_token(user)
 
-        prefixed = "redis:1:ws:ticket:myticket"
-        with (
-            _patch_prefixed_key(prefixed),
-            _make_getdel_patcher(str(user.pk).encode()) as get_client,
-        ):
+        with _spends(user.pk) as spend:
             result = await authenticate_ticket("myticket")
 
         self.assertEqual(result.pk, user.pk)
-        get_client.return_value.getdel.assert_called_once_with(prefixed)
+        spend.assert_called_once_with("ws", "myticket")
 
 
 # ---------------------------------------------------------------------------

@@ -3110,6 +3110,18 @@ if EMAIL_TRANSPORT not in ("smtp", "resend"):
 # without its own verified domain. A store with its own domain has its key on
 # its Tenant row and never falls back to this one.
 RESEND_API_KEY = getenv("RESEND_API_KEY", "")
+# The signing secret of the webhook endpoint of that same team, registered on
+# the platform host (``emails.webhooks``). A store with its own team keeps
+# its secret on its Tenant row. Empty: the platform host answers 503.
+RESEND_WEBHOOK_SECRET = getenv("RESEND_WEBHOOK_SECRET", "")
+# How old (or far ahead) a delivery's timestamp may be before it is refused
+# as a replay; Svix's own default.
+RESEND_WEBHOOK_TOLERANCE_SECONDS = int(
+    getenv("RESEND_WEBHOOK_TOLERANCE_SECONDS", "300")
+)
+RESEND_WEBHOOK_MAX_BODY_BYTES = int(
+    getenv("RESEND_WEBHOOK_MAX_BODY_BYTES", str(256 * 1024))
+)
 if PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 

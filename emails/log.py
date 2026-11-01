@@ -20,7 +20,7 @@ from django.utils import timezone
 from emails import optout
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
-from emails.status import Status
+from emails.status import NOT_SENT, Status
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def record_skip(
 
 def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
     """The row of a message about to be sent. The retry of a task finds the
-    row its earlier attempt wrote (same delivery id): a ``SENT`` one is
+    row its earlier attempt wrote (same delivery id): one the provider has is
     returned as it is, so the caller does not send it again, any other goes
     back to ``QUEUED``. When the row cannot be written the message is sent
     anyway and the row stays unsaved."""
@@ -113,7 +113,7 @@ def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
     if earlier is None:
         _write(entry)
         return entry
-    if earlier.status != Status.SENT:
+    if earlier.status in NOT_SENT:
         earlier.status = Status.QUEUED
         earlier.error = ""
         _write(earlier, update_fields=["status", "error", "updated_at"])

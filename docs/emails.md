@@ -667,7 +667,8 @@ without its own domain.
 - `Tenant.resend_api_key` and `Tenant.resend_webhook_secret` are
   Fernet-encrypted (see `secret-encryption.md`), editable by platform staff
   only (the "Email & Security" tab of the platform's tenant admin); a store
-  role sees "set / not set". The webhook secret is read by the webhook PR.
+  role sees "set / not set". The webhook secret is read by the webhook
+  receiver (see The Resend webhook).
 - `RESEND_API_KEY` is required in production **and staging** when
   `EMAIL_TRANSPORT=resend`; `EMAIL_HOST_PASSWORD` is required only for
   `smtp`.
@@ -747,7 +748,74 @@ mail that has already left. The send then simply has no row.
 
 `EmailEvent` (the provider timeline of one row, unique on the provider's
 event id) and `EmailSuppression` (an address hash with a reason and a scope,
-kept until removed) exist for the webhook that fills them.
+kept until removed) are filled by the webhook (next section).
+
+## The Resend webhook (`webhooks.py`, `svix.py`, `events.py`, `suppression.py`)
+
+`POST /resend/webhook/`, mounted on **every** host (root-shared, like the Viva
+and BoxNow receivers), because each Resend team registers the host that owns
+its keys:
+
+- a store with its own team registers its own API host and the delivery is
+  verified with that store's `Tenant.resend_webhook_secret`, resolved by the
+  host it arrived on;
+- the platform's team registers the platform host, verified with
+  `settings.RESEND_WEBHOOK_SECRET`; its events are routed by their signed
+  `schema` tag to the store (or `public`) that sent the mail.
+
+There is no fallback between the two secrets, and a host with none answers
+503 (Resend retries until it is set).
+
+1. **Verification** (`svix.verify`): HMAC-SHA256 over `"{svix-id}.{svix-timestamp}.{raw body}"`
+   under the secret (`whsec_` + base64), any one of the `v1,` signatures in
+   `svix-signature`, and a timestamp within `RESEND_WEBHOOK_TOLERANCE_SECONDS`
+   (300) either way, which is the replay guard. It is hand-written (the scheme
+   is a few lines, the library would be a new dependency) and pinned by
+   `tests/unit/emails/test_svix.py` against a signature made by the `svix`
+   package. The body is verified before it is parsed, and capped at
+   `RESEND_WEBHOOK_MAX_BODY_BYTES` (413). 400 for anything else, with no
+   payload in the log.
+2. **Queue.** The view answers 200 at once and queues
+   `emails.tasks.process_provider_event(svix_id, payload)`, which runs in the
+   schema of the host that received it.
+3. **Routing** (`events.route`): a store's endpoint speaks only for that
+   store (a tag naming another schema is dropped), the platform's routes by
+   the tag to `public` or an existing store, an unknown store is dropped with
+   a warning.
+4. **Matching** (`events.process`): the row must match BOTH the `log` tag
+   (the row's uuid) and `data.email_id` (the provider's id), so a valid event
+   can never update another row. A row not there yet (a fast event can beat
+   the send's write of the id) retries up to four times with backoff, then
+   ends as a recorded task failure.
+5. **Dedupe:** `EmailEvent.provider_event_id` is the `svix-id`, unique per
+   schema; a repeated delivery is recorded once and changes nothing.
+6. **Effect:**
+
+| Event | Row status | Also |
+|---|---|---|
+| `email.sent` | unchanged | recorded |
+| `email.delivered` | `delivered` | |
+| `email.delivery_delayed` | `delayed` | |
+| `email.bounced`, type `Permanent` | `bounced` | `EmailSuppression` (hard bounce, scope all) |
+| `email.bounced`, any other type | `delayed` | |
+| `email.complained` | `complained` | `EmailSuppression` (complaint, scope marketing, D7) and an `EmailOptOut` for every marketing type |
+| `email.failed` | `failed` | the reason token in `error` |
+| `email.suppressed` | `provider_suppressed` | `EmailSuppression` (provider, scope all) |
+
+   The status only moves forward (`events.RANK`: sent, delayed, delivered,
+   failed, bounced or suppressed, complained), because events arrive out of
+   order. `detail` keeps the bounce type and sub-type, the failure reason or
+   the suppression type as fixed tokens, never an address or the provider's
+   message. Open and click events are not subscribed (D9); one that arrives is
+   recorded and changes nothing.
+
+**Suppression at send time.** `send_email` asks `suppression.blocks` before it
+renders: `all` blocks every type, `marketing` only a marketing one. A blocked
+recipient is a `skipped_suppressed` row and `Delivery`. A required mail (a
+receipt, a security code) to an `all`-suppressed address is not sent either,
+and is logged at WARNING so it is never lost silently. A wider scope replaces
+a narrower row (a bounce after a complaint), never the reverse. Removing a row
+is the admin's (PR 3.4), and must also remove the address in Resend's own list.
 
 **Retention.** `EMAIL_LOG_RETENTION_DAYS` (store setting, default 90, `0`
 keeps everything, validator `emails.log.validate_retention_days_setting`).
@@ -759,9 +827,11 @@ tables (`devtools/anonymise/rules.py`).
 
 ## Not built yet
 
-- The webhook that fills `EmailEvent` and `EmailSuppression`, the send-time
-  suppression check, and a deferred (`defer`) send; there is no
-  `X-Entity-Ref-ID`.
+- A deferred (`defer`) send; there is no `X-Entity-Ref-ID`.
+- The order note that tells staff a receipt was not sent because the address
+  is suppressed (it needs a hook on `EmailType` the order types implement),
+  and moving a newsletter subscription to `BOUNCED` on a hard bounce (the
+  event carries an address, the log only its hash).
 - The platform admin's own page for the platform types (they have no
   switches, so it would be a listing and the log); the rest of the store's
   admin page (status, log, test-send); the switches and the preview are on
@@ -777,6 +847,12 @@ tables (`devtools/anonymise/rules.py`).
   contents for the test and restores them. Never register a probe type in
   production code. A test that runs a store email (an order task) needs a
   store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
+- `tests/unit/emails/test_svix.py`, `tests/integration/emails/test_resend_webhook.py`
+  and `tests_mt/test_email_webhook_routing.py`: verification (changed byte,
+  stale timestamp, other secret, no fallback between the two secrets, 503,
+  413), every event's effect, the forward-only status, dedupe, matching on
+  both ids, suppression scopes, `send_email` honouring the list, and the
+  cross-schema isolation with real schemas.
 - `tests/integration/emails/test_resend_setup_guard.py`: who is lacking a key
   (one query), the system check and `migration_preflight` failing, the
   `Tenant.clean` refusal, both dashboards and their roles.

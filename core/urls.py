@@ -31,6 +31,7 @@ from core.views import (
     robots_txt,
     upload_image,
 )
+from emails.webhooks import ResendWebhookView
 from order.views.viva_webhook import viva_wallet_webhook
 from shipping_boxnow.views.webhook import BoxNowWebhookView
 
@@ -72,6 +73,11 @@ _root_shared_patterns = [
         "boxnow/webhook/",
         BoxNowWebhookView.as_view(),
         name="boxnow-webhook",
+    ),
+    path(
+        "resend/webhook/",
+        ResendWebhookView.as_view(),
+        name="resend-webhook",
     ),
     # allauth headless endpoints must be at the root (not inside i18n_patterns)
     # so non-default locales don't get a /{lang}/_allauth/ prefix that

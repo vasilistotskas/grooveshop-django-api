@@ -435,3 +435,42 @@ class TestPublishedRead:
             response = self.read(locale="el")
 
         assert response.status_code == status.HTTP_200_OK
+
+
+class TestRootSettingsInThePublishedRead:
+    def test_a_pages_seo_is_resolved_for_the_locale(
+        self, admin, catalogue, features_on
+    ):
+        cache.clear()
+        client = api_as(admin)
+        draft = {
+            **document(("a", section("banner@1", {"text": "x"}))),
+            "settings": {"seoTitle": "Σπίτι", "seoKeywords": "κλειδί"},
+        }
+        client.put(
+            draft_url("page:about"),
+            {
+                "draft": draft,
+                "i18n": {"en": {"@document": {"/seoTitle": "Home"}}},
+            },
+            format="json",
+            headers={"If-Match": "0"},
+        )
+        client.post(
+            reverse("builder:publish"),
+            {"documents": ["page:about"]},
+            format="json",
+        )
+        read = APIClient()
+
+        el = read.get(
+            reverse("builder:published", kwargs={"page_key": "about"}),
+            {"locale": "el"},
+        ).json()["page"]
+        en = read.get(
+            reverse("builder:published", kwargs={"page_key": "about"}),
+            {"locale": "en"},
+        ).json()["page"]
+
+        assert el["settings"] == {"seoTitle": "Σπίτι", "seoKeywords": "κλειδί"}
+        assert en["settings"] == {"seoTitle": "Home", "seoKeywords": "κλειδί"}

@@ -553,3 +553,26 @@ class TestDeletePage:
             services.delete_page(admin, key=HOME, expected_revision=1)
 
         assert issue_codes(caught.value) == {(None, "not_a_page")}
+
+
+class TestBlogCategoryReference:
+    def test_it_must_exist_to_be_published(self, admin, catalogue, features_on):
+        from blog.factories.category import BlogCategoryFactory
+
+        category = BlogCategoryFactory()
+        save(
+            admin, HOME, draft=document(("a", hero(blogCategoryId=category.pk)))
+        )
+        services.publish(admin, keys=[HOME])
+        assert BuilderReference.objects.get().kind == "blogCategory"
+
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(blogCategoryId=987654))),
+            revision=1,
+        )
+        with pytest.raises(DocumentInvalid) as caught:
+            services.publish(admin, keys=[HOME])
+
+        assert issue_codes(caught.value) == {(HOME, "reference_not_found")}

@@ -45,6 +45,7 @@ id read through `StaffActor`.
 
 ```json
 {
+  "settings": {"seoTitle": "..."},
   "sections": {
     "hero_1": {
       "type": "hero@2",
@@ -57,6 +58,14 @@ id read through `StaffActor`.
   "order": ["hero_1"]
 }
 ```
+
+`settings` is the document's own settings (a page's SEO fields), optional,
+declared per kind of document by the catalogue's `documentKinds`
+(`{page|template|theme|group: {schema, translatable, refs?}}`, inside the
+catalogue `hash`). A kind the catalogue gives no root takes no `settings`
+(`document_settings_not_allowed`). The overlay addresses them with the
+reserved node id `@document` (`i18n[locale]["@document"]["/seoTitle"]`), and the
+public read answers each document's `settings` already localised.
 
 Ids match `[A-Za-z0-9_-]{1,64}` and are unique across the whole document
 (the overlay addresses nodes by id). `order` and `blockOrder` list every
@@ -126,7 +135,9 @@ tighten them.
 
 `i18n[locale][node id][pointer] = value`, where `pointer` is a JSON pointer
 within the node's `settings` that the block's `translatable` names
-(`/title`, `/items/0/label`). Structure is never per language. The default
+(`/title`, `/items/0/label`). A pointer may name a whole array or object
+setting (`/bullets`): the overlay value then replaces it whole and is checked
+against its sub-schema. Structure is never per language. The default
 language is never in the overlay. At render a missing entry falls back to
 the default content. An overlay value is validated by running the node's
 schema over the merged settings, and reported at the overlay's pointer.
@@ -135,7 +146,7 @@ schema over the merged settings, and reported at the overlay's pointer.
 
 Settings the catalogue marks as `refs` hold ids: `product` and `category`
 (active, numeric id), `page` (a published content page slug, or a page
-document of the store), `menu` (a navigation slot), `media` (a
+document of the store), `blogCategory` (a blog category id), `menu` (a navigation slot), `media` (a
 `MediaAsset` id). A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront

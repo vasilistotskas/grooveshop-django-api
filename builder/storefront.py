@@ -36,7 +36,9 @@ logger = logging.getLogger(__name__)
 KIND_SECTION = "section"
 KIND_BLOCK = "block"
 
-REFERENCE_KINDS = frozenset({"product", "category", "page", "media", "menu"})
+REFERENCE_KINDS = frozenset(
+    {"product", "category", "page", "media", "menu", "blogCategory"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +69,27 @@ class BlockDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class RootDefinition:
+    """The settings a kind of document carries at its root (a page's SEO
+    fields), declared by the catalogue's ``documentKinds``. It answers the
+    same questions as a :class:`BlockDefinition` for its ``settings``."""
+
+    schema: dict[str, Any]
+    translatable: tuple[str, ...]
+    rich_text: tuple[str, ...]
+    refs: dict[str, str]
+    validator: Validator = field(compare=False, repr=False)
+
+
+#: What a settings object is validated against: a block's or a document root's.
+Spec = BlockDefinition | RootDefinition
+
+
+@dataclass(frozen=True, slots=True)
 class Catalogue:
     hash: str
     blocks: tuple[BlockDefinition, ...]
+    roots: dict[str, RootDefinition] = field(default_factory=dict)
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -107,9 +127,7 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
     schema = raw["schema"]
     limits = raw.get("limits") or {}
     children = raw.get("children") or {}
-    refs = {str(k): str(v) for k, v in (raw.get("refs") or {}).items()}
-    if not set(refs.values()) <= REFERENCE_KINDS:
-        raise ValueError("unknown reference kind")
+    refs = _parse_refs(raw.get("refs"))
     return BlockDefinition(
         type=str(raw["type"]),
         version=int(raw["version"]),
@@ -135,12 +153,37 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
     )
 
 
+def _parse_refs(raw: Any) -> dict[str, str]:
+    refs = {str(k): str(v) for k, v in (raw or {}).items()}
+    if not set(refs.values()) <= REFERENCE_KINDS:
+        raise ValueError("unknown reference kind")
+    return refs
+
+
+def _parse_root(raw: dict[str, Any]) -> RootDefinition:
+    schema = raw["schema"]
+    return RootDefinition(
+        schema=schema,
+        translatable=tuple(str(p) for p in raw.get("translatable") or ()),
+        rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
+        refs=_parse_refs(raw.get("refs")),
+        validator=Draft202012Validator(
+            schema, format_checker=Draft202012Validator.FORMAT_CHECKER
+        ),
+    )
+
+
 def parse_catalogue(payload: Any) -> Catalogue:
     try:
         blocks = tuple(_parse_block(raw) for raw in payload["blocks"])
+        roots = {
+            str(kind): _parse_root(raw)
+            for kind, raw in (payload.get("documentKinds") or {}).items()
+        }
         return Catalogue(
             hash=str(payload["hash"]),
             blocks=blocks,
+            roots=roots,
             _index={block.type: block for block in blocks},
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

@@ -38,10 +38,11 @@ _MAX_NAME = 64  # a page slug or a menu slot, as ``BuilderReference.target``
 
 def accepts_value(kind: str, value: Any) -> bool:
     """Whether ``value`` has the shape of a ``kind`` reference: a numeric
-    id for products, categories and media; a non-empty name otherwise."""
+    id for products, categories, blog categories and media; a non-empty name otherwise."""
     if kind in {
         ReferenceKind.PRODUCT,
         ReferenceKind.CATEGORY,
+        ReferenceKind.BLOG_CATEGORY,
         ReferenceKind.MEDIA,
     }:
         return (
@@ -70,6 +71,17 @@ def _existing_categories(targets: set[str]) -> set[str]:
         str(pk)
         for pk in ProductCategory.objects.filter(
             pk__in=[int(t) for t in targets], active=True
+        ).values_list("pk", flat=True)
+    }
+
+
+def _existing_blog_categories(targets: set[str]) -> set[str]:
+    from blog.models.category import BlogCategory
+
+    return {
+        str(pk)
+        for pk in BlogCategory.objects.filter(
+            pk__in=[int(t) for t in targets]
         ).values_list("pk", flat=True)
     }
 
@@ -116,6 +128,7 @@ def _existing_media(targets: set[str]) -> set[str]:
 _EXISTS: dict[str, Callable[[set[str]], set[str]]] = {
     ReferenceKind.PRODUCT: _existing_products,
     ReferenceKind.CATEGORY: _existing_categories,
+    ReferenceKind.BLOG_CATEGORY: _existing_blog_categories,
     ReferenceKind.PAGE: _existing_pages,
     ReferenceKind.MENU: _existing_menus,
     ReferenceKind.MEDIA: _existing_media,

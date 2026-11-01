@@ -13,9 +13,22 @@ import pytest
 
 from builder.storefront import parse_catalogue
 from builder.validation import validate_document
-from tests.utils.builder import HASH, default_blocks, document, hero, section
+from tests.utils.builder import (
+    HASH,
+    default_blocks,
+    default_document_kinds,
+    document,
+    hero,
+    section,
+)
 
-CATALOGUE = parse_catalogue({"hash": HASH, "blocks": default_blocks()})
+CATALOGUE = parse_catalogue(
+    {
+        "hash": HASH,
+        "blocks": default_blocks(),
+        "documentKinds": default_document_kinds(),
+    }
+)
 
 
 def run(
@@ -460,3 +473,120 @@ def test_an_older_version_is_outdated_even_when_accepts_names_only_the_current()
     )
 
     assert codes(issues) == {"/sections/a/type": "block_version_outdated"}
+
+
+class TestDocumentRootSettings:
+    def doc(self, **root):
+        return {**document(("a", hero())), "settings": root}
+
+    def test_a_page_may_carry_seo_fields_and_they_are_translatable(self):
+        issues, validated = run(
+            self.doc(seoTitle="Home", seoDescription="Welcome"),
+            i18n={"en": {"@document": {"/seoTitle": "Home page"}}},
+        )
+
+        assert issues == []
+        assert validated is not None
+        assert validated.data["settings"]["seoTitle"] == "Home"
+        assert validated.i18n["en"]["@document"] == {"/seoTitle": "Home page"}
+
+    def test_settings_are_optional(self):
+        assert run(document(("a", hero())))[0] == []
+
+    @pytest.mark.parametrize(
+        ("root", "path", "code"),
+        [
+            ({"seoTitle": "x" * 71}, "/settings/seoTitle", "invalid_settings"),
+            ({"other": 1}, "/settings", "invalid_settings"),
+            ("nope", "/settings", "invalid_document"),
+        ],
+    )
+    def test_they_are_held_to_the_catalogues_schema(self, root, path, code):
+        data = {**document(("a", hero())), "settings": root}
+
+        issues, _ = run(data)
+
+        assert codes(issues)[path] == code
+
+    def test_a_kind_the_catalogue_gives_no_root_gets_none(self):
+        issues, _ = run(
+            {
+                **document(("a", section("announcement@1", {"text": "x"}))),
+                "settings": {},
+            },
+            key="group:header",
+        )
+
+        assert codes(issues) == {"/settings": "document_settings_not_allowed"}
+
+    def test_an_overlay_needs_settings_to_translate(self):
+        issues, _ = run(
+            document(("a", hero())),
+            i18n={"en": {"@document": {"/seoTitle": "x"}}},
+        )
+
+        assert codes(issues) == {"/i18n/en/@document": "unknown_node"}
+
+    def test_an_overlay_value_is_checked_like_the_default(self):
+        issues, _ = run(
+            self.doc(seoTitle="Home"),
+            i18n={"en": {"@document": {"/seoTitle": "x" * 71}}},
+        )
+
+        assert codes(issues) == {
+            "/i18n/en/@document/seoTitle": "invalid_settings"
+        }
+
+    def test_an_untranslatable_root_setting_is_refused(self):
+        blocks = default_blocks()
+        kinds = default_document_kinds()
+        kinds["page"]["translatable"] = ["/seoTitle"]
+        catalogue = parse_catalogue(
+            {"hash": HASH, "blocks": blocks, "documentKinds": kinds}
+        )
+
+        issues, _ = validate_document(
+            key="page:about",
+            data={
+                **document(("a", section("banner@1", {"text": "x"}))),
+                "settings": {"seoKeywords": "k"},
+            },
+            i18n={"en": {"@document": {"/seoKeywords": "y"}}},
+            catalogue=catalogue,
+            feature_on=lambda name: True,
+        )
+
+        assert codes(issues) == {
+            "/i18n/en/@document/seoKeywords": "untranslatable_setting"
+        }
+
+
+class TestWholeValueTranslations:
+    def test_an_array_setting_is_replaced_whole_and_checked_as_a_whole(self):
+        base = document(("a", hero(bullets=["one", "two"])))
+
+        ok, validated = run(
+            base, i18n={"en": {"a": {"/bullets": ["uno", "dos", "tres"]}}}
+        )
+        too_long = run(
+            base, i18n={"en": {"a": {"/bullets": ["a", "b", "c", "d"]}}}
+        )[0]
+        item = run(base, i18n={"en": {"a": {"/bullets": ["x" * 21]}}})[0]
+
+        assert ok == []
+        assert validated is not None
+        assert validated.i18n["en"]["a"]["/bullets"] == ["uno", "dos", "tres"]
+        assert codes(too_long) == {"/i18n/en/a/bullets": "invalid_settings"}
+        assert codes(item) == {"/i18n/en/a/bullets": "invalid_settings"}
+
+
+def test_a_blog_category_is_a_numeric_reference():
+    issues, validated = run(document(("a", hero(blogCategoryId=4))))
+    bad, _ = run(document(("a", hero(blogCategoryId="4"))))
+
+    assert issues == []
+    assert validated is not None
+    assert validated.refs == {
+        "blogCategory": {"4": ["/sections/a/settings/blogCategoryId"]}
+    }
+    assert "/sections/a/settings/blogCategoryId" in codes(bad)

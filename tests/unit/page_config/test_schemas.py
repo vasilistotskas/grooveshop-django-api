@@ -219,60 +219,6 @@ def test_hero_banner_stats_errors_name_their_own_key():
         validate_section_props("hero_banner", {"stats": "48"})
 
 
-def test_page_hero_props():
-    """The top of every inner page."""
-    validate_section_props(
-        "page_hero",
-        {
-            "eyebrow": "Delta Sigma Energy Telecontrol",
-            "heading": "DeSET",
-            "standfirst": "Telemetry for renewable plants.",
-            "body": "In full compliance with HEDNO's specifications.",
-            "cta_text": "Request a quote",
-            "cta_link": "/contact",
-            "secondary_cta_text": "Compare the systems",
-            "secondary_cta_link": "/deset",
-            "stats": [{"value": "48", "label": "projects"}],
-            "callout": {
-                "tone": "warning",
-                "title": "Regulatory obligation",
-                "text": "Every plant above 400 kW must report.",
-                "note": "Law 5106/2024",
-            },
-            "facts": [
-                {"label": "Protocol", "value": "IEC 60870-5-104"},
-                {"label": "Threshold", "value": "> 400 kW"},
-            ],
-        },
-    )
-
-
-def test_page_hero_callout_tone_is_an_enum_not_a_colour():
-    """A merchant cannot author a hex into a page."""
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "page_hero",
-            {"callout": {"tone": "#ff0000", "title": "x"}},
-        )
-    with pytest.raises(ValidationError):
-        validate_section_props("page_hero", {"callout": {"text": "no title"}})
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "page_hero", {"callout": {"title": "x", "colour": "red"}}
-        )
-    with pytest.raises(ValidationError):
-        validate_section_props("page_hero", {"callout": [{"title": "x"}]})
-
-
-def test_page_hero_facts_are_bounded_and_named():
-    with pytest.raises(ValidationError, match="facts"):
-        validate_section_props("page_hero", {"facts": [{"label": "x"}]})
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "page_hero", {"facts": [{"label": "x", "value": "y"}] * 7}
-        )
-
-
 def test_partner_strip_props():
     validate_section_props(
         "partner_strip",
@@ -488,92 +434,8 @@ def test_faq_items_shape():
         validate_section_props("faq", {"multiple": "yes"})
 
 
-def test_project_register_props():
-    """A register: rows plus the taxonomy they are filtered by."""
-    validate_section_props(
-        "project_register",
-        {
-            "meta_label": "Ανάδοχος / Πελάτης",
-            "note": "Συνεχής υποστήριξη σε τρεις εγκαταστάσεις.",
-            "sectors": [
-                {"key": "viologikoi", "label": "Βιολογικοί"},
-                {"key": "energeia", "label": "Ενέργεια/ΑΠΕ"},
-            ],
-            "items": [
-                {
-                    "sector": "energeia",
-                    "title": "Επιτήρηση δεκατριών ανεμογεννητριών",
-                    "note": "Μελέτη, κατασκευή, προγραμματισμός.",
-                    "meta": "ENVICON A.T.E.E.",
-                },
-                {"title": "Έργο χωρίς τομέα"},
-            ],
-        },
-    )
-    with pytest.raises(ValidationError, match="sectors"):
-        validate_section_props("project_register", {"sectors": [{"key": "x"}]})
-    with pytest.raises(ValidationError, match="items"):
-        validate_section_props("project_register", {"items": [{"note": "x"}]})
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "project_register", {"items": [{"title": "x"}] * 201}
-        )
-
-
-def test_project_register_rejects_a_sector_nothing_declares():
-    """The one cross-prop rule: a row's sector is a KEY into ``sectors``.
-
-    The storefront resolves the pill colour from the sector's POSITION
-    in ``sectors``, so a key that is not there loses its colour with no
-    other symptom — invisible in the admin, and easy to typo by hand.
-    """
-    with pytest.raises(ValidationError, match="not declared in sectors"):
-        validate_section_props(
-            "project_register",
-            {
-                "sectors": [{"key": "energeia", "label": "Ενέργεια"}],
-                "items": [{"sector": "viologikoi", "title": "Έργο"}],
-            },
-        )
-    # A register with no taxonomy at all is a plain list, not an error.
-    validate_section_props(
-        "project_register",
-        {"items": [{"sector": "energeia", "title": "Έργο"}]},
-    )
-
-
-def test_vendor_cards_props():
-    """A card per manufacturer: what it is, and the parts that prove it."""
-    validate_section_props(
-        "vendor_cards",
-        {
-            "note": "Επιπλέον εργαζόμαστε σε πλατφόρμες Siemens και WAGO.",
-            "items": [
-                {
-                    "title": "ABB",
-                    "label": "Αυτοματισμός & ελεγκτές",
-                    "text": "Ελεγκτές και ρυθμιστές στροφών.",
-                    "tags": ["PM5072-2ETH", "Modbus TCP"],
-                },
-                {"title": "ODOT Automation"},
-            ],
-        },
-    )
-    with pytest.raises(ValidationError, match="items"):
-        validate_section_props("vendor_cards", {"items": [{"label": "x"}]})
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "vendor_cards",
-            {"items": [{"title": "ABB", "tags": ["x"] * 9}]},
-        )
-    with pytest.raises(ValidationError):
-        validate_section_props(
-            "vendor_cards", {"items": [{"title": "ABB", "logo": "abb.svg"}]}
-        )
-
-
 def test_contact_panel_props():
-    """The copy and the enquiry taxonomy — not the offices, not the labels."""
+    """The copy — not the offices, not the labels."""
     validate_section_props(
         "contact_panel",
         {
@@ -581,17 +443,13 @@ def test_contact_panel_props():
             "heading": "Πείτε μας τι πρέπει να λειτουργήσει.",
             "body": "Δύο γραφεία, Θεσσαλονίκη και Αττική.",
             "hint": "Όσο πιο συγκεκριμένη η περιγραφή, τόσο πιο ακριβής.",
-            "response_time": "Απάντηση εντός 2 εργάσιμων ημερών",
-            "subjects": [
-                {"label": "Προσφορά έργου"},
-                {"label": "Υποστήριξη"},
-            ],
         },
     )
-    with pytest.raises(ValidationError, match="subjects"):
-        validate_section_props(
-            "contact_panel", {"subjects": [{"name": "Προσφορά"}]}
-        )
+    # The enquiry taxonomy and the response time were retired with the
+    # one store that wrote them: a section cannot carry them any more.
+    for retired in ("response_time", "subjects"):
+        with pytest.raises(ValidationError, match="not allowed"):
+            validate_section_props("contact_panel", {retired: "x"})
     # The addresses come from STORE_OFFICES; a page cannot carry a
     # second copy of them.
     with pytest.raises(ValidationError, match="not allowed"):
@@ -621,58 +479,6 @@ def test_features_grid_can_be_framed_with_a_standfirst():
     )
     with pytest.raises(ValidationError):
         validate_section_props("features_grid", {"decor": "boxed"})
-
-
-def test_option_selector_layouts_and_bullets():
-    """Three ways to offer the options, and a list per option."""
-    for layout in ("cards", "strip", "rail"):
-        validate_section_props(
-            "option_selector",
-            {
-                "layout": layout,
-                "bullets_label": "Παραδοτέα",
-                "options": [
-                    {
-                        "name": "Μελέτη & σχεδιασμός",
-                        "label": "01",
-                        "title": "Μελέτη & σχεδιασμός",
-                        "rationale": "Κατασκευαστικά σχέδια και σχέδια ροής.",
-                        "bullets": ["Κατασκευαστικά σχέδια", "Κοστολογήσεις"],
-                    }
-                ],
-                "prompt": {
-                    "title": "Ενδιαφέρεστε για κάτι άλλο;",
-                    "text": "Ρωτήστε μας.",
-                    "cta_text": "Επικοινωνία",
-                    "cta_link": "/contact",
-                },
-            },
-        )
-    with pytest.raises(ValidationError):
-        validate_section_props("option_selector", {"layout": "grid"})
-    with pytest.raises(ValidationError, match="bullets"):
-        validate_section_props(
-            "option_selector",
-            {"options": [{"name": "x", "bullets": [""]}]},
-        )
-    with pytest.raises(ValidationError, match="bullets"):
-        validate_section_props(
-            "option_selector",
-            {"options": [{"name": "x", "bullets": ["y"] * 11}]},
-        )
-
-
-def test_option_selector_takes_a_whole_list_not_just_a_family():
-    """Eight options: a page whose subject IS the list needs them all."""
-    validate_section_props(
-        "option_selector",
-        {"options": [{"name": f"Φάση {i}"} for i in range(8)]},
-    )
-    with pytest.raises(ValidationError, match="options"):
-        validate_section_props(
-            "option_selector",
-            {"options": [{"name": f"Φάση {i}"} for i in range(9)]},
-        )
 
 
 def test_story_timeline_surface_is_an_enum():

@@ -110,14 +110,6 @@ class ComponentType(models.TextChoices):
     STATS_STRIP = "stats_strip", _("Stats Strip")
     PARTNER_STRIP = "partner_strip", _("Partner Strip")
     PULL_QUOTE = "pull_quote", _("Pull Quote")
-    REFERENCE_CARDS = "reference_cards", _("Reference Cards")
-    PAGE_HERO = "page_hero", _("Page Hero")
-    FEATURE_LISTS = "feature_lists", _("Feature Lists")
-    OPTION_SELECTOR = "option_selector", _("Option Selector")
-    COMPARISON_TABLE = "comparison_table", _("Comparison Table")
-    FLOW_STEPS = "flow_steps", _("Flow Steps")
-    PROJECT_REGISTER = "project_register", _("Project Register")
-    VENDOR_CARDS = "vendor_cards", _("Vendor Cards")
     CONTACT_PANEL = "contact_panel", _("Contact Panel")
 
 

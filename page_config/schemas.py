@@ -2,9 +2,8 @@
 
 Section ``props`` and ``i18n`` validate against the JSON Schemas in
 ``page_config.section_schemas``, the canonical contract the storefront's
-render-time parser is generated from. The two rules that span props stay
-here as Python: a register's rows name declared sectors, and a
-comparison table's rows are equally wide.
+render-time parser is generated from. The one rule that spans props stays
+here as Python: a carousel slide's product exists.
 
 The navigation checks validate the item shapes the seed commands build
 the relational menus from.
@@ -40,45 +39,6 @@ def _schema_errors(schema: dict, value: object) -> list[str]:
             key=lambda error: [str(part) for part in error.absolute_path],
         )
     ]
-
-
-def _cross_check_project_register(props: dict) -> list[str]:
-    """Every row's sector must be one of the declared sectors.
-
-    The storefront resolves a row's pill colour by the sector's POSITION
-    in ``sectors``, so a key that is not there loses its colour
-    silently — cheap to get wrong by hand in the admin, invisible after.
-    """
-    declared = {sector["key"] for sector in props.get("sectors") or []}
-    if not declared:
-        return []
-    unknown = sorted(
-        {
-            item["sector"]
-            for item in props.get("items") or []
-            # ``sector`` is optional: only a stated sector can be wrong.
-            if item.get("sector") and item["sector"] not in declared
-        }
-    )
-    if not unknown:
-        return []
-    return [f"items: sector(s) not declared in sectors: {unknown}"]
-
-
-def _cross_check_comparison_rows(props: dict) -> list[str]:
-    """Every row spans the same columns. A ragged row is refused rather
-    than padded: a table whose rows disagree about the column count
-    prints a value under the wrong heading."""
-    widths = [len(row["values"]) for row in props.get("rows") or []]
-    for index, width in enumerate(widths[1:], start=1):
-        if width != widths[0]:
-            return [
-                (
-                    f"rows[{index}].values: {width} values where the first "
-                    f"row has {widths[0]} - every row spans the same columns"
-                )
-            ]
-    return []
 
 
 def _cross_check_hero_products(props: dict) -> list[str]:
@@ -117,8 +77,6 @@ def _cross_check_hero_products(props: dict) -> list[str]:
 # Run only once the props fit their schema: a cross-prop rule cannot
 # say anything useful about a prop whose SHAPE is already wrong.
 _CROSS_CHECKS: dict[str, Callable[[dict], list[str]]] = {
-    "project_register": _cross_check_project_register,
-    "comparison_table": _cross_check_comparison_rows,
     "hero_carousel": _cross_check_hero_products,
 }
 

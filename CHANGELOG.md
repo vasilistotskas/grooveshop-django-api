@@ -3,6 +3,37 @@
 
 
 
+## v3.179.0 (2026-11-01)
+
+### Features
+
+* feat(emails): log every send, skip and failure in EmailLog (#400)
+
+One EmailLog row per recipient delivery (sent, skipped, failed) with a keyed hash and masked recipient, EmailEvent and EmailSuppression tables, a retention sweep on EMAIL_LOG_RETENTION_DAYS, and a delivery identity that survives Celery retries so a retried task reuses its row instead of mailing again.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`57945a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/57945a4411f686c88ab690efcb4e6d57b27350ac))
+
+### Refactoring
+
+* refactor(emails): give the sender and the store's operator list their home in emails (#399)
+
+tenant_from_email, tenant_reply_to and tenant_operator_addresses only
+serve the email pipeline. They now live where the pipeline reads them:
+emails.sender.from_address, emails.sender.store_reply_to and
+emails.recipients.store_operator_addresses. Every caller moves with them
+(the BoxNow partner notification address, the pipeline, the tests that
+patch the operator list); tenant.credentials keeps no alias. Its
+in_tenant_schema helper, which the sender needs, loses its underscore.
+
+docs/emails.md names the new homes and drops the "Not built yet" line
+about the storefront preferences UI, which shipped.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d16d0ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d16d0ae521aea3c28bcf876f5a8660607fc06c9a))
+
 ## v3.178.0 (2026-11-01)
 
 ### Bug fixes

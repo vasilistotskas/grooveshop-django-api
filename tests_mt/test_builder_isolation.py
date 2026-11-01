@@ -122,3 +122,28 @@ def test_the_release_lock_is_taken_per_schema(mt_tenant, mt_tenant_b):
     assert mt_tenant.schema_name in seen[0]
     assert mt_tenant_b.schema_name in seen[1]
     assert seen[0] != seen[1]
+
+
+@pytest.mark.django_db
+def test_an_upload_lands_in_its_stores_media_directory(mt_tenant, mt_tenant_b):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from builder import media_services
+
+    def png() -> SimpleUploadedFile:
+        buffer = io.BytesIO()
+        Image.new("RGB", (4, 4)).save(buffer, format="PNG")
+        return SimpleUploadedFile("a.png", buffer.getvalue(), "image/png")
+
+    paths = []
+    for tenant in (mt_tenant, mt_tenant_b):
+        with schema_context(tenant.schema_name):
+            asset = media_services.create_asset(_Staff(), upload=png())
+            paths.append((tenant.schema_name, asset.file.path, asset.file.url))
+
+    for schema, path, url in paths:
+        assert f"{schema}" in path.replace("\\", "/").split("/")
+        assert f"/{schema}/uploads/builder/" in url

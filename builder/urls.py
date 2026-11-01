@@ -1,6 +1,6 @@
 from django.urls import path
 
-from builder import views
+from builder import media_api, views
 
 app_name = "builder"
 
@@ -44,6 +44,21 @@ urlpatterns = [
         "builder/documents/<str:key>/versions/<int:number>/restore",
         views.RestoreView.as_view(),
         name="version-restore",
+    ),
+    path(
+        "builder/media",
+        media_api.AssetListView.as_view(),
+        name="media-list",
+    ),
+    path(
+        "builder/media/resolve",
+        media_api.ResolvedMediaView.as_view(),
+        name="media-resolve",
+    ),
+    path(
+        "builder/media/<int:pk>",
+        media_api.AssetDetailView.as_view(),
+        name="media-detail",
     ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),

@@ -324,6 +324,10 @@ msgid "%(likes)d likes, %(replies)d replies"
 msgstr "%(likes)d επισημάνσεις, %(replies)d απαντήσεις"
 
 #, python-format
+msgid "%(locale)s is not a language of this store."
+msgstr "Η γλώσσα %(locale)s δεν είναι γλώσσα αυτού του καταστήματος."
+
+#, python-format
 msgid "%(locale)s is not a language that can be translated."
 msgstr "Η γλώσσα %(locale)s δεν μπορεί να μεταφραστεί."
 
@@ -593,6 +597,12 @@ msgstr "(χωρίς email)"
 msgid "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 msgstr "0 για μεμονωμένες καταχωρήσεις ή για τον πρώτο πληθυντικό τύπο· 1, 2, ... για τους επόμενους πληθυντικούς τύπους που ορίζονται από τον κανόνα πληθυντικού της γλώσσας."
 
+msgid "0 is the left edge, 1 the right."
+msgstr "Το 0 είναι η αριστερή άκρη, το 1 η δεξιά."
+
+msgid "0 is the top edge, 1 the bottom."
+msgstr "Το 0 είναι η πάνω άκρη, το 1 η κάτω."
+
 msgid "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
 msgstr "10ψήφιο voucher ACS (Voucher_No από το ACS_Create_Voucher)."
 
@@ -662,6 +672,9 @@ msgstr "Ένα domain έχει το πολύ %(max)d χαρακτήρες."
 
 msgid "A domain needs at least two labels, such as shop.example.com."
 msgstr "Ένα domain χρειάζεται τουλάχιστον δύο τμήματα, όπως shop.example.com."
+
+msgid "A focal point is between 0 and 1."
+msgstr "Το σημείο εστίασης είναι μεταξύ 0 και 1."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."
@@ -1392,6 +1405,15 @@ msgstr "Ειδοποίηση «ήδη εγγεγραμμένος» στάλθη�
 msgid "Alt Text"
 msgstr "Εναλλακτικό κείμενο"
 
+msgid "Alt text"
+msgstr "Εναλλακτικό κείμενο"
+
+msgid "Alt text is an object of language to text."
+msgstr "Το εναλλακτικό κείμενο είναι αντικείμενο με γλώσσα και κείμενο."
+
+msgid "Alt text is at most 255 characters."
+msgstr "Το εναλλακτικό κείμενο έχει το πολύ 255 χαρακτήρες."
+
 msgid "Always positive; the kind says which way it moved."
 msgstr "Πάντα θετικό· το είδος δείχνει προς ποια κατεύθυνση κινήθηκε."
 
@@ -1527,6 +1549,9 @@ msgstr "Ενότητα"
 
 msgid "Arrival notified at"
 msgstr "Ειδοποίηση άφιξης στις"
+
+msgid "As a browser shows it, in px."
+msgstr "Όπως το εμφανίζει ο φυλλομετρητής, σε px."
 
 msgid "Ask for a new link"
 msgstr "Ζητήστε νέο σύνδεσμο"
@@ -5984,6 +6009,12 @@ msgstr "Βήματα ροής"
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
 
+msgid "Focal point X"
+msgstr "Σημείο εστίασης X"
+
+msgid "Focal point Y"
+msgstr "Σημείο εστίασης Y"
+
 msgid "Follow up"
 msgstr "Παρακολούθηση"
 
@@ -8130,6 +8161,12 @@ msgstr "Πολυμέσα & Συγχρονισμός"
 msgid "Media + Text"
 msgstr "Πολυμέσα + κείμενο"
 
+msgid "Media asset"
+msgstr "Αρχείο πολυμέσων"
+
+msgid "Media assets"
+msgstr "Αρχεία πολυμέσων"
+
 msgid "Medium"
 msgstr "Μέτριο"
 
@@ -8365,6 +8402,10 @@ msgstr "N/A"
 
 msgid "Name"
 msgstr "Όνομα"
+
+#, python-format
+msgid "Name between 1 and %(limit)s asset ids."
+msgstr "Δώσε από 1 έως %(limit)s αναγνωριστικά αρχείων."
 
 #, python-format
 msgid "Name length: %(name_len)d chars — Code length: %(code_len)d chars — Has name: %(has_name)s — Sort position: %(sort)s"
@@ -9043,6 +9084,10 @@ msgstr "Απεγγραφή με ένα κλικ"
 
 msgid "Online payment methods must have a provider code."
 msgstr "Οι online μέθοδοι πληρωμής πρέπει να έχουν κωδικό παρόχου."
+
+#, python-format
+msgid "Only %(formats)s images can be uploaded."
+msgstr "Μπορούν να ανεβαίνουν μόνο εικόνες %(formats)s."
 
 msgid "Only YouTube and Vimeo videos can be embedded."
 msgstr "Μπορείτε να ενσωματώσετε μόνο βίντεο από YouTube και Vimeo."
@@ -13784,8 +13829,15 @@ msgid "The file is empty."
 msgstr "Το αρχείο είναι κενό."
 
 #, python-format
+msgid "The file is larger than %(limit)s MB."
+msgstr "Το αρχείο είναι μεγαλύτερο από %(limit)s MB."
+
+#, python-format
 msgid "The file is larger than the %(mb)s MB limit."
 msgstr "Το αρχείο υπερβαίνει το όριο των %(mb)s MB."
+
+msgid "The file is not a valid image."
+msgstr "Το αρχείο δεν είναι έγκυρη εικόνα."
 
 #, python-format
 msgid "The following %(counter)s product has reached its low-stock threshold:"
@@ -13813,6 +13865,10 @@ msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρω�
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "Το αναγνωριστικό που επέστρεψε ο πάροχος. Κενό μέσω SMTP, που δεν επιστρέφει κάποιο."
+
+#, python-format
+msgid "The image has more than %(limit)s megapixels."
+msgstr "Η εικόνα έχει περισσότερα από %(limit)s megapixels."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "Το τιμολόγιο ή η απόδειξη (PDF ή εικόνα). Παραμένει ιδιωτικό."
@@ -14225,8 +14281,14 @@ msgstr "Αυτός ο τύπος email δεν υπάρχει."
 msgid "This field is required"
 msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
 
+msgid "This file cannot be used."
+msgstr "Αυτό το αρχείο δεν μπορεί να χρησιμοποιηθεί."
+
 msgid "This id is used twice."
 msgstr "Αυτό το αναγνωριστικό χρησιμοποιείται δύο φορές."
+
+msgid "This image is used by a published page."
+msgstr "Αυτή η εικόνα χρησιμοποιείται σε δημοσιευμένη σελίδα."
 
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "Αυτός είναι ένας μοναδικός σύνδεσμος λήψης. Αποθηκεύστε το αρχείο κάπου ασφαλές — δεν διατηρούμε αντίγραφο μετά τη λήξη του συνδέσμου."
@@ -14989,6 +15051,9 @@ msgstr "Ανεβάστε μια έγκυρη εικόνα. Το αρχείο π�
 
 msgid "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 msgstr "Ανέβασμα ενός αρχείου για επισύναψη σε μήνυμα επικοινωνίας. Επιστρέφει το id που πρέπει να σταλεί στο attachmentIds του μηνύματος. Διαθέσιμο μόνο όσο το κατάστημα δέχεται συνημμένα."
+
+msgid "Uploaded by (staff)"
+msgstr "Ανέβηκε από (προσωπικό)"
 
 msgid "Urgent"
 msgstr "Επείγον"

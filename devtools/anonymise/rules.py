@@ -492,6 +492,8 @@ NOT_PERSONAL: dict[str, str] = {
         "builder.BuilderVersion",
         "builder.BuilderRelease",
         "builder.BuilderReference",
+        "builder.MediaAsset",
+        "builder.MediaAssetTranslation",
         "page_config.ContentPageTranslation",
         "page_config.LegalDocumentVersion",
         "page_config.NavigationColumn",

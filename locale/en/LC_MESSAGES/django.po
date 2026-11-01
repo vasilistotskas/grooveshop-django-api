@@ -319,6 +319,10 @@ msgid "%(likes)d likes, %(replies)d replies"
 msgstr "%(likes)d likes, %(replies)d replies"
 
 #, python-format
+msgid "%(locale)s is not a language of this store."
+msgstr "%(locale)s is not a language of this store."
+
+#, python-format
 msgid "%(locale)s is not a language that can be translated."
 msgstr "%(locale)s is not a language that can be translated."
 
@@ -588,6 +592,12 @@ msgstr "(no email)"
 msgid "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 msgstr "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 
+msgid "0 is the left edge, 1 the right."
+msgstr "0 is the left edge, 1 the right."
+
+msgid "0 is the top edge, 1 the bottom."
+msgstr "0 is the top edge, 1 the bottom."
+
 msgid "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
 msgstr "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
 
@@ -657,6 +667,9 @@ msgstr "A domain is at most %(max)d characters long."
 
 msgid "A domain needs at least two labels, such as shop.example.com."
 msgstr "A domain needs at least two labels, such as shop.example.com."
+
+msgid "A focal point is between 0 and 1."
+msgstr "A focal point is between 0 and 1."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
@@ -1387,6 +1400,15 @@ msgstr "Already-Subscribed Notice Sent At"
 msgid "Alt Text"
 msgstr "Alt Text"
 
+msgid "Alt text"
+msgstr "Alt text"
+
+msgid "Alt text is an object of language to text."
+msgstr "Alt text is an object of language to text."
+
+msgid "Alt text is at most 255 characters."
+msgstr "Alt text is at most 255 characters."
+
 msgid "Always positive; the kind says which way it moved."
 msgstr "Always positive; the kind says which way it moved."
 
@@ -1522,6 +1544,9 @@ msgstr "Area"
 
 msgid "Arrival notified at"
 msgstr "Arrival notified at"
+
+msgid "As a browser shows it, in px."
+msgstr "As a browser shows it, in px."
 
 msgid "Ask for a new link"
 msgstr "Ask for a new link"
@@ -5978,6 +6003,12 @@ msgstr "Flow Steps"
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
 
+msgid "Focal point X"
+msgstr "Focal point X"
+
+msgid "Focal point Y"
+msgstr "Focal point Y"
+
 msgid "Follow up"
 msgstr "Follow up"
 
@@ -8120,6 +8151,12 @@ msgstr "Media & Sync"
 msgid "Media + Text"
 msgstr "Media + Text"
 
+msgid "Media asset"
+msgstr "Media asset"
+
+msgid "Media assets"
+msgstr "Media assets"
+
 msgid "Medium"
 msgstr "Medium"
 
@@ -8355,6 +8392,10 @@ msgstr "N/A"
 
 msgid "Name"
 msgstr "Name"
+
+#, python-format
+msgid "Name between 1 and %(limit)s asset ids."
+msgstr "Name between 1 and %(limit)s asset ids."
 
 #, python-format
 msgid "Name length: %(name_len)d chars — Code length: %(code_len)d chars — Has name: %(has_name)s — Sort position: %(sort)s"
@@ -9034,6 +9075,10 @@ msgstr "One-click unsubscribe"
 
 msgid "Online payment methods must have a provider code."
 msgstr "Online payment methods must have a provider code."
+
+#, python-format
+msgid "Only %(formats)s images can be uploaded."
+msgstr "Only %(formats)s images can be uploaded."
 
 msgid "Only YouTube and Vimeo videos can be embedded."
 msgstr "Only YouTube and Vimeo videos can be embedded."
@@ -13779,8 +13824,15 @@ msgid "The file is empty."
 msgstr "The file is empty."
 
 #, python-format
+msgid "The file is larger than %(limit)s MB."
+msgstr "The file is larger than %(limit)s MB."
+
+#, python-format
 msgid "The file is larger than the %(mb)s MB limit."
 msgstr "The file is larger than the %(mb)s MB limit."
+
+msgid "The file is not a valid image."
+msgstr "The file is not a valid image."
 
 #, python-format
 msgid "The following %(counter)s product has reached its low-stock threshold:"
@@ -13808,6 +13860,10 @@ msgstr "The gross unit price a consumer paid: price plus VAT, minus the product 
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
+
+#, python-format
+msgid "The image has more than %(limit)s megapixels."
+msgstr "The image has more than %(limit)s megapixels."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."
@@ -14220,8 +14276,14 @@ msgstr "This email type does not exist."
 msgid "This field is required"
 msgstr "This field is required"
 
+msgid "This file cannot be used."
+msgstr "This file cannot be used."
+
 msgid "This id is used twice."
 msgstr "This id is used twice."
+
+msgid "This image is used by a published page."
+msgstr "This image is used by a published page."
 
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
@@ -14984,6 +15046,9 @@ msgstr "Upload a valid image. The file you uploaded was either not an image or a
 
 msgid "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 msgstr "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
+
+msgid "Uploaded by (staff)"
+msgstr "Uploaded by (staff)"
 
 msgid "Urgent"
 msgstr "Urgent"

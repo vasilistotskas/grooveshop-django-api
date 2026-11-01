@@ -940,6 +940,19 @@ BUILDER_MAX_PAGES = int(getenv("BUILDER_MAX_PAGES", "100"))
 BUILDER_UNRELEASED_CHECKPOINTS_KEPT = int(
     getenv("BUILDER_UNRELEASED_CHECKPOINTS_KEPT", "20")
 )
+# The media library: what an upload may be. Raster formats only (an SVG can
+# carry script, and has no size to reserve); names are Pillow's.
+BUILDER_MEDIA_FORMATS = ("JPEG", "PNG", "WEBP", "GIF", "AVIF")
+BUILDER_MEDIA_MAX_BYTES = int(
+    getenv("BUILDER_MEDIA_MAX_BYTES", str(10 * 1024 * 1024))
+)
+BUILDER_MEDIA_MAX_PIXELS = int(
+    getenv("BUILDER_MEDIA_MAX_PIXELS", str(40_000_000))
+)
+# Most assets one ``builder/media/resolve`` call answers for.
+BUILDER_MEDIA_RESOLVE_MAX_IDS = int(
+    getenv("BUILDER_MEDIA_RESOLVE_MAX_IDS", "100")
+)
 # How long a resolved published page is kept. The key names the release,
 # so a new release reads a new key and nothing is ever purged.
 BUILDER_PUBLISHED_CACHE_SECONDS = int(

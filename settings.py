@@ -3114,11 +3114,6 @@ RESEND_API_KEY = getenv("RESEND_API_KEY", "")
 # the platform host (``emails.webhooks``). A store with its own team keeps
 # its secret on its Tenant row. Empty: the platform host answers 503.
 RESEND_WEBHOOK_SECRET = getenv("RESEND_WEBHOOK_SECRET", "")
-# How old (or far ahead) a delivery's timestamp may be before it is refused
-# as a replay; Svix's own default.
-RESEND_WEBHOOK_TOLERANCE_SECONDS = int(
-    getenv("RESEND_WEBHOOK_TOLERANCE_SECONDS", "300")
-)
 RESEND_WEBHOOK_MAX_BODY_BYTES = int(
     getenv("RESEND_WEBHOOK_MAX_BODY_BYTES", str(256 * 1024))
 )

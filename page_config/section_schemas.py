@@ -134,18 +134,6 @@ PROMPT = obj(
     required=("title",),
 )
 
-# A boxed aside beside a page hero. ``tone`` is an enum, not a colour:
-# the storefront decides what "warning" looks like from its own tokens.
-CALLOUT = obj(
-    {
-        "tone": choice("info", "warning", "success"),
-        "title": required_text(100),
-        "text": text(400),
-        "note": text(160),
-    },
-    required=("title",),
-)
-
 # A carousel of full editorial slides. Each owns its copy and its
 # destination; when ``slides`` is present the flat props are ignored. No
 # ``theme``: the copy sits on the accent panel beside the artwork.
@@ -222,57 +210,6 @@ BADGES = array(
     },
     12,
 )
-
-# The options an ``option_selector`` switches between: eight, because a
-# page whose SUBJECT is a list puts every one in the rail.
-OPTIONS = array(
-    obj(
-        {
-            "name": required_text(60),
-            "label": text(40),
-            "model": text(120),
-            "title": text(120),
-            "rationale": text(600),
-            "note": text(400),
-            "cta_text": text(100),
-            "cta_link": LINK,
-            "bullets": lines(10, 200),
-            "rows": entries(12, {"label": 60, "value": 120}),
-        },
-        required=("name",),
-    ),
-    8,
-)
-
-# ``label`` plus one value per column; equal widths are checked in
-# Python (a ragged row prints a value under the wrong heading).
-MATRIX_ROWS = array(
-    obj(
-        {
-            "label": required_text(60),
-            "values": array(text(120), 4, min_items=1),
-        },
-        required=("label", "values"),
-    ),
-    24,
-)
-
-
-def nested_lines(
-    max_items: int,
-    required: dict[str, int],
-    optional: dict[str, Schema],
-    lines_key: str,
-    max_lines: int,
-    line_length: int,
-) -> Schema:
-    """Entries that each carry their own list of lines — a card with
-    bullet points, a step with its protocols."""
-    return entries(
-        max_items,
-        required,
-        {**optional, lines_key: lines(max_lines, line_length)},
-    )
 
 
 def product_rail(max_page_size: int) -> dict[str, Schema]:
@@ -417,97 +354,6 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
         "label": text(80),
         "items": entries(12, {"name": 60}, {"href": LINK}),
     },
-    # The top of an inner page: the same band opens a product page, a
-    # register and a contact page.
-    "page_hero": {
-        "eyebrow": text(100),
-        "heading": text(200),
-        "standfirst": text(300),
-        "body": text(1000),
-        "cta_text": text(100),
-        "cta_link": LINK,
-        "secondary_cta_text": text(100),
-        "secondary_cta_link": LINK,
-        "stats": STATS,
-        "callout": CALLOUT,
-        "facts": entries(6, {"label": 40, "value": 60}),
-    },
-    # Two or three cards, each an icon, a title and a checklist, with
-    # one shared footnote under them.
-    "feature_lists": {
-        "heading": text(200),
-        "note": text(1000),
-        "emphasis": text(120),
-        "items": nested_lines(
-            4, {"title": 100}, {"icon": icon(100)}, "bullets", 8, 300
-        ),
-    },
-    # Pick one of a few options and see it in detail.
-    "option_selector": {
-        "heading": text(200),
-        "standfirst": text(400),
-        "rows_label": text(60),
-        "rationale_label": text(60),
-        "bullets_label": text(60),
-        # cards: variants of one product as boxed tabs; strip: a
-        # numbered SEQUENCE as underlined tabs; rail: a list that IS the
-        # page's subject, beside the panel.
-        "layout": choice("cards", "strip", "rail"),
-        "prompt": PROMPT,
-        "options": OPTIONS,
-    },
-    "comparison_table": {
-        "heading": text(200),
-        "row_label": text(60),
-        "note": text(600),
-        "columns": array(required_text(60), 4, min_items=1),
-        "rows": MATRIX_ROWS,
-    },
-    "flow_steps": {
-        "heading": text(200),
-        "body": text(600),
-        "items": nested_lines(
-            4, {"title": 100}, {"label": text(60)}, "lines", 8, 120
-        ),
-    },
-    # A curated few of something a longer page lists in full; the
-    # attribution LABEL is shared by the band, its value is per card.
-    "reference_cards": {
-        "heading": text(200),
-        "meta_label": text(40),
-        "cta_text": text(100),
-        "cta_link": LINK,
-        "items": entries(
-            6,
-            {"title": 160},
-            {"label": text(60), "text": text(300), "meta": text(80)},
-        ),
-    },
-    # One numbered row per installation, filterable by sector. 200 rows
-    # because a register GROWS and the storefront prints all of them.
-    "project_register": {
-        "meta_label": text(60),
-        "note": text(400),
-        "sectors": entries(12, {"key": 40, "label": 40}),
-        "items": entries(
-            200,
-            {"title": 200},
-            {"sector": text(40), "note": text(200), "meta": text(120)},
-        ),
-    },
-    # One card per manufacturer or platform; the tags are CHIPS — a part
-    # number, a bus, a band.
-    "vendor_cards": {
-        "note": text(400),
-        "items": nested_lines(
-            8,
-            {"title": 60},
-            {"label": text(60), "text": text(600)},
-            "tags",
-            8,
-            40,
-        ),
-    },
     # The contact page as one band. The offices come from the
     # STORE_OFFICES setting and the form labels are UI, so neither is here.
     "contact_panel": {
@@ -515,8 +361,6 @@ SECTION_PROPS: dict[str, dict[str, Schema]] = {
         "heading": text(200),
         "body": text(600),
         "hint": text(400),
-        "response_time": text(120),
-        "subjects": entries(6, {"label": 40}),
     },
     # A stated principle with the reason under it — not a testimonial.
     "pull_quote": {

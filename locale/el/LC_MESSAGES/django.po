@@ -3113,9 +3113,6 @@ msgstr "ΔΟΥ εταιρείας"
 msgid "Compare with"
 msgstr "Σύγκριση με"
 
-msgid "Comparison Table"
-msgstr "Πίνακας σύγκρισης"
-
 msgid "Compartment Size"
 msgstr "Μέγεθος θυρίδας"
 
@@ -4802,9 +4799,6 @@ msgstr "Συμπληρώθηκε το όριο αγαπημένων"
 msgid "Feature Image"
 msgstr "Χαρακτηριστική εικόνα"
 
-msgid "Feature Lists"
-msgstr "Λίστες χαρακτηριστικών"
-
 msgid "Featured"
 msgstr "Προτεινόμενο"
 
@@ -6054,9 +6048,6 @@ msgstr "Όροφος"
 
 msgid "Floor, as a FloorChoicesEnum member (e.g. FIRST_FLOOR)"
 msgstr "Όροφος, ως μέλος του FloorChoicesEnum (π.χ. FIRST_FLOOR)"
-
-msgid "Flow Steps"
-msgstr "Βήματα ροής"
 
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
@@ -9235,9 +9226,6 @@ msgstr "Χειριστής που συμφώνησε την απόδοση. Αν
 msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Χειριστής που κατέγραψε τον διακανονισμό. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
-msgid "Option Selector"
-msgstr "Επιλογέας επιλογών"
-
 msgid "Optional ISO 3166-1 alpha-2 filter applied against each provider's ``metadata['supported_countries']`` list."
 msgstr "Προαιρετικό φίλτρο ISO 3166-1 alpha-2 που εφαρμόζεται στη λίστα ``metadata['supported_countries']`` κάθε παρόχου."
 
@@ -9717,9 +9705,6 @@ msgstr "Σελίδα %(number)s από %(total)s"
 
 msgid "Page Configuration"
 msgstr "Διαμόρφωση σελίδων"
-
-msgid "Page Hero"
-msgstr "Κεντρική ενότητα σελίδας"
 
 msgid "Page Layout"
 msgstr "Διάταξη σελίδας"
@@ -10869,9 +10854,6 @@ msgstr "Κέρδος"
 msgid "Proforma Invoice"
 msgstr "Προτιμολόγιο"
 
-msgid "Project Register"
-msgstr "Μητρώο έργων"
-
 msgid "Promotion"
 msgstr "Προσφορά"
 
@@ -11363,9 +11345,6 @@ msgstr "Έναρξη μείωσης"
 
 msgid "Ref"
 msgstr "Αρ. αναφοράς"
-
-msgid "Reference Cards"
-msgstr "Κάρτες αναφοράς"
 
 msgid "Reference Order"
 msgstr "Σχετική παραγγελία"
@@ -15448,9 +15427,6 @@ msgstr "ΦΠΑ"
 msgid "Vats"
 msgstr "ΦΠΑ"
 
-msgid "Vendor Cards"
-msgstr "Κάρτες προμηθευτών"
-
 msgid "Verified purchase"
 msgstr "Επαληθευμένη αγορά"
 
@@ -17001,6 +16977,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά"
 
+#~ msgid "Comparison Table"
+#~ msgstr "Πίνακας σύγκρισης"
+
 #~ msgid "Complete Your Order"
 #~ msgstr "Ολοκληρώστε την Παραγγελία σας"
 
@@ -17097,6 +17076,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "False"
 #~ msgstr "Όχι"
 
+#~ msgid "Feature Lists"
+#~ msgstr "Λίστες χαρακτηριστικών"
+
 #~ msgid "Featured Articles"
 #~ msgstr "Προβεβλημένα Άρθρα"
 
@@ -17144,6 +17126,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Flag"
 #~ msgstr "Σημαία"
+
+#~ msgid "Flow Steps"
+#~ msgstr "Βήματα ροής"
 
 #~ msgid "Free Threshold Range"
 #~ msgstr "Εύρος ορίου δωρεάν"
@@ -17402,6 +17387,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Ο χειριστής που κατέγραψε την εκκαθάριση. Αποθηκεύει id χρήστη του σχήματος PLATFORM· δεν επιβάλλεται ως FK."
 
+#~ msgid "Option Selector"
+#~ msgstr "Επιλογέας επιλογών"
+
 #~ msgid "Optional ISO 3166-1 alpha-2 country code — drives the country-level shipping multiplier. Match what the order-create body will carry."
 #~ msgstr "Προαιρετικός κωδικός χώρας ISO 3166-1 alpha-2 — καθορίζει τον συντελεστή αποστολής σε επίπεδο χώρας. Πρέπει να ταιριάζει με αυτόν που θα φέρει το αίτημα δημιουργίας παραγγελίας."
 
@@ -17451,6 +17439,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Output file path (default: analytics_export.json)"
 #~ msgstr "Διαδρομή αρχείου εξόδου (προεπιλογή: analytics_export.json)"
+
+#~ msgid "Page Hero"
+#~ msgstr "Κεντρική ενότητα σελίδας"
 
 #~ msgid "Paid orders"
 #~ msgstr "Πληρωμένες παραγγελίες"
@@ -17534,6 +17525,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Product with id '{product_name}' is not available."
 #~ msgstr "Το προϊόν με id '{product_name}' δεν είναι διαθέσιμο."
 
+#~ msgid "Project Register"
+#~ msgstr "Μητρώο έργων"
+
 #~ msgid "Promotional campaigns"
 #~ msgstr "Προωθητικές καμπάνιες"
 
@@ -17572,6 +17566,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Recent Activity"
 #~ msgstr "Πρόσφατη δραστηριότητα"
+
+#~ msgid "Reference Cards"
+#~ msgstr "Κάρτες αναφοράς"
 
 #~ msgid "Refund Information"
 #~ msgstr "Πληροφορίες επιστροφής"
@@ -17845,6 +17842,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Validation error"
 #~ msgstr "Σφάλμα επαλήθευσης"
+
+#~ msgid "Vendor Cards"
+#~ msgstr "Κάρτες προμηθευτών"
 
 #~ msgid "Very High VAT (50%+)"
 #~ msgstr "Πολύ Υψηλός ΦΠΑ (50%+)"

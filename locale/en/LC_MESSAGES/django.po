@@ -3105,9 +3105,6 @@ msgstr "Company tax office (ΔΟΥ)"
 msgid "Compare with"
 msgstr "Compare with"
 
-msgid "Comparison Table"
-msgstr "Comparison Table"
-
 msgid "Compartment Size"
 msgstr "Compartment Size"
 
@@ -4796,9 +4793,6 @@ msgstr "Favourites limit reached"
 msgid "Feature Image"
 msgstr "Feature Image"
 
-msgid "Feature Lists"
-msgstr "Feature Lists"
-
 msgid "Featured"
 msgstr "Featured"
 
@@ -6048,9 +6042,6 @@ msgstr "Floor"
 
 msgid "Floor, as a FloorChoicesEnum member (e.g. FIRST_FLOOR)"
 msgstr "Floor, as a FloorChoicesEnum member (e.g. FIRST_FLOOR)"
-
-msgid "Flow Steps"
-msgstr "Flow Steps"
 
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
@@ -9226,9 +9217,6 @@ msgstr "Operator who reconciled the payout. Id of a platform staff account (publ
 msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
-msgid "Option Selector"
-msgstr "Option Selector"
-
 msgid "Optional ISO 3166-1 alpha-2 filter applied against each provider's ``metadata['supported_countries']`` list."
 msgstr "Optional ISO 3166-1 alpha-2 filter applied against each provider's ``metadata['supported_countries']`` list."
 
@@ -9707,9 +9695,6 @@ msgstr "Page %(number)s of %(total)s"
 
 msgid "Page Configuration"
 msgstr "Page Configuration"
-
-msgid "Page Hero"
-msgstr "Page Hero"
 
 msgid "Page Layout"
 msgstr "Page Layout"
@@ -10859,9 +10844,6 @@ msgstr "Profit"
 msgid "Proforma Invoice"
 msgstr "Proforma Invoice"
 
-msgid "Project Register"
-msgstr "Project Register"
-
 msgid "Promotion"
 msgstr "Promotion"
 
@@ -11353,9 +11335,6 @@ msgstr "Reduction Started At"
 
 msgid "Ref"
 msgstr "Ref"
-
-msgid "Reference Cards"
-msgstr "Reference Cards"
 
 msgid "Reference Order"
 msgstr "Reference Order"
@@ -15443,9 +15422,6 @@ msgstr "Vat"
 msgid "Vats"
 msgstr "Vats"
 
-msgid "Vendor Cards"
-msgstr "Vendor Cards"
-
 msgid "Verified purchase"
 msgstr "Verified purchase"
 
@@ -16821,6 +16797,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Comma-separated facet fields for counts and stats"
 
+#~ msgid "Comparison Table"
+#~ msgstr "Comparison Table"
+
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"
 
@@ -16848,11 +16827,17 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "False"
 #~ msgstr "False"
 
+#~ msgid "Feature Lists"
+#~ msgstr "Feature Lists"
+
 #~ msgid "Federated search across products and blog posts"
 #~ msgstr "Federated search across products and blog posts"
 
 #~ msgid "Filter by online payment methods"
 #~ msgstr "Filter by online payment methods"
+
+#~ msgid "Flow Steps"
+#~ msgstr "Flow Steps"
 
 #~ msgid "Fully Refunded"
 #~ msgstr "Fully Refunded"
@@ -16921,11 +16906,17 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 
+#~ msgid "Option Selector"
+#~ msgstr "Option Selector"
+
 #~ msgid "Order Lifecycle"
 #~ msgstr "Order Lifecycle"
 
 #~ msgid "Order Reminder"
 #~ msgstr "Order Reminder"
+
+#~ msgid "Page Hero"
+#~ msgstr "Page Hero"
 
 #~ msgid "Paid orders"
 #~ msgstr "Paid orders"
@@ -16943,6 +16934,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 
+#~ msgid "Project Register"
+#~ msgstr "Project Register"
+
 #~ msgid "RFC 8058 one-click unsubscribe from a topic"
 #~ msgstr "RFC 8058 one-click unsubscribe from a topic"
 
@@ -16958,6 +16952,9 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "Recorded in the last %(days)s days"
 #~ msgstr "Recorded in the last %(days)s days"
+
+#~ msgid "Reference Cards"
+#~ msgstr "Reference Cards"
 
 #~ msgid "Refund Information"
 #~ msgstr "Refund Information"
@@ -17073,6 +17070,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Validation error"
 #~ msgstr "Validation error"
+
+#~ msgid "Vendor Cards"
+#~ msgstr "Vendor Cards"
 
 #, python-format
 #~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."

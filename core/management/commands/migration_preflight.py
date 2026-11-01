@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from django.core.checks import Tags
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DEFAULT_DB_ALIAS, connection, router
 from django.db.migrations.executor import MigrationExecutor
@@ -90,7 +91,8 @@ class Command(BaseCommand):
         # The database-tagged system checks (``emails.checks``: a store that
         # would lose its mail on the selected transport) stop the deploy
         # here too, by the same exit status.
-        self.check(databases=[DEFAULT_DB_ALIAS])
+        # Only those: ``execute`` already ran the rest.
+        self.check(databases=[DEFAULT_DB_ALIAS], tags=[Tags.database])
         cache: dict = {}
         by_finding: dict[Finding, list[str]] = defaultdict(list)
         try:

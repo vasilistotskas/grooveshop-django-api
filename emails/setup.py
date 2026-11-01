@@ -25,7 +25,9 @@ def has_own_sender(tenant: Tenant) -> bool:
     """Whether *tenant* sends as its own verified domain (``from_email``
     set and ``from_email_verified``): the fact ``sender.own_sender`` and the
     Resend key choice both rest on."""
-    return bool(tenant.from_email.strip()) and tenant.from_email_verified
+    return bool((getattr(tenant, "from_email", "") or "").strip()) and bool(
+        getattr(tenant, "from_email_verified", False)
+    )
 
 
 def lacks_resend_key(tenant: Tenant) -> bool:

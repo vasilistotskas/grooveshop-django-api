@@ -3,6 +3,132 @@
 
 
 
+## v3.178.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(api): drop image_size_kb from the product image serializers (#396)
+
+image_size_kb stat()ed the file on the media volume once per image on
+every request, and nothing reads it: not the storefront UI (only a test
+fixture and the generated schema), not the agent gateway, not the docs.
+Remove it from ProductImageSerializer (and so the detail serializer)
+and regenerate schema.yml.
+
+A required response field is removed, so this ships only after a
+storefront release that no longer requires imageSizeKb is in production.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`701c786`](https://github.com/vasilistotskas/grooveshop-django-api/commit/701c78677e2dc0cc1e63cdd80303d7408f24ef06))
+
+* fix(emails): keep the operator alert templates in emails/ops, order the stale digest
+
+The health and backup alert templates sit in emails/ops, the directory the
+other operator alerts use, so the template catalogue that is about to go
+(core/email) finds no unknown directory. Two tests of that catalogue's
+fallback for a template no type sends lose their only subject, now that
+every email template has a type, and are removed.
+
+check_stale_acs_shipments built its digest in database order, which is
+undefined for parcels created in the same instant: the golden file of the
+digest failed on one CI run in two. The query now sorts by created_at then
+id.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4d98528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d98528b17bb0943f58a3bee95b72d5e17224f2a))
+
+### Features
+
+* feat(emails): move the platform's own mail onto the pipeline
+
+The billing notices, the staff password reset and the health and backup
+alerts were the last mail sent outside send_email. Seven platform.* types
+(owner PLATFORM, required, sent from public) replace the hand-built
+EmailMultiAlternatives and mail_admins calls:
+
+- platform.billing_expiring, _expired, _suspended: the owner, in the
+  store's default locale, from the platform's sender
+- platform.billing_stage_copy: the operators' trail of stages 2 and 3,
+  now a template pair with a translated subject
+- platform.staff_password_reset: the platform sender (owner decision D2),
+  the store's language, the link still on the host that asked; the store's
+  name is read in its schema and carried in the object
+- platform.health_alert, platform.backup_failed: settings.ADMINS in the
+  platform's language; a failed health alert send is still logged and never
+  masks the result, and the backup task still re-raises
+
+render.owner_schema is entered by both send_email and render, so the
+preview of a platform type shows the mail that is sent. SERVER_EMAIL and
+EMAIL_SUBJECT_PREFIX, which only mail_admins read, are removed.
+
+Golden files record the billing notices and the staff reset from the old
+send paths; the diff is the named From and, for the staff reset, the
+platform's brand.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4d98528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d98528b17bb0943f58a3bee95b72d5e17224f2a))
+
+### Performance improvements
+
+* perf(product): prefetch translations on the product images action (#395)
+
+GET /product/<pk>/images listed product.images.all() with no prefetch,
+so with parler's translation cache off every image cost one query for
+its translations and another for the product name behind alt_text
+(2 images: 8 queries, 8 images: 20). Read the images through
+ProductImage.objects.for_detail(), which prefetches both and orders by
+sort_order: the count is now constant (6) whatever the image count.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`13ee004`](https://github.com/vasilistotskas/grooveshop-django-api/commit/13ee00473474ed31c056d44e4e5a0a50c5519180))
+
+### Refactoring
+
+* refactor(emails): delete core/email, guard the one sender, drop the rendered-mail task (#398) ([`4d98528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d98528b17bb0943f58a3bee95b72d5e17224f2a))
+
+* refactor(emails): delete core/email, guard the one sender, drop the rendered-mail task
+
+core/email kept a second catalogue (registry by directory scan, config with
+an is_used flag, sample data, a preview service with its own contexts) that
+the email types made redundant. The admin preview is rebuilt on the emails
+registry: emails.preview.build_preview renders any registered type through
+emails.render.render, from a chosen order for the order types or from the
+type's own sample, and the page and its htmx endpoint live on the store's
+Emails admin (preview/ and preview/render/), behind the same
+order.view_order check. The list shows the registered types by area, not
+every template on disk.
+
+tests/unit/emails/test_only_transport_sends.py reads every module's syntax
+tree and fails when a module outside emails/transport.py imports or calls
+EmailMessage, EmailMultiAlternatives, send_mail, send_mass_mail,
+mail_admins or mail_managers. It replaces the carrier-only mail_admins
+guard.
+
+send_rendered_email_task is deleted: nothing has queued it since
+send_allauth_email_task replaced it, and production runs the release that
+stopped. Its retry-policy and log-masking tests now cover
+send_allauth_email_task, the task that carries the same secrets.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`4d98528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d98528b17bb0943f58a3bee95b72d5e17224f2a))
+
+* refactor(emails): mark an email Off on the preview list the way the switch page does
+
+The preview list showed Sent or Not sent, which reads as a delivery state.
+It now shows the labels of the Emails page: "Off: <gate>" when a gate is
+closed, "Off" when the store switched it off, nothing otherwise.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4d98528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d98528b17bb0943f58a3bee95b72d5e17224f2a))
+
 ## v3.177.0 (2026-11-01)
 
 ### Bug fixes

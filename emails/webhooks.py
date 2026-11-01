@@ -24,6 +24,7 @@ import logging
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -60,6 +61,9 @@ class ResendWebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    # A machine-to-machine receiver, not part of the contract the storefront
+    # generates its types from.
+    @extend_schema(exclude=True)
     def post(self, request: Request) -> Response:
         body: bytes = request.body
         if len(body) > settings.RESEND_WEBHOOK_MAX_BODY_BYTES:

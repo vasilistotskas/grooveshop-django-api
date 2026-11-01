@@ -3820,6 +3820,9 @@ msgstr "Default Subscription"
 msgid "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
 msgstr "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
 
+msgid "Delayed"
+msgstr "Delayed"
+
 msgid "Delegated card payment is not configured for this store."
 msgstr "Delegated card payment is not configured for this store."
 
@@ -8124,6 +8127,9 @@ msgstr "Mark specific notifications as unseen"
 
 msgid "Mark specific notifications as unseen for the authenticated user."
 msgstr "Mark specific notifications as unseen for the authenticated user."
+
+msgid "Marked as spam"
+msgstr "Marked as spam"
 
 msgid "Marketing"
 msgstr "Marketing"
@@ -12791,6 +12797,9 @@ msgstr "Skipped protected tenants: %(names)s"
 msgid "Skipped tenants still within 24-hour cooldown: %(names)s"
 msgstr "Skipped tenants still within 24-hour cooldown: %(names)s"
 
+msgid "Skipped: address suppressed"
+msgstr "Skipped: address suppressed"
+
 msgid "Skipped: feature off"
 msgstr "Skipped: feature off"
 
@@ -13409,6 +13418,9 @@ msgstr "Supports Home Delivery"
 
 msgid "Supports Pickup Point"
 msgstr "Supports Pickup Point"
+
+msgid "Suppressed by the provider"
+msgstr "Suppressed by the provider"
 
 msgid "Surface"
 msgstr "Surface"

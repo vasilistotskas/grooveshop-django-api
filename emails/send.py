@@ -15,13 +15,13 @@ from typing import Any
 
 from django.core.cache import cache
 
-from emails import log, optout, sender, transport
+from emails import log, optout, sender, suppression, transport
 from emails.headers import build_headers
 from emails.models import EmailSwitch
 from emails.recipients import Recipient
 from emails.registry import registry
 from emails.render import owner_schema, render
-from emails.status import Status
+from emails.status import NOT_SENT, Status
 from emails.transport import Attachment
 from emails.types import EmailType, Owner, RenderEnv
 from tenant.membership import bound_tenant
@@ -120,13 +120,23 @@ def _send_to(
 ) -> Delivery:
     if optout.is_opted_out(recipient.address, email_type):
         return _skip(email_type, Status.SKIPPED_OPTED_OUT, recipient=recipient)
+    if suppression.blocks(recipient.address, email_type):
+        if not email_type.opt_out_applies:
+            # A required mail (a receipt, a security code) is never silently
+            # lost: the row says so and the log line is a warning.
+            logger.warning(
+                "Required email %s not sent: the address is suppressed",
+                email_type.key,
+                extra={"email_type": email_type.key},
+            )
+        return _skip(email_type, Status.SKIPPED_SUPPRESSED, recipient=recipient)
     rendered = render(
         email_type,
         obj,
         RenderEnv(language=recipient.language, recipient=recipient),
     )
     entry = log.start(email_type.key, recipient, rendered.subject)
-    if entry.status == Status.SENT:
+    if entry.status not in NOT_SENT:
         # An earlier attempt of this task already sent it (a retry after a
         # later recipient failed): never send it twice.
         return Delivery(

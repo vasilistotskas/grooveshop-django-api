@@ -519,6 +519,13 @@ def box_now_credentials() -> BoxNowCredentials:
     }
 
 
+def tenant_resend_webhook_secret() -> str:
+    """The bound store's own Resend webhook signing secret, ``""`` when it
+    has none. Tenant-only, with no platform fallback: a delivery to a store's
+    host is verified with that store's secret or not at all."""
+    return _get_tenant_field("resend_webhook_secret")
+
+
 def tenant_resend_api_key() -> str:
     """The bound store's own Resend sending key, ``""`` when it has none.
 

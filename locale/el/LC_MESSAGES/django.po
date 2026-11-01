@@ -3826,6 +3826,9 @@ msgstr "Προεπιλεγμένη συνδρομή"
 msgid "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
 msgstr "Προεπιλογή: GIFT_CARD_VALIDITY_DAYS μετά την έκδοση (ελληνική νομοθεσία: 5 έτη)· κενό σημαίνει ότι δεν λήγει ποτέ"
 
+msgid "Delayed"
+msgstr "Καθυστερημένο"
+
 msgid "Delegated card payment is not configured for this store."
 msgstr "Η εξουσιοδοτημένη πληρωμή με κάρτα δεν είναι διαμορφωμένη για αυτό το κατάστημα."
 
@@ -8134,6 +8137,9 @@ msgstr "Σήμανση συγκεκριμένων ειδοποιήσεων ως 
 
 msgid "Mark specific notifications as unseen for the authenticated user."
 msgstr "Σήμανση συγκεκριμένων ειδοποιήσεων ως μη ορατών για τον συνδεδεμένο χρήστη."
+
+msgid "Marked as spam"
+msgstr "Σημειώθηκε ως ανεπιθύμητο"
 
 msgid "Marketing"
 msgstr "Marketing"
@@ -12800,6 +12806,9 @@ msgstr "Παραλείφθηκαν προστατευμένα καταστήμα
 msgid "Skipped tenants still within 24-hour cooldown: %(names)s"
 msgstr "Παραλείφθηκαν καταστήματα εντός της περιόδου αναμονής 24 ωρών: %(names)s"
 
+msgid "Skipped: address suppressed"
+msgstr "Παραλείφθηκε: η διεύθυνση είναι αποκλεισμένη"
+
 msgid "Skipped: feature off"
 msgstr "Παραλείφθηκε: η λειτουργία είναι ανενεργή"
 
@@ -13414,6 +13423,9 @@ msgstr "Υποστηρίζει Κατ' Οίκον Παράδοση"
 
 msgid "Supports Pickup Point"
 msgstr "Υποστηρίζει σημείο παραλαβής"
+
+msgid "Suppressed by the provider"
+msgstr "Αποκλείστηκε από τον πάροχο"
 
 msgid "Surface"
 msgstr "Επιφάνεια"

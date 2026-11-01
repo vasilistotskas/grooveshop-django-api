@@ -186,6 +186,9 @@ class EmailLog(TimeStampMixinModel, UUIDModel):
         help_text=_("The failure's class and code; never the address."),
     )
     sent_at = models.DateTimeField(_("Sent at"), null=True, blank=True)
+    last_event_at = models.DateTimeField(
+        _("Last event at"), null=True, blank=True
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Email log")
@@ -246,6 +249,7 @@ class EmailSuppression(TimeStampMixinModel):
     class Reason(models.TextChoices):
         HARD_BOUNCE = "hard_bounce", _("Hard bounce")
         COMPLAINT = "complaint", _("Spam complaint")
+        PROVIDER = "provider", _("Suppressed by the provider")
         MANUAL = "manual", _("Added manually")
 
     class Scope(models.TextChoices):

@@ -1566,6 +1566,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "qrcode" },
     { name = "requests" },
+    { name = "standardwebhooks" },
     { name = "urllib3" },
     { name = "uvicorn" },
     { name = "uvicorn-worker" },
@@ -1649,6 +1650,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.2.4" },
     { name = "qrcode", specifier = "==8.2" },
     { name = "requests", specifier = "==2.34.2" },
+    { name = "standardwebhooks", specifier = "==1.1.0" },
     { name = "urllib3", specifier = "==2.8.0" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "uvicorn-worker", specifier = ">=0.4.0" },
@@ -3101,6 +3103,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5f/d3/3f06a1006f2261d1342aefb3c71eed02f5d4ca5bdbecd86ebc12ad38306e/sqlparse-0.6.0.tar.gz", hash = "sha256:113c35c75365ab9cc9c7231d68c6428fb11c085fc8e9eb1ad659b7ddbf6cd2b9", size = 178477, upload-time = "2026-08-13T19:16:06.396Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/50/f00935da0ec7cbf325f8dc4f772ae46fbc7b672dd62876e73f0a94adda57/sqlparse-0.6.0-py3-none-any.whl", hash = "sha256:b861c0288ce2fa56209a9a6412d2e066ac664b3873b89c26c9d8415e8e32996f", size = 50070, upload-time = "2026-08-13T19:16:04.062Z" },
+]
+
+[[package]]
+name = "standardwebhooks"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/81/a26b812525dd9ad6cc0f6ba2f8eafd5bf595542e319d95123aa92b51bf22/standardwebhooks-1.1.0.tar.gz", hash = "sha256:e5cb66e21a6356ebb9375aeb57f1348583323015808d475a7c1baaa4b718068a", size = 3232, upload-time = "2026-07-21T15:49:51.45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/dc/0cd2bd9a536e61ad0ee9de3b724492a38faa88ce1828fbc15940824664c3/standardwebhooks-1.1.0-py3-none-any.whl", hash = "sha256:9a88d48a1f198be61517fc7ad328cf58ba02b73f0fbd8941d4213e9c0b6c2a61", size = 3538, upload-time = "2026-07-21T15:49:50.519Z" },
 ]
 
 [[package]]

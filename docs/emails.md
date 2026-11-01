@@ -750,7 +750,7 @@ mail that has already left. The send then simply has no row.
 event id) and `EmailSuppression` (an address hash with a reason and a scope,
 kept until removed) are filled by the webhook (next section).
 
-## The Resend webhook (`webhooks.py`, `svix.py`, `events.py`, `suppression.py`)
+## The Resend webhook (`webhooks.py`, `events.py`, `suppression.py`)
 
 `POST /resend/webhook/`, mounted on **every** host (root-shared, like the Viva
 and BoxNow receivers), because each Resend team registers the host that owns
@@ -766,15 +766,23 @@ its keys:
 There is no fallback between the two secrets, and a host with none answers
 503 (Resend retries until it is set).
 
-1. **Verification** (`svix.verify`): HMAC-SHA256 over `"{svix-id}.{svix-timestamp}.{raw body}"`
-   under the secret (`whsec_` + base64), any one of the `v1,` signatures in
-   `svix-signature`, and a timestamp within `RESEND_WEBHOOK_TOLERANCE_SECONDS`
-   (300) either way, which is the replay guard. It is hand-written (the scheme
-   is a few lines, the library would be a new dependency) and pinned by
-   `tests/unit/emails/test_svix.py` against a signature made by the `svix`
-   package. The body is verified before it is parsed, and capped at
-   `RESEND_WEBHOOK_MAX_BODY_BYTES` (413). 400 for anything else, with no
-   payload in the log.
+1. **Verification** (`webhooks.verify_signature`): the **Standard Webhooks**
+   library's `Webhook(secret).verify` (the `standardwebhooks` package, the
+   reference verifier Svix maintains and the `svix` client itself delegates to;
+   it has no dependencies of its own). Resend signs with Svix, whose three
+   headers are `svix-id`, `svix-timestamp` and `svix-signature`; the adapter
+   renames them to the `webhook-` names the library reads. The library checks
+   HMAC-SHA256 over `"{id}.{timestamp}.{raw body}"` under the secret (`whsec_` +
+   base64), accepts any one of the `v1,` signatures in the header (several while
+   a secret rotates), compares in constant time, and refuses a timestamp more than
+   five minutes either way, which is the replay guard (fixed by the library, so
+   there is no setting). Everything it can raise for a request that is not a
+   delivery (a missing header, a malformed signature or secret, a body that is not
+   UTF-8) becomes one `InvalidSignature`, so a forged request is a 400, never a
+   500. The adapter is pinned by `tests/unit/emails/test_webhook_signature.py`
+   against a signature made by the `svix` package itself. The body is verified
+   before it is parsed, and capped at `RESEND_WEBHOOK_MAX_BODY_BYTES` (413). 400
+   for anything else, with no payload in the log.
 2. **Queue.** The view answers 200 at once and queues
    `emails.tasks.process_provider_event(svix_id, payload)`, which runs in the
    schema of the host that received it.
@@ -847,7 +855,7 @@ tables (`devtools/anonymise/rules.py`).
   contents for the test and restores them. Never register a probe type in
   production code. A test that runs a store email (an order task) needs a
   store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
-- `tests/unit/emails/test_svix.py`, `tests/integration/emails/test_resend_webhook.py`
+- `tests/unit/emails/test_webhook_signature.py`, `tests/integration/emails/test_resend_webhook.py`
   and `tests_mt/test_email_webhook_routing.py`: verification (changed byte,
   stale timestamp, other secret, no fallback between the two secrets, 503,
   413), every event's effect, the forward-only status, dedupe, matching on

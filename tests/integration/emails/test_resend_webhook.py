@@ -10,13 +10,15 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from datetime import UTC, datetime
 from unittest import mock
 
 import pytest
 from django.core import mail
 from rest_framework.test import APIClient
+from standardwebhooks.webhooks import Webhook
 
-from emails import events, optout, svix
+from emails import events, optout
 from emails.models import (
     EVERY_MARKETING_TYPE,
     EmailEvent,
@@ -44,6 +46,17 @@ def _setup(tenant, settings):
     tenant.resend_webhook_secret = SECRET
     tenant.save()
     mail.outbox.clear()
+
+
+#: Standard Webhooks' replay window (five minutes), fixed by the library.
+TOLERANCE_SECONDS = 300
+
+
+def sign(secret: str, message_id: str, timestamp: int, body: bytes) -> str:
+    """What Resend sends in ``svix-signature``, made by the same library."""
+    return Webhook(secret).sign(
+        message_id, datetime.fromtimestamp(timestamp, UTC), body.decode()
+    )
 
 
 def _log(**fields) -> EmailLog:
@@ -84,7 +97,7 @@ def _post(
         content_type="application/json",
         HTTP_SVIX_ID=message_id,
         HTTP_SVIX_TIMESTAMP=str(timestamp),
-        HTTP_SVIX_SIGNATURE=svix.sign(secret, message_id, timestamp, raw),
+        HTTP_SVIX_SIGNATURE=sign(secret, message_id, timestamp, raw),
     )
 
 
@@ -103,7 +116,7 @@ class TestVerification:
         payload = _event(_log(), "email.delivered", tenant.schema_name)
         raw = json.dumps(payload).encode()
         timestamp = int(time.time())
-        signature = svix.sign(SECRET, "msg_1", timestamp, raw)
+        signature = sign(SECRET, "msg_1", timestamp, raw)
 
         with mock.patch.object(process_provider_event, "delay") as delay:
             response = APIClient().post(
@@ -118,15 +131,13 @@ class TestVerification:
         assert response.status_code == 400
         delay.assert_not_called()
 
-    def test_a_stale_timestamp_is_a_400(self, tenant, settings):
+    def test_a_stale_timestamp_is_a_400(self, tenant):
         payload = _event(_log(), "email.delivered", tenant.schema_name)
 
         with mock.patch.object(process_provider_event, "delay") as delay:
             response = _post(
                 payload,
-                timestamp=int(time.time())
-                - settings.RESEND_WEBHOOK_TOLERANCE_SECONDS
-                - 60,
+                timestamp=int(time.time()) - TOLERANCE_SECONDS - 60,
             )
 
         assert response.status_code == 400
@@ -189,6 +200,57 @@ class TestVerification:
         self, tenant, body
     ):
         assert _post(None, body=body).status_code == 400
+
+    @pytest.mark.parametrize(
+        "signature",
+        ["garbage", "v1", "v1,", "v1,!!!not-base64", "v2,AAAA", ",,,", " "],
+    )
+    def test_a_malformed_signature_header_is_a_400_never_a_500(
+        self, tenant, signature
+    ):
+        payload = _event(_log(), "email.delivered", tenant.schema_name)
+        raw = json.dumps(payload).encode()
+
+        with mock.patch.object(process_provider_event, "delay") as delay:
+            response = APIClient().post(
+                URL,
+                data=raw,
+                content_type="application/json",
+                HTTP_SVIX_ID="msg_1",
+                HTTP_SVIX_TIMESTAMP=str(int(time.time())),
+                HTTP_SVIX_SIGNATURE=signature,
+            )
+
+        assert response.status_code == 400
+        delay.assert_not_called()
+
+    def test_a_missing_header_is_a_400(self, tenant):
+        response = APIClient().post(
+            URL, data=b"{}", content_type="application/json"
+        )
+
+        assert response.status_code == 400
+
+    def test_a_body_that_is_not_utf8_is_a_400_never_a_500(self, tenant):
+        # It cannot be signed (a signature covers text), so the signature is
+        # another body's: the point is that it is refused, not that it crashes.
+        timestamp = int(time.time())
+        response = APIClient().post(
+            URL,
+            data=b"\xff\xfe{}",
+            content_type="application/json",
+            HTTP_SVIX_ID="msg_1",
+            HTTP_SVIX_TIMESTAMP=str(timestamp),
+            HTTP_SVIX_SIGNATURE=sign(SECRET, "msg_1", timestamp, b"{}"),
+        )
+
+        assert response.status_code == 400
+
+    def test_a_malformed_stored_secret_is_a_400_not_a_500(self, tenant):
+        tenant.resend_webhook_secret = "whsec_not base64!"
+        tenant.save()
+
+        assert _post(_event(_log(), "email.delivered", "x")).status_code == 400
 
     def test_only_post_is_allowed(self):
         assert APIClient().get(URL).status_code == 405

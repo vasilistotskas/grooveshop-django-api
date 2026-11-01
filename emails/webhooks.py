@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -30,12 +31,49 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from standardwebhooks.exceptions import WebhookVerificationError
+from standardwebhooks.webhooks import EmptyWebhookSecretError, Webhook
 
-from emails import svix
 from emails.tasks import process_provider_event
 from tenant.credentials import in_tenant_schema, tenant_resend_webhook_secret
 
 logger = logging.getLogger(__name__)
+
+
+#: Resend signs with Svix, whose three headers are the Standard Webhooks
+#: ones under an older prefix; the library reads the ``webhook-`` names.
+_STANDARD_HEADERS = {
+    "svix-id": "webhook-id",
+    "svix-timestamp": "webhook-timestamp",
+    "svix-signature": "webhook-signature",
+}
+
+
+class InvalidSignature(Exception):
+    """The request is not a fresh, correctly signed delivery."""
+
+
+def verify_signature(
+    secret: str, headers: Mapping[str, str], body: bytes
+) -> str:
+    """Return the verified ``svix-id``; raise :class:`InvalidSignature`.
+
+    Verification is the Standard Webhooks library's (HMAC-SHA256 over
+    ``id.timestamp.body``, any ``v1`` signature, a five-minute timestamp
+    tolerance as the replay guard). *body* is the raw request body, byte for
+    byte. Everything that library can raise for a request that is not a
+    delivery (a missing header, a stale timestamp, a malformed signature or
+    secret, a body that is not UTF-8) is one :class:`InvalidSignature`, so a
+    forged request is a 400, never a 500.
+    """
+    standard = {
+        new: headers.get(old, "") for old, new in _STANDARD_HEADERS.items()
+    }
+    try:
+        Webhook(secret).verify(body, standard, json_parse=False)
+    except WebhookVerificationError, EmptyWebhookSecretError, ValueError:
+        raise InvalidSignature from None
+    return standard["webhook-id"]
 
 
 def webhook_secret() -> str:
@@ -73,13 +111,8 @@ class ResendWebhookView(APIView):
             logger.warning("Resend webhook refused: this host has no secret")
             return Response(status=status.HTTP_503_SERVICE_UNAVAILABLE)
         try:
-            svix_id = svix.verify(
-                secret,
-                request.headers,
-                body,
-                tolerance_seconds=settings.RESEND_WEBHOOK_TOLERANCE_SECONDS,
-            )
-        except svix.InvalidSignature:
+            svix_id = verify_signature(secret, request.headers, body)
+        except InvalidSignature:
             logger.warning("Resend webhook refused: invalid signature")
             return Response(status=status.HTTP_400_BAD_REQUEST)
         try:

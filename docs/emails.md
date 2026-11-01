@@ -671,6 +671,33 @@ without its own domain.
   `EMAIL_TRANSPORT=resend`; `EMAIL_HOST_PASSWORD` is required only for
   `smtp`.
 
+### Guarding the switch (`emails/setup.py`, `emails/checks.py`)
+
+A store that sends from its own verified domain and has no key cannot send
+over Resend at all, so selecting `resend` while one exists would fail all its
+mail for good. One definition (`setup.lacks_resend_key`, `stores_lacking_resend_key`:
+Resend selected, active and not suspended, `from_email` set and verified, no
+`resend_api_key`, one query on `public`) feeds three guards:
+
+1. **Deploy guard.** `emails.E001`, a `database` system check, is an error
+   naming each store and its domain. `migration_preflight` (step 0 of the
+   PreSync hook, and CI) runs the database checks first, so a bad switch
+   fails the hook before any pod rolls and the previous release keeps sending
+   over SMTP. The web process does not query at boot; settings import only
+   checks `RESEND_API_KEY`.
+2. **Validation at the source.** `Tenant.clean` refuses a save that leaves a
+   verified own-domain store without its key while Resend is selected: both
+   ticking From Email verified without a key and clearing the key of a
+   verified store (error on `resend_api_key`).
+3. **Dashboards.** The platform dashboard (`PlatformAlerts`) lists each such
+   store ("Emails can't be sent from <domain> until its Resend key is
+   saved") with a link to it; the store's own dashboard (`StoreAlerts`, for
+   whoever may change store settings, OWNER and ADMIN) tells the merchant
+   that its emails are not being sent and to contact support, since only the
+   platform can fix it.
+
+All three are inert while `EMAIL_TRANSPORT=smtp`.
+
 ### Failures
 
 Every failure is a `requests` exception, so `core.retry` decides as for any
@@ -749,6 +776,9 @@ tables (`devtools/anonymise/rules.py`).
   contents for the test and restores them. Never register a probe type in
   production code. A test that runs a store email (an order task) needs a
   store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
+- `tests/integration/emails/test_resend_setup_guard.py`: who is lacking a key
+  (one query), the system check and `migration_preflight` failing, the
+  `Tenant.clean` refusal, both dashboards and their roles.
 - `tests/integration/emails/test_resend_transport.py`: the request (key,
   idempotency key, tags, attachments, headers), which key a store uses, the
   retry verdict of each failure, demo suppression. HTTP is mocked at

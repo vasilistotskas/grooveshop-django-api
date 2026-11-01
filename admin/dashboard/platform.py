@@ -34,6 +34,48 @@ def _stores():
 
 
 @register_component
+class PlatformAlerts(DashboardWidget):
+    """What the platform's operators must fix: today, a store whose mail
+    cannot be sent through the selected transport (``emails.setup``)."""
+
+    def shape(self, data: None) -> dict[str, Any]:
+        from emails import setup
+
+        stores = setup.stores_lacking_resend_key()
+        if not stores:
+            return {"alerts": []}
+        return {
+            "alerts": [
+                {
+                    "variant": "danger",
+                    "icon": "mail",
+                    "title": _(
+                        "Emails cannot be sent until a Resend key is saved"
+                    ),
+                    "text": _(
+                        "Email goes through Resend and these stores send from "
+                        "their own verified domain, which only their own "
+                        "Resend key can sign for. Open each store, tab "
+                        "Email & Security:"
+                    ),
+                    "items": [
+                        link_cell(
+                            self.change_url("tenant.Tenant", store.pk),
+                            _(
+                                "Emails can't be sent from %(domain)s until its "
+                                "Resend key is saved"
+                            )
+                            % {"domain": setup.sender_domain(store)},
+                        )
+                        for store in stores
+                    ],
+                    "link": None,
+                }
+            ]
+        }
+
+
+@register_component
 class PlatformEstateCards(DashboardWidget):
     """Stores, live, suspended, and background-job health."""
 

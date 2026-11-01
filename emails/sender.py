@@ -12,6 +12,7 @@ from typing import Any
 from django.conf import settings
 from django.db import connection
 
+from emails.setup import has_own_sender
 from emails.types import Audience, EmailType, Owner
 from tenant.credentials import (
     in_tenant_schema,
@@ -29,9 +30,8 @@ def own_sender() -> str:
     if not in_tenant_schema():
         return ""
     tenant = bound_tenant()
-    own = (getattr(tenant, "from_email", "") or "").strip()
-    if own and getattr(tenant, "from_email_verified", False):
-        return own
+    if tenant is not None and has_own_sender(tenant):
+        return tenant.from_email.strip()
     return ""
 
 

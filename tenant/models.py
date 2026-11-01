@@ -1360,6 +1360,24 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_social_urls()
         self._validate_box_now_partner_id()
         self._validate_cloudflare_credentials()
+        self._validate_resend_credentials()
+
+    def _validate_resend_credentials(self) -> None:
+        # Over Resend a store on its own verified domain cannot send with
+        # the platform's key, so it must not be saved (or lose its key)
+        # without its own: its mail would fail for good.
+        from emails import setup
+
+        if setup.lacks_resend_key(self):
+            raise ValidationError(
+                {
+                    "resend_api_key": _(
+                        "Email is sent through Resend and this store sends "
+                        "from its own verified domain: save its Resend API "
+                        "key, or untick From Email verified."
+                    )
+                }
+            )
 
     def _validate_cloudflare_credentials(self) -> None:
         # A zone without a token (or the reverse) purges nothing, and the

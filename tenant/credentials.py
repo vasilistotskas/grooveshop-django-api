@@ -517,3 +517,14 @@ def box_now_credentials() -> BoxNowCredentials:
         "webhook_secret": _get_tenant_field("box_now_webhook_secret"),
         "live_mode": bool(getattr(tenant, "box_now_live_mode", None)),
     }
+
+
+def tenant_resend_api_key() -> str:
+    """The bound store's own Resend sending key, ``""`` when it has none.
+
+    Tenant-only, like the payment and carrier credentials: a store's key
+    never falls back to the platform's (``settings.RESEND_API_KEY``), and
+    the choice between the two is ``emails.resend.api_key``'s, made on
+    whether the store sends from its own verified domain.
+    """
+    return _get_tenant_field("resend_api_key")

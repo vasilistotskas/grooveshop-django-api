@@ -319,6 +319,10 @@ msgid "%(likes)d likes, %(replies)d replies"
 msgstr "%(likes)d likes, %(replies)d replies"
 
 #, python-format
+msgid "%(locale)s is not a language of this store."
+msgstr "%(locale)s is not a language of this store."
+
+#, python-format
 msgid "%(locale)s is not a language that can be translated."
 msgstr "%(locale)s is not a language that can be translated."
 
@@ -588,6 +592,12 @@ msgstr "(no email)"
 msgid "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 msgstr "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 
+msgid "0 is the left edge, 1 the right."
+msgstr "0 is the left edge, 1 the right."
+
+msgid "0 is the top edge, 1 the bottom."
+msgstr "0 is the top edge, 1 the bottom."
+
 msgid "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
 msgstr "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
 
@@ -657,6 +667,9 @@ msgstr "A domain is at most %(max)d characters long."
 
 msgid "A domain needs at least two labels, such as shop.example.com."
 msgstr "A domain needs at least two labels, such as shop.example.com."
+
+msgid "A focal point is between 0 and 1."
+msgstr "A focal point is between 0 and 1."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
@@ -1390,6 +1403,15 @@ msgstr "Already-Subscribed Notice Sent At"
 msgid "Alt Text"
 msgstr "Alt Text"
 
+msgid "Alt text"
+msgstr "Alt text"
+
+msgid "Alt text is an object of language to text."
+msgstr "Alt text is an object of language to text."
+
+msgid "Alt text is at most 255 characters."
+msgstr "Alt text is at most 255 characters."
+
 msgid "Always positive; the kind says which way it moved."
 msgstr "Always positive; the kind says which way it moved."
 
@@ -1525,6 +1547,9 @@ msgstr "Area"
 
 msgid "Arrival notified at"
 msgstr "Arrival notified at"
+
+msgid "As a browser shows it, in px."
+msgstr "As a browser shows it, in px."
 
 msgid "Ask for a new link"
 msgstr "Ask for a new link"
@@ -4150,6 +4175,10 @@ msgstr "Duplicate category IDs are not allowed."
 msgid "Duration (ms)"
 msgstr "Duration (ms)"
 
+#, python-format
+msgid "EMAIL_TRANSPORT is 'resend' but these stores send from their own verified domain and have no Resend API key: %(stores)s."
+msgstr "EMAIL_TRANSPORT is 'resend' but these stores send from their own verified domain and have no Resend API key: %(stores)s."
+
 msgid "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 msgstr "EU Omnibus reference: the lowest gross price of the 30 days before the current reduction started, frozen at its start. Empty when no reduction may be announced."
 
@@ -4241,8 +4270,14 @@ msgstr "Email event"
 msgid "Email events"
 msgstr "Email events"
 
+msgid "Email goes through Resend and these stores send from their own verified domain, which only their own Resend key can sign for. Open each store, tab Email & Security:"
+msgstr "Email goes through Resend and these stores send from their own verified domain, which only their own Resend key can sign for. Open each store, tab Email & Security:"
+
 msgid "Email is required."
 msgstr "Email is required."
+
+msgid "Email is sent through Resend and this store sends from its own verified domain: save its Resend API key, or untick From Email verified."
+msgstr "Email is sent through Resend and this store sends from its own verified domain: save its Resend API key, or untick From Email verified."
 
 msgid "Email log"
 msgstr "Email log"
@@ -4282,6 +4317,13 @@ msgstr "Emails"
 
 msgid "Emails & Engagement"
 msgstr "Emails & Engagement"
+
+#, python-format
+msgid "Emails can't be sent from %(domain)s until its Resend key is saved"
+msgstr "Emails can't be sent from %(domain)s until its Resend key is saved"
+
+msgid "Emails cannot be sent until a Resend key is saved"
+msgstr "Emails cannot be sent until a Resend key is saved"
 
 msgid "Empty cart"
 msgstr "Empty cart"
@@ -5966,6 +6008,12 @@ msgstr "Flow Steps"
 
 msgid "Flower (Celery)"
 msgstr "Flower (Celery)"
+
+msgid "Focal point X"
+msgstr "Focal point X"
+
+msgid "Focal point Y"
+msgstr "Focal point Y"
 
 msgid "Follow up"
 msgstr "Follow up"
@@ -8109,6 +8157,12 @@ msgstr "Media & Sync"
 msgid "Media + Text"
 msgstr "Media + Text"
 
+msgid "Media asset"
+msgstr "Media asset"
+
+msgid "Media assets"
+msgstr "Media assets"
+
 msgid "Medium"
 msgstr "Medium"
 
@@ -8344,6 +8398,10 @@ msgstr "N/A"
 
 msgid "Name"
 msgstr "Name"
+
+#, python-format
+msgid "Name between 1 and %(limit)s asset ids."
+msgstr "Name between 1 and %(limit)s asset ids."
 
 #, python-format
 msgid "Name length: %(name_len)d chars — Code length: %(code_len)d chars — Has name: %(has_name)s — Sort position: %(sort)s"
@@ -9024,6 +9082,10 @@ msgstr "One-click unsubscribe"
 msgid "Online payment methods must have a provider code."
 msgstr "Online payment methods must have a provider code."
 
+#, python-format
+msgid "Only %(formats)s images can be uploaded."
+msgstr "Only %(formats)s images can be uploaded."
+
 msgid "Only YouTube and Vimeo videos can be embedded."
 msgstr "Only YouTube and Vimeo videos can be embedded."
 
@@ -9400,6 +9462,10 @@ msgstr "Order VAT Line"
 
 msgid "Order VAT Lines"
 msgstr "Order VAT Lines"
+
+#, python-format
+msgid "Order and account emails from %(domain)s cannot reach your customers until the email service connection for your domain is finished. Contact support: the platform completes it."
+msgstr "Order and account emails from %(domain)s cannot reach your customers until the email service connection for your domain is finished. Contact support: the platform completes it."
 
 msgid "Order associated with this stock operation (if applicable)"
 msgstr "Order associated with this stock operation (if applicable)"
@@ -11549,11 +11615,17 @@ msgstr "Requires Confirmation"
 msgid "Resend"
 msgstr "Resend"
 
+msgid "Resend API key"
+msgstr "Resend API key"
+
 msgid "Resend confirmation"
 msgstr "Resend confirmation"
 
 msgid "Resend delivery email"
 msgstr "Resend delivery email"
+
+msgid "Resend webhook signing secret"
+msgstr "Resend webhook signing secret"
 
 msgid "Reservation"
 msgstr "Reservation"
@@ -11939,6 +12011,9 @@ msgstr "Sanitised request body (PII fields are hashed by the facebook_business S
 
 msgid "Save"
 msgstr "Save"
+
+msgid "Save each store's key in the platform admin (Email & Security) first, or set EMAIL_TRANSPORT back to 'smtp'."
+msgstr "Save each store's key in the platform admin (Email & Security) first, or set EMAIL_TRANSPORT back to 'smtp'."
 
 msgid "Save your recovery codes"
 msgstr "Save your recovery codes"
@@ -13758,8 +13833,15 @@ msgid "The file is empty."
 msgstr "The file is empty."
 
 #, python-format
+msgid "The file is larger than %(limit)s MB."
+msgstr "The file is larger than %(limit)s MB."
+
+#, python-format
 msgid "The file is larger than the %(mb)s MB limit."
 msgstr "The file is larger than the %(mb)s MB limit."
+
+msgid "The file is not a valid image."
+msgstr "The file is not a valid image."
 
 #, python-format
 msgid "The following %(counter)s product has reached its low-stock threshold:"
@@ -13787,6 +13869,10 @@ msgstr "The gross unit price a consumer paid: price plus VAT, minus the product 
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
+
+#, python-format
+msgid "The image has more than %(limit)s megapixels."
+msgstr "The image has more than %(limit)s megapixels."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."
@@ -14010,6 +14096,12 @@ msgstr "The selected shipping method is not available for the selected country."
 msgid "The selected shipping provider is currently unavailable."
 msgstr "The selected shipping provider is currently unavailable."
 
+msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+msgstr "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+
+msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 
@@ -14196,8 +14288,14 @@ msgstr "This email type does not exist."
 msgid "This field is required"
 msgstr "This field is required"
 
+msgid "This file cannot be used."
+msgstr "This file cannot be used."
+
 msgid "This id is used twice."
 msgstr "This id is used twice."
+
+msgid "This image is used by a published page."
+msgstr "This image is used by a published page."
 
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
@@ -14963,6 +15061,9 @@ msgstr "Upload a valid image. The file you uploaded was either not an image or a
 
 msgid "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 msgstr "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
+
+msgid "Uploaded by (staff)"
+msgstr "Uploaded by (staff)"
 
 msgid "Urgent"
 msgstr "Urgent"
@@ -16177,6 +16278,9 @@ msgstr "Your store has been suspended"
 #, python-format
 msgid "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
 msgstr "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
+
+msgid "Your store's emails are not being sent"
+msgstr "Your store's emails are not being sent"
 
 msgid "Your subscription to this topic is pending confirmation."
 msgstr "Your subscription to this topic is pending confirmation."

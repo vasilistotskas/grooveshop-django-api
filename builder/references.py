@@ -103,9 +103,14 @@ def _existing_menus(targets: set[str]) -> set[str]:
 
 
 def _existing_media(targets: set[str]) -> set[str]:
-    # The media library lands with ``MediaAsset``; until then nothing a
-    # document could name exists.
-    return set()
+    from builder.models import MediaAsset
+
+    return {
+        str(pk)
+        for pk in MediaAsset.objects.filter(
+            pk__in=[int(t) for t in targets]
+        ).values_list("pk", flat=True)
+    }
 
 
 _EXISTS: dict[str, Callable[[set[str]], set[str]]] = {

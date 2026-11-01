@@ -66,6 +66,15 @@ def _media_name(src: str) -> str | None:
     return path[len(prefix) :]
 
 
+def displayed_size(image: Image.Image) -> tuple[int, int]:
+    """The size a browser shows an opened image at: its stored size, with
+    width and height swapped when its EXIF orientation is a quarter turn."""
+    width, height = image.size
+    if image.getexif().get(_EXIF_ORIENTATION_TAG) in _QUARTER_TURNS:
+        width, height = height, width
+    return width, height
+
+
 def natural_size(
     src: str, storage: TenantFileSystemStorage
 ) -> tuple[int, int] | None:
@@ -75,8 +84,7 @@ def natural_size(
         return None
     try:
         with storage.open(name) as stored, Image.open(stored) as image:
-            width, height = image.size
-            orientation = image.getexif().get(_EXIF_ORIENTATION_TAG)
+            return displayed_size(image)
     except (
         OSError,
         ValueError,
@@ -87,9 +95,6 @@ def natural_size(
         # Missing, not an image (an SVG, a truncated upload) or outside
         # the store's directory: no size to record.
         return None
-    if orientation in _QUARTER_TURNS:
-        width, height = height, width
-    return width, height
 
 
 def _with_natural_size(tag: str, size: tuple[int, int] | None) -> str:

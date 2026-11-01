@@ -34,6 +34,7 @@ no recipient can match.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 
 from django.conf import settings
 from django.core.mail import get_connection
@@ -105,17 +106,27 @@ class DemoRecipientSuppressingBackend(BaseEmailBackend):
             setattr(
                 message,
                 field,
-                [
-                    address
-                    for address in addresses
-                    if _mailbox(address) not in suppressed
-                ],
+                without_demo_mailboxes(addresses, suppressed),
             )
         return bool(
             getattr(message, "to", None)
             or getattr(message, "cc", None)
             or getattr(message, "bcc", None)
         )
+
+
+def without_demo_mailboxes(
+    addresses: Sequence[str],
+    suppressed: frozenset[str] | None = None,
+) -> list[str]:
+    """*addresses* minus a demo store's own mailboxes, for every transport:
+    the Django backend above and ``emails.resend``, which never goes through
+    it. *suppressed* defaults to the bound store's set."""
+    if suppressed is None:
+        suppressed = demo_store_mailboxes()
+    return [
+        address for address in addresses if _mailbox(address) not in suppressed
+    ]
 
 
 def _mailbox(address: str) -> str:

@@ -4,7 +4,8 @@ A store's theme, section groups (header, footer, ...), templates and pages
 are **documents**: versioned JSON that the store's staff edit in the
 storefront's visual editor and publish together. Source: `builder/`
 (`models.py`, `services.py`, `validation.py`, `storefront.py`,
-`references.py`, `published.py`, `views.py`, `rendering.py`), the
+`references.py`, `published.py`, `views.py`, `rendering.py`,
+`media_services.py`, `media_api.py`), the
 `builder` cache surface in `core/cache/surfaces.py`,
 `tenant/role_scopes.py`. The code wins over this page.
 
@@ -134,8 +135,8 @@ schema over the merged settings, and reported at the overlay's pointer.
 
 Settings the catalogue marks as `refs` hold ids: `product` and `category`
 (active, numeric id), `page` (a published content page slug, or a page
-document of the store), `menu` (a navigation slot), `media` (until
-`MediaAsset` exists nothing satisfies it). A draft may point at something
+document of the store), `menu` (a navigation slot), `media` (a
+`MediaAsset` id). A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a
@@ -197,6 +198,52 @@ cached under `builder:<schema>:r<release>:<page_key>:<locale>`: immutable
 per release, never purged. The current release number is kept under the
 store's cache generation, so a warm read touches neither the database nor
 anything else.
+
+## The media library
+
+`MediaAsset` (`builder/models.py`) is an image in the store's library; an
+image setting is a `media` reference to its id, never a URL. The storefront
+gets what it needs to render it well: the size a browser shows (EXIF
+orientation applied, so it can reserve space and size `srcset`), a focal
+point (`focalX`, `focalY`, 0 to 1) to crop around, the alt text per
+language, and `path` (`media/<schema>/uploads/builder/<name>`, what
+media-stream serves). The file is in the store's media directory
+(`tenant/storage.py`).
+
+`alt` is a parler translation, unlike a block's settings (a JSON overlay):
+the row stands alone and its text is one plain field, while a block's
+structure must not vary per language.
+
+`builder/media_services.py` is the only writer. Only raster images
+(`BUILDER_MEDIA_FORMATS`; an SVG can carry script and has no size to
+reserve), at most `BUILDER_MEDIA_MAX_BYTES` and `BUILDER_MEDIA_MAX_PIXELS`
+(`file_too_large`, `unsupported_image_type`, `image_too_large`,
+`invalid_image`, `invalid_focal_point`, `unknown_locale`, `invalid_alt`).
+The file never changes; a new image is a new asset.
+
+A used asset cannot be deleted silently: the reference index of the current
+release names every document that uses it, and a delete answers
+`409 media_in_use` with `usedBy`. A draft that uses it is not in the index,
+so deleting the asset leaves that draft's publish refused
+(`reference_not_found`). Changing a used asset's alt text or focal point
+moves the cache generation and the `builder` surface (a release is immutable
+and the media is resolved at render, so the release cannot carry it);
+changing an unused one purges nothing.
+
+Staff (`StoreStaffModelPermissions`, so ADMIN and OWNER write, STAFF look):
+
+| Route | |
+|---|---|
+| `GET media` (`?search=`, `?ordering=createdAt\|sizeBytes`) | The library, newest first, each with `usedBy` |
+| `POST media` | Multipart: `file`, optional `focalX`, `focalY`, `alt` (a JSON object, language to text) |
+| `GET/PATCH/DELETE media/<id>` | `PATCH` changes `focalX`, `focalY` and the alt of the languages named |
+
+Public: `GET media/resolve?ids=1,2&locale=` (AllowAny) answers
+`{results: [{id, path, width, height, mime, focalX, focalY, alt}]}` with the
+alt in the asked language, else the default one. **Only assets the current
+release uses are answered** (ids are sequential, and an image nobody
+published is not the public's to list); any other id is left out and the
+storefront shows that block empty.
 
 ## Signing in to the editor
 

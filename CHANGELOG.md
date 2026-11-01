@@ -3,6 +3,117 @@
 
 
 
+## v3.184.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(emails): keep the machine-to-machine webhook out of the OpenAPI schema
+
+The storefront generates its types from schema.yml; a webhook receiver is
+not part of that contract.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d3bcd5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3bcd5c9a148c47df6cf5cc657cf013b28de401e))
+
+### Features
+
+* feat(builder): import a store's legacy page layouts and menus as documents (#409) ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* feat(builder): import a store's legacy page layouts and menus as documents
+
+builder_import_legacy sends each PageLayout and NavigationMenu, described by
+builder.legacy, to the storefront's converter (POST /api/builder/convert-legacy,
+the one implementation of props to settings and blocks), validates every
+result like any other document, and, only when all pass, writes the
+documents (a layout that is not published stays a draft), one version for
+each released one and ONE release, in one transaction per store. A problem
+anywhere writes nothing, a store that already has builder data is refused,
+--dry-run rolls everything back, and the legacy tables are untouched.
+builder_export_legacy writes the requests as a corpus for the storefront's
+tests.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* feat(builder): a layout is a template or a custom page by the catalogue's templates
+
+The storefront's catalogue lists the fixed page types as templates; a layout
+of any other page type is imported as the page:<page_type> document.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* feat(builder): refuse a template document the storefront has no page type for
+
+A template:<name> key must be one of the catalogue's templates.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* feat(emails): Resend webhook, provider events and the suppression list (#407) ([`d3bcd5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3bcd5c9a148c47df6cf5cc657cf013b28de401e))
+
+* feat(emails): Resend webhook, provider events and the suppression list
+
+POST /resend/webhook/ is mounted on every host. A store with its own
+Resend team registers its own host and the delivery is verified with that
+store secret, resolved by host; the platform team registers the platform
+host, verified with RESEND_WEBHOOK_SECRET, and its events are routed by the
+signed schema tag. There is no fallback between the two secrets.
+
+The Svix signature is verified on the raw body (HMAC-SHA256, any v1
+signature, a timestamp tolerance as the replay guard), pinned against a
+signature made by the svix package, with no new dependency. The view
+answers 200 and queues process_provider_event, which routes the event to
+its schema (a store endpoint speaks only for that store), matches the row by
+both the log tag and the provider id, records it once per svix-id in
+EmailEvent, and moves the EmailLog status forward only.
+
+A permanent bounce suppresses every email, a spam complaint only marketing
+and opts the address out of marketing, a provider suppression is mirrored.
+send_email skips a suppressed address with a skipped_suppressed row; a
+required mail is warned about, never lost silently.
+
+The migration only adds a nullable column and widens two choices.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`d3bcd5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3bcd5c9a148c47df6cf5cc657cf013b28de401e))
+
+### Testing
+
+* test(builder): replay the storefront's converter fixtures against the exporter
+
+The storefront's golden request/response fixtures are vendored under
+tests/fixtures/builder/legacy. A layout or menu built from a fixture's rows
+exports the fixture's request, and each response parses into what the
+importer validates. The exporter now leaves out an empty section overlay,
+an empty column icon and a false merchant-identity flag, and sends the
+menu's id, as the fixtures spell them.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* test(builder): let a fixture leave a menu link's id out
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
+* test(builder): re-vendor the menu-header fixture with the label fallback
+
+The content-page link's English label is its Greek title (the legacy menu
+shows another language's title when a page has none), with the overlay
+pointer the storefront sends.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`94dc950`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94dc950f2ebf0b14cca3474034b976f6b5d27909))
+
 ## v3.183.0 (2026-11-01)
 
 ### Features

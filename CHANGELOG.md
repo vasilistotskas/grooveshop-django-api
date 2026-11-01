@@ -3,6 +3,44 @@
 
 
 
+## v3.186.0 (2026-11-01)
+
+### Features
+
+* feat(builder): count each imported document's sections and blocks in the report (#414)
+
+The import report (and --json) now gives, per document, how many sections it
+has and how many blocks at every depth, so a dry run says what would be
+imported and not only which documents.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`07cbd1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07cbd1cc955fc36935fb2f4e6c714cb05b5469fe))
+
+### Refactoring
+
+* refactor(emails): verify the Resend webhook with the Standard Webhooks library (#415)
+
+The Svix signature check was hand-written. Signature verification is
+security code, so it is now the maintained reference implementation: the
+standardwebhooks package, which the svix client itself delegates to and
+which has no dependencies of its own (the svix package would add httpx and
+the whole API client for the same verifier).
+
+A thin adapter in emails.webhooks renames Resend svix-* headers to the
+webhook-* names the library reads and turns everything it can raise for a
+request that is not a delivery (missing header, malformed signature or
+secret, non UTF-8 body) into one InvalidSignature, so a forged request is a
+400, never a 500; tests cover each. The five minute replay window is the
+library, so RESEND_WEBHOOK_TOLERANCE_SECONDS is removed. emails/svix.py is
+deleted; the real-svix signature vector is kept.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5021399`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5021399763ae6d303d4e617fc342e3ad4884c502))
+
 ## v3.185.0 (2026-11-01)
 
 ### Chores

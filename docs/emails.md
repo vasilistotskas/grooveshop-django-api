@@ -633,9 +633,7 @@ transport), then sets `SENT` (`sent_at`, `provider`, `provider_message_id`;
 SMTP returns no id, so it stays null there) or `FAILED` (`error`). A skip is
 one row with its status and, for a closed gate, the gate's label in `reason`.
 
-### Delivery identity across retries
-
-`EmailLog.uuid` is the delivery's identity (`log.delivery_id`). Inside a Celery
+**Delivery identity across retries.** `EmailLog.uuid` is the delivery's identity (`log.delivery_id`). Inside a Celery
 task it is derived from the task id, which `retry()` keeps, plus the type, the
 recipient hash and the subject; outside a task it is a fresh uuid4. A retry of
 a send that failed (or whose response was lost) therefore finds the row its

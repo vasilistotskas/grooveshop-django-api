@@ -347,7 +347,6 @@ class EmailTemplatePreviewService:
                     "url": f"{get_tenant_base_url()}/blog/success-story",
                 },
             ],
-            "unsubscribe_url": f"{get_tenant_base_url()}/unsubscribe",
             "preferences_url": f"{get_tenant_base_url()}/preferences",
         }
 

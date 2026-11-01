@@ -18,7 +18,7 @@ from emails.headers import (
     build_transactional_list_headers,
 )
 
-URL = "https://api.shop.example/api/v1/user/unsubscribe/tok/"
+URL = "https://api.shop.example/api/v1/emails/unsubscribe/tok"
 
 
 @pytest.fixture

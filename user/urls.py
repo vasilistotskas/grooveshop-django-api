@@ -9,8 +9,6 @@ from user.views.subscription import (
     ConfirmSubscriptionByTokenView,
     NewsletterSubscribeView,
     SubscriptionTopicViewSet,
-    UnsubscribeAllView,
-    UnsubscribeTopicView,
     UserSubscriptionViewSet,
 )
 
@@ -190,16 +188,6 @@ urlpatterns = [
         "user/subscription/topic/<int:pk>/unsubscribe",
         SubscriptionTopicViewSet.as_view({"post": "unsubscribe"}),
         name="user-subscription-topic-unsubscribe",
-    ),
-    path(
-        "user/unsubscribe/<str:token>/<str:topic_slug>",
-        UnsubscribeTopicView.as_view(),
-        name="user-unsubscribe-topic",
-    ),
-    path(
-        "user/unsubscribe/<str:token>",
-        UnsubscribeAllView.as_view(),
-        name="user-unsubscribe",
     ),
     path(
         "user/subscription/confirm/<str:token>",

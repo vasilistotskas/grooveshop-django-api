@@ -30,4 +30,4 @@ owner@store.test
 https://shop.example
 
 Δεν θέλετε να λαμβάνετε αυτά τα emails;
-Απεγγραφή: https://api.shop.example/api/v1/user/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwicGsiOjUwMDAwMX0:1AbCdE:PKrlMdo_yvNug7f72eLNs0_HgaqR5GKxkcVUN0TrqC0
+Απεγγραφή: https://shop.example/email/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0IjoidXNlci5yZWVuZ2FnZW1lbnQiLCJhIjo1MDAwMDF9:1AbCdE:HEihNlPr9wVV6ZKh7BthVbxa9CgEk6X2Mprrd0Hk83U

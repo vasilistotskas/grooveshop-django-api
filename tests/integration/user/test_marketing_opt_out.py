@@ -7,11 +7,9 @@ neither sender looked at any opt-out, and the link only flipped
 customer who clicked it, or whose mail client clicked it for them, kept
 receiving both.
 
-The customer's refusal now lives on the account
-(``UserAccount.marketing_opted_out_at``), recorded by the blanket
-unsubscribe link, and each marketing sender skips the account. The tests
-drive the real thing: the link taken from the header of an email that was
-actually sent.
+The customer's refusal lives in ``EmailOptOut`` and each marketing send
+skips it. The tests drive the real thing: the link taken from the header of
+an email that was actually sent.
 """
 
 from __future__ import annotations
@@ -22,7 +20,6 @@ from datetime import timedelta
 import pytest
 from django.core import mail
 from django.utils import timezone
-from rest_framework import status
 from rest_framework.test import APIClient
 
 from cart.factories.cart import CartFactory
@@ -34,13 +31,7 @@ from order.tasks import send_checkout_abandonment_emails
 from product.factories.product import ProductFactory
 from tests.utils.emails import open_email_gates  # noqa: F401
 from user.factories.account import UserAccountFactory
-from user.factories.subscription import UserSubscriptionFactory
 from user.models.account import UserAccount
-from user.models.subscription import UserSubscription
-from user.utils.subscription import (
-    generate_blanket_unsubscribe_link,
-    generate_unsubscribe_link,
-)
 
 pytestmark = [
     pytest.mark.django_db,
@@ -111,87 +102,6 @@ def _abandoned_cart(user) -> StockReservation:
     return reservation
 
 
-class TestTheUnsubscribeLinkRecordsTheOptOut:
-    def test_one_click_post_opts_the_account_out_without_any_subscription(
-        self,
-    ):
-        """The case that was broken: no topic row to flip."""
-        user = UserAccountFactory(num_addresses=0)
-
-        response = _one_click(generate_blanket_unsubscribe_link(user))
-
-        assert response.status_code == status.HTTP_200_OK
-        user.refresh_from_db()
-        assert user.marketing_opted_out_at is not None
-
-    def test_the_get_link_opts_out_and_says_so(self):
-        user = UserAccountFactory(num_addresses=0)
-        path = _path(generate_blanket_unsubscribe_link(user))
-
-        first = APIClient().get(path)
-        second = APIClient().get(path)
-
-        # "Successfully ..." reports a count; "Already ..." does not.
-        assert first.data["count"] == 0
-        assert first.data["message"] != second.data["message"]
-        assert "count" not in second.data
-
-    def test_the_first_refusal_stands(self):
-        user = UserAccountFactory(num_addresses=0)
-        path = _path(generate_blanket_unsubscribe_link(user))
-        APIClient().get(path)
-        user.refresh_from_db()
-        first = user.marketing_opted_out_at
-
-        APIClient().get(path)
-
-        user.refresh_from_db()
-        assert user.marketing_opted_out_at == first
-
-    def test_a_topic_link_ends_that_topic_only(self):
-        subscription = UserSubscriptionFactory(
-            status=UserSubscription.SubscriptionStatus.ACTIVE
-        )
-        user = subscription.user
-
-        response = APIClient().post(
-            _path(generate_unsubscribe_link(subscription))
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        user.refresh_from_db()
-        assert user.marketing_opted_out_at is None
-
-    def test_a_guest_link_opts_no_account_out(self):
-        guest = UserSubscriptionFactory(
-            user=None,
-            email="guest@example.com",
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-        bystander = UserAccountFactory(num_addresses=0)
-        token = generate_unsubscribe_link(guest).split("/unsubscribe/")[1]
-        token = token.split("/")[0]
-
-        APIClient().get(f"/api/v1/user/unsubscribe/{token}")
-
-        bystander.refresh_from_db()
-        assert bystander.marketing_opted_out_at is None
-        assert not UserAccount.objects.filter(
-            marketing_opted_out_at__isnull=False
-        ).exists()
-
-    def test_a_forged_link_opts_nobody_out(self):
-        user = UserAccountFactory(num_addresses=0)
-
-        response = _one_click(
-            generate_blanket_unsubscribe_link(user)[:-4] + "XXXX"
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        user.refresh_from_db()
-        assert user.marketing_opted_out_at is None
-
-
 class TestReengagementHonoursTheOptOut:
     def test_the_one_click_link_in_the_email_stops_the_next_one(self):
         leaver = _inactive_user(email="leaver@example.com")
@@ -212,6 +122,22 @@ class TestReengagementHonoursTheOptOut:
         send_inactive_user_notifications()
 
         assert [m.to[0] for m in mail.outbox] == [stayer.email]
+
+    def test_the_body_link_opens_the_confirm_page_and_opts_nobody_out(self):
+        user = _inactive_user(email="leaver@example.com")
+
+        send_inactive_user_notifications()
+
+        message = mail.outbox[0]
+        match = re.search(
+            r"https://\S+/email/unsubscribe/([^\s\"<>]+)", message.body
+        )
+        assert match is not None
+        claims = optout.read_token(match.group(1))
+        assert claims.address_hash == optout.address_hash(user.email)
+        assert claims.type_key == "user.reengagement"
+        assert "/api/v1/" not in match.group(0)
+        assert not EmailOptOut.objects.exists()
 
     def test_an_opted_out_account_is_not_mailed_or_counted_as_sent(self):
         user = _inactive_user()

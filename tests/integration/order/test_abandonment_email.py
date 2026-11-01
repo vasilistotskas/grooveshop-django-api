@@ -1,10 +1,9 @@
 """Regression test: the abandoned-cart email's unsubscribe link must use the
 current signing-based token scheme.
 
-The unsubscribe URL migration removed the old uidb64/default_token_generator
-route; send_checkout_abandonment_emails still hand-rolled that old format,
-producing links that always failed BadSignature. It now uses the shared
-generate_blanket_unsubscribe_link helper.
+send_checkout_abandonment_emails once hand-rolled an old uidb64 format,
+producing links that always failed BadSignature. Its List-Unsubscribe header
+now carries the pipeline's signed token.
 """
 
 from __future__ import annotations

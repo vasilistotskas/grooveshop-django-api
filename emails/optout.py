@@ -8,8 +8,13 @@ The unsubscribe link carries a signed token naming the owning schema, the
 address hash and the type (or ``*`` for every marketing type). It is signed
 under a salt of its own, so it cannot be replayed as another kind of token,
 and it names the schema because ``SECRET_KEY`` is global: a token minted for
-one store must not verify on another's host (the same rule as
-``user.utils.subscription._make_unsubscribe_token``).
+one store must not verify on another's host.
+
+Two URLs carry that one token. :func:`unsubscribe_url` is the API endpoint
+named in the RFC 8058 ``List-Unsubscribe`` header, which a mailbox provider
+POSTs. :func:`confirm_url` is the storefront page a person reaches from a
+link in a mail body: it shows a button that POSTs the same token, because a
+link scanner that follows a body link must not opt anyone out.
 """
 
 from __future__ import annotations
@@ -20,10 +25,14 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection
 
-from core.utils.tenant_urls import get_tenant_api_base_url
+from core.utils.tenant_urls import (
+    get_tenant_api_base_url,
+    get_tenant_frontend_url,
+)
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from emails.registry import UnknownEmailType, registry
 from emails.types import EmailType
@@ -34,6 +43,8 @@ TOKEN_SALT = "emails.optout"
 TOKEN_MAX_AGE = timedelta(days=365)
 #: The unsubscribe endpoint, on the API host: it has no storefront proxy.
 UNSUBSCRIBE_PATH = "/api/v1/emails/unsubscribe"
+#: The storefront page that confirms by button and POSTs to the endpoint.
+CONFIRM_PATH = "/email/unsubscribe"
 
 
 class InvalidToken(Exception):
@@ -82,20 +93,42 @@ def opt_out(
 ) -> EmailOptOut:
     """Record the opt-out (once). Raises ``UnknownEmailType`` for an
     unknown type and ``ValueError`` for one that takes no opt-out."""
+    return opt_out_hashed(address_hash(address), type_key, source=source)
+
+
+def opt_out_hashed(
+    hashed: str, type_key: str, *, source: EmailOptOut.Source
+) -> EmailOptOut:
+    """:func:`opt_out` for a caller that holds the address hash only, such
+    as the claims of a token."""
     if not _takes_opt_out(type_key):
         raise ValueError(f"Email type {type_key!r} takes no opt-out.")
-    return _record(address_hash(address), type_key, source)
+    return _record(hashed, type_key, source)
+
+
+def _account_pk(address: str) -> int | None:
+    """The pk of the account that owns *address*, or None for a guest."""
+    return (
+        get_user_model()
+        .objects.filter(email__iexact=address.strip())
+        .values_list("pk", flat=True)
+        .first()
+    )
 
 
 def make_token(address: str, type_key: str) -> str:
-    return signing.dumps(
-        {
-            "schema": connection.schema_name,
-            "h": address_hash(address),
-            "t": type_key,
-        },
-        salt=TOKEN_SALT,
-    )
+    """Sign the schema, the address hash and the type; for an account's
+    address also its pk (``a``), because the hash cannot be turned back
+    into an account and the address must not travel in a URL."""
+    payload = {
+        "schema": connection.schema_name,
+        "h": address_hash(address),
+        "t": type_key,
+    }
+    account_pk = _account_pk(address)
+    if account_pk is not None:
+        payload["a"] = account_pk
+    return signing.dumps(payload, salt=TOKEN_SALT)
 
 
 def unsubscribe_url(address: str, email_type: EmailType) -> str:
@@ -105,10 +138,26 @@ def unsubscribe_url(address: str, email_type: EmailType) -> str:
     )
 
 
+def confirm_url_for_token(token: str, *, language: str) -> str:
+    """The storefront confirm page for an existing *token*."""
+    return get_tenant_frontend_url(f"{CONFIRM_PATH}/{token}", language=language)
+
+
+def confirm_url(address: str, email_type: EmailType, *, language: str) -> str:
+    """The storefront confirm page for a link in a mail body, in the
+    language the mail is rendered in."""
+    return confirm_url_for_token(
+        make_token(address, email_type.key), language=language
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class TokenClaims:
     address_hash: str
     type_key: str
+    #: The account the address belonged to when the mail was sent; None
+    #: for a guest.
+    account_pk: int | None = None
 
 
 def read_token(token: str) -> TokenClaims:
@@ -121,7 +170,11 @@ def read_token(token: str) -> TokenClaims:
             raise InvalidToken("The type takes no opt-out.")
     except (signing.BadSignature, KeyError, UnknownEmailType) as error:
         raise InvalidToken(str(error)) from error
-    return TokenClaims(address_hash=claims["h"], type_key=claims["t"])
+    return TokenClaims(
+        address_hash=claims["h"],
+        type_key=claims["t"],
+        account_pk=claims.get("a"),
+    )
 
 
 def opt_out_by_token(token: str, *, source: EmailOptOut.Source) -> EmailOptOut:

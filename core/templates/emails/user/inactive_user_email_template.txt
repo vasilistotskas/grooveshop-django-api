@@ -32,4 +32,4 @@
 {% endif %}{{ SITE_URL }}
 
 {% trans "Don't want to receive these emails?" %}
-{% trans "Unsubscribe" %}: {{ unsubscribe_url|default:SITE_URL }}
+{% trans "Unsubscribe" %}: {{ unsubscribe_url }}

@@ -47,6 +47,7 @@ from admin.export import ExportActionMixin
 from admin.features import Gate, store_features
 from admin.filters import RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
+from emails import optout
 from emails.models import EmailOptOut
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
@@ -531,7 +532,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
             # by phone or email; the field is read-only once set, because
             # only the customer can lift it.
             opt_out_of_marketing(
-                obj.email,
+                optout.address_hash(obj.email),
                 account_pk=obj.pk,
                 source=EmailOptOut.Source.STAFF,
             )

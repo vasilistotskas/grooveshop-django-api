@@ -77,18 +77,19 @@ class NewsletterFormResult:
 
 
 def opt_out_of_marketing(
-    address: str,
+    address_hash: str,
     *,
     account_pk: int | None,
     source: EmailOptOut.Source,
 ) -> bool:
-    """Unsubscribe *address* from every marketing email: the one writer.
+    """Unsubscribe the address with *address_hash* from every marketing
+    email: the one writer.
 
     Writes ``EmailOptOut`` for every marketing type, which is what stops the
     mail, and, for an account, ``marketing_opted_out_at`` (account state the
     admin shows), in one transaction. A guest has no account: *account_pk*
-    is None. Both the blanket unsubscribe link and the customer admin come
-    here, so neither half is ever written alone.
+    is None. The customer admin comes here, so neither half is ever written
+    alone.
 
     Returns True when this call recorded the account's flag, False when it
     was already set (the first time stands), there is no account, or the
@@ -97,7 +98,7 @@ def opt_out_of_marketing(
     from user.models.account import UserAccount
 
     with transaction.atomic():
-        optout.opt_out(address, EVERY_MARKETING_TYPE, source=source)
+        optout.opt_out_hashed(address_hash, EVERY_MARKETING_TYPE, source=source)
         if account_pk is None:
             return False
         return bool(
@@ -105,6 +106,30 @@ def opt_out_of_marketing(
                 pk=account_pk, marketing_opted_out_at__isnull=True
             ).update(marketing_opted_out_at=timezone.now())
         )
+
+
+def unsubscribe_from_all_marketing(
+    claims: optout.TokenClaims, *, source: EmailOptOut.Source
+) -> None:
+    """What "stop all marketing emails from the store" means for the holder
+    of a valid token: every marketing type is opted out and, for an
+    account, the account's flag is set and its active topic subscriptions
+    end, together. A guest's token names no account, so only the opt-out
+    row is written (the hash cannot be turned back into a subscription).
+    """
+    with transaction.atomic():
+        opt_out_of_marketing(
+            claims.address_hash,
+            account_pk=claims.account_pk,
+            source=source,
+        )
+        if claims.account_pk is None:
+            return
+        for subscription in UserSubscription.objects.filter(
+            user_id=claims.account_pk,
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        ):
+            subscription.unsubscribe()
 
 
 @dataclass(frozen=True)

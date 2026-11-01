@@ -25,14 +25,12 @@ from core.utils.tenant_urls import (
     get_tenant_frontend_url,
     localize_storefront_url,
 )
+from emails import optout
 from emails.declare import customer_email, marketing_email
 from emails.gates import FeatureGate, ScheduleGate
 from emails.recipients import Recipient, customer_of
 from emails.types import RenderEnv
-from user.utils.subscription import (
-    generate_blanket_unsubscribe_link,
-    subscription_confirmation_url,
-)
+from user.utils.subscription import subscription_confirmation_url
 
 if TYPE_CHECKING:
     from user.models import UserAccount, UserDataExport, UserSubscription
@@ -88,9 +86,8 @@ def _already_subscribed(
     subscription: UserSubscription, env: RenderEnv
 ) -> dict[str, Any]:
     # An account manages its subscriptions where it signs in. A guest has
-    # no login and gets no link: the only unsubscribe route that works
-    # without one acts on GET, and a mail scanner's prefetch must not
-    # unsubscribe someone this mail tells they ARE subscribed.
+    # no login and gets no link: this mail tells them they ARE subscribed,
+    # so it offers no unsubscribe.
     context = _subscription_context(subscription, env)
     if subscription.user_id:
         context["manage_url"] = get_tenant_frontend_url(
@@ -107,7 +104,9 @@ def _reengagement(user: UserAccount, env: RenderEnv) -> dict[str, Any]:
             "username": user.username,
             "email": user.email,
         },
-        "unsubscribe_url": generate_blanket_unsubscribe_link(user),
+        "unsubscribe_url": optout.confirm_url(
+            env.recipient.address, REENGAGEMENT, language=env.language
+        ),
     }
 
 
@@ -210,7 +209,7 @@ customer_email(
     recipients=_subscriber,
     gates=(FeatureGate(feature="newsletter", label=_("Newsletter feature")),),
 )
-marketing_email(
+REENGAGEMENT = marketing_email(
     "user.reengagement",
     title=_("We miss you"),
     description=_(

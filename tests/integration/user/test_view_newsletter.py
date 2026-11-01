@@ -14,10 +14,9 @@ from uuid import uuid4
 
 import pytest
 from allauth.account.models import EmailAddress
-from django.core import mail, signing
+from django.core import mail
 from django.core.cache.backends.locmem import LocMemCache
 from django.db import IntegrityError, connection, transaction
-from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -31,7 +30,6 @@ from user.models.subscription import (
     UserSubscription,
 )
 from user.serializers.subscription import SubscriptionTopicWriteSerializer
-from user.utils.subscription import UNSUBSCRIBE_SALT, generate_unsubscribe_link
 
 pytestmark = pytest.mark.django_db
 
@@ -224,7 +222,7 @@ class TestSubscribe:
         assert message.to == ["guest@example.com"]
         assert "already subscribed" in message.subject
         # A guest has no login and no link: nothing a scanner can act on.
-        assert "/api/v1/user/unsubscribe/" not in message.body
+        assert "/email/unsubscribe/" not in message.body
         assert "/account/subscriptions" not in message.body
 
     def test_second_submission_inside_the_cooldown_sends_nothing(
@@ -297,7 +295,7 @@ class TestSubscribe:
         assert len(mail.outbox) == 1
         assert mail.outbox[0].to == ["owner@example.com"]
         assert "/account/subscriptions" in mail.outbox[0].body
-        assert "/api/v1/user/unsubscribe/" not in mail.outbox[0].body
+        assert "/email/unsubscribe/" not in mail.outbox[0].body
 
     def test_pending_row_inside_the_cooldown_sends_no_notice(
         self, client, topic, django_capture_on_commit_callbacks
@@ -531,65 +529,6 @@ class TestConfirm:
 
         response = client.post(_confirm_url(token))
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-
-class TestGuestUnsubscribe:
-    @override_settings(API_BASE_URL="https://api.test-site.com")
-    def test_sid_link_unsubscribes_the_guest_row(self, client, topic):
-        row = UserSubscription.objects.create(
-            topic=topic, email="guest@example.com", status=Status.ACTIVE
-        )
-        path = generate_unsubscribe_link(row).split(
-            "https://api.test-site.com"
-        )[1]
-
-        response = client.get(path)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json()["userEmail"] == "guest@example.com"
-        row.refresh_from_db()
-        assert row.status == Status.UNSUBSCRIBED
-
-    def test_one_click_post_with_sid(self, client, topic):
-        row = UserSubscription.objects.create(
-            topic=topic, email="guest@example.com", status=Status.ACTIVE
-        )
-        token = signing.dumps(
-            {"schema": connection.schema_name, "sid": str(row.uuid)},
-            salt=UNSUBSCRIBE_SALT,
-        )
-
-        response = client.post(
-            reverse("user-unsubscribe-topic", args=[token, topic.slug])
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        row.refresh_from_db()
-        assert row.status == Status.UNSUBSCRIBED
-
-    def test_sid_minted_for_another_tenant_is_rejected(self, client, topic):
-        """Schema-scoped like the account token: a valid signature from
-        another store's domain unsubscribes nothing here."""
-        row = UserSubscription.objects.create(
-            topic=topic, email="guest@example.com", status=Status.ACTIVE
-        )
-        token = signing.dumps(
-            {"schema": "tenant_b", "sid": str(row.uuid)},
-            salt=UNSUBSCRIBE_SALT,
-        )
-
-        get = client.get(
-            reverse("user-unsubscribe-topic", args=[token, topic.slug])
-        )
-        post = client.post(
-            reverse("user-unsubscribe-topic", args=[token, topic.slug])
-        )
-
-        assert get.status_code == status.HTTP_400_BAD_REQUEST
-        # RFC 8058: one-click stays silent, but changes nothing.
-        assert post.status_code == status.HTTP_200_OK
-        row.refresh_from_db()
-        assert row.status == Status.ACTIVE
 
 
 class TestRequestPathIsAddressIndependent:

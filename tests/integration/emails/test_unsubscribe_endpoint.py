@@ -1,4 +1,5 @@
-"""``POST /api/v1/emails/unsubscribe/<token>``, the RFC 8058 target."""
+"""``/api/v1/emails/unsubscribe/<token>``: the RFC 8058 POST target, and
+a GET that only redirects to the storefront confirm page."""
 
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from core.utils.i18n import store_language
 from emails import optout
 from emails.models import EVERY_MARKETING_TYPE, EmailOptOut
 from emails.types import Kind
@@ -103,12 +105,23 @@ def test_it_opts_out_of_the_named_type_only():
     ]
 
 
-def test_a_get_never_opts_anyone_out():
+def test_a_get_redirects_to_the_confirm_page_and_opts_nobody_out():
     token = optout.make_token(ADDRESS, MARKETING)
 
     response = APIClient().get(_url(token))
 
-    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    assert response.status_code == status.HTTP_302_FOUND
+    assert response["Location"] == optout.confirm_url_for_token(
+        token, language=store_language()
+    )
+    assert response["Location"].endswith(f"{optout.CONFIRM_PATH}/{token}")
+    assert not EmailOptOut.objects.exists()
+
+
+def test_a_get_with_a_bad_token_still_only_redirects():
+    response = APIClient().get(_url("garbage"))
+
+    assert response.status_code == status.HTTP_302_FOUND
     assert not EmailOptOut.objects.exists()
 
 
@@ -159,3 +172,16 @@ def test_a_bad_token_is_a_400_that_says_nothing_about_why(token):
         "code": "unsubscribe_token_invalid",
     }
     assert not EmailOptOut.objects.exists()
+
+
+def test_a_get_never_redirects_off_the_storefront(monkeypatch):
+    monkeypatch.setattr(
+        optout,
+        "confirm_url_for_token",
+        lambda token, *, language: "https://evil.example/email/unsubscribe/x",
+    )
+
+    response = APIClient().get(_url("x"))
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "unsubscribe_token_invalid"

@@ -1343,9 +1343,6 @@ msgstr "Already subscribed"
 msgid "Already subscribed to this topic."
 msgstr "Already subscribed to this topic."
 
-msgid "Already unsubscribed"
-msgstr "Already unsubscribed"
-
 msgid "Already-Subscribed Notice Sent At"
 msgstr "Already-Subscribed Notice Sent At"
 
@@ -2263,6 +2260,9 @@ msgstr "Calculations"
 msgid "Call to Action Banner"
 msgstr "Call to Action Banner"
 
+msgid "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
+msgstr "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
+
 msgctxt "order source type"
 msgid "Campaign"
 msgstr "Campaign"
@@ -2632,6 +2632,9 @@ msgstr "Changed by (staff)"
 
 msgid "Changed only"
 msgstr "Changed only"
+
+msgid "Changes nothing: redirects to the storefront page where the recipient confirms the unsubscribe with a button."
+msgstr "Changes nothing: redirects to the storefront page where the recipient confirms the unsubscribe with a button."
 
 msgid "Channel"
 msgstr "Channel"
@@ -7074,9 +7077,6 @@ msgstr "Invalid ids parameter."
 msgid "Invalid language code."
 msgstr "Invalid language code."
 
-msgid "Invalid or expired unsubscribe link"
-msgstr "Invalid or expired unsubscribe link"
-
 msgid "Invalid or inactive topic IDs: {}"
 msgstr "Invalid or inactive topic IDs: {}"
 
@@ -7136,9 +7136,6 @@ msgstr "Invoice request"
 
 msgid "Invoicing & myDATA"
 msgstr "Invoicing & myDATA"
-
-msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
-msgstr "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
 
 msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
 msgstr "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. The token names the email type, or every marketing type, and is valid for the store that sent it only. Idempotent: repeating it changes nothing."
@@ -8903,6 +8900,9 @@ msgstr "Open the order and use Settle chargeback (goods) to say whether the good
 
 msgid "Open the shipment timeline"
 msgstr "Open the shipment timeline"
+
+msgid "Open the unsubscribe confirmation page"
+msgstr "Open the unsubscribe confirmation page"
 
 msgid "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
 msgstr "OpenAI / ChatGPT Ads conversion pixel ID (e.g. '8MktrqpXN1MRdD2NUfkXmU'). Alphanumeric only. Empty → the ChatGPT Ads pixel is disabled for this tenant, and its origin is left out of the CSP."
@@ -10771,12 +10771,6 @@ msgstr "RETAIL CREDIT RECEIPT"
 
 msgid "RETAIL RECEIPT"
 msgstr "RETAIL RECEIPT"
-
-msgid "RFC 8058 one-click unsubscribe from a topic"
-msgstr "RFC 8058 one-click unsubscribe from a topic"
-
-msgid "RFC 8058 one-click unsubscribe from all topics"
-msgstr "RFC 8058 one-click unsubscribe from all topics"
 
 msgid "RFC 8058 one-click unsubscribe from marketing email"
 msgstr "RFC 8058 one-click unsubscribe from marketing email"
@@ -13018,9 +13012,6 @@ msgstr "Success message"
 msgid "Success message for username update"
 msgstr "Success message for username update"
 
-msgid "Successfully unsubscribed"
-msgstr "Successfully unsubscribed"
-
 msgid "Successfully unsubscribed."
 msgstr "Successfully unsubscribed."
 
@@ -13715,6 +13706,9 @@ msgstr "The storefront has no language %(language)s."
 
 msgid "The storefront has no text in this language."
 msgstr "The storefront has no text in this language."
+
+msgid "The storefront unsubscribe confirmation page."
+msgstr "The storefront unsubscribe confirmation page."
 
 msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
@@ -14481,11 +14475,8 @@ msgstr "Unsubscribe"
 msgid "Unsubscribe from a topic"
 msgstr "Unsubscribe from a topic"
 
-msgid "Unsubscribe from a topic via email link (GET)"
-msgstr "Unsubscribe from a topic via email link (GET)"
-
-msgid "Unsubscribe from all topics via email link (GET)"
-msgstr "Unsubscribe from all topics via email link (GET)"
+msgid "Unsubscribe from all marketing email of the store"
+msgstr "Unsubscribe from all marketing email of the store"
 
 msgid "Unsubscribe here"
 msgstr "Unsubscribe here"
@@ -16178,6 +16169,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 #~ msgstr "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list. Stores a PLATFORM-schema user id; not FK-enforced (see db_constraint above)."
 
+#~ msgid "Already unsubscribed"
+#~ msgstr "Already unsubscribed"
+
 #~ msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 #~ msgstr "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 
@@ -16239,6 +16233,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 #~ msgstr "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 
+#~ msgid "Invalid or expired unsubscribe link"
+#~ msgstr "Invalid or expired unsubscribe link"
+
+#~ msgid "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
+#~ msgstr "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. Returns 200 OK regardless of token validity (silent per RFC 8058)."
+
 #~ msgid "Is Online Payment"
 #~ msgstr "Is Online Payment"
 
@@ -16291,6 +16291,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 
+#~ msgid "RFC 8058 one-click unsubscribe from a topic"
+#~ msgstr "RFC 8058 one-click unsubscribe from a topic"
+
+#~ msgid "RFC 8058 one-click unsubscribe from all topics"
+#~ msgstr "RFC 8058 one-click unsubscribe from all topics"
+
 #~ msgid "Reason for the refund"
 #~ msgstr "Reason for the refund"
 
@@ -16334,6 +16340,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
+#~ msgid "Successfully unsubscribed"
+#~ msgstr "Successfully unsubscribed"
+
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Thank you for shopping with us!"
@@ -16370,6 +16379,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "True"
 #~ msgstr "True"
+
+#~ msgid "Unsubscribe from a topic via email link (GET)"
+#~ msgstr "Unsubscribe from a topic via email link (GET)"
 
 #~ msgid "User who performed the operation (null for system operations)"
 #~ msgstr "User who performed the operation (null for system operations)"

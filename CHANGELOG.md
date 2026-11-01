@@ -3,6 +3,193 @@
 
 
 
+## v3.180.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(builder): an older block version is outdated whatever accepts says
+
+The storefront serves accepts as the current version only, so judging
+outdated by membership of accepts made every old version unknown. A lower
+version is block_version_outdated, a higher one unknown_block_version.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1b58eca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b58eca4dbfb5e4428d14ab173a3dd0d3e6723df))
+
+* fix(emails): give EmailEvent.log a translatable label
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* fix(emails): a failing log write never stops or repeats a send
+
+EmailLog.start raised before the transport ran, so with the database
+unreachable the health alert that reports exactly that could not be sent.
+Every log write now goes through one helper that reports a failure and
+carries on: the insert before the send, the update after it and a skip. The
+send is then logged without a row, and a mail that has already left is not
+repeated by a task retry.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* fix(emails): one delivery identity across the retries of a task
+
+The row's uuid, which is also the provider's idempotency key, was fresh on
+every send_email call, so the retry of a task after a lost response made a
+new row and a new key and could send the mail twice.
+
+Inside a Celery task the uuid is now derived from the task id (kept by
+retry()), the type, the recipient hash and the subject. A retry finds the
+row its earlier attempt wrote and reuses it, queued again; a recipient whose
+row is already sent is not sent again. Outside a task the uuid is fresh.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* fix(emails): the Resend idempotency key now survives a task retry
+
+The key is the delivery uuid, stable across the retries of a task (see the
+log change on the base branch), so a retry after a lost response is sent
+under the same key. Test and docs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* fix(emails): keep the deploy guard to the database checks and tolerate stand-in tenants
+
+migration_preflight ran every system check, and one of them aborts the
+transaction a test runs in; it now runs only the database-tagged checks.
+has_own_sender reads from_email defensively again, as own_sender did, for
+the stand-in tenants some tests bind.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+### Documentation
+
+* docs(emails): fold the delivery identity paragraph into the log section
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+### Features
+
+* feat(builder): versioned page documents, releases and the staff API (#402) ([`1b58eca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b58eca4dbfb5e4428d14ab173a3dd0d3e6723df))
+
+* feat(builder): versioned page documents, releases and the staff API
+
+A new tenant app holds a store's theme, section groups, templates and
+pages as documents: a draft with a per-language overlay and a revision
+(If-Match, a stale save is a 409 naming who saved), immutable versions
+(named saves and publishes only), and immutable releases that map
+document key to version. A publish validates every named draft and
+creates one release in one transaction; a rollback is a new release over
+older versions. The reference index of the current release is derived.
+
+The block catalogue is the storefront's, fetched per store with ETag
+revalidation (builder.storefront, sharing core.storefront with texts):
+every save is validated against it with jsonschema plus the checks only
+Django can make (references exist, feature gates, store limits, rich text
+through the sanitiser), each problem a JSON pointer and a stable code, and
+nothing is saved when no catalogue is available.
+
+A release moves Tenant.cache_generation and the builder cache surface; a
+draft save purges nothing. The public read resolves the current release
+for a locale (overlay merged, disabled nodes dropped) and is cached under
+the release number. builder joins STORE_SETTINGS_APP_LABELS and
+STAFF_READ_ONLY_APP_LABELS: ADMIN and OWNER edit and publish, STAFF look.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`1b58eca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b58eca4dbfb5e4428d14ab173a3dd0d3e6723df))
+
+* feat(emails): send through Resend's HTTP API, chosen by EMAIL_TRANSPORT (#401) ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* feat(emails): log every send, skip and failure in EmailLog
+
+send_email now writes one EmailLog row per recipient delivery, in the
+schema the mail is sent under (a store's schema, or public for a platform
+type). The row exists before the transport runs, so its uuid can travel
+with the message later, then becomes sent or failed; a skipped feature,
+switch, missing recipient or opt-out is one row with its status and
+reason. It holds a keyed hash and a masked form of the address, the
+subject and the failure's class and code, never an address or a body.
+
+EmailEvent (the provider timeline of one row) and EmailSuppression (an
+address hash with a reason and a scope) are added for the webhook that
+follows. The transport returns a Receipt naming the provider and its
+message id, which SMTP leaves empty.
+
+Rows are swept after EMAIL_LOG_RETENTION_DAYS (store setting, 90, 0 keeps)
+through delete_in_batches, in public from beat and per store through the
+fanout that reaches suspended stores. Staging anonymisation deletes the
+three tables.
+
+The migration only adds tables.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* feat(emails): send through Resend's HTTP API, chosen by EMAIL_TRANSPORT
+
+emails.transport now has two transports behind one deliver(): SMTP (the
+existing path through DemoRecipientSuppressingBackend) and Resend
+(emails.resend, POST /emails with requests). The Resend request carries
+the log row's uuid as Idempotency-Key and two hidden tags, schema and log;
+the returned id is recorded as provider_message_id. Every failure is a
+requests exception, so core.retry already retries a timeout, a dropped
+connection, a 5xx and a 429 and treats any other 4xx as permanent; neither
+the key nor a body is logged or put in an exception message.
+
+The key follows the sending domain. A store that sends from its own
+verified domain uses Tenant.resend_api_key and, without one, fails with
+ResendNotConfigured rather than borrow the platform's key; every other
+store and every platform type uses RESEND_API_KEY. Tenant.resend_api_key
+and Tenant.resend_webhook_secret are Fernet-encrypted, kept out of the
+history table and editable by platform staff only.
+
+A demo store's own mailboxes are dropped on both transports
+(core.mail.without_demo_mailboxes). EMAIL_TRANSPORT defaults to smtp, so
+nothing changes in production until it is set; with resend, production
+boot requires RESEND_API_KEY instead of EMAIL_HOST_PASSWORD.
+
+The migration only adds two columns with a db_default.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+* feat(emails): refuse a Resend switch that would stop a store mail
+
+A store that sends from its own verified domain and has no Resend key
+cannot send over Resend at all. One definition (emails.setup) now feeds
+three guards, all inert over SMTP:
+
+- a database system check, emails.E001, that migration_preflight runs
+  first, so the PreSync hook fails before any pod rolls and the previous
+  release keeps sending over SMTP;
+- Tenant.clean, which refuses ticking From Email verified without a key and
+  clearing the key of a verified store while Resend is selected;
+- an alert on the platform dashboard naming each store, and one on the
+  store dashboard for whoever may change store settings.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`6f59c1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f59c1dbae162d1ea34666f26045218ad178b83e))
+
+### Testing
+
+* test(builder): an older version is outdated when accepts is the current only
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1b58eca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b58eca4dbfb5e4428d14ab173a3dd0d3e6723df))
+
 ## v3.179.0 (2026-11-01)
 
 ### Features

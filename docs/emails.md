@@ -9,17 +9,17 @@ Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 
 **State.** The order, shipping, product, gift card, B2B, contact, account,
 cart, operational alert and allauth (account, MFA and social sign-in)
-emails are on the pipeline (see Registered types). What is not yet (the
-platform's own mail) still goes through its own send path and moves onto it
-one domain at a time, each move keeping the recorded golden files equal
-(see Tests).
+emails and the platform's own mail (billing notices, the staff password
+reset, the health and backup alerts) are on the pipeline (see Registered
+types). Each domain moved onto it in turn, keeping the recorded golden files
+equal (see Tests).
 
 ## The pieces
 
 | Module | What it does |
 |---|---|
 | `types.py` | `EmailType`, the contract of one kind of email, and `Audience`, `Kind`, `Owner`, `RenderEnv`. |
-| `declare.py` | `customer_email`, `marketing_email`, `staff_email`: the three shapes a domain declares its types with. |
+| `declare.py` | `customer_email`, `marketing_email`, `staff_email`, `platform_email`, `operator_alert`: the shapes a domain declares its types with. |
 | `registry.py` | `registry`: `register`, `freeze`, `get`, `all_types`, `types_for`. |
 | `gates.py` | The four gates a type can list. |
 | `recipients.py` | `Recipient(address, language)` and the resolvers `customer_of`, `store_operators`, `platform_operators`. |
@@ -27,7 +27,7 @@ one domain at a time, each move keeping the recorded golden files equal
 | `headers.py` | `build_headers`: the list headers by kind, and the two builders under it. |
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
-| `render.py` | `render`: subject and both bodies in one language; `clean_header_text`. |
+| `render.py` | `render`: subject and both bodies in one language; `clean_header_text`; `owner_schema`, the schema a type is read and sent under. |
 | `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it; the pipeline's only sender. |
 | `send.py` | `send_email`: the whole envelope. |
 | `models.py`, `services.py` | `EmailSwitch`, `EmailOptOut`; `set_switch`, the only writer of switches. |
@@ -227,6 +227,43 @@ for every account that opted out before the link also wrote `EmailOptOut`
 by phone or email (setting the field writes `EmailOptOut("*")`,
 `UserAdmin.save_model`); once set the field is read-only, because only the
 customer can lift an opt-out, through their own preferences (below).
+
+### The platform's own mail (`platform.*`)
+
+Seven types with `owner=Owner.PLATFORM`, declared with `platform_email` or
+`operator_alert`. They are sent from `public` whatever store is bound
+(`render.owner_schema`, entered by `send_email` and by `render`, so the
+admin preview shows the mail that is sent): the platform's name, logo,
+contact address and `"{SITE_NAME}" <DEFAULT_FROM_EMAIL>` sender, never a
+store's. They are listed on no store's Settings -> Emails page
+(`switches.switch_groups` reads `Owner.STORE` only). All are `required`:
+the platform has no switch page, and a billing notice, a password reset or
+an alert to the operators must not be mutable. None carries list headers
+(store staff and operators).
+
+| Key | Declared in | About | Audience, language |
+|---|---|---|---|
+| `platform.billing_expiring`, `platform.billing_expired`, `platform.billing_suspended` | `tenant/emails.py` | a `BillingNotice` (the `Tenant` row and the grace days), sent by `tenant.billing._send_stage_email` | the owner (`Tenant.owner_email`), in the store's `default_locale` |
+| `platform.billing_stage_copy` | `tenant/emails.py` | a `BillingStageCopy` (store, stage), the operators' trail of stages 2 and 3 | `settings.ADMINS` (`platform_operators()`), `settings.LANGUAGE_CODE` |
+| `platform.staff_password_reset` | `tenant/emails.py` | a `StaffPasswordReset` (the link, built by `tenant.tasks.send_staff_password_reset_email`) | the staff member's address, in the asked store's language |
+| `platform.health_alert` | `core/emails.py` | a `HealthAlert` (the failed components and their errors), from `core.tasks.monitor_system_health` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+| `platform.backup_failed` | `core/emails.py` | a `BackupFailed` (the error), from `core.tasks.scheduled_database_backup` | `settings.ADMINS`, `settings.LANGUAGE_CODE` |
+
+The staff reset is built under `public`, which knows only the platform, so
+the task reads the store's name in the store's schema first and carries it
+in the object (`store_name`): the subject and heading name the store, the
+rest of the brand is the platform's (owner decision D2: the platform
+sender). Its link still points at the host that asked, in the store's
+language.
+
+Both operator alerts keep their old guarantees: a failed health alert send
+is logged and does not mask the failure the task raises, and the backup
+task still re-raises its own error after a failed alert. The billing
+copy never fails the owner's notice it follows. `mail_admins` is no longer
+called anywhere in the project: an operator alert goes to the same
+`ADMINS`, now with a template pair, a translated subject and the platform's
+sender (the subject starts `[{site}]`, as the ops alerts do; `SERVER_EMAIL`
+and `EMAIL_SUBJECT_PREFIX`, which only `mail_admins` read, are gone).
 
 ### Email preferences (`GET` and `PATCH /api/v1/user/email-preferences`)
 
@@ -568,9 +605,10 @@ during the rollout.
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
 - The storefront's email-preferences UI (the endpoint exists).
-- The platform's own mail (billing, staff reset, health and backup
-  alerts) and the rest of the admin page (status, log, preview, test-send); the switches
-  are on it already. The preview of every registered type already
+- The platform admin's own page for the platform types (they have no
+  switches, so it would be a listing and the log); the rest of the store's
+  admin page (status, log, preview, test-send); the switches are on it
+  already. The preview of every registered type already
   goes through `render`; a real object is chosen only for the order types
   (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
 
@@ -597,6 +635,13 @@ during the rollout.
   for the product, gift card, B2B, contact, account and cart emails. It
   pins what the rows cannot (the user and product ids, the signer's clock,
   `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
+- `tests/integration/emails/test_golden_render_platform.py` records the
+  platform's mail. The billing notices and the staff reset were recorded on
+  the old send paths and kept equal, but for the deliberate differences (a
+  named `From`, the platform's brand on the staff reset); the operator mail
+  had no template, so its files record what it is now. It pins the platform
+  name, sender, contact address and static host so the files do not follow
+  `.env`.
 - `tests/integration/emails/test_golden_render_allauth.py` records the
   19 allauth mails through the adapter, and fails for a type with no
   case. `tests/integration/user/test_allauth_flows_use_the_pipeline.py`

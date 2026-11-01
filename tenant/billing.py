@@ -40,6 +40,9 @@ from typing import Any
 
 from django.conf import settings
 
+from emails.send import send_email
+from tenant.emails import BillingNotice, BillingStageCopy
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,82 +100,33 @@ _STAGES: dict[int, tuple[str, bool]] = {
 }
 
 
-def _stage_subject(tenant: Any, stage: int) -> str:
-    """Subject line, built INSIDE the caller's translation override."""
-    from django.utils.formats import date_format
-
-    # Aliased to ``_`` (not ``_g``): xgettext extraction is lexical and
-    # only recognises the standard keywords, so a ``_g("...")`` string
-    # silently never reaches the .po files.
-    from django.utils.translation import gettext as _
-
-    store = tenant.store_name or tenant.name
-    if stage == 1:
-        return _("%(store)s — your plan expires on %(date)s") % {
-            "store": store,
-            "date": date_format(tenant.paid_until),
-        }
-    if stage == 2:
-        return _("%(store)s — your plan has expired") % {"store": store}
-    return _("%(store)s — your store has been suspended") % {"store": store}
-
-
 def _send_stage_email(tenant: Any, stage: int, *, grace_days: int) -> None:
-    """One dunning email to the owner; stages 2–3 also copy admins.
+    """One dunning email to the owner; stages 2–3 also copy the operators.
 
-    Platform → merchant mail: the platform's own sender
-    (``DEFAULT_FROM_EMAIL``), rendered in the tenant's default locale.
+    Platform → merchant mail: the platform's own sender, rendered in the
+    tenant's default locale (``tenant.emails``).
     """
-    from django.core.mail import (
-        EmailMultiAlternatives,
-        mail_admins,
-    )
-    from django.template.loader import render_to_string
-    from django.utils import translation
-
-    from core.utils.email_context import build_email_context
-    from tenant.models import TenantPlan
-
-    slug, copy_admins = _STAGES[stage]
-    locale = tenant.default_locale or settings.LANGUAGE_CODE
-    context = build_email_context(
-        language=locale,
-        store_name=tenant.store_name or tenant.name,
-        plan_display=tenant.get_plan_display(),
-        is_trial=tenant.plan == TenantPlan.TRIAL,
-        paid_until=tenant.paid_until,
-        grace_days=grace_days,
-        owner_email=tenant.owner_email,
+    slug, copy_operators = _STAGES[stage]
+    send_email(
+        f"platform.billing_{slug}",
+        BillingNotice(tenant=tenant, grace_days=grace_days),
     )
 
-    with translation.override(locale):
-        subject = _stage_subject(tenant, stage)
-        html_body = render_to_string(f"emails/billing/{slug}.html", context)
-        text_body = render_to_string(f"emails/billing/{slug}.txt", context)
-
-    msg = EmailMultiAlternatives(
-        subject=subject,
-        body=text_body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[tenant.owner_email],
-    )
-    msg.attach_alternative(html_body, "text/html")
-    msg.send(fail_silently=False)
-
-    if copy_admins:
-        # Ops trail — a no-op when ADMINS (ADMIN_EMAIL) is unset, and
-        # never allowed to fail the merchant-facing send it follows.
-        mail_admins(
-            subject=f"tenant billing stage {stage}: {tenant.schema_name}",
-            message=(
-                f"Store: {tenant.store_name or tenant.name}\n"
-                f"Schema: {tenant.schema_name}\n"
-                f"Plan: {tenant.plan}\n"
-                f"Term ended: {tenant.paid_until}\n"
-                f"Stage: {stage} ({slug})"
-            ),
-            fail_silently=True,
-        )
+    if copy_operators:
+        # The ops trail is never allowed to fail the merchant-facing send
+        # it follows.
+        try:
+            send_email(
+                "platform.billing_stage_copy",
+                BillingStageCopy(tenant=tenant, stage=stage, slug=slug),
+            )
+        except Exception:
+            logger.warning(
+                "billing: the operators' copy of stage %d for %s failed",
+                stage,
+                tenant.schema_name,
+                exc_info=True,
+            )
 
 
 def run_billing_cycle() -> dict[str, int]:

@@ -798,17 +798,16 @@ class TestMonitorSystemHealthTask:
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open")
-    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(
         MEDIA_ROOT="/tmp/media",
         DEFAULT_FROM_EMAIL="admin@example.com",
         ADMINS=["admin@example.com"],
+        LANGUAGE_CODE="en",
     )
     def test_monitor_system_health_database_failure(
         self,
         mock_logger,
-        mock_mail_admins,
         mock_file,
         mock_cache,
         mock_connections,
@@ -827,25 +826,23 @@ class TestMonitorSystemHealthTask:
         with pytest.raises(HealthCheckFailed, match="database"):
             monitor_system_health()
 
-        mock_mail_admins.assert_called_once()
-        call_args = mock_mail_admins.call_args[1]
-        assert "CRITICAL: System Health Check Failed" in call_args["subject"]
+        [message] = mail.outbox
+        assert message.to == ["admin@example.com"]
+        assert "CRITICAL: System Health Check Failed" in message.subject
         # The subject names what broke. "System Health Check Failed"
         # alone makes every alert look identical in an inbox, which is
         # how the ACS ones ended up filtered away unread.
-        assert "database" in call_args["subject"]
+        assert "database" in message.subject
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open", new_callable=mock_open)
     @patch("core.tasks.os.remove")
-    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
-    @override_settings(MEDIA_ROOT="/tmp/media")
+    @override_settings(MEDIA_ROOT="/tmp/media", ADMINS=["admin@example.com"])
     def test_monitor_system_health_cache_failure(
         self,
         mock_logger,
-        mock_mail_admins,
         mock_remove,
         mock_file,
         mock_cache,
@@ -867,16 +864,15 @@ class TestMonitorSystemHealthTask:
         with pytest.raises(HealthCheckFailed, match="cache"):
             monitor_system_health()
 
-        mock_mail_admins.assert_called_once()
-        assert "cache" in mock_mail_admins.call_args[1]["subject"]
+        [message] = mail.outbox
+        assert "cache" in message.subject
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
-    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
-    @override_settings(MEDIA_ROOT="/tmp/media")
+    @override_settings(MEDIA_ROOT="/tmp/media", ADMINS=["admin@example.com"])
     def test_monitor_system_health_storage_failure(
-        self, mock_logger, mock_mail_admins, mock_cache, mock_connections
+        self, mock_logger, mock_cache, mock_connections
     ):
         mock_cursor = Mock()
         mock_connections.__getitem__.return_value.cursor.return_value.__enter__.return_value = mock_cursor
@@ -899,20 +895,22 @@ class TestMonitorSystemHealthTask:
         ):
             monitor_system_health()
 
-        mock_mail_admins.assert_called_once()
-        assert "storage" in mock_mail_admins.call_args[1]["subject"]
+        [message] = mail.outbox
+        assert "storage" in message.subject
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open", new_callable=mock_open)
     @patch("core.tasks.os.remove")
-    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
-    @override_settings(MEDIA_ROOT="/tmp/media")
+    @override_settings(
+        MEDIA_ROOT="/tmp/media",
+        ADMINS=["admin@example.com"],
+        LANGUAGE_CODE="en",
+    )
     def test_a_redis_that_answers_but_cannot_persist_is_unhealthy(
         self,
         mock_logger,
-        mock_mail_admins,
         mock_remove,
         mock_file,
         mock_cache,
@@ -942,10 +940,35 @@ class TestMonitorSystemHealthTask:
         with pytest.raises(HealthCheckFailed, match="cache"):
             monitor_system_health()
 
-        body = mock_mail_admins.call_args[1]["message"]
+        [message] = mail.outbox
+        body = message.body
         assert "aof_last_write_status=err" in body
         assert "aof_last_bgrewrite_status=err" in body
         assert "free space" in body
+
+    @patch("core.tasks.connections")
+    @patch("core.tasks.cache")
+    @patch("core.tasks.logger")
+    @override_settings(MEDIA_ROOT="/tmp/media", ADMINS=["admin@example.com"])
+    def test_a_failed_alert_is_logged_and_does_not_mask_the_failure(
+        self, mock_logger, mock_cache, mock_connections
+    ):
+        mock_connections.__getitem__.return_value.cursor.side_effect = (
+            Exception("DB error")
+        )
+        mock_cache.get.return_value = "ok"
+        mock_cache.failing_persistence_statuses.return_value = {}
+
+        with (
+            patch("core.tasks.send_email", side_effect=OSError("smtp down")),
+            pytest.raises(HealthCheckFailed, match="database"),
+        ):
+            monitor_system_health()
+
+        assert any(
+            "Failed to send health check alert email" in str(call)
+            for call in mock_logger.error.call_args_list
+        )
 
     def test_the_monitor_never_retries(self):
         """Retrying a probe only re-asks the same question.
@@ -1049,14 +1072,14 @@ class TestScheduledDatabaseBackupTask:
 
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.cleanup_old_backups")
-    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(
         DEFAULT_FROM_EMAIL="admin@example.com",
         ADMINS=["admin@example.com"],
+        LANGUAGE_CODE="en",
     )
     def test_scheduled_backup_chain_failure(
-        self, mock_logger, mock_mail_admins, mock_cleanup, mock_backup
+        self, mock_logger, mock_cleanup, mock_backup
     ):
         mock_chain = Mock()
         mock_chain.apply_async.side_effect = Exception("Broker unreachable")
@@ -1065,7 +1088,32 @@ class TestScheduledDatabaseBackupTask:
             with pytest.raises(Exception, match="Broker unreachable"):
                 scheduled_database_backup()
 
-        mock_mail_admins.assert_called_once()
+        [message] = mail.outbox
+        assert message.to == ["admin@example.com"]
+        assert "Scheduled Database Backup Failed" in message.subject
+        assert "Broker unreachable" in message.body
+
+    @patch("core.tasks.backup_database_task")
+    @patch("core.tasks.cleanup_old_backups")
+    @patch("core.tasks.logger")
+    @override_settings(ADMINS=["admin@example.com"])
+    def test_a_failed_alert_does_not_mask_the_backup_failure(
+        self, mock_logger, mock_cleanup, mock_backup
+    ):
+        mock_chain = Mock()
+        mock_chain.apply_async.side_effect = Exception("Broker unreachable")
+
+        with (
+            patch("celery.chain", return_value=mock_chain),
+            patch("core.tasks.send_email", side_effect=OSError("smtp down")),
+            pytest.raises(Exception, match="Broker unreachable"),
+        ):
+            scheduled_database_backup()
+
+        assert any(
+            "Failed to send backup failure alert email" in str(call)
+            for call in mock_logger.error.call_args_list
+        )
 
 
 class TestCleanupOldBackupsTask:

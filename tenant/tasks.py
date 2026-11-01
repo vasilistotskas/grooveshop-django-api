@@ -517,31 +517,32 @@ def send_staff_password_reset_email(
     Queued for EVERY accepted request, found address or not, so the
     request never learns whether the address is an account (see
     ``admin.password_reset``). It runs in the schema of the host that
-    asked, which decides the sender and the language: the store's own
-    default locale on a store host, the project default on the platform
-    host. The link points at the host the request came in on.
+    asked, which decides the language: the store's own default locale on a
+    store host, the project default on the platform host. The platform
+    sends the mail (``platform.staff_password_reset``) and the link points
+    at the host the request came in on.
     """
     from django.contrib.auth.tokens import default_token_generator
-    from django.core.mail import EmailMultiAlternatives
-    from django.template.loader import render_to_string
     from django.urls import reverse
     from django.utils import translation
     from django.utils.encoding import force_bytes
     from django.utils.http import urlsafe_base64_encode
-    from django.utils.translation import gettext as _
 
     from admin.password_reset import StaffPasswordResetForm
-    from core.utils.email_context import build_email_context
-    from tenant.credentials import tenant_from_email
+    from emails.send import send_email
+    from tenant.credentials import tenant_site_name
+    from tenant.emails import StaffPasswordReset
     from tenant.membership import bound_tenant
 
     tenant = bound_tenant()
     language = getattr(tenant, "default_locale", None) or settings.LANGUAGE_CODE
+    # The mail is built under ``public`` (the platform sends it), which
+    # knows only the platform's name: the store is named from this schema.
+    store_name = tenant_site_name()
     sent = 0
     for user in StaffPasswordResetForm().get_users(email):
-        # Everything the recipient reads is built in the store's language,
-        # the link included: the admin's URLs carry a language prefix, and
-        # the page it opens answers in that language.
+        # The link is built in the store's language: the admin's URLs carry
+        # a language prefix, and the page it opens answers in that language.
         with translation.override(language):
             path = reverse(
                 "admin:admin_password_reset_confirm",
@@ -552,27 +553,15 @@ def send_staff_password_reset_email(
                 current_app=site_name,
                 urlconf=urlconf,
             )
-            context = build_email_context(
+        send_email(
+            "platform.staff_password_reset",
+            StaffPasswordReset(
+                address=user.email,
                 language=language,
                 reset_url=f"{'https' if secure else 'http'}://{host}{path}",
                 valid_minutes=settings.PASSWORD_RESET_TIMEOUT // 60,
-            )
-            subject = _("Choose a new password for %(store)s") % {
-                "store": context["SITE_NAME"]
-            }
-            html_body = render_to_string(
-                "emails/staff/password_reset.html", context
-            )
-            text_body = render_to_string(
-                "emails/staff/password_reset.txt", context
-            )
-        message = EmailMultiAlternatives(
-            subject=subject,
-            body=text_body,
-            from_email=tenant_from_email(),
-            to=[user.email],
+                store_name=store_name,
+            ),
         )
-        message.attach_alternative(html_body, "text/html")
-        message.send(fail_silently=False)
         sent += 1
     return {"sent": sent}

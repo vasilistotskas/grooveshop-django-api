@@ -3026,14 +3026,10 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
 EMAIL_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
-# Used by mail_admins() as the From: header for operational alerts
-# (system health, low stock, new-order notifications). Aliased to
-# DEFAULT_FROM_EMAIL so all outbound mail uses one verified sender.
-SERVER_EMAIL = DEFAULT_FROM_EMAIL
-EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
-# Site administrator email is sourced via the ADMINS setting + mail_admins()
-# — there is no separate ADMIN_EMAIL Django setting. The ADMIN_EMAIL env
-# var is read once at module import time into ADMINS (see top of file).
+# The platform operators' address is the ADMINS setting: the ADMIN_EMAIL env
+# var is read once at module import time into it (see above), and the
+# ``platform.*`` operator alerts (``emails.recipients.platform_operators``)
+# go there from ``DEFAULT_FROM_EMAIL``.
 
 REST_KNOX = {
     "TOKEN_TTL": datetime.timedelta(days=7),

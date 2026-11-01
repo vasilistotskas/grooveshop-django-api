@@ -2,8 +2,8 @@
 
 Staff identities live in the PUBLIC schema; a store host binds the store's
 schema, whose own ``user_useraccount`` holds SHOPPERS. The flow must look
-for the account and save the new password in public, mail from the store
-(its sender, its language) with a link on the host that asked, and admit
+for the account and save the new password in public, mail from the platform
+(its sender; the store's language and name) with a link on the host that asked, and admit
 on each host only who could sign in there: a staff role in this store, or
 a superuser; the platform host serves superusers alone. The main suite
 runs every table in one schema and has no hosts, so none of this is
@@ -13,6 +13,7 @@ visible there.
 from __future__ import annotations
 
 import re
+from email.utils import formataddr
 from urllib.parse import urlsplit
 
 import pytest
@@ -155,8 +156,11 @@ class TestOnAStoreHost:
         assert message.to == [user.email]
         link = urlsplit(LINK.search(message.body).group(0))
         assert link.netloc == MT_TENANT_DOMAIN
-        # Sent as the store, not as the platform.
-        assert mt_tenant.name in message.from_email
+        # Sent by the platform, about the store.
+        assert message.from_email == formataddr(
+            (settings.SITE_NAME, settings.DEFAULT_FROM_EMAIL)
+        )
+        assert mt_tenant.name in message.subject
 
     def test_the_link_saves_the_password_to_the_public_account(
         self, store, mt_tenant

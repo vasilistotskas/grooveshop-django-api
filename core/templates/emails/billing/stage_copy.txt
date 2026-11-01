@@ -1,0 +1,12 @@
+{% load i18n %}{% blocktrans with store=store_name|safe %}{{ store }} reached billing stage {{ stage }}{% endblocktrans %}
+
+{% trans "Store" %}: {{ store_name|safe }}
+{% trans "Schema" %}: {{ schema|safe }}
+{% trans "Plan" %}: {{ plan|safe }}
+{% trans "Term ended" %}: {{ paid_until|date:"DATE_FORMAT" }}
+{% trans "Stage" %}: {{ stage }} ({{ slug }})
+
+{% trans "The store's owner received the matching notice." %}
+
+---
+{{ SITE_NAME }}

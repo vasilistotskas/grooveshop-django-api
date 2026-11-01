@@ -8,16 +8,19 @@ from __future__ import annotations
 
 import logging
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from string import Formatter
 
+from django.db import connection
 from django.template.loader import render_to_string
 from django.utils import translation
 from django.utils.translation import gettext
+from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.utils.email_context import build_email_context
-from emails.types import EmailType, RenderEnv, subject_fields
+from emails.types import EmailType, Owner, RenderEnv, subject_fields
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,25 @@ class RenderedEmail:
     language: str
     #: What the templates were rendered with, for the admin preview.
     context: Mapping[str, object]
+
+
+@contextmanager
+def owner_schema(email_type: EmailType) -> Generator[None]:
+    """The schema *email_type* is read and sent under: ``public`` for the
+    platform's own mail, whatever store is bound, so the platform's name,
+    logo and contact address brand it; the bound store's otherwise.
+
+    ``send_email`` and :func:`render` both enter it, so the admin preview
+    of a platform type shows the mail that is sent.
+    """
+    if (
+        email_type.owner is Owner.PLATFORM
+        and connection.schema_name != get_public_schema_name()
+    ):
+        with schema_context(get_public_schema_name()):
+            yield
+    else:
+        yield
 
 
 def clean_header_text(
@@ -94,7 +116,7 @@ def render(email_type: EmailType, obj: object, env: RenderEnv) -> RenderedEmail:
     recipient's language, so a lazy label in the context and the subject
     resolve in it whatever language the worker was left in.
     """
-    with translation.override(env.language):
+    with owner_schema(email_type), translation.override(env.language):
         context = build_email_context(
             language=env.language, **email_type.build_context(obj, env)
         )

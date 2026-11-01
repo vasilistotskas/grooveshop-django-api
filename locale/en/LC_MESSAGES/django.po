@@ -467,16 +467,8 @@ msgid "%(slot)s navigation"
 msgstr "%(slot)s navigation"
 
 #, python-format
-msgid "%(store)s — your plan expires on %(date)s"
-msgstr "%(store)s — your plan expires on %(date)s"
-
-#, python-format
-msgid "%(store)s — your plan has expired"
-msgstr "%(store)s — your plan has expired"
-
-#, python-format
-msgid "%(store)s — your store has been suspended"
-msgstr "%(store)s — your store has been suspended"
+msgid "%(store)s reached billing stage %(stage)s"
+msgstr "%(store)s reached billing stage %(stage)s"
 
 #, python-format
 msgid "%(store)s: Stripe provisioning failed — %(error)s"
@@ -1822,6 +1814,13 @@ msgstr "Billing city is required."
 msgid "Billing code"
 msgstr "Billing code"
 
+#, python-format
+msgid "Billing stage %(stage)s: %(schema)s"
+msgstr "Billing stage %(stage)s: %(schema)s"
+
+msgid "Billing stage reached"
+msgstr "Billing stage reached"
+
 msgid "Billing status"
 msgstr "Billing status"
 
@@ -2704,6 +2703,9 @@ msgstr "Check each voucher with ACS (wrong address, parcel waiting at a station,
 msgid "Check the health status of database, Redis, and Celery"
 msgstr "Check the health status of database, Redis, and Celery"
 
+msgid "Check the system logs and make sure the backup system is working properly."
+msgstr "Check the system logs and make sure the backup system is working properly."
+
 msgid "Check these details carefully — the store issues your invoice with exactly what is shown here."
 msgstr "Check these details carefully — the store issues your invoice with exactly what is shown here."
 
@@ -2765,6 +2767,10 @@ msgstr "Choose a new password"
 #, python-format
 msgid "Choose a new password for %(store)s"
 msgstr "Choose a new password for %(store)s"
+
+#, python-brace-format
+msgid "Choose a new password for {store_name}"
+msgstr "Choose a new password for {store_name}"
 
 msgid "City"
 msgstr "City"
@@ -10030,6 +10036,12 @@ msgstr "Plan & Billing"
 msgid "Plan and Paid Until are platform-only. They are excluded from the public tenant-resolve payload, and the merchant self-service allowlist withholds every commercial term — a store admin can edit branding and their own credentials, never their plan, term, flags or lifecycle state."
 msgstr "Plan and Paid Until are platform-only. They are excluded from the public tenant-resolve payload, and the merchant self-service allowlist withholds every commercial term — a store admin can edit branding and their own credentials, never their plan, term, flags or lifecycle state."
 
+msgid "Plan expired"
+msgstr "Plan expired"
+
+msgid "Plan expiring"
+msgstr "Plan expiring"
+
 msgid "Plans"
 msgstr "Plans"
 
@@ -11759,6 +11771,12 @@ msgstr "Scanned at"
 msgid "Scheduled"
 msgstr "Scheduled"
 
+msgid "Scheduled backup failed"
+msgstr "Scheduled backup failed"
+
+msgid "Scheduled database backup failed"
+msgstr "Scheduled database backup failed"
+
 #, python-format
 msgid "Scheduled myDATA cancellation for %(count)d credit document(s)."
 msgstr "Scheduled myDATA cancellation for %(count)d credit document(s)."
@@ -12595,9 +12613,15 @@ msgstr "Staff member who last changed the product from the admin. Id of a platfo
 msgid "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Staff member who reviewed the company. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
+msgid "Staff password reset"
+msgstr "Staff password reset"
+
 #, python-format
 msgid "Staff token %(key)s: %(user)s"
 msgstr "Staff token %(key)s: %(user)s"
+
+msgid "Stage"
+msgstr "Stage"
 
 msgid "Staging"
 msgstr "Staging"
@@ -12779,6 +12803,9 @@ msgstr "Store search"
 
 msgid "Store staff"
 msgstr "Store staff"
+
+msgid "Store suspended"
+msgstr "Store suspended"
 
 msgid "Store vertical"
 msgstr "Store vertical"
@@ -13082,6 +13109,9 @@ msgstr "System Information"
 msgid "System Notifications"
 msgstr "System Notifications"
 
+msgid "System health check failed"
+msgstr "System health check failed"
+
 msgid "THANK YOU FOR YOUR PURCHASE!"
 msgstr "THANK YOU FOR YOUR PURCHASE!"
 
@@ -13154,6 +13184,24 @@ msgstr "Tax office (ΔΟΥ) is required."
 
 msgid "Team"
 msgstr "Team"
+
+msgid "Tells a store's owner that the plan term ends soon, before the grace period starts."
+msgstr "Tells a store's owner that the plan term ends soon, before the grace period starts."
+
+msgid "Tells a store's owner that the plan term has ended and when the store will be suspended."
+msgstr "Tells a store's owner that the plan term has ended and when the store will be suspended."
+
+msgid "Tells a store's owner that the store was suspended for an unpaid plan and how to bring it back."
+msgstr "Tells a store's owner that the store was suspended for an unpaid plan and how to bring it back."
+
+msgid "Tells the platform's operators that a store reached the expired or the suspended billing stage."
+msgstr "Tells the platform's operators that a store reached the expired or the suspended billing stage."
+
+msgid "Tells the platform's operators that the database, the cache or the media storage failed its health check."
+msgstr "Tells the platform's operators that the database, the cache or the media storage failed its health check."
+
+msgid "Tells the platform's operators that the scheduled database backup failed."
+msgstr "Tells the platform's operators that the scheduled database backup failed."
 
 msgid "Tells the store's staff that ACS paid COD money that could not be tied to an order."
 msgstr "Tells the store's staff that ACS paid COD money that could not be tied to an order."
@@ -13234,6 +13282,9 @@ msgstr "Tenant created, but automatic provisioning failed: %(error)s. Provision 
 
 msgid "Tenants"
 msgstr "Tenants"
+
+msgid "Term ended"
+msgstr "Term ended"
 
 # Email Template Translations
 msgid "Testimonials"
@@ -13507,6 +13558,9 @@ msgstr "The legal obligation the retention rests on."
 msgid "The line a goods row was taken from; empty otherwise."
 msgstr "The line a goods row was taken from; empty otherwise."
 
+msgid "The link a store's staff member asked for to choose a new admin password."
+msgstr "The link a store's staff member asked for to choose a new admin password."
+
 #, python-format
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
@@ -13663,11 +13717,17 @@ msgstr "The review was approved."
 msgid "The review was rejected."
 msgstr "The review was rejected."
 
+msgid "The run is recorded as a failure. Fix the component, then check the next scheduled run."
+msgstr "The run is recorded as a failure. Fix the component, then check the next scheduled run."
+
 msgid "The same value as ``error.type``."
 msgstr "The same value as ``error.type``."
 
 msgid "The same value as ``reason``."
 msgstr "The same value as ``reason``."
+
+msgid "The scheduled database backup failed with this error:"
+msgstr "The scheduled database backup failed with this error:"
 
 msgid "The selected locker is not in the delivery country."
 msgstr "The selected locker is not in the delivery country."
@@ -13690,6 +13750,9 @@ msgstr "The store line in the storefront's other languages, keyed by locale, e.g
 #, python-format
 msgid "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
 msgstr "The store was created but these defaults did not seed: %(steps)s. It is usable, but check the server log — a missing Meilisearch index makes EVERY search on this store return an error until the nightly sync repairs it."
+
+msgid "The store's owner received the matching notice."
+msgstr "The store's owner received the matching notice."
 
 msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 msgstr "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
@@ -13771,6 +13834,9 @@ msgstr "There is no automated platform billing rail yet. Merchants pay the platf
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "These keys are reserved and cannot be sent: %(keys)s"
+
+msgid "These system components failed their health checks:"
+msgstr "These system components failed their health checks:"
 
 msgid "Third Floor"
 msgstr "Third Floor"
@@ -15844,6 +15910,14 @@ msgid "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
 msgstr "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
 
 #, python-brace-format
+msgid "[{site}] ALERT: Scheduled Database Backup Failed"
+msgstr "[{site}] ALERT: Scheduled Database Backup Failed"
+
+#, python-brace-format
+msgid "[{site}] CRITICAL: System Health Check Failed ({components})"
+msgstr "[{site}] CRITICAL: System Health Check Failed ({components})"
+
+#, python-brace-format
 msgid "[{site}] Confirm your alert for {name}"
 msgstr "[{site}] Confirm your alert for {name}"
 
@@ -15874,6 +15948,10 @@ msgstr "[{site}] Review waiting for approval: {product_name}"
 #, python-brace-format
 msgid "[{site}] Stale ACS shipment alert — {n} shipment(s)"
 msgstr "[{site}] Stale ACS shipment alert — {n} shipment(s)"
+
+#, python-brace-format
+msgid "[{site}] Tenant billing stage {stage}: {schema}"
+msgstr "[{site}] Tenant billing stage {stage}: {schema}"
 
 #, python-brace-format
 msgid "[{site}] Update on your business account application"
@@ -16134,6 +16212,18 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+#, python-brace-format
+msgid "{store} — your plan expires on {date}"
+msgstr "{store} — your plan expires on {date}"
+
+#, python-brace-format
+msgid "{store} — your plan has expired"
+msgstr "{store} — your plan has expired"
+
+#, python-brace-format
+msgid "{store} — your store has been suspended"
+msgstr "{store} — your store has been suspended"
 
 msgid "© 2026"
 msgstr "© 2026"

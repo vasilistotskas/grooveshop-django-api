@@ -1,0 +1,10 @@
+{
+  "attachments": [],
+  "from": "Grooveshop <noreply@platform.test>",
+  "headers": {},
+  "reply_to": [],
+  "subject": "[Grooveshop] ALERT: Scheduled Database Backup Failed",
+  "to": [
+    "ops@platform.test"
+  ]
+}

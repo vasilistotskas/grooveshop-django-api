@@ -157,7 +157,7 @@ class TestRunBillingCycle:
     @pytest.fixture(autouse=True)
     def _config(self, settings, mailoutbox):
         settings.TENANT_BILLING = dict(_BILLING)
-        # A developer's .env ADMIN_EMAIL would add mail_admins copies to
+        # A developer's .env ADMIN_EMAIL would add the operators' copies to
         # the outbox and skew the counts — pin the ops channel shut.
         settings.ADMINS = []
         self.outbox = mailoutbox

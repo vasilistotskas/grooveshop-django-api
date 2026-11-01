@@ -1,0 +1,10 @@
+System health check failed
+
+These system components failed their health checks:
+
+Database health check failed: connection refused
+
+The run is recorded as a failure. Fix the component, then check the next scheduled run.
+
+---
+Grooveshop

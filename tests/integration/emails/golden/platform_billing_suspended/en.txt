@@ -1,0 +1,11 @@
+Your store Acme Gadgets has been suspended
+
+Your store has been suspended: its term ended on Aug. 1, 2026 and no renewal was recorded within the 7-day grace period. The storefront is offline and no orders can be placed.
+
+Nothing has been deleted — your products, orders, and settings are all intact.
+
+To bring your store back, arrange the renewal by replying to this email or contacting us at info@platform.test. The moment it is recorded, your store reactivates automatically.
+
+---
+Grooveshop
+https://platform.example/en

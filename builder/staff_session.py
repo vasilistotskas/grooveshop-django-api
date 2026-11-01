@@ -16,31 +16,30 @@ it for a short-lived **staff token**:
    no more than the builder's routes, is not renewed by use and ends at its
    expiry (``BUILDER_STAFF_SESSION_TTL_SECONDS``).
 
-This is the single-use ticket of the WebSocket (``core.middleware.channels``)
-applied to staff. The cache key is per store (the cache key function adds the
-schema), so a ticket minted on one store finds nothing on another.
+This is the single-use ticket of the WebSocket applied to staff
+(``core.tickets`` mints and spends both). The cache key is per store (the
+cache key function adds the schema), so a ticket minted on one store finds
+nothing on another.
 """
 
 from __future__ import annotations
 
-import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
-from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from builder.errors import BuilderError
 from builder.services import CHANGE_PERMISSION
+from core import tickets
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.membership import get_current_tenant, get_membership
 from tenant.models import PlatformStaffToken, StaffTokenScope
 from tenant.staff_actors import resolve_staff, staff_id
-
-TICKET_CACHE_PREFIX = "builder:staff-ticket:"
 
 #: ``role`` in the session answer for a platform superuser, who holds no
 #: membership.
@@ -55,28 +54,14 @@ class InvalidTicket(BuilderError):
 def mint_ticket(user: Any) -> str:
     """A single-use ticket for *user*, a staff identity of the store being
     served, valid for ``BUILDER_STAFF_TICKET_TTL_SECONDS``."""
-    ticket = secrets.token_urlsafe(32)
-    cache.set(
-        f"{TICKET_CACHE_PREFIX}{ticket}",
-        staff_id(user),
+    identity = staff_id(user)
+    if identity is None:
+        raise PermissionDenied
+    return tickets.mint(
+        tickets.BUILDER_EDITOR,
+        identity,
         settings.BUILDER_STAFF_TICKET_TTL_SECONDS,
     )
-    return ticket
-
-
-def _consume_ticket(ticket: str) -> int | None:
-    """The staff id a ticket names, deleting it in the same round trip.
-
-    ``GETDEL`` is atomic where a ``get`` then ``delete`` is not: of two
-    concurrent requests with one ticket, one gets the value and the other
-    nothing.
-    """
-    key = cache.make_and_validate_key(f"{TICKET_CACHE_PREFIX}{ticket}")
-    raw = cache._cache.get_client(key, write=True).getdel(key)
-    try:
-        return int(raw) if raw is not None else None
-    except ValueError, TypeError:
-        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +88,9 @@ def open_session(ticket: str) -> Session:
     this store's pages (the role backend, through the provenance stamp).
     Any failure is the same ``invalid_ticket``, so a probe learns nothing.
     """
-    ticket_owner = _consume_ticket(ticket) if ticket else None
+    ticket_owner = (
+        tickets.spend(tickets.BUILDER_EDITOR, ticket) if ticket else None
+    )
     user = (
         resolve_staff([ticket_owner]).get(ticket_owner)
         if ticket_owner

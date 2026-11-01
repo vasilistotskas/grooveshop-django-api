@@ -182,7 +182,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 - HTTP: Django ASGI. CORS is django-cors-headers only: the static `CORS_ALLOWED_ORIGINS` holds the platform origins and `tenant.signals.allow_tenant_origin` admits the current tenant's own domains (the same rule as `TenantCsrfMiddleware`); never set `CORS_ALLOW_ALL_ORIGINS`
 - WebSocket: `ws/notifications/` → `NotificationConsumer`
-- Auth via `TokenAuthMiddleware` — a single-use `?ticket=<token>` minted by the API and consumed atomically from Redis (`core/middleware/channels.py`); Knox tokens and session cookies are not accepted on the socket
+- Auth via `TokenAuthMiddleware` — a single-use `?ticket=<token>` minted by the API and consumed atomically from Redis (`core/tickets.py`, spent in `core/middleware/channels.py`); Knox tokens and session cookies are not accepted on the socket
 - Groups: `tenant_{schema}_user_{id}` per user (`notification/groups.py`); WebSocket identities are tenant-schema customers, so there is no staff group on the socket
 
 ### Celery

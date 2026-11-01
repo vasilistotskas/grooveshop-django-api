@@ -216,7 +216,7 @@ class TestStrictKeysStillRaise:
             "allauth.mfa.totp.used?user=1&code=123456",
             "allauth.idp.oidc.authorization_code[c:x]",
             "allauth.idp.oidc.device_code[d]",
-            "ws:ticket:abc",
+            "strict:ticket:ws:abc",
         ],
     )
     def test_reads_writes_and_deletes_raise(self, down, key):

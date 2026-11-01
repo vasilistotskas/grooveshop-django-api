@@ -210,7 +210,10 @@ class EmailEvent(models.Model):
     """One provider event on an :class:`EmailLog` row (the webhook's)."""
 
     log = models.ForeignKey(
-        EmailLog, on_delete=models.CASCADE, related_name="events"
+        EmailLog,
+        on_delete=models.CASCADE,
+        related_name="events",
+        verbose_name=_("Email log"),
     )
     provider_event_id = models.CharField(
         _("Provider event id"), max_length=128, unique=True

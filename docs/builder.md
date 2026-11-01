@@ -108,10 +108,12 @@ template (a page is the template `page`), and a block with neither lists is
 allowed anywhere except a group.
 
 Only the **current** version of a block is accepted on a write: the catalogue
-carries one schema per block. `accepts` lists older versions the storefront
-still upgrades when it renders, so an old published version keeps working
-and a restored old draft is accepted as a draft; the editor upgrades it, and
-the save and the publish validate it.
+carries one schema per block. An older version is `block_version_outdated` and a newer one
+`unknown_block_version`, whatever `accepts` says (the storefront may serve
+`accepts` as the current version only). Old published versions keep working
+because the storefront upgrades them when it renders, and a restored old
+draft is accepted as a draft; the editor upgrades it, and the save and the
+publish validate it.
 
 Limits come from settings, never from code paths:
 `BUILDER_MAX_SECTIONS_PER_DOCUMENT`, `BUILDER_MAX_BLOCKS_PER_NODE`,

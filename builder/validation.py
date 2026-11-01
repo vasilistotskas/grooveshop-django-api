@@ -274,7 +274,7 @@ def _definition_of(
         )
         return None
     if version != definition.version:
-        outdated = version in definition.accepts
+        outdated = version < definition.version
         walk.add(
             f"{where}/type",
             "block_version_outdated" if outdated else "unknown_block_version",

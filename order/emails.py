@@ -5,7 +5,7 @@ here next to the code that reads the order for it (``emails.EmailsConfig``
 imports this module at boot and then freezes the catalogue). A type's
 ``build_context`` is the ONE reader of the order for that email: the
 sending task (``emails.send.send_email``) and the admin preview
-(``core.email.preview_service``) both go through ``emails.render.render``,
+(``emails.preview``) both go through ``emails.render.render``,
 so what the preview shows is what the order is sent. A change to what an
 email says is made once.
 

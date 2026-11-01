@@ -147,18 +147,10 @@ _shared_i18n_patterns = [
     ),
 ]
 
-# Locale-prefixed, STOREFRONT only: merchant admin tooling that reads
-# TENANT_APPS data. Kept in its own group because it MUST be resolved
-# before ``admin/`` — ``AdminSite`` ends its URLconf with a catch-all
-# (``final_catch_all_view``) that would answer ``admin/email-templates/*``
-# with a 404 instead of letting resolution fall through. It is absent
-# from ``public_shared_urlpatterns`` on purpose: these views query
-# ``Order``, whose table does not exist in the public schema.
+# Locale-prefixed, STOREFRONT only: the merchant admin, which reads
+# TENANT_APPS data. It is absent from ``public_shared_urlpatterns`` on
+# purpose: those tables do not exist in the public schema.
 _storefront_admin_i18n_patterns = [
-    path(
-        _("admin/email-templates/"),
-        include("core.email.urls", namespace="email_templates"),
-    ),
     # The STORE admin, and storefront-only. It used to sit in
     # ``_shared_i18n_patterns``, which put it on the platform host as
     # well — and ``tenant/urls_public.py`` shadows only the UNPREFIXED
@@ -177,11 +169,6 @@ _storefront_admin_i18n_patterns = [
     # Nuxt purge goes out with no host and flushes every store's SSR
     # cache. The platform host now serves ``platform_admin_site`` and
     # nothing else.
-    #
-    # After email-templates, not before: ``AdminSite`` ends its URLconf
-    # with ``final_catch_all_view``, which would answer
-    # ``admin/email-templates/*`` with a 404 instead of letting
-    # resolution fall through.
     path(_("admin/"), admin.site.urls),
 ]
 

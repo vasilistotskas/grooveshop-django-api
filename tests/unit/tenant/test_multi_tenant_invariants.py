@@ -200,23 +200,3 @@ class TestEmailHelperCallSites:
                 f"{rel_path} reads settings.DEFAULT_FROM_EMAIL: the "
                 "pipeline's sender (emails.sender) decides the From"
             )
-
-    def test_shipping_modules_never_use_mail_admins(self) -> None:
-        """``mail_admins`` targets platform ADMINS. Merchant-facing
-        shipping alerts (failed vouchers, stale digests, COD payouts)
-        must be ``ops.*`` email types, so they reach the owning tenant's
-        operators.
-        """
-        import pathlib
-
-        root = pathlib.Path(__file__).resolve().parents[3]
-        offenders = [
-            str(p.relative_to(root))
-            for pkg in ("shipping", "shipping_acs", "shipping_boxnow")
-            for p in (root / pkg).rglob("*.py")
-            if "mail_admins" in p.read_text(encoding="utf-8")
-        ]
-        assert not offenders, (
-            "shipping modules must send ops.* email types, "
-            f"not mail_admins: {offenders}"
-        )

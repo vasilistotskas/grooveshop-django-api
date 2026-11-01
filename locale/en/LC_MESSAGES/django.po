@@ -1063,9 +1063,6 @@ msgstr "Account email"
 msgid "Account preferences"
 msgstr "Account preferences"
 
-msgid "Account security"
-msgstr "Account security"
-
 msgid "Account security notice"
 msgstr "Account security notice"
 
@@ -1635,9 +1632,6 @@ msgstr "Awaiting a decision"
 
 msgid "Awaiting collection"
 msgstr "Awaiting collection"
-
-msgid "B2B"
-msgstr "B2B"
 
 msgid "B2B Enabled"
 msgstr "B2B Enabled"
@@ -4108,9 +4102,6 @@ msgstr "Email Address"
 msgid "Email Addresses"
 msgstr "Email Addresses"
 
-msgid "Email Template Management"
-msgstr "Email Template Management"
-
 msgid "Email Templates"
 msgstr "Email Templates"
 
@@ -4156,9 +4147,6 @@ msgstr "Email switch"
 
 msgid "Email switches"
 msgstr "Email switches"
-
-msgid "Email template"
-msgstr "Email template"
 
 msgid "Email type"
 msgstr "Email type"
@@ -6950,9 +6938,6 @@ msgstr "Inactive Tags"
 msgid "Inactive Users"
 msgstr "Inactive Users"
 
-msgid "Inactive user notification"
-msgstr "Inactive user notification"
-
 msgid "Include related surfaces"
 msgstr "Include related surfaces"
 
@@ -8928,9 +8913,6 @@ msgstr "Operation"
 msgid "Operation Type"
 msgstr "Operation Type"
 
-msgid "Operational alerts"
-msgstr "Operational alerts"
-
 msgid "Operational note from BoxNow"
 msgstr "Operational note from BoxNow"
 
@@ -9200,9 +9182,6 @@ msgstr "Order Item Information"
 
 msgid "Order Items"
 msgstr "Order Items"
-
-msgid "Order Lifecycle"
-msgstr "Order Lifecycle"
 
 msgid "Order Number"
 msgstr "Order Number"
@@ -11858,6 +11837,9 @@ msgstr "Search by text, key or page, in any language"
 msgid "Search by title, subtitle, slug, body, or author email/username."
 msgstr "Search by title, subtitle, slug, body, or author email/username."
 
+msgid "Search emails..."
+msgstr "Search emails..."
+
 msgid "Search index"
 msgstr "Search index"
 
@@ -11869,9 +11851,6 @@ msgstr "Search products with advanced filters"
 
 msgid "Search query string"
 msgstr "Search query string"
-
-msgid "Search templates..."
-msgstr "Search templates..."
 
 msgid "Search timeout in milliseconds (searchCutoffMs)"
 msgstr "Search timeout in milliseconds (searchCutoffMs)"
@@ -11930,12 +11909,6 @@ msgstr "Select a region for the selected country."
 msgid "Select a region that belongs to the selected country."
 msgstr "Select a region that belongs to the selected country."
 
-msgid "Select a template to preview"
-msgstr "Select a template to preview"
-
-msgid "Select a template to preview."
-msgstr "Select a template to preview."
-
 msgid "Select a valid country."
 msgstr "Select a valid country."
 
@@ -11944,6 +11917,12 @@ msgstr "Select all"
 
 msgid "Select an ACS Smartpoint locker before placing an order with locker delivery."
 msgstr "Select an ACS Smartpoint locker before placing an order with locker delivery."
+
+msgid "Select an email to preview"
+msgstr "Select an email to preview"
+
+msgid "Select an email to preview."
+msgstr "Select an email to preview."
 
 msgid "Select at least one cache surface to purge."
 msgstr "Select at least one cache surface to purge."
@@ -12100,15 +12079,6 @@ msgstr "Sent when an order is returned to the store."
 
 msgid "Sent when an order's payment fails, with a link to retry."
 msgstr "Sent when an order's payment fails, with a link to retry."
-
-msgid "Sent when order is canceled"
-msgstr "Sent when order is canceled"
-
-msgid "Sent when order is delivered"
-msgstr "Sent when order is delivered"
-
-msgid "Sent when order is shipped"
-msgstr "Sent when order is shipped"
 
 msgid "Sent when someone signs up with an address that already has an account."
 msgstr "Sent when someone signs up with an address that already has an account."
@@ -12512,9 +12482,6 @@ msgstr "Social account connected"
 msgid "Social account disconnected"
 msgstr "Social account disconnected"
 
-msgid "Social sign-in"
-msgstr "Social sign-in"
-
 msgid "Software and subscriptions"
 msgstr "Software and subscriptions"
 
@@ -12679,15 +12646,6 @@ msgstr "Status ID"
 
 msgid "Status Updated At"
 msgstr "Status Updated At"
-
-msgid "Status update for completed orders"
-msgstr "Status update for completed orders"
-
-msgid "Status update for refunded orders"
-msgstr "Status update for refunded orders"
-
-msgid "Status update for returned orders"
-msgstr "Status update for returned orders"
 
 #, python-format
 msgid "Step %(current)s of %(total)s"
@@ -13008,9 +12966,6 @@ msgstr "Subscription Topic"
 msgid "Subscription Topics"
 msgstr "Subscription Topics"
 
-msgid "Subscription confirmation email"
-msgstr "Subscription confirmation email"
-
 msgid "Subscription pending confirmation."
 msgstr "Subscription pending confirmation."
 
@@ -13247,9 +13202,6 @@ msgstr "Tells the store's staff that the payment of a gift card purchase was dis
 
 msgid "Tells the store's staff which products have run down to their low-stock threshold."
 msgstr "Tells the store's staff which products have run down to their low-stock threshold."
-
-msgid "Templates"
-msgstr "Templates"
 
 msgid "Ten"
 msgstr "Ten"
@@ -14369,9 +14321,6 @@ msgstr "Twitter/X profile URL. Must use https://. Empty → link hidden in store
 msgid "Two"
 msgstr "Two"
 
-msgid "Two-factor authentication"
-msgstr "Two-factor authentication"
-
 msgid "Two-step verification"
 msgstr "Two-step verification"
 
@@ -14583,9 +14532,6 @@ msgstr "Untitled"
 msgid "Untitled Product"
 msgstr "Untitled Product"
 
-msgid "Unused"
-msgstr "Unused"
-
 msgid "Unused Tags"
 msgstr "Unused Tags"
 
@@ -14731,9 +14677,6 @@ msgstr "User ID"
 
 msgid "User ID. Leave empty for guest orders."
 msgstr "User ID. Leave empty for guest orders."
-
-msgid "User Management"
-msgstr "User Management"
 
 msgid "User Sessions"
 msgstr "User Sessions"
@@ -16018,9 +15961,6 @@ msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, fro
 msgid "admin/"
 msgstr "admin/"
 
-msgid "admin/email-templates/"
-msgstr "admin/email-templates/"
-
 msgid "cart"
 msgstr "cart"
 
@@ -16247,6 +16187,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 
+#~ msgid "Account security"
+#~ msgstr "Account security"
+
 #~ msgid "Active (Last 24h)"
 #~ msgstr "Active (Last 24h)"
 
@@ -16267,6 +16210,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Awaiting payment"
 #~ msgstr "Awaiting payment"
+
+#~ msgid "B2B"
+#~ msgstr "B2B"
 
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
@@ -16291,6 +16237,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
 #~ msgstr "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
+
+#~ msgid "Email Template Management"
+#~ msgstr "Email Template Management"
+
+#~ msgid "Email template"
+#~ msgstr "Email template"
 
 #~ msgid "False"
 #~ msgstr "False"
@@ -16322,6 +16274,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 #~ msgstr "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
+
+#~ msgid "Inactive user notification"
+#~ msgstr "Inactive user notification"
 
 #~ msgid "Invalid or expired unsubscribe link"
 #~ msgstr "Invalid or expired unsubscribe link"
@@ -16359,8 +16314,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Old (7+ days)"
 #~ msgstr "Old (7+ days)"
 
+#~ msgid "Operational alerts"
+#~ msgstr "Operational alerts"
+
 #~ msgid "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
 #~ msgstr "Operator who recorded the settlement. Stores a PLATFORM-schema user id; not FK-enforced."
+
+#~ msgid "Order Lifecycle"
+#~ msgstr "Order Lifecycle"
 
 #~ msgid "Order Reminder"
 #~ msgstr "Order Reminder"
@@ -16423,15 +16384,42 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
 #~ msgstr "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
 
+#~ msgid "Sent when order is canceled"
+#~ msgstr "Sent when order is canceled"
+
+#~ msgid "Sent when order is delivered"
+#~ msgstr "Sent when order is delivered"
+
+#~ msgid "Sent when order is shipped"
+#~ msgstr "Sent when order is shipped"
+
 #, python-format
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Setting '%(key)s' not found"
 
+#~ msgid "Social sign-in"
+#~ msgstr "Social sign-in"
+
+#~ msgid "Status update for completed orders"
+#~ msgstr "Status update for completed orders"
+
+#~ msgid "Status update for refunded orders"
+#~ msgstr "Status update for refunded orders"
+
+#~ msgid "Status update for returned orders"
+#~ msgstr "Status update for returned orders"
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
+#~ msgid "Subscription confirmation email"
+#~ msgstr "Subscription confirmation email"
+
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Successfully unsubscribed"
+
+#~ msgid "Templates"
+#~ msgstr "Templates"
 
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"
@@ -16470,8 +16458,17 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "True"
 #~ msgstr "True"
 
+#~ msgid "Two-factor authentication"
+#~ msgstr "Two-factor authentication"
+
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Unsubscribe from a topic via email link (GET)"
+
+#~ msgid "Unused"
+#~ msgstr "Unused"
+
+#~ msgid "User Management"
+#~ msgstr "User Management"
 
 #~ msgid "User who performed the operation (null for system operations)"
 #~ msgstr "User who performed the operation (null for system operations)"
@@ -16489,3 +16486,6 @@ msgstr "…and {count} more lines with errors."
 #, python-format
 #~ msgid "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
 #~ msgstr "You're receiving this email because user %(user_display)s has given your email address to register an account on %(site_name)s."
+
+#~ msgid "admin/email-templates/"
+#~ msgstr "admin/email-templates/"

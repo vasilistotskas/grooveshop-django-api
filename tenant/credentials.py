@@ -89,65 +89,7 @@ def _get_tenant_field(
 # ---------------------------------------------------------------------------
 
 
-def tenant_from_email() -> str:
-    """Return the outbound ``From`` header for the active tenant,
-    deliverability-safe.
-
-    An address is only usable in ``From`` when the relay can
-    authenticate it, so the sending domain — not the merchant's
-    preference — decides. Policy:
-
-    - Tenant whose own domain is VERIFIED on the relay
-      (``from_email`` set AND ``from_email_verified``): RFC 5322
-      display-name form ``"{store name}" <from_email>``. The relay
-      holds a DKIM key for that domain, so the message is signed and
-      DMARC-aligned. This is the white-label case.
-    - Any other tenant: ``"{store name}" <DEFAULT_FROM_EMAIL>`` —
-      authenticated platform envelope, tenant brand in the inbox sender
-      line. The tenant's own address belongs in ``Reply-To`` (send
-      sites already pass ``tenant_contact_email()``).
-    - Public schema (platform/admin sends): ``"{SITE_NAME}"
-      <DEFAULT_FROM_EMAIL>``.
-    - No tenant bound to the connection at all: bare
-      ``DEFAULT_FROM_EMAIL``.
-
-    The verification flag IS the safety property. Putting a merchant's
-    address in ``From`` on a relay that cannot sign for that domain
-    fails DMARC alignment and lands the mail in spam — not
-    hypothetically: ``DEFAULT_FROM_EMAIL`` was itself set to a tenant's
-    address (``info@webside.gr``) on a relay authorised for neither
-    SPF nor DKIM, so EVERY tenant's mail went out unauthenticated, and
-    under tenant #1's domain, until 2026-09-13.
-
-    ``DEFAULT_FROM_EMAIL`` must therefore be a PLATFORM address. The
-    flag is platform-only — deliberately absent from
-    ``TENANT_SELF_EDITABLE_FIELDS``, so a store operator can propose a
-    ``from_email`` but cannot certify it.
-    """
-    from email.utils import formataddr
-
-    tenant = bound_tenant()
-    address = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-
-    if _in_tenant_schema():
-        own = (getattr(tenant, "from_email", "") or "").strip()
-        if own and getattr(tenant, "from_email_verified", False):
-            address = own
-
-    if not address:
-        # No sender configured at all — an empty address inside a
-        # display-name form ("Store <>") would be invalid RFC 5322.
-        return ""
-    # Any binding (a store row, or the public schema's FakeTenant, which
-    # ``bound_tenant`` reads as None) carries a display name; only a
-    # connection with no tenant at all sends the bare address.
-    name = tenant_site_name()
-    if name and getattr(connection, "tenant", None) is not None:
-        return formataddr((name, address))
-    return address
-
-
-def _in_tenant_schema() -> bool:
+def in_tenant_schema() -> bool:
     """True when a store's schema is active (not the public schema, not
     a bare management/Celery context)."""
     from django_tenants.utils import get_public_schema_name
@@ -189,36 +131,9 @@ def tenant_contact_email() -> str:
     else:
         if setting_value:
             return setting_value
-    if _in_tenant_schema():
+    if in_tenant_schema():
         return ""
     return getattr(settings, "INFO_EMAIL", "") or ""
-
-
-def tenant_reply_to() -> list[str]:
-    """Return the ``Reply-To`` list for outbound mail from the active tenant.
-
-    ``[tenant_contact_email()]`` when the store has a contact address,
-    ``[]`` when it has none. ``EmailMessage`` joins whatever list it is
-    given, so ``[""]`` would put a literal empty ``Reply-To:`` header on
-    the wire — an RFC 5322 violation some receivers score as spam —
-    whereas an empty list emits no header at all and replies go to the
-    authenticated platform sender.
-    """
-    email = tenant_contact_email()
-    return [email] if email else []
-
-
-def tenant_operator_addresses() -> list[str]:
-    """The bound tenant's own operator addresses: ``Tenant.contact_email``
-    then ``Tenant.owner_email``, deduped, and ``[]`` for a tenant with
-    neither. There is no platform fallback: ``emails.recipients.
-    store_operators`` skips the mail instead."""
-    recipients: list[str] = []
-    for field in ("contact_email", "owner_email"):
-        value = _get_tenant_field(field)
-        if value and value not in recipients:
-            recipients.append(value)
-    return recipients
 
 
 def tenant_site_name() -> str:

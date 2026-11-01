@@ -4,7 +4,7 @@ Fails when the PLATFORM's outbound sender identity is not actually
 platform-owned.
 
 Why this exists: ``DEFAULT_FROM_EMAIL`` is the platform-wide fallback —
-``tenant_from_email()`` hands it to every tenant that has not verified a
+``emails.sender.from_address()`` hands it to every tenant that has not verified a
 domain of its own. In production it was set to ``info@webside.gr``, which
 is TENANT #1's address, so Εκ Φύσεως Φυτειάς, Demo and Delta Sigma all
 sent mail under tenant #1's domain, on a relay that domain authorises for

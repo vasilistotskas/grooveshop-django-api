@@ -32,7 +32,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def operators(open_email_gates):
     with patch(
-        "emails.recipients.tenant_operator_addresses",
+        "emails.recipients.store_operator_addresses",
         return_value=["ops@example.com"],
     ):
         yield

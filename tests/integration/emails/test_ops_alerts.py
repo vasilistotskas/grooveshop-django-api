@@ -73,7 +73,7 @@ def _operators():
     mail.outbox.clear()
     with (
         patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             return_value=[OPERATOR],
         ),
         patch("shipping_acs.config.is_configured", return_value=True),
@@ -123,7 +123,7 @@ class TestNoOneToWriteTo:
         settings.ADMINS = ["platform@example.test"]
 
         with patch(
-            "emails.recipients.tenant_operator_addresses", return_value=[]
+            "emails.recipients.store_operator_addresses", return_value=[]
         ):
             [delivery] = send_email(
                 "ops.webhook_failed",

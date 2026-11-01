@@ -43,7 +43,7 @@ def _stale_shipment(**overrides):
 def operators_configured(open_email_gates):
     mail.outbox.clear()
     with patch(
-        "emails.recipients.tenant_operator_addresses",
+        "emails.recipients.store_operator_addresses",
         return_value=["admin@example.com"],
     ):
         yield
@@ -131,7 +131,7 @@ class TestCheckStaleAcsShipments:
         shipment = _stale_shipment()
 
         with patch(
-            "emails.recipients.tenant_operator_addresses", return_value=[]
+            "emails.recipients.store_operator_addresses", return_value=[]
         ):
             mail.outbox.clear()
             result = check_stale_acs_shipments.run()

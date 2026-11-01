@@ -394,7 +394,9 @@ settings); Django never converts:
   released one, and ONE release (number 1, no staff, note "Imported from page
   layouts"). A problem anywhere, including a reference to nothing, writes
   nothing. A store that already has builder data is refused. `--dry-run` does
-  everything and rolls it back. The legacy tables are not touched.
+  everything and rolls it back; the `--json` report also gives each document's
+  `counts` (`sections` and `blocks` at every depth). The legacy tables are not
+  touched.
 - The storefront's golden fixtures (`{request, response}` per section type,
   and the menus) are copied under `tests/fixtures/builder/legacy/` and
   replayed by `tests/integration/builder/test_converter_fixtures.py`. The copy

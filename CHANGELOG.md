@@ -3,6 +3,81 @@
 
 
 
+## v3.176.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(emails): link marketing mail to an unsubscribe confirm page, drop the GET-acting routes (#394) ([`5cf1e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cf1e975f6c91c1d894603413f6b75b6f775653d))
+
+* fix(emails): link marketing mail to the unsubscribe confirm page, drop the GET-acting routes
+
+The re-engagement mail linked its body to /api/v1/user/unsubscribe/<token>,
+whose GET opted the customer out of all marketing, so a mail scanner's
+prefetch unsubscribed people.
+
+- emails.optout gains confirm_url / confirm_url_for_token: the storefront
+  page /email/unsubscribe/<token> (locale-prefixed), carrying the same
+  signed token as the List-Unsubscribe header.
+- GET /api/v1/emails/unsubscribe/<token> answers 302 to that page in the
+  store's language and changes nothing; POST is unchanged.
+- The re-engagement body links to the confirm page of its own type, and its
+  template no longer falls back to SITE_URL.
+- The product-alert templates lose their dead unsubscribe branch, and the
+  preview sample its fake unsubscribe_url.
+- Removed the legacy /api/v1/user/unsubscribe/<token>[/<topic>] routes, their
+  views and helpers, the user.unsubscribe token (salt, max age, both token
+  makers) and generate_unsubscribe_link / generate_blanket_unsubscribe_link,
+  with their tests. Removing the operations is a breaking API change for
+  oasdiff; the storefront does not call them.
+docs/emails.md and docs/order-system.md describe the new flow.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5cf1e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cf1e975f6c91c1d894603413f6b75b6f775653d))
+
+* fix(emails): keep the unsubscribe redirect on the store's storefront
+
+The GET builds its Location from the request's token; refuse it unless
+url_has_allowed_host_and_scheme places it on the store's own storefront.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5cf1e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cf1e975f6c91c1d894603413f6b75b6f775653d))
+
+### Features
+
+* feat(emails): add the "stop all marketing emails" unsubscribe route
+
+The storefront confirm page offers a second choice beside the token's own
+type: stop every marketing email from the store.
+
+- POST /api/v1/emails/unsubscribe/<token>/all (unsubscribeFromAllMarketingEmail)
+  takes any valid token of the store and opts the address out of every
+  marketing type with source link. For an account it also sets
+  marketing_opted_out_at and ends the account's active topic subscriptions
+  (user.services.subscription.unsubscribe_from_all_marketing).
+- Tokens of an account's address carry the account pk (a): the hash cannot
+  be turned back into an account and the address must not travel in a URL.
+  A guest's token records the opt-out row only.
+- opt_out_of_marketing, the one writer, takes the address hash, so the
+  customer admin and the token route share it.
+- The type-scoped POST stays type-only (RFC 8058).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5cf1e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cf1e975f6c91c1d894603413f6b75b6f775653d))
+
+### Refactoring
+
+* refactor(emails): build the re-engagement link from its declared type and recipient
+
+Reference the REENGAGEMENT type object instead of looking its key up
+in the registry, and mint the token for the address the mail goes to.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5cf1e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5cf1e975f6c91c1d894603413f6b75b6f775653d))
+
 ## v3.175.0 (2026-10-31)
 
 ### Bug fixes

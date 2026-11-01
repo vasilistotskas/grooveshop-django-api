@@ -1,0 +1,13 @@
+{% extends "admin/delete_confirmation.html" %}
+{% load i18n %}
+
+{% block content %}
+    {% blocktrans trimmed asvar resend_note %}
+        Removing an address here lets this store write to it again. Resend keeps
+        its own suppression list for the whole team, and nothing here changes
+        it: if the address is on it, also remove it in the Resend dashboard
+        (Emails, Suppressions), or its emails will still be refused.
+    {% endblocktrans %}
+    <div class="mb-4">{% include "unfold/helpers/messages/warning.html" with message=resend_note %}</div>
+    {{ block.super }}
+{% endblock %}

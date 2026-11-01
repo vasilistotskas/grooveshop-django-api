@@ -123,6 +123,23 @@ def _build_retail_credit():
 
 
 BUILDERS: dict[str, Callable[[], object]] = {
+    "emails.EmailLog": lambda: __import__(
+        "emails.models", fromlist=["EmailLog"]
+    ).EmailLog.objects.create(
+        type_key="order.shipped",
+        status="sent",
+        recipient_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+        recipient_masked="a***@b***.test",
+        subject="Your order has shipped",
+    ),
+    "emails.EmailSuppression": lambda: __import__(
+        "emails.models", fromlist=["EmailSuppression"]
+    ).EmailSuppression.objects.create(
+        address_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+        recipient_masked="a***@b***.test",
+        reason="hard_bounce",
+        scope="all",
+    ),
     # Factories that reuse a related row, so their batches do not grow.
     # NEW: the changelist opens on the reviews waiting for approval, so
     # only those rows are rendered; the factory cycles through statuses.

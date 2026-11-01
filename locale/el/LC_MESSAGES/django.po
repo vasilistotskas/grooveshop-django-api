@@ -227,6 +227,12 @@ msgstr[0] "%(count)d ετικέτα απενεργοποιήθηκε."
 msgstr[1] "%(count)d ετικέτες απενεργοποιήθηκαν."
 
 #, python-format
+msgid "%(count)s failed"
+msgid_plural "%(count)s failed"
+msgstr[0] "%(count)s απέτυχε"
+msgstr[1] "%(count)s απέτυχαν"
+
+#, python-format
 msgid "%(count)s failure(s) acknowledged."
 msgstr "%(count)s αποτυχία(-ες) επιβεβαιώθηκαν."
 
@@ -253,6 +259,12 @@ msgid "%(count)s scheduled task enabled"
 msgid_plural "%(count)s scheduled tasks enabled"
 msgstr[0] "%(count)s προγραμματισμένη εργασία ενεργή"
 msgstr[1] "%(count)s προγραμματισμένες εργασίες ενεργές"
+
+#, python-format
+msgid "%(count)s sent in 30 days"
+msgid_plural "%(count)s sent in 30 days"
+msgstr[0] "%(count)s εστάλη τις τελευταίες 30 ημέρες"
+msgstr[1] "%(count)s εστάλησαν τις τελευταίες 30 ημέρες"
 
 #, python-format
 msgid "%(counter)s COD parcel was delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for it:"
@@ -807,6 +819,10 @@ msgstr "Η διαδρομή του καταστήματος δεν μπορεί 
 
 msgid "A subscription topic with this slug already exists."
 msgstr "Υπάρχει ήδη θέμα εγγραφής με αυτό το slug."
+
+#, python-format
+msgid "A test of “%(title)s” was sent to %(address)s."
+msgstr "Στάλθηκε δοκιμή του «%(title)s» στο %(address)s."
 
 #, python-format
 msgid "A third-party account from %(provider)s has been connected to your account."
@@ -1390,6 +1406,9 @@ msgstr "Όλα έτοιμα: τίποτα δεν περιμένει."
 msgid "All email"
 msgstr "Όλα τα email"
 
+msgid "All emails"
+msgstr "Όλα τα email"
+
 msgid "All rights reserved."
 msgstr "Όλα τα δικαιώματα διατηρούνται."
 
@@ -1531,6 +1550,9 @@ msgstr[1] "Εφαρμόστηκε έκπτωση %(discount)s%% σε %(count)d �
 
 msgid "Applies to the whole order"
 msgstr "Ισχύει για ολόκληρη την παραγγελία"
+
+msgid "Apply"
+msgstr "Εφαρμογή"
 
 msgid "Apply Custom Discount"
 msgstr "Εφαρμογή Προσαρμοσμένης Έκπτωσης"
@@ -2055,6 +2077,9 @@ msgstr "Αγοράζονται μαζί"
 
 msgid "Bounced"
 msgstr "Επιστράφηκε"
+
+msgid "Bounced, failed or marked as spam in the last 7 days"
+msgstr "Αναπήδησαν, απέτυχαν ή σημειώθηκαν ως ανεπιθύμητα τις τελευταίες 7 ημέρες"
 
 msgid "BoxNow APM identifier"
 msgstr "Αναγνωριστικό APM BoxNow"
@@ -4282,9 +4307,6 @@ msgstr "Διεύθυνση Email"
 msgid "Email Addresses"
 msgstr "Διευθύνσεις email"
 
-msgid "Email Templates"
-msgstr "Πρότυπα Email"
-
 msgid "Email address"
 msgstr "Διεύθυνση email"
 
@@ -4367,6 +4389,9 @@ msgstr "Δεν μπορούν να σταλούν email από το %(domain)s �
 
 msgid "Emails cannot be sent until a Resend key is saved"
 msgstr "Τα email δεν μπορούν να σταλούν μέχρι να αποθηκευτεί κλειδί Resend"
+
+msgid "Emails failing"
+msgstr "Email που αποτυγχάνουν"
 
 msgid "Empty cart"
 msgstr "Άδειο καλάθι"
@@ -4771,6 +4796,9 @@ msgstr "Αποτυχία ανάκτησης ρυθμίσεων"
 
 msgid "Failed to start the payment."
 msgstr "Αποτυχία έναρξης της πληρωμής."
+
+msgid "Failing"
+msgstr "Αποτυχημένα"
 
 msgid "Failure"
 msgstr "Αποτυχία"
@@ -7023,6 +7051,9 @@ msgstr "Αναγνωριστικό του μέλους του προσωπικο
 msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που έκανε την αλλαγή (public schema, όχι χρήστης του καταστήματος)."
 
+msgid "Id of the platform staff member who sent this test (public schema, not a store user). Read it through ``triggered_by_staff``."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που έστειλε αυτή τη δοκιμή (public schema, όχι χρήστης του καταστήματος)."
+
 msgid "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που απενεργοποίησε αυτόν τον τύπο (public schema, όχι χρήστης του καταστήματος)."
 
@@ -7162,6 +7193,12 @@ msgstr "Διαθέσιμο (%(stock)s)"
 #, python-format
 msgid "In the last %(days)s days"
 msgstr "Τις τελευταίες %(days)s ημέρες"
+
+msgid "In the last 30 days"
+msgstr "Τις τελευταίες 30 ημέρες"
+
+msgid "In the last 7 days"
+msgstr "Τις τελευταίες 7 ημέρες"
 
 msgid "In transit"
 msgstr "Σε μεταφορά"
@@ -7587,6 +7624,10 @@ msgstr "Τελευταία παραγγελία"
 msgid "Last polled at"
 msgstr "Τελευταία ανάκτηση"
 
+#, python-format
+msgid "Last sent %(ago)s ago"
+msgstr "Τελευταία αποστολή πριν από %(ago)s"
+
 msgid "Last synced at"
 msgstr "Τελευταίος συγχρονισμός"
 
@@ -7601,6 +7642,9 @@ msgstr "Η αργότερη αναμενόμενη ημερομηνία παρά
 
 msgid "Latest orders"
 msgstr "Πρόσφατες παραγγελίες"
+
+msgid "Latest sends"
+msgstr "Τελευταίες αποστολές"
 
 msgid "Latitude"
 msgstr "Γεωγραφικό πλάτος"
@@ -8744,6 +8788,9 @@ msgstr "Χωρίς περιγραφή"
 msgid "No discounts applied"
 msgstr "Δεν εφαρμόστηκαν εκπτώσεις"
 
+msgid "No email matches."
+msgstr "Κανένα email δεν ταιριάζει."
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "Κανένα προϊόν του καλαθιού δεν καλύπτεται από αυτή την προσφορά"
 
@@ -8933,6 +8980,9 @@ msgstr "Δεν σαρώθηκε"
 msgid "Not sent"
 msgstr "Μη απεσταλμένο"
 
+msgid "Not sent in the last 30 days"
+msgstr "Δεν στάλθηκε τις τελευταίες 30 ημέρες"
+
 msgid "Not set"
 msgstr "Δεν έχει οριστεί"
 
@@ -8962,6 +9012,9 @@ msgstr "Δεν έχει γίνει καμία αλλαγή ακόμη."
 
 msgid "Nothing has been deleted — your products, orders, and settings are all intact."
 msgstr "Τίποτα δεν έχει διαγραφεί — τα προϊόντα, οι παραγγελίες και οι ρυθμίσεις σας είναι όλα ανέπαφα."
+
+msgid "Nothing has been sent yet."
+msgstr "Δεν έχει σταλεί τίποτα ακόμη."
 
 msgid "Nothing has changed since the last release."
 msgstr "Δεν έχει αλλάξει τίποτα από την τελευταία δημοσίευση."
@@ -11599,6 +11652,9 @@ msgstr "Αφαίρεση του εφαρμοσμένου κωδικού κουπ
 msgid "Remove this store's wording and go back to the default?"
 msgstr "Να αφαιρεθεί η διατύπωση του καταστήματος και να επανέλθει το αρχικό κείμενο;"
 
+msgid "Removing an address here lets this store write to it again. Resend keeps its own suppression list for the whole team, and nothing here changes it: if the address is on it, also remove it in the Resend dashboard (Emails, Suppressions), or its emails will still be refused."
+msgstr "Η αφαίρεση μιας διεύθυνσης από εδώ επιτρέπει στο κατάστημα να της γράφει ξανά. Το Resend κρατά τη δική του λίστα αποκλεισμών για ολόκληρη την ομάδα και τίποτα εδώ δεν την αλλάζει: αν η διεύθυνση υπάρχει σε αυτήν, αφαιρέστε την και από τον πίνακα του Resend (Emails, Suppressions), αλλιώς τα email προς αυτήν θα συνεχίσουν να απορρίπτονται."
+
 msgid "Rendered"
 msgstr "Δημιουργήθηκε"
 
@@ -12295,9 +12351,6 @@ msgstr "Επιλογή όλων"
 msgid "Select an ACS Smartpoint locker before placing an order with locker delivery."
 msgstr "Επιλέξτε ένα locker ACS Smartpoint πριν την υποβολή παραγγελίας με παράδοση σε locker."
 
-msgid "Select an email to preview"
-msgstr "Επιλέξτε email για προεπισκόπηση"
-
 msgid "Select an email to preview."
 msgstr "Επιλέξτε email για προεπισκόπηση."
 
@@ -12334,6 +12387,12 @@ msgstr "Στείλτε το ως κεφαλίδα X-Cart-Token."
 msgid "Send receipt to myDATA"
 msgstr "Αποστολή απόδειξης στο myDATA"
 
+msgid "Send test"
+msgstr "Αποστολή δοκιμής"
+
+msgid "Send test goes only to the email address of your own account, in the language and with the data chosen above, and is marked as a test in the log."
+msgstr "Η αποστολή δοκιμής γίνεται μόνο στη διεύθυνση email του δικού σας λογαριασμού, στη γλώσσα και με τα δεδομένα που επιλέξατε παραπάνω, και σημειώνεται ως δοκιμή στο αρχείο."
+
 msgid "Send the link"
 msgstr "Αποστολή συνδέσμου"
 
@@ -12351,6 +12410,9 @@ msgstr "Αποστέλλεται μετά την εγγραφή για να επ
 
 msgid "Sent at"
 msgstr "Στάλθηκε στις"
+
+msgid "Sent from the admin's Send test, to the staff member."
+msgstr "Στάλθηκε από την Αποστολή δοκιμής του admin, στο μέλος του προσωπικού."
 
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Αποστέλλεται μία φορά για κάθε επιστροφή χρημάτων στον πελάτη."
@@ -13427,6 +13489,9 @@ msgstr "Υποστηρίζει σημείο παραλαβής"
 msgid "Suppressed by the provider"
 msgstr "Αποκλείστηκε από τον πάροχο"
 
+msgid "Suppression list"
+msgstr "Λίστα αποκλεισμών"
+
 msgid "Surface"
 msgstr "Επιφάνεια"
 
@@ -13457,6 +13522,12 @@ msgstr "Ανεστάλη από το admin της πλατφόρμας"
 
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Η αναστολή (η ενέργεια στη λίστα Καταστήματα ή η εργασία χρέωσης) σημειώνει το κατάστημα ως ανενεργό και καταγράφει πότε και γιατί: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία. Το storefront σταματά να αποκρίνεται άμεσα (οι επισκέπτες βλέπουν ότι το κατάστημα δεν βρέθηκε), οι συνδέσεις WebSocket απορρίπτονται, οι προγραμματισμένες εργασίες παρακάμπτουν το κατάστημα και το agent gateway δεν το εξυπηρετεί πλέον. Τα δεδομένα μένουν ανέπαφα· η ενέργεια «Ενεργοποίηση επιλεγμένων καταστημάτων» επαναφέρει τα πάντα."
+
+msgid "Switch on or off"
+msgstr "Ενεργοποίηση ή απενεργοποίηση"
+
+msgid "Switched off"
+msgstr "Απενεργοποιημένο"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Συγχρονισμός lockers από BoxNow API"
@@ -13655,6 +13726,9 @@ msgstr "Καταστήματα"
 
 msgid "Term ended"
 msgstr "Λήξη περιόδου"
+
+msgid "Test send"
+msgstr "Δοκιμαστική αποστολή"
 
 # Email Template Translations
 msgid "Testimonials"
@@ -14220,6 +14294,9 @@ msgstr "Τα καταστήματα της πλατφόρμας, τα πλάνα
 msgid "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 msgstr "Το ΔΙΚΟ του καταστήματος μυστικό κλειδί Stripe (sk_live_*, sk_test_* ή περιορισμένο κλειδί rk_*). Μυστικό — δεν πρέπει ποτέ να εκτίθεται στον browser. Κενό σημαίνει ότι το Stripe δεν είναι διαθέσιμο για αυτό το κατάστημα — δεν υπάρχει εναλλακτική τιμή σε επίπεδο πλατφόρμας."
 
+msgid "The test email could not be sent. The email log has the reason."
+msgstr "Το δοκιμαστικό email δεν στάλθηκε. Ο λόγος αναγράφεται στο αρχείο email."
+
 msgid "The text is not valid. Check the braces { }, the | separators and the @ references."
 msgstr "Το κείμενο δεν είναι έγκυρο. Ελέγξτε τις αγκύλες { }, τους διαχωριστές | και τις αναφορές @."
 
@@ -14681,6 +14758,9 @@ msgstr "Για να επανέλθει το κατάστημά σας, κανο�
 msgid "To confirm your email address, open this link:"
 msgstr "Για να επιβεβαιώσετε τη διεύθυνση email σας, ανοίξτε αυτόν τον σύνδεσμο:"
 
+msgid "To customers"
+msgstr "Προς τους πελάτες"
+
 msgid "To issue in timologio"
 msgstr "Για έκδοση στο timologio"
 
@@ -14834,6 +14914,9 @@ msgstr "Τρόπος ενεργοποίησης"
 msgid "Triggered by"
 msgstr "Ενεργοποιήθηκε από"
 
+msgid "Triggered by (staff)"
+msgstr "Στάλθηκε από (προσωπικό)"
+
 msgid "True if reservation was converted to actual stock decrement"
 msgstr "True αν η δέσμευση μετατράπηκε σε πραγματική μείωση αποθέματος"
 
@@ -14884,6 +14967,12 @@ msgstr "Τύπος"
 
 msgid "Type DELETE exactly to confirm account deletion."
 msgstr "Πληκτρολογήστε ακριβώς DELETE για να επιβεβαιώσετε τη διαγραφή του λογαριασμού."
+
+msgid "Type an exact email address to find the emails sent to it."
+msgstr "Πληκτρολογήστε ακριβή διεύθυνση email για να βρείτε τα email που στάλθηκαν σε αυτήν."
+
+msgid "Type an exact email address to find whether it is suppressed."
+msgstr "Πληκτρολογήστε ακριβή διεύθυνση email για να δείτε αν είναι αποκλεισμένη."
 
 msgid "Type cannot be changed after creation"
 msgstr "Ο τύπος δεν μπορεί να αλλάξει μετά τη δημιουργία"
@@ -15745,6 +15834,9 @@ msgstr "Το ποσό που οφείλει ο πελάτης για την πα
 msgid "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 msgstr "Όσα χρέωσε ο πάροχος για αυτή την κίνηση, όπως τα ανέφερε. Κενό μέχρι να αναφερθούν· ποτέ εκτίμηση."
 
+msgid "What the provider reported"
+msgstr "Τι ανέφερε ο πάροχος"
+
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "Τι πληρώνει ο πελάτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν από το ``free_shipping_threshold`` ή τη ζωντανή τιμή (``live_quote``) του courier."
 
@@ -15918,6 +16010,9 @@ msgstr "Ποια ροή παρόχου πρέπει να εκτελέσει ο c
 
 msgid "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
 msgstr "Ποιος μετακίνησε τα χρήματα: ο κωδικός του παρόχου πληρωμών ή ο κωδικός αντικαταβολής του μεταφορέα."
+
+msgid "Who receives the email"
+msgstr "Ποιος λαμβάνει το email"
 
 msgid "Who sees what"
 msgstr "Ποιος βλέπει τι"
@@ -16112,6 +16207,9 @@ msgstr "Δεν έχετε δικαίωμα εκτέλεσης αυτής της 
 msgid "You have already reviewed this product."
 msgstr "Έχετε ήδη αξιολογήσει αυτό το προϊόν."
 
+msgid "You have used all your test emails for this hour. Try again later."
+msgstr "Χρησιμοποιήσατε όλες τις δοκιμαστικές αποστολές της ώρας. Δοκιμάστε ξανά αργότερα."
+
 msgid "You left something behind"
 msgstr "Ξεχάσατε κάτι στο καλάθι σας"
 
@@ -16188,6 +16286,9 @@ msgstr "Η παραγγελία σας έχει αποσταλεί!"
 
 msgid "Your Receipt"
 msgstr "Η Απόδειξή σου"
+
+msgid "Your account has no email address to send it to."
+msgstr "Ο λογαριασμός σας δεν έχει διεύθυνση email για την αποστολή."
 
 msgid "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
 msgstr "Ο λογαριασμός σας διαγράφεται. Θα αποσυνδεθείτε σύντομα. Οι παραγγελίες διατηρούνται σε ανωνυμοποιημένη μορφή για φορολογικούς/λογιστικούς λόγους."
@@ -16419,6 +16520,9 @@ msgstr "Τ.Κ."
 
 msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
+
+msgid "[Test]"
+msgstr "[Δοκιμή]"
 
 #, python-brace-format
 msgid "[{site}] A scheduled publish failed"
@@ -17067,6 +17171,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Email Template Management"
 #~ msgstr "Διαχείριση Προτύπων Email"
 
+#~ msgid "Email Templates"
+#~ msgstr "Πρότυπα Email"
+
 #~ msgid "Email template"
 #~ msgstr "Πρότυπο email"
 
@@ -17635,6 +17742,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Select Order"
 #~ msgstr "Επιλογή παραγγελίας"
+
+#~ msgid "Select an email to preview"
+#~ msgstr "Επιλέξτε email για προεπισκόπηση"
 
 #~ msgid "Selection Summary"
 #~ msgstr "Σύνοψη επιλογής"

@@ -33,8 +33,12 @@ def _english():
         yield
 
 
-def url(name: str = "preview") -> str:
+def url(name: str = "changelist") -> str:
     return reverse(f"admin:emails_emailswitch_{name}")
+
+
+def type_url(key: str = KEY) -> str:
+    return reverse("admin:emails_emailswitch_type", args=[key])
 
 
 def post(client: Client, **data):
@@ -59,15 +63,17 @@ def admin(tenant):
 
 
 class TestAccess:
-    @pytest.mark.parametrize("name", ["preview", "preview_render"])
-    def test_anonymous_is_sent_to_the_login(self, name):
-        response = Client().get(url(name))
+    @pytest.mark.parametrize("target", ["type", "preview_render"])
+    def test_anonymous_is_sent_to_the_login(self, target):
+        link = type_url() if target == "type" else url(target)
+
+        response = Client().get(link)
 
         assert response.status_code in (301, 302)
         assert "login" in response["Location"]
 
-    @pytest.mark.parametrize("name", ["preview", "preview_render"])
-    def test_a_bare_is_staff_user_is_denied(self, name):
+    @pytest.mark.parametrize("target", ["type", "preview_render"])
+    def test_a_bare_is_staff_user_is_denied(self, target):
         """``is_staff`` alone must not open it: it is a global flag on the
         shared account, so it would let a staff member of one store read
         another's orders. ``force_login`` mints a session through
@@ -81,15 +87,17 @@ class TestAccess:
                 is_staff=True,
             )
         )
+        link = type_url() if target == "type" else url(target)
 
-        response = client.get(url(name))
+        response = client.get(link)
 
         assert response.status_code in (301, 302)
         assert "login" in response["Location"]
 
-    def test_a_staff_member_without_the_order_permission_is_refused(
+    def test_without_the_order_permission_only_sample_data_is_offered(
         self, tenant, monkeypatch
     ):
+        order = OrderFactory(num_order_items=0)
         user = store_staff(tenant, role=TenantMembershipRole.STAFF)
         client = Client()
         client.force_login(
@@ -101,34 +109,41 @@ class TestAccess:
             lambda self, perm, obj=None: perm != "order.view_order",
         )
 
-        assert client.get(url()).status_code == 403
-        assert post(client, type_key=KEY).status_code == 403
+        page = client.get(type_url())
+
+        assert page.status_code == 200
+        assert f'value="{order.pk}"' not in page.content.decode()
+        # A crafted order id is not read: the sample is rendered.
+        rendered = post(client, type_key=KEY, order=order.pk)
+        assert rendered.status_code == 200
+        assert f"#{order.pk}" not in rendered.content.decode()
 
     def test_an_admin_is_admitted(self, admin):
-        assert admin.get(url()).status_code == 200
+        assert admin.get(type_url()).status_code == 200
 
-    def test_the_sidebar_offers_it(self, admin):
+    def test_the_sidebar_has_no_separate_templates_entry(self, admin):
         html = admin.get(reverse("admin:index")).content.decode()
 
         assert url() in html
+        assert "Email Templates" not in html
 
 
 class TestThePage:
-    def test_it_lists_every_store_email_and_recent_orders(self, admin):
+    def test_the_type_page_offers_the_preview_and_recent_orders(self, admin):
         order = OrderFactory(num_order_items=0)
 
-        html = admin.get(url()).content.decode()
+        html = admin.get(type_url()).content.decode()
 
-        for email_type in registry.types_for(Owner.STORE):
-            assert f'data-type="{email_type.key}"' in html, email_type.key
         assert f'hx-post="{url("preview_render")}"' in html
         assert f'value="{order.pk}"' in html
+        assert f'value="{KEY}"' in html
 
-    def test_it_lists_no_platform_email(self, admin):
-        html = admin.get(url()).content.decode()
+    def test_an_unknown_email_is_a_404(self, admin):
+        assert admin.get(type_url("no.such_type")).status_code == 404
 
+    def test_a_platform_email_has_no_page_on_the_store(self, admin):
         for email_type in registry.types_for(Owner.PLATFORM):
-            assert f'data-type="{email_type.key}"' not in html
+            assert admin.get(type_url(email_type.key)).status_code == 404
 
     def test_a_platform_email_cannot_be_previewed_from_the_store(self, admin):
         response = post(admin, type_key="platform.health_alert")

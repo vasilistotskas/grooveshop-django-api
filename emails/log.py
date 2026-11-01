@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 import requests
 from celery import current_task
@@ -92,7 +93,13 @@ def record_skip(
     )
 
 
-def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
+def start(
+    type_key: str,
+    recipient: Recipient,
+    subject: str,
+    *,
+    test_by: Any = None,
+) -> EmailLog:
     """The row of a message about to be sent. The retry of a task finds the
     row its earlier attempt wrote (same delivery id): one the provider has is
     returned as it is, so the caller does not send it again, any other goes
@@ -104,8 +111,11 @@ def start(type_key: str, recipient: Recipient, subject: str) -> EmailLog:
         type_key=type_key,
         status=Status.QUEUED,
         subject=subject,
+        is_test=test_by is not None,
         **fields,
     )
+    if test_by is not None:
+        entry.triggered_by_staff = test_by
     try:
         earlier = EmailLog.objects.filter(uuid=entry.uuid).first()
     except Error:

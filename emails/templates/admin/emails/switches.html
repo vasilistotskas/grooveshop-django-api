@@ -7,14 +7,26 @@
 
 {% block content %}
     <div class="flex flex-col gap-6" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-        {% component "unfold/components/text.html" %}
-            {% blocktrans trimmed %}
-                Every email your store sends. Switch one off and your store
-                stops sending it, and only that one. Emails that a customer or
-                the law needs, such as an order confirmation or a password
-                reset, cannot be switched off.
-            {% endblocktrans %}
-        {% endcomponent %}
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            {% component "unfold/components/text.html" with class="max-w-3xl" %}
+                {% blocktrans trimmed %}
+                    Every email your store sends. Switch one off and your store
+                    stops sending it, and only that one. Emails that a customer or
+                    the law needs, such as an order confirmation or a password
+                    reset, cannot be switched off.
+                {% endblocktrans %}
+            {% endcomponent %}
+            <div class="flex flex-wrap gap-2 shrink-0">
+                {% if log_url %}
+                    {% trans "Email log" as log_label %}
+                    {% component "unfold/components/button.html" with href=log_url icon="history" variant="default" %}{{ log_label }}{% endcomponent %}
+                {% endif %}
+                {% if suppressions_url %}
+                    {% trans "Suppression list" as suppressions_label %}
+                    {% component "unfold/components/button.html" with href=suppressions_url icon="block" variant="default" %}{{ suppressions_label }}{% endcomponent %}
+                {% endif %}
+            </div>
+        </div>
 
         {% if not perms.emails.change_emailswitch %}
             {% blocktrans trimmed asvar read_only_message %}
@@ -24,13 +36,34 @@
             {% include "unfold/helpers/messages/info.html" with message=read_only_message %}
         {% endif %}
 
+        <nav class="flex flex-wrap gap-2" aria-label="{% trans 'Who receives the email' %}">
+            {% for item in tabs %}
+                {% if item.active %}
+                    {% component "unfold/components/button.html" with href=item.url variant="primary" %}{{ item.label }}{% endcomponent %}
+                {% else %}
+                    {% component "unfold/components/button.html" with href=item.url variant="default" %}{{ item.label }}{% endcomponent %}
+                {% endif %}
+            {% endfor %}
+        </nav>
+
+        <form method="get" class="flex flex-wrap gap-4 items-end">
+            {{ form.tab }}
+            {% include "unfold/helpers/field.html" with field=form.q %}
+            {% include "unfold/helpers/field.html" with field=form.status %}
+            {% trans "Apply" as apply_label %}
+            {% component "unfold/components/button.html" with submit=True variant="default" icon="filter_list" %}{{ apply_label }}{% endcomponent %}
+        </form>
+
         {% for group, rows in groups %}
             <section class="flex flex-col gap-3" aria-labelledby="area-{{ group.area }}">
                 <h2 id="area-{{ group.area }}" class="font-semibold text-important text-base">{{ group.title }}</h2>
                 {% for item in rows %}
-                    {% include "admin/emails/_row.html" with row=item.row control=item.control %}
+                    {% include "admin/emails/_row.html" with row=item.row control=item.control last_sent=item.last_sent page_url=item.page_url failing_url=item.failing_url can_test=item.can_test %}
                 {% endfor %}
             </section>
+        {% empty %}
+            {% trans "No email matches." as empty_label %}
+            {% include "unfold/helpers/messages/info.html" with message=empty_label %}
         {% endfor %}
     </div>
 {% endblock %}

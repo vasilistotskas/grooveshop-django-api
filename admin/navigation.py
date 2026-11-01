@@ -489,15 +489,8 @@ def store_sidebar(request: Any) -> list[Item]:
                 "route",
             ),
             page("vat.Vat", _("VAT Rates"), "percent"),
-            # The template previews render real orders.
-            _tool(
-                _("Email Templates"),
-                "forward_to_inbox",
-                reverse("admin:emails_emailswitch_preview"),
-            )
-            if user.has_perm("order.view_order")
-            else None,
-            # Which emails the store sends; one page, not a model list.
+            # Which emails the store sends, with their preview, log and
+            # suppression list; one page, not a model list.
             page("emails.EmailSwitch", _("Emails"), "mail"),
             _tool(
                 _("Translations"),

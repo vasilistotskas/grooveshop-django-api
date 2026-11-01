@@ -3119,6 +3119,8 @@ RESEND_WEBHOOK_SECRET = getenv("RESEND_WEBHOOK_SECRET", "")
 RESEND_WEBHOOK_TOLERANCE_SECONDS = int(
     getenv("RESEND_WEBHOOK_TOLERANCE_SECONDS", "300")
 )
+# How many times a staff member may use the admin's Send test per hour.
+EMAIL_TEST_SENDS_PER_HOUR = int(getenv("EMAIL_TEST_SENDS_PER_HOUR", "10"))
 RESEND_WEBHOOK_MAX_BODY_BYTES = int(
     getenv("RESEND_WEBHOOK_MAX_BODY_BYTES", str(256 * 1024))
 )

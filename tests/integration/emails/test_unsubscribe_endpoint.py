@@ -172,3 +172,16 @@ def test_a_bad_token_is_a_400_that_says_nothing_about_why(token):
         "code": "unsubscribe_token_invalid",
     }
     assert not EmailOptOut.objects.exists()
+
+
+def test_a_get_never_redirects_off_the_storefront(monkeypatch):
+    monkeypatch.setattr(
+        optout,
+        "confirm_url_for_token",
+        lambda token, *, language: "https://evil.example/email/unsubscribe/x",
+    )
+
+    response = APIClient().get(_url("x"))
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["code"] == "unsubscribe_token_invalid"

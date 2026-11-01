@@ -15,8 +15,10 @@ POST's 400.
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 from django.http import HttpResponseRedirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -28,6 +30,7 @@ from rest_framework.views import APIView
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import EmailUnsubscribeThrottle
 from core.utils.i18n import store_language
+from core.utils.tenant_urls import get_tenant_base_url
 from emails import optout
 from emails.models import EmailOptOut
 from user.services.subscription import unsubscribe_from_all_marketing
@@ -80,9 +83,19 @@ class EmailUnsubscribeView(APIView):
         responses={302: None},
     )
     def get(self, request, token: str):
-        return HttpResponseRedirect(
-            optout.confirm_url_for_token(token, language=store_language())
-        )
+        url = optout.confirm_url_for_token(token, language=store_language())
+        # The token comes from the request: the redirect must still land on
+        # this store's own storefront and nowhere else.
+        storefront = urlsplit(get_tenant_base_url())
+        if not url_has_allowed_host_and_scheme(
+            url,
+            allowed_hosts={storefront.netloc},
+            require_https=storefront.scheme == "https",
+        ):
+            return _invalid_token_response(
+                optout.InvalidToken("The confirm URL leaves the storefront.")
+            )
+        return HttpResponseRedirect(url)
 
     @extend_schema(
         operation_id="unsubscribeFromEmailOneClick",

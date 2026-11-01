@@ -18,7 +18,7 @@ from emails.declare import operator_alert
 from emails.types import RenderEnv
 from tenant.credentials import tenant_site_name
 
-TEMPLATE_DIR = "emails/platform"
+TEMPLATE_DIR = "emails/ops"
 
 
 @dataclass(frozen=True, slots=True)

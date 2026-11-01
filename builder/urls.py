@@ -1,6 +1,6 @@
 from django.urls import path
 
-from builder import media_api, views
+from builder import media_api, session_api, views
 
 app_name = "builder"
 
@@ -59,6 +59,11 @@ urlpatterns = [
         "builder/media/<int:pk>",
         media_api.AssetDetailView.as_view(),
         name="media-detail",
+    ),
+    path(
+        "builder/staff-session",
+        session_api.StaffSessionView.as_view(),
+        name="staff-session",
     ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),

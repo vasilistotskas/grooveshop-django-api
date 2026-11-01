@@ -1040,6 +1040,9 @@ msgctxt "legal acceptance source"
 msgid "AI agent checkout"
 msgstr "AI agent checkout"
 
+msgid "API"
+msgstr "API"
+
 msgid "API Tokens"
 msgstr "API Tokens"
 
@@ -4199,6 +4202,9 @@ msgstr "Echo on click events so attach can be attributed."
 
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
+
+msgid "Edit storefront"
+msgstr "Edit storefront"
 
 msgid "Edited"
 msgstr "Edited"
@@ -9677,6 +9683,9 @@ msgstr "Page Type"
 msgid "Page builder"
 msgstr "Page builder"
 
+msgid "Page builder session"
+msgstr "Page builder session"
+
 msgid "Page deleted"
 msgstr "Page deleted"
 
@@ -14147,6 +14156,9 @@ msgstr "The text is too long: %(length)s of %(max)s characters."
 msgid "The text must keep the same placeholders as the original."
 msgstr "The text must keep the same placeholders as the original."
 
+msgid "The ticket is not valid."
+msgstr "The ticket is not valid."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
 
@@ -14410,6 +14422,9 @@ msgstr "This shipping method is not available for the selected country."
 
 msgid "This staff token grants no access to this store."
 msgstr "This staff token grants no access to this store."
+
+msgid "This staff token is for the page builder only."
+msgstr "This staff token is for the page builder only."
 
 msgid "This status means"
 msgstr "This status means"

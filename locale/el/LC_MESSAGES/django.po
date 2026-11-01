@@ -1045,6 +1045,9 @@ msgctxt "legal acceptance source"
 msgid "AI agent checkout"
 msgstr "Αγορά μέσω πράκτορα AI"
 
+msgid "API"
+msgstr "API"
+
 msgid "API Tokens"
 msgstr "Tokens API"
 
@@ -4205,6 +4208,9 @@ msgstr "Στείλτε το ξανά στα συμβάντα κλικ, ώστε 
 
 msgid "Edit 'Locker External ID' directly to override the locker for stage testing (e.g. set to '4' per BoxNow's stage instructions)."
 msgstr "Επεξεργαστείτε απευθείας το «Locker External ID» για να παρακάμψετε το locker σε δοκιμές stage (π.χ. ορίστε το σε «4» σύμφωνα με τις οδηγίες stage της BoxNow)."
+
+msgid "Edit storefront"
+msgstr "Επεξεργασία καταστήματος"
 
 msgid "Edited"
 msgstr "Επεξεργασία"
@@ -9687,6 +9693,9 @@ msgstr "Τύπος σελίδας"
 msgid "Page builder"
 msgstr "Δημιουργός σελίδων"
 
+msgid "Page builder session"
+msgstr "Συνεδρία δημιουργού σελίδων"
+
 msgid "Page deleted"
 msgstr "Η σελίδα διαγράφηκε"
 
@@ -14152,6 +14161,9 @@ msgstr "Το κείμενο είναι πολύ μεγάλο: %(length)s από 
 msgid "The text must keep the same placeholders as the original."
 msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημεία αντικατάστασης με το αρχικό."
 
+msgid "The ticket is not valid."
+msgstr "Το εισιτήριο δεν είναι έγκυρο."
+
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
 
@@ -14415,6 +14427,9 @@ msgstr "Αυτή η μέθοδος αποστολής δεν είναι διαθ
 
 msgid "This staff token grants no access to this store."
 msgstr "Αυτό το token προσωπικού δεν παρέχει πρόσβαση σε αυτό το κατάστημα."
+
+msgid "This staff token is for the page builder only."
+msgstr "Αυτό το διακριτικό προσωπικού ισχύει μόνο για τον δημιουργό σελίδων."
 
 msgid "This status means"
 msgstr "Αυτή η κατάσταση σημαίνει"

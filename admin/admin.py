@@ -223,6 +223,7 @@ class MyAdminSite(
             TurnoverView,
             TurnoverXlsxView,
         )
+        from builder.admin_views import edit_storefront
 
         urls = super().get_urls()
         custom_urls = [
@@ -230,6 +231,11 @@ class MyAdminSite(
                 "clear-cache/",
                 self.admin_view(self.clear_cache_view),
                 name="clear-cache",
+            ),
+            path(
+                "edit-storefront/",
+                self.admin_view(edit_storefront),
+                name="edit-storefront",
             ),
             path(
                 "turnover/",

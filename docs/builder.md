@@ -245,8 +245,58 @@ release uses are answered** (ids are sequential, and an image nobody
 published is not the public's to list); any other id is left out and the
 storefront shows that block empty.
 
+## Signing in to the editor
+
+The editor runs on the store's own host, where nobody is signed in as staff
+(staff are public-schema identities; a storefront session is a customer's).
+`builder/staff_session.py`:
+
+1. Store admin, **Content -> Edit storefront** (`admin:edit-storefront`,
+   `builder/admin_views.py`; only for a holder of
+   `builder.change_builderdocument`, so ADMIN and OWNER; `never_cache`).
+   It stores the staff id in Redis under a random key for
+   `BUILDER_STAFF_TICKET_TTL_SECONDS` (a minute) and redirects to
+   `https://<store>/_builder?ticket=<ticket>`.
+2. The storefront's SERVER posts `{ticket}` to `POST /api/v1/builder/
+   staff-session` and answers `200 {token, expiresAt, staff: {id, name,
+   role}}`; any problem is `400 invalid_ticket`, one body whatever the
+   cause. `role` is the membership role in this store, or `superuser`.
+3. The storefront keeps the token in its own HttpOnly cookie and sends it as
+   `Authorization: StaffBearer <token>`. `DELETE builder/staff-session`
+   (that token) ends it.
+
+Security properties, each with a test:
+
+- **Single use.** The ticket is consumed with Redis `GETDEL`, one round trip:
+  of two requests with the same ticket one wins. Intercepting it after use
+  gains nothing, and unused it dies in a minute.
+- **Checked when spent, not when minted.** The person must still be an
+  active staff account with the right to change this store's pages (the role
+  backend, through the provenance stamp), so a role lost in between is
+  `invalid_ticket`.
+- **One store.** The cache key function puts the schema in every key, so a
+  ticket minted on store A finds nothing on store B
+  (`tests_mt/test_builder_staff_ticket.py`).
+- **A token that stays small.** It is a `PlatformStaffToken` with
+  `scope = builder` (`tenant.models.StaffTokenScope`): knox's auto-refresh
+  would push any token to its seven-day lifetime, so
+  `PlatformStaffTokenAuthentication` does not renew a builder token (it ends
+  at `BUILDER_STAFF_SESSION_TTL_SECONDS`, a working day) and refuses it on
+  every route outside the `builder` URL namespace (`401 staff_token_scope`).
+- **Revocation.** The authenticator re-checks `is_staff` and the role in this
+  store on every request, so removing the membership, clearing `is_staff` or
+  deactivating the account ends a live session at once; a password reset
+  deletes the account's staff tokens (`admin/password_reset.py`); logout
+  deletes it.
+- **A ticket is in a URL**, so it can reach a log or a history entry; that is
+  why it lives a minute and is single use. The storefront should trade it at
+  once and redirect without it.
+- The sign-in route has its own throttle scope (`builder_session`): its one
+  caller is our storefront, for every store, so the per-person budget of the
+  platform login does not fit; a ticket is 256 random bits, so the limit
+  bounds load, not guessing.
+
 ## Not here yet
 
-Scheduled publishing, the storefront staff session, and the
-`builder_block_usage` command that will gate removing a block type: each is
-its own change.
+Scheduled publishing and the `builder_block_usage` command that will gate
+removing a block type: each is its own change.

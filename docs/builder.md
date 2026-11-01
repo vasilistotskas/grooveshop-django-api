@@ -351,6 +351,38 @@ publish can wait for a time:
   `POST schedules/<id>/acknowledge` or the **Acknowledge the failure** action of
   Content, Page builder, Scheduled publishes (read-only admin) takes it away.
 
+## Importing the legacy layouts
+
+`page_config` (`PageLayout` + `PageSection`, `NavigationMenu`) is what the
+builder replaces. `manage.py builder_import_legacy [--tenant S | --all-tenants]
+[--dry-run] [--json]` (`builder/importing.py`) turns a store's layouts and
+menus into documents and releases them once. The conversion is **one
+implementation, the storefront's** `fromLegacy` (its blocks know their own
+settings); Django never converts:
+
+- `builder/legacy.py` describes the legacy data as the converter's request
+  (`kind` template or group, `key`, `legacy`: a layout's `sections` with their
+  uuid, `type`, `title`, `isVisible`, stored snake_case `props` and `i18n`, and
+  its SEO per language; a menu's columns and links with the label each would
+  show in every language of the store, and the target). A layout is
+  `template:<page_type>`, a menu slot `group:<slot>`.
+- `builder/convert.py` calls `POST {storefront}/api/builder/convert-legacy`
+  with the secret the cache purge uses (`NUXT_CACHE_PURGE_TOKEN`,
+  header `X-Cache-Purge-Token`) and `defaultLocale`. `200 {document, i18n,
+  warnings}`; `422` is a refusal about the data (unknown block type, props its
+  schema refuses), anything else is the storefront being unavailable.
+- Each result is validated like any other document (`builder.validation`).
+  Feature gates are not applied to the import (a block whose feature is off
+  renders nothing, as before; they apply on every later save).
+- **All or nothing per store**, in one transaction: the documents (a layout
+  that is not published stays a draft, a menu is live), one version for each
+  released one, and ONE release (number 1, no staff, note "Imported from page
+  layouts"). A problem anywhere, including a reference to nothing, writes
+  nothing. A store that already has builder data is refused. `--dry-run` does
+  everything and rolls it back. The legacy tables are not touched.
+- `manage.py builder_export_legacy --all-tenants --out DIR` writes every
+  request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
+
 ## Not here yet
 
 The `builder_block_usage` command that will gate removing a block type is its

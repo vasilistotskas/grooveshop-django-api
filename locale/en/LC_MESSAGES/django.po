@@ -14497,6 +14497,9 @@ msgstr "This staff token is for the page builder only."
 msgid "This status means"
 msgstr "This status means"
 
+msgid "This store already has page builder data."
+msgstr "This store already has page builder data."
+
 #, python-format
 msgid "This store has no block called %(type)s."
 msgstr "This store has no block called %(type)s."

@@ -14502,6 +14502,9 @@ msgstr "Αυτό το διακριτικό προσωπικού ισχύει μ�
 msgid "This status means"
 msgstr "Αυτή η κατάσταση σημαίνει"
 
+msgid "This store already has page builder data."
+msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."
+
 #, python-format
 msgid "This store has no block called %(type)s."
 msgstr "Αυτό το κατάστημα δεν έχει μπλοκ με όνομα %(type)s."

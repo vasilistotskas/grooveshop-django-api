@@ -299,6 +299,10 @@ msgid "%(kind)s %(amount)s on order %(order)s"
 msgstr "%(kind)s %(amount)s on order %(order)s"
 
 #, python-format
+msgid "%(kind)s %(target)s does not exist in this store."
+msgstr "%(kind)s %(target)s does not exist in this store."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — product %(product)s"
 
@@ -313,6 +317,10 @@ msgstr "%(likes)d likes, %(comments)d comments, %(views)d views"
 #, python-format
 msgid "%(likes)d likes, %(replies)d replies"
 msgstr "%(likes)d likes, %(replies)d replies"
+
+#, python-format
+msgid "%(locale)s is not a language that can be translated."
+msgstr "%(locale)s is not a language that can be translated."
 
 #, python-format
 msgid "%(minutes)s min"
@@ -519,6 +527,34 @@ msgstr[0] "%(type)s %(points)s point (user %(user)s)"
 msgstr[1] "%(type)s %(points)s points (user %(user)s)"
 
 #, python-format
+msgid "%(type)s can be used %(limit)s time(s) in a document."
+msgstr "%(type)s can be used %(limit)s time(s) in a document."
+
+#, python-format
+msgid "%(type)s cannot be used here."
+msgstr "%(type)s cannot be used here."
+
+#, python-format
+msgid "%(type)s cannot be used in this document."
+msgstr "%(type)s cannot be used in this document."
+
+#, python-format
+msgid "%(type)s cannot go inside %(parent)s."
+msgstr "%(type)s cannot go inside %(parent)s."
+
+#, python-format
+msgid "%(type)s is at version %(current)s; this is version %(sent)s."
+msgstr "%(type)s is at version %(current)s; this is version %(sent)s."
+
+#, python-format
+msgid "%(type)s needs a feature that is off for this store."
+msgstr "%(type)s needs a feature that is off for this store."
+
+#, python-format
+msgid "%(type)s needs a feature this platform does not have."
+msgstr "%(type)s needs a feature this platform does not have."
+
+#, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr "%(user)s received a %(points)d loyalty points adjustment."
 
@@ -722,6 +758,10 @@ msgstr "A shipping provider is required for locker / pickup-point delivery."
 
 msgid "A signed-in session is required."
 msgstr "A signed-in session is required."
+
+#, python-format
+msgid "A store can have at most %(limit)s pages."
+msgstr "A store can have at most %(limit)s pages."
 
 msgid "A store must keep at least one active owner."
 msgstr "A store must keep at least one active owner."
@@ -1521,6 +1561,14 @@ msgid "At most %(count)s files."
 msgstr "At most %(count)s files."
 
 #, python-format
+msgid "At most %(limit)s blocks fit here."
+msgstr "At most %(limit)s blocks fit here."
+
+#, python-format
+msgid "At most %(limit)s sections fit in a document."
+msgstr "At most %(limit)s sections fit in a document."
+
+#, python-format
 msgid "At most %(max)d gift cards per order."
 msgstr "At most %(max)d gift cards per order."
 
@@ -1851,11 +1899,17 @@ msgstr "Biography"
 msgid "Birth Date"
 msgstr "Birth Date"
 
+msgid "Block types"
+msgstr "Block types"
+
 msgid "Blocked"
 msgstr "Blocked"
 
 msgid "Blocked keys"
 msgstr "Blocked keys"
+
+msgid "Blocks cannot be nested this deep."
+msgstr "Blocks cannot be nested this deep."
 
 msgid "Blog"
 msgstr "Blog"
@@ -2066,6 +2120,30 @@ msgstr "Browser"
 
 msgid "Budget (€0-€20)"
 msgstr "Budget (€0-€20)"
+
+msgid "Builder document"
+msgstr "Builder document"
+
+msgid "Builder documents"
+msgstr "Builder documents"
+
+msgid "Builder reference"
+msgstr "Builder reference"
+
+msgid "Builder references"
+msgstr "Builder references"
+
+msgid "Builder release"
+msgstr "Builder release"
+
+msgid "Builder releases"
+msgstr "Builder releases"
+
+msgid "Builder version"
+msgstr "Builder version"
+
+msgid "Builder versions"
+msgstr "Builder versions"
 
 msgid "Built-in page"
 msgstr "Built-in page"
@@ -2556,6 +2634,9 @@ msgstr "Catalog"
 msgid "Catalogue feature"
 msgstr "Catalogue feature"
 
+msgid "Catalogue hash"
+msgstr "Catalogue hash"
+
 msgid "Categories"
 msgstr "Categories"
 
@@ -2774,6 +2855,9 @@ msgstr "Choose a new password for %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Choose a new password for {store_name}"
+
+msgid "Choose at least one document to publish."
+msgstr "Choose at least one document to publish."
 
 msgid "City"
 msgstr "City"
@@ -3364,6 +3448,9 @@ msgstr "Created By"
 
 msgid "Created at"
 msgstr "Created at"
+
+msgid "Created by (staff)"
+msgstr "Created by (staff)"
 
 msgid "Creates unique random codes attached to this promotion."
 msgstr "Creates unique random codes attached to this promotion."
@@ -4029,6 +4116,12 @@ msgstr "Download your export"
 msgid "Draft"
 msgstr "Draft"
 
+msgid "Draft revision"
+msgstr "Draft revision"
+
+msgid "Draft translations"
+msgstr "Draft translations"
+
 msgid "Drop candidates whose price is more than this many times the seed's, or less than 1/this. Empty disables the band."
 msgstr "Drop candidates whose price is more than this many times the seed's, or less than 1/this. Empty disables the band."
 
@@ -4446,6 +4539,9 @@ msgstr "Every store carries exactly one plan — a commercial label set by platf
 
 msgid "Every submission to AADE will fail until they are set."
 msgstr "Every submission to AADE will fail until they are set."
+
+msgid "Every type@version used, for the catalogue usage gate."
+msgstr "Every type@version used, for the catalogue usage gate."
 
 msgid "Exactly what the order costs."
 msgstr "Exactly what the order costs."
@@ -6833,6 +6929,9 @@ msgstr "Icon Image"
 msgid "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
 msgstr "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
 
+msgid "Id of the platform staff member who last saved the draft (public schema, not a store user)."
+msgstr "Id of the platform staff member who last saved the draft (public schema, not a store user)."
+
 msgid "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
 msgstr "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
 
@@ -6917,6 +7016,9 @@ msgstr "If you have any questions, please contact our customer service team."
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "If you have any questions, please contact our customer service."
+
+msgid "If-Match must be a revision number."
+msgstr "If-Match must be a revision number."
 
 msgid "Image"
 msgstr "Image"
@@ -8211,6 +8313,9 @@ msgstr "Month"
 msgid "Most posts to return, from 1 to {max} (the default)."
 msgstr "Most posts to return, from 1 to {max} (the default)."
 
+msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
+msgstr "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
+
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 
@@ -8231,6 +8336,9 @@ msgstr "Must be a valid integer."
 
 msgid "Must be a valid number."
 msgstr "Must be a valid number."
+
+msgid "Must be an object."
+msgstr "Must be an object."
 
 msgid "Must be true or false."
 msgstr "Must be true or false."
@@ -8260,6 +8368,9 @@ msgstr "Name must be at least 2 characters long."
 
 msgid "Name of the content type"
 msgstr "Name of the content type"
+
+msgid "Named save"
+msgstr "Named save"
 
 msgid "Names of the ad click-id parameters the landing URL carried. Their values are never sent."
 msgstr "Names of the ad click-id parameters the landing URL carried. Their values are never sent."
@@ -8671,8 +8782,24 @@ msgstr "No voucher available — shipment is in state '%(state)s'. The BoxNow de
 msgid "No vouchers are waiting for a pickup list."
 msgstr "No vouchers are waiting for a pickup list."
 
+msgid "Node path"
+msgstr "Node path"
+
 msgid "Normal Priority"
 msgstr "Normal Priority"
+
+msgid "Not a JSON pointer."
+msgstr "Not a JSON pointer."
+
+#, python-format
+msgid "Not a valid %(kind)s reference."
+msgstr "Not a valid %(kind)s reference."
+
+msgid "Not a valid document key."
+msgstr "Not a valid document key."
+
+msgid "Not a valid id."
+msgstr "Not a valid id."
 
 #, python-format
 msgid "Not an email type you can choose: %(keys)s."
@@ -8688,6 +8815,9 @@ msgstr "Not enough stock available. Only {product_stock} remaining."
 #, python-brace-format
 msgid "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
 msgstr "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
+
+msgid "Not found."
+msgstr "Not found."
 
 msgid "Not in Use"
 msgstr "Not in Use"
@@ -8734,6 +8864,9 @@ msgstr "Nothing has been changed yet."
 msgid "Nothing has been deleted — your products, orders, and settings are all intact."
 msgstr "Nothing has been deleted — your products, orders, and settings are all intact."
 
+msgid "Nothing has changed since the last release."
+msgstr "Nothing has changed since the last release."
+
 msgid "Nothing retained"
 msgstr "Nothing retained"
 
@@ -8777,6 +8910,9 @@ msgstr "Notified at"
 
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null until the enquiry that claims this upload is submitted."
+
+msgid "Number"
+msgstr "Number"
 
 msgid "Number of blog posts using this tag"
 msgstr "Number of blog posts using this tag"
@@ -8911,6 +9047,9 @@ msgstr "Only a cash-on-delivery shipment with an amount due can be settled."
 #, python-format
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Only a delivered shipment can be settled (this one is %(state)s)."
+
+msgid "Only a page can be deleted."
+msgstr "Only a page can be deleted."
 
 msgid "Only one active newsletter topic can be the default."
 msgstr "Only one active newsletter topic can be the default."
@@ -9489,6 +9628,12 @@ msgstr "Page Sections"
 
 msgid "Page Type"
 msgstr "Page Type"
+
+msgid "Page builder"
+msgstr "Page builder"
+
+msgid "Page deleted"
+msgstr "Page deleted"
 
 msgid "Page number (pageNumber pagination strategy)"
 msgstr "Page number (pageNumber pagination strategy)"
@@ -10706,6 +10851,9 @@ msgstr "Provisioned Stripe webhook"
 msgid "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
 msgstr "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
 
+msgid "Publish"
+msgstr "Publish"
+
 msgid "Publish Status"
 msgstr "Publish Status"
 
@@ -10717,6 +10865,15 @@ msgstr "Published"
 
 msgid "Published At"
 msgstr "Published At"
+
+msgid "Published at"
+msgstr "Published at"
+
+msgid "Published by (staff)"
+msgstr "Published by (staff)"
+
+msgid "Published revision"
+msgstr "Published revision"
 
 msgid "Publishing"
 msgstr "Publishing"
@@ -11103,6 +11260,9 @@ msgstr "Reference number"
 msgid "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
 msgstr "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
 
+msgid "References"
+msgstr "References"
+
 msgctxt "order source type"
 msgid "Referral"
 msgstr "Referral"
@@ -11312,6 +11472,9 @@ msgstr "Release stock reservations"
 
 msgid "Release stock reservations when checkout is abandoned or payment fails. This makes the reserved stock available for other customers."
 msgstr "Release stock reservations when checkout is abandoned or payment fails. This makes the reserved stock available for other customers."
+
+msgid "Releases"
+msgstr "Releases"
 
 msgid "Remaining balance"
 msgstr "Remaining balance"
@@ -11692,6 +11855,9 @@ msgstr "Rich Text Block"
 msgid "Role"
 msgstr "Role"
 
+msgid "Rolled back to"
+msgstr "Rolled back to"
+
 msgid "Row fingerprint"
 msgstr "Row fingerprint"
 
@@ -11966,6 +12132,9 @@ msgstr "Secondary address line"
 msgid "Seconds until the token stops working."
 msgstr "Seconds until the token stops working."
 
+msgid "Section group"
+msgstr "Section group"
+
 msgid "Security"
 msgstr "Security"
 
@@ -12052,6 +12221,9 @@ msgstr "Send receipt to myDATA"
 
 msgid "Send the link"
 msgstr "Send the link"
+
+msgid "Send the revision you are changing in If-Match."
+msgstr "Send the revision you are changing in If-Match."
 
 msgid "Sender Name"
 msgstr "Sender Name"
@@ -12494,6 +12666,9 @@ msgstr "Sixth Floor Plus"
 msgid "Size"
 msgstr "Size"
 
+msgid "Size (bytes)"
+msgstr "Size (bytes)"
+
 msgid "Skip products that already carry a product-level markdown (discount percent > 0)"
 msgstr "Skip products that already carry a product-level markdown (discount percent > 0)"
 
@@ -12606,6 +12781,9 @@ msgstr "Some of what these figures need is not recorded: goods sold without a co
 msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
 msgstr "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
 
+msgid "Someone else changed this document since you opened it."
+msgstr "Someone else changed this document since you opened it."
+
 #, python-format
 msgid "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
 msgstr "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
@@ -12639,6 +12817,9 @@ msgstr "Spacer"
 
 msgid "Spam complaint"
 msgstr "Spam complaint"
+
+msgid "Sparse per-language overlay: {locale: {node id: {setting pointer: value}}}. Structure is never per language."
+msgstr "Sparse per-language overlay: {locale: {node id: {setting pointer: value}}}. Structure is never per language."
 
 msgid "Specific categories"
 msgstr "Specific categories"
@@ -13214,6 +13395,9 @@ msgstr "Tagged Items"
 msgid "Tags"
 msgstr "Tags"
 
+msgid "Target"
+msgstr "Target"
+
 msgid "Target Scope"
 msgstr "Target Scope"
 
@@ -13313,6 +13497,9 @@ msgstr "Tells the store's staff that the payment of a gift card purchase was dis
 
 msgid "Tells the store's staff which products have run down to their low-stock threshold."
 msgstr "Tells the store's staff which products have run down to their low-stock threshold."
+
+msgid "Template"
+msgstr "Template"
 
 msgid "Ten"
 msgstr "Ten"
@@ -13424,6 +13611,9 @@ msgstr "That file is too large."
 #, python-format
 msgid "That file type is not accepted. Allowed: %(types)s."
 msgstr "That file type is not accepted. Allowed: %(types)s."
+
+msgid "That release is already the current one."
+msgstr "That release is already the current one."
 
 #, python-format
 msgid "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
@@ -13545,6 +13735,9 @@ msgstr "The customer was told it was refunded: pay them back another way, or ref
 msgid "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
 msgstr "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
 
+msgid "The default language has no such setting."
+msgstr "The default language has no such setting."
+
 msgid "The destination this option was priced for."
 msgstr "The destination this option was priced for."
 
@@ -13553,6 +13746,16 @@ msgstr "The dispute closed against you and the money was taken back. It is recor
 
 msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
 msgstr "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
+
+msgid "The document has problems that must be fixed first."
+msgstr "The document has problems that must be fixed first."
+
+#, python-format
+msgid "The document is larger than %(limit)s KB."
+msgstr "The document is larger than %(limit)s KB."
+
+msgid "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
+msgstr "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 
 msgid "The end is before the start."
 msgstr "The end is before the start."
@@ -13663,6 +13866,9 @@ msgstr "The order's UUID. Required when the order belongs to a guest (no account
 msgid "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
 msgstr "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
 
+msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
+msgstr "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
+
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 
@@ -13770,12 +13976,18 @@ msgstr "The refund that returned value onto gift cards and points, which this do
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
 
+msgid "The release whose versions this one restores."
+msgstr "The release whose versions this one restores."
+
 msgid "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
 msgstr "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
 
 #, python-brace-format
 msgid "The repayment reference can be at most {max_length} characters."
 msgstr "The repayment reference can be at most {max_length} characters."
+
+msgid "The request could not be processed."
+msgstr "The request could not be processed."
 
 msgid "The resolved ``ShippingRate`` price (or a live provider quote, or 0 when the rate's free-shipping threshold is met)."
 msgstr "The resolved ``ShippingRate`` price (or a live provider quote, or 0 when the rate's free-shipping threshold is met)."
@@ -13838,6 +14050,12 @@ msgstr "The store's owner received the matching notice."
 msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 msgstr "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 
+msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
+msgstr "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
+
+msgid "The storefront catalogue build the draft was last validated against."
+msgstr "The storefront catalogue build the draft was last validated against."
+
 msgid "The storefront could not be reached to check this text, so nothing was saved. Try again in a moment."
 msgstr "The storefront could not be reached to check this text, so nothing was saved. Try again in a moment."
 
@@ -13876,6 +14094,9 @@ msgstr "The text must keep the same placeholders as the original."
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
 
+msgid "The type must look like name@version."
+msgstr "The type must look like name@version."
+
 msgid "The updated cart, as returned by the cart detail endpoint"
 msgstr "The updated cart, as returned by the cart detail endpoint"
 
@@ -13897,8 +14118,14 @@ msgstr "The wholesale pricing tier this business gets"
 msgid "The wording a store replaced in its storefront, and every page rendered with it. Purges itself when a text is saved, reset or restored in the text editor."
 msgstr "The wording a store replaced in its storefront, and every page rendered with it. Purges itself when a text is saved, reset or restored in the text editor."
 
+msgid "The working copy: the default-language content."
+msgstr "The working copy: the default-language content."
+
 msgid "The zone of the store's own domain, from the Cloudflare dashboard's domain overview. Empty when the store uses a platform hostname."
 msgstr "The zone of the store's own domain, from the Cloudflare dashboard's domain overview. Empty when the store uses a platform hostname."
+
+msgid "Theme"
+msgstr "Theme"
 
 msgid "Theme Metadata"
 msgstr "Theme Metadata"
@@ -13911,6 +14138,19 @@ msgstr "There can only be one main address per user."
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
+
+msgid "There is no such document."
+msgstr "There is no such document."
+
+#, python-format
+msgid "There is no such document: %(keys)s."
+msgstr "There is no such document: %(keys)s."
+
+msgid "There is no such release."
+msgstr "There is no such release."
+
+msgid "There is no such version."
+msgstr "There is no such version."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -13962,6 +14202,9 @@ msgstr "This content contains markup that cannot be published and would be remov
 msgid "This credit receipt is your proof of the refund — please keep it for your records."
 msgstr "This credit receipt is your proof of the refund — please keep it for your records."
 
+msgid "This document has no such block."
+msgstr "This document has no such block."
+
 msgid "This download link has expired."
 msgstr "This download link has expired."
 
@@ -13976,6 +14219,9 @@ msgstr "This email type does not exist."
 
 msgid "This field is required"
 msgstr "This field is required"
+
+msgid "This id is used twice."
+msgstr "This id is used twice."
 
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
@@ -14059,6 +14305,10 @@ msgstr "This order was not paid through a payment provider, so there is nothing 
 msgid "This order's payment status does not allow a retry."
 msgstr "This order's payment status does not allow a retry."
 
+#, python-format
+msgid "This page is linked from %(documents)s."
+msgstr "This page is linked from %(documents)s."
+
 msgid "This payment method is not available for this store."
 msgstr "This payment method is not available for this store."
 
@@ -14084,6 +14334,9 @@ msgstr "This range would show more than %(rows)s rows: choose longer periods, or
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "This receipt is your proof of purchase — please keep it for your records."
 
+msgid "This setting is the same in every language."
+msgstr "This setting is the same in every language."
+
 msgid "This shipment already has a BoxNow parcel."
 msgstr "This shipment already has a BoxNow parcel."
 
@@ -14098,6 +14351,10 @@ msgstr "This staff token grants no access to this store."
 
 msgid "This status means"
 msgstr "This status means"
+
+#, python-format
+msgid "This store has no block called %(type)s."
+msgstr "This store has no block called %(type)s."
 
 msgid "This store has no credentials for the payment provider, so the payment cannot be refunded here."
 msgstr "This store has no credentials for the payment provider, so the payment cannot be refunded here."
@@ -14554,6 +14811,9 @@ msgstr "Unknown carrier"
 
 msgid "Unknown gift card code."
 msgstr "Unknown gift card code."
+
+msgid "Unknown property."
+msgstr "Unknown property."
 
 msgid "Unknown shipping provider."
 msgstr "Unknown shipping provider."
@@ -15033,6 +15293,9 @@ msgstr "Version"
 msgid "Version %(version)s"
 msgstr "Version %(version)s"
 
+msgid "Versions"
+msgstr "Versions"
+
 msgid "Very High Usage (50+)"
 msgstr "Very High Usage (50+)"
 
@@ -15411,6 +15674,9 @@ msgstr "Where the strip is rendered; selects the slot."
 
 msgid "Where the subscription was made."
 msgstr "Where the subscription was made."
+
+msgid "Where things are used"
+msgstr "Where things are used"
 
 msgid "Whether a live promotion waives the shipping cost"
 msgstr "Whether a live promotion waives the shipping cost"
@@ -16093,6 +16359,12 @@ msgstr "``{rate, subtotal, vat, gross}`` rows of what this document credits, fro
 msgid "admin/"
 msgstr "admin/"
 
+msgid "blockOrder must list every block exactly once."
+msgstr "blockOrder must list every block exactly once."
+
+msgid "blocks and blockOrder go together."
+msgstr "blocks and blockOrder go together."
+
 msgid "cart"
 msgstr "cart"
 
@@ -16225,6 +16497,9 @@ msgstr "not stated"
 msgid "order"
 msgstr "order"
 
+msgid "order must list every section exactly once."
+msgstr "order must list every section exactly once."
+
 msgid "paid by the customer"
 msgstr "paid by the customer"
 
@@ -16234,6 +16509,9 @@ msgstr "paid by the store"
 #, python-brace-format
 msgid "payment intent is in an invalid state: {status}"
 msgstr "payment intent is in an invalid state: {status}"
+
+msgid "sha256 of data+i18n"
+msgstr "sha256 of data+i18n"
 
 msgid "shipping_provider_code is required for pickup_point."
 msgstr "shipping_provider_code is required for pickup_point."
@@ -16284,6 +16562,12 @@ msgstr "week"
 
 msgid "without voucher"
 msgstr "without voucher"
+
+msgid "{document key: version id}"
+msgstr "{document key: version id}"
+
+msgid "{kind: {target id: [node pointers]}}"
+msgstr "{kind: {target id: [node pointers]}}"
 
 #, python-brace-format
 msgid "{store} — your plan expires on {date}"
@@ -16549,9 +16833,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Successfully unsubscribed"
-
-#~ msgid "Templates"
-#~ msgstr "Templates"
 
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"

@@ -29,6 +29,8 @@ from typing import Any
 import requests
 from django.conf import settings
 
+from core.storefront import StorefrontUnavailable, base_url
+
 logger = logging.getLogger(__name__)
 
 #: The codes ``/api/texts/validate`` answers with.
@@ -39,10 +41,6 @@ PLACEHOLDER_MISMATCH = "placeholder_mismatch"
 REJECTION_CODES = frozenset(
     {UNKNOWN_KEY, LOCKED_KEY, SYNTAX_ERROR, PLACEHOLDER_MISMATCH}
 )
-
-
-class StorefrontUnavailable(Exception):
-    """The storefront did not give a usable answer."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,13 +78,6 @@ class Catalogue:
 class Rejection:
     code: str
     detail: str
-
-
-def _base_url() -> str:
-    base = (settings.NUXT_INTERNAL_BASE_URL or "").rstrip("/")
-    if not base:
-        raise StorefrontUnavailable("NUXT_INTERNAL_BASE_URL is not set")
-    return base
 
 
 def _parse_catalogue(payload: Any) -> Catalogue:
@@ -154,7 +145,7 @@ def fetch_catalogue(schema: str) -> Catalogue:
         headers["If-None-Match"] = held.etag
     try:
         response = requests.get(
-            f"{_base_url()}/api/texts/catalogue",
+            f"{base_url()}/api/texts/catalogue",
             params={"schema": schema},
             headers=headers,
             timeout=settings.TEXTS_STOREFRONT_TIMEOUT_SECONDS,
@@ -190,7 +181,7 @@ def validate_text(
     """None when the storefront accepts *value*, else why it does not."""
     try:
         response = requests.post(
-            f"{_base_url()}/api/texts/validate",
+            f"{base_url()}/api/texts/validate",
             json={
                 "namespace": namespace,
                 "key": key,

@@ -8758,6 +8758,519 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/documents:
+    get:
+      operationId: api_v1_builder_documents_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDocumentListList'
+          description: ''
+  /api/v1/builder/documents/{key}:
+    get:
+      operationId: api_v1_builder_documents_retrieve
+      description: Common to every staff route.
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+          description: ''
+    delete:
+      operationId: api_v1_builder_documents_destroy
+      description: Delete a page. A released page leaves the store with a new release;
+        a page another released document links to is refused (`page_in_use`).
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: string
+        description: The draft revision this change is made against, as read from
+          the document (`draftRevision`, or the ETag). `0` creates a document that
+          does not exist. A stale revision answers 409 `revision_conflict` with the
+          current one and who saved it.
+        required: true
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/documents/{key}/checkpoint:
+    post:
+      operationId: api_v1_builder_documents_checkpoint_create
+      description: 'A named save: freeze the current draft as a version.'
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckpointWriteRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/documents/{key}/discard:
+    post:
+      operationId: api_v1_builder_documents_discard_create
+      description: Common to every staff route.
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: string
+        description: The draft revision this change is made against, as read from
+          the document (`draftRevision`, or the ETag). `0` creates a document that
+          does not exist. A stale revision answers 409 `revision_conflict` with the
+          current one and who saved it.
+        required: true
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/documents/{key}/draft:
+    put:
+      operationId: api_v1_builder_documents_draft_update
+      description: Autosave. The document is validated in full against the storefront's
+        catalogue; the answer is 503 `storefront_unavailable` when it cannot be checked,
+        and 400 `invalid_document` with every problem as `{path, code, message}` (a
+        JSON pointer into what was sent).
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: string
+        description: The draft revision this change is made against, as read from
+          the document (`draftRevision`, or the ETag). `0` creates a document that
+          does not exist. A stale revision answers 409 `revision_conflict` with the
+          current one and who saved it.
+        required: true
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/documents/{key}/versions:
+    get:
+      operationId: api_v1_builder_documents_versions_list
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVersionListList'
+          description: ''
+  /api/v1/builder/documents/{key}/versions/{number}:
+    get:
+      operationId: api_v1_builder_documents_versions_retrieve
+      description: Common to every staff route.
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: number
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionDetail'
+          description: ''
+  /api/v1/builder/documents/{key}/versions/{number}/restore:
+    post:
+      operationId: api_v1_builder_documents_versions_restore_create
+      description: Put a version back as the DRAFT. It is not checked against the
+        catalogue (the editor upgrades old blocks); publishing validates.
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: string
+        description: The draft revision this change is made against, as read from
+          the document (`draftRevision`, or the ETag). `0` creates a document that
+          does not exist. A stale revision answers 409 `revision_conflict` with the
+          current one and who saved it.
+        required: true
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: number
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/publish:
+    post:
+      operationId: api_v1_builder_publish_create
+      description: Release the drafts of the named documents together, or none of
+        them. Every draft is validated in full, references included; the answer lists
+        every problem with its `document`.
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/published/{page_key}:
+    get:
+      operationId: api_v1_builder_published_retrieve
+      description: '`{release, locale, theme, groups, page}`: the documents of the
+        CURRENT release resolved for the locale (overlay merged, disabled nodes dropped).
+        `page` is the page of that key, else the template of that name. Never reads
+        a draft and never calls the storefront; the content keys are the storefront''s
+        own and are not camelCased.'
+      parameters:
+      - in: query
+        name: locale
+        schema:
+          type: string
+        description: Language to resolve the content in; unknown or omitted means
+          the store's default language.
+      - in: path
+        name: pageKey
+        schema:
+          type: string
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/builder/releases:
+    get:
+      operationId: api_v1_builder_releases_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReleaseList'
+          description: ''
+  /api/v1/builder/rollback:
+    post:
+      operationId: api_v1_builder_rollback_create
+      description: A new release pointing at the versions of an older one.
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RollbackWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/cart:
     get:
       operationId: retrieveCart
@@ -36863,6 +37376,26 @@ components:
       required:
       - id
       - name
+    BuilderDocumentKindEnum:
+      enum:
+      - theme
+      - group
+      - template
+      - page
+      type: string
+      description: |-
+        * `theme` - Θέμα
+        * `group` - Ομάδα ενοτήτων
+        * `template` - Πρότυπο
+        * `page` - Σελίδα
+    BuilderVersionKindEnum:
+      enum:
+      - checkpoint
+      - publish
+      type: string
+      description: |-
+        * `checkpoint` - Ονομασμένη αποθήκευση
+        * `publish` - Δημοσίευση
     BulkSubscriptionFailure:
       type: object
       properties:
@@ -37912,6 +38445,13 @@ components:
       - clientSecret
       - currency
       - paymentIntentId
+    CheckpointWriteRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          default: ''
+          maxLength: 255
     ClickIdsEnum:
       enum:
       - gclid
@@ -38891,6 +39431,104 @@ components:
             που είναι στη γλώσσα του αιτήματος.
       required:
       - detail
+    DocumentDetail:
+      type: object
+      properties:
+        key:
+          type: string
+          readOnly: true
+          title: Κλειδί
+        kind:
+          $ref: '#/components/schemas/BuilderDocumentKindEnum'
+        draftRevision:
+          type: integer
+          readOnly: true
+          title: Αναθεώρηση πρόχειρου
+          description: Αλλάζει με κάθε αλλαγή του πρόχειρου· κάθε αποθήκευση δηλώνει
+            την αναθεώρηση πάνω στην οποία έγινε (If-Match).
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Ενημερώθηκε στις
+        updatedBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        publishedVersion:
+          type: integer
+          nullable: true
+          readOnly: true
+        hasUnpublishedChanges:
+          type: boolean
+          readOnly: true
+        draft: {}
+        i18n: {}
+        draftCatalogueHash:
+          type: string
+          readOnly: true
+          title: Αποτύπωμα καταλόγου
+          description: Η έκδοση του καταλόγου του καταστήματος με την οποία ελέγχθηκε
+            τελευταία φορά το πρόχειρο.
+      required:
+      - draft
+      - draftCatalogueHash
+      - draftRevision
+      - hasUnpublishedChanges
+      - i18n
+      - key
+      - kind
+      - publishedVersion
+      - updatedAt
+      - updatedBy
+    DocumentList:
+      type: object
+      properties:
+        key:
+          type: string
+          readOnly: true
+          title: Κλειδί
+        kind:
+          $ref: '#/components/schemas/BuilderDocumentKindEnum'
+        draftRevision:
+          type: integer
+          readOnly: true
+          title: Αναθεώρηση πρόχειρου
+          description: Αλλάζει με κάθε αλλαγή του πρόχειρου· κάθε αποθήκευση δηλώνει
+            την αναθεώρηση πάνω στην οποία έγινε (If-Match).
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Ενημερώθηκε στις
+        updatedBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        publishedVersion:
+          type: integer
+          nullable: true
+          readOnly: true
+        hasUnpublishedChanges:
+          type: boolean
+          readOnly: true
+      required:
+      - draftRevision
+      - hasUnpublishedChanges
+      - key
+      - kind
+      - publishedVersion
+      - updatedAt
+      - updatedBy
+    DraftWriteRequest:
+      type: object
+      properties:
+        draft: {}
+        i18n: {}
+      required:
+      - draft
     EmailPreference:
       type: object
       properties:
@@ -42649,6 +43287,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
+    PaginatedDocumentListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentList'
     PaginatedGiftCardList:
       type: object
       required:
@@ -43333,6 +44009,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Region'
+    PaginatedReleaseList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Release'
     PaginatedSubscriptionTopicList:
       type: object
       required:
@@ -43599,6 +44313,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserSubscription'
+    PaginatedVersionListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VersionList'
     PatchedBlogAuthorWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -48096,6 +48848,21 @@ components:
           description: Τιμές ρυθμίσεων με κλειδί το όνομα της ρύθμισης.
       required:
       - settings
+    PublishWriteRequest:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        note:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - documents
     PublishedPageLayout:
       type: object
       description: |-
@@ -48467,6 +49234,45 @@ components:
         * `accessory` - Αξεσουάρ για
         * `replacement` - Αντικατάσταση για
         * `bundle` - Πακέτο με
+    Release:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        number:
+          type: integer
+          readOnly: true
+          title: Αριθμός
+        publishedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημοσιεύθηκε στις
+        publishedBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        note:
+          type: string
+          readOnly: true
+          title: Σημείωση
+        rolledBackFrom:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Αριθμός
+          readOnly: true
+        versions: {}
+      required:
+      - id
+      - note
+      - number
+      - publishedAt
+      - publishedBy
+      - rolledBackFrom
+      - versions
     ReleaseReservationsRequestRequest:
       type: object
       description: Serializer for releasing stock reservations.
@@ -48565,6 +49371,18 @@ components:
         * `NEW` - Σε αναμονή έγκρισης
         * `TRUE` - Εγκεκριμένο
         * `FALSE` - Απορρίφθηκε
+    RollbackWriteRequest:
+      type: object
+      properties:
+        release:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - release
     ScanStatusEnum:
       enum:
       - PENDING
@@ -49073,6 +49891,16 @@ components:
         * `header` - Κεφαλίδα
         * `footer` - Υποσέλιδο
         * `mobile` - Κινητό
+    Staff:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     StoreFeatures:
       type: object
       description: |-
@@ -50936,6 +51764,121 @@ components:
       required:
       - id
       - value
+    VersionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        number:
+          type: integer
+          readOnly: true
+          title: Αριθμός
+        kind:
+          $ref: '#/components/schemas/BuilderVersionKindEnum'
+        note:
+          type: string
+          readOnly: true
+          title: Σημείωση
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+        createdBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        sizeBytes:
+          type: integer
+          readOnly: true
+          title: Μέγεθος (bytes)
+        blockTypes:
+          type: array
+          items:
+            type: string
+            maxLength: 80
+          readOnly: true
+          title: Τύποι μπλοκ
+          description: Κάθε τύπος@έκδοση που χρησιμοποιείται, για τον έλεγχο χρήσης
+            του καταλόγου.
+        catalogueHash:
+          type: string
+          readOnly: true
+          title: Αποτύπωμα καταλόγου
+        data: {}
+        i18n: {}
+        refs:
+          readOnly: true
+          title: Αναφορές
+          description: '{είδος: {αναγνωριστικό στόχου: [δείκτες κόμβων]}}'
+      required:
+      - blockTypes
+      - catalogueHash
+      - createdAt
+      - createdBy
+      - data
+      - i18n
+      - id
+      - kind
+      - note
+      - number
+      - refs
+      - sizeBytes
+    VersionList:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        number:
+          type: integer
+          readOnly: true
+          title: Αριθμός
+        kind:
+          $ref: '#/components/schemas/BuilderVersionKindEnum'
+        note:
+          type: string
+          readOnly: true
+          title: Σημείωση
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+        createdBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+          readOnly: true
+        sizeBytes:
+          type: integer
+          readOnly: true
+          title: Μέγεθος (bytes)
+        blockTypes:
+          type: array
+          items:
+            type: string
+            maxLength: 80
+          readOnly: true
+          title: Τύποι μπλοκ
+          description: Κάθε τύπος@έκδοση που χρησιμοποιείται, για τον έλεγχο χρήσης
+            του καταλόγου.
+        catalogueHash:
+          type: string
+          readOnly: true
+          title: Αποτύπωμα καταλόγου
+      required:
+      - blockTypes
+      - catalogueHash
+      - createdAt
+      - createdBy
+      - id
+      - kind
+      - note
+      - number
+      - sizeBytes
     ViesStatusEnum:
       enum:
       - UNCHECKED

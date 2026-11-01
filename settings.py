@@ -304,6 +304,9 @@ TENANT_APPS = [
     # Store-edited storefront texts (overrides of the storefront's locale
     # defaults, validated through the storefront before they are saved)
     "texts",
+    # The storefront page builder: versioned documents, releases and the
+    # staff API (the block catalogue is the storefront's, ``builder.storefront``)
+    "builder",
     # Agent surface (OIDC-bearer API over tenant-schema data; no models
     # of its own — placed here because everything it serves is per-store)
     "agent",
@@ -906,6 +909,41 @@ TEXTS_STOREFRONT_TIMEOUT_SECONDS = float(
 # keyed by the store's cache generation, so a save moves them at once).
 TEXTS_OVERRIDES_CACHE_SECONDS = int(
     getenv("TEXTS_OVERRIDES_CACHE_SECONDS", "3600")
+)
+
+# The storefront page builder (``builder``). Like the texts, the catalogue
+# of blocks and their settings schemas is the storefront's, asked over
+# ``NUXT_INTERNAL_BASE_URL`` (``builder.storefront``).
+#
+# Seconds a process trusts its copy of the catalogue before it asks the
+# storefront whether the build changed (a conditional request).
+BUILDER_CATALOGUE_REVALIDATE_SECONDS = int(
+    getenv("BUILDER_CATALOGUE_REVALIDATE_SECONDS", "60")
+)
+# Seconds to wait for the storefront when fetching the catalogue.
+BUILDER_STOREFRONT_TIMEOUT_SECONDS = float(
+    getenv("BUILDER_STOREFRONT_TIMEOUT_SECONDS", "5")
+)
+# Limits a save is refused beyond. A block's own ``limits`` in the
+# catalogue can only tighten them.
+BUILDER_MAX_SECTIONS_PER_DOCUMENT = int(
+    getenv("BUILDER_MAX_SECTIONS_PER_DOCUMENT", "40")
+)
+BUILDER_MAX_BLOCKS_PER_NODE = int(getenv("BUILDER_MAX_BLOCKS_PER_NODE", "50"))
+# Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
+BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
+BUILDER_MAX_DOCUMENT_BYTES = int(
+    getenv("BUILDER_MAX_DOCUMENT_BYTES", str(256 * 1024))
+)
+BUILDER_MAX_PAGES = int(getenv("BUILDER_MAX_PAGES", "100"))
+# Named saves kept per document that no release points at; older ones go.
+BUILDER_UNRELEASED_CHECKPOINTS_KEPT = int(
+    getenv("BUILDER_UNRELEASED_CHECKPOINTS_KEPT", "20")
+)
+# How long a resolved published page is kept. The key names the release,
+# so a new release reads a new key and nothing is ever purged.
+BUILDER_PUBLISHED_CACHE_SECONDS = int(
+    getenv("BUILDER_PUBLISHED_CACHE_SECONDS", "86400")
 )
 
 # The platform's own Cloudflare zone, which caches the storefront pages of
@@ -4100,6 +4138,11 @@ SPECTACULAR_SETTINGS = {
         # ``Type8dcEnum``, which bleeds into the generated frontend
         # types. ``TypeEnum`` keeps the name it already had.
         "TypeEnum": "shipping_boxnow.enum.locker_type.BoxNowLockerType",
+        # ``BuilderDocument.kind`` and ``BuilderVersion.kind`` are two choice
+        # sets behind one field name; named, they do not become hashed
+        # ``Kind1e3Enum``/``KindCbcEnum`` in the generated frontend types.
+        "BuilderDocumentKindEnum": "builder.models.DocumentKind",
+        "BuilderVersionKindEnum": "builder.models.VersionKind",
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",

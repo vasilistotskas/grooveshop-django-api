@@ -304,6 +304,10 @@ msgid "%(kind)s %(amount)s on order %(order)s"
 msgstr "%(kind)s %(amount)s στην παραγγελία %(order)s"
 
 #, python-format
+msgid "%(kind)s %(target)s does not exist in this store."
+msgstr "Το στοιχείο %(kind)s %(target)s δεν υπάρχει σε αυτό το κατάστημα."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — προϊόν %(product)s"
 
@@ -318,6 +322,10 @@ msgstr "%(likes)d επισημάνσεις, %(comments)d σχόλια, %(views)d
 #, python-format
 msgid "%(likes)d likes, %(replies)d replies"
 msgstr "%(likes)d επισημάνσεις, %(replies)d απαντήσεις"
+
+#, python-format
+msgid "%(locale)s is not a language that can be translated."
+msgstr "Η γλώσσα %(locale)s δεν μπορεί να μεταφραστεί."
 
 #, python-format
 msgid "%(minutes)s min"
@@ -524,6 +532,34 @@ msgstr[0] "%(type)s %(points)s πόντος (χρήστης %(user)s)"
 msgstr[1] "%(type)s %(points)s πόντοι (χρήστης %(user)s)"
 
 #, python-format
+msgid "%(type)s can be used %(limit)s time(s) in a document."
+msgstr "Το στοιχείο %(type)s μπορεί να χρησιμοποιηθεί έως %(limit)s φορά(-ές) σε ένα έγγραφο."
+
+#, python-format
+msgid "%(type)s cannot be used here."
+msgstr "Το στοιχείο %(type)s δεν μπορεί να χρησιμοποιηθεί εδώ."
+
+#, python-format
+msgid "%(type)s cannot be used in this document."
+msgstr "Το στοιχείο %(type)s δεν μπορεί να χρησιμοποιηθεί σε αυτό το έγγραφο."
+
+#, python-format
+msgid "%(type)s cannot go inside %(parent)s."
+msgstr "Το στοιχείο %(type)s δεν μπορεί να μπει μέσα στο %(parent)s."
+
+#, python-format
+msgid "%(type)s is at version %(current)s; this is version %(sent)s."
+msgstr "Το στοιχείο %(type)s είναι στην έκδοση %(current)s· αυτό είναι η έκδοση %(sent)s."
+
+#, python-format
+msgid "%(type)s needs a feature that is off for this store."
+msgstr "Το στοιχείο %(type)s χρειάζεται μια λειτουργία που είναι απενεργοποιημένη για αυτό το κατάστημα."
+
+#, python-format
+msgid "%(type)s needs a feature this platform does not have."
+msgstr "Το στοιχείο %(type)s χρειάζεται μια λειτουργία που δεν υπάρχει στην πλατφόρμα."
+
+#, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr "Ο/Η %(user)s έλαβε προσαρμογή %(points)d πόντων πιστότητας."
 
@@ -727,6 +763,10 @@ msgstr "Απαιτείται μεταφορέας για παράδοση σε l
 
 msgid "A signed-in session is required."
 msgstr "Απαιτείται συνδεδεμένη συνεδρία."
+
+#, python-format
+msgid "A store can have at most %(limit)s pages."
+msgstr "Ένα κατάστημα μπορεί να έχει το πολύ %(limit)s σελίδες."
 
 msgid "A store must keep at least one active owner."
 msgstr "Ένα κατάστημα πρέπει να έχει πάντα τουλάχιστον έναν ενεργό Ιδιοκτήτη."
@@ -1526,6 +1566,14 @@ msgid "At most %(count)s files."
 msgstr "Έως %(count)s αρχεία."
 
 #, python-format
+msgid "At most %(limit)s blocks fit here."
+msgstr "Εδώ χωράνε το πολύ %(limit)s μπλοκ."
+
+#, python-format
+msgid "At most %(limit)s sections fit in a document."
+msgstr "Ένα έγγραφο χωράει το πολύ %(limit)s ενότητες."
+
+#, python-format
 msgid "At most %(max)d gift cards per order."
 msgstr "Έως %(max)d δωροκάρτες ανά παραγγελία."
 
@@ -1856,11 +1904,17 @@ msgstr "Βιογραφικό"
 msgid "Birth Date"
 msgstr "Ημ/νία γέννησης"
 
+msgid "Block types"
+msgstr "Τύποι μπλοκ"
+
 msgid "Blocked"
 msgstr "Αποκλεισμένο"
 
 msgid "Blocked keys"
 msgstr "Αποκλεισμένα κλειδιά"
+
+msgid "Blocks cannot be nested this deep."
+msgstr "Τα μπλοκ δεν μπορούν να τοποθετηθούν τόσο βαθιά το ένα μέσα στο άλλο."
 
 msgid "Blog"
 msgstr "Blog"
@@ -2071,6 +2125,30 @@ msgstr "Πρόγραμμα περιήγησης"
 
 msgid "Budget (€0-€20)"
 msgstr "Οικονομικό (€0-€20)"
+
+msgid "Builder document"
+msgstr "Έγγραφο δημιουργού σελίδων"
+
+msgid "Builder documents"
+msgstr "Έγγραφα δημιουργού σελίδων"
+
+msgid "Builder reference"
+msgstr "Αναφορά δημιουργού σελίδων"
+
+msgid "Builder references"
+msgstr "Αναφορές δημιουργού σελίδων"
+
+msgid "Builder release"
+msgstr "Έκδοση δημοσίευσης"
+
+msgid "Builder releases"
+msgstr "Εκδόσεις δημοσίευσης"
+
+msgid "Builder version"
+msgstr "Έκδοση εγγράφου δημιουργού"
+
+msgid "Builder versions"
+msgstr "Εκδόσεις εγγράφων δημιουργού"
 
 msgid "Built-in page"
 msgstr "Ενσωματωμένη σελίδα"
@@ -2563,6 +2641,9 @@ msgstr "Κατάλογος"
 msgid "Catalogue feature"
 msgstr "Λειτουργία καταλόγου"
 
+msgid "Catalogue hash"
+msgstr "Αποτύπωμα καταλόγου"
+
 msgid "Categories"
 msgstr "Κατηγορίες"
 
@@ -2781,6 +2862,9 @@ msgstr "Νέος κωδικός πρόσβασης για %(store)s"
 #, python-brace-format
 msgid "Choose a new password for {store_name}"
 msgstr "Νέος κωδικός πρόσβασης για {store_name}"
+
+msgid "Choose at least one document to publish."
+msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
 
 msgid "City"
 msgstr "Πόλη"
@@ -3369,6 +3453,9 @@ msgstr "Δημιουργήθηκε από"
 
 msgid "Created at"
 msgstr "Δημιουργήθηκε στις"
+
+msgid "Created by (staff)"
+msgstr "Δημιουργήθηκε από (προσωπικό)"
 
 msgid "Creates unique random codes attached to this promotion."
 msgstr "Δημιουργεί μοναδικούς τυχαίους κωδικούς συνδεδεμένους με αυτή την προσφορά."
@@ -4035,6 +4122,12 @@ msgstr "Λήψη του export σας"
 msgid "Draft"
 msgstr "Πρόχειρο"
 
+msgid "Draft revision"
+msgstr "Αναθεώρηση πρόχειρου"
+
+msgid "Draft translations"
+msgstr "Μεταφράσεις πρόχειρου"
+
 msgid "Drop candidates whose price is more than this many times the seed's, or less than 1/this. Empty disables the band."
 msgstr "Απορρίπτονται οι υποψήφιοι με τιμή πάνω από τόσες φορές την τιμή του προϊόντος αναφοράς ή κάτω από το 1/αυτού του αριθμού. Αν μείνει κενό, το εύρος απενεργοποιείται."
 
@@ -4452,6 +4545,9 @@ msgstr "Κάθε κατάστημα έχει ακριβώς ένα πλάνο �
 
 msgid "Every submission to AADE will fail until they are set."
 msgstr "Κάθε υποβολή στην ΑΑΔΕ θα αποτυγχάνει μέχρι να οριστούν."
+
+msgid "Every type@version used, for the catalogue usage gate."
+msgstr "Κάθε τύπος@έκδοση που χρησιμοποιείται, για τον έλεγχο χρήσης του καταλόγου."
 
 msgid "Exactly what the order costs."
 msgstr "Ακριβώς όσο κοστίζει η παραγγελία."
@@ -6841,6 +6937,9 @@ msgstr "Εικόνα εικονιδίου"
 msgid "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που το πρόσθεσε χειροκίνητα (public schema, όχι χρήστης του καταστήματος)."
 
+msgid "Id of the platform staff member who last saved the draft (public schema, not a store user)."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που αποθήκευσε τελευταίο το πρόχειρο (public schema, όχι χρήστης του καταστήματος)."
+
 msgid "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που αποθήκευσε τελευταίο αυτό το κείμενο (public schema, όχι χρήστης του καταστήματος)."
 
@@ -6925,6 +7024,9 @@ msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρα�
 
 msgid "If you have any questions, please contact our customer service."
 msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
+
+msgid "If-Match must be a revision number."
+msgstr "Το If-Match πρέπει να είναι αριθμός αναθεώρησης."
 
 msgid "Image"
 msgstr "Εικόνα"
@@ -8221,6 +8323,9 @@ msgstr "Μήνας"
 msgid "Most posts to return, from 1 to {max} (the default)."
 msgstr "Μέγιστος αριθμός άρθρων προς επιστροφή, από 1 έως {max} (η προεπιλογή)."
 
+msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
+msgstr "Αλλάζει με κάθε αλλαγή του πρόχειρου· κάθε αποθήκευση δηλώνει την αναθεώρηση πάνω στην οποία έγινε (If-Match)."
+
 msgid "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
 msgstr "Αριθμοί θυγατρικών vouchers πολλαπλών δεμάτων, τελευταία απόκριση δημιουργίας voucher, τελευταίος φάκελος σφάλματος, URL POD σε cache."
 
@@ -8241,6 +8346,9 @@ msgstr "Πρέπει να είναι έγκυρος ακέραιος."
 
 msgid "Must be a valid number."
 msgstr "Πρέπει να είναι έγκυρος αριθμός."
+
+msgid "Must be an object."
+msgstr "Πρέπει να είναι αντικείμενο."
 
 msgid "Must be true or false."
 msgstr "Πρέπει να είναι true ή false."
@@ -8270,6 +8378,9 @@ msgstr "Το όνομα πρέπει να έχει τουλάχιστον 2 χα
 
 msgid "Name of the content type"
 msgstr "Όνομα τύπου περιεχομένου"
+
+msgid "Named save"
+msgstr "Ονομασμένη αποθήκευση"
 
 msgid "Names of the ad click-id parameters the landing URL carried. Their values are never sent."
 msgstr "Τα ονόματα των παραμέτρων click-id διαφημίσεων που είχε η διεύθυνση προσγείωσης. Οι τιμές τους δεν αποστέλλονται ποτέ."
@@ -8680,8 +8791,24 @@ msgstr "Δεν υπάρχει διαθέσιμο voucher — η αποστολή
 msgid "No vouchers are waiting for a pickup list."
 msgstr "Δεν υπάρχουν vouchers σε αναμονή για λίστα παραλαβής."
 
+msgid "Node path"
+msgstr "Διαδρομή κόμβου"
+
 msgid "Normal Priority"
 msgstr "Κανονική προτεραιότητα"
+
+msgid "Not a JSON pointer."
+msgstr "Δεν είναι δείκτης JSON."
+
+#, python-format
+msgid "Not a valid %(kind)s reference."
+msgstr "Δεν είναι έγκυρη αναφορά τύπου %(kind)s."
+
+msgid "Not a valid document key."
+msgstr "Δεν είναι έγκυρο κλειδί εγγράφου."
+
+msgid "Not a valid id."
+msgstr "Δεν είναι έγκυρο αναγνωριστικό."
 
 #, python-format
 msgid "Not an email type you can choose: %(keys)s."
@@ -8697,6 +8824,9 @@ msgstr "Δεν υπάρχει αρκετό απόθεμα. Απομένουν μ
 #, python-brace-format
 msgid "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
 msgstr "Ανεπαρκές απόθεμα για '{product_name}'. Διαθέσιμο: {product_stock}, Ζητήθηκε: {quantity}"
+
+msgid "Not found."
+msgstr "Δεν βρέθηκε."
 
 msgid "Not in Use"
 msgstr "Δεν χρησιμοποιείται"
@@ -8743,6 +8873,9 @@ msgstr "Δεν έχει γίνει καμία αλλαγή ακόμη."
 msgid "Nothing has been deleted — your products, orders, and settings are all intact."
 msgstr "Τίποτα δεν έχει διαγραφεί — τα προϊόντα, οι παραγγελίες και οι ρυθμίσεις σας είναι όλα ανέπαφα."
 
+msgid "Nothing has changed since the last release."
+msgstr "Δεν έχει αλλάξει τίποτα από την τελευταία δημοσίευση."
+
 msgid "Nothing retained"
 msgstr "Δεν διατηρήθηκε τίποτα"
 
@@ -8786,6 +8919,9 @@ msgstr "Ειδοποιήθηκε στις"
 
 msgid "Null until the enquiry that claims this upload is submitted."
 msgstr "Null μέχρι να υποβληθεί το μήνυμα επικοινωνίας που δεσμεύει αυτό το ανεβασμένο αρχείο."
+
+msgid "Number"
+msgstr "Αριθμός"
 
 msgid "Number of blog posts using this tag"
 msgstr "Αριθμός άρθρων που χρησιμοποιούν αυτή την ετικέτα"
@@ -8920,6 +9056,9 @@ msgstr "Μόνο αποστολή με αντικαταβολή και οφει�
 #, python-format
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Μόνο μια παραδομένη αποστολή μπορεί να εκκαθαριστεί (αυτή είναι: %(state)s)."
+
+msgid "Only a page can be deleted."
+msgstr "Μόνο μια σελίδα μπορεί να διαγραφεί."
 
 msgid "Only one active newsletter topic can be the default."
 msgstr "Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
@@ -9499,6 +9638,12 @@ msgstr "Ενότητες σελίδας"
 
 msgid "Page Type"
 msgstr "Τύπος σελίδας"
+
+msgid "Page builder"
+msgstr "Δημιουργός σελίδων"
+
+msgid "Page deleted"
+msgstr "Η σελίδα διαγράφηκε"
 
 msgid "Page number (pageNumber pagination strategy)"
 msgstr "Αριθμός σελίδας (στρατηγική σελιδοποίησης pageNumber)"
@@ -10716,6 +10861,9 @@ msgstr "Το webhook Stripe ρυθμίστηκε"
 msgid "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
 msgstr "Δημόσιο email επικοινωνίας που εμφανίζεται στο footer και στη σελίδα επικοινωνίας του storefront, και τα εισερχόμενα για τις υποβολές της φόρμας επικοινωνίας. Κενό σημαίνει ότι το κατάστημα δεν έχει διεύθυνση επικοινωνίας: οι υποβολές δεν παραδίδονται και τα εξερχόμενα μηνύματα δεν έχουν Reply-To."
 
+msgid "Publish"
+msgstr "Δημοσίευση"
+
 msgid "Publish Status"
 msgstr "Κατάσταση δημοσίευσης"
 
@@ -10727,6 +10875,15 @@ msgstr "Δημοσιευμένο"
 
 msgid "Published At"
 msgstr "Δημοσιεύθηκε στις"
+
+msgid "Published at"
+msgstr "Δημοσιεύθηκε στις"
+
+msgid "Published by (staff)"
+msgstr "Δημοσιεύθηκε από (προσωπικό)"
+
+msgid "Published revision"
+msgstr "Δημοσιευμένη αναθεώρηση"
 
 msgid "Publishing"
 msgstr "Δημοσίευση"
@@ -11113,6 +11270,9 @@ msgstr "Αριθμός αναφοράς"
 msgid "Reference_Key1 from voucher creation — matches Order.id for our partner-side reconciliation."
 msgstr "Reference_Key1 από τη δημιουργία voucher — αντιστοιχεί στο Order.id για τη συμφωνία στοιχείων με τον συνεργάτη."
 
+msgid "References"
+msgstr "Αναφορές"
+
 msgctxt "order source type"
 msgid "Referral"
 msgstr "Παραπομπή"
@@ -11322,6 +11482,9 @@ msgstr "Αποδέσμευση δεσμεύσεων αποθέματος"
 
 msgid "Release stock reservations when checkout is abandoned or payment fails. This makes the reserved stock available for other customers."
 msgstr "Απελευθέρωση δεσμεύσεων αποθέματος όταν η ολοκλήρωση αγοράς εγκαταλείπεται ή η πληρωμή αποτυγχάνει. Αυτό καθιστά το δεσμευμένο απόθεμα διαθέσιμο για άλλους πελάτες."
+
+msgid "Releases"
+msgstr "Δημοσιεύσεις"
 
 msgid "Remaining balance"
 msgstr "Υπόλοιπο"
@@ -11701,6 +11864,9 @@ msgstr "Μπλοκ εμπλουτισμένου κειμένου"
 msgid "Role"
 msgstr "Ρόλος"
 
+msgid "Rolled back to"
+msgstr "Επαναφορά στη δημοσίευση"
+
 msgid "Row fingerprint"
 msgstr "Αποτύπωμα γραμμής"
 
@@ -11975,6 +12141,9 @@ msgstr "Δευτερεύουσα γραμμή διεύθυνσης"
 msgid "Seconds until the token stops working."
 msgstr "Δευτερόλεπτα μέχρι να σταματήσει να λειτουργεί το διακριτικό."
 
+msgid "Section group"
+msgstr "Ομάδα ενοτήτων"
+
 msgid "Security"
 msgstr "Ασφάλεια"
 
@@ -12061,6 +12230,9 @@ msgstr "Αποστολή απόδειξης στο myDATA"
 
 msgid "Send the link"
 msgstr "Αποστολή συνδέσμου"
+
+msgid "Send the revision you are changing in If-Match."
+msgstr "Στείλε στο If-Match την αναθεώρηση που αλλάζεις."
 
 msgid "Sender Name"
 msgstr "Όνομα αποστολέα"
@@ -12503,6 +12675,9 @@ msgstr "6ος όροφος +"
 msgid "Size"
 msgstr "Μέγεθος"
 
+msgid "Size (bytes)"
+msgstr "Μέγεθος (bytes)"
+
 msgid "Skip products that already carry a product-level markdown (discount percent > 0)"
 msgstr "Παράλειψη προϊόντων που έχουν ήδη έκπτωση σε επίπεδο προϊόντος (ποσοστό έκπτωσης > 0)"
 
@@ -12615,6 +12790,9 @@ msgstr "Κάποια από όσα χρειάζονται αυτά τα ποσά
 msgid "Someone asked to reset the password of your staff account. Open the link below to choose a new one. It works once and expires in %(valid_minutes)s minutes."
 msgstr "Κάποιος ζήτησε επαναφορά του κωδικού πρόσβασης του λογαριασμού προσωπικού σας. Ανοίξτε τον παρακάτω σύνδεσμο για να επιλέξετε νέο. Λειτουργεί μία φορά και λήγει σε %(valid_minutes)s λεπτά."
 
+msgid "Someone else changed this document since you opened it."
+msgstr "Κάποιος άλλος άλλαξε αυτό το έγγραφο αφότου το άνοιξες."
+
 #, python-format
 msgid "Someone, most likely you, just asked to subscribe this address to %(topic_name)s. It is already subscribed, so there is nothing more to do."
 msgstr "Κάποιος, πιθανότατα εσείς, ζήτησε μόλις να εγγραφεί αυτή η διεύθυνση στο %(topic_name)s. Είναι ήδη εγγεγραμμένη, οπότε δεν χρειάζεται να κάνετε κάτι άλλο."
@@ -12648,6 +12826,9 @@ msgstr "Κενό διάστημα"
 
 msgid "Spam complaint"
 msgstr "Καταγγελία ως ανεπιθύμητο"
+
+msgid "Sparse per-language overlay: {locale: {node id: {setting pointer: value}}}. Structure is never per language."
+msgstr "Αραιή επικάλυψη ανά γλώσσα: {γλώσσα: {κόμβος: {δείκτης ρύθμισης: τιμή}}}. Η δομή δεν αλλάζει ποτέ ανά γλώσσα."
 
 msgid "Specific categories"
 msgstr "Συγκεκριμένες κατηγορίες"
@@ -13219,6 +13400,9 @@ msgstr "Αντικείμενα με ετικέτες"
 msgid "Tags"
 msgstr "Ετικέτες"
 
+msgid "Target"
+msgstr "Στόχος"
+
 msgid "Target Scope"
 msgstr "Εύρος στόχευσης"
 
@@ -13318,6 +13502,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 
 msgid "Tells the store's staff which products have run down to their low-stock threshold."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ποια προϊόντα έφτασαν στο όριο χαμηλού αποθέματος."
+
+msgid "Template"
+msgstr "Πρότυπο"
 
 msgid "Ten"
 msgstr "Δέκα"
@@ -13429,6 +13616,9 @@ msgstr "Αυτό το αρχείο είναι πολύ μεγάλο."
 #, python-format
 msgid "That file type is not accepted. Allowed: %(types)s."
 msgstr "Αυτός ο τύπος αρχείου δεν γίνεται δεκτός. Επιτρέπονται: %(types)s."
+
+msgid "That release is already the current one."
+msgstr "Αυτή η δημοσίευση είναι ήδη η τρέχουσα."
 
 #, python-format
 msgid "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
@@ -13550,6 +13740,9 @@ msgstr "Ο πελάτης ενημερώθηκε ότι έγινε επιστρ�
 msgid "The day the cost belongs to (the invoice date), which is the month of the profit report it lands in."
 msgstr "Η ημέρα στην οποία ανήκει το κόστος (η ημερομηνία του τιμολογίου), που καθορίζει τον μήνα της αναφοράς κέρδους όπου μετράει."
 
+msgid "The default language has no such setting."
+msgstr "Η προεπιλεγμένη γλώσσα δεν έχει τέτοια ρύθμιση."
+
 msgid "The destination this option was priced for."
 msgstr "Ο προορισμός για τον οποίο τιμολογήθηκε αυτή η επιλογή."
 
@@ -13558,6 +13751,16 @@ msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και
 
 msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
 msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το καθολικό πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
+
+msgid "The document has problems that must be fixed first."
+msgstr "Το έγγραφο έχει προβλήματα που πρέπει πρώτα να διορθωθούν."
+
+#, python-format
+msgid "The document is larger than %(limit)s KB."
+msgstr "Το έγγραφο είναι μεγαλύτερο από %(limit)s KB."
+
+msgid "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
+msgstr "Η αναθεώρηση του πρόχειρου που περιέχει η τρέχουσα δημοσίευση, κενή όταν δεν είναι γνωστή (μετά από επαναφορά, πριν από την πρώτη δημοσίευση). Ένα πρόχειρο με άλλη αναθεώρηση έχει αλλαγές που δεν έχουν δημοσιευτεί."
 
 msgid "The end is before the start."
 msgstr "Η λήξη είναι πριν από την έναρξη."
@@ -13668,6 +13871,9 @@ msgstr "Το UUID της παραγγελίας. Απαιτείται όταν �
 msgid "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
 msgstr "Οι διατάξεις του page builder, τα μενού πλοήγησης και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που παράγονται από αυτά. Εκκαθαρίστε μετά από επεξεργασία μιας διάταξης, των props μιας ενότητας, μιας σελίδας περιεχομένου ή ενός μενού."
 
+msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
+msgstr "Οι σελίδες, το θέμα και οι ενότητες που δημοσίευσε ένα κατάστημα με τον δημιουργό σελίδων, και κάθε σελίδα που εμφανίζεται με αυτά. Καθαρίζει μόνη της όταν δημοσιεύεται ή επαναφέρεται μια έκδοση· η αποθήκευση πρόχειρου δεν καθαρίζει τίποτα."
+
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "Η τιμή paid_until στην οποία αναφέρεται το στάδιο ειδοποίησης. Ασυμφωνία με το τρέχον paid_until σημαίνει ότι το στάδιο είναι παρωχημένο και μηδενίζεται στην επόμενη εκτέλεση χρέωσης."
 
@@ -13775,12 +13981,18 @@ msgstr "Η επιστροφή που επέστρεψε αξία σε δωροκ
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
 
+msgid "The release whose versions this one restores."
+msgstr "Η δημοσίευση της οποίας τις εκδόσεις επαναφέρει αυτή."
+
 msgid "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
 msgstr "Το παραχθέν PDF. Αποθηκεύεται σε ιδιωτικό χώρο αποθήκευσης ανά tenant — η πρόσβαση πελατών γίνεται μέσω ``OrderViewSet.invoice_download`` (μέσω ροής με ταυτοποίηση Django)· το ιδιωτικό δέντρο βρίσκεται εκτός κάθε δημόσιου web root ως επιπλέον επίπεδο ασφαλείας."
 
 #, python-brace-format
 msgid "The repayment reference can be at most {max_length} characters."
 msgstr "Η αναφορά επιστροφής μπορεί να έχει το πολύ {max_length} χαρακτήρες."
+
+msgid "The request could not be processed."
+msgstr "Το αίτημα δεν μπόρεσε να επεξεργαστεί."
 
 msgid "The resolved ``ShippingRate`` price (or a live provider quote, or 0 when the rate's free-shipping threshold is met)."
 msgstr "Η τιμή της ``ShippingRate`` που ισχύει (ή η ζωντανή τιμή του παρόχου, ή 0 όταν καλύπτεται το όριο δωρεάν μεταφορικών)."
@@ -13843,6 +14055,12 @@ msgstr "Ο ιδιοκτήτης του καταστήματος έλαβε τη�
 msgid "The store's terms of use or privacy policy cannot be shown right now, so the order cannot be placed. Please contact the store."
 msgstr "Οι όροι χρήσης ή η πολιτική απορρήτου του καταστήματος δεν μπορούν να εμφανιστούν αυτή τη στιγμή, γι' αυτό η παραγγελία δεν μπορεί να ολοκληρωθεί. Επικοινωνήστε με το κατάστημα."
 
+msgid "The storefront cannot be reached, so the change cannot be checked. Try again in a moment."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα για τον έλεγχο της αλλαγής. Δοκίμασε ξανά σε λίγο."
+
+msgid "The storefront catalogue build the draft was last validated against."
+msgstr "Η έκδοση του καταλόγου του καταστήματος με την οποία ελέγχθηκε τελευταία φορά το πρόχειρο."
+
 msgid "The storefront could not be reached to check this text, so nothing was saved. Try again in a moment."
 msgstr "Δεν ήταν δυνατή η επικοινωνία με το κατάστημα για τον έλεγχο του κειμένου, γι' αυτό δεν αποθηκεύτηκε τίποτα. Δοκιμάστε ξανά σε λίγο."
 
@@ -13881,6 +14099,9 @@ msgstr "Το κείμενο πρέπει να κρατά τα ίδια σημε�
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "Ο χρόνος πληρωμής αυτής της παραγγελίας έληξε. Κάντε νέα παραγγελία από το καλάθι σας."
 
+msgid "The type must look like name@version."
+msgstr "Ο τύπος πρέπει να έχει τη μορφή όνομα@έκδοση."
+
 msgid "The updated cart, as returned by the cart detail endpoint"
 msgstr "Το ενημερωμένο καλάθι, όπως το επιστρέφει η λήψη καλαθιού"
 
@@ -13902,8 +14123,14 @@ msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει 
 msgid "The wording a store replaced in its storefront, and every page rendered with it. Purges itself when a text is saved, reset or restored in the text editor."
 msgstr "Η διατύπωση που άλλαξε ένα κατάστημα και όλες οι σελίδες που εμφανίζονται με αυτήν. Καθαρίζει μόνη της όταν ένα κείμενο αποθηκεύεται, επαναφέρεται ή ανακτάται στον επεξεργαστή κειμένων."
 
+msgid "The working copy: the default-language content."
+msgstr "Το αντίγραφο εργασίας: το περιεχόμενο στην προεπιλεγμένη γλώσσα."
+
 msgid "The zone of the store's own domain, from the Cloudflare dashboard's domain overview. Empty when the store uses a platform hostname."
 msgstr "Η ζώνη του δικού σας domain, από την επισκόπηση του domain στο Cloudflare. Κενό όταν το κατάστημα χρησιμοποιεί διεύθυνση της πλατφόρμας."
+
+msgid "Theme"
+msgstr "Θέμα"
 
 msgid "Theme Metadata"
 msgstr "Μεταδεδομένα Θέματος"
@@ -13916,6 +14143,19 @@ msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυ
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο κανάλι χρέωσης της πλατφόρμας. Οι έμποροι πληρώνουν την πλατφόρμα εκτός συστήματος (τιμολόγιο / τραπεζική μεταφορά) και το προσωπικό καταχωρεί το αποτέλεσμα ορίζοντας την ημερομηνία «Πληρωμένο έως» του tenant — επεκτείνετέ την κατά την πληρωμένη περίοδο σε κάθε ανανέωση. Τα δοκιμαστικά αποκτούν περίοδο κατά τη δημιουργία (tenant_create --trial-days, προεπιλογή 30)· κενό «Πληρωμένο έως» σημαίνει ότι η περίοδος δεν λήγει ποτέ."
+
+msgid "There is no such document."
+msgstr "Δεν υπάρχει τέτοιο έγγραφο."
+
+#, python-format
+msgid "There is no such document: %(keys)s."
+msgstr "Δεν υπάρχει τέτοιο έγγραφο: %(keys)s."
+
+msgid "There is no such release."
+msgstr "Δεν υπάρχει τέτοια δημοσίευση."
+
+msgid "There is no such version."
+msgstr "Δεν υπάρχει τέτοια έκδοση."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -13967,6 +14207,9 @@ msgstr "Το περιεχόμενο περιέχει κώδικα που δεν 
 msgid "This credit receipt is your proof of the refund — please keep it for your records."
 msgstr "Αυτή η πιστωτική απόδειξη αποδεικνύει την επιστροφή χρημάτων — κράτησέ την για το αρχείο σου."
 
+msgid "This document has no such block."
+msgstr "Αυτό το έγγραφο δεν έχει τέτοιο μπλοκ."
+
 msgid "This download link has expired."
 msgstr "Ο σύνδεσμος λήψης έχει λήξει."
 
@@ -13981,6 +14224,9 @@ msgstr "Αυτός ο τύπος email δεν υπάρχει."
 
 msgid "This field is required"
 msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
+
+msgid "This id is used twice."
+msgstr "Αυτό το αναγνωριστικό χρησιμοποιείται δύο φορές."
 
 msgid "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires."
 msgstr "Αυτός είναι ένας μοναδικός σύνδεσμος λήψης. Αποθηκεύστε το αρχείο κάπου ασφαλές — δεν διατηρούμε αντίγραφο μετά τη λήξη του συνδέσμου."
@@ -14064,6 +14310,10 @@ msgstr "Αυτή η παραγγελία δεν πληρώθηκε μέσω πα
 msgid "This order's payment status does not allow a retry."
 msgstr "Η κατάσταση πληρωμής αυτής της παραγγελίας δεν επιτρέπει επανάληψη."
 
+#, python-format
+msgid "This page is linked from %(documents)s."
+msgstr "Αυτή η σελίδα συνδέεται από: %(documents)s."
+
 msgid "This payment method is not available for this store."
 msgstr "Αυτή η μέθοδος πληρωμής δεν είναι διαθέσιμη για αυτό το κατάστημα."
 
@@ -14089,6 +14339,9 @@ msgstr "Αυτό το εύρος θα εμφάνιζε περισσότερες 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "Αυτή η απόδειξη αποδεικνύει την αγορά σου — κράτησέ την για το αρχείο σου."
 
+msgid "This setting is the same in every language."
+msgstr "Αυτή η ρύθμιση είναι ίδια σε όλες τις γλώσσες."
+
 msgid "This shipment already has a BoxNow parcel."
 msgstr "Αυτή η αποστολή έχει ήδη δέμα BoxNow."
 
@@ -14103,6 +14356,10 @@ msgstr "Αυτό το token προσωπικού δεν παρέχει πρόσ�
 
 msgid "This status means"
 msgstr "Αυτή η κατάσταση σημαίνει"
+
+#, python-format
+msgid "This store has no block called %(type)s."
+msgstr "Αυτό το κατάστημα δεν έχει μπλοκ με όνομα %(type)s."
 
 msgid "This store has no credentials for the payment provider, so the payment cannot be refunded here."
 msgstr "Το κατάστημα δεν έχει διαπιστευτήρια για τον πάροχο πληρωμών, επομένως η πληρωμή δεν μπορεί να επιστραφεί από εδώ."
@@ -14559,6 +14816,9 @@ msgstr "Άγνωστος μεταφορέας"
 
 msgid "Unknown gift card code."
 msgstr "Άγνωστος κωδικός δωροκάρτας."
+
+msgid "Unknown property."
+msgstr "Άγνωστη ιδιότητα."
 
 msgid "Unknown shipping provider."
 msgstr "Άγνωστος πάροχος αποστολής."
@@ -15038,6 +15298,9 @@ msgstr "Έκδοση"
 msgid "Version %(version)s"
 msgstr "Έκδοση %(version)s"
 
+msgid "Versions"
+msgstr "Εκδόσεις"
+
 msgid "Very High Usage (50+)"
 msgstr "Πολύ Υψηλή Χρήση (50+)"
 
@@ -15416,6 +15679,9 @@ msgstr "Πού εμφανίζεται η λωρίδα· καθορίζει τη 
 
 msgid "Where the subscription was made."
 msgstr "Πού έγινε η εγγραφή."
+
+msgid "Where things are used"
+msgstr "Πού χρησιμοποιούνται"
 
 msgid "Whether a live promotion waives the shipping cost"
 msgstr "Αν μια ενεργή προσφορά μηδενίζει το κόστος αποστολής"
@@ -16098,6 +16364,12 @@ msgstr "Γραμμές ``{rate, subtotal, vat, gross}`` με όσα πιστών
 msgid "admin/"
 msgstr "admin/"
 
+msgid "blockOrder must list every block exactly once."
+msgstr "Το blockOrder πρέπει να περιέχει κάθε μπλοκ ακριβώς μία φορά."
+
+msgid "blocks and blockOrder go together."
+msgstr "Τα blocks και το blockOrder πηγαίνουν μαζί."
+
 msgid "cart"
 msgstr "καλάθι"
 
@@ -16230,6 +16502,9 @@ msgstr "δεν έχει οριστεί"
 msgid "order"
 msgstr "παραγγελία"
 
+msgid "order must list every section exactly once."
+msgstr "Το order πρέπει να περιέχει κάθε ενότητα ακριβώς μία φορά."
+
 msgid "paid by the customer"
 msgstr "τα πληρώνει ο πελάτης"
 
@@ -16239,6 +16514,9 @@ msgstr "τα πληρώνει το κατάστημα"
 #, python-brace-format
 msgid "payment intent is in an invalid state: {status}"
 msgstr "το payment intent βρίσκεται σε μη έγκυρη κατάσταση: {status}"
+
+msgid "sha256 of data+i18n"
+msgstr "sha256 των data+i18n"
 
 msgid "shipping_provider_code is required for pickup_point."
 msgstr "Το shipping_provider_code είναι υποχρεωτικό για το pickup_point."
@@ -16289,6 +16567,12 @@ msgstr "εβδομάδα"
 
 msgid "without voucher"
 msgstr "χωρίς voucher"
+
+msgid "{document key: version id}"
+msgstr "{κλειδί εγγράφου: αναγνωριστικό έκδοσης}"
+
+msgid "{kind: {target id: [node pointers]}}"
+msgstr "{είδος: {αναγνωριστικό στόχου: [δείκτες κόμβων]}}"
 
 #, python-brace-format
 msgid "{store} — your plan expires on {date}"
@@ -17278,9 +17562,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Template Preview"
 #~ msgstr "Προεπισκόπηση προτύπου"
 
-#~ msgid "Templates"
-#~ msgstr "Πρότυπα"
-
 #~ msgid "Test federated search functionality with sample queries"
 #~ msgstr "Δοκιμή λειτουργίας ομοσπονδιακής αναζήτησης με δείγματα ερωτημάτων"
 
@@ -17298,9 +17579,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Thank you for your order!"
 #~ msgstr "Ευχαριστούμε για την παραγγελία σας!"
-
-#~ msgid "Theme"
-#~ msgstr "Θέμα"
 
 #~ msgid "This Week's Highlights"
 #~ msgstr "Τα σημαντικότερα της εβδομάδας"
@@ -17379,9 +17657,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "User is already subscribed to this topic."
 #~ msgstr "Ο χρήστης είναι ήδη εγγεγραμμένος σε αυτό το θέμα."
-
-#~ msgid "User not found."
-#~ msgstr "Δεν βρέθηκε χρήστης."
 
 #~ msgid "User who performed the operation (null for system operations)"
 #~ msgstr "Χρήστης που εκτέλεσε τη λειτουργία (null για λειτουργίες συστήματος)"

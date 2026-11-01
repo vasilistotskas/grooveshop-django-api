@@ -141,7 +141,7 @@ class TestAfterTheImportOnlyTheSwitchDecides:
         mail.outbox.clear()
 
         with patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             return_value=["owner@store.test"],
         ):
             [delivery] = send_email(

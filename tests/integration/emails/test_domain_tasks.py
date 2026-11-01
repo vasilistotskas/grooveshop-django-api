@@ -52,7 +52,7 @@ OPERATOR = "owner@store.test"
 def _operators():
     mail.outbox.clear()
     with patch(
-        "emails.recipients.tenant_operator_addresses", return_value=[OPERATOR]
+        "emails.recipients.store_operator_addresses", return_value=[OPERATOR]
     ):
         yield
 
@@ -134,7 +134,7 @@ class TestLowStock:
 
     def test_a_store_with_nobody_to_write_to_releases_the_claim(self, product):
         with patch(
-            "emails.recipients.tenant_operator_addresses", return_value=[]
+            "emails.recipients.store_operator_addresses", return_value=[]
         ):
             result = check_low_stock_products.run()
 

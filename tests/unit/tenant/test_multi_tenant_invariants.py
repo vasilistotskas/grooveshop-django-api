@@ -142,14 +142,12 @@ class TestMeiliIndexNamePerTenant:
 
 
 class TestEmailHelperCallSites:
-    """Audit that the per-tenant email helpers (``tenant_from_email``,
+    """Audit that the per-tenant email helpers (``emails.sender.from_address``,
     ``tenant_contact_email``) are actually used wherever the tenant
     fallback matters. A grep-based static check is cheap to maintain
     and catches the regression where a contributor reaches for
     ``settings.DEFAULT_FROM_EMAIL`` directly.
     """
-
-    REQUIRED_HELPERS = ("tenant_from_email", "tenant_contact_email")
 
     EXPECTED_CALLERS = (
         # path inside grooveshop-django-api / required helpers
@@ -157,7 +155,7 @@ class TestEmailHelperCallSites:
         ("emails/headers.py", ("tenant_contact_email",)),
         # Every mail sent through ``emails.send_email`` takes its
         # envelope from here.
-        ("emails/sender.py", ("tenant_from_email", "tenant_reply_to")),
+        ("emails/sender.py", ("from_address", "store_reply_to")),
     )
 
     #: Modules whose mail goes through ``emails.send_email`` only.

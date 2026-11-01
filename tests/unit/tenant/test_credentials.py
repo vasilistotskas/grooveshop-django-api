@@ -27,11 +27,9 @@ from tenant.credentials import (
     box_now_credentials,
     mydata_credentials,
     tenant_contact_email,
-    tenant_from_email,
     tenant_logo_url,
     tenant_meta_capi_access_token,
     tenant_meta_pixel_id,
-    tenant_reply_to,
     tenant_site_name,
     tenant_totp_issuer,
     viva_wallet_credentials,
@@ -224,81 +222,8 @@ class TestTenantOnlyCredentials:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2B: Email helpers
+# Email helpers
 # ---------------------------------------------------------------------------
-
-
-class TestTenantFromEmail:
-    def test_an_unverified_merchant_address_is_never_used_as_from(
-        self, bind_tenant, db, settings
-    ):
-        """DMARC safety: the relay can only sign for domains it has a
-        DKIM key for. An address the platform has not verified would
-        fail the merchant domain's alignment, so the tenant brand rides
-        the DISPLAY NAME on the platform-authenticated address instead.
-        Setting from_email alone must change nothing."""
-        tenant = store_tenant("email_from_1")
-        tenant.from_email = "shop@brand.com"
-        tenant.store_name = "Brand Shop"
-        tenant.save()
-        bind_tenant(tenant)
-        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
-        assert tenant_from_email() == "Brand Shop <noreply@platform.com>"
-        assert "shop@brand.com" not in tenant_from_email()
-
-    def test_a_verified_merchant_address_becomes_the_from(
-        self, bind_tenant, db, settings
-    ):
-        """The white-label case. Once the platform has authenticated the
-        store's domain on the relay, the relay holds a DKIM key for it,
-        so the merchant's own address is both usable and preferable —
-        customers see the shop's domain, not the platform's."""
-        tenant = store_tenant("email_from_verified")
-        tenant.from_email = "orders@brand.com"
-        tenant.from_email_verified = True
-        tenant.store_name = "Brand Shop"
-        tenant.save()
-        bind_tenant(tenant)
-        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
-        assert tenant_from_email() == "Brand Shop <orders@brand.com>"
-
-    def test_the_flag_alone_does_nothing_without_an_address(
-        self, bind_tenant, db, settings
-    ):
-        """Verified but blank must not produce "Store <>", which is not
-        a valid RFC 5322 address."""
-        tenant = store_tenant("email_from_flag_only")
-        tenant.from_email = ""
-        tenant.from_email_verified = True
-        tenant.store_name = "Flag Only"
-        tenant.save()
-        bind_tenant(tenant)
-        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
-        assert tenant_from_email() == "Flag Only <noreply@platform.com>"
-
-    def test_falls_back_to_settings(self, bind_tenant, db, settings):
-        tenant = store_tenant("email_from_2")
-        tenant.from_email = ""
-        tenant.store_name = "Fallback Store"
-        tenant.save()
-        bind_tenant(tenant)
-        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
-        assert tenant_from_email() == "Fallback Store <noreply@platform.com>"
-
-    def test_no_tenant_uses_settings(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
-        settings.DEFAULT_FROM_EMAIL = "platform@example.com"
-        assert tenant_from_email() == "platform@example.com"
-
-    def test_webside_safety_empty_tenant_field(self, bind_tenant, db, settings):
-        """webside.gr: empty from_email → platform address with the
-        store display name (envelope/domain unchanged)."""
-        tenant = store_tenant("ws_from_email")
-        tenant.store_name = "Webside"
-        tenant.save()
-        bind_tenant(tenant)
-        settings.DEFAULT_FROM_EMAIL = "noreply@webside.gr"
-        assert tenant_from_email() == "Webside <noreply@webside.gr>"
 
 
 class TestTenantContactEmail:
@@ -370,43 +295,6 @@ class TestTenantContactEmail:
         settings.INFO_EMAIL = "info@platform.com"
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
         assert tenant_contact_email() == "info@platform.com"
-
-
-class TestTenantReplyTo:
-    """``tenant_reply_to()`` — the ``Reply-To`` list for outbound mail."""
-
-    def test_store_with_contact_address(self, bind_tenant, db):
-        tenant = store_tenant("reply_to_1")
-        tenant.contact_email = "contact@shop.com"
-        tenant.save()
-        bind_tenant(tenant)
-        assert tenant_reply_to() == ["contact@shop.com"]
-
-    def test_store_without_contact_address_emits_no_header(
-        self, bind_tenant, db, settings
-    ):
-        # ``EmailMessage`` joins the list verbatim, so ``[""]`` would put
-        # a literal empty ``Reply-To:`` header on the wire; ``[]`` emits
-        # none at all.
-        from django.core.mail import EmailMultiAlternatives
-        from extra_settings.models import Setting
-
-        tenant = store_tenant("reply_to_2")
-        tenant.contact_email = ""
-        tenant.save()
-        bind_tenant(tenant)
-        settings.INFO_EMAIL = "info@platform.com"
-        Setting.objects.filter(name="CONTACT_EMAIL").delete()
-
-        assert tenant_reply_to() == []
-        message = EmailMultiAlternatives(
-            "s",
-            "b",
-            "from@example.com",
-            ["to@example.com"],
-            reply_to=tenant_reply_to(),
-        ).message()
-        assert "Reply-To" not in message
 
 
 class TestTenantSiteName:

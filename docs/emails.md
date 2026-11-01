@@ -22,8 +22,8 @@ equal (see Tests).
 | `declare.py` | `customer_email`, `marketing_email`, `staff_email`, `platform_email`, `operator_alert`: the shapes a domain declares its types with. |
 | `registry.py` | `registry`: `register`, `freeze`, `get`, `all_types`, `types_for`. |
 | `gates.py` | The four gates a type can list. |
-| `recipients.py` | `Recipient(address, language)` and the resolvers `customer_of`, `store_operators`, `platform_operators`. |
-| `sender.py` | The `From` and `Reply-To`. Reuses `tenant.credentials`. |
+| `recipients.py` | `Recipient(address, language)`, the resolvers `customer_of`, `store_operators`, `platform_operators`, and `store_operator_addresses`, the store's own inbox list. |
+| `sender.py` | The `From` (`from_address`) and `Reply-To` (`reply_to`, `store_reply_to`). |
 | `headers.py` | `build_headers`: the list headers by kind, and the two builders under it. |
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
@@ -178,7 +178,7 @@ email type declared with `staff_email(..., area="ops")`, so the store's
 `EmailSwitch`, the gates and `store_operators()` apply. All are switchable,
 store staff, with no list headers. A store with no contact or owner address
 gets `SKIPPED_NO_RECIPIENT` (the old `ADMINS` fallback is gone with
-`tenant_admin_recipients`); the work still shows on the dashboard counter or
+`tenant_admin_recipients`, deleted); the work still shows on the dashboard counter or
 the order note, whatever the switch says.
 
 | Key | About | Declared in | Gate |
@@ -392,10 +392,10 @@ dispute mails), which is deleted.
 
 ### Sender
 
-`From` is `tenant.credentials.tenant_from_email()` read in the schema the
+`From` is `emails.sender.from_address()` read in the schema the
 send runs under, so a platform type is sent as `"{SITE_NAME}"
 <DEFAULT_FROM_EMAIL>` and a store type as the store (its own verified domain,
-else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type)`) is the store's contact
+else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type, obj)`) is the store's contact
 address for a store type sent to customers, and empty for a platform type
 and for mail to the store's own staff.
 
@@ -622,7 +622,6 @@ name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
 
 - `EmailLog`, provider events, suppression and a deferred (`defer`) send;
   skips are only a structured log line, and there is no `X-Entity-Ref-ID`.
-- The storefront's email-preferences UI (the endpoint exists).
 - The platform admin's own page for the platform types (they have no
   switches, so it would be a listing and the log); the rest of the store's
   admin page (status, log, test-send); the switches and the preview are on

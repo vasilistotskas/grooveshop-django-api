@@ -1,7 +1,7 @@
 """``validate_platform_email`` — the platform sender is never a tenant's.
 
 ``DEFAULT_FROM_EMAIL`` is the platform-wide fallback that
-``tenant_from_email()`` hands to every tenant without a verified domain
+``emails.sender.from_address()`` hands to every tenant without a verified domain
 of its own. Production had it set to ``info@webside.gr`` — tenant #1's
 address — so three other stores sent mail under tenant #1's domain, on a
 relay that domain authorises for neither SPF nor DKIM. Nothing detected

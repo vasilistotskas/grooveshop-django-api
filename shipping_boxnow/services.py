@@ -399,12 +399,10 @@ class BoxNowService:
         # BoxNow API §3.4 — BoxNow sends us the success-notification +
         # PDF label here. The customer gets BoxNow's own customer-facing
         # notifications via ``destination.contactEmail`` / ``contactNumber``.
-        from tenant.credentials import (
-            tenant_contact_email,
-            tenant_from_email,
-        )
+        from emails.sender import from_address
+        from tenant.credentials import tenant_contact_email
 
-        partner_notify_email = tenant_contact_email() or tenant_from_email()
+        partner_notify_email = tenant_contact_email() or from_address()
 
         # BoxNow P408 rejects ``amountToBeCollected`` outside (0, 5000).
         # For PREPAID parcels the courier shouldn't collect anything;

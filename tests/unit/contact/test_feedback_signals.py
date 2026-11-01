@@ -19,7 +19,7 @@ def _english_store(settings):
     with (
         patch("emails.recipients.store_language", return_value="en"),
         patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             side_effect=lambda: (
                 [settings.INFO_EMAIL] if settings.INFO_EMAIL else []
             ),

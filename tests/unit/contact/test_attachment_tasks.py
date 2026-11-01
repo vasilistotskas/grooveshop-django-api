@@ -308,7 +308,7 @@ class TestTheNotificationEmail:
         with (
             mock.patch("emails.recipients.store_language", return_value="en"),
             mock.patch(
-                "emails.recipients.tenant_operator_addresses",
+                "emails.recipients.store_operator_addresses",
                 return_value=["admin@example.com"],
             ),
         ):

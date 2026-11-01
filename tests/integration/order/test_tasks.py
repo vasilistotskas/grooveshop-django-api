@@ -868,10 +868,10 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         )
 
     @patch(
-        "emails.recipients.tenant_operator_addresses",
+        "emails.recipients.store_operator_addresses",
         return_value=["merchant@store.test"],
     )
-    @patch("emails.sender.tenant_from_email", return_value="orders@store.test")
+    @patch("emails.sender.from_address", return_value="orders@store.test")
     @patch("emails.render.render_to_string")
     @override_settings(
         SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
@@ -899,7 +899,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         self.assertEqual(sent.from_email, "orders@store.test")
         self.assertEqual(sent.body, "Text body")
 
-    @patch("emails.recipients.tenant_operator_addresses", return_value=[])
+    @patch("emails.recipients.store_operator_addresses", return_value=[])
     def test_send_admin_new_order_email_skips_when_unconfigured(
         self, _mock_contact
     ):
@@ -921,7 +921,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         mail.outbox.clear()
 
         with patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             return_value=["merchant@store.test"],
         ):
             result = send_admin_new_order_email(self.order.id)
@@ -935,7 +935,7 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
         mail.outbox.clear()
 
         with patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             return_value=["contact@store.test", "owner@store.test"],
         ):
             result = send_admin_new_order_email(self.order.id)

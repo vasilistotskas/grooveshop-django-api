@@ -177,7 +177,7 @@ def test_an_undelivered_parcel_is_not_reported():
 def _operators(open_email_gates):
     mail.outbox.clear()
     with patch(
-        "emails.recipients.tenant_operator_addresses",
+        "emails.recipients.store_operator_addresses",
         return_value=["ops@example.com"],
     ):
         yield

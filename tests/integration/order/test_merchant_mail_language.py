@@ -31,7 +31,7 @@ CONTACT = "owner@store.test"
 @pytest.fixture(autouse=True)
 def _contact_email():
     with patch(
-        "emails.recipients.tenant_operator_addresses", return_value=[CONTACT]
+        "emails.recipients.store_operator_addresses", return_value=[CONTACT]
     ):
         yield
 

@@ -29,7 +29,7 @@ def _english_store(settings):
     with (
         patch("emails.recipients.store_language", return_value="en"),
         patch(
-            "emails.recipients.tenant_operator_addresses",
+            "emails.recipients.store_operator_addresses",
             side_effect=lambda: (
                 [settings.INFO_EMAIL] if settings.INFO_EMAIL else []
             ),
@@ -65,7 +65,7 @@ class TestContactSignals(TestCase):
         assert contact.email in email.body
         assert contact.message in email.body
         # DMARC-safe From: platform-authenticated address, tenant brand
-        # in the display name (see tenant_from_email).
+        # in the display name (see emails.sender.from_address).
         assert email.from_email.endswith("<noreply@example.com>")
         assert _INFO_EMAIL in email.to
 
@@ -277,7 +277,7 @@ class TestContactSignals(TestCase):
 
         # Celery task (running eagerly in tests) sends one message built
         # from the contact's own name/email/message. From is the DMARC-safe
-        # display-name form (tenant_from_email); Reply-To is the submitter.
+        # display-name form (emails.sender.from_address); Reply-To is the submitter.
         [email] = mail.outbox
         assert email.subject == (
             f"New contact form submission from {contact.name}"

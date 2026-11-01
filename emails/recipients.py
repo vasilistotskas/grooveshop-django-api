@@ -15,7 +15,7 @@ from typing import Any
 from django.conf import settings
 
 from core.utils.i18n import get_order_language, store_language
-from tenant.credentials import tenant_operator_addresses
+from tenant.membership import bound_tenant
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +37,21 @@ def customer_of(obj: Any) -> Recipient:
     )
 
 
+def store_operator_addresses() -> list[str]:
+    """The bound store's own operator addresses: ``Tenant.contact_email``
+    then ``Tenant.owner_email``, deduped, and ``[]`` for a store with
+    neither. There is no platform fallback: ``store_operators`` skips the
+    mail instead."""
+    tenant = bound_tenant()
+    return list(
+        dict.fromkeys(
+            address
+            for field in ("contact_email", "owner_email")
+            if (address := getattr(tenant, field, ""))
+        )
+    )
+
+
 def store_operators() -> list[Recipient]:
     """The bound store's contact and owner addresses, in the store's
     language. Empty when the store has neither: the work is then skipped
@@ -44,7 +59,7 @@ def store_operators() -> list[Recipient]:
     language = store_language()
     return [
         Recipient(address=address, language=language)
-        for address in tenant_operator_addresses()
+        for address in store_operator_addresses()
     ]
 
 

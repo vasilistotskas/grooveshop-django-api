@@ -9726,6 +9726,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/staff-session:
+    post:
+      operationId: api_v1_builder_staff_session_create
+      description: 'Spend a single-use ticket (minted by the store admin''s `Edit
+        storefront`) for a staff token that works on the builder''s routes only (`Authorization:
+        StaffBearer <token>`), is not renewed by use and ends at `expiresAt`. Any
+        problem with the ticket, or with the person''s right to edit this store''s
+        pages now, is `400 invalid_ticket`.'
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+    delete:
+      operationId: api_v1_builder_staff_session_destroy
+      description: '``POST``: open a session from a ticket. ``DELETE``: end it.'
+      tags:
+      - Builder
+      responses:
+        '204':
+          description: No response body
   /api/v1/cart:
     get:
       operationId: retrieveCart
@@ -50109,7 +50156,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-          title: Προγραμματισμένο για
         status:
           allOf:
           - $ref: '#/components/schemas/ScheduleStatusEnum'
@@ -50134,7 +50180,6 @@ components:
           format: date-time
           readOnly: true
           nullable: true
-          title: Εκτελέστηκε στις
         release:
           type: integer
           maximum: 2147483647
@@ -50143,16 +50188,14 @@ components:
           readOnly: true
         failure:
           readOnly: true
-          title: Αποτυχία
-          description: 'Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]'
+          description: 'Why it could not be released: [{path, code, message}]'
         acknowledgedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
-          title: Επιβεβαιώθηκε στις
-          description: Πότε είδε κάποιος ότι απέτυχε. Ένας προγραμματισμός που απέτυχε
-            εμφανίζεται στον πίνακα ελέγχου του καταστήματος μέχρι τότε.
+          description: When someone saw that it failed. A failed schedule shows on
+            the store dashboard until then.
       required:
       - acknowledgedAt
       - documents
@@ -50174,7 +50217,7 @@ components:
       description: |-
         * `pending` - Εκκρεμεί
         * `published` - Δημοσιευμένο
-        * `cancelled` - Ακυρώθηκε
+        * `cancelled` - Cancelled
         * `failed` - Απέτυχε
     ScheduleWriteRequest:
       type: object
@@ -50291,6 +50334,42 @@ components:
       - byContentType
       - byLanguage
       - total
+    SessionRequestRequest:
+      type: object
+      properties:
+        ticket:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - ticket
+    SessionResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        staff:
+          $ref: '#/components/schemas/SessionStaff'
+      required:
+      - expiresAt
+      - staff
+      - token
+    SessionStaff:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - role
     Setting:
       type: object
       properties:

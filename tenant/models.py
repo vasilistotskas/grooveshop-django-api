@@ -862,6 +862,32 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "every message from this store fail DMARC and land in spam."
         ),
     )
+    resend_api_key = EncryptedCharField(
+        _("Resend API key"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The sending key of this store's own Resend team, restricted "
+            "to its verified domain. Secret. Used only while From Email "
+            "is verified; a store without its own domain sends through "
+            "the platform's team. There is NO platform fallback for a "
+            "verified store: empty means its mail is not sent."
+        ),
+    )
+    resend_webhook_secret = EncryptedCharField(
+        _("Resend webhook signing secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The signing secret of the webhook endpoint in this store's "
+            "own Resend team, used to verify the delivery events it "
+            "sends. Secret. Empty for a store on the platform's team."
+        ),
+    )
     contact_email = models.EmailField(
         _("Contact Email"),
         blank=True,
@@ -1220,6 +1246,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "stripe_secret_key",
             "meta_capi_access_token",
             "cloudflare_api_token",
+            "resend_api_key",
+            "resend_webhook_secret",
             "viva_wallet_api_key",
             "viva_wallet_client_secret",
             "viva_wallet_webhook_verification_key",
@@ -1332,6 +1360,24 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_social_urls()
         self._validate_box_now_partner_id()
         self._validate_cloudflare_credentials()
+        self._validate_resend_credentials()
+
+    def _validate_resend_credentials(self) -> None:
+        # Over Resend a store on its own verified domain cannot send with
+        # the platform's key, so it must not be saved (or lose its key)
+        # without its own: its mail would fail for good.
+        from emails import setup
+
+        if setup.lacks_resend_key(self):
+            raise ValidationError(
+                {
+                    "resend_api_key": _(
+                        "Email is sent through Resend and this store sends "
+                        "from its own verified domain: save its Resend API "
+                        "key, or untick From Email verified."
+                    )
+                }
+            )
 
     def _validate_cloudflare_credentials(self) -> None:
         # A zone without a token (or the reverse) purges nothing, and the
@@ -1969,6 +2015,13 @@ class UserTenantMembership(TimeStampMixinModel):
         )
 
 
+class StaffTokenScope(models.TextChoices):
+    """What a ``PlatformStaffToken`` may be used for."""
+
+    API = "api", _("API")
+    BUILDER = "builder", _("Page builder session")
+
+
 class PlatformStaffToken(AbstractAuthToken):
     """API token for a PLATFORM identity — the staff sibling of knox's.
 
@@ -1999,6 +2052,19 @@ class PlatformStaffToken(AbstractAuthToken):
         on_delete=models.CASCADE,
         related_name="platform_staff_tokens",
         verbose_name=_("User"),
+    )
+    # A page builder session is minted from a single-use ticket, lives for
+    # hours and must stay that short: knox's AUTO_REFRESH would push any
+    # token to its seven-day TTL, and the authenticator would accept it on
+    # every staff route. ``tenant.api_tokens.PlatformStaffTokenAuthentication``
+    # neither renews a ``builder`` token nor lets it past the builder's
+    # routes.
+    scope = models.CharField(
+        _("Scope"),
+        max_length=16,
+        choices=StaffTokenScope.choices,
+        default=StaffTokenScope.API,
+        db_default=StaffTokenScope.API,
     )
 
     class Meta:

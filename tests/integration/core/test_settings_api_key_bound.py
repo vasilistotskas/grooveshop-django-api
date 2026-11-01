@@ -31,6 +31,7 @@ pytestmark = pytest.mark.django_db
 FORBIDDEN = [
     "SECRET_KEY",
     "EMAIL_HOST_PASSWORD",
+    "RESEND_API_KEY",
     "DATABASES",
     "REDIS_URL",
     "CELERY_BROKER_URL",

@@ -33,6 +33,15 @@ from core.api.tokens import BoundedTokenAuthentication
 # auth-backends module so the stamp is ONE symbol project-wide — the
 # role backend must not be able to drift from the authenticators.
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
+from tenant.models import StaffTokenScope
+
+#: The URL namespace of the page builder's routes (``builder.urls``).
+BUILDER_ROUTES = "builder"
+
+
+def _on_builder_route(request) -> bool:
+    match = getattr(request, "resolver_match", None)
+    return match is not None and match.app_name == BUILDER_ROUTES
 
 
 class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
@@ -67,6 +76,27 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
     """
 
     token_model_name = "tenant.PlatformStaffToken"
+
+    def authenticate(self, request):
+        result = super().authenticate(request)
+        if result is None:
+            return None
+        auth_token = result[1]
+        if (
+            auth_token.scope == StaffTokenScope.BUILDER
+            and not _on_builder_route(request)
+        ):
+            raise exceptions.AuthenticationFailed(
+                _("This staff token is for the page builder only."),
+                code="staff_token_scope",
+            )
+        return result
+
+    def renew_token(self, auth_token) -> None:
+        """A builder session ends at its expiry; only an API token is
+        pushed forward by use."""
+        if auth_token.scope == StaffTokenScope.API:
+            super().renew_token(auth_token)
 
     def authenticate_header(self, request):
         # Doubles as the Authorization keyword knox matches on AND the

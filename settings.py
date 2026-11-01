@@ -607,6 +607,11 @@ REST_FRAMEWORK = {
         # Staff token minting (tenant.staff_api) — a credential-guessing
         # surface on the platform host, so budget accordingly.
         "staff_login": None if DEBUG else "10/hour",
+        # The storefront's server trades a builder ticket for a session
+        # (``builder.session_api``). One caller (our own storefront) for
+        # every store, so the budget is not the per-person one above; a
+        # ticket is 256 random bits, so this bounds load, not guessing.
+        "builder_session": None if DEBUG else "120/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -952,6 +957,16 @@ BUILDER_MEDIA_MAX_PIXELS = int(
 # Most assets one ``builder/media/resolve`` call answers for.
 BUILDER_MEDIA_RESOLVE_MAX_IDS = int(
     getenv("BUILDER_MEDIA_RESOLVE_MAX_IDS", "100")
+)
+# The staff ticket the store admin hands to the storefront editor, and the
+# token the storefront trades it for (``builder.staff_session``). The ticket
+# is single-use and rides a URL, so it lives a minute; the session is a
+# working day and is never renewed by use.
+BUILDER_STAFF_TICKET_TTL_SECONDS = int(
+    getenv("BUILDER_STAFF_TICKET_TTL_SECONDS", "60")
+)
+BUILDER_STAFF_SESSION_TTL_SECONDS = int(
+    getenv("BUILDER_STAFF_SESSION_TTL_SECONDS", str(8 * 60 * 60))
 )
 # Scheduled publishing: how far ahead a publish may be set, and how many may
 # wait at once (``builder.scheduling``).
@@ -3081,13 +3096,33 @@ EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
 EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
-if EMAIL_HOST_PASSWORD == "changeme" and PRODUCTION_PROFILE:
+# Which transport carries the pipeline's mail (``emails.transport``): the
+# SMTP relay above, or Resend's HTTP API. Production stays on SMTP until the
+# platform's Resend team exists and one live send is verified.
+EMAIL_TRANSPORT = getenv("EMAIL_TRANSPORT", "smtp")
+if EMAIL_TRANSPORT not in ("smtp", "resend"):
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
-        "EMAIL_HOST_PASSWORD must be set in production "
-        "(current value is the insecure default 'changeme')."
+        f"EMAIL_TRANSPORT must be 'smtp' or 'resend', not {EMAIL_TRANSPORT!r}."
     )
+# The platform's Resend team: carries the platform's own mail and every store
+# without its own verified domain. A store with its own domain has its key on
+# its Tenant row and never falls back to this one.
+RESEND_API_KEY = getenv("RESEND_API_KEY", "")
+if PRODUCTION_PROFILE:
+    from django.core.exceptions import ImproperlyConfigured
+
+    if EMAIL_TRANSPORT == "smtp" and EMAIL_HOST_PASSWORD == "changeme":
+        raise ImproperlyConfigured(
+            "EMAIL_HOST_PASSWORD must be set in production "
+            "(current value is the insecure default 'changeme')."
+        )
+    if EMAIL_TRANSPORT == "resend" and not RESEND_API_KEY:
+        raise ImproperlyConfigured(
+            "RESEND_API_KEY must be set in production when "
+            "EMAIL_TRANSPORT is 'resend'."
+        )
 # STARTTLS (upgrade a plaintext connection, conventionally port 587)
 # versus implicit TLS (the socket is encrypted from the first byte,
 # conventionally port 465). Django treats these as mutually exclusive and

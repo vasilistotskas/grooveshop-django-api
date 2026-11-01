@@ -130,6 +130,8 @@ class TestTenantAdminScoping:
             "chat_api_key",
             "acp_bearer_token",
             "cloudflare_api_token",
+            "resend_api_key",
+            "resend_webhook_secret",
         ):
             assert secret not in listed
             assert f"{secret}_is_set" in listed

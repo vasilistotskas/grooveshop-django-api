@@ -725,7 +725,34 @@ class StoreAlerts(DashboardWidget):
             alerts += self._legal_identity()
         if self.is_superuser:
             alerts += self._mydata()
+        if self.request.user.has_perm("extra_settings.change_setting"):
+            alerts += self._email_setup()
         return {"alerts": alerts}
+
+    def _email_setup(self) -> list[dict[str, Any]]:
+        """A store on its own domain whose email service connection the
+        platform has not finished: nothing it sends reaches a customer, and
+        only the platform can fix it, so the merchant is told to ask."""
+        from emails import setup
+        from tenant.membership import bound_tenant
+
+        tenant = bound_tenant()
+        if tenant is None or not setup.lacks_resend_key(tenant):
+            return []
+        return [
+            _alert(
+                "danger",
+                "mail",
+                _("Your store's emails are not being sent"),
+                _(
+                    "Order and account emails from %(domain)s cannot reach "
+                    "your customers until the email service connection for "
+                    "your domain is finished. Contact support: the platform "
+                    "completes it."
+                )
+                % {"domain": setup.sender_domain(tenant)},
+            )
+        ]
 
     def _legal_updates(self) -> list[dict[str, Any]]:
         if not self.request.user.has_perm("page_config.change_contentpage"):

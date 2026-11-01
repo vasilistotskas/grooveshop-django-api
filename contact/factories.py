@@ -7,7 +7,10 @@ from contact.models import Contact, Feedback, FeedbackCategory
 @factory.django.mute_signals(signals.post_save)
 class ContactFactory(factory.django.DjangoModelFactory):
     name = factory.Faker("name")
-    email = factory.Faker("email")
+    # A sequence, not Faker: the factory gets-or-creates on the email, so
+    # two random addresses that collide would silently return ONE row and
+    # a test that counts the rows it made would flake.
+    email = factory.Sequence(lambda n: f"contact{n}@example.com")
     message = factory.Faker(
         "random_element",
         elements=[

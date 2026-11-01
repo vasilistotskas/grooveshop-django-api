@@ -44,13 +44,22 @@ from tenant.cache import bump_cache_generation
 SURFACE = "builder"
 
 
+@dataclass(frozen=True, slots=True)
+class Refusal:
+    """Why a store is not reset: a stable ``code`` for callers and tests, a
+    ``message`` for a person."""
+
+    code: str
+    message: str
+
+
 @dataclass(slots=True)
 class ResetReport:
     schema: str
     documents: list[str] = field(default_factory=list)
     releases: int = 0
     versions: int = 0
-    refusals: list[str] = field(default_factory=list)
+    refusals: list[Refusal] = field(default_factory=list)
     applied: bool = False
 
     @property
@@ -58,31 +67,50 @@ class ResetReport:
         return not self.refusals
 
 
-def _refusals() -> list[str]:
+def _refusals() -> list[Refusal]:
     """Why this store's builder data is more than an unused import."""
-    reasons = []
+    refusals = []
     releases = list(BuilderRelease.objects.all())
     if any(r.number != 1 for r in releases):
-        reasons.append(
-            _("There is a release after the first: someone published.")
+        refusals.append(
+            Refusal(
+                "later_release",
+                _("There is a release after the first: someone published."),
+            )
         )
     if any(r.published_by_staff_id is not None for r in releases):
-        reasons.append(_("A release was published by a staff member."))
+        refusals.append(
+            Refusal(
+                "release_by_staff",
+                _("A release was published by a staff member."),
+            )
+        )
     versions = BuilderVersion.objects.all()
     if versions.exclude(kind=VersionKind.PUBLISH).exists():
-        reasons.append(_("There is a named save (checkpoint)."))
+        refusals.append(
+            Refusal("named_save", _("There is a named save (checkpoint)."))
+        )
     if versions.exclude(created_by_staff_id=None).exists():
-        reasons.append(_("A version was saved by a staff member."))
+        refusals.append(
+            Refusal(
+                "version_by_staff",
+                _("A version was saved by a staff member."),
+            )
+        )
     if versions.exclude(number=1).exists():
-        reasons.append(_("A document has more than one version."))
+        refusals.append(
+            Refusal("many_versions", _("A document has more than one version."))
+        )
     documents = BuilderDocument.objects.all_with_deleted()
     if documents.exclude(draft_revision=1).exists():
-        reasons.append(_("A draft was edited."))
+        refusals.append(Refusal("edited_draft", _("A draft was edited.")))
     if documents.filter(is_deleted=True).exists():
-        reasons.append(_("A document was deleted."))
+        refusals.append(
+            Refusal("deleted_document", _("A document was deleted."))
+        )
     if BuilderScheduledPublish.objects.exists():
-        reasons.append(_("A publication is scheduled."))
-    return reasons
+        refusals.append(Refusal("scheduled", _("A publication is scheduled.")))
+    return refusals
 
 
 def reset_store(*, dry_run: bool = False) -> ResetReport:

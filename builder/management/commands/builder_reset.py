@@ -41,8 +41,11 @@ class Command(TenantCommandMixin, BaseCommand):
             with context:
                 report = reset_store(dry_run=not options["confirm"])
         if not report.ok:
-            for reason in report.refusals:
-                self.stderr.write(f"{report.schema}: refused: {reason}")
+            for refusal in report.refusals:
+                self.stderr.write(
+                    f"{report.schema}: refused ({refusal.code}): "
+                    f"{refusal.message}"
+                )
             raise CommandError(f"{report.schema}: builder data is in use")
         verb = "deleted" if report.applied else "would delete"
         self.stdout.write(

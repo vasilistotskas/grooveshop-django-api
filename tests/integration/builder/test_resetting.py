@@ -106,51 +106,52 @@ class TestAnUnusedStore:
 
 class TestAStoreInUse:
     def refused(self) -> list[str]:
+        """The codes the store was refused with."""
         before = counts()
         report = resetting.reset_store()
         assert not report.ok
         assert not report.applied
         assert counts() == before
-        return report.refusals
+        return [refusal.code for refusal in report.refusals]
 
     def test_a_later_release_refuses(self, seeded):
         BuilderRelease.objects.create(number=2, versions={})
 
-        assert "release after the first" in " ".join(self.refused())
+        assert self.refused() == ["later_release"]
 
     def test_a_release_by_staff_refuses(self, seeded):
         BuilderRelease.objects.filter(pk=seeded.pk).update(
             published_by_staff_id=7
         )
 
-        assert "published by a staff member" in " ".join(self.refused())
+        assert self.refused() == ["release_by_staff"]
 
     def test_an_edited_draft_refuses(self, seeded):
         BuilderDocument.objects.filter(key="template:home").update(
             draft_revision=2
         )
 
-        assert "draft was edited" in " ".join(self.refused())
+        assert self.refused() == ["edited_draft"]
 
     def test_a_named_save_refuses(self, seeded):
         BuilderVersion.objects.filter().update(kind=VersionKind.CHECKPOINT)
 
-        assert "named save" in " ".join(self.refused())
+        assert self.refused() == ["named_save"]
 
     def test_a_version_by_staff_refuses(self, seeded):
         BuilderVersion.objects.filter().update(created_by_staff_id=7)
 
-        assert "saved by a staff member" in " ".join(self.refused())
+        assert self.refused() == ["version_by_staff"]
 
     def test_a_deleted_document_refuses(self, seeded):
         BuilderDocument.objects.get(key="template:home").delete()
 
-        assert "was deleted" in " ".join(self.refused())
+        assert self.refused() == ["deleted_document"]
 
     def test_a_schedule_refuses(self, seeded):
         BuilderScheduledPublishFactory()
 
-        assert "scheduled" in " ".join(self.refused())
+        assert self.refused() == ["scheduled"]
 
 
 def test_a_store_with_nothing_has_nothing_to_delete(tenant):

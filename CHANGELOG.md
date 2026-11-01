@@ -3,6 +3,63 @@
 
 
 
+## v3.177.0 (2026-11-01)
+
+### Bug fixes
+
+* fix(emails): keep the operator alert templates in emails/ops, order the stale digest
+
+The health and backup alert templates sit in emails/ops, the directory the
+other operator alerts use, so the template catalogue that is about to go
+(core/email) finds no unknown directory. Two tests of that catalogue's
+fallback for a template no type sends lose their only subject, now that
+every email template has a type, and are removed.
+
+check_stale_acs_shipments built its digest in database order, which is
+undefined for parcels created in the same instant: the golden file of the
+digest failed on one CI run in two. The query now sorts by created_at then
+id.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`31ce181`](https://github.com/vasilistotskas/grooveshop-django-api/commit/31ce181030fbacb1c01b70f7d0ae6428e4da0732))
+
+### Features
+
+* feat(emails): move the platform's own mail onto the pipeline (#397) ([`31ce181`](https://github.com/vasilistotskas/grooveshop-django-api/commit/31ce181030fbacb1c01b70f7d0ae6428e4da0732))
+
+* feat(emails): move the platform's own mail onto the pipeline
+
+The billing notices, the staff password reset and the health and backup
+alerts were the last mail sent outside send_email. Seven platform.* types
+(owner PLATFORM, required, sent from public) replace the hand-built
+EmailMultiAlternatives and mail_admins calls:
+
+- platform.billing_expiring, _expired, _suspended: the owner, in the
+  store's default locale, from the platform's sender
+- platform.billing_stage_copy: the operators' trail of stages 2 and 3,
+  now a template pair with a translated subject
+- platform.staff_password_reset: the platform sender (owner decision D2),
+  the store's language, the link still on the host that asked; the store's
+  name is read in its schema and carried in the object
+- platform.health_alert, platform.backup_failed: settings.ADMINS in the
+  platform's language; a failed health alert send is still logged and never
+  masks the result, and the backup task still re-raises
+
+render.owner_schema is entered by both send_email and render, so the
+preview of a platform type shows the mail that is sent. SERVER_EMAIL and
+EMAIL_SUBJECT_PREFIX, which only mail_admins read, are removed.
+
+Golden files record the billing notices and the staff reset from the old
+send paths; the diff is the named From and, for the staff reset, the
+platform's brand.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`31ce181`](https://github.com/vasilistotskas/grooveshop-django-api/commit/31ce181030fbacb1c01b70f7d0ae6428e4da0732))
+
 ## v3.176.0 (2026-11-01)
 
 ### Bug fixes

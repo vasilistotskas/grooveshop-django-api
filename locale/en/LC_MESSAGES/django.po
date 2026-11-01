@@ -11377,11 +11377,17 @@ msgstr "Requires Confirmation"
 msgid "Resend"
 msgstr "Resend"
 
+msgid "Resend API key"
+msgstr "Resend API key"
+
 msgid "Resend confirmation"
 msgstr "Resend confirmation"
 
 msgid "Resend delivery email"
 msgstr "Resend delivery email"
+
+msgid "Resend webhook signing secret"
+msgstr "Resend webhook signing secret"
 
 msgid "Reservation"
 msgstr "Reservation"
@@ -13788,6 +13794,12 @@ msgstr "The selected shipping method is not available for the selected country."
 
 msgid "The selected shipping provider is currently unavailable."
 msgstr "The selected shipping provider is currently unavailable."
+
+msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+msgstr "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+
+msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+msgstr "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."

@@ -11387,11 +11387,17 @@ msgstr "Απαιτείται Επιβεβαίωση"
 msgid "Resend"
 msgstr "Resend"
 
+msgid "Resend API key"
+msgstr "Κλειδί API του Resend"
+
 msgid "Resend confirmation"
 msgstr "Επαναποστολή επιβεβαίωσης"
 
 msgid "Resend delivery email"
 msgstr "Επαναποστολή email παράδοσης"
+
+msgid "Resend webhook signing secret"
+msgstr "Μυστικό υπογραφής webhook του Resend"
 
 msgid "Reservation"
 msgstr "Δέσμευση"
@@ -13793,6 +13799,12 @@ msgstr "Η επιλεγμένη μέθοδος αποστολής δεν είν�
 
 msgid "The selected shipping provider is currently unavailable."
 msgstr "Ο επιλεγμένος μεταφορέας δεν είναι διαθέσιμος αυτή τη στιγμή."
+
+msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
+msgstr "Το κλειδί αποστολής της δικής σας ομάδας Resend, περιορισμένο στο επαληθευμένο domain. Μυστικό. Χρησιμοποιείται μόνο όσο το From Email είναι επαληθευμένο· ένα κατάστημα χωρίς δικό του domain στέλνει μέσω της ομάδας της πλατφόρμας. ΔΕΝ υπάρχει εναλλακτική από την πλατφόρμα για κατάστημα με επαληθευμένο domain: αν είναι κενό, τα email του δεν στέλνονται."
+
+msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
+msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
 
 msgid "The store line in the storefront's other languages, keyed by locale, e.g. {\"en\": \"...\"}. The default locale line is Store Description; a locale left out falls back to it."
 msgstr "Η γραμμή του καταστήματος στις υπόλοιπες γλώσσες του storefront, ανά γλώσσα, π.χ. {\"en\": \"...\"}. Η γραμμή της προεπιλεγμένης γλώσσας είναι η Περιγραφή Καταστήματος· μια γλώσσα που λείπει χρησιμοποιεί αυτήν."

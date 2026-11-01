@@ -4,7 +4,7 @@ The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
 Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
-`transport.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `models.py`,
+`transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `models.py`,
 `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
@@ -30,7 +30,8 @@ equal (see Tests).
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
 | `preview.py` | `build_preview`, the admin preview of any registered type, and its form. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`; `owner_schema`, the schema a type is read and sent under. |
-| `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it, returning a `Receipt` (provider and its message id); the pipeline's only sender. |
+| `transport.py` | The pipeline's only sender: builds the message and hands it to the transport `EMAIL_TRANSPORT` names (SMTP through Django, or Resend), returning a `Receipt` (provider and its message id). |
+| `resend.py` | The Resend HTTP client: which team's key, one `POST`, the error text. |
 | `send.py` | `send_email`: the whole envelope. |
 | `status.py` | `Status`: what became of one recipient's send, shared by `Delivery` and `EmailLog`. |
 | `log.py`, `tasks.py` | The `EmailLog` writes of `send_email`, and the retention sweep. |
@@ -623,6 +624,67 @@ name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
 `get_from_email` are deleted, and so is `user.tasks.send_rendered_email_task`
 (nothing has queued it since `send_allauth_email_task` replaced it).
 
+## Transports (`transport.py`, `resend.py`)
+
+`settings.EMAIL_TRANSPORT` (env, `smtp` or `resend`, anything else stops
+boot) names the one transport that carries the pipeline's mail.
+
+- **`smtp`** (default; production until the owner switches it, staging
+  always): `EmailMultiAlternatives.send()` through
+  `core.mail.DemoRecipientSuppressingBackend` over the `EMAIL_HOST*` relay.
+  SMTP returns no message id, so `EmailLog.provider_message_id` stays null:
+  an environment fact, not a fallback.
+- **`resend`**: `POST https://api.resend.com/emails` with `requests`, one
+  request per recipient. The body is `from`, `to`, `subject`, `html`,
+  `text`, `reply_to` and `headers` (the list headers, `List-Unsubscribe`
+  included, only when non-empty) and `attachments` (`filename`, base64
+  `content`, `content_type`). `Authorization: Bearer <key>` and
+  `Idempotency-Key: <EmailLog.uuid>` (Resend keeps a key for 24 hours).
+  The returned `id` is recorded as `provider_message_id`.
+  Two hidden **tags**, never headers: `schema=<schema name>` and
+  `log=<EmailLog.uuid>`; they come back in the webhook's `data.tags`, which
+  is how an event finds its row. No address is in a tag, header or log line.
+
+A demo store's own mailboxes are dropped on both transports
+(`core.mail.without_demo_mailboxes`); a message left with no recipient posts
+nothing.
+
+### Which Resend team
+
+One Resend team per store that has its own verified domain (owner decision
+D6); the platform's team carries the platform's own mail and every store
+without its own domain.
+
+- The store sends as itself when `emails.sender.own_sender()` is set: its
+  `from_email` is set **and** `from_email_verified` is ticked. Then the key
+  is `Tenant.resend_api_key` and **only** that: a store with its own domain
+  and no key raises `ResendNotConfigured` (an `ImproperlyConfigured`, not a
+  class a task retries; the row is `FAILED`) instead of borrowing the
+  platform's, whose team does not own the domain.
+- Any other store, and every platform type (sent under `public`), uses
+  `settings.RESEND_API_KEY`. Empty raises `ResendNotConfigured`.
+- `Tenant.resend_api_key` and `Tenant.resend_webhook_secret` are
+  Fernet-encrypted (see `secret-encryption.md`), editable by platform staff
+  only (the "Email & Security" tab of the platform's tenant admin); a store
+  role sees "set / not set". The webhook secret is read by the webhook PR.
+- `RESEND_API_KEY` is required in production **and staging** when
+  `EMAIL_TRANSPORT=resend`; `EMAIL_HOST_PASSWORD` is required only for
+  `smtp`.
+
+### Failures
+
+Every failure is a `requests` exception, so `core.retry` decides as for any
+HTTP call. A timeout, a dropped connection, a 5xx and a 429 are retried by
+the calling task (`MAIL_TRANSIENT_ERRORS`); any other 4xx is permanent
+(`is_permanent_http_failure`). The exception text is `Resend answered 422
+validation_error`: the status and Resend's error name, never its message
+(which can quote the address) or the request. The key is never logged.
+
+An idempotency key is per `EmailLog` row, and a task retry sends again
+through `send_email`, so it makes a new row and a new key. It protects a
+request that is repeated with the same row, not a task retry after a lost
+response.
+
 ## The email log (`EmailLog`, `log.py`)
 
 One row per recipient's delivery, in the schema the mail is sent under: a
@@ -677,6 +739,10 @@ tables (`devtools/anonymise/rules.py`).
   contents for the test and restores them. Never register a probe type in
   production code. A test that runs a store email (an order task) needs a
   store bound: `tests.utils.staff.store_tenant` + `bind_store_tenant`.
+- `tests/integration/emails/test_resend_transport.py`: the request (key,
+  idempotency key, tags, attachments, headers), which key a store uses, the
+  retry verdict of each failure, demo suppression. HTTP is mocked at
+  `requests.post`.
 - `tests/integration/emails/test_email_log.py`: a row for every outcome, no
   raw address in any column, a failure never reaches the row, the retention
   sweep. `tests_mt/test_email_isolation.py` proves a platform type's row is in

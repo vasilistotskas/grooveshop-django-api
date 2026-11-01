@@ -862,6 +862,32 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "every message from this store fail DMARC and land in spam."
         ),
     )
+    resend_api_key = EncryptedCharField(
+        _("Resend API key"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The sending key of this store's own Resend team, restricted "
+            "to its verified domain. Secret. Used only while From Email "
+            "is verified; a store without its own domain sends through "
+            "the platform's team. There is NO platform fallback for a "
+            "verified store: empty means its mail is not sent."
+        ),
+    )
+    resend_webhook_secret = EncryptedCharField(
+        _("Resend webhook signing secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The signing secret of the webhook endpoint in this store's "
+            "own Resend team, used to verify the delivery events it "
+            "sends. Secret. Empty for a store on the platform's team."
+        ),
+    )
     contact_email = models.EmailField(
         _("Contact Email"),
         blank=True,
@@ -1220,6 +1246,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "stripe_secret_key",
             "meta_capi_access_token",
             "cloudflare_api_token",
+            "resend_api_key",
+            "resend_webhook_secret",
             "viva_wallet_api_key",
             "viva_wallet_client_secret",
             "viva_wallet_webhook_verification_key",

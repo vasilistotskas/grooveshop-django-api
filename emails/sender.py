@@ -21,6 +21,20 @@ from tenant.credentials import (
 from tenant.membership import bound_tenant
 
 
+def own_sender() -> str:
+    """The bound store's own ``From`` address, ``""`` when it has none to
+    use: only a store whose domain is VERIFIED on the relay (``from_email``
+    set AND ``from_email_verified``) sends as itself. The same fact decides
+    which Resend team carries the mail (``emails.resend.api_key``)."""
+    if not in_tenant_schema():
+        return ""
+    tenant = bound_tenant()
+    own = (getattr(tenant, "from_email", "") or "").strip()
+    if own and getattr(tenant, "from_email_verified", False):
+        return own
+    return ""
+
+
 def from_address() -> str:
     """Return the outbound ``From`` header for the active tenant,
     deliverability-safe.
@@ -58,13 +72,7 @@ def from_address() -> str:
     """
     from email.utils import formataddr
 
-    tenant = bound_tenant()
-    address = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
-
-    if in_tenant_schema():
-        own = (getattr(tenant, "from_email", "") or "").strip()
-        if own and getattr(tenant, "from_email_verified", False):
-            address = own
+    address = own_sender() or getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
 
     if not address:
         # No sender configured at all — an empty address inside a

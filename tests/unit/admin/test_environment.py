@@ -183,3 +183,42 @@ def test_every_listed_encryption_key_is_accepted():
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_smtp_production_refuses_the_default_relay_password():
+    result = _import_settings(
+        SYSTEM_ENV="staging",
+        EMAIL_TRANSPORT="smtp",
+        EMAIL_HOST_PASSWORD="changeme",
+    )
+
+    assert result.returncode != 0
+    assert "EMAIL_HOST_PASSWORD must be set in production" in result.stderr
+
+
+def test_resend_production_needs_its_key_not_the_relay_password():
+    refused = _import_settings(
+        SYSTEM_ENV="staging",
+        EMAIL_TRANSPORT="resend",
+        EMAIL_HOST_PASSWORD="changeme",
+        RESEND_API_KEY="",
+    )
+    accepted = _import_settings(
+        SYSTEM_ENV="staging",
+        EMAIL_TRANSPORT="resend",
+        EMAIL_HOST_PASSWORD="changeme",
+        RESEND_API_KEY="re_not_a_real_key",
+    )
+
+    assert refused.returncode != 0
+    assert "RESEND_API_KEY must be set in production" in refused.stderr
+    assert accepted.returncode == 0, accepted.stderr
+
+
+def test_an_unknown_email_transport_is_refused_at_startup():
+    result = _import_settings(
+        SYSTEM_ENV="staging", EMAIL_TRANSPORT="carrier-pigeon"
+    )
+
+    assert result.returncode != 0
+    assert "EMAIL_TRANSPORT must be 'smtp' or 'resend'" in result.stderr

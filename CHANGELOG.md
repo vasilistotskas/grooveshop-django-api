@@ -3,6 +3,68 @@
 
 
 
+## v3.185.0 (2026-11-01)
+
+### Chores
+
+* chore(builder): pin the storefront's converter fixtures and check them for drift (#411)
+
+tests/fixtures/builder/legacy/ is a copy of the storefront's golden
+converter fixtures, and a copy can drift silently. It is now pinned to a
+storefront commit by its git tree id (legacy.source.json). A unit test
+recomputes the tree id of the copy, with no network, and fails when it is
+not the pinned one, so the copy cannot be edited by hand or half refreshed.
+.github/scripts/sync_converter_fixtures.py is the only thing that writes the
+copy and the pin (the tree id is read from GitHub, every file is checked
+against its blob id), and a weekly workflow runs it with --check, going red
+when the storefront's main has moved, without blocking unrelated pull
+requests. The tree hashing is tested against git itself.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`92e05a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92e05a7164ea1ae3591655444b32bf01715fbfee))
+
+### Features
+
+* feat(builder): a page-less published read for the chrome and the sitemap (#412)
+
+GET /api/v1/builder/published?locale= answers what every page needs and
+none owns: the theme and section groups resolved for the locale, and the
+page: and template: documents of the current release as key, kind and when
+the version was made (the sitemap's lastmod). A store with no release is a
+valid empty answer, not a 404. It is cached per release like the page read,
+and the builder cache surface purges the storefront's builderChrome handler
+beside builderPage.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0aeed9d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aeed9d693da7c3ca9d34aad91f5d43ec26676c9))
+
+### Refactoring
+
+* refactor: one single-use ticket helper; the builder catalogue refuses when the storefront is silent (#410)
+
+core.tickets mints and spends the single-use tickets of the WebSocket and
+of the page builder's editor sign-in, which each had their own copy of the
+Redis GETDEL. Spending goes through CustomCache.getdel. Every ticket now
+lives under the strict: cache namespace, so an unreachable Redis raises
+instead of failing open: the builder's ticket was not under a strict
+prefix, so a lost write would have handed out a ticket nobody could redeem.
+The WebSocket middleware tests use the helper instead of mocking the raw
+cache client, and the helper has its own tests against real Redis,
+including a concurrent spend.
+
+The builder catalogue no longer outlives a failed revalidation: like the
+texts catalogue, when the storefront does not answer nothing is saved,
+whether or not a copy is held.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e7d99f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7d99f4b856d2ea9171e799b589bf670fbc6853e))
+
 ## v3.184.0 (2026-11-01)
 
 ### Bug fixes

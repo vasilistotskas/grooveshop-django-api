@@ -127,7 +127,8 @@ def build_links(parent: dict, owner_field: str, owner) -> None:
             fields["route"] = target["route"]
         else:
             fields["url"] = target["href"]
-        row = NavigationLink.objects.create(uuid=link["id"], **fields)
+        ids = {"uuid": link["id"]} if "id" in link else {}
+        row = NavigationLink.objects.create(**ids, **fields)
         for code, label in link["labels"].items():
             if label:
                 row.create_translation(code, label=label)
@@ -153,7 +154,7 @@ def build_menu(request: dict) -> NavigationMenu:
     return menu
 
 
-def structure(data: dict) -> list:
+def structure(data: dict, *, ids: bool = True) -> list:
     """Everything a menu request says except the link labels, which the
     legacy menu fills from the page's own title when a link has no label of
     its own (so a fixture's empty label is not what the rows produce), and
@@ -161,11 +162,14 @@ def structure(data: dict) -> list:
     columns = "columns" in data
     return [
         (
-            entry["id"],
+            entry.get("id") if ids else None,
             entry.get("icon", "") if columns else "",
             entry.get("showsMerchantIdentity", False),
             entry.get("target"),
-            [(link["id"], link["target"]) for link in entry.get("links", [])],
+            [
+                (link.get("id") if ids else None, link["target"])
+                for link in entry.get("links", [])
+            ],
         )
         for entry in data.get("columns") or data.get("links") or []
     ]
@@ -180,7 +184,11 @@ def test_a_menu_is_sent_as_the_storefront_expects(path):
 
     assert sent["slot"] == request["legacy"]["slot"]
     assert sent["id"] == request["legacy"].get("id", sent["id"])
-    assert structure(sent) == structure(request["legacy"])
+    expected = request["legacy"]
+    # A fixture may leave a link's id out (ids are optional on the wire).
+    entries = expected.get("columns") or expected.get("links") or []
+    ids = all("id" in entry for entry in entries)
+    assert structure(sent, ids=ids) == structure(expected, ids=ids)
 
 
 @pytest.mark.parametrize("path", CASES, ids=lambda p: p.stem)

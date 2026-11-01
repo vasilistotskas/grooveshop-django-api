@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tenant', '0064_default_currency_choices'),
+        ('tenant', '0065_tenant_resend_credentials'),
     ]
 
     operations = [

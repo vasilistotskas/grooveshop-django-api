@@ -469,7 +469,7 @@ def store_sidebar(request: Any) -> list[Item]:
             _tool(
                 _("Email Templates"),
                 "forward_to_inbox",
-                reverse("email_templates:management"),
+                reverse("admin:emails_emailswitch_preview"),
             )
             if user.has_perm("order.view_order")
             else None,

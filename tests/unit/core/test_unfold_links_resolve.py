@@ -2,7 +2,7 @@
 
 Under django-tenants a request resolves against one urlconf — the
 public schema's (``platform_admin``) or the tenant's (``admin``,
-``email_templates``, ``swagger-ui``, Rosetta) — so a ``reverse_lazy``
+``swagger-ui``, Rosetta) — so a ``reverse_lazy``
 without an explicit ``urlconf`` can only be cast on the host that
 registers its namespace. Django's technical 500 page pretty-prints the
 settings and casts every lazy in them, so on every host at least one

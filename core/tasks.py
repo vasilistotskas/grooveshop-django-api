@@ -77,10 +77,10 @@ class MonitoredTask(TenantTask):
     #: Kwarg names whose VALUES must never reach the logs, whatever they
     #: are called. ``_safe_repr`` masks by NAME — it catches ``token`` and
     #: ``password`` — but a payload can carry a secret under an innocent
-    #: key. ``send_rendered_email_task`` is the case that forced this:
-    #: its ``body`` kwarg is a rendered password-reset mail, so the
-    #: one-time reset link landed in an ERROR log on the exact failure
-    #: this masking exists for.
+    #: key. ``send_allauth_email_task`` is the case: its ``context`` kwarg
+    #: carries the password-reset link or the login code, which would
+    #: otherwise land in an ERROR log on the exact failure this masking
+    #: exists for.
     sensitive_kwargs: frozenset[str] = frozenset()
 
     def retry(self, *args: Any, **options: Any) -> Any:

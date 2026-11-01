@@ -1504,16 +1504,16 @@ status template they and `order_returned` build on lives at
 a generic fallback (every status that emails has its own type and
 template; PENDING, PROCESSING and SHIPPED return before building one).
 
-The admin email preview (`core/email/preview_service.py`) renders the
+The admin email preview (`emails/preview.py`) renders the
 type through `emails.render.render`, the function the task's `send_email`
 calls: for a real order through `order.emails.preview_object`, which finds
 the refund, receipt, dispute or shipment the email is about, so what it
 shows is what that order is sent, subject included
-(`tests/integration/core/email/test_preview_matches_send.py` sends each
+(`tests/integration/emails/test_preview_matches_send.py` sends each
 email and compares). An order that has no record the email is about (no
 refund, no receipt, no shipment) is reported instead of rendering something
 else. Without an order it renders the type's `sample`. A subject lives on
-its type and nowhere else: never in `core/email/config.py`.
+its type and nowhere else.
 
 A receipt or credit mail carries its PDF as an `emails.transport.Attachment`
 passed to `send_email`; the bytes are never logged.
@@ -1965,7 +1965,7 @@ the linked memory note or the originating PR's commit message.
 4. Wire from a signal handler in `order/signals/handlers.py` via `transaction.on_commit`.
 5. Add a case in `tests/integration/emails/test_golden_render.py` (and its
    golden files) and one in
-   `tests/integration/core/email/test_preview_matches_send.py`; a
+   `tests/integration/emails/test_preview_matches_send.py`; a
    regression test in `tests/integration/order/test_signals.py`.
 
 ### 9.2 Adding a new order status

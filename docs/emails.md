@@ -4,7 +4,7 @@ The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
 Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
-`transport.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
+`transport.py`, `preview.py`, `models.py`, `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
 **State.** The order, shipping, product, gift card, B2B, contact, account,
@@ -27,6 +27,7 @@ equal (see Tests).
 | `headers.py` | `build_headers`: the list headers by kind, and the two builders under it. |
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
+| `preview.py` | `build_preview`, the admin preview of any registered type, and its form. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`; `owner_schema`, the schema a type is read and sent under. |
 | `transport.py` | Builds the `EmailMultiAlternatives` (and attaches `Attachment`s) and sends it; the pipeline's only sender. |
 | `send.py` | `send_email`: the whole envelope. |
@@ -448,6 +449,24 @@ the page answers 403 and is not in their sidebar. The audit is the
 simple-history row with the staff member (`EmailSwitch.history`). Platform
 types (`Owner.PLATFORM`) are not on this page.
 
+### The preview (`emails/preview.py`, `Settings -> Email Templates`)
+
+`EmailSwitchAdmin.preview_view` (`preview/`) lists every `Owner.STORE` type
+by area (marked "Off" or "Off: <gate label>" when the store does not send it), and a panel that an htmx form fills
+(`preview/render/`, POST only): the type, a language, the data (sample data,
+or one of the store's ten most recent orders) and HTML or text. HTML is shown
+in a sandboxed `srcdoc` frame, text in a `pre`. Both views need
+`order.view_order` on top of the admin site's own tenant-membership gate,
+because the panel can render a real order; `is_staff` alone is never enough.
+
+`build_preview` calls `emails.render.render`, the function `send_email`
+calls, so the preview is the mail that is sent (`test_preview_matches_send`
+sends each order email and compares): from a chosen order for the order types
+(`order.emails.ORDER_EMAIL_KEYS`, found through `preview_object`), else from
+the type's own `sample`. An order that does not exist, or that has no record
+the email is about (no refund, no receipt, no shipment), is reported and never
+replaced by sample data.
+
 ## Opt-out (`optout.py`)
 
 Only marketing types honour an opt-out; a receipt or a security mail is not
@@ -596,9 +615,8 @@ the task runs gets no mail.
 The subject is the type's msgid, as everywhere on the pipeline. allauth's old
 `[<store name>]` subject prefix is gone (the `From` carries the store's
 name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
-`get_from_email` are deleted. `user.tasks.send_rendered_email_task` has no
-caller any more and stays one release, for messages the previous image queued
-during the rollout.
+`get_from_email` are deleted, and so is `user.tasks.send_rendered_email_task`
+(nothing has queued it since `send_allauth_email_task` replaced it).
 
 ## Not built yet
 
@@ -607,10 +625,9 @@ during the rollout.
 - The storefront's email-preferences UI (the endpoint exists).
 - The platform admin's own page for the platform types (they have no
   switches, so it would be a listing and the log); the rest of the store's
-  admin page (status, log, preview, test-send); the switches are on it
-  already. The preview of every registered type already
-  goes through `render`; a real object is chosen only for the order types
-  (`order.emails.ORDER_EMAIL_KEYS`), every other type previews its `sample`.
+  admin page (status, log, test-send); the switches and the preview are on
+  it already. A real object is chosen only for the order types, every other
+  type previews its `sample`.
 
 ## Tests
 
@@ -635,6 +652,11 @@ during the rollout.
   for the product, gift card, B2B, contact, account and cart emails. It
   pins what the rows cannot (the user and product ids, the signer's clock,
   `SECRET_KEY`, `EMAIL_HASH_KEY`) because the factories draw at random.
+- `tests/unit/emails/test_only_transport_sends.py` reads every module's
+  syntax tree and fails when a module outside `emails/transport.py` imports or
+  calls `EmailMessage`, `EmailMultiAlternatives`, `send_mail`,
+  `send_mass_mail`, `mail_admins` or `mail_managers`: a send site that skips
+  the pipeline skips the switch, the opt-out and the headers.
 - `tests/integration/emails/test_golden_render_platform.py` records the
   platform's mail. The billing notices and the staff reset were recorded on
   the old send paths and kept equal, but for the deliberate differences (a

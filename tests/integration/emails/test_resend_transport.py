@@ -14,6 +14,7 @@ import pytest
 import requests
 from django.core import mail
 
+from core import celery_app
 from core.retry import MAIL_TRANSIENT_ERRORS, is_permanent_failure
 from emails.models import EmailLog, EmailProvider
 from emails.recipients import Recipient
@@ -386,3 +387,40 @@ class TestSmtpStaysTheDefault:
         log = EmailLog.objects.get()
         assert log.provider == EmailProvider.SMTP
         assert log.provider_message_id is None
+
+
+class TestRetryAfterALostResponse:
+    def test_the_retry_sends_the_same_idempotency_key_and_keeps_one_row(
+        self, catalogue
+    ):
+        catalogue(probe())
+
+        @celery_app.task(bind=True, max_retries=2, name="tests.resend_retry")
+        def task(self):
+            try:
+                send_email("probe.notice", probe_object())
+            except OSError as error:
+                raise self.retry(exc=error, countdown=0) from error
+
+        try:
+            with mock.patch(
+                "emails.resend.requests.post",
+                side_effect=[
+                    requests.Timeout("response lost"),
+                    _response(200, {"id": RESEND_ID}),
+                ],
+            ) as post:
+                task.apply(throw=False)
+        finally:
+            celery_app.tasks.pop("tests.resend_retry", None)
+
+        keys = [
+            call.kwargs["headers"]["Idempotency-Key"]
+            for call in post.call_args_list
+        ]
+        assert len(keys) == 2
+        assert keys[0] == keys[1]
+        log = EmailLog.objects.get()
+        assert keys[0] == str(log.uuid)
+        assert log.status == Status.SENT
+        assert log.provider_message_id == RESEND_ID

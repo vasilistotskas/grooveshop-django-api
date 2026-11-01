@@ -680,10 +680,9 @@ the calling task (`MAIL_TRANSIENT_ERRORS`); any other 4xx is permanent
 validation_error`: the status and Resend's error name, never its message
 (which can quote the address) or the request. The key is never logged.
 
-An idempotency key is per `EmailLog` row, and a task retry sends again
-through `send_email`, so it makes a new row and a new key. It protects a
-request that is repeated with the same row, not a task retry after a lost
-response.
+The idempotency key is the delivery's uuid (see Delivery identity across
+retries), so a task retry after a lost response sends the same key and Resend
+answers with the first message instead of sending a second one.
 
 ## The email log (`EmailLog`, `log.py`)
 

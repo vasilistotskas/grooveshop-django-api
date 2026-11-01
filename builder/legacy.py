@@ -9,8 +9,9 @@ the legacy data in the request shape the two sides agreed
 (``docs/builder.md``, "Importing the legacy layouts"). Nothing here
 changes a row.
 
-A layout becomes the document ``template:<page_type>``, a menu slot the
-group ``group:<slot>``.
+A layout becomes ``template:<page_type>`` when its page type is one of the
+catalogue's fixed ``templates`` and ``page:<page_type>`` otherwise, a menu
+slot the group ``group:<slot>``.
 """
 
 from __future__ import annotations
@@ -50,8 +51,12 @@ def store_locales() -> list[str]:
     return [default_locale(), *(c for c in locales if c != default_locale())]
 
 
-def layout_key(layout: PageLayout) -> str:
-    return f"{DocumentKind.TEMPLATE.value}:{layout.page_type}"
+def layout_kind(layout: PageLayout, templates: frozenset[str]) -> DocumentKind:
+    """A layout of a fixed page type (the catalogue's ``templates``) is that
+    template; any other is a page the store made."""
+    if layout.page_type in templates:
+        return DocumentKind.TEMPLATE
+    return DocumentKind.PAGE
 
 
 def menu_key(menu: NavigationMenu) -> str:
@@ -135,20 +140,21 @@ def export_menu(menu: NavigationMenu, locales: list[str]) -> dict[str, Any]:
 
 
 def convert_requests(
-    locales: list[str],
+    locales: list[str], templates: frozenset[str]
 ) -> list[tuple[str, bool, dict[str, Any]]]:
     """``(document key, published, convert request body)`` for everything
     the store has: each layout (published only if its flag says so) and
     each menu slot with a row (a menu has no flag: it is live)."""
     requests = []
     for layout in PageLayout.objects.prefetch_related("translations"):
-        key = layout_key(layout)
+        kind = layout_kind(layout, templates)
+        key = f"{kind.value}:{layout.page_type}"
         requests.append(
             (
                 key,
                 layout.is_published,
                 {
-                    "kind": DocumentKind.TEMPLATE.value,
+                    "kind": kind.value,
                     "key": key,
                     "legacy": export_layout(layout),
                 },

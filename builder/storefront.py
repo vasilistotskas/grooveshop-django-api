@@ -98,6 +98,9 @@ class Catalogue:
     hash: str
     blocks: tuple[BlockDefinition, ...]
     roots: dict[str, RootDefinition] = field(default_factory=dict)
+    #: The page types that are fixed templates (home, about, ...); any
+    #: other page is a custom ``page:<key>``. The storefront's routing.
+    templates: frozenset[str] = frozenset()
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -192,6 +195,7 @@ def parse_catalogue(payload: Any) -> Catalogue:
             hash=str(payload["hash"]),
             blocks=blocks,
             roots=roots,
+            templates=frozenset(str(t) for t in payload.get("templates") or ()),
             _index={block.type: block for block in blocks},
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

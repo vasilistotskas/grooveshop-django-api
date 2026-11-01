@@ -207,6 +207,31 @@ class TestImporting:
         )
         assert BuilderVersion.objects.count() == 2
 
+    def test_a_page_type_the_catalogue_does_not_list_is_a_custom_page(
+        self, converter
+    ):
+        make_layout("home")
+        make_layout("spring-campaign")
+
+        report = importing.import_store()
+
+        assert sorted(report.documents) == [
+            "page:spring-campaign",
+            "template:home",
+        ]
+        kinds = {
+            call.args[0]["key"]: call.args[0]["kind"]
+            for call in converter.call_args_list
+        }
+        assert kinds == {
+            "template:home": "template",
+            "page:spring-campaign": "page",
+        }
+        assert (
+            BuilderDocument.objects.get(key="page:spring-campaign").kind
+            == "page"
+        )
+
     def test_the_seo_of_the_default_language_becomes_the_documents_settings(
         self, converter
     ):

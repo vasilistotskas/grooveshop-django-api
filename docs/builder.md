@@ -364,8 +364,11 @@ settings); Django never converts:
   (`kind` template or group, `key`, `legacy`: a layout's `sections` with their
   uuid, `type`, `title`, `isVisible`, stored snake_case `props` and `i18n`, and
   its SEO per language; a menu's columns and links with the label each would
-  show in every language of the store, and the target). A layout is
-  `template:<page_type>`, a menu slot `group:<slot>`.
+  show in every language of the store, and the target). A layout whose page
+  type is one of the catalogue's top-level `templates` (the storefront's fixed
+  page types: home, about, ...; read from the catalogue, never copied) is
+  `template:<page_type>`, any other is the custom page `page:<page_type>`; a
+  menu slot is `group:<slot>`.
 - `builder/convert.py` calls `POST {storefront}/api/builder/convert-legacy`
   with the secret the cache purge uses (`NUXT_CACHE_PURGE_TOKEN`,
   header `X-Cache-Purge-Token`) and `defaultLocale`. `200 {document, i18n,

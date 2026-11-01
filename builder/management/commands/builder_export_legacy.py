@@ -14,11 +14,12 @@ import json
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
-from builder import legacy
+from builder import legacy, storefront
 from core.management.tenant_mixin import TenantCommandMixin
+from core.storefront import StorefrontUnavailable
 
 
 class Command(TenantCommandMixin, BaseCommand):
@@ -33,10 +34,18 @@ class Command(TenantCommandMixin, BaseCommand):
         written = 0
         for context in self.iter_tenant_contexts(options):
             with context:
+                try:
+                    templates = storefront.fetch_catalogue(
+                        connection.schema_name
+                    ).templates
+                except StorefrontUnavailable as exc:
+                    raise CommandError(
+                        f"storefront unavailable: {exc}"
+                    ) from exc
                 folder = Path(options["out"]) / connection.schema_name
                 folder.mkdir(parents=True, exist_ok=True)
                 for key, _published, body in legacy.convert_requests(
-                    legacy.store_locales()
+                    legacy.store_locales(), templates
                 ):
                     request = {
                         "schema": connection.schema_name,

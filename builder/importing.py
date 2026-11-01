@@ -60,10 +60,12 @@ def _problem(
 
 
 def _convert_all(
-    report: StoreReport,
+    report: StoreReport, templates: frozenset[str]
 ) -> list[tuple[str, bool, Converted]]:
     converted = []
-    for key, published, body in legacy.convert_requests(legacy.store_locales()):
+    for key, published, body in legacy.convert_requests(
+        legacy.store_locales(), templates
+    ):
         try:
             result = convert_legacy(body)
         except ConversionRefused as refusal:
@@ -100,7 +102,7 @@ def import_store(*, dry_run: bool = False) -> StoreReport:
         )
         return report
     catalogue = storefront.fetch_catalogue(connection.schema_name)
-    planned = _convert_all(report)
+    planned = _convert_all(report, catalogue.templates)
     if report.problems:
         return report
 

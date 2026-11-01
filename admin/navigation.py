@@ -399,6 +399,13 @@ def store_sidebar(request: Any) -> list[Item]:
             # The wording of the storefront itself (buttons, labels, notices),
             # one editor page rather than a model list.
             page("texts.TextOverride", _("Storefront Texts"), "translate"),
+            # The visual editor lives on the storefront; this signs the
+            # person in there with a single-use ticket.
+            _tool(
+                _("Edit storefront"), "edit", reverse("admin:edit-storefront")
+            )
+            if user.has_perm("builder.change_builderdocument")
+            else None,
             # What the page builder holds, read only: the editor itself is
             # the storefront's.
             _menu(

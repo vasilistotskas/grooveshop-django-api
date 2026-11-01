@@ -607,6 +607,11 @@ REST_FRAMEWORK = {
         # Staff token minting (tenant.staff_api) — a credential-guessing
         # surface on the platform host, so budget accordingly.
         "staff_login": None if DEBUG else "10/hour",
+        # The storefront's server trades a builder ticket for a session
+        # (``builder.session_api``). One caller (our own storefront) for
+        # every store, so the budget is not the per-person one above; a
+        # ticket is 256 random bits, so this bounds load, not guessing.
+        "builder_session": None if DEBUG else "120/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -939,6 +944,16 @@ BUILDER_MAX_PAGES = int(getenv("BUILDER_MAX_PAGES", "100"))
 # Named saves kept per document that no release points at; older ones go.
 BUILDER_UNRELEASED_CHECKPOINTS_KEPT = int(
     getenv("BUILDER_UNRELEASED_CHECKPOINTS_KEPT", "20")
+)
+# The staff ticket the store admin hands to the storefront editor, and the
+# token the storefront trades it for (``builder.staff_session``). The ticket
+# is single-use and rides a URL, so it lives a minute; the session is a
+# working day and is never renewed by use.
+BUILDER_STAFF_TICKET_TTL_SECONDS = int(
+    getenv("BUILDER_STAFF_TICKET_TTL_SECONDS", "60")
+)
+BUILDER_STAFF_SESSION_TTL_SECONDS = int(
+    getenv("BUILDER_STAFF_SESSION_TTL_SECONDS", str(8 * 60 * 60))
 )
 # How long a resolved published page is kept. The key names the release,
 # so a new release reads a new key and nothing is ever purged.

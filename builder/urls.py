@@ -1,6 +1,6 @@
 from django.urls import path
 
-from builder import views
+from builder import session_api, views
 
 app_name = "builder"
 
@@ -44,6 +44,11 @@ urlpatterns = [
         "builder/documents/<str:key>/versions/<int:number>/restore",
         views.RestoreView.as_view(),
         name="version-restore",
+    ),
+    path(
+        "builder/staff-session",
+        session_api.StaffSessionView.as_view(),
+        name="staff-session",
     ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),

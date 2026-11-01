@@ -367,6 +367,16 @@ protect the Django admin login either.
   session. The reset also ends the account's staff API tokens
   (`PlatformStaffToken`), which the old password could have minted.
 
+## Builder session tokens
+
+A staff token has a `scope`. `api` is the token the platform login mints
+(renewed by use, any staff route the role allows). `builder` is minted by
+the page builder's ticket exchange (`docs/builder.md`, "Signing in to the
+editor"): it is never renewed, ends at its expiry, and
+`PlatformStaffTokenAuthentication` refuses it outside the `builder` URL
+namespace (`staff_token_scope`). The role and `is_staff` re-checks apply to
+both.
+
 ## Staff members named on store rows
 
 A staff member is a **public-schema** account; the rows they act on (a

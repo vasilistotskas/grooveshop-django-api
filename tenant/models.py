@@ -1969,6 +1969,13 @@ class UserTenantMembership(TimeStampMixinModel):
         )
 
 
+class StaffTokenScope(models.TextChoices):
+    """What a ``PlatformStaffToken`` may be used for."""
+
+    API = "api", _("API")
+    BUILDER = "builder", _("Page builder session")
+
+
 class PlatformStaffToken(AbstractAuthToken):
     """API token for a PLATFORM identity — the staff sibling of knox's.
 
@@ -1999,6 +2006,19 @@ class PlatformStaffToken(AbstractAuthToken):
         on_delete=models.CASCADE,
         related_name="platform_staff_tokens",
         verbose_name=_("User"),
+    )
+    # A page builder session is minted from a single-use ticket, lives for
+    # hours and must stay that short: knox's AUTO_REFRESH would push any
+    # token to its seven-day TTL, and the authenticator would accept it on
+    # every staff route. ``tenant.api_tokens.PlatformStaffTokenAuthentication``
+    # neither renews a ``builder`` token nor lets it past the builder's
+    # routes.
+    scope = models.CharField(
+        _("Scope"),
+        max_length=16,
+        choices=StaffTokenScope.choices,
+        default=StaffTokenScope.API,
+        db_default=StaffTokenScope.API,
     )
 
     class Meta:

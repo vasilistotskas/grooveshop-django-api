@@ -3,6 +3,59 @@
 
 
 
+## v3.183.0 (2026-11-01)
+
+### Features
+
+* feat(builder): document root settings, whole-value translations and blog category references (#406) ([`ff784bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff784bd48986b992a40ab1a32b5c911995188548))
+
+* feat(builder): document root settings, whole-value translations and blog category references
+
+A document may carry settings of its own (a page's SEO fields), declared
+per kind of document by the storefront catalogue's documentKinds: validated
+like a block's settings (schema, references, rich text), translatable
+through the reserved overlay node id @document, and answered already
+localised by the public read. A kind the catalogue gives no root takes none.
+
+A translatable pointer may name a whole array or object setting; the overlay
+value replaces it whole and is validated against the merged settings, which
+the overlay already did and is now tested. blogCategory is a new reference
+kind with an existence check and an index entry.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`ff784bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff784bd48986b992a40ab1a32b5c911995188548))
+
+* feat(builder): a contentPage reference kind; a page reference names a page or template document
+
+page is now the key of a page: or template: document of the store (draft or
+released), contentPage is a ContentPage slug in any state, so a store can
+import its menus before it publishes a policy page.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`ff784bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff784bd48986b992a40ab1a32b5c911995188548))
+
+### Refactoring
+
+* refactor(page-config): retire eight unused section types and two contact_panel keys (#408)
+
+page_hero, feature_lists, option_selector, comparison_table, flow_steps,
+reference_cards, project_register and vendor_cards have no PageSection row
+in any store (checked on production and staging), and the one contact_panel
+carries neither response_time nor subjects. They leave ComponentType, the
+section schemas, the cross-prop checks that only they needed and the
+published OpenAPI props components. The migration only changes the field's
+choices. Dropping enum values from a response is a superset for the live
+storefront; oasdiff reports no breaking change.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e1e2b59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e1e2b59a166cca70b5678ba5c0e13dd4e58e6447))
+
 ## v3.182.0 (2026-11-01)
 
 ### Bug fixes

@@ -14196,6 +14196,10 @@ msgstr "The storefront could not be reached, so the list of texts is not availab
 msgid "The storefront has no language %(language)s."
 msgstr "The storefront has no language %(language)s."
 
+#, python-format
+msgid "The storefront has no page type called %(name)s."
+msgstr "The storefront has no page type called %(name)s."
+
 msgid "The storefront has no text in this language."
 msgstr "The storefront has no text in this language."
 
@@ -14508,6 +14512,9 @@ msgstr "This staff token is for the page builder only."
 
 msgid "This status means"
 msgstr "This status means"
+
+msgid "This store already has page builder data."
+msgstr "This store already has page builder data."
 
 #, python-format
 msgid "This store has no block called %(type)s."

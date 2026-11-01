@@ -117,9 +117,11 @@ def default_blocks() -> list[dict[str, Any]]:
             "type": "announcement",
             "version": 1,
             "accepts": [],
-            "schema": _schema(text={**TEXT, "required": True}),
+            "schema": _schema(
+                text={**TEXT, "required": True}, pageSlug={"type": "string"}
+            ),
             "translatable": ["/text"],
-            "refs": {},
+            "refs": {"/pageSlug": "page"},
             "limits": {},
             "children": {"allowed": []},
             "kinds": ["section"],
@@ -203,6 +205,7 @@ class FakeCatalogue:
             "hash": self.hash,
             "blocks": self.blocks,
             "documentKinds": self.document_kinds,
+            "templates": ["home", "about", "contact", "product"],
         }
         return response
 

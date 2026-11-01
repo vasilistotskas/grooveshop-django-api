@@ -27,6 +27,7 @@ CATALOGUE = parse_catalogue(
         "hash": HASH,
         "blocks": default_blocks(),
         "documentKinds": default_document_kinds(),
+        "templates": ["home", "about", "contact", "product"],
     }
 )
 
@@ -462,7 +463,9 @@ class TestTranslations:
 def test_an_older_version_is_outdated_even_when_accepts_names_only_the_current():
     blocks = default_blocks()
     blocks[0]["accepts"] = [blocks[0]["version"]]
-    catalogue = parse_catalogue({"hash": HASH, "blocks": blocks})
+    catalogue = parse_catalogue(
+        {"hash": HASH, "blocks": blocks, "templates": ["home"]}
+    )
 
     issues, _ = validate_document(
         key="template:home",
@@ -590,3 +593,13 @@ def test_a_blog_category_is_a_numeric_reference():
         "blogCategory": {"4": ["/sections/a/settings/blogCategoryId"]}
     }
     assert "/sections/a/settings/blogCategoryId" in codes(bad)
+
+
+def test_a_template_must_be_a_page_type_the_storefront_has():
+    issues, validated = run(document(("a", hero())), key="template:nowhere")
+
+    assert validated is None
+    assert codes(issues) == {"": "unknown_template"}
+    # A custom page is not a template: any slug goes.
+    banner = document(("a", section("banner@1", {"text": "x"})))
+    assert run(banner, key="page:nowhere")[0] == []

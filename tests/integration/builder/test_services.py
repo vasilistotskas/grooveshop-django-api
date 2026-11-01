@@ -98,7 +98,7 @@ class TestSaveDraft:
         with pytest.raises(NotFoundError):
             save(
                 admin,
-                key="template:missing",
+                key="template:contact",
                 draft=document(("a", section("banner@1", {"text": "x"}))),
                 revision=3,
             )
@@ -448,7 +448,7 @@ class TestPublish:
         save(admin, HOME, draft=document(("a", hero(pageSlug="about"))))
         save(
             admin,
-            "template:other",
+            "template:contact",
             draft=document(("a", section("banner@1", {"text": "x"}))),
         )
 

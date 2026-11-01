@@ -596,6 +596,17 @@ def validate_document(
         walk.add("", "invalid_key", _("Not a valid document key."))
         return walk.issues, None
 
+    if kind is DocumentKind.TEMPLATE and (
+        key.partition(":")[2] not in catalogue.templates
+    ):
+        walk.add(
+            "",
+            "unknown_template",
+            _("The storefront has no page type called %(name)s.")
+            % {"name": key.partition(":")[2]},
+        )
+        return walk.issues, None
+
     size = len(encode(data, i18n))
     if size > settings.BUILDER_MAX_DOCUMENT_BYTES:
         walk.add(

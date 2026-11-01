@@ -24,6 +24,7 @@ from django.db import connection
 
 from builder import pointers
 from builder.models import BuilderRelease, BuilderVersion, DocumentKind
+from builder.validation import DOCUMENT_NODE
 from tenant.membership import bound_tenant
 
 GROUP_PREFIX = f"{DocumentKind.GROUP.value}:"
@@ -64,17 +65,27 @@ def _overlay_for(i18n: dict[str, Any], locale: str) -> dict[str, Any]:
     return i18n.get(locale) or {}
 
 
+def _localised(
+    node_settings: dict[str, Any], overrides: dict[str, Any]
+) -> dict[str, Any]:
+    """A copy of *node_settings* with each overlay pointer's value set."""
+    resolved = copy.deepcopy(node_settings)
+    for pointer, value in overrides.items():
+        path = pointers.resolve_concrete(resolved, pointers.parse(pointer))
+        if path is not None:
+            pointers.set_at(resolved, path, value)
+    return resolved
+
+
 def _resolve_node(
     node_id: str, node: dict[str, Any], overlay: dict[str, Any]
 ) -> dict[str, Any] | None:
     if node.get("disabled"):
         return None
-    node_settings = copy.deepcopy(node["settings"])
-    for pointer, value in (overlay.get(node_id) or {}).items():
-        path = pointers.resolve_concrete(node_settings, pointers.parse(pointer))
-        if path is not None:
-            pointers.set_at(node_settings, path, value)
-    resolved: dict[str, Any] = {"type": node["type"], "settings": node_settings}
+    resolved: dict[str, Any] = {
+        "type": node["type"],
+        "settings": _localised(node["settings"], overlay.get(node_id) or {}),
+    }
     if "blocks" in node:
         blocks = {
             child_id: child
@@ -105,12 +116,17 @@ def resolve_document(
         )
         is not None
     }
-    return {
+    resolved: dict[str, Any] = {
         "key": key,
         "version": version.number,
         "sections": sections,
         "order": list(sections),
     }
+    if "settings" in version.data:
+        resolved["settings"] = _localised(
+            version.data["settings"], overlay.get(DOCUMENT_NODE) or {}
+        )
+    return resolved
 
 
 def _page_document_key(versions: dict[str, int], page_key: str) -> str | None:

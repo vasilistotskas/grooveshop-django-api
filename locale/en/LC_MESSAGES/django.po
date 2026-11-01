@@ -2021,6 +2021,9 @@ msgstr "Blog Tag"
 msgid "Blog Tags"
 msgstr "Blog Tags"
 
+msgid "Blog category"
+msgstr "Blog category"
+
 msgid "Blog comment liked"
 msgstr "Blog comment liked"
 
@@ -14386,6 +14389,9 @@ msgstr "This is above the limit a staff member can put on gift cards in one step
 #, python-format
 msgid "This is an automated message from %(site_name)s."
 msgstr "This is an automated message from %(site_name)s."
+
+msgid "This kind of document has no settings of its own."
+msgstr "This kind of document has no settings of its own."
 
 msgid "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."
 msgstr "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."

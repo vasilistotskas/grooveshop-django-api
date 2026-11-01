@@ -38,6 +38,7 @@ from builder.storefront import (
     KIND_SECTION,
     BlockDefinition,
     Catalogue,
+    Spec,
 )
 from core.fields.rich_text import validate_rich_text
 from core.utils.i18n import available_language_codes
@@ -47,7 +48,11 @@ from core.utils.sanitize import sanitize_html
 NODE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 VERSIONED_TYPE = re.compile(r"^([^@\s]+)@(\d+)$")
 NODE_KEYS = frozenset({"type", "disabled", "settings", "blocks", "blockOrder"})
-DOCUMENT_KEYS = frozenset({"sections", "order"})
+DOCUMENT_KEYS = frozenset({"settings", "sections", "order"})
+
+#: The node id the overlay uses for a document's root settings. Node ids
+#: never contain ``@``, so it cannot clash with one.
+DOCUMENT_NODE = "@document"
 
 #: The ``groups`` entry a block names to be allowed in the theme document.
 THEME_GROUP = DocumentKind.THEME.value
@@ -85,9 +90,7 @@ class _Walk:
     issues: list[Issue] = field(default_factory=list)
     seen_ids: set[str] = field(default_factory=set)
     #: node id -> (definition, concrete path of its settings)
-    nodes: dict[str, tuple[BlockDefinition, pointers.Path]] = field(
-        default_factory=dict
-    )
+    nodes: dict[str, tuple[Spec, pointers.Path]] = field(default_factory=dict)
     block_types: set[str] = field(default_factory=set)
     refs: list[tuple[str, str, str]] = field(default_factory=list)
     per_type: dict[str, list[str]] = field(
@@ -142,7 +145,7 @@ def _feature_enabled(walk: _Walk, feature: str) -> bool | None:
 
 
 def _sanitise_rich_text(
-    walk: _Walk, definition: BlockDefinition, settings_: Any, base: str
+    walk: _Walk, definition: Spec, settings_: Any, base: str
 ) -> None:
     """Hold every rich text setting to the policy: refuse what it would
     lose, store what it leaves (``core.fields.rich_text.RichTextField``)."""
@@ -164,7 +167,7 @@ def _sanitise_rich_text(
 
 def _collect_references(
     walk: _Walk,
-    definition: BlockDefinition,
+    definition: Spec,
     settings_: Any,
     base: str,
 ) -> None:
@@ -425,6 +428,38 @@ def _check_shape(data: Any, walk: _Walk) -> bool:
     return True
 
 
+def _check_root(walk: _Walk, data: dict[str, Any]) -> None:
+    """The document's own settings (a page's SEO fields), against what the
+    catalogue declares for this kind of document. They are optional; a
+    kind the catalogue gives no root settings takes none."""
+    if "settings" not in data:
+        return
+    root = walk.catalogue.roots.get(walk.kind.value)
+    if root is None:
+        walk.add(
+            "/settings",
+            "document_settings_not_allowed",
+            _("This kind of document has no settings of its own."),
+        )
+        return
+    settings_ = data["settings"]
+    if not isinstance(settings_, dict):
+        walk.add("/settings", "invalid_document", _("Must be an object."))
+        return
+    for error in sorted(
+        root.validator.iter_errors(settings_),
+        key=lambda e: [str(p) for p in e.absolute_path],
+    ):
+        walk.add(
+            f"/settings{pointers.format_path(tuple(error.absolute_path))}",
+            "invalid_settings",
+            error.message,
+        )
+    _collect_references(walk, root, settings_, "/settings")
+    _sanitise_rich_text(walk, root, settings_, "/settings")
+    walk.nodes[DOCUMENT_NODE] = (root, ("settings",))
+
+
 def _check_per_type_limits(walk: _Walk) -> None:
     for type_name, wheres in walk.per_type.items():
         definition = walk.catalogue.get(type_name)
@@ -574,6 +609,7 @@ def validate_document(
     cleaned = copy.deepcopy(data)
     if not _check_shape(cleaned, walk):
         return walk.issues, None
+    _check_root(walk, cleaned)
 
     for section_id, section in cleaned["sections"].items():
         definition_levels = settings.BUILDER_MAX_DEPTH - 1

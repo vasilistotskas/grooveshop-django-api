@@ -367,6 +367,8 @@ class ReferenceKind(models.TextChoices):
     PAGE = "page", _("Page")
     MEDIA = "media", _("Media")
     MENU = "menu", _("Menu")
+    BLOG_CATEGORY = "blogCategory", _("Blog category")
+    CONTENT_PAGE = "contentPage", _("Content page")
 
 
 class BuilderReference(models.Model):

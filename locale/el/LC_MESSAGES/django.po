@@ -1164,6 +1164,12 @@ msgstr "Προσθήκη πληροφοριών παρακολούθησης σ�
 msgid "Add tracking information to an order"
 msgstr "Προσθήκη πληροφοριών παρακολούθησης σε παραγγελία"
 
+msgid "Added by (staff)"
+msgstr "Προστέθηκε από (προσωπικό)"
+
+msgid "Added manually"
+msgstr "Προστέθηκε χειροκίνητα"
+
 msgid "Additional Data"
 msgstr "Επιπλέον δεδομένα"
 
@@ -1300,6 +1306,9 @@ msgstr "Όλες οι ενότητες"
 
 msgid "All caught up: nothing is waiting for you."
 msgstr "Όλα έτοιμα: τίποτα δεν περιμένει."
+
+msgid "All email"
+msgstr "Όλα τα email"
 
 msgid "All rights reserved."
 msgstr "Όλα τα δικαιώματα διατηρούνται."
@@ -4133,8 +4142,20 @@ msgstr "Επιβεβαίωση email"
 msgid "Email confirmation at sign-up"
 msgstr "Επιβεβαίωση email κατά την εγγραφή"
 
+msgid "Email event"
+msgstr "Συμβάν email"
+
+msgid "Email events"
+msgstr "Συμβάντα email"
+
 msgid "Email is required."
 msgstr "Το email είναι υποχρεωτικό."
+
+msgid "Email log"
+msgstr "Αρχείο email"
+
+msgid "Email logs"
+msgstr "Αρχείο email"
 
 msgid "Email opt-out"
 msgstr "Εξαίρεση από email"
@@ -4147,6 +4168,12 @@ msgstr "Προεπισκόπηση email"
 
 msgid "Email removed"
 msgstr "Το email αφαιρέθηκε"
+
+msgid "Email suppression"
+msgstr "Αποκλεισμός email"
+
+msgid "Email suppressions"
+msgstr "Αποκλεισμοί email"
 
 msgid "Email switch"
 msgstr "Διακόπτης email"
@@ -6539,6 +6566,9 @@ msgstr "Κατάσταση HTTP"
 msgid "Handling non-payment"
 msgstr "Διαχείριση μη πληρωμής"
 
+msgid "Hard bounce"
+msgstr "Μόνιμη αποτυχία παράδοσης"
+
 msgid "Has Active Reservations"
 msgstr "Έχει ενεργές δεσμεύσεις"
 
@@ -6790,6 +6820,9 @@ msgstr "Εικονίδιο"
 
 msgid "Icon Image"
 msgstr "Εικόνα εικονιδίου"
+
+msgid "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
+msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που το πρόσθεσε χειροκίνητα (public schema, όχι χρήστης του καταστήματος)."
 
 msgid "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
 msgstr "Αναγνωριστικό του μέλους του προσωπικού της πλατφόρμας που αποθήκευσε τελευταίο αυτό το κείμενο (public schema, όχι χρήστης του καταστήματος)."
@@ -7240,6 +7273,9 @@ msgstr "Είδη: %(items)d συνολικά, %(unique)d μοναδικά. Συ�
 
 msgid "Key"
 msgstr "Κλειδί"
+
+msgid "Keyed hash of the address; empty when the mail had no recipient to write to."
+msgstr "Κρυπτογραφικό αποτύπωμα της διεύθυνσης· κενό όταν το email δεν είχε παραλήπτη."
 
 msgid "Kind"
 msgstr "Είδος"
@@ -7914,6 +7950,9 @@ msgstr "Καμπάνιες marketing"
 
 msgid "Marketing Opted Out At"
 msgstr "Απεγγραφή από το marketing στις"
+
+msgid "Marketing email"
+msgstr "Email marketing"
 
 msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 msgstr "Γενικός διακόπτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής) — όταν είναι κλειστός, δεν εμφανίζεται στην ολοκλήρωση αγοράς, ανεξάρτητα από το ``is_active`` του παρόχου."
@@ -8807,6 +8846,9 @@ msgstr "Η συμμετοχή OWNER %(verb)s για τον %(email)s."
 
 msgid "Object ID"
 msgstr "ID αντικειμένου"
+
+msgid "Occurred at"
+msgstr "Συνέβη στις"
 
 msgid "Off"
 msgstr "Ανενεργό"
@@ -10623,8 +10665,14 @@ msgstr "Αναγνωριστικό συναλλαγής παρόχου"
 msgid "Provider customer id to attach the payment to"
 msgstr "ID πελάτη του παρόχου στον οποίο θα συνδεθεί η πληρωμή"
 
+msgid "Provider event id"
+msgstr "Αναγνωριστικό συμβάντος παρόχου"
+
 msgid "Provider fee"
 msgstr "Προμήθεια παρόχου"
+
+msgid "Provider message id"
+msgstr "Αναγνωριστικό μηνύματος παρόχου"
 
 msgid "Provider payment-method id to charge"
 msgstr "ID μεθόδου πληρωμής του παρόχου προς χρέωση"
@@ -10760,6 +10808,9 @@ msgstr "Ερωτήσεις;"
 
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή UserDataExport."
+
+msgid "Queued"
+msgstr "Σε αναμονή"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "ΑΞΙΟΛΟΓΗΣΤΕ ΤΗΝ ΑΓΟΡΑ ΣΑΣ"
@@ -10926,6 +10977,9 @@ msgstr "Email παραλήπτη"
 
 msgid "Recipient Name"
 msgstr "Όνομα παραλήπτη"
+
+msgid "Recipient hash"
+msgstr "Αποτύπωμα παραλήπτη"
 
 msgid "Recipients"
 msgstr "Παραλήπτες"
@@ -11330,6 +11384,9 @@ msgstr "Υποχρεωτικό για επισκέπτες· για συνδεδ
 msgid "Requires Confirmation"
 msgstr "Απαιτείται Επιβεβαίωση"
 
+msgid "Resend"
+msgstr "Resend"
+
 msgid "Resend confirmation"
 msgstr "Επαναποστολή επιβεβαίωσης"
 
@@ -11663,6 +11720,9 @@ msgstr "SKU"
 msgid "SKU %(sku)s"
 msgstr "SKU %(sku)s"
 
+msgid "SMTP"
+msgstr "SMTP"
+
 msgid "SPECIMEN"
 msgstr "ΔΕΙΓΜΑ"
 
@@ -11802,6 +11862,9 @@ msgstr "Όνομα schema"
 
 msgid "Schema of the destroyed tenant. Kept as a plain value, not a foreign key — the Tenant row it named no longer exists."
 msgstr "Schema του διαγραμμένου καταστήματος. Διατηρείται ως απλή τιμή, όχι ως foreign key — η εγγραφή Tenant στην οποία αντιστοιχούσε δεν υπάρχει πλέον."
+
+msgid "Scope"
+msgstr "Εύρος"
 
 msgid "Score"
 msgstr "Βαθμολογία"
@@ -11977,6 +12040,9 @@ msgstr "Απεστάλη"
 
 msgid "Sent after sign-up to confirm the address, with a link or a code."
 msgstr "Αποστέλλεται μετά την εγγραφή για να επιβεβαιωθεί η διεύθυνση, με σύνδεσμο ή κωδικό."
+
+msgid "Sent at"
+msgstr "Στάλθηκε στις"
 
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Αποστέλλεται μία φορά για κάθε επιστροφή χρημάτων στον πελάτη."
@@ -12429,6 +12495,18 @@ msgstr "Παραλείφθηκαν προστατευμένα καταστήμα
 msgid "Skipped tenants still within 24-hour cooldown: %(names)s"
 msgstr "Παραλείφθηκαν καταστήματα εντός της περιόδου αναμονής 24 ωρών: %(names)s"
 
+msgid "Skipped: feature off"
+msgstr "Παραλείφθηκε: η λειτουργία είναι ανενεργή"
+
+msgid "Skipped: no recipient"
+msgstr "Παραλείφθηκε: χωρίς παραλήπτη"
+
+msgid "Skipped: opted out"
+msgstr "Παραλείφθηκε: ο παραλήπτης έχει διαγραφεί από τη λίστα"
+
+msgid "Skipped: switched off"
+msgstr "Παραλείφθηκε: το email είναι απενεργοποιημένο"
+
 msgid "Slot"
 msgstr "Θέση"
 
@@ -12528,6 +12606,9 @@ msgstr "Πεδία ταξινόμησης"
 
 msgid "Source"
 msgstr "Πηγή"
+
+msgid "Source log"
+msgstr "Εγγραφή προέλευσης"
 
 msgid "Source type"
 msgstr "Τύπος πηγής"
@@ -13364,6 +13445,9 @@ msgstr "Οι εφαρμοσμένες εκπτώσεις και δωροκάρτ
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr "Ο κωδικός της τράπεζας για τη μεταφορά. Μία μεταφορά δεν μπορεί να πληρώσει δύο παραγγελίες."
 
+msgid "The bounce type and sub-type; never an address."
+msgstr "Ο τύπος και ο υποτύπος της αποτυχίας παράδοσης· ποτέ διεύθυνση."
+
 msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
 msgstr "Ο αγοραστής αποδέχεται τους όρους χρήσης και την πολιτική απορρήτου του καταστήματος. Πρέπει να είναι true."
 
@@ -13396,6 +13480,9 @@ msgstr "Η κατηγορία στην οποία αναφέρεται μια σ
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
+
+msgid "The closed gate's label, for a skipped feature."
+msgstr "Η ετικέτα της κλειστής πύλης, για παραλειφθείσα λειτουργία."
 
 msgid "The code cannot be combined with the applied promotions"
 msgstr "Ο κωδικός δεν μπορεί να συνδυαστεί με τις εφαρμοσμένες προσφορές"
@@ -13457,6 +13544,9 @@ msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο
 msgid "The exact email address of the person's existing platform account."
 msgstr "Η ακριβής διεύθυνση email του υπάρχοντος λογαριασμού πλατφόρμας του ατόμου."
 
+msgid "The failure's class and code; never the address."
+msgstr "Η κλάση και ο κωδικός του σφάλματος· ποτέ η διεύθυνση."
+
 msgid "The file is empty."
 msgstr "Το αρχείο είναι κενό."
 
@@ -13487,6 +13577,9 @@ msgstr "Το δώρο αυτού του κωδικού δεν είναι δια�
 
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρωσε ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά."
+
+msgid "The id the provider returned. Empty over SMTP, which returns none."
+msgstr "Το αναγνωριστικό που επέστρεψε ο πάροχος. Κενό μέσω SMTP, που δεν επιστρέφει κάποιο."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "Το τιμολόγιο ή η απόδειξη (PDF ή εικόνα). Παραμένει ιδιωτικό."

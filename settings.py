@@ -1324,6 +1324,22 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        # Runs in PUBLIC: the platform types' EmailLog, under the
+        # EMAIL_LOG_RETENTION_DAYS stored in the public schema.
+        "purge-expired-email-logs": {
+            "task": "emails.tasks.purge_expired_email_logs",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # Fans the same task into every store: EmailLog is per schema, so
+        # the public pass above never reaches a store's rows.
+        "purge-expired-email-logs-tenants": {
+            "task": "tenant.tasks.fanout_purge_expired_email_logs",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         # Fans the same task into every store: django_admin_log is per
         # schema, so the public pass above never reaches a store's rows.
         "purge-expired-admin-log-entries-tenants": {
@@ -2335,6 +2351,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "changed or deleted what) is DELETED. 0 keeps the whole "
             "history indefinitely. Entries already older than this are "
             "deleted on the next nightly run after you set it."
+        ),
+    },
+    {
+        "name": "EMAIL_LOG_RETENTION_DAYS",
+        "type": "int",
+        "value": 90,
+        "validator": "emails.log.validate_retention_days_setting",
+        "description": (
+            "Days after which a row of the email log (which mail went to "
+            "whom, in what status) is DELETED, with its provider events. "
+            "The log holds a masked address and the subject, never the "
+            "message body. 0 keeps the log indefinitely. Rows already "
+            "older than this are deleted on the next nightly run after "
+            "you set it."
         ),
     },
     {

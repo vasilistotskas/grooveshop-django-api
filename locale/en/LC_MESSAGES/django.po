@@ -1159,6 +1159,12 @@ msgstr "Add tracking information to an existing order"
 msgid "Add tracking information to an order"
 msgstr "Add tracking information to an order"
 
+msgid "Added by (staff)"
+msgstr "Added by (staff)"
+
+msgid "Added manually"
+msgstr "Added manually"
+
 msgid "Additional Data"
 msgstr "Additional Data"
 
@@ -1295,6 +1301,9 @@ msgstr "All areas"
 
 msgid "All caught up: nothing is waiting for you."
 msgstr "All caught up: nothing is waiting for you."
+
+msgid "All email"
+msgstr "All email"
 
 msgid "All rights reserved."
 msgstr "All rights reserved."
@@ -4127,8 +4136,20 @@ msgstr "Email confirmation"
 msgid "Email confirmation at sign-up"
 msgstr "Email confirmation at sign-up"
 
+msgid "Email event"
+msgstr "Email event"
+
+msgid "Email events"
+msgstr "Email events"
+
 msgid "Email is required."
 msgstr "Email is required."
+
+msgid "Email log"
+msgstr "Email log"
+
+msgid "Email logs"
+msgstr "Email logs"
 
 msgid "Email opt-out"
 msgstr "Email opt-out"
@@ -4141,6 +4162,12 @@ msgstr "Email preview"
 
 msgid "Email removed"
 msgstr "Email removed"
+
+msgid "Email suppression"
+msgstr "Email suppression"
+
+msgid "Email suppressions"
+msgstr "Email suppressions"
 
 msgid "Email switch"
 msgstr "Email switch"
@@ -6531,6 +6558,9 @@ msgstr "HTTP status"
 msgid "Handling non-payment"
 msgstr "Handling non-payment"
 
+msgid "Hard bounce"
+msgstr "Hard bounce"
+
 msgid "Has Active Reservations"
 msgstr "Has Active Reservations"
 
@@ -6782,6 +6812,9 @@ msgstr "Icon"
 
 msgid "Icon Image"
 msgstr "Icon Image"
+
+msgid "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
+msgstr "Id of the platform staff member who added it by hand (public schema, not a store user). Read it through ``created_by_staff``."
 
 msgid "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
 msgstr "Id of the platform staff member who last saved this text (public schema, not a store user). Read it through ``updated_by_staff``."
@@ -7231,6 +7264,9 @@ msgstr "Items: %(items)d total, %(unique)d unique. Total price: %(price)s. Total
 
 msgid "Key"
 msgstr "Key"
+
+msgid "Keyed hash of the address; empty when the mail had no recipient to write to."
+msgstr "Keyed hash of the address; empty when the mail had no recipient to write to."
 
 msgid "Kind"
 msgstr "Kind"
@@ -7904,6 +7940,9 @@ msgstr "Marketing Campaigns"
 
 msgid "Marketing Opted Out At"
 msgstr "Marketing Opted Out At"
+
+msgid "Marketing email"
+msgstr "Marketing email"
 
 msgid "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
 msgstr "Master switch for this (provider, country, kind) — off hides it from checkout regardless of the provider's own ``is_active``."
@@ -8798,6 +8837,9 @@ msgstr "OWNER membership %(verb)s for %(email)s."
 
 msgid "Object ID"
 msgstr "Object ID"
+
+msgid "Occurred at"
+msgstr "Occurred at"
 
 msgid "Off"
 msgstr "Off"
@@ -10613,8 +10655,14 @@ msgstr "Provider Transaction ID"
 msgid "Provider customer id to attach the payment to"
 msgstr "Provider customer id to attach the payment to"
 
+msgid "Provider event id"
+msgstr "Provider event id"
+
 msgid "Provider fee"
 msgstr "Provider fee"
+
+msgid "Provider message id"
+msgstr "Provider message id"
 
 msgid "Provider payment-method id to charge"
 msgstr "Provider payment-method id to charge"
@@ -10750,6 +10798,9 @@ msgstr "Questions?"
 
 msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
 msgstr "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
+
+msgid "Queued"
+msgstr "Queued"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "RATE YOUR PURCHASE"
@@ -10916,6 +10967,9 @@ msgstr "Recipient Email"
 
 msgid "Recipient Name"
 msgstr "Recipient Name"
+
+msgid "Recipient hash"
+msgstr "Recipient hash"
 
 msgid "Recipients"
 msgstr "Recipients"
@@ -11320,6 +11374,9 @@ msgstr "Required for guests; authenticated buyers default to their account email
 msgid "Requires Confirmation"
 msgstr "Requires Confirmation"
 
+msgid "Resend"
+msgstr "Resend"
+
 msgid "Resend confirmation"
 msgstr "Resend confirmation"
 
@@ -11654,6 +11711,9 @@ msgstr "SKU"
 msgid "SKU %(sku)s"
 msgstr "SKU %(sku)s"
 
+msgid "SMTP"
+msgstr "SMTP"
+
 msgid "SPECIMEN"
 msgstr "SPECIMEN"
 
@@ -11793,6 +11853,9 @@ msgstr "Schema name"
 
 msgid "Schema of the destroyed tenant. Kept as a plain value, not a foreign key — the Tenant row it named no longer exists."
 msgstr "Schema of the destroyed tenant. Kept as a plain value, not a foreign key — the Tenant row it named no longer exists."
+
+msgid "Scope"
+msgstr "Scope"
 
 msgid "Score"
 msgstr "Score"
@@ -11968,6 +12031,9 @@ msgstr "Sent"
 
 msgid "Sent after sign-up to confirm the address, with a link or a code."
 msgstr "Sent after sign-up to confirm the address, with a link or a code."
+
+msgid "Sent at"
+msgstr "Sent at"
 
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Sent once for every refund paid back to the customer."
@@ -12420,6 +12486,18 @@ msgstr "Skipped protected tenants: %(names)s"
 msgid "Skipped tenants still within 24-hour cooldown: %(names)s"
 msgstr "Skipped tenants still within 24-hour cooldown: %(names)s"
 
+msgid "Skipped: feature off"
+msgstr "Skipped: feature off"
+
+msgid "Skipped: no recipient"
+msgstr "Skipped: no recipient"
+
+msgid "Skipped: opted out"
+msgstr "Skipped: opted out"
+
+msgid "Skipped: switched off"
+msgstr "Skipped: switched off"
+
 msgid "Slot"
 msgstr "Slot"
 
@@ -12519,6 +12597,9 @@ msgstr "Sortable Fields"
 
 msgid "Source"
 msgstr "Source"
+
+msgid "Source log"
+msgstr "Source log"
 
 msgid "Source type"
 msgstr "Source type"
@@ -13359,6 +13440,9 @@ msgstr "The applied discounts and gift cards cover the full total; no payment in
 msgid "The bank's id for the transfer. One transfer cannot pay two orders."
 msgstr "The bank's id for the transfer. One transfer cannot pay two orders."
 
+msgid "The bounce type and sub-type; never an address."
+msgstr "The bounce type and sub-type; never an address."
+
 msgid "The buyer accepts the store's terms of use and privacy policy. Must be true."
 msgstr "The buyer accepts the store's terms of use and privacy policy. Must be true."
 
@@ -13391,6 +13475,9 @@ msgstr "The category a listing page is about, which scopes the effective_price s
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
+
+msgid "The closed gate's label, for a skipped feature."
+msgstr "The closed gate's label, for a skipped feature."
 
 msgid "The code cannot be combined with the applied promotions"
 msgstr "The code cannot be combined with the applied promotions"
@@ -13452,6 +13539,9 @@ msgstr "The exact consent sentence shown to the visitor."
 msgid "The exact email address of the person's existing platform account."
 msgstr "The exact email address of the person's existing platform account."
 
+msgid "The failure's class and code; never the address."
+msgstr "The failure's class and code; never the address."
+
 msgid "The file is empty."
 msgstr "The file is empty."
 
@@ -13482,6 +13572,9 @@ msgstr "The gift for this code is not available right now"
 
 msgid "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
 msgstr "The gross unit price a consumer paid: price plus VAT, minus the product markdown and any unconditional automatic promotion."
+
+msgid "The id the provider returned. Empty over SMTP, which returns none."
+msgstr "The id the provider returned. Empty over SMTP, which returns none."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."

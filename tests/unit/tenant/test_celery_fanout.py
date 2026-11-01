@@ -215,6 +215,9 @@ class TestBeatScheduleTenantCoverage:
         # CachePurgeLog exists only there.
         "core.tasks.purge_expired_admin_log_entries",
         "core.tasks.purge_expired_cache_purge_logs",
+        # The platform types' EmailLog lives in public; the stores' are
+        # reached through their own fanout entry.
+        "emails.tasks.purge_expired_email_logs",
         # Billing terms + dunning bookkeeping are public-schema Tenant
         # rows; the cycle never enters a tenant schema (tenant/billing.py).
         "tenant.tasks.process_tenant_billing",

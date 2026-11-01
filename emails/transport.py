@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from django.core.mail import EmailMultiAlternatives
 
+from emails.models import EmailProvider
 from emails.render import RenderedEmail
 
 
@@ -28,6 +29,15 @@ class Attachment:
     mimetype: str
 
 
+@dataclass(frozen=True, slots=True)
+class Receipt:
+    """What the transport knows of a message it handed on."""
+
+    provider: EmailProvider
+    #: The provider's id for the message. SMTP returns none.
+    message_id: str | None = None
+
+
 def deliver(
     rendered: RenderedEmail,
     *,
@@ -36,7 +46,7 @@ def deliver(
     reply_to: Sequence[str],
     headers: Mapping[str, str],
     attachments: Sequence[Attachment] = (),
-) -> None:
+) -> Receipt:
     message = EmailMultiAlternatives(
         subject=rendered.subject,
         body=rendered.text,
@@ -51,3 +61,4 @@ def deliver(
             attachment.filename, attachment.content, attachment.mimetype
         )
     message.send()
+    return Receipt(provider=EmailProvider.SMTP)

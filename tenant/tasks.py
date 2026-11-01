@@ -316,6 +316,16 @@ def fanout_purge_expired_admin_log_entries():
     )
 
 
+# The email log holds a masked address and the subject of every mail, so
+# it reaches SUSPENDED tenants too.
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_email_logs():
+    return run_for_all_tenants(
+        "emails.tasks.purge_expired_email_logs",
+        include_suspended=True,
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_purge_unconfirmed_guest_alerts():
     return run_for_all_tenants(

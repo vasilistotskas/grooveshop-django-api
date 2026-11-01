@@ -219,6 +219,7 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "INACTIVE_USER_",
             "SUBSCRIPTION_",
             "CONTACT_",
+            "EMAIL_LOG_",
         ),
     ),
     (gettext_noop("Agent Commerce"), ("AGENT_", "PRODUCT_FEEDS_")),

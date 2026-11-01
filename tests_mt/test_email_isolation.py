@@ -15,7 +15,12 @@ from django_tenants.test.client import TenantClient
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from emails import optout
-from emails.models import EVERY_MARKETING_TYPE, EmailOptOut, EmailSwitch
+from emails.models import (
+    EVERY_MARKETING_TYPE,
+    EmailLog,
+    EmailOptOut,
+    EmailSwitch,
+)
 from emails.send import Status, send_email, switched_off_keys
 from emails.types import Audience, Kind, Owner
 from tests.utils.emails import probe, probe_object
@@ -32,6 +37,7 @@ def _cleanup(mt_tenant, mt_tenant_b):
         with schema_context(schema):
             EmailSwitch.objects.all().delete()
             EmailOptOut.objects.all().delete()
+            EmailLog.objects.all().delete()
     mail.outbox.clear()
 
 
@@ -150,3 +156,31 @@ def test_an_opt_out_link_for_one_store_is_a_400_on_anothers_host(
         assert EmailOptOut.objects.count() == 1
     with schema_context(mt_tenant_b.schema_name):
         assert not EmailOptOut.objects.exists()
+
+
+@pytest.mark.django_db
+def test_a_log_row_is_written_in_the_schema_the_mail_is_sent_under(
+    mt_tenant, mt_tenant_b, catalogue
+):
+    catalogue(
+        probe(KEY),
+        probe(
+            "probe.platform",
+            owner=Owner.PLATFORM,
+            audience=Audience.PLATFORM_OPERATOR,
+        ),
+    )
+    with schema_context(mt_tenant.schema_name):
+        send_email(KEY, probe_object())
+        send_email("probe.platform", probe_object())
+
+    with schema_context(mt_tenant.schema_name):
+        assert list(EmailLog.objects.values_list("type_key", flat=True)) == [
+            KEY
+        ]
+    with schema_context(PUBLIC):
+        assert list(EmailLog.objects.values_list("type_key", flat=True)) == [
+            "probe.platform"
+        ]
+    with schema_context(mt_tenant_b.schema_name):
+        assert not EmailLog.objects.exists()

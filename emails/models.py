@@ -6,9 +6,10 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from simple_history.models import HistoricalRecords
 
-from core.models import TimeStampMixinModel
+from core.models import TimeStampMixinModel, UUIDModel
 from emails.registry import UnknownEmailType, registry
-from emails.types import KEY_MAX_LENGTH
+from emails.status import Status
+from emails.types import KEY_MAX_LENGTH, SUBJECT_MAX_LENGTH
 from tenant.staff_actors import (
     StaffActor,
     history_user_getter,
@@ -120,3 +121,169 @@ class EmailOptOut(TimeStampMixinModel):
 
     def __str__(self) -> str:
         return self.type_key
+
+
+class EmailProvider(models.TextChoices):
+    """The transport that carried a message."""
+
+    SMTP = "smtp", _("SMTP")
+    RESEND = "resend", _("Resend")
+
+
+class EmailLog(TimeStampMixinModel, UUIDModel):
+    """One recipient's delivery of one email: sent, skipped or failed.
+
+    Written by ``send_email`` (``emails.log``) in the schema the mail is
+    sent under, so a store's rows are in its schema and a platform type's
+    in ``public``. The row holds no address (a keyed hash and a masked form
+    only) and no body: a body is re-rendered from the type and its object.
+    The ``uuid`` is the idempotency key and the hidden tag the provider
+    carries, which is how a provider event finds its row.
+    """
+
+    type_key = models.CharField(_("Email type"), max_length=KEY_MAX_LENGTH)
+    status = models.CharField(
+        _("Status"), max_length=24, choices=Status.choices
+    )
+    reason = models.CharField(
+        _("Reason"),
+        max_length=120,
+        blank=True,
+        help_text=_("The closed gate's label, for a skipped feature."),
+    )
+    recipient_hash = models.CharField(
+        _("Recipient hash"),
+        max_length=64,
+        blank=True,
+        help_text=_(
+            "Keyed hash of the address; empty when the mail had no "
+            "recipient to write to."
+        ),
+    )
+    recipient_masked = models.CharField(
+        _("Recipient"), max_length=120, blank=True
+    )
+    language = models.CharField(_("Language"), max_length=8, blank=True)
+    subject = models.CharField(
+        _("Subject"), max_length=SUBJECT_MAX_LENGTH, blank=True
+    )
+    provider = models.CharField(
+        _("Provider"), max_length=16, choices=EmailProvider.choices, blank=True
+    )
+    provider_message_id = models.CharField(
+        _("Provider message id"),
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "The id the provider returned. Empty over SMTP, which returns none."
+        ),
+    )
+    error = models.TextField(
+        _("Error"),
+        blank=True,
+        help_text=_("The failure's class and code; never the address."),
+    )
+    sent_at = models.DateTimeField(_("Sent at"), null=True, blank=True)
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Email log")
+        verbose_name_plural = _("Email logs")
+        ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            models.Index(
+                fields=["type_key", "created_at"], name="emaillog_type_ix"
+            ),
+            models.Index(
+                fields=["status", "created_at"], name="emaillog_status_ix"
+            ),
+            models.Index(fields=["recipient_hash"], name="emaillog_rcpt_ix"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.type_key} {self.status}"
+
+
+class EmailEvent(models.Model):
+    """One provider event on an :class:`EmailLog` row (the webhook's)."""
+
+    log = models.ForeignKey(
+        EmailLog,
+        on_delete=models.CASCADE,
+        related_name="events",
+        verbose_name=_("Email log"),
+    )
+    provider_event_id = models.CharField(
+        _("Provider event id"), max_length=128, unique=True
+    )
+    type = models.CharField(_("Event"), max_length=64)
+    occurred_at = models.DateTimeField(_("Occurred at"))
+    detail = models.JSONField(
+        _("Detail"),
+        default=dict,
+        blank=True,
+        help_text=_("The bounce type and sub-type; never an address."),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Email event")
+        verbose_name_plural = _("Email events")
+        ordering = ["occurred_at"]
+
+    def __str__(self) -> str:
+        return self.type
+
+
+class EmailSuppression(TimeStampMixinModel):
+    """An address that must not be written to again, by hash.
+
+    Kept until removed: a protective record, holding only the hash and the
+    masked form. ``scope`` says how much it blocks.
+    """
+
+    class Reason(models.TextChoices):
+        HARD_BOUNCE = "hard_bounce", _("Hard bounce")
+        COMPLAINT = "complaint", _("Spam complaint")
+        MANUAL = "manual", _("Added manually")
+
+    class Scope(models.TextChoices):
+        ALL = "all", _("All email")
+        MARKETING = "marketing", _("Marketing email")
+
+    address_hash = models.CharField(
+        _("Address hash"), max_length=64, unique=True
+    )
+    recipient_masked = models.CharField(_("Address"), max_length=120)
+    reason = models.CharField(
+        _("Reason"), max_length=16, choices=Reason.choices
+    )
+    scope = models.CharField(_("Scope"), max_length=16, choices=Scope.choices)
+    source_log = models.ForeignKey(
+        EmailLog,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("Source log"),
+    )
+    created_by_staff_id = models.BigIntegerField(
+        _("Added by (staff)"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Id of the platform staff member who added it by hand (public "
+            "schema, not a store user). Read it through "
+            "``created_by_staff``."
+        ),
+    )
+    created_by_staff = StaffActor()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Email suppression")
+        verbose_name_plural = _("Email suppressions")
+        indexes = [*TimeStampMixinModel.Meta.indexes]
+
+    def __str__(self) -> str:
+        return self.recipient_masked

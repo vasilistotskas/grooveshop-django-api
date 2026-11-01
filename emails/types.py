@@ -27,6 +27,8 @@ from emails.recipients import Recipient
 #: (dots become dashes) and, with dots as dashes, the default ``List-ID``.
 KEY_PATTERN = re.compile(r"[a-z0-9_]+(\.[a-z0-9_]+)*")
 KEY_MAX_LENGTH = 64
+#: The longest subject that goes out (and that the log records).
+SUBJECT_MAX_LENGTH = 200
 
 
 def subject_fields(template: str) -> frozenset[str]:

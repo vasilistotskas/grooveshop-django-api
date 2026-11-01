@@ -77,7 +77,8 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   switch on.
 - **Deleted**: sessions, Knox tokens, MFA and WebAuthn authenticators, social
   accounts and tokens, e-mail confirmations, OIDC tokens, GDPR export rows,
-  search queries, notifications, stock reservations, admin log entries,
+  search queries, notifications, stock reservations, admin log entries, the email log, its provider
+  events and the suppression list (hashes under the production key),
   Conversions API logs, Celery results, and every dj-stripe mirror row except
   the platform's own Stripe account (the API key and webhook endpoint rows are
   wiped, and `manage.py bootstrap_stripe` rebuilds them from a sandbox key).

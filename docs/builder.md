@@ -211,6 +211,16 @@ per release, never purged. The current release number is kept under the
 store's cache generation, so a warm read touches neither the database nor
 anything else.
 
+`GET published?locale=` (AllowAny) is the page-less read: what every page needs
+and none owns. `{release, locale, theme, groups, pages}`: the theme and groups
+resolved like the page read, and `pages` listing every `page:` and `template:`
+document of the current release as `{key, kind, updatedAt}` (`key` the
+suffix, `updatedAt` when its version was made, for the sitemap's `lastmod`).
+A store with no release answers `{release: 0, theme: null, groups: {}, pages:
+[]}`, not 404. Cached under `builder:<schema>:r<release>:chrome:<locale>`,
+immutable per release; the `builder` surface purges the storefront's
+`builderPage` and `builderChrome` handlers.
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an

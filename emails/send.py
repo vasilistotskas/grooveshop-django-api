@@ -143,6 +143,7 @@ def _send_to(
             reply_to=sender.reply_to(email_type, obj),
             headers=build_headers(email_type, recipient),
             attachments=attachments,
+            message_ref=entry.uuid,
         )
     except Exception as error:
         log.mark_failed(entry, error)

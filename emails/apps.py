@@ -16,6 +16,7 @@ class EmailsConfig(AppConfig):
         once, so a bad type stops the process at boot, not at its first
         send.
         """
+        from emails import checks  # noqa: F401  (registers the deploy guard)
         from emails.registry import registry
 
         autodiscover_modules("emails")

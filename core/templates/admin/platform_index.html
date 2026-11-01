@@ -27,6 +27,8 @@ Layout only: the widgets live in admin/dashboard/platform.py.
         </div>
     </div>
 
+    {% component "admin/dashboard/components/alerts.html" with component_class="PlatformAlerts" %}{% endcomponent %}
+
     {% component "admin/dashboard/components/kpi_list.html" with component_class="PlatformEstateCards" %}{% endcomponent %}
 
     {% component "admin/dashboard/components/table_card.html" with component_class="PlatformStoresTable" %}{% endcomponent %}

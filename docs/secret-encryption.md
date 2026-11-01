@@ -14,8 +14,10 @@ Every `EncryptedCharField` on `Tenant`: `stripe_secret_key`,
 `viva_wallet_client_secret`, `viva_wallet_webhook_verification_key`,
 `acs_api_key`, `acs_company_password`, `acs_user_password`,
 `box_now_client_secret`, `box_now_webhook_secret`, `acp_bearer_token`,
-`chat_api_key`, `mydata_subscription_key`. Each maps onto a
-`<name>_encrypted` text column. `mydata_user_id` is the TAXISnet username,
+`chat_api_key`, `mydata_subscription_key`, `resend_api_key`,
+`resend_webhook_secret`. Each maps onto a
+`<name>_encrypted` text column (the newest, `mydata_subscription_key` and the
+two `resend_*` fields, keep their own column name). `mydata_user_id` is the TAXISnet username,
 an identifier like `acs_user_id` and `viva_wallet_client_id`, and stays
 plaintext.
 
@@ -62,7 +64,7 @@ derived from `SECRET_KEY`, so rotating one does not touch the other.
 - A store role never sees a secret the platform sets. On the store's own
   profile, the encrypted fields that are not in
   `TENANT_SELF_EDITABLE_FIELDS` (`chat_api_key`, `acp_bearer_token`,
-  `cloudflare_api_token`) are replaced by a read-only "set / not set"
+  `cloudflare_api_token`, `resend_api_key`, `resend_webhook_secret`) are replaced by a read-only "set / not set"
   column (`<name>_is_set`), because Django renders a read-only field as
   text, decrypted. The platform operator still edits the real field. A
   secret the merchant owns and may edit (Stripe, Viva, ACS, BoxNow,

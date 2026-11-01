@@ -30,6 +30,7 @@ from tenant.credentials import (
     tenant_logo_url,
     tenant_meta_capi_access_token,
     tenant_meta_pixel_id,
+    tenant_resend_api_key,
     tenant_site_name,
     tenant_totp_issuer,
     viva_wallet_credentials,
@@ -174,6 +175,12 @@ _TENANT_ONLY = [
         "meta_pixel_id",
         "META_PIXEL_ID",
         "5555666677778888",
+    ),
+    _single(
+        tenant_resend_api_key,
+        "resend_api_key",
+        "RESEND_API_KEY",
+        "re_store_key",
     ),
 ]
 

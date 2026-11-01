@@ -31,7 +31,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 
 from builder import pointers, references
-from builder.errors import Issue
+from builder.errors import Issue, message_for
 from builder.models import DocumentKind, kind_of_key
 from builder.storefront import (
     KIND_BLOCK,
@@ -625,8 +625,10 @@ def check_references(refs: references.Refs) -> list[Issue]:
         Issue(
             path=pointer,
             code="reference_not_found",
-            message=_("%(kind)s %(target)s does not exist in this store.")
-            % {"kind": kind, "target": target},
+            message=message_for(
+                "reference_not_found", {"kind": kind, "target": target}, ""
+            ),
+            params={"kind": kind, "target": target},
         )
         for kind, targets in gone.items()
         for target in sorted(targets)

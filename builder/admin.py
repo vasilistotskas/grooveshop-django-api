@@ -8,10 +8,21 @@ releases, and where a thing is used. Every write goes through
 
 from __future__ import annotations
 
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.shortcuts import redirect
+from django.utils.translation import gettext_lazy as _
+from unfold.decorators import action
 
 from admin.base import BaseModelAdmin
-from builder.models import BuilderDocument, BuilderReference, BuilderRelease
+from builder import scheduling
+from builder.models import (
+    BuilderDocument,
+    BuilderReference,
+    BuilderRelease,
+    BuilderScheduledPublish,
+    ScheduleStatus,
+)
+from builder.services import PUBLISH_PERMISSION
 
 
 class ReadOnlyAdmin(BaseModelAdmin):
@@ -66,3 +77,54 @@ class BuilderReferenceAdmin(ReadOnlyAdmin):
     list_display = ("kind", "target", "document", "node_path")
     list_filter = ("kind",)
     search_fields = ("target", "document")
+
+
+@admin.register(BuilderScheduledPublish)
+class BuilderScheduledPublishAdmin(ReadOnlyAdmin):
+    """Scheduled publishes, read only. The one thing to do here is to
+    acknowledge a failure (the dashboard shows it until someone has)."""
+
+    list_display = (
+        "scheduled_for",
+        "status",
+        "executed_at",
+        "acknowledged_at",
+        "note",
+    )
+    list_filter = ("status",)
+    ordering = ("-scheduled_for",)
+    actions = ["acknowledge_failures"]
+    readonly_fields = (
+        "scheduled_for",
+        "status",
+        "versions",
+        "revisions",
+        "note",
+        "created_by_staff",
+        "executed_at",
+        "release",
+        "failure",
+        "acknowledged_at",
+        "acknowledged_by_staff",
+    )
+    exclude = ("created_by_staff_id", "acknowledged_by_staff_id")
+
+    def has_acknowledge_permission(self, request) -> bool:
+        return request.user.has_perm(PUBLISH_PERMISSION)
+
+    @action(
+        description=_("Acknowledge the failure"),
+        permissions=["acknowledge"],
+        icon="done",
+    )
+    def acknowledge_failures(self, request, queryset):
+        done = 0
+        for schedule in queryset.filter(status=ScheduleStatus.FAILED):
+            scheduling.acknowledge(request.user, pk=schedule.pk)
+            done += 1
+        self.message_user(
+            request,
+            _("%(count)s failure(s) acknowledged.") % {"count": done},
+            messages.SUCCESS,
+        )
+        return redirect(request.get_full_path())

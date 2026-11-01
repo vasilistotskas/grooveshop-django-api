@@ -245,11 +245,6 @@ release uses are answered** (ids are sequential, and an image nobody
 published is not the public's to list); any other id is left out and the
 storefront shows that block empty.
 
-## Not here yet
-
-Scheduled publishing, the storefront staff session, and the
-`builder_block_usage` command that will gate removing a block type: each is
-its own change.
 ## Scheduled publishing
 
 `builder/scheduling.py`, `builder/tasks.py`, `BuilderScheduledPublish`. A
@@ -281,9 +276,19 @@ publish can wait for a time:
   those versions) is `failed` with the problems in `failure`, never half
   done. Otherwise it is the ordinary release (made by who scheduled it): the
   cache generation and the `builder` surface move at that moment.
+- **A failure reaches a person.** When the sweep marks a schedule `failed`,
+  after that commit it sends the store-staff email `ops.builder_schedule_failed`
+  (`builder/emails.py`, area `ops`, switchable on the store's Emails page like
+  the other `ops.*` alerts; Greek and English) naming the pages, the scheduled
+  time (store timezone) and the problems in plain words. The problem sentences
+  are re-read from the stored code and params in the language of the email
+  (`errors.message_for`), not the language the sweep ran in. A mail that cannot
+  go out never undoes the failure. The store dashboard shows a danger alert to
+  anyone who may publish while a failed schedule is unacknowledged;
+  `POST schedules/<id>/acknowledge` or the **Acknowledge the failure** action of
+  Content, Page builder, Scheduled publishes (read-only admin) takes it away.
 
 ## Not here yet
 
-The media library, the storefront staff session and the
-`builder_block_usage` command that will gate removing a block type are their
-own changes.
+The `builder_block_usage` command that will gate removing a block type is its
+own change.

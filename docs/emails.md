@@ -194,6 +194,7 @@ the order note, whatever the switch says.
 | `ops.payment_after_cancel` | a `PaymentAfterCancel` | `order/emails.py` | |
 | `ops.payment_mismatch` | a `PaymentMismatch` | `order/emails.py` | |
 | `ops.refund_failed` | a `RefundFailed` | `order/emails.py` | |
+| `ops.builder_schedule_failed` | a `ScheduleFailed` (a failed scheduled page publish) | `builder/emails.py` | |
 | `ops.gift_card_reversal` | a `GiftCardReversal` (the purchase, and what was already spent, or none when only disputed) | `giftcard/emails.py` | none |
 | `ops.review_pending` | the `ProductReview` | `product/emails.py` | `FeatureGate("product_reviews")` |
 
@@ -724,7 +725,7 @@ tables (`devtools/anonymise/rules.py`).
   drives the real headless endpoints (sign-up, password reset, login
   code), and `test_allauth_email_store_identity.py` discovers the kinds
   from the installed allauth and fails for one that is not mapped.
-- `tests/integration/emails/test_golden_render_ops.py` records the ten
+- `tests/integration/emails/test_golden_render_ops.py` records the
   operational alerts through the real code that sends them. They had no
   template and no translation before, so the files record what they are now.
 - `tests/integration/emails/test_switch_admin.py`: the page's permissions

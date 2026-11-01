@@ -319,6 +319,20 @@ class BuilderScheduledPublish(TimeStampMixinModel):
         help_text=_("Why it could not be released: [{path, code, message}]"),
     )
 
+    acknowledged_at = models.DateTimeField(
+        _("Acknowledged at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When someone saw that it failed. A failed schedule shows on the "
+            "store dashboard until then."
+        ),
+    )
+    acknowledged_by_staff_id = models.BigIntegerField(
+        _("Acknowledged by (staff)"), null=True, blank=True
+    )
+    acknowledged_by_staff = StaffActor()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Scheduled publish")
         verbose_name_plural = _("Scheduled publishes")
@@ -333,6 +347,15 @@ class BuilderScheduledPublish(TimeStampMixinModel):
 
     def __str__(self) -> str:
         return f"{self.scheduled_for:%Y-%m-%d %H:%M} ({self.status})"
+
+
+def document_label(key: str) -> str:
+    """``Template: home`` for ``template:home``: what a person reads."""
+    kind = kind_of_key(key)
+    if kind is None:
+        return key
+    name = key.partition(":")[2]
+    return f"{kind.label}: {name}" if name else str(kind.label)
 
 
 class ReferenceKind(models.TextChoices):

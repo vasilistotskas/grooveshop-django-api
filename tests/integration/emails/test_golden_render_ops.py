@@ -299,3 +299,50 @@ class TestReviewAlert:
         assert send_review_pending_alert.run(review.pk)["status"] == "sent"
 
         assert_sent("ops_review_pending", language)
+
+
+class TestBuilderAlerts:
+    def test_schedule_failed(self, language, settings):
+        from django.db import connection
+
+        from builder import scheduling, services
+        from builder.models import BuilderScheduledPublish
+        from builder.storefront import clear_catalogue_cache
+        from tenant.models import TenantMembershipRole
+        from tests.utils.builder import FakeCatalogue, document, hero
+        from tests.utils.staff import store_staff
+
+        settings.NUXT_INTERNAL_BASE_URL = "http://storefront.test"
+        clear_catalogue_cache()
+        admin = store_staff(connection.tenant, role=TenantMembershipRole.ADMIN)
+        product = ProductFactory(id=424242, active=True)
+        with (
+            patch(
+                "builder.storefront.requests.get",
+                side_effect=FakeCatalogue().get,
+            ),
+            patch("builder.services.feature_on", return_value=True),
+        ):
+            services.save_draft(
+                admin,
+                key="template:home",
+                draft=document(("hero", hero("Spring", productId=product.pk))),
+                i18n={},
+                expected_revision=0,
+            )
+            schedule = scheduling.schedule_publish(
+                admin,
+                keys=["template:home"],
+                when=NOW + timedelta(hours=1),
+                note="Spring sale",
+            )
+        clear_catalogue_cache()
+        product.delete()
+        BuilderScheduledPublish.objects.filter(pk=schedule.pk).update(
+            scheduled_for=NOW - timedelta(minutes=1)
+        )
+        mail.outbox.clear()
+
+        scheduling.run_due()
+
+        assert_sent("ops_builder_schedule_failed", language)

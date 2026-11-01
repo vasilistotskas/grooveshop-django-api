@@ -176,6 +176,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
             "executed_at",
             "release",
             "failure",
+            "acknowledged_at",
         )
         read_only_fields = fields
 

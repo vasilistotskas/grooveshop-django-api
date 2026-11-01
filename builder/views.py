@@ -414,6 +414,24 @@ class ScheduleView(StaffView):
         )
 
 
+class ScheduleAcknowledgeView(StaffView):
+    queryset = BuilderScheduledPublish.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=None,
+        responses={200: ScheduleSerializer, **ERRORS},
+        description=(
+            "Say that a failed schedule was seen; it stops showing on the "
+            "store dashboard. Repeating it changes nothing."
+        ),
+    )
+    def post(self, request: Request, pk: int) -> Response:
+        return Response(
+            ScheduleSerializer(scheduling.acknowledge(request.user, pk=pk)).data
+        )
+
+
 class PublishedPageView(APIView):
     """The current release's theme, groups and page, for one locale."""
 

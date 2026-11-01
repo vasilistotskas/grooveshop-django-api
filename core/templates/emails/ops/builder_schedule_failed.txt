@@ -1,0 +1,17 @@
+{% load i18n %}{% trans "A scheduled publish failed" %}
+
+{% blocktrans %}The changes scheduled for {{ scheduled_for }} did not go live. Nothing was published and your live pages are unchanged.{% endblocktrans %}
+
+{% trans "Pages" %}:
+{% for document in documents %}- {{ document|safe }}
+{% endfor %}{% if note %}
+{% trans "Note" %}: {{ note|safe }}
+{% endif %}
+{% trans "Why" %}:
+{% for problem in problems %}- {{ problem|safe }}
+{% endfor %}
+{% trans "Fix the cause in the storefront editor and schedule the publish again, or publish it now." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

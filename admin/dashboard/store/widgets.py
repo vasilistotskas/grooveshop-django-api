@@ -720,7 +720,7 @@ class StoreAlerts(DashboardWidget):
     """
 
     def shape(self, data: None) -> dict[str, Any]:
-        alerts = self._legal_updates()
+        alerts = self._legal_updates() + self._failed_schedules()
         if self.request.user.has_perm("extra_settings.change_setting"):
             alerts += self._legal_identity()
         if self.is_superuser:
@@ -751,6 +751,57 @@ class StoreAlerts(DashboardWidget):
                     )
                     for pk, page in pages.items()
                 ],
+            )
+        ]
+
+    def _failed_schedules(self) -> list[dict[str, Any]]:
+        """Scheduled publishes that failed and that nobody has
+        acknowledged yet, for whoever may publish. Acknowledging in the
+        list takes the alert away."""
+        from builder.models import (
+            BuilderScheduledPublish,
+            ScheduleStatus,
+            document_label,
+        )
+        from builder.services import PUBLISH_PERMISSION
+
+        if not self.request.user.has_perm(PUBLISH_PERMISSION):
+            return []
+        failed = list(
+            BuilderScheduledPublish.objects.filter(
+                status=ScheduleStatus.FAILED, acknowledged_at__isnull=True
+            ).order_by("-scheduled_for")[:5]
+        )
+        if not failed:
+            return []
+        return [
+            _alert(
+                "danger",
+                "event_busy",
+                _("A scheduled publish failed"),
+                _(
+                    "These changes did not go live at their time and your "
+                    "live pages are unchanged. Open one to see why."
+                ),
+                items=[
+                    link_cell(
+                        self.change_url(
+                            "builder.BuilderScheduledPublish", schedule.pk
+                        ),
+                        ", ".join(
+                            document_label(key)
+                            for key in sorted(schedule.versions)
+                        ),
+                    )
+                    for schedule in failed
+                ],
+                link=(
+                    self.changelist_url(
+                        "builder.BuilderScheduledPublish",
+                        "status__exact=failed",
+                    ),
+                    _("Open the failed publishes"),
+                ),
             )
         ]
 

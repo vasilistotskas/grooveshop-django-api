@@ -9687,6 +9687,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/schedules/{id}/acknowledge:
+    post:
+      operationId: api_v1_builder_schedules_acknowledge_create
+      description: Say that a failed schedule was seen; it stops showing on the store
+        dashboard. Repeating it changes nothing.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/cart:
     get:
       operationId: retrieveCart
@@ -50106,7 +50145,16 @@ components:
           readOnly: true
           title: Αποτυχία
           description: 'Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]'
+        acknowledgedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Επιβεβαιώθηκε στις
+          description: Πότε είδε κάποιος ότι απέτυχε. Ένας προγραμματισμός που απέτυχε
+            εμφανίζεται στον πίνακα ελέγχου του καταστήματος μέχρι τότε.
       required:
+      - acknowledgedAt
       - documents
       - executedAt
       - failure

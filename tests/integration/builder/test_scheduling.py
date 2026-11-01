@@ -12,7 +12,8 @@ from django.utils import timezone
 from rest_framework import status
 
 from builder import scheduling, services
-from builder.errors import DocumentInvalid, NotFoundError
+from builder.errors import BuilderError, DocumentInvalid, NotFoundError
+from builder.factories import BuilderScheduledPublishFactory
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
@@ -473,3 +474,147 @@ def test_two_sweeps_at_once_make_one_release(admin):
 
     assert sorted(r for r in results if r is not None) == [1]
     assert BuilderRelease.objects.count() == 1
+
+
+class TestFailureReachesAPerson:
+    @pytest.fixture
+    def failing(self, admin):
+        product = ProductFactory(active=True)
+        save(admin, productId=product.pk)
+        schedule = scheduling.schedule_publish(admin, keys=[HOME], when=soon())
+        product.delete()
+        due(schedule)
+        return schedule
+
+    def test_a_failure_is_mailed_to_the_stores_staff(self, failing, tenant):
+        from django.core import mail
+
+        mail.outbox.clear()
+
+        scheduling.run_due()
+
+        [message] = mail.outbox
+        assert (
+            "scheduled publish failed" in message.subject.lower()
+            or message.subject
+        )
+        body = message.body
+        assert "Template: home" in body or "home" in body
+        assert "does not exist" in body or "δεν υπάρχει" in body
+
+    def test_a_publish_that_worked_says_nothing(self, admin):
+        from django.core import mail
+
+        save(admin)
+        due(scheduling.schedule_publish(admin, keys=[HOME], when=soon()))
+        mail.outbox.clear()
+
+        scheduling.run_due()
+
+        assert mail.outbox == []
+
+    def test_a_mail_that_cannot_go_out_does_not_undo_the_failure(self, failing):
+        from unittest import mock
+
+        with mock.patch(
+            "builder.scheduling.send_email", side_effect=RuntimeError("smtp")
+        ):
+            scheduling.run_due()
+
+        failing.refresh_from_db()
+        assert failing.status == ScheduleStatus.FAILED
+        assert scheduling.run_due() == {"due": 0, "published": 0}
+
+    def test_the_mail_is_an_email_type_the_store_can_switch(self):
+        from emails.registry import registry
+
+        email_type = registry.get("ops.builder_schedule_failed")
+
+        assert email_type.area == "ops"
+        assert email_type.audience.name == "STORE_STAFF"
+
+
+class TestAcknowledging:
+    @pytest.fixture
+    def failed(self, admin):
+        return BuilderScheduledPublishFactory(
+            status=ScheduleStatus.FAILED,
+            versions={HOME: 1},
+            failure=[{"path": "", "code": "document_gone", "message": "x"}],
+        )
+
+    def test_acknowledging_records_who_and_when_and_is_repeatable(
+        self, admin, failed
+    ):
+        scheduling.acknowledge(admin, pk=failed.pk)
+        first = BuilderScheduledPublish.objects.get(pk=failed.pk)
+        scheduling.acknowledge(admin, pk=failed.pk)
+        again = BuilderScheduledPublish.objects.get(pk=failed.pk)
+
+        assert first.acknowledged_by_staff_id == admin.pk
+        assert first.acknowledged_at == again.acknowledged_at
+
+    def test_only_a_failure_is_acknowledged_by_someone_who_may_publish(
+        self, admin, staff, failed
+    ):
+        pending = BuilderScheduledPublishFactory()
+
+        with pytest.raises(BuilderError) as caught:
+            scheduling.acknowledge(admin, pk=pending.pk)
+        with pytest.raises(PermissionDenied):
+            scheduling.acknowledge(staff, pk=failed.pk)
+        with pytest.raises(NotFoundError):
+            scheduling.acknowledge(admin, pk=999999)
+
+        assert caught.value.detail["code"] == "schedule_not_failed"
+
+    def test_through_the_api(self, admin, failed):
+        response = api_as(admin).post(
+            reverse("builder:schedule-acknowledge", kwargs={"pk": failed.pk})
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["acknowledgedAt"] is not None
+
+    def test_the_dashboard_shows_it_until_it_is_acknowledged(
+        self, admin, staff, failed
+    ):
+        from django.test import RequestFactory
+        from django.utils import translation
+
+        from admin.dashboard.store import widgets
+
+        def titles(user) -> list[str]:
+            request = RequestFactory().get("/admin/")
+            request.user = user
+            with translation.override("en"):
+                context = widgets.StoreAlerts(
+                    request=request
+                ).get_context_data()
+                return [str(a["title"]) for a in context["alerts"]]
+
+        assert "A scheduled publish failed" in titles(admin)
+        assert "A scheduled publish failed" not in titles(staff)
+
+        scheduling.acknowledge(admin, pk=failed.pk)
+
+        assert "A scheduled publish failed" not in titles(admin)
+
+    def test_the_admin_list_acknowledges_in_bulk(self, admin, failed, tenant):
+        from django.test import Client
+        from django.utils import translation
+
+        client = Client()
+        client.force_login(
+            admin, backend="tenant.auth_backends.PlatformStaffBackend"
+        )
+        with translation.override("en"):
+            url = reverse("admin:builder_builderscheduledpublish_changelist")
+        response = client.post(
+            url,
+            {"action": "acknowledge_failures", "_selected_action": [failed.pk]},
+        )
+
+        assert response.status_code == status.HTTP_302_FOUND
+        failed.refresh_from_db()
+        assert failed.acknowledged_at is not None

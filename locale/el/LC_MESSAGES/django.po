@@ -227,6 +227,10 @@ msgstr[0] "%(count)d ετικέτα απενεργοποιήθηκε."
 msgstr[1] "%(count)d ετικέτες απενεργοποιήθηκαν."
 
 #, python-format
+msgid "%(count)s failure(s) acknowledged."
+msgstr "%(count)s αποτυχία(-ες) επιβεβαιώθηκαν."
+
+#, python-format
 msgid "%(count)s item, qty %(qty)s — %(total)s"
 msgid_plural "%(count)s items, qty %(qty)s — %(total)s"
 msgstr[0] "%(count)s είδος, ποσότητα %(qty)s — %(total)s"
@@ -761,6 +765,9 @@ msgstr "Η απόδειξη λιανικής εκδίδεται για παρα�
 msgid "A review is waiting for approval"
 msgstr "Μια κριτική περιμένει έγκριση"
 
+msgid "A scheduled publish failed"
+msgstr "Μια προγραμματισμένη δημοσίευση απέτυχε"
+
 msgid "A search query is required."
 msgstr "Η αναζήτηση είναι υποχρεωτική."
 
@@ -1131,6 +1138,15 @@ msgstr "Προτιμήσεις λογαριασμού"
 
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
+
+msgid "Acknowledge the failure"
+msgstr "Επιβεβαίωση της αποτυχίας"
+
+msgid "Acknowledged at"
+msgstr "Επιβεβαιώθηκε στις"
+
+msgid "Acknowledged by (staff)"
+msgstr "Επιβεβαιώθηκε από (προσωπικό)"
 
 msgid "Acs_Station_Branch_Destination value."
 msgstr "Τιμή Acs_Station_Branch_Destination."
@@ -5992,6 +6008,9 @@ msgstr "Πέντε"
 msgid "Fix in settings"
 msgstr "Διόρθωση στις ρυθμίσεις"
 
+msgid "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
+msgstr "Διόρθωσε την αιτία στον επεξεργαστή του καταστήματος και προγραμμάτισε ξανά τη δημοσίευση, ή δημοσίευσέ την τώρα."
+
 msgid "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
 msgstr "Σταθερή καθαρή (προ ΦΠΑ) τιμή για αυτή την ομάδα. Υπερισχύει του ποσοστού έκπτωσης της ομάδας."
 
@@ -9109,6 +9128,9 @@ msgstr "Μόνο αποστολή με αντικαταβολή και οφει�
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Μόνο μια παραδομένη αποστολή μπορεί να εκκαθαριστεί (αυτή είναι: %(state)s)."
 
+msgid "Only a failed schedule needs acknowledging."
+msgstr "Επιβεβαίωση χρειάζεται μόνο ένας προγραμματισμός που απέτυχε."
+
 msgid "Only a page can be deleted."
 msgstr "Μόνο μια σελίδα μπορεί να διαγραφεί."
 
@@ -9141,6 +9163,9 @@ msgstr "Αδιαφανής δείκτης (στρατηγική σελιδοπο
 
 msgid "Open full stock history chart"
 msgstr "Άνοιγμα πλήρους ιστορικού αποθέματος →"
+
+msgid "Open the failed publishes"
+msgstr "Άνοιγμα των δημοσιεύσεων που απέτυχαν"
 
 msgid "Open the myDATA settings"
 msgstr "Άνοιγμα ρυθμίσεων myDATA"
@@ -13527,6 +13552,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Tells the store's staff that a dispute closed against it."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια αμφισβήτηση έκλεισε εις βάρος του."
 
+msgid "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια δημοσίευση σελίδων που είχε προγραμματιστεί για κάποια ώρα δεν μπόρεσε να γίνει, με τις σελίδες και τους λόγους."
+
 msgid "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι έφτασε πληρωμή για παραγγελία που είχε ήδη ακυρωθεί, οπότε ο πελάτης πρέπει να πάρει πίσω τα χρήματά του."
 
@@ -13751,6 +13779,10 @@ msgstr "Το free_threshold_value του καλαθιού: τα προϊόντα
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "Η κατηγορία στην οποία αναφέρεται μια σελίδα καταλόγου· περιορίζει τα στατιστικά effective_price του sidebarFacets στις υποκατηγορίες της. Σε αντίθεση με το categories, δεν φιλτράρει τα αποτελέσματα."
+
+#, python-format
+msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
+msgstr "Οι αλλαγές που είχαν προγραμματιστεί για τις %(scheduled_for)s δεν δημοσιεύτηκαν. Δεν δημοσιεύτηκε τίποτα και οι ζωντανές σελίδες σου δεν άλλαξαν."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "Το κανάλι από το οποίο ξεκίνησε το καλάθι της παραγγελίας, με το όνομα που έχει η πηγή της παραγγελίας. Κενό όταν το καλάθι δεν είχε καταγεγραμμένη πηγή."
@@ -14221,6 +14253,9 @@ msgstr "Δεν υπάρχει τέτοιος προγραμματισμός."
 
 msgid "There is no such version."
 msgstr "Δεν υπάρχει τέτοια έκδοση."
+
+msgid "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
+msgstr "Αυτές οι αλλαγές δεν δημοσιεύτηκαν στην ώρα τους και οι ζωντανές σελίδες σου δεν άλλαξαν. Άνοιξε μία για να δεις γιατί."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -15697,6 +15732,9 @@ msgstr "Όταν ορίζεται, μόνο αγορές με αυτό το emai
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "Όταν ορίζεται, μόνο αυτός ο πελάτης μπορεί να εξαργυρώσει τον κωδικό (προσωπικό κουπόνι)"
 
+msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+msgstr "Πότε είδε κάποιος ότι απέτυχε. Ένας προγραμματισμός που απέτυχε εμφανίζεται στον πίνακα ελέγχου του καταστήματος μέχρι τότε."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
 
@@ -15846,6 +15884,9 @@ msgstr "Τιμολόγηση χονδρικής"
 
 msgid "Wholesale-priced"
 msgstr "Με τιμές χονδρικής"
+
+msgid "Why"
+msgstr "Γιατί"
 
 msgid "Why Microlearning"
 msgstr "Γιατί μικρομάθηση"
@@ -16323,6 +16364,10 @@ msgstr "Τ.Κ."
 
 msgid "Zipcode is required."
 msgstr "Ο ταχυδρομικός κώδικας είναι υποχρεωτικός."
+
+#, python-brace-format
+msgid "[{site}] A scheduled publish failed"
+msgstr "[{site}] Μια προγραμματισμένη δημοσίευση απέτυχε"
 
 #, python-brace-format
 msgid "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"

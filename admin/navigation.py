@@ -408,6 +408,10 @@ def store_sidebar(request: Any) -> list[Item]:
                     page("builder.BuilderDocument", _("Builder documents")),
                     page("builder.BuilderRelease", _("Releases")),
                     page(
+                        "builder.BuilderScheduledPublish",
+                        _("Scheduled publishes"),
+                    ),
+                    page(
                         "builder.BuilderReference", _("Where things are used")
                     ),
                 ],

@@ -222,6 +222,10 @@ msgstr[0] "%(count)d tag was deactivated."
 msgstr[1] "%(count)d tags were deactivated."
 
 #, python-format
+msgid "%(count)s failure(s) acknowledged."
+msgstr "%(count)s failure(s) acknowledged."
+
+#, python-format
 msgid "%(count)s item, qty %(qty)s — %(total)s"
 msgid_plural "%(count)s items, qty %(qty)s — %(total)s"
 msgstr[0] "%(count)s item, qty %(qty)s — %(total)s"
@@ -756,6 +760,9 @@ msgstr "A retail receipt is issued for a receipt order once it has shipped. Orde
 msgid "A review is waiting for approval"
 msgstr "A review is waiting for approval"
 
+msgid "A scheduled publish failed"
+msgstr "A scheduled publish failed"
+
 msgid "A search query is required."
 msgstr "A search query is required."
 
@@ -1126,6 +1133,15 @@ msgstr "Account preferences"
 
 msgid "Account security notice"
 msgstr "Account security notice"
+
+msgid "Acknowledge the failure"
+msgstr "Acknowledge the failure"
+
+msgid "Acknowledged at"
+msgstr "Acknowledged at"
+
+msgid "Acknowledged by (staff)"
+msgstr "Acknowledged by (staff)"
 
 msgid "Acs_Station_Branch_Destination value."
 msgstr "Acs_Station_Branch_Destination value."
@@ -5986,6 +6002,9 @@ msgstr "Five"
 msgid "Fix in settings"
 msgstr "Fix in settings"
 
+msgid "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
+msgstr "Fix the cause in the storefront editor and schedule the publish again, or publish it now."
+
 msgid "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
 msgstr "Fixed NET (VAT-exclusive) price for this group. Wins over the group's discount percent."
 
@@ -9100,6 +9119,9 @@ msgstr "Only a cash-on-delivery shipment with an amount due can be settled."
 msgid "Only a delivered shipment can be settled (this one is %(state)s)."
 msgstr "Only a delivered shipment can be settled (this one is %(state)s)."
 
+msgid "Only a failed schedule needs acknowledging."
+msgstr "Only a failed schedule needs acknowledging."
+
 msgid "Only a page can be deleted."
 msgstr "Only a page can be deleted."
 
@@ -9132,6 +9154,9 @@ msgstr "Opaque cursor (cursor pagination strategy)"
 
 msgid "Open full stock history chart"
 msgstr "Open full stock history chart"
+
+msgid "Open the failed publishes"
+msgstr "Open the failed publishes"
 
 msgid "Open the myDATA settings"
 msgstr "Open the myDATA settings"
@@ -13522,6 +13547,9 @@ msgstr "Tells the store's staff that a customer's review waits for their approva
 msgid "Tells the store's staff that a dispute closed against it."
 msgstr "Tells the store's staff that a dispute closed against it."
 
+msgid "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+msgstr "Tells the store's staff that a page publish scheduled for a time could not go live, with the pages and the reasons."
+
 msgid "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 msgstr "Tells the store's staff that a payment arrived for an order that was already canceled, so the customer must be refunded."
 
@@ -13746,6 +13774,10 @@ msgstr "The cart's free_threshold_value: the products after discounts, excluding
 
 msgid "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
 msgstr "The category a listing page is about, which scopes the effective_price stats of sidebarFacets to its subtree. Unlike categories, it is not a filter of the results."
+
+#, python-format
+msgid "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
+msgstr "The changes scheduled for %(scheduled_for)s did not go live. Nothing was published and your live pages are unchanged."
 
 msgid "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
 msgstr "The channel the order's cart was started from, named like the order source. Empty when the cart had none recorded."
@@ -14216,6 +14248,9 @@ msgstr "There is no such schedule."
 
 msgid "There is no such version."
 msgstr "There is no such version."
+
+msgid "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
+msgstr "These changes did not go live at their time and your live pages are unchanged. Open one to see why."
 
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
@@ -15692,6 +15727,9 @@ msgstr "When set, only checkouts with this email can redeem the code — covers 
 msgid "When set, only this customer can redeem the code (personal coupon)"
 msgstr "When set, only this customer can redeem the code (personal coupon)"
 
+msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+msgstr "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 
@@ -15841,6 +15879,9 @@ msgstr "Wholesale pricing"
 
 msgid "Wholesale-priced"
 msgstr "Wholesale-priced"
+
+msgid "Why"
+msgstr "Why"
 
 msgid "Why Microlearning"
 msgstr "Why Microlearning"
@@ -16318,6 +16359,10 @@ msgstr "Zipcode"
 
 msgid "Zipcode is required."
 msgstr "Zipcode is required."
+
+#, python-brace-format
+msgid "[{site}] A scheduled publish failed"
+msgstr "[{site}] A scheduled publish failed"
 
 #, python-brace-format
 msgid "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"

@@ -29,7 +29,14 @@ from django.utils.translation import gettext as _
 from rest_framework import status
 
 from builder import validation
-from builder.errors import BuilderError, DocumentInvalid, Issue, NotFoundError
+from builder.emails import ScheduleFailed
+from builder.errors import (
+    BuilderError,
+    DocumentInvalid,
+    Issue,
+    NotFoundError,
+    message_for,
+)
 from builder.models import (
     BuilderDocument,
     BuilderScheduledPublish,
@@ -48,9 +55,13 @@ from builder.services import (
     require_permission,
     validated_drafts,
 )
+from emails.send import send_email
 from tenant.staff_actors import staff_id
 
 logger = logging.getLogger(__name__)
+
+#: The email type told to the store's staff when a schedule fails.
+ALERT_EMAIL = "ops.builder_schedule_failed"
 
 
 class NotPending(BuilderError):
@@ -176,6 +187,36 @@ def cancel(user: Any, *, pk: int) -> BuilderScheduledPublish:
     return schedule
 
 
+def acknowledge(user: Any, *, pk: int) -> BuilderScheduledPublish:
+    """Say that a failure was seen: it stops showing on the dashboard.
+    Anyone who may publish may; acknowledging twice changes nothing."""
+    require_permission(user, PUBLISH_PERMISSION)
+    with transaction.atomic():
+        schedule = (
+            BuilderScheduledPublish.objects.select_for_update()
+            .filter(pk=pk)
+            .first()
+        )
+        if schedule is None:
+            raise NotFoundError(_("There is no such schedule."))
+        if schedule.status != ScheduleStatus.FAILED:
+            raise BuilderError(
+                _("Only a failed schedule needs acknowledging."),
+                code="schedule_not_failed",
+            )
+        if schedule.acknowledged_at is None:
+            schedule.acknowledged_at = timezone.now()
+            schedule.acknowledged_by_staff = user
+            schedule.save(
+                update_fields=[
+                    "acknowledged_at",
+                    "acknowledged_by_staff_id",
+                    "updated_at",
+                ]
+            )
+    return schedule
+
+
 def _fail(schedule: BuilderScheduledPublish, issues: list[Issue]) -> None:
     schedule.status = ScheduleStatus.FAILED
     schedule.executed_at = timezone.now()
@@ -187,6 +228,11 @@ def _fail(schedule: BuilderScheduledPublish, issues: list[Issue]) -> None:
         "Scheduled publish %s failed: %s",
         schedule.pk,
         [issue.code for issue in issues],
+    )
+    # After the commit that records the failure, and never able to undo it:
+    # a mail that cannot go out must not leave the schedule pending.
+    transaction.on_commit(
+        lambda: send_email(ALERT_EMAIL, ScheduleFailed(schedule)), robust=True
     )
 
 
@@ -224,8 +270,9 @@ def execute(pk: int) -> int | None:
             Issue(
                 path="/documents",
                 code="document_gone",
-                message=_("%(key)s no longer exists.") % {"key": key},
+                message=message_for("document_gone", {"key": key}, ""),
                 document=key,
+                params={"key": key},
             )
             for key in keys
             if key not in live or schedule.versions[key] not in versions
@@ -238,6 +285,7 @@ def execute(pk: int) -> int | None:
                         code=issue.code,
                         message=issue.message,
                         document=key,
+                        params=issue.params,
                     )
                     for issue in validation.check_references(
                         versions[schedule.versions[key]].refs
@@ -250,7 +298,7 @@ def execute(pk: int) -> int | None:
                 Issue(
                     path="/documents",
                     code="nothing_to_publish",
-                    message=_("Nothing has changed since the last release."),
+                    message=message_for("nothing_to_publish", None, ""),
                 )
             ]
         if issues:

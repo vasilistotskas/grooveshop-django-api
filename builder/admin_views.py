@@ -9,7 +9,7 @@ from django.http import Http404, HttpRequest, HttpResponseRedirect
 from django.views.decorators.cache import never_cache
 
 from builder import staff_session
-from builder.services import CHANGE_PERMISSION
+from builder.services import VIEW_PERMISSION
 from core.utils.tenant_urls import get_tenant_base_url
 from tenant.membership import get_current_tenant
 
@@ -21,10 +21,11 @@ EDITOR_PATH = "/_builder"
 def edit_storefront(request: HttpRequest) -> HttpResponseRedirect:
     """Send the signed-in staff member to the editor with a single-use
     ticket. Only on a store host (the platform has no storefront) and only
-    for someone who may change the store's pages (ADMIN and OWNER)."""
+    for someone who may see the store's pages: ADMIN and OWNER edit in the
+    editor, STAFF open it read only (every write is refused by role)."""
     if get_current_tenant() is None:
         raise Http404
-    if not request.user.has_perm(CHANGE_PERMISSION):
+    if not request.user.has_perm(VIEW_PERMISSION):
         raise PermissionDenied
     ticket = staff_session.mint_ticket(request.user)
     return HttpResponseRedirect(

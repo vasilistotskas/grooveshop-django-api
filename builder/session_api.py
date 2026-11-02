@@ -23,18 +23,18 @@ from tenant.api_tokens import PlatformStaffTokenAuthentication
 TAGS = ["Builder"]
 
 
-class SessionRequestSerializer(serializers.Serializer):
+class StaffSessionTicketSerializer(serializers.Serializer):
     ticket = serializers.CharField(max_length=128)
 
 
-class SessionStaffSerializer(StaffSerializer):
+class StaffSessionStaffSerializer(StaffSerializer):
     role = serializers.CharField()
 
 
-class SessionResponseSerializer(serializers.Serializer):
+class StaffSessionResponseSerializer(serializers.Serializer):
     token = serializers.CharField()
     expires_at = serializers.DateTimeField()
-    staff = SessionStaffSerializer()
+    staff = StaffSessionStaffSerializer()
 
 
 class StaffSessionView(APIView):
@@ -56,9 +56,9 @@ class StaffSessionView(APIView):
 
     @extend_schema(
         tags=TAGS,
-        request=SessionRequestSerializer,
+        request=StaffSessionTicketSerializer,
         responses={
-            200: SessionResponseSerializer,
+            200: StaffSessionResponseSerializer,
             400: OpenApiResponse(response=ErrorResponseSerializer),
         },
         description=(
@@ -71,7 +71,7 @@ class StaffSessionView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
-        body = SessionRequestSerializer(data=request.data)
+        body = StaffSessionTicketSerializer(data=request.data)
         body.is_valid(raise_exception=True)
         session = staff_session.open_session(body.validated_data["ticket"])
         return Response(

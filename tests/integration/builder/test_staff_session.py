@@ -64,16 +64,30 @@ class TestMinting:
         assert "no-store" in response["Cache-Control"]
         assert tickets.spend(tickets.BUILDER_EDITOR, ticket) == admin.pk
 
-    def test_staff_who_may_not_edit_are_refused(self, staff, tenant):
+    def test_staff_who_may_only_look_are_sent_too(self, staff, tenant):
         client = Client()
         client.force_login(staff, backend=STAFF_BACKEND)
 
         with translation.override("en"):
             response = client.get(reverse("admin:edit-storefront"))
 
+        assert response.status_code == status.HTTP_302_FOUND
+        (ticket,) = parse_qs(urlsplit(response["Location"]).query)["ticket"]
+        assert tickets.spend(tickets.BUILDER_EDITOR, ticket) == staff.pk
+
+    def test_someone_who_cannot_see_the_pages_is_refused(self, admin, tenant):
+        client = Client()
+        client.force_login(admin, backend=STAFF_BACKEND)
+
+        with (
+            mock.patch("builder.admin_views.VIEW_PERMISSION", "builder.nope"),
+            translation.override("en"),
+        ):
+            response = client.get(reverse("admin:edit-storefront"))
+
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_the_sidebar_offers_it_to_admins_only(self, admin, staff, tenant):
+    def test_the_sidebar_offers_it_to_every_role(self, admin, staff, tenant):
         def sidebar(user) -> bool:
             client = Client()
             client.force_login(user, backend=STAFF_BACKEND)
@@ -82,7 +96,7 @@ class TestMinting:
             return reverse("admin:edit-storefront") in body
 
         assert sidebar(admin) is True
-        assert sidebar(staff) is False
+        assert sidebar(staff) is True
 
     def test_a_ticket_lives_as_long_as_the_setting_says(self, admin, settings):
         settings.BUILDER_STAFF_TICKET_TTL_SECONDS = 7
@@ -152,23 +166,21 @@ class TestOpening:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "ticket" in response.json()["fields"]
 
-    def test_every_refusal_looks_the_same(self, admin, staff, tenant):
-        staff_ticket = staff_session.mint_ticket(staff)
+    def test_staff_open_a_session_that_reports_their_role(self, staff, tenant):
+        response = spend(staff_session.mint_ticket(staff))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["staff"]["role"] == TenantMembershipRole.STAFF
+
+    def test_every_refusal_looks_the_same(self, admin, tenant):
+        gone = store_staff(tenant, role=TenantMembershipRole.STAFF)
+        ticket = staff_session.mint_ticket(gone)
+        UserTenantMembership.objects.filter(user=gone).update(is_active=False)
         unknown = spend("unknown").json()
 
-        refused = spend(staff_ticket).json()
+        refused = spend(ticket).json()
 
         assert refused == unknown
-
-    def test_the_right_to_edit_is_checked_when_the_ticket_is_spent(
-        self, admin, tenant
-    ):
-        ticket = staff_session.mint_ticket(admin)
-        UserTenantMembership.objects.filter(user=admin).update(
-            role=TenantMembershipRole.STAFF
-        )
-
-        assert spend(ticket).status_code == status.HTTP_400_BAD_REQUEST
 
     def test_a_deactivated_membership_or_account_is_refused(self, tenant):
         member = store_staff(tenant, role=TenantMembershipRole.ADMIN)
@@ -279,6 +291,43 @@ class TestTheToken:
             status.HTTP_401_UNAUTHORIZED,
             status.HTTP_403_FORBIDDEN,
         )
+
+    def test_a_staff_session_reads_and_writes_nothing(
+        self, staff, tenant, catalogue, features_on
+    ):
+        from tests.utils.builder import document, hero
+
+        token = spend(staff_session.mint_ticket(staff)).json()["token"]
+        client = bearer(token)
+        home = {"key": "template:home"}
+
+        read = client.get(reverse("builder:document-list"))
+        writes = [
+            client.put(
+                reverse("builder:document-draft", kwargs=home),
+                {"draft": document(("a", hero())), "i18n": {}},
+                format="json",
+                headers={"If-Match": "0"},
+            ),
+            client.post(
+                reverse("builder:publish"),
+                {"documents": ["template:home"]},
+                format="json",
+            ),
+            client.post(
+                reverse("builder:schedule-list"),
+                {
+                    "documents": ["template:home"],
+                    "scheduledFor": (
+                        timezone.now() + timedelta(days=1)
+                    ).isoformat(),
+                },
+                format="json",
+            ),
+        ]
+
+        assert read.status_code == status.HTTP_200_OK
+        assert {r.status_code for r in writes} == {status.HTTP_403_FORBIDDEN}
 
     def test_a_session_can_edit_as_the_role_allows(
         self, session, tenant, catalogue, features_on

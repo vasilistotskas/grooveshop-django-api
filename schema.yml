@@ -8762,6 +8762,16 @@ paths:
     get:
       operationId: api_v1_builder_documents_list
       parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+          enum:
+          - group
+          - page
+          - template
+          - theme
+        description: Only the documents of this kind.
       - name: page
         required: false
         in: query
@@ -8796,6 +8806,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedDocumentListList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
           description: ''
   /api/v1/builder/documents/{key}:
     get:
@@ -9819,13 +9837,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SessionRequestRequest'
+              $ref: '#/components/schemas/StaffSessionTicketRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SessionRequestRequest'
+              $ref: '#/components/schemas/StaffSessionTicketRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/SessionRequestRequest'
+              $ref: '#/components/schemas/StaffSessionTicketRequest'
         required: true
       security:
       - {}
@@ -9834,7 +9852,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionResponse'
+                $ref: '#/components/schemas/StaffSessionResponse'
           description: ''
         '400':
           content:
@@ -49349,42 +49367,6 @@ components:
       - byContentType
       - byLanguage
       - total
-    SessionRequestRequest:
-      type: object
-      properties:
-        ticket:
-          type: string
-          minLength: 1
-          maxLength: 128
-      required:
-      - ticket
-    SessionResponse:
-      type: object
-      properties:
-        token:
-          type: string
-        expiresAt:
-          type: string
-          format: date-time
-        staff:
-          $ref: '#/components/schemas/SessionStaff'
-      required:
-      - expiresAt
-      - staff
-      - token
-    SessionStaff:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        role:
-          type: string
-      required:
-      - id
-      - name
-      - role
     Setting:
       type: object
       properties:
@@ -49783,6 +49765,42 @@ components:
       required:
       - id
       - name
+    StaffSessionResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        staff:
+          $ref: '#/components/schemas/StaffSessionStaff'
+      required:
+      - expiresAt
+      - staff
+      - token
+    StaffSessionStaff:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+      required:
+      - id
+      - name
+      - role
+    StaffSessionTicketRequest:
+      type: object
+      properties:
+        ticket:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - ticket
     StoreFeatures:
       type: object
       description: |-

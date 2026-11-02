@@ -3,6 +3,74 @@
 
 
 
+## v3.189.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): name the catalogue key linkRefs and refuse links under translatables
+
+The storefront emits `linkRefs`, not `links`. A link pointer that equals,
+lies under or holds a translatable pointer (wildcards count either way)
+is a catalogue error, not only an exact duplicate: a link resolves to the
+viewer's language path, so nothing in it is translated.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Chores
+
+* chore(builder): drop a stray patch backup
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Documentation
+
+* docs(builder): linkRefs is optional only for the deploy order
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Features
+
+* feat(builder): link references, a blogPost kind and a link-targets read (#420) ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+* feat(builder): link references, a blogPost kind and a link-targets read
+
+A link setting stores a reference instead of a raw internal address, so a
+slug change cannot rot it. The catalogue's blocks may declare `links`
+(pointer patterns, like `refs`); for each `{ref: {kind, id}}` found there,
+validation checks the id has the shape of its kind (an unknown kind is
+invalid_reference rather than a KeyError at the existence check) and
+records (kind, id, the link's own pointer) with the other references, so
+the version's refs, BuilderReference, the publish check and "where used"
+treat it like any other. `{href}` and `{route}` are the schema's. A
+pointer in both `links` and `translatable` is a catalogue error: a link
+resolves to the viewer's language path and is never translatable.
+
+blogPost is a new reference kind (a published post).
+
+GET builder/link-targets?product=..&category=..&blogPost=..&blogCategory=..
+answers {kind: {id: slug}} for the ids that exist and are visible by the
+rules of the existence checks, one query per kind, capped by
+BUILDER_LINK_TARGETS_MAX_IDS.
+
+Additive: a catalogue without `links` is valid.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Testing
+
+* test(builder): nested translatable leaves beside a link
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
 ## v3.188.1 (2026-11-02)
 
 ### Bug fixes

@@ -187,6 +187,7 @@ catalogue, then the write):
 | `discard_draft` | The draft becomes the published version |
 | `publish` | Validates every named draft (references included), reports every problem with its `document`, creates the versions, one release, one transaction, per-store advisory lock for the release number; `nothing_to_publish` when nothing changed |
 | `rollback` | A new release with an older release's map |
+| `publish_version` | A new release that repoints ONE key at one of its stored versions and leaves every other document and the draft alone; its references must exist (`reference_not_found`), `nothing_to_publish` when it is already the published one; the document counts as published only if its draft is exactly that version |
 | `delete_page` | A released page leaves the store with a new release; a page another released document links to is `page_in_use` |
 
 ## What a release moves
@@ -214,6 +215,7 @@ Staff (`StoreStaffModelPermissions`):
 | `DELETE documents/<key>` | A page, `If-Match` required |
 | `POST documents/<key>/discard`, `.../checkpoint` | |
 | `GET documents/<key>/versions`, `.../versions/<n>`, `POST .../versions/<n>/restore` | |
+| `POST documents/<key>/versions/<n>/publish` `{note}` | Release that version of that key alone (a release, not a rollback: `rolledBackFrom` is empty) |
 | `POST publish` `{documents: [key], note}`, `POST rollback` `{release, note}`, `GET releases` | |
 
 Roles: `builder` is in `STORE_SETTINGS_APP_LABELS` and

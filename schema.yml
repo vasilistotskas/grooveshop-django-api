@@ -9086,6 +9086,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/VersionDetail'
           description: ''
+  /api/v1/builder/documents/{key}/versions/{number}/publish:
+    post:
+      operationId: api_v1_builder_documents_versions_publish_create
+      description: 'Release one stored version of ONE document: the previous release
+        with only that key repointed. The draft is left as it is. Its references must
+        still exist (`reference_not_found` with the `document`); `nothing_to_publish`
+        when it is already the published version.'
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: number
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishVersionWriteRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/documents/{key}/versions/{number}/restore:
     post:
       operationId: api_v1_builder_documents_versions_restore_create
@@ -48898,6 +48949,13 @@ components:
           description: Τιμές ρυθμίσεων με κλειδί το όνομα της ρύθμισης.
       required:
       - settings
+    PublishVersionWriteRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          default: ''
+          maxLength: 255
     PublishWriteRequest:
       type: object
       properties:

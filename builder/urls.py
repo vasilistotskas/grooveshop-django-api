@@ -46,6 +46,11 @@ urlpatterns = [
         name="version-restore",
     ),
     path(
+        "builder/documents/<str:key>/versions/<int:number>/publish",
+        views.PublishVersionView.as_view(),
+        name="version-publish",
+    ),
+    path(
         "builder/media",
         media_api.AssetListView.as_view(),
         name="media-list",

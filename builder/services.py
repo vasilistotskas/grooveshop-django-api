@@ -555,6 +555,57 @@ def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:
     return PublishResult(release=release, changed=changed)
 
 
+def publish_version(
+    user: Any, *, key: str, number: int, note: str = ""
+) -> BuilderRelease:
+    """Release version *number* of document *key* alone: the previous
+    release with that one key repointed, so every other document stays as
+    it is. The draft is not touched, so work in progress survives; it only
+    counts as published when it is exactly this version.
+
+    The version was valid when it was made (a checkpoint is validated, a
+    published one was released), and the storefront upgrades old blocks
+    when it renders, so it is not checked against the catalogue again; its
+    references are, as for any publish."""
+    require_permission(user, PUBLISH_PERMISSION)
+    with transaction.atomic():
+        _lock_release_sequence()
+        document = _locked(key)
+        version = BuilderVersion.objects.filter(
+            document=document, number=number
+        ).first()
+        if version is None:
+            raise NotFoundError(_("There is no such version."))
+        previous = published_versions()
+        if previous.get(key) == version.pk:
+            raise DocumentInvalid(
+                [
+                    Issue(
+                        path="/version",
+                        code="nothing_to_publish",
+                        message=_("That version is already the published one."),
+                        document=key,
+                    )
+                ]
+            )
+        problems = validation.check_references(version.refs)
+        if problems:
+            raise DocumentInvalid(
+                [replace(issue, document=key) for issue in problems]
+            )
+        release = _create_release(
+            staff_id(user), {**previous, key: version.pk}, note=note
+        )
+        is_draft = validation.encode(
+            document.draft, document.draft_i18n
+        ) == validation.encode(version.data, version.i18n)
+        document.published_revision = (
+            document.draft_revision if is_draft else None
+        )
+        document.save(update_fields=["published_revision"])
+    return release
+
+
 def rollback(user: Any, *, release_id: int, note: str = "") -> BuilderRelease:
     """A new release pointing at the versions of an older one. History is
     never rewritten, and the older versions need no validation: they were

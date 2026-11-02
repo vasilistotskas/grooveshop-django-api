@@ -432,12 +432,7 @@ settings); Django never converts:
   touched.
 - The storefront's golden fixtures (`{request, response}` per section type,
   and the menus) are copied under `tests/fixtures/builder/legacy/` and
-  replayed by `tests/integration/builder/test_converter_fixtures.py`. The copy
-  is pinned to a storefront commit by its git tree id
-  (`legacy.source.json`); only `.github/scripts/sync_converter_fixtures.py`
-  writes it, a unit test fails if the copy is not the pinned tree, and a
-  weekly workflow (`converter-fixtures.yml`) fails when the storefront's
-  `main` has moved on.
+  replayed by `tests/integration/builder/test_converter_fixtures.py`.
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
 
@@ -496,6 +491,39 @@ changes for a visitor until the storefront switch.
    builder: that is the storefront deployment, so a reset belongs before it,
    never after. The media library and `page_config` are never touched.
    Afterwards the import can be run again.
+
+## What is copied from the storefront
+
+The storefront owns the blocks, so three things are pinned COPIES of its
+files:
+
+| Source | Copy | Used by |
+|---|---|---|
+| `test/fixtures/builder/legacy/` | `tests/fixtures/builder/legacy/` | the converter fixture replay |
+| `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds test: a snapshot of the block catalogue |
+| `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
+
+`tests/fixtures/builder/storefront.lock.json` names the storefront commit and
+the git id of each source (the tree id of a directory, the blob id of a file).
+Only `.github/scripts/sync_storefront_sources.py` writes the copies and the
+lock; `tests/unit/builder/test_storefront_sources_pin.py` fails when a copy is
+not the pinned one, and the weekly `storefront-sources.yml` workflow fails when
+the storefront's `main` has moved on. A refresh is: run the script, replay the
+builder tests, commit.
+
+## Default documents for a new store
+
+`builder/seeding.py` loads `builder/seeds/*.json` (each a converter fixture:
+the document is `response.document`, its translations `response.i18n`, the key
+`request.key`). Provisioning (`tenant.provisioning`, step "page builder")
+stores each as a document whose draft equals its published content, one
+version, and ONE release (number 1) holding them all; today that is
+`template:home`, 11 sections with fixed ids. It calls no service, so a
+storefront outage cannot leave a store without its homepage, and a store that
+already has builder data is left alone. What stands in for validation is
+`tests/unit/builder/test_seeds.py`, which validates every seed against the
+catalogue snapshot and checks the values `seeding` derives (block types,
+references) equal what validation derives.
 
 ## Not here yet
 

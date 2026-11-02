@@ -13,10 +13,10 @@ Django's side of the same contract:
   validates and stores.
 
 The copies are PINNED to a storefront commit (``tests/fixtures/builder/
-legacy.source.json``, checked by ``tests/unit/builder/
-test_converter_fixture_pin.py``) and refreshed only by
-``python .github/scripts/sync_converter_fixtures.py``, which a weekly
-workflow (``converter-fixtures.yml``) reminds us to run. After a refresh, a
+storefront.lock.json``, checked by ``tests/unit/builder/
+test_storefront_sources_pin.py``) and refreshed only by
+``python .github/scripts/sync_storefront_sources.py``, which a weekly
+workflow (``storefront-sources.yml``) reminds us to run. After a refresh, a
 failing case here is a contract change to agree on, not to paper over.
 """
 
@@ -194,16 +194,38 @@ def test_a_menu_is_sent_as_the_storefront_expects(path):
     assert structure(sent, ids=ids) == structure(expected, ids=ids)
 
 
-@pytest.mark.parametrize("path", CASES, ids=lambda p: p.stem)
-def test_a_response_parses_into_what_the_importer_validates(path, settings):
+def refused_cases() -> list[Path]:
+    """The cases whose response is the storefront's 422 refusal."""
+    return [
+        p for p in CASES if load(p)["response"].get("code") == "unconvertible"
+    ]
+
+
+def converted_cases() -> list[Path]:
+    return [p for p in CASES if p not in refused_cases()]
+
+
+def answer(status: int, body: dict) -> mock.Mock:
+    reply = mock.Mock(spec=requests.Response)
+    reply.status_code = status
+    reply.json.return_value = body
+    return reply
+
+
+@pytest.fixture
+def storefront(settings):
     settings.NUXT_CACHE_PURGE_TOKEN = "token"
     settings.NUXT_INTERNAL_BASE_URL = "http://storefront.test"
-    fixture = load(path)
-    reply = mock.Mock(spec=requests.Response)
-    reply.status_code = 200
-    reply.json.return_value = fixture["response"]
 
-    with mock.patch("builder.convert.requests.post", return_value=reply):
+
+@pytest.mark.parametrize("path", converted_cases(), ids=lambda p: p.stem)
+def test_a_response_parses_into_what_the_importer_validates(path, storefront):
+    fixture = load(path)
+
+    with mock.patch(
+        "builder.convert.requests.post",
+        return_value=answer(200, fixture["response"]),
+    ):
         converted = convert.convert_legacy(fixture["request"])
 
     assert converted.document == fixture["response"]["document"]
@@ -211,3 +233,23 @@ def test_a_response_parses_into_what_the_importer_validates(path, settings):
     assert converted.warnings == fixture["response"]["warnings"]
     assert set(converted.document) <= {"settings", "sections", "order"}
     assert list(converted.document["sections"]) == converted.document["order"]
+
+
+@pytest.mark.parametrize("path", refused_cases(), ids=lambda p: p.stem)
+def test_a_refusal_is_what_the_importer_reports(path, storefront):
+    fixture = load(path)
+
+    with (
+        mock.patch(
+            "builder.convert.requests.post",
+            return_value=answer(422, fixture["response"]),
+        ),
+        pytest.raises(convert.ConversionRefused) as refused,
+    ):
+        convert.convert_legacy(fixture["request"])
+
+    assert refused.value.errors == fixture["response"]["errors"]
+
+
+def test_the_storefront_refuses_some_cases():
+    assert refused_cases()

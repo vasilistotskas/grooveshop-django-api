@@ -38,7 +38,8 @@ uv run pre-commit run --all-files
 uv run python manage.py makemigrations
 uv run python manage.py migrate
 uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
-# `manage.py runserver` does not work: the project is ASGI-only and has no wsgi module
+# `manage.py runserver` is not the dev server: it serves plain HTTP through
+# Django's default WSGI handler but no WebSocket (ws/notifications/)
 uv run python manage.py seed_all
 
 # Generate OpenAPI schema (used by Nuxt frontend for types)

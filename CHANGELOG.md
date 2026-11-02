@@ -3,6 +3,37 @@
 
 
 
+## v3.200.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): keep the media content hash a non-null string
+
+A nullable string column is refused by the suite (test_nullable_string_fields):
+the hash is an empty string until a file is hashed, with a database default.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0931d82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0931d82324b6e157a7facf0ba00ce7a616bc343a))
+
+### Features
+
+* feat(builder): import store images into the media library, de-duplicate them, resolve them for previews (#439) ([`0931d82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0931d82324b6e157a7facf0ba00ce7a616bc343a))
+
+* feat(builder): import store images into the media library, de-duplicate them, resolve them for previews
+
+An image uploaded or imported twice is one asset (a SHA-256 of the file, an
+indexed nullable column). POST builder/media/import brings in an image of this
+store by path: a file the storefront serves (fetched from its internal address,
+redirects refused) or one already uploaded (copied); anything with a scheme or
+host is refused. Staff can resolve any asset for the editor's preview, and a
+share-preview link resolves only the assets its frozen documents reference. The
+media list also searches alt text.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0931d82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0931d82324b6e157a7facf0ba00ce7a616bc343a))
+
 ## v3.199.0 (2026-11-02)
 
 ### Bug fixes

@@ -9583,6 +9583,49 @@ paths:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
           description: ''
+  /api/v1/builder/presence:
+    post:
+      operationId: api_v1_builder_presence_create
+      description: 'A heartbeat: the documents this editor has open (the full list;
+        ones left out are let go of). Answers who ELSE has each of them open, `{documents:
+        {key: [{id, name, since}]}}`, the caller excluded. A person lapses `BUILDER_PRESENCE_TTL_SECONDS`
+        after their last heartbeat. It is a hint: the draft''s `If-Match` revision
+        still decides a save.'
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresenceWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Presence'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+    delete:
+      operationId: api_v1_builder_presence_destroy
+      description: 'Who else has a document open: a heartbeat, and sign-out.'
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/builder/preview/resolve:
     post:
       operationId: api_v1_builder_preview_resolve_create
@@ -45889,6 +45932,45 @@ components:
       - points
       - referenceOrder
       - transactionType
+    Presence:
+      type: object
+      description: |-
+        ``{documents: {key: [{id, name, since}]}}``: who else has each of the
+        documents named in the heartbeat open.
+      properties:
+        documents:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/PresenceEntry'
+      required:
+      - documents
+    PresenceEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        since:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - since
+    PresenceWriteRequest:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+      required:
+      - documents
     PreviewCopyRequest:
       type: object
       properties:

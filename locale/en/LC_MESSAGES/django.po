@@ -317,6 +317,10 @@ msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → product %(product)s: %(price)s"
 
 #, python-format
+msgid "%(key)s is not a document key."
+msgstr "%(key)s is not a document key."
+
+#, python-format
 msgid "%(key)s no longer exists."
 msgstr "%(key)s no longer exists."
 
@@ -704,6 +708,10 @@ msgstr "A domain needs at least two labels, such as shop.example.com."
 
 msgid "A focal point is between 0 and 1."
 msgstr "A focal point is between 0 and 1."
+
+#, python-format
+msgid "A heartbeat can name at most %(limit)s documents."
+msgstr "A heartbeat can name at most %(limit)s documents."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."

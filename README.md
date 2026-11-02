@@ -97,7 +97,8 @@ uv run celery --app core beat --loglevel=info \
 
 Fill the search indexes for a store with
 `uv run python manage.py meilisearch_sync_all_indexes --tenant local`. Every
-`meilisearch_*` command takes `--tenant <schema>` or `--all-tenants`; see
+`meilisearch_*` command except the server-wide `meilisearch_enable_experimental`
+takes `--tenant <schema>` or `--all-tenants`; see
 [the command reference](docs/search/management-commands.md).
 
 The API is served under `/api/v1/`. Swagger UI is at
@@ -167,7 +168,8 @@ detail.
 - [`docs/`](docs/): the deep reference for this service (orders, emails,
   search, pricing, the page builder, migrations, testing and more). It is
   published on the docs site under
-  [/dev/django/reference](https://docs.grooveshop.space/dev/django/reference/order-system).
+  [/dev/django/reference](https://docs.grooveshop.space/dev/django/reference/order-system)
+  (basic auth).
 - [docs.grooveshop.space](https://docs.grooveshop.space): the public admin guide
   for store owners (Greek and English), and the developer docs under `/dev`
   (basic auth).

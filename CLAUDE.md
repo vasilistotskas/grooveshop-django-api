@@ -78,7 +78,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
 - **promotion/**, **giftcard/**, **b2b/** — Rule-based promotions and coupons; stored-value gift cards with a ledger; wholesale program (business profiles, VIES, group pricing)
 - **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`shipping/interfaces.py`) and the two carrier integrations
-- **page_config/** — Merchant-editable storefront layouts, navigation and content pages
+- **page_config/** — Content pages (policies, FAQ, info pages) and the legal documents: the platform's texts, their rollout, and the version each order accepted. Pages and menus are the page builder's (`builder/`)
 - **texts/** — Store-edited storefront wording (`TextOverride`), the store admin's text editor, and the public overrides read; the catalogue and the syntax check are the storefront's
 - **builder/** — The storefront page builder: versioned documents (theme, section groups, templates, pages), immutable releases, the staff API and the public read of the current release; the block catalogue is the storefront's
 - **meta_capi/** — Meta Conversions API event dispatch

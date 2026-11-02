@@ -2,7 +2,6 @@
 
 import django.contrib.postgres.indexes
 import django.db.models.deletion
-import page_config.schemas
 import parler.fields
 import parler.models
 import uuid
@@ -24,7 +23,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
                 ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-                ('icon', models.CharField(blank=True, default='', help_text='An i-* icon name, e.g. i-heroicons-light-bulb.', max_length=64, validators=[page_config.schemas.validate_icon_name], verbose_name='Icon')),
+                ('icon', models.CharField(blank=True, default='', help_text='An i-* icon name, e.g. i-heroicons-light-bulb.', max_length=64, verbose_name='Icon')),
                 ('menu', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='columns', to='page_config.navigationmenu', verbose_name='Menu')),
             ],
             options={

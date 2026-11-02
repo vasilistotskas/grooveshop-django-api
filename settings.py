@@ -4209,7 +4209,6 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api.schema.postprocess_schema_parameters_to_accept_strings",
         "core.api.schema.publish_error_schemas",
-        "page_config.openapi.publish_section_schemas",
     ],
     "PREPROCESSING_HOOKS": [
         "drf_spectacular.hooks.preprocess_exclude_path_format",

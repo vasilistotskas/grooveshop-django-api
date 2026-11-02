@@ -399,7 +399,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "This tenant is a disposable showcase, not a real "
             "merchant. Allows manage.py seed_demo_store to overwrite "
-            "its catalogue, layouts and navigation without --force. "
+            "its catalogue and showcase content without --force. "
             "Never set this on a store that takes real orders."
         ),
     )
@@ -1471,7 +1471,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         # import would close the cycle.
         from django_tenants.utils import schema_exists, tenant_context
 
-        from page_config.defaults import legal_translation_coverage
+        from page_config.content_pages import legal_translation_coverage
         from page_config.legal_documents import missing_legal_translations
 
         added = self._newly_added_locales()

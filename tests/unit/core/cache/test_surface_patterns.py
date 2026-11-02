@@ -159,39 +159,37 @@ class TestSiteRootPathname:
 
 
 class TestPageConfigSurface:
-    """The page builder had no surface at all, so a layout edit sat
-    behind Nitro's SSR cache for the rest of its TTL with no way to
-    flush it."""
+    """The content pages: a content page edit must not sit behind
+    Nitro's SSR cache for the rest of its TTL."""
 
-    def test_names_the_real_nuxt_navigation_handler(self):
-        """``pageConfigNavigation``, not ``pageNavigation``.
-
-        The Nuxt handler names here are ``defineCachedEventHandler``
+    def test_names_the_real_nuxt_content_page_handlers(self):
+        """The Nuxt handler names here are ``defineCachedEventHandler``
         ``name:`` values from the storefront repo; there is no
         cross-repo check, so a wrong one silently matches nothing. That
         happened: an operator's menu edit stayed invisible on staging
         because the purge named a handler that does not exist. Pinned
-        because the correct name is not guessable from this side.
+        because the correct names are not guessable from this side.
         """
         patterns = get_surface("page_config").nuxt_patterns
 
-        assert "cache:nitro:handlers:pageConfigNavigation*" in patterns
-        assert "cache:nitro:handlers:pageNavigation*" not in patterns
+        assert "cache:nitro:handlers:ContentPageViewSet*" in patterns
+        assert "cache:nitro:handlers:ContentPageDetailViewSet*" in patterns
 
     def test_purges_both_the_json_and_the_rendered_html(self):
         patterns = get_surface("page_config").nuxt_patterns
 
         # The JSON the pages are built from...
-        assert "cache:nitro:handlers:pageConfig*" in patterns
+        assert "cache:nitro:handlers:ContentPageDetailViewSet*" in patterns
         # ...and the HTML already built from it. Purging only the first
         # leaves the storefront serving the old page.
         assert "cache:nitro:routes:_:*" in patterns
 
     def test_purges_every_cached_page_of_the_store(self):
-        """A menu edit shows on every page and a layout edit on any
-        custom content page, whose path is the merchant's own. A fixed
-        list of routes left those pages stale for up to 600 s. The purge
-        endpoint keeps only the purging store's keys (``host``)."""
+        """Every page links content pages (the footers, the checkout's
+        legal strip), and a custom content page's path is the
+        merchant's own. A fixed list of routes left those pages stale
+        for up to 600 s. The purge endpoint keeps only the purging
+        store's keys (``host``)."""
         endpoint = _endpoint_regex
         patterns = get_surface("page_config").nuxt_patterns
 
@@ -210,8 +208,8 @@ class TestPageConfigSurface:
         )
 
     def test_declares_no_django_patterns(self):
-        """Nothing in page_config is ``@cache_methods``-decorated — not
-        the plain @api_view endpoints and not ContentPageViewSet either.
+        """Nothing in page_config is ``@cache_methods``-decorated, not
+        even ContentPageViewSet.
         A pattern here would match zero keys and report success, which
         is the failure mode this whole module guards against.
         """

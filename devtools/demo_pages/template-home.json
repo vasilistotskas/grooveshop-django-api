@@ -1,0 +1,467 @@
+{
+  "key": "template:home",
+  "document": {
+    "order": [
+      "dec52c57-5926-4c89-ab72-c131b6657dad",
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df",
+      "cbfdd54f-93e0-4aaf-9257-bbbd09663721",
+      "7ea1f9de-48d6-47da-bcd2-e39c6d901898",
+      "5abce05f-5e36-4aee-b2cb-fe2ac3b2fc02",
+      "a6cd13d8-606e-4319-bc99-6fe6988ebee3",
+      "b24a6d27-62ce-4515-ac96-abd610be79b7",
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f",
+      "6286bb96-460d-4e8b-b3f5-81a883da837d",
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72",
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62"
+    ],
+    "sections": {
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72": {
+        "blockOrder": [
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-1",
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-2",
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-3"
+        ],
+        "blocks": {
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-1": {
+            "settings": {
+              "name": "Γιώργος Π.",
+              "rating": 5,
+              "role": "Επαληθευμένη αγορά",
+              "text": "Ο φορτιστής των 65W αντικατέστησε τρία τροφοδοτικά στην τσάντα μου. Ήρθε το επόμενο πρωί στη Θεσσαλονίκη."
+            },
+            "type": "testimonial@1"
+          },
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-2": {
+            "settings": {
+              "name": "Μαρία Κ.",
+              "rating": 5,
+              "role": "Επαληθευμένη αγορά",
+              "text": "Η διάφανη θήκη είναι ακόμα διάφανη μετά από τέσσερις μήνες. Την άλλαξα χωρίς κόπο όταν πήρα λάθος μέγεθος."
+            },
+            "type": "testimonial@1"
+          },
+          "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-3": {
+            "settings": {
+              "name": "Νίκος Α.",
+              "rating": 5,
+              "role": "Πελάτης χονδρικής",
+              "text": "Παίρνουμε καλώδια για όλο το γραφείο με τιμές χονδρικής. Τα τιμολόγια πάνε αυτόματα στο myDATA."
+            },
+            "type": "testimonial@1"
+          }
+        },
+        "settings": {
+          "heading": "Τι λένε οι πελάτες μας",
+          "surface": "muted"
+        },
+        "type": "testimonials@1"
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df": {
+        "blockOrder": [
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-1",
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-2",
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-3",
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-4",
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-5"
+        ],
+        "blocks": {
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-1": {
+            "settings": {
+              "icon": "i-heroicons-truck",
+              "kind": "shipping",
+              "label": "Δωρεάν αποστολή από 50€"
+            },
+            "type": "trust_badge@1"
+          },
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-2": {
+            "settings": {
+              "icon": "i-heroicons-arrow-uturn-left",
+              "kind": "custom",
+              "label": "Επιστροφές 30 ημερών"
+            },
+            "type": "trust_badge@1"
+          },
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-3": {
+            "settings": {
+              "icon": "i-heroicons-shield-check",
+              "kind": "custom",
+              "label": "Εγγύηση 2 ετών"
+            },
+            "type": "trust_badge@1"
+          },
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-4": {
+            "settings": {
+              "icon": "i-heroicons-lock-closed",
+              "kind": "payment",
+              "label": "Ασφαλείς πληρωμές"
+            },
+            "type": "trust_badge@1"
+          },
+          "26c15d55-ac34-4aba-83bd-e9452bbf76df-5": {
+            "settings": {
+              "href": {
+                "ref": {
+                  "id": "ai-ready",
+                  "kind": "contentPage"
+                }
+              },
+              "icon": "i-heroicons-sparkles",
+              "kind": "ai",
+              "label": "Έτοιμο για AI agents"
+            },
+            "type": "trust_badge@1"
+          }
+        },
+        "settings": {
+          "marquee": false,
+          "surface": "muted"
+        },
+        "type": "trust_badges@1"
+      },
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f": {
+        "blockOrder": [
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-1",
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-2",
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-3",
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-4"
+        ],
+        "blocks": {
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-1": {
+            "settings": {
+              "label": "παραγγελίες στάλθηκαν",
+              "value": "12.400+"
+            },
+            "type": "stat@1"
+          },
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-2": {
+            "settings": {
+              "label": "μέση βαθμολογία",
+              "value": "4,8 / 5"
+            },
+            "type": "stat@1"
+          },
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-3": {
+            "settings": {
+              "label": "εργάσιμες για παράδοση",
+              "value": "1–3"
+            },
+            "type": "stat@1"
+          },
+          "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-4": {
+            "settings": {
+              "label": "εγγύηση",
+              "value": "2 έτη"
+            },
+            "type": "stat@1"
+          }
+        },
+        "settings": {
+          "surface": "muted"
+        },
+        "type": "stats_strip@1"
+      },
+      "5abce05f-5e36-4aee-b2cb-fe2ac3b2fc02": {
+        "settings": {
+          "ctaLink": {
+            "route": "/offers"
+          },
+          "eyebrow": "Τρέχουσες προσφορές",
+          "heading": "Κωδικοί που όντως ισχύουν.",
+          "limit": 3,
+          "surface": "ink"
+        },
+        "type": "offers_preview@1"
+      },
+      "6286bb96-460d-4e8b-b3f5-81a883da837d": {
+        "settings": {
+          "count": 3,
+          "ctaLink": {
+            "route": "/blog"
+          },
+          "ctaText": "Όλα τα άρθρα",
+          "heading": "Από το blog",
+          "subheading": "Οδηγοί και συμβουλές, χωρίς μάρκετινγκ.",
+          "surface": "default"
+        },
+        "type": "blog_posts_grid@1"
+      },
+      "7ea1f9de-48d6-47da-bcd2-e39c6d901898": {
+        "settings": {
+          "ctaLink": {
+            "route": "/products"
+          },
+          "ctaText": "Δες όλα",
+          "heading": "Νέες αφίξεις",
+          "ordering": "newest",
+          "pageSize": 4,
+          "showAddToCart": true,
+          "subheading": "Ό,τι μπήκε τελευταίο στο κατάστημα.",
+          "surface": "default"
+        },
+        "type": "products_grid@1"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62": {
+        "blockOrder": [
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-1",
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-2",
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-3",
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-4"
+        ],
+        "blocks": {
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-1": {
+            "settings": {
+              "answer": "Δωρεάν από 50 €. Αλλιώς 3,50 € με courier ACS ή σε locker BOX NOW.",
+              "question": "Πόσο κοστίζει η αποστολή;"
+            },
+            "type": "faq_item@1"
+          },
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-2": {
+            "settings": {
+              "answer": "Σε 1–3 εργάσιμες σε όλη την Ελλάδα. Παραγγελίες μέχρι τις 15:00 φεύγουν αυθημερόν.",
+              "question": "Πότε θα φτάσει η παραγγελία μου;"
+            },
+            "type": "faq_item@1"
+          },
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-3": {
+            "settings": {
+              "answer": "Ναι, μέσα σε 30 ημέρες, στην αρχική του συσκευασία.",
+              "question": "Μπορώ να επιστρέψω κάτι;"
+            },
+            "type": "faq_item@1"
+          },
+          "a340a1bb-e05d-4a0c-980f-4508534b8d62-4": {
+            "settings": {
+              "answer": "Με κάρτα, με αντικαταβολή ή με δωροκάρτα του καταστήματος.",
+              "question": "Πώς μπορώ να πληρώσω;"
+            },
+            "type": "faq_item@1"
+          }
+        },
+        "settings": {
+          "heading": "Συχνές ερωτήσεις",
+          "multiple": false,
+          "surface": "default"
+        },
+        "type": "faq@1"
+      },
+      "a6cd13d8-606e-4319-bc99-6fe6988ebee3": {
+        "settings": {
+          "ctaLink": {
+            "route": "/products"
+          },
+          "ctaText": "Δες όλα",
+          "heading": "Δημοφιλή προϊόντα",
+          "ordering": "popular",
+          "pageSize": 4,
+          "showAddToCart": true,
+          "subheading": "Αυτά βάζουν όλοι στο καλάθι τους αυτόν τον μήνα.",
+          "surface": "muted"
+        },
+        "type": "featured_products@1"
+      },
+      "b24a6d27-62ce-4515-ac96-abd610be79b7": {
+        "settings": {
+          "title": "Οι πόντοι σου"
+        },
+        "type": "loyalty_hero@1"
+      },
+      "cbfdd54f-93e0-4aaf-9257-bbbd09663721": {
+        "settings": {
+          "heading": "Αγόρασε ανά κατηγορία",
+          "layout": "tiles",
+          "limit": 6,
+          "surface": "muted"
+        },
+        "type": "product_categories@1"
+      },
+      "dec52c57-5926-4c89-ab72-c131b6657dad": {
+        "blockOrder": [
+          "dec52c57-5926-4c89-ab72-c131b6657dad-1",
+          "dec52c57-5926-4c89-ab72-c131b6657dad-2",
+          "dec52c57-5926-4c89-ab72-c131b6657dad-3"
+        ],
+        "blocks": {
+          "dec52c57-5926-4c89-ab72-c131b6657dad-1": {
+            "settings": {
+              "alt": "Φορτιστής, καλώδιο και power bank σε γραφείο",
+              "ctaLink": {
+                "route": "/products"
+              },
+              "ctaText": "Δες τη φόρτιση",
+              "eyebrow": "Φόρτιση",
+              "heading": "Φόρτισε γρήγορα, μία φορά την ημέρα",
+              "imageUrl": "{{asset:hero-charging}}",
+              "productId": "{{product:demo-powerbank-20k}}",
+              "secondaryCtaLink": {
+                "route": "/blog"
+              },
+              "secondaryCtaText": "Οδηγοί αγοράς",
+              "subheading": "Power banks, φορτιστές GaN και καλώδια που αντέχουν."
+            },
+            "type": "hero_slide@1"
+          },
+          "dec52c57-5926-4c89-ab72-c131b6657dad-2": {
+            "settings": {
+              "alt": "Ασύρματα ακουστικά με τη θήκη τους",
+              "ctaLink": {
+                "route": "/products"
+              },
+              "ctaText": "Δες τον ήχο",
+              "eyebrow": "Ήχος",
+              "heading": "Ακουστικά που κάθονται σωστά",
+              "imageUrl": "{{asset:hero-audio}}",
+              "subheading": "Ακύρωση θορύβου, αυτονομία και εφαρμογή — με αυτή τη σειρά."
+            },
+            "type": "hero_slide@1"
+          },
+          "dec52c57-5926-4c89-ab72-c131b6657dad-3": {
+            "settings": {
+              "alt": "Χρωματιστές θήκες κινητού",
+              "ctaLink": {
+                "route": "/products"
+              },
+              "ctaText": "Δες την προστασία",
+              "eyebrow": "Προστασία",
+              "heading": "Κράτα το καινούργιο, καινούργιο",
+              "imageUrl": "{{asset:hero-protection}}",
+              "subheading": "Θήκες και tempered glass για κάθε μοντέλο."
+            },
+            "type": "hero_slide@1"
+          }
+        },
+        "settings": {
+          "aspect": "wide",
+          "autoplayMs": 6000
+        },
+        "type": "hero_carousel@1"
+      }
+    },
+    "settings": {
+      "seoDescription": "Θήκες, τζαμάκια, καλώδια USB-C, φορτιστές GaN και powerbanks για το κινητό σου. Αποστολή σε 1-3 ημέρες, δωρεάν πάνω από 50€ και εγγύηση 2 ετών.",
+      "seoTitle": "GrooveShop Demo | Αξεσουάρ κινητού με γρήγορη αποστολή"
+    }
+  },
+  "i18n": {
+    "en": {
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72": {
+        "/heading": "What our customers say"
+      },
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-1": {
+        "/name": "Giorgos P.",
+        "/role": "Verified purchase",
+        "/text": "The 65W charger replaced three bricks in my bag. Delivered the next morning in Thessaloniki."
+      },
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-2": {
+        "/name": "Maria K.",
+        "/role": "Verified purchase",
+        "/text": "Clear case still clear after four months. Returns were painless when I picked the wrong size first."
+      },
+      "1c4cdfc9-9d7f-4b5c-ab70-527edcd08e72-3": {
+        "/name": "Nikos A.",
+        "/role": "Wholesale customer",
+        "/text": "We order cables for the whole office on wholesale pricing. Invoices land in myDATA automatically."
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df-1": {
+        "/label": "Free delivery over 50€"
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df-2": {
+        "/label": "30-day returns"
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df-3": {
+        "/label": "Two-year warranty"
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df-4": {
+        "/label": "Secure payments"
+      },
+      "26c15d55-ac34-4aba-83bd-e9452bbf76df-5": {
+        "/label": "AI-agent ready"
+      },
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-1": {
+        "/label": "orders shipped",
+        "/value": "12,400+"
+      },
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-2": {
+        "/label": "average rating",
+        "/value": "4.8 / 5"
+      },
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-3": {
+        "/label": "working days",
+        "/value": "1–3"
+      },
+      "4ee32f17-3c6b-4a39-8a0f-e9af3791ec1f-4": {
+        "/label": "warranty",
+        "/value": "2 years"
+      },
+      "5abce05f-5e36-4aee-b2cb-fe2ac3b2fc02": {
+        "/eyebrow": "Running offers",
+        "/heading": "Codes that actually work."
+      },
+      "6286bb96-460d-4e8b-b3f5-81a883da837d": {
+        "/ctaText": "All posts",
+        "/heading": "From the blog",
+        "/subheading": "Guides and tips, without the marketing."
+      },
+      "7ea1f9de-48d6-47da-bcd2-e39c6d901898": {
+        "/ctaText": "See all",
+        "/heading": "New arrivals",
+        "/subheading": "The latest things to land in the shop."
+      },
+      "@document": {
+        "/seoDescription": "Cases, screen protectors, USB-C cables, GaN chargers and power banks for your phone. Delivered in 1-3 days, free over €50, with a two-year warranty.",
+        "/seoTitle": "GrooveShop Demo | Phone Accessories, Delivered Fast"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62": {
+        "/heading": "Frequently asked"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62-1": {
+        "/answer": "Free over 50 €. Otherwise 3,50 € with ACS courier or a BOX NOW locker.",
+        "/question": "How much is delivery?"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62-2": {
+        "/answer": "In 1–3 working days across Greece. Orders before 15:00 leave the same day.",
+        "/question": "When will my order arrive?"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62-3": {
+        "/answer": "Yes, within 30 days, in its original packaging.",
+        "/question": "Can I return something?"
+      },
+      "a340a1bb-e05d-4a0c-980f-4508534b8d62-4": {
+        "/answer": "By card, cash on delivery, or with a store gift card.",
+        "/question": "How can I pay?"
+      },
+      "a6cd13d8-606e-4319-bc99-6fe6988ebee3": {
+        "/ctaText": "See all",
+        "/heading": "Most popular",
+        "/subheading": "What everyone is adding to their cart this month."
+      },
+      "b24a6d27-62ce-4515-ac96-abd610be79b7": {
+        "/title": "Your rewards"
+      },
+      "cbfdd54f-93e0-4aaf-9257-bbbd09663721": {
+        "/heading": "Shop by category"
+      },
+      "dec52c57-5926-4c89-ab72-c131b6657dad-1": {
+        "/alt": "A charger, cable and power bank on a desk",
+        "/ctaText": "Shop charging",
+        "/eyebrow": "Charging",
+        "/heading": "Charge fast, once a day",
+        "/secondaryCtaText": "Buying guides",
+        "/subheading": "Power banks, GaN chargers and cables that last."
+      },
+      "dec52c57-5926-4c89-ab72-c131b6657dad-2": {
+        "/alt": "Wireless earbuds beside their case",
+        "/ctaText": "Shop audio",
+        "/eyebrow": "Audio",
+        "/heading": "Earbuds that actually fit",
+        "/subheading": "Noise cancelling, battery and fit — in that order."
+      },
+      "dec52c57-5926-4c89-ab72-c131b6657dad-3": {
+        "/alt": "Coloured phone cases",
+        "/ctaText": "Shop protection",
+        "/eyebrow": "Protection",
+        "/heading": "Keep it looking new",
+        "/subheading": "Cases and tempered glass for every model."
+      }
+    }
+  }
+}

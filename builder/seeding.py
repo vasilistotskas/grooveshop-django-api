@@ -15,26 +15,41 @@ must not leave a store without its homepage. What stands in for validation
 is ``tests/unit/builder/test_seeds.py``, which validates every seed against
 the vendored catalogue snapshot and checks that what is derived here (block
 types, references) is what validation derives.
+
+:func:`seed_with_content` releases richer content in the same files' shape
+(the demo store's pages, ``devtools/demo_pages``) on a store that holds
+nothing an editor made. That content names the store's own records, so it
+is validated against the store's catalogue, references included, like a
+publish.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from django.db import transaction
 
 from builder import validation
+from builder.errors import DocumentInvalid, Issue
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
+    BuilderScheduledPublish,
+    BuilderVersion,
     VersionKind,
     kind_of_key,
 )
-from builder.services import _create_release, _new_version
+from builder.services import (
+    _catalogue,
+    _create_release,
+    _issues,
+    _lock_release_sequence,
+    _new_version,
+)
 
 SEEDS = Path(__file__).parent / "seeds"
 
@@ -124,3 +139,95 @@ def seed_store() -> BuilderRelease | None:
                 catalogue_hash="",
             ).pk
         return _create_release(None, versions, note=NOTE)
+
+
+def _untouched_defaults() -> dict[str, int] | None:
+    """The release map of a store whose builder data is exactly what
+    :func:`seed_store` leaves, ``{}`` for a store with none at all, and
+    ``None`` for any other: a draft saved, a page deleted, a named save, a
+    schedule or a release by a person all mean someone has worked here."""
+    releases = list(BuilderRelease.objects.order_by("number")[:2])
+    documents = BuilderDocument.objects.all_with_deleted()
+    if not releases:
+        return None if documents.exists() else {}
+    if (
+        len(releases) > 1
+        or releases[0].note != NOTE
+        or releases[0].published_by_staff_id is not None
+        or documents.filter(is_deleted=True).exists()
+        or documents.exclude(draft_revision=1).exists()
+        or BuilderVersion.objects.exclude(kind=VersionKind.PUBLISH).exists()
+        or BuilderVersion.objects.exclude(created_by_staff_id=None).exists()
+        or BuilderScheduledPublish.objects.exists()
+    ):
+        return None
+    return dict(releases[0].versions)
+
+
+def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
+    """Release *seeds* as a store's content in ONE release, validated like a
+    publish; ``None``, writing nothing, unless the store has no builder data
+    or only the untouched defaults (:func:`_untouched_defaults`), so it can
+    never overwrite what an editor has done.
+
+    Unlike the defaults, content may name the store's records (a product, a
+    content page, another page), so it is not trusted: every seed is
+    validated against the store's catalogue, its references included, and
+    one problem anywhere is a ``DocumentInvalid`` that writes nothing. With
+    no catalogue nothing is written either (``StorefrontUnavailableError``),
+    the rule of every builder write. A default document no seed names stays
+    as it was.
+    """
+    catalogue = _catalogue()
+    with transaction.atomic():
+        _lock_release_sequence()
+        base = _untouched_defaults()
+        if base is None:
+            return None
+        problems: list[Issue] = []
+        checked: dict[str, validation.Validated] = {}
+        for seed in seeds:
+            issues, validated = _issues(
+                seed.key, seed.data, seed.i18n, catalogue
+            )
+            if validated is not None:
+                checked[seed.key] = validated
+            problems.extend(
+                replace(issue, document=seed.key) for issue in issues
+            )
+        if problems:
+            raise DocumentInvalid(problems)
+        documents: dict[str, BuilderDocument] = {}
+        for seed in seeds:
+            kind = kind_of_key(seed.key)
+            assert kind is not None, seed.key
+            document, _ = BuilderDocument.objects.get_or_create(
+                key=seed.key, defaults={"kind": kind, "draft_revision": 0}
+            )
+            document.draft = checked[seed.key].data
+            document.draft_i18n = checked[seed.key].i18n
+            document.draft_catalogue_hash = catalogue.hash
+            document.draft_revision += 1
+            document.published_revision = document.draft_revision
+            document.save()
+            documents[seed.key] = document
+        # References are checked once every seed is a document: a seed may
+        # link another (a menu linking the about page).
+        for seed in seeds:
+            problems.extend(
+                replace(issue, document=seed.key)
+                for issue in validation.check_references(checked[seed.key].refs)
+            )
+        if problems:
+            raise DocumentInvalid(problems)
+        versions = dict(base)
+        for key, document in documents.items():
+            versions[key] = _new_version(
+                None,
+                document,
+                checked[key],
+                kind=VersionKind.PUBLISH,
+                note=note,
+                catalogue_hash=catalogue.hash,
+            ).pk
+        return _create_release(None, versions, note=note)

@@ -58,10 +58,6 @@ _DELIBERATE: dict[str, str] = {
         "retention date via tenant_arch_ret_ix. created_at/updated_at are "
         "never read."
     ),
-    "page_config.NavigationMenu": (
-        "Ordered by `slot`; a handful of rows per tenant and neither "
-        "timestamp is queried."
-    ),
     "order.Order": (
         "Takes MetaDataModel's `metadata` GIN index explicitly but not "
         "its `private_metadata` one: no query reads that column on an "

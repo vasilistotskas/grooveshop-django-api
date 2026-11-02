@@ -31,6 +31,7 @@ from rest_framework.views import APIView
 
 from builder import media_services
 from builder.errors import BuilderError
+from builder.localization import LOCALE_PARAM, requested_locale
 from builder.models import BuilderReference, MediaAsset, ReferenceKind
 from builder.serializers import StaffSerializer
 from builder.services import staff_summary
@@ -38,7 +39,6 @@ from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.utils.i18n import available_language_codes
 from core.utils.image_paths import image_to_media_path
-from page_config.localization import LOCALE_PARAM, requested_locale
 
 TAGS = ["Builder media"]
 IDS_PARAM = "ids"

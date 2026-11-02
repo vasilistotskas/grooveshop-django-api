@@ -383,19 +383,6 @@ def store_sidebar(request: Any) -> list[Item]:
                 _("Accepted legal texts"),
                 "gavel",
             ),
-            _menu(
-                _("Menus"),
-                "menu",
-                [
-                    page("page_config.NavigationMenu", _("Menus")),
-                    page("page_config.NavigationColumn", _("Menu Columns")),
-                ],
-            ),
-            page(
-                "page_config.PageLayout",
-                _("Page Layouts"),
-                "dashboard_customize",
-            ),
             # The wording of the storefront itself (buttons, labels, notices),
             # one editor page rather than a model list.
             page("texts.TextOverride", _("Storefront Texts"), "translate"),

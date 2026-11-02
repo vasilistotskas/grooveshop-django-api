@@ -19,7 +19,7 @@ from django_tenants.utils import schema_context
 
 @pytest.mark.django_db
 def test_fresh_tenant_privacy_policy_is_current(mt_tenant):
-    from page_config.defaults import pending_legal_reviews
+    from page_config.content_pages import pending_legal_reviews
     from page_config.legal_documents import LEGAL_TEXT_REVISION
     from page_config.models import ContentPage
 

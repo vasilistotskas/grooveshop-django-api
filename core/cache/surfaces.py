@@ -421,18 +421,17 @@ def register_default_surfaces() -> None:
     register_surface(
         CacheSurface(
             code="page_config",
-            label=_("Pages & navigation"),
+            label=_("Content pages"),
             description=_(
-                "The page-builder layouts, the navigation menus and the"
-                " RENDERED pages built from them. Purge after editing a"
-                " layout, a section's props, a content page or a menu."
+                "The content pages (policies, FAQ, info pages) and the"
+                " RENDERED pages that show or link them. Purge after"
+                " editing a content page."
             ),
             # NOTHING in page_config is ``@cache_methods``-decorated:
-            # public_page_config / public_navigation are plain @api_view
-            # functions, and ContentPageViewSet — despite being a
-            # BaseModelViewSet — carries no decorator either (checked
-            # against page_config/views.py, which does not import
-            # cache_methods at all). A ``*ContentPageViewSet_*`` pattern
+            # ContentPageViewSet — despite being a BaseModelViewSet —
+            # carries no decorator (checked against page_config/views.py,
+            # which does not import cache_methods at all). A
+            # ``*ContentPageViewSet_*`` pattern
             # here would match zero keys and report success, which is
             # the exact failure test_surface_patterns.py exists to
             # prevent. So the Django half is empty by fact, not by
@@ -440,28 +439,23 @@ def register_default_surfaces() -> None:
             django_patterns=(),
             # Two halves, and BOTH are needed: purging the handler drops
             # the JSON, purging the route drops the HTML already built
-            # from it. Without the route half a layout edit sits behind
+            # from it. Without the route half an edit sits behind
             # Nitro's SSR cache for the rest of its TTL.
             #
-            # Every cached page of the store, not a list of paths: a
-            # navigation menu renders on every page, and a layout or
-            # section edit reaches any custom ContentPage, whose path is
+            # Every cached page of the store, not a list of paths: the
+            # footers and the checkout's legal strip link content pages
+            # from every page, and a custom ContentPage's path is
             # whatever the merchant typed. A fixed list left those stale
             # for up to 600 s. The purge endpoint narrows the one pattern
             # to this store's keys (``host``), as for ``store_pages``, and
             # a route-prefix pattern queues the edge purge.
             # These are ``defineCachedEventHandler`` NAMES from the Nuxt
             # repo, not guesses — verified against the ``name:`` field of
-            # server/api/page-config/[pageType].get.ts,
-            # server/api/page-config/navigation.get.ts and
-            # server/api/content-pages/*.get.ts. The navigation handler
-            # is ``pageConfigNavigation``; a shorter "pageNavigation"
-            # matches nothing, which is how an operator's menu edit
-            # stayed invisible after the row was updated (caught on
-            # staging 2026-09-01).
+            # server/api/content-pages/*.get.ts. A name that matches no
+            # handler purges nothing and reports success (an operator's
+            # menu edit stayed invisible that way, staging 2026-09-01).
+            # Pages and menus are the page builder's: its own surface.
             nuxt_patterns=_nuxt(
-                "pageConfig",
-                "pageConfigNavigation",
                 "ContentPageViewSet",
                 "ContentPageDetailViewSet",
             )
@@ -469,14 +463,6 @@ def register_default_surfaces() -> None:
             invalidated_by=(
                 "page_config.ContentPage",
                 "page_config.ContentPageTranslation",
-                "page_config.PageLayout",
-                "page_config.PageLayoutTranslation",
-                "page_config.PageSection",
-                "page_config.NavigationMenu",
-                "page_config.NavigationColumn",
-                "page_config.NavigationColumnTranslation",
-                "page_config.NavigationLink",
-                "page_config.NavigationLinkTranslation",
             ),
             icon="dashboard_customize",
             group="content",

@@ -382,14 +382,15 @@ class TestRenamesAndDeletes:
                 _migration(
                     "page_config",
                     "0999_delete",
-                    [migrations.DeleteModel("NavigationMenu")],
+                    [migrations.DeleteModel("LegalDocumentVersion")],
                 )
             ],
         )
 
         assert [f.reason for f in findings] == [
             (
-                "removes table page_config_navigationmenu, which the serving "
+                "removes table page_config_legaldocumentversion, which the "
+                "serving "
                 "release still reads"
             )
         ]

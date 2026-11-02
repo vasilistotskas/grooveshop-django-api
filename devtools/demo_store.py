@@ -33,6 +33,7 @@ import re
 import secrets
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from django.utils import timezone
@@ -49,7 +50,6 @@ from devtools.demo_catalogue import (
     specs_for,
     view_count,
 )
-from devtools.demo_home import HERO_SLIDE_PRODUCTS, HOME_SECTIONS
 from devtools.demo_media import (
     ensure_asset,
     ensure_assets,
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 DEMO_MARKER = "demo"
 
-# The opening of every body ``page_config.defaults.DEFAULT_CONTENT_PAGES``
+# The opening of every body ``page_config.content_pages.DEFAULT_CONTENT_PAGES``
 # seeds ("Προσθέστε εδώ …" — "add … here"). Used to tell an untouched
 # placeholder from a body a merchant has actually written, so publishing
 # never overwrites real content.
@@ -112,7 +112,7 @@ def _demo_contact_email() -> str:
     """
     from django.conf import settings
 
-    from page_config.defaults import tenant_document_context
+    from page_config.content_pages import tenant_document_context
 
     site_host, _store_name = tenant_document_context()
     host = site_host or getattr(settings, "APP_MAIN_HOST_NAME", "")
@@ -449,571 +449,8 @@ def acp_token() -> str:
     return f"acp_{DEMO_MARKER}_{secrets.token_urlsafe(32)}"
 
 
-# ── page builder ─────────────────────────────────────────────────────
-# Section props are validated against ``page_config.schemas`` before
-# they are written: that validation lives in the admin and the
-# serializers, NOT on the model, so a direct ORM write would otherwise
-# bypass it and the storefront would silently strip the bad keys.
-#
-# Two constraints shaped the distribution below, and both are load-
-# bearing rather than stylistic:
-#
-#   1. ``products``/``blog`` layouts stay EMPTY. ``page_config.defaults``
-#      records why: a listing section there double-renders the page
-#      (products_grid mounts its own ProductsList over the page's own
-#      breadcrumb + sidebar + list, two lists competing over the same
-#      URL filter state). That was a real regression; do not re-seed it.
-#   2. ``home`` gets three sections, not twenty. It is SWR-cached with a
-#      tuned JS budget (PSI mobile pass, preloads 151→2); every extra
-#      section is another lazy chunk on the highest-traffic route.
-#
-# ``hero_banner`` is the only type in HEADING_SECTION_TYPES — it takes
-# over the page's <h1> and makes the page stand its own PageTitle down,
-# so it is left out of ``contact``/``feedback``, which carry their own.
-#
-# ``sort_order`` below is the INTENDED order, used to sequence the
-# creates. It is not written: ``SortableModel.save()`` derives the
-# stored value from ``max(sections of this layout) + 1``.
-CONTACT_SECTIONS: tuple[dict[str, Any], ...] = (
-    {
-        "component_type": "business_hours",
-        "title": "",
-        "props": {},
-        "sort_order": 0,
-    },
-    {
-        "component_type": "location_map",
-        "title": "",
-        "props": {
-            "address": "Τσιμισκή 100, Θεσσαλονίκη 54622",
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "address": "100 Tsimiski St, Thessaloniki 54622",
-                }
-            }
-        },
-        "sort_order": 1,
-    },
-    {
-        "component_type": "divider",
-        "title": "",
-        "props": {"variant": "thread"},
-        "sort_order": 2,
-    },
-)
-
-FEEDBACK_SECTIONS: tuple[dict[str, Any], ...] = (
-    {
-        "component_type": "testimonials",
-        "title": "Τι λένε οι πελάτες μας",
-        "props": {
-            "items": [
-                {
-                    "name": "Γιώργος Π.",
-                    "text": "Παρέλαβα την επόμενη μέρα, όλα σωστά.",
-                },
-                {
-                    "name": "Μαρία Κ.",
-                    "text": "Ρώτησα κάτι στο chat και απάντησαν αμέσως.",
-                },
-                {
-                    "name": "Νίκος Α.",
-                    "text": "Καλές τιμές και σοβαρή εξυπηρέτηση.",
-                },
-            ],
-        },
-        "i18n": {
-            "en": {
-                "title": "What our customers say",
-                "props": {
-                    "items": [
-                        {
-                            "name": "George P.",
-                            "text": "Arrived the next day, everything correct.",
-                        },
-                        {
-                            "name": "Maria K.",
-                            "text": "Asked a question in the chat and got an answer straight away.",
-                        },
-                        {
-                            "name": "Nikos A.",
-                            "text": "Good prices and service that takes you seriously.",
-                        },
-                    ],
-                },
-            }
-        },
-        "sort_order": 0,
-    },
-)
-
-# ``about`` already carries the webside ``about_content`` variant at
-# sort_order 0; these append below it.
-ABOUT_SECTIONS: tuple[dict[str, Any], ...] = (
-    {
-        "component_type": "features_grid",
-        "title": "Γιατί εμάς",
-        "props": {
-            "heading": "Γιατί να μας επιλέξεις",
-            "columns": 3,
-            "decor": "gradient_tiles",
-            "items": [
-                {
-                    "title": "Αποστολή σε 1-3 ημέρες",
-                    "text": "Από την αποθήκη μας στη Θεσσαλονίκη.",
-                    "icon": "i-heroicons-truck",
-                },
-                {
-                    "title": "Εγγύηση 2 ετών",
-                    "text": "Σε όλα τα προϊόντα μας.",
-                    "icon": "i-heroicons-shield-check",
-                },
-                {
-                    "title": "Δωρεάν επιστροφή",
-                    "text": "14 ημέρες, χωρίς ερωτήσεις.",
-                    "icon": "i-heroicons-arrow-uturn-left",
-                },
-            ],
-        },
-        "i18n": {
-            "en": {
-                "title": "Why us",
-                "props": {
-                    "heading": "Why shop with us",
-                    "items": [
-                        {
-                            "title": "Delivered in 1-3 days",
-                            "text": "From our warehouse in Thessaloniki.",
-                            "icon": "i-heroicons-truck",
-                        },
-                        {
-                            "title": "Two-year warranty",
-                            "text": "On everything we sell.",
-                            "icon": "i-heroicons-shield-check",
-                        },
-                        {
-                            "title": "Free returns",
-                            "text": "Fourteen days, no questions asked.",
-                            "icon": "i-heroicons-arrow-uturn-left",
-                        },
-                    ],
-                },
-            }
-        },
-        "sort_order": 1,
-    },
-    {
-        "component_type": "media_text",
-        "title": "",
-        "props": {
-            "heading": "Ξεκινήσαμε από ένα συρτάρι με καλώδια",
-            "body": "Το 2019 ψάχναμε ένα καλώδιο που να αντέχει. Δεν το βρήκαμε, οπότε αρχίσαμε να διαλέγουμε μόνοι μας τι αξίζει να μπει στο συρτάρι.",
-            "image_url": "/img/main-banner.png",
-            "image_position": "left",
-            "cta_text": "Δες τη γκάμα",
-            "cta_link": "/products",
-            "decor": "orbs",
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "It started with a drawer full of cables",
-                    "body": "In 2019 we went looking for a cable that would last. We could not find one, so we started picking for ourselves what deserved a place in the drawer.",
-                    "cta_text": "See the range",
-                },
-            }
-        },
-        "sort_order": 2,
-    },
-    {
-        "component_type": "story_timeline",
-        "title": "",
-        "props": {
-            "heading": "Η πορεία μας",
-            "items": [
-                {
-                    "date": "2019",
-                    "title": "Τα πρώτα βήματα",
-                    "text": "Ξεκινάμε με 12 κωδικούς καλωδίων.",
-                    "icon": "i-heroicons-sparkles",
-                },
-                {
-                    "date": "2021",
-                    "title": "Πρώτη αποθήκη",
-                    "text": "Μετακομίζουμε σε δικό μας χώρο.",
-                    "icon": "i-heroicons-building-storefront",
-                },
-                {
-                    "date": "2023",
-                    "title": "Πανελλαδική αποστολή",
-                    "text": "Συνεργασία με ACS και BoxNow.",
-                    "icon": "i-heroicons-truck",
-                },
-                {
-                    "date": "2026",
-                    "title": "Χονδρική",
-                    "text": "Ανοίγουμε πρόγραμμα για επαγγελματίες.",
-                    "icon": "i-heroicons-briefcase",
-                },
-            ],
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "How we got here",
-                    "items": [
-                        {
-                            "date": "2019",
-                            "title": "First steps",
-                            "text": "We start out with twelve cable SKUs.",
-                            "icon": "i-heroicons-sparkles",
-                        },
-                        {
-                            "date": "2021",
-                            "title": "A warehouse of our own",
-                            "text": "We move into our own space.",
-                            "icon": "i-heroicons-building-storefront",
-                        },
-                        {
-                            "date": "2023",
-                            "title": "Shipping nationwide",
-                            "text": "We partner with ACS and BOX NOW.",
-                            "icon": "i-heroicons-truck",
-                        },
-                        {
-                            "date": "2026",
-                            "title": "Wholesale",
-                            "text": "We open a programme for businesses.",
-                            "icon": "i-heroicons-briefcase",
-                        },
-                    ],
-                },
-            }
-        },
-        "sort_order": 3,
-    },
-    {
-        "component_type": "image_gallery",
-        "title": "",
-        "props": {
-            "columns": 3,
-            "items": [
-                {
-                    "src": "/img/main-banner.png",
-                    "alt": "Η αποθήκη μας",
-                    "caption": "Η αποθήκη στη Θεσσαλονίκη",
-                },
-                {
-                    "src": "/img/main-banner-mobile.png",
-                    "alt": "Συσκευασία παραγγελίας",
-                    "caption": "Κάθε παραγγελία με το χέρι",
-                },
-                {
-                    "src": "/img/main-banner.png",
-                    "alt": "Έλεγχος ποιότητας",
-                    "caption": "Δοκιμάζουμε ό,τι πουλάμε",
-                },
-            ],
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "items": [
-                        {
-                            "src": "/img/main-banner.png",
-                            "alt": "Our warehouse",
-                            "caption": "The warehouse in Thessaloniki",
-                        },
-                        {
-                            "src": "/img/main-banner-mobile.png",
-                            "alt": "An order being packed",
-                            "caption": "Every order packed by hand",
-                        },
-                        {
-                            "src": "/img/main-banner.png",
-                            "alt": "Quality control",
-                            "caption": "We test what we sell",
-                        },
-                    ],
-                },
-            }
-        },
-        "sort_order": 4,
-    },
-    {
-        "component_type": "faq",
-        "title": "",
-        "props": {
-            "heading": "Συχνές ερωτήσεις",
-            "multiple": True,
-            "items": [
-                {
-                    "question": "Πόσο κοστίζει η αποστολή;",
-                    "answer": "2,99€ με ACS και 1,99€ με BoxNow. Δωρεάν για παραγγελίες πάνω από 50€.",
-                },
-                {
-                    "question": "Πόσο γρήγορα θα παραλάβω;",
-                    "answer": "Οι παραγγελίες που μπαίνουν μέχρι τις 14:00 φεύγουν την ίδια μέρα.",
-                },
-                {
-                    "question": "Μπορώ να επιστρέψω ένα προϊόν;",
-                    "answer": "Ναι, μέσα σε 14 ημέρες από την παραλαβή, στην αρχική του συσκευασία.",
-                },
-                {
-                    "question": "Εκδίδετε τιμολόγιο;",
-                    "answer": "Ναι. Συμπλήρωσε τα στοιχεία της εταιρείας σου στο checkout και το τιμολόγιο εκδίδεται αυτόματα.",
-                },
-            ],
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Frequently asked questions",
-                    "items": [
-                        {
-                            "question": "How much is delivery?",
-                            "answer": "2.99 EUR with ACS and 1.99 EUR with BOX NOW. Free on orders over 50 EUR.",
-                        },
-                        {
-                            "question": "How quickly will it arrive?",
-                            "answer": "Orders placed before 14:00 leave the same day.",
-                        },
-                        {
-                            "question": "Can I return something?",
-                            "answer": "Yes, within fourteen days of delivery, in its original packaging.",
-                        },
-                        {
-                            "question": "Do you issue invoices?",
-                            "answer": "Yes. Fill in your company details at checkout and the invoice is issued automatically.",
-                        },
-                    ],
-                },
-            }
-        },
-        "sort_order": 5,
-    },
-    {
-        "component_type": "newsletter_signup",
-        "title": "",
-        "props": {
-            "heading": "Μείνε ενημερωμένος",
-            "description": "Νέα προϊόντα και προσφορές, μία φορά τον μήνα.",
-            "placeholder": "Το email σου",
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "heading": "Stay in the loop",
-                    "description": "New products and offers, once a month.",
-                    "placeholder": "Your email",
-                },
-            }
-        },
-        "sort_order": 6,
-    },
-    {
-        "component_type": "spacer",
-        "title": "",
-        "props": {"height": "lg"},
-        "sort_order": 7,
-    },
-    {
-        "component_type": "rich_text",
-        "title": "",
-        "props": {
-            "content": "<h2>Επικοινωνία</h2><p>Στείλε μας μήνυμα από τη φόρμα επικοινωνίας για ό,τι χρειαστείς.</p>",
-        },
-        "i18n": {
-            "en": {
-                "props": {
-                    "content": "<h2>Get in touch</h2><p>Send us a message through the contact form for anything you need.</p>",
-                },
-            }
-        },
-        "sort_order": 8,
-    },
-)
-
-# page_type -> language -> (SEO title, meta description). Only the home
-# page carries its own: without it the storefront's <title> is the bare
-# store name and the description the store-wide one. Titles stay under
-# 60 characters and descriptions within 140-160, the lengths search
-# results show without truncating.
-LAYOUT_SEO: dict[str, dict[str, tuple[str, str]]] = {
-    "home": {
-        "el": (
-            "GrooveShop Demo | Αξεσουάρ κινητού με γρήγορη αποστολή",
-            (
-                "Θήκες, τζαμάκια, καλώδια USB-C, φορτιστές GaN και "
-                "powerbanks για το κινητό σου. Αποστολή σε 1-3 ημέρες, "
-                "δωρεάν πάνω από 50€ και εγγύηση 2 ετών."
-            ),
-        ),
-        "en": (
-            "GrooveShop Demo | Phone Accessories, Delivered Fast",
-            (
-                "Cases, screen protectors, USB-C cables, GaN chargers and "
-                "power banks for your phone. Delivered in 1-3 days, free "
-                "over €50, with a two-year warranty."
-            ),
-        ),
-    },
-}
-
-# page_type -> (sections, mode) where mode is "append" (keep existing
-# rows, add ours) or "replace" (this layout is ours end to end).
-LAYOUT_PLAN: dict[str, tuple[tuple[dict[str, Any], ...], str]] = {
-    "home": (HOME_SECTIONS, "replace"),
-    "about": (ABOUT_SECTIONS, "append"),
-    "contact": (CONTACT_SECTIONS, "replace"),
-    "feedback": (FEEDBACK_SECTIONS, "replace"),
-}
-
-# Boilerplate inherited from a microlearning template: three indexable
-# pages of marketing copy about a product concept this store does not
-# sell. Nothing links to them any more — the code-level footer dropped
-# those columns and no NavigationMenu row exists — so unpublishing the
-# layout is what takes them out of circulation. The routes and the
-# variant components are a separate frontend deletion.
-UNPUBLISH_LAYOUTS: tuple[str, ...] = (
-    "vision",
-    "what-is-microlearning",
-    "why-microlearning",
-)
-
-# ── navigation ───────────────────────────────────────────────────────
-# Authored here rather than reusing ``BRAND_FOOTER_COLUMNS`` from
-# page_config.defaults: those columns link to /vision and the two
-# microlearning routes, which UNPUBLISH_LAYOUTS above takes down.
-#
-# There is no header menu on purpose: a configured header REPLACES the
-# storefront's code navbar, and the code navbar already draws Shop with
-# its category panel plus Offers, Blog, Gift cards and Rewards behind the
-# same gates as their pages. ``seed_navigation`` removes a header row an
-# earlier run created.
-#
-# Slot shapes (validated by ``validate_navigation_items``):
-#   mobile: [{label, to|href, icon?}] — EXACTLY one of to/href
-#   footer:        [{label, icon?, children: [...]}]
-NAV_MOBILE: list[dict[str, Any]] = [
-    {"label": "Αρχική", "to": "/", "icon": "i-heroicons-home"},
-    {
-        "label": "Κατάστημα",
-        "to": "/products",
-        "icon": "i-heroicons-shopping-bag",
-    },
-    {"label": "Blog", "to": "/blog", "icon": "i-heroicons-newspaper"},
-    {"label": "Δωροκάρτες", "to": "/gift-cards", "icon": "i-heroicons-gift"},
-    {
-        "label": "Επικοινωνία",
-        "to": "/contact",
-        "icon": "i-heroicons-chat-bubble-left-right",
-    },
-]
-
-NAV_FOOTER: list[dict[str, Any]] = [
-    {
-        "label": "Κατάστημα",
-        "icon": "i-heroicons-shopping-bag",
-        "children": [
-            {"label": "Όλα τα προϊόντα", "to": "/products"},
-            {"label": "Προσφορές", "to": "/offers"},
-            {"label": "Δωροκάρτες", "to": "/gift-cards"},
-            {"label": "Πρόγραμμα Επιβράβευσης", "to": "/loyalty-program"},
-        ],
-    },
-    {
-        "label": "Εξυπηρέτηση",
-        "icon": "i-heroicons-lifebuoy",
-        "children": [
-            {"label": "Επικοινωνία", "to": "/contact"},
-            {"label": "Συχνές Ερωτήσεις", "to": "/info/faq"},
-            {"label": "Πληροφορίες Αποστολής", "to": "/info/shipping-info"},
-            {"label": "Αξιολόγησε μας", "to": "/feedback"},
-        ],
-    },
-    {
-        "label": "Η εταιρεία",
-        "icon": "i-heroicons-information-circle",
-        "children": [
-            {"label": "Σχετικά με εμάς", "to": "/about"},
-            {"label": "Blog", "to": "/blog"},
-        ],
-    },
-    {
-        "label": "Όροι & Προϋποθέσεις",
-        "icon": "i-heroicons-rectangle-group",
-        "children": [
-            {"label": "Όροι Χρήσης", "to": "/terms-of-use"},
-            {"label": "Πολιτική Απορρήτου", "to": "/privacy-policy"},
-            {"label": "Πολιτική Cookies", "to": "/cookies-policy"},
-            {"label": "Πολιτική Επιστροφών", "to": "/return-policy"},
-        ],
-    },
-]
-
-
-# English menus.
-#
-# ``build_navigation_menu`` takes a WHOLE-MENU copy per locale and reads
-# only the labels out of it — a translation cannot retarget a link — but
-# `validate_navigation_i18n` still runs each copy through the full link
-# validator, so every entry needs its `to` and the shape has to match
-# position for position. Deriving the copy from the Greek menu is what
-# makes that impossible to get wrong: nothing can drift but a word.
-#
-# Without these, every `/en` page rendered a Greek header and a Greek
-# four-column footer. The menus are relational rows, not `t()` strings,
-# so nothing on the storefront side could translate them.
-NAV_LABELS_EN: dict[str, str] = {
-    "Αρχική": "Home",
-    "Κατάστημα": "Shop",
-    "Προσφορές": "Offers",
-    "Blog": "Blog",
-    "Δωροκάρτες": "Gift cards",
-    "Επικοινωνία": "Contact",
-    "Όλα τα προϊόντα": "All products",
-    "Πρόγραμμα Επιβράβευσης": "Rewards programme",
-    "Εξυπηρέτηση": "Support",
-    "Συχνές Ερωτήσεις": "FAQ",
-    "Πληροφορίες Αποστολής": "Shipping information",
-    "Αξιολόγησε μας": "Leave feedback",
-    "Η εταιρεία": "The company",
-    "Σχετικά με εμάς": "About us",
-    "Όροι & Προϋποθέσεις": "Terms & conditions",
-    "Όροι Χρήσης": "Terms of use",
-    "Πολιτική Απορρήτου": "Privacy policy",
-    "Πολιτική Cookies": "Cookie policy",
-    "Πολιτική Επιστροφών": "Return policy",
-}
-
-
-def english_menu(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The same menu with English labels, shape for shape.
-
-    A label with no entry in ``NAV_LABELS_EN`` raises rather than
-    passing the Greek through: a menu that is English except for one
-    stray word reads as a bug, and silence would hide it until somebody
-    browsed ``/en``. ``test_demo_store`` covers every label, so this
-    cannot first raise during a seed run.
-    """
-    translated: list[dict[str, Any]] = []
-    for item in items:
-        label = item["label"]
-        if label not in NAV_LABELS_EN:
-            raise KeyError(f"No English label for navigation entry {label!r}")
-        copy = dict(item)
-        copy["label"] = NAV_LABELS_EN[label]
-        if "children" in copy:
-            copy["children"] = english_menu(item["children"])
-        translated.append(copy)
-    return translated
-
-
 # ── content pages ────────────────────────────────────────────────────
-# ``about`` stays unpublished: `/about` is a PageLayout page that
+# ``about`` stays unpublished: `/about` is a page-builder page that
 # already carries real content, so publishing the ContentPage of the
 # same name puts two indexable copies of it on the site, and the
 # footer's LEGAL_PAGE_SLUGS dedup does not cover that slug.
@@ -1907,22 +1344,28 @@ def seed_b2b() -> dict[str, int]:
 
 
 _ASSET_RE = re.compile(r"\{\{asset:([a-z0-9-]+)\}\}")
+_PRODUCT_RE = re.compile(r"^\{\{product:([a-z0-9-]+)\}\}$")
+
+#: The demo store's pages: builder documents (``{key, document, i18n}``,
+#: the shape of ``builder/seeds``), exported from production's demo store.
+DEMO_PAGES = Path(__file__).resolve().parent / "demo_pages"
+DEMO_PAGES_NOTE = "Demo content"
 
 
-def _resolve_assets(value):
-    """Swap every ``{{asset:<key>}}`` for this tenant's media path.
+def _resolve_placeholders(value, product_ids: dict[str, int]):
+    """Swap the placeholders of a demo page for this store's values.
 
-    A section prop stores a bare string, so it cannot lean on an
-    ImageField to produce a tenant-aware URL. The placeholder is
-    resolved here, at seed time, inside the tenant's schema context:
-    the file is copied into THIS store's media first and the path that
-    replaces it is ``media/<schema>/uploads/...``, which media-stream
-    routes and ``ImgWithFallback`` absolutises.
-
-    Writing a full URL into the dataset instead would bake a hostname
-    into per-tenant data and break the day the store changes domain.
+    ``{{asset:<key>}}`` becomes this tenant's media path for the asset: the
+    file is copied into THIS store's media first, and the path that
+    replaces it is ``media/<schema>/uploads/...``, which media-stream routes
+    and ``ImgWithFallback`` absolutises. A setting that is exactly
+    ``{{product:<slug>}}`` becomes that product's id here. Both differ per
+    schema, and a full URL or a literal id would bake one store's into
+    another's data.
     """
     if isinstance(value, str):
+        if match := _PRODUCT_RE.match(value):
+            return product_ids[match.group(1)]
         return _ASSET_RE.sub(
             lambda match: (
                 ensure_asset(match.group(1)) and media_path(match.group(1))
@@ -1930,163 +1373,62 @@ def _resolve_assets(value):
             value,
         )
     if isinstance(value, list):
-        return [_resolve_assets(item) for item in value]
+        return [_resolve_placeholders(item, product_ids) for item in value]
     if isinstance(value, dict):
-        return {key: _resolve_assets(item) for key, item in value.items()}
+        return {
+            key: _resolve_placeholders(item, product_ids)
+            for key, item in value.items()
+        }
     return value
 
 
-def _attach_slide_products(
-    props: dict[str, Any], product_ids: dict[str, int]
-) -> dict[str, Any]:
-    """Write ``product_id`` into the slides ``HERO_SLIDE_PRODUCTS`` names.
+def _product_slugs(value) -> set[str]:
+    if isinstance(value, str):
+        match = _PRODUCT_RE.match(value)
+        return {match.group(1)} if match else set()
+    if isinstance(value, list):
+        return set().union(*(_product_slugs(item) for item in value))
+    if isinstance(value, dict):
+        return set().union(*(_product_slugs(item) for item in value.values()))
+    return set()
 
-    Run on the section's props and on every locale's override, because
-    an override replaces ``slides`` wholesale: a chip written only into
-    the default copy would vanish on the English page.
+
+def seed_pages() -> dict[str, int]:
+    """Release the demo store's pages and menus through the page builder.
+
+    ``builder.seeding.seed_with_content`` does the writing: one release,
+    every document validated against the store's catalogue with its
+    references, and NOTHING written on a store an editor has touched, so a
+    re-run, or a run on a store restored from production, leaves its pages
+    alone. The products a page names must exist (products seed first), and
+    a missing one raises naming its slug.
     """
-    slides = props.get("slides")
-    if not slides:
-        return props
-    return {
-        **props,
-        "slides": [
-            {**slide, "product_id": product_ids[HERO_SLIDE_PRODUCTS[index]]}
-            if index in HERO_SLIDE_PRODUCTS
-            else slide
-            for index, slide in enumerate(slides)
-        ],
-    }
-
-
-def seed_layouts() -> dict[str, int]:
-    """Apply ``LAYOUT_PLAN`` and unpublish the microlearning boilerplate.
-
-    Two modes, because two different things are being seeded:
-
-    ``append`` adds a section type the layout does not have yet and
-    leaves everything else alone — right for a page an operator may
-    have already arranged. On a tenant flagged ``is_demo`` it also
-    refreshes the bands this plan owns, because there is no operator
-    there and the seed is the only author the page has.
-
-    ``replace`` rebuilds the stack from scratch. The demo store's home,
-    contact and feedback pages ARE this seed: there is no operator
-    behind them, the order of the bands is the design, and appending
-    could never remove the blog-first default stack the tenant was
-    created with. ``SortableModel`` assigns ``sort_order`` from
-    ``max(siblings) + 1``, so deleting first is also what makes the
-    order below the order on the page.
-
-    Props and per-locale overrides are validated before every write.
-    That validation is wired into the admin and the serializers but NOT
-    the model, so a direct ORM write bypasses it and the mistake only
-    surfaces as a silently-stripped prop in the Nuxt proxy's
-    ``safeParse``.
-    """
-    from page_config.models import PageLayout, PageSection
-    from page_config.schemas import (
-        validate_section_i18n,
-        validate_section_props,
-    )
+    from builder import seeding
     from product.models import Product
 
-    # The hero's featured products. A missing one is a seeding-order
-    # bug (products seed first), and the KeyError says which.
-    product_ids = dict(
-        Product.objects.filter(
-            slug__in=HERO_SLIDE_PRODUCTS.values()
-        ).values_list("slug", "pk")
-    )
-
-    report: dict[str, int] = {}
-    seed_owns_existing = _current_tenant_is_demo()
-    titles = {
-        "home": "Homepage",
-        "about": "About",
-        "contact": "Contact",
-        "feedback": "Feedback",
-    }
-    for page_type, (sections, mode) in LAYOUT_PLAN.items():
-        layout, created = PageLayout.objects.get_or_create(
-            page_type=page_type,
-            defaults={
-                "title": titles.get(page_type, page_type.title()),
-                "is_published": True,
-            },
+    seeds = seeding.load_seeds(DEMO_PAGES)
+    slugs = set().union(
+        *(
+            _product_slugs(seed.data) | _product_slugs(seed.i18n)
+            for seed in seeds
         )
-        if created:
-            _bump(report, "layouts_created")
-        elif not layout.is_published:
-            layout.is_published = True
-            layout.save(update_fields=["is_published"])
-            _bump(report, "layouts_published")
-        if page_type in LAYOUT_SEO:
-            _write_seo(layout, LAYOUT_SEO[page_type], report)
-
-        if mode == "replace":
-            removed, _ = layout.sections.all().delete()
-            if removed:
-                _bump(report, "sections_removed", removed)
-
-        present = set(layout.sections.values_list("component_type", flat=True))
-        # Iterate in the intended order: SortableModel assigns
-        # sort_order from max(siblings) + 1 per layout, so CREATION
-        # order is what determines where each band lands.
-        ordered = sorted(sections, key=lambda item: item["sort_order"])
-        for section in ordered:
-            component_type = section["component_type"]
-            props = _resolve_assets(section["props"])
-            i18n = _resolve_assets(section.get("i18n") or {})
-            if component_type == "hero_carousel":
-                props = _attach_slide_products(props, product_ids)
-                i18n = {
-                    code: {
-                        **override,
-                        "props": _attach_slide_products(
-                            override["props"], product_ids
-                        ),
-                    }
-                    for code, override in i18n.items()
-                }
-            validate_section_props(component_type, props)
-            validate_section_i18n(component_type, i18n)
-            if component_type in present:
-                # On a demo store the seed IS the content, so a re-run
-                # has to be able to correct a band that already exists —
-                # the English overrides below were added long after the
-                # rows were first written, and ``append`` alone would
-                # have left every one of them Greek forever. Anywhere
-                # else ``append`` keeps its promise and never touches an
-                # arrangement an operator may have made.
-                #
-                # ``update()`` on purpose: ``SortableModel.save()``
-                # would re-derive ``sort_order`` and walk the band down
-                # the page on every run.
-                if not seed_owns_existing:
-                    _bump(report, "sections_unchanged")
-                    continue
-                refreshed = layout.sections.filter(
-                    component_type=component_type
-                ).update(title=section["title"], props=props, i18n=i18n)
-                _bump(report, "sections_refreshed", refreshed)
-                continue
-            PageSection.objects.create(
-                layout=layout,
-                component_type=component_type,
-                title=section["title"],
-                props=props,
-                i18n=i18n,
-                is_visible=True,
-            )
-            _bump(report, "sections_created")
-
-    unpublished = PageLayout.objects.filter(
-        page_type__in=UNPUBLISH_LAYOUTS, is_published=True
-    ).update(is_published=False)
-    if unpublished:
-        _bump(report, "boilerplate_unpublished", unpublished)
-    return report
+    )
+    product_ids = dict(
+        Product.objects.filter(slug__in=slugs).values_list("slug", "pk")
+    )
+    if missing := slugs - product_ids.keys():
+        raise KeyError(f"Demo pages name missing products: {sorted(missing)}")
+    resolved = [
+        seeding.Seed(
+            key=seed.key,
+            data=_resolve_placeholders(seed.data, product_ids),
+            i18n=_resolve_placeholders(seed.i18n, product_ids),
+        )
+        for seed in seeds
+    ]
+    if seeding.seed_with_content(resolved, note=DEMO_PAGES_NOTE) is None:
+        return {"pages_left_alone": len(resolved)}
+    return {"pages_seeded": len(resolved)}
 
 
 def _current_tenant_is_demo() -> bool:
@@ -2418,70 +1760,6 @@ def seed_promotions() -> dict[str, int]:
     return _seed_promotions(_translate, _current_tenant_is_demo())
 
 
-def seed_navigation() -> dict[str, int]:
-    """Create the three NavigationMenu slots, in both locales.
-
-    ``get_or_create`` on an ordinary store: a NavigationMenu row IS the
-    operator's content, and a re-run must not overwrite a menu somebody
-    arranged in the admin.
-
-    A DEMO store is rebuilt instead, the same argument ``seed_layouts``
-    makes for the demo's page stacks: there is no operator behind these
-    menus, the seed IS the content, and without a rebuild a menu
-    created by an earlier run can never gain anything the seed later
-    adds. That is not hypothetical — it is how the demo store served a
-    Greek header and a Greek four-column footer on every `/en` page
-    after English was opened. The menus are relational rows, not `t()`
-    strings, so nothing on the storefront side could translate them.
-    """
-    from page_config.defaults import build_navigation_menu
-    from page_config.models import NavigationMenu, NavigationSlot
-    from page_config.schemas import (
-        validate_navigation_i18n,
-        validate_navigation_items,
-    )
-
-    report: dict[str, int] = {}
-    payloads = {
-        NavigationSlot.MOBILE: NAV_MOBILE,
-        NavigationSlot.FOOTER: NAV_FOOTER,
-    }
-    rebuild = _current_tenant_is_demo()
-
-    if rebuild:
-        # No header menu any more: an earlier run's row would keep
-        # REPLACING the storefront's code navbar, so on a demo store it
-        # goes. Anywhere else a header row is an operator's.
-        removed, _ = NavigationMenu.objects.filter(
-            slot=NavigationSlot.HEADER
-        ).delete()
-        if removed:
-            _bump(report, "header_removed")
-
-    for slot, items in payloads.items():
-        overrides = {"en": english_menu(items)}
-        validate_navigation_items(slot, items)
-        validate_navigation_i18n(slot, overrides)
-
-        menu, created = NavigationMenu.objects.get_or_create(slot=slot)
-        if not created and not rebuild:
-            _bump(report, "unchanged")
-            continue
-        if not created:
-            # Links hang off columns, so the columns go first and the
-            # links with them; leaving them would double every entry.
-            menu.columns.all().delete()
-            menu.links.all().delete()
-            _bump(report, "rebuilt")
-        else:
-            _bump(report, "created")
-        # Rows, not the JSON this used to store: the menu is built
-        # from columns and links now, so a seeded blob would leave
-        # the demo store with a footer that renders nothing.
-        build_navigation_menu(menu, items, overrides)
-    return report
-
-
 def publish_content_pages() -> dict[str, int]:
     """Publish and fill the content pages a showcase has to carry.
 
@@ -2512,7 +1790,7 @@ def publish_content_pages() -> dict[str, int]:
         if page is None:
             # A row this seeder OWNS is created; a row provisioning owns
             # is reported. `faq`, `shipping-info` and `return-policy`
-            # come from `page_config.defaults` at tenant creation, so
+            # come from `page_config.content_pages` at tenant creation, so
             # their absence means the schema is under-provisioned and
             # should be said out loud rather than papered over. The
             # AI-ready page has no such origin — it is showcase content,

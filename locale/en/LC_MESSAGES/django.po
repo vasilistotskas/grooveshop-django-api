@@ -509,10 +509,6 @@ msgid "%(seen)d/%(total)d seen (%(rate).0f%%)"
 msgstr "%(seen)d/%(total)d seen (%(rate).0f%%)"
 
 #, python-format
-msgid "%(slot)s navigation"
-msgstr "%(slot)s navigation"
-
-#, python-format
 msgid "%(store)s reached billing stage %(stage)s"
 msgstr "%(store)s reached billing stage %(stage)s"
 
@@ -1113,9 +1109,6 @@ msgstr "Abandoned checkout reminder"
 msgid "Abandonment Notified"
 msgstr "Abandonment Notified"
 
-msgid "About Content"
-msgstr "About Content"
-
 msgid "Accent Hex"
 msgstr "Accent Hex"
 
@@ -1348,9 +1341,6 @@ msgstr "Admin"
 msgid "Admin History"
 msgstr "Admin History"
 
-msgid "Admin display name for this layout."
-msgstr "Admin display name for this layout."
-
 msgid "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
@@ -1502,9 +1492,6 @@ msgstr "Amount to be Collected"
 msgid "An IP address is not a store domain; use a host name."
 msgstr "An IP address is not a store domain; use a host name."
 
-msgid "An absolute https URL on another site."
-msgstr "An absolute https URL on another site."
-
 msgid "An email address is required for guest alerts."
 msgstr "An email address is required for guest alerts."
 
@@ -1522,9 +1509,6 @@ msgstr "An error occurred while processing your request."
 
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "An error occurred while restocking the item. Please try again later."
-
-msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
-msgstr "An i-* icon name, e.g. i-heroicons-light-bulb."
 
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
@@ -2015,9 +1999,6 @@ msgstr "Blog Authors"
 msgid "Blog Categories"
 msgstr "Blog Categories"
 
-msgid "Blog Categories Rail"
-msgstr "Blog Categories Rail"
-
 msgid "Blog Category"
 msgstr "Blog Category"
 
@@ -2041,15 +2022,6 @@ msgstr "Blog Post Translations"
 
 msgid "Blog Posts"
 msgstr "Blog Posts"
-
-msgid "Blog Posts Carousel"
-msgstr "Blog Posts Carousel"
-
-msgid "Blog Posts Grid"
-msgstr "Blog Posts Grid"
-
-msgid "Blog Posts List"
-msgstr "Blog Posts List"
 
 msgid "Blog Tag"
 msgstr "Blog Tag"
@@ -2246,9 +2218,6 @@ msgstr "Builder version"
 msgid "Builder versions"
 msgstr "Builder versions"
 
-msgid "Built-in page"
-msgstr "Built-in page"
-
 msgid "Bulk update category images"
 msgstr "Bulk update category images"
 
@@ -2263,9 +2232,6 @@ msgstr "Bundle with"
 
 msgid "Business Customers"
 msgstr "Business Customers"
-
-msgid "Business Hours"
-msgstr "Business Hours"
 
 msgid "Business Profile"
 msgstr "Business Profile"
@@ -2437,9 +2403,6 @@ msgstr "Cached print PDF (base64), unprinted-vouchers list, and raw API response
 
 msgid "Calculations"
 msgstr "Calculations"
-
-msgid "Call to Action Banner"
-msgstr "Call to Action Banner"
 
 msgid "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
 msgstr "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
@@ -3052,13 +3015,6 @@ msgstr "Collected"
 msgid "Collected off-platform"
 msgstr "Collected off-platform"
 
-msgid "Column"
-msgstr "Column"
-
-#, python-format
-msgid "Column #%(id)s"
-msgstr "Column #%(id)s"
-
 msgid "Come back and see what's new"
 msgstr "Come back and see what's new"
 
@@ -3164,12 +3120,6 @@ msgstr "Completed"
 
 msgid "Completeness"
 msgstr "Completeness"
-
-msgid "Component Type"
-msgstr "Component Type"
-
-msgid "Component-specific configuration as JSON."
-msgstr "Component-specific configuration as JSON."
 
 msgid "Computed at"
 msgstr "Computed at"
@@ -3295,9 +3245,6 @@ msgstr "Contact Email"
 msgid "Contact Information"
 msgstr "Contact Information"
 
-msgid "Contact Panel"
-msgstr "Contact Panel"
-
 msgid "Contact Period"
 msgstr "Contact Period"
 
@@ -3349,6 +3296,9 @@ msgstr "Content hash"
 
 msgid "Content page"
 msgstr "Content page"
+
+msgid "Content pages"
+msgstr "Content pages"
 
 msgid "Content type"
 msgstr "Content type"
@@ -3662,9 +3612,6 @@ msgstr "Cursor for pagination"
 
 msgid "Custom"
 msgstr "Custom"
-
-msgid "Custom page"
-msgstr "Custom page"
 
 msgid "Customer"
 msgstr "Customer"
@@ -4126,9 +4073,6 @@ msgstr "Distance from the supplied address in kilometres"
 msgid "Distinctive title"
 msgstr "Distinctive title"
 
-msgid "Divider"
-msgstr "Divider"
-
 msgid "Django"
 msgstr "Django"
 
@@ -4549,9 +4493,6 @@ msgstr "Enterprise"
 msgid "Entire order"
 msgstr "Entire order"
 
-msgid "Entries"
-msgstr "Entries"
-
 msgid "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
 msgstr "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
 
@@ -4742,12 +4683,6 @@ msgstr "Export store data (before destroying)"
 msgid "External ID"
 msgstr "External ID"
 
-msgid "External link"
-msgstr "External link"
-
-msgid "FAQ Accordion"
-msgstr "FAQ Accordion"
-
 msgid "Facebook Profile"
 msgstr "Facebook Profile"
 
@@ -4844,14 +4779,8 @@ msgstr "Feature Image"
 msgid "Featured"
 msgstr "Featured"
 
-msgid "Featured Products"
-msgstr "Featured Products"
-
 msgid "Features"
 msgstr "Features"
-
-msgid "Features Grid"
-msgstr "Features Grid"
 
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Fee charged by the payment method (e.g., Cash on Delivery fee)"
@@ -6112,9 +6041,6 @@ msgstr "Food & drink"
 msgid "Footer"
 msgstr "Footer"
 
-msgid "Footer links belong to a column."
-msgstr "Footer links belong to a column."
-
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 
@@ -6826,9 +6752,6 @@ msgstr "Hash"
 msgid "Header"
 msgstr "Header"
 
-msgid "Header and mobile links hang off the menu directly."
-msgstr "Header and mobile links hang off the menu directly."
-
 msgid "Heaviest parcel the rate carries, or null for no cap."
 msgstr "Heaviest parcel the rate carries, or null for no cap."
 
@@ -6856,12 +6779,6 @@ msgstr "Help & Guides"
 
 msgid "Here's what you might have missed:"
 msgstr "Here's what you might have missed:"
-
-msgid "Hero Banner"
-msgstr "Hero Banner"
-
-msgid "Hero Carousel"
-msgstr "Hero Carousel"
 
 msgid "Hero Image"
 msgstr "Hero Image"
@@ -7072,9 +6989,6 @@ msgstr "Idempotency key"
 msgid "Identification"
 msgstr "Identification"
 
-msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
-msgstr "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
-
 msgid "Identity"
 msgstr "Identity"
 
@@ -7150,9 +7064,6 @@ msgstr "Image"
 
 msgid "Image Flag"
 msgstr "Image Flag"
-
-msgid "Image Gallery"
-msgstr "Image Gallery"
 
 msgid "Image Information"
 msgstr "Image Information"
@@ -7432,9 +7343,6 @@ msgstr "Is Refunded"
 msgid "Is Variant Axis"
 msgstr "Is Variant Axis"
 
-msgid "Is Visible"
-msgstr "Is Visible"
-
 msgid "Is active"
 msgstr "Is active"
 
@@ -7660,14 +7568,8 @@ msgstr "Latitude"
 msgid "Latitude (string as returned by BoxNow)"
 msgstr "Latitude (string as returned by BoxNow)"
 
-msgid "Layout"
-msgstr "Layout"
-
 msgid "Learn weights"
 msgstr "Learn weights"
-
-msgid "Leave empty for a page link to use the page's own title, which is already translated."
-msgstr "Leave empty for a page link to use the page's own title, which is already translated."
 
 msgid "Ledger"
 msgstr "Ledger"
@@ -7755,10 +7657,6 @@ msgid "Link"
 msgstr "Link"
 
 #, python-format
-msgid "Link #%(id)s"
-msgstr "Link #%(id)s"
-
-#, python-format
 msgid "Link expires on %(expires)s."
 msgstr "Link expires on %(expires)s."
 
@@ -7770,9 +7668,6 @@ msgstr "LinkedIn URL"
 
 msgid "LinkedIn company page URL. Must use https://. Empty → link hidden in storefront footer."
 msgstr "LinkedIn company page URL. Must use https://. Empty → link hidden in storefront footer."
-
-msgid "Links"
-msgstr "Links"
 
 msgid "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
 msgstr "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
@@ -7872,9 +7767,6 @@ msgstr "Live key counts are unavailable — the cache backend did not answer. Th
 msgid "Live promotion"
 msgstr "Live promotion"
 
-msgid "Locale Overrides"
-msgstr "Locale Overrides"
-
 msgid "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 msgstr "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 
@@ -7886,9 +7778,6 @@ msgstr "Localized product name"
 
 msgid "Location"
 msgstr "Location"
-
-msgid "Location Map"
-msgstr "Location Map"
 
 msgid "Location Type"
 msgstr "Location Type"
@@ -8027,9 +7916,6 @@ msgstr "Loyalty Pauses"
 msgid "Loyalty Points"
 msgstr "Loyalty Points"
 
-msgid "Loyalty Program Hero"
-msgstr "Loyalty Program Hero"
-
 msgid "Loyalty Tier"
 msgstr "Loyalty Tier"
 
@@ -8052,9 +7938,6 @@ msgstr "Loyalty off from %(start)s"
 
 msgid "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
 msgstr "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
-
-msgid "Loyalty program"
-msgstr "Loyalty program"
 
 #, python-brace-format
 msgid "Loyalty redemption cannot be applied: {reason}"
@@ -8258,9 +8141,6 @@ msgstr "Media"
 msgid "Media & Sync"
 msgstr "Media & Sync"
 
-msgid "Media + Text"
-msgstr "Media + Text"
-
 msgid "Media asset"
 msgstr "Media asset"
 
@@ -8287,15 +8167,6 @@ msgstr "Members"
 
 msgid "Memberships"
 msgstr "Memberships"
-
-msgid "Menu"
-msgstr "Menu"
-
-msgid "Menu Columns"
-msgstr "Menu Columns"
-
-msgid "Menus"
-msgstr "Menus"
 
 msgid "Merchant curated"
 msgstr "Merchant curated"
@@ -8441,9 +8312,6 @@ msgstr "Missing uuid."
 msgid "Mixed"
 msgstr "Mixed"
 
-msgid "Mobile"
-msgstr "Mobile"
-
 msgid "Mode"
 msgstr "Mode"
 
@@ -8528,36 +8396,6 @@ msgstr "Names of the ad click-id parameters the landing URL carried. Their value
 
 msgid "Namespace"
 msgstr "Namespace"
-
-msgid "Navigation Column"
-msgstr "Navigation Column"
-
-msgid "Navigation Column Translation"
-msgstr "Navigation Column Translation"
-
-msgid "Navigation Column Translations"
-msgstr "Navigation Column Translations"
-
-msgid "Navigation Columns"
-msgstr "Navigation Columns"
-
-msgid "Navigation Link"
-msgstr "Navigation Link"
-
-msgid "Navigation Link Translation"
-msgstr "Navigation Link Translation"
-
-msgid "Navigation Link Translations"
-msgstr "Navigation Link Translations"
-
-msgid "Navigation Links"
-msgstr "Navigation Links"
-
-msgid "Navigation Menu"
-msgstr "Navigation Menu"
-
-msgid "Navigation Menus"
-msgstr "Navigation Menus"
 
 msgid "Needs attention"
 msgstr "Needs attention"
@@ -8694,9 +8532,6 @@ msgstr "New value of the changed field(s)."
 
 msgid "Newsletter"
 msgstr "Newsletter"
-
-msgid "Newsletter Signup"
-msgstr "Newsletter Signup"
 
 msgid "Newsletter confirmation"
 msgstr "Newsletter confirmation"
@@ -9163,12 +8998,6 @@ msgstr "Off"
 #, python-format
 msgid "Off: %(reason)s"
 msgstr "Off: %(reason)s"
-
-msgid "Offers"
-msgstr "Offers"
-
-msgid "Offers Preview"
-msgstr "Offers Preview"
 
 msgid "Office"
 msgstr "Office"
@@ -9778,27 +9607,6 @@ msgstr "Page %(number)s of %(total)s"
 msgid "Page Configuration"
 msgstr "Page Configuration"
 
-msgid "Page Layout"
-msgstr "Page Layout"
-
-msgid "Page Layout Translation"
-msgstr "Page Layout Translation"
-
-msgid "Page Layout Translations"
-msgstr "Page Layout Translations"
-
-msgid "Page Layouts"
-msgstr "Page Layouts"
-
-msgid "Page Section"
-msgstr "Page Section"
-
-msgid "Page Sections"
-msgstr "Page Sections"
-
-msgid "Page Type"
-msgstr "Page Type"
-
 msgid "Page builder"
 msgstr "Page builder"
 
@@ -9813,9 +9621,6 @@ msgstr "Page number (pageNumber pagination strategy)"
 
 msgid "Pages"
 msgstr "Pages"
-
-msgid "Pages & navigation"
-msgstr "Pages & navigation"
 
 msgid "Pagination strategy type"
 msgstr "Pagination strategy type"
@@ -9935,9 +9740,6 @@ msgstr "Partially update cart item information. Requires authentication. For gue
 
 msgid "Partly back in stock"
 msgstr "Partly back in stock"
-
-msgid "Partner Strip"
-msgstr "Partner Strip"
 
 msgid "Partner shop (2)"
 msgstr "Partner shop (2)"
@@ -10254,9 +10056,6 @@ msgstr "Pending submission"
 
 msgid "Per-customer Usage Limit"
 msgstr "Per-customer Usage Limit"
-
-msgid "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
-msgstr "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
 
 msgid "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
 msgstr "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
@@ -10896,12 +10695,6 @@ msgstr "Production"
 msgid "Products"
 msgstr "Products"
 
-msgid "Products Grid"
-msgstr "Products Grid"
-
-msgid "Products Slider"
-msgstr "Products Slider"
-
 msgid "Products Using This VAT"
 msgstr "Products Using This VAT"
 
@@ -10972,9 +10765,6 @@ msgstr "Promotions Enabled"
 
 msgid "Proof of delivery"
 msgstr "Proof of delivery"
-
-msgid "Props"
-msgstr "Props"
 
 msgid "Protected"
 msgstr "Protected"
@@ -11047,9 +10837,6 @@ msgstr "Published revision"
 
 msgid "Publishing"
 msgstr "Publishing"
-
-msgid "Pull Quote"
-msgstr "Pull Quote"
 
 msgid "Purchase"
 msgstr "Purchase"
@@ -11303,9 +11090,6 @@ msgstr "Recently Added"
 
 msgid "Recently Created"
 msgstr "Recently Created"
-
-msgid "Recently Viewed Rail"
-msgstr "Recently Viewed Rail"
 
 msgid "Recipient"
 msgstr "Recipient"
@@ -12022,9 +11806,6 @@ msgstr "Revisions"
 msgid "Reward Products"
 msgstr "Reward Products"
 
-msgid "Rich Text Block"
-msgstr "Rich Text Block"
-
 msgid "Role"
 msgstr "Role"
 
@@ -12247,9 +12028,6 @@ msgstr "Search"
 msgctxt "order source type"
 msgid "Search"
 msgstr "Search"
-
-msgid "Search Bar"
-msgstr "Search Bar"
 
 msgid "Search Configuration"
 msgstr "Search Configuration"
@@ -12812,14 +12590,8 @@ msgstr "Show detailed index settings"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Show nothing rather than fewer than this many suggestions."
 
-msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
-msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
-
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
-
-msgid "Shows the seller's details"
-msgstr "Shows the seller's details"
 
 msgid "Sign-in code"
 msgstr "Sign-in code"
@@ -12896,9 +12668,6 @@ msgstr "Skipped: opted out"
 
 msgid "Skipped: switched off"
 msgstr "Skipped: switched off"
-
-msgid "Slot"
-msgstr "Slot"
 
 msgid "Slots"
 msgstr "Slots"
@@ -13005,9 +12774,6 @@ msgstr "Source log"
 
 msgid "Source type"
 msgstr "Source type"
-
-msgid "Spacer"
-msgstr "Spacer"
 
 msgid "Spam complaint"
 msgstr "Spam complaint"
@@ -13117,9 +12883,6 @@ msgstr "State"
 
 msgid "Statistics"
 msgstr "Statistics"
-
-msgid "Stats Strip"
-msgstr "Stats Strip"
 
 msgid "Status"
 msgstr "Status"
@@ -13283,9 +13046,6 @@ msgstr "Stores"
 
 msgid "Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Stores a PLATFORM-schema user id; not FK-enforced."
-
-msgid "Story Timeline"
-msgstr "Story Timeline"
 
 msgid "Strategy"
 msgstr "Strategy"
@@ -13748,10 +13508,6 @@ msgstr "Term ended"
 msgid "Test send"
 msgstr "Test send"
 
-# Email Template Translations
-msgid "Testimonials"
-msgstr "Testimonials"
-
 msgid "Text"
 msgstr "Text"
 
@@ -13924,6 +13680,9 @@ msgstr "The code does not exist"
 msgid "The code has reached its usage limit"
 msgstr "The code has reached its usage limit"
 
+msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
+msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
+
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "The cost without VAT: this is what the profit report uses."
 
@@ -14095,9 +13854,6 @@ msgstr "The order total is below this wholesale tier's minimum of {minimum}."
 
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 msgstr "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
-
-msgid "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
-msgstr "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
 
 msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 msgstr "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
@@ -14311,9 +14067,6 @@ msgstr "The storefront has no text in this language."
 
 msgid "The storefront unsubscribe confirmation page."
 msgstr "The storefront unsubscribe confirmation page."
-
-msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
-msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 
 msgid "The stores on this platform, their plans and the health of background work."
 msgstr "The stores on this platform, their plans and the health of background work."
@@ -14652,8 +14405,8 @@ msgstr "This takes you above the limit a staff member can put on gift cards in a
 msgid "This tenant cannot be destroyed right now."
 msgstr "This tenant cannot be destroyed right now."
 
-msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
-msgstr "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
+msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue and showcase content without --force. Never set this on a store that takes real orders."
+msgstr "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue and showcase content without --force. Never set this on a store that takes real orders."
 
 #, python-format
 msgid "This text has %(n)s forms, separated by |."
@@ -14961,9 +14714,6 @@ msgstr "True when the caller's cart (identified by the same ``X-Cart-Id`` header
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
-
-msgid "Trust Badges"
-msgstr "Trust Badges"
 
 msgid "Try again"
 msgstr "Try again"
@@ -15624,9 +15374,6 @@ msgstr "View your order"
 msgid "View your orders and their status"
 msgstr "View your orders and their status"
 
-msgid "Vision Content"
-msgstr "Vision Content"
-
 msgid "Visit our website"
 msgstr "Visit our website"
 
@@ -15833,9 +15580,6 @@ msgstr "Welcome back to"
 
 msgid "Well Reviewed (>7.0)"
 msgstr "Well Reviewed (>7.0)"
-
-msgid "What Is Microlearning"
-msgstr "What Is Microlearning"
 
 msgid "What This Means"
 msgstr "What This Means"
@@ -16064,9 +15808,6 @@ msgstr "Wholesale-priced"
 
 msgid "Why"
 msgstr "Why"
-
-msgid "Why Microlearning"
-msgstr "Why Microlearning"
 
 msgid "Why it could not be released: [{path, code, message}]"
 msgstr "Why it could not be released: [{path, code, message}]"
@@ -16919,6 +16660,10 @@ msgstr "Small"
 msgid "…and {count} more lines with errors."
 msgstr "…and {count} more lines with errors."
 
+#, python-format
+#~ msgid "%(slot)s navigation"
+#~ msgstr "%(slot)s navigation"
+
 #~ msgid "A document has more than one version."
 #~ msgstr "A document has more than one version."
 
@@ -16943,11 +16688,17 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 
+#~ msgid "About Content"
+#~ msgstr "About Content"
+
 #~ msgid "Account security"
 #~ msgstr "Account security"
 
 #~ msgid "Active (Last 24h)"
 #~ msgstr "Active (Last 24h)"
+
+#~ msgid "Admin display name for this layout."
+#~ msgstr "Admin display name for this layout."
 
 #~ msgid "Admin user who created this adjustment"
 #~ msgstr "Admin user who created this adjustment"
@@ -16961,6 +16712,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Already unsubscribed"
 #~ msgstr "Already unsubscribed"
 
+#~ msgid "An absolute https URL on another site."
+#~ msgstr "An absolute https URL on another site."
+
+#~ msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
+#~ msgstr "An i-* icon name, e.g. i-heroicons-light-bulb."
+
 #~ msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 #~ msgstr "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 
@@ -16970,8 +16727,36 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "B2B"
 #~ msgstr "B2B"
 
+#~ msgid "Blog Categories Rail"
+#~ msgstr "Blog Categories Rail"
+
+#~ msgid "Blog Posts Carousel"
+#~ msgstr "Blog Posts Carousel"
+
+#~ msgid "Blog Posts Grid"
+#~ msgstr "Blog Posts Grid"
+
+#~ msgid "Blog Posts List"
+#~ msgstr "Blog Posts List"
+
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
+
+#~ msgid "Built-in page"
+#~ msgstr "Built-in page"
+
+#~ msgid "Business Hours"
+#~ msgstr "Business Hours"
+
+#~ msgid "Call to Action Banner"
+#~ msgstr "Call to Action Banner"
+
+#~ msgid "Column"
+#~ msgstr "Column"
+
+#, python-format
+#~ msgid "Column #%(id)s"
+#~ msgstr "Column #%(id)s"
 
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Comma-separated facet fields for counts and stats"
@@ -16982,11 +16767,23 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Complete Your Order"
 #~ msgstr "Complete Your Order"
 
+#~ msgid "Component Type"
+#~ msgstr "Component Type"
+
+#~ msgid "Component-specific configuration as JSON."
+#~ msgstr "Component-specific configuration as JSON."
+
+#~ msgid "Contact Panel"
+#~ msgstr "Contact Panel"
+
 #~ msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
 #~ msgstr "Currency code (e.g., USD, EUR). Required if amount is provided."
 
 #~ msgid "Currency is required when amount is provided"
 #~ msgstr "Currency is required when amount is provided"
+
+#~ msgid "Custom page"
+#~ msgstr "Custom page"
 
 #~ msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
 #~ msgstr "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
@@ -16997,6 +16794,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
 #~ msgstr "Deprecated — use ``settlement=online``. Removed with the column in the release after settlement lands."
 
+#~ msgid "Divider"
+#~ msgstr "Divider"
+
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"
 
@@ -17006,11 +16806,26 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Email template"
 #~ msgstr "Email template"
 
+#~ msgid "Entries"
+#~ msgstr "Entries"
+
+#~ msgid "External link"
+#~ msgstr "External link"
+
+#~ msgid "FAQ Accordion"
+#~ msgstr "FAQ Accordion"
+
 #~ msgid "False"
 #~ msgstr "False"
 
 #~ msgid "Feature Lists"
 #~ msgstr "Feature Lists"
+
+#~ msgid "Featured Products"
+#~ msgstr "Featured Products"
+
+#~ msgid "Features Grid"
+#~ msgstr "Features Grid"
 
 #~ msgid "Federated search across products and blog posts"
 #~ msgstr "Federated search across products and blog posts"
@@ -17021,6 +16836,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Flow Steps"
 #~ msgstr "Flow Steps"
 
+#~ msgid "Footer links belong to a column."
+#~ msgstr "Footer links belong to a column."
+
 #~ msgid "Fully Refunded"
 #~ msgstr "Fully Refunded"
 
@@ -17030,9 +16848,21 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Go to Your Account"
 #~ msgstr "Go to Your Account"
 
+#~ msgid "Header and mobile links hang off the menu directly."
+#~ msgstr "Header and mobile links hang off the menu directly."
+
 #, python-format
 #~ msgid "Hello from %(site_name)s!"
 #~ msgstr "Hello from %(site_name)s!"
+
+#~ msgid "Hero Banner"
+#~ msgstr "Hero Banner"
+
+#~ msgid "Hero Carousel"
+#~ msgstr "Hero Carousel"
+
+#~ msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
+#~ msgstr "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
 
 #~ msgid "Idle"
 #~ msgstr "Idle"
@@ -17042,6 +16872,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 #~ msgstr "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
+
+#~ msgid "Image Gallery"
+#~ msgstr "Image Gallery"
 
 #~ msgid "Inactive user notification"
 #~ msgstr "Inactive user notification"
@@ -17055,14 +16888,54 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Is Online Payment"
 #~ msgstr "Is Online Payment"
 
+#~ msgid "Is Visible"
+#~ msgstr "Is Visible"
+
 #~ msgid "Last Reminder Sent At"
 #~ msgstr "Last Reminder Sent At"
+
+#~ msgid "Layout"
+#~ msgstr "Layout"
+
+#~ msgid "Leave empty for a page link to use the page's own title, which is already translated."
+#~ msgstr "Leave empty for a page link to use the page's own title, which is already translated."
+
+#, python-format
+#~ msgid "Link #%(id)s"
+#~ msgstr "Link #%(id)s"
+
+#~ msgid "Links"
+#~ msgstr "Links"
+
+#~ msgid "Locale Overrides"
+#~ msgstr "Locale Overrides"
+
+#~ msgid "Location Map"
+#~ msgstr "Location Map"
 
 #~ msgid "Loyalty & Engagement"
 #~ msgstr "Loyalty & Engagement"
 
+#~ msgid "Loyalty Program Hero"
+#~ msgstr "Loyalty Program Hero"
+
+#~ msgid "Loyalty program"
+#~ msgstr "Loyalty program"
+
 #~ msgid "Maximum total number of results to return"
 #~ msgstr "Maximum total number of results to return"
+
+#~ msgid "Media + Text"
+#~ msgstr "Media + Text"
+
+#~ msgid "Menu"
+#~ msgstr "Menu"
+
+#~ msgid "Menu Columns"
+#~ msgstr "Menu Columns"
+
+#~ msgid "Menus"
+#~ msgstr "Menus"
 
 #~ msgid "Meta CAPI Dataset ID"
 #~ msgstr "Meta CAPI Dataset ID"
@@ -17070,14 +16943,56 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 
+#~ msgid "Mobile"
+#~ msgstr "Mobile"
+
 #~ msgid "Months"
 #~ msgstr "Months"
+
+#~ msgid "Navigation Column"
+#~ msgstr "Navigation Column"
+
+#~ msgid "Navigation Column Translation"
+#~ msgstr "Navigation Column Translation"
+
+#~ msgid "Navigation Column Translations"
+#~ msgstr "Navigation Column Translations"
+
+#~ msgid "Navigation Columns"
+#~ msgstr "Navigation Columns"
+
+#~ msgid "Navigation Link"
+#~ msgstr "Navigation Link"
+
+#~ msgid "Navigation Link Translation"
+#~ msgstr "Navigation Link Translation"
+
+#~ msgid "Navigation Link Translations"
+#~ msgstr "Navigation Link Translations"
+
+#~ msgid "Navigation Links"
+#~ msgstr "Navigation Links"
+
+#~ msgid "Navigation Menu"
+#~ msgstr "Navigation Menu"
+
+#~ msgid "Navigation Menus"
+#~ msgstr "Navigation Menus"
+
+#~ msgid "Newsletter Signup"
+#~ msgstr "Newsletter Signup"
 
 #~ msgid "No payment ID found for order"
 #~ msgstr "No payment ID found for order"
 
 #~ msgid "Number of pending-order reminder emails sent."
 #~ msgstr "Number of pending-order reminder emails sent."
+
+#~ msgid "Offers"
+#~ msgstr "Offers"
+
+#~ msgid "Offers Preview"
+#~ msgstr "Offers Preview"
 
 #~ msgid "Old (7+ days)"
 #~ msgstr "Old (7+ days)"
@@ -17100,6 +17015,30 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Page Hero"
 #~ msgstr "Page Hero"
 
+#~ msgid "Page Layout"
+#~ msgstr "Page Layout"
+
+#~ msgid "Page Layout Translation"
+#~ msgstr "Page Layout Translation"
+
+#~ msgid "Page Layout Translations"
+#~ msgstr "Page Layout Translations"
+
+#~ msgid "Page Layouts"
+#~ msgstr "Page Layouts"
+
+#~ msgid "Page Section"
+#~ msgstr "Page Section"
+
+#~ msgid "Page Sections"
+#~ msgstr "Page Sections"
+
+#~ msgid "Page Type"
+#~ msgstr "Page Type"
+
+#~ msgid "Pages & navigation"
+#~ msgstr "Pages & navigation"
+
 #~ msgid "Paid orders"
 #~ msgstr "Paid orders"
 
@@ -17110,14 +17049,32 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Partial refund amount. Leave empty for full refund."
 #~ msgstr "Partial refund amount. Leave empty for full refund."
 
+#~ msgid "Partner Strip"
+#~ msgstr "Partner Strip"
+
+#~ msgid "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
+#~ msgstr "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
+
 #~ msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
 #~ msgstr "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
 
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 
+#~ msgid "Products Grid"
+#~ msgstr "Products Grid"
+
+#~ msgid "Products Slider"
+#~ msgstr "Products Slider"
+
 #~ msgid "Project Register"
 #~ msgstr "Project Register"
+
+#~ msgid "Props"
+#~ msgstr "Props"
+
+#~ msgid "Pull Quote"
+#~ msgstr "Pull Quote"
 
 #~ msgid "RFC 8058 one-click unsubscribe from a topic"
 #~ msgstr "RFC 8058 one-click unsubscribe from a topic"
@@ -17130,6 +17087,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Recent"
 #~ msgstr "Recent"
+
+#~ msgid "Recently Viewed Rail"
+#~ msgstr "Recently Viewed Rail"
 
 #, python-format
 #~ msgid "Recorded in the last %(days)s days"
@@ -17158,6 +17118,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Review #%(id)s: %(comment)s"
 #~ msgstr "Review #%(id)s: %(comment)s"
 
+#~ msgid "Rich Text Block"
+#~ msgstr "Rich Text Block"
+
+#~ msgid "Search Bar"
+#~ msgstr "Search Bar"
+
 #~ msgid "Search failed. Please try again later."
 #~ msgstr "Search failed. Please try again later."
 
@@ -17180,8 +17146,23 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Setting '%(key)s' not found"
 #~ msgstr "Setting '%(key)s' not found"
 
+#~ msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+#~ msgstr "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+
+#~ msgid "Shows the seller's details"
+#~ msgstr "Shows the seller's details"
+
+#~ msgid "Slot"
+#~ msgstr "Slot"
+
 #~ msgid "Social sign-in"
 #~ msgstr "Social sign-in"
+
+#~ msgid "Spacer"
+#~ msgstr "Spacer"
+
+#~ msgid "Stats Strip"
+#~ msgstr "Stats Strip"
 
 #~ msgid "Status update for completed orders"
 #~ msgstr "Status update for completed orders"
@@ -17192,6 +17173,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Status update for returned orders"
 #~ msgstr "Status update for returned orders"
 
+#~ msgid "Story Timeline"
+#~ msgstr "Story Timeline"
+
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 
@@ -17200,6 +17184,10 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Successfully unsubscribed"
+
+# Email Template Translations
+#~ msgid "Testimonials"
+#~ msgstr "Testimonials"
 
 #, python-format
 #~ msgid "Thank you for staying connected with %(site_name)s!"
@@ -17215,6 +17203,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Thank you for your order!"
 #~ msgstr "Thank you for your order!"
+
+#~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
+#~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 
 #~ msgid "There is a named save (checkpoint)."
 #~ msgstr "There is a named save (checkpoint)."
@@ -17247,6 +17238,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "True"
 #~ msgstr "True"
 
+#~ msgid "Trust Badges"
+#~ msgstr "Trust Badges"
+
 #~ msgid "Two-factor authentication"
 #~ msgstr "Two-factor authentication"
 
@@ -17268,9 +17262,18 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Vendor Cards"
 #~ msgstr "Vendor Cards"
 
+#~ msgid "Vision Content"
+#~ msgstr "Vision Content"
+
 #, python-format
 #~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
 #~ msgstr "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."
+
+#~ msgid "What Is Microlearning"
+#~ msgstr "What Is Microlearning"
+
+#~ msgid "Why Microlearning"
+#~ msgstr "Why Microlearning"
 
 #~ msgid "You can view your order status by logging into your account on our website."
 #~ msgstr "You can view your order status by logging into your account on our website."

@@ -94,9 +94,10 @@ STEPS: tuple[tuple[str, str], ...] = (
     # product's price history so the platform's own Omnibus evaluation
     # can announce the reduction (see `devtools/demo_price_history.py`).
     ("price-history", "seed_price_history"),
-    ("layouts", "seed_layouts"),
-    ("navigation", "seed_navigation"),
     ("content-pages", "publish_content_pages"),
+    # After products and content pages: the pages name a product and the
+    # AI-ready content page, and a release refuses a reference to nothing.
+    ("pages", "seed_pages"),
     # Before `locales`: the Tenant model refuses a locale whose legal
     # documents have no body in it, so the locale step is blocked
     # until these exist.

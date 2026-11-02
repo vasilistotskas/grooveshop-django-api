@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from page_config.defaults import legal_translation_coverage
+from page_config.content_pages import legal_translation_coverage
 from page_config.legal_documents import (
     LEGAL_DOCUMENT_SLUGS,
     missing_legal_translations,

@@ -428,6 +428,27 @@ already has builder data is left alone. What stands in for validation is
 catalogue snapshot and checks the values `seeding` derives (block types,
 references) equal what validation derives.
 
+## The demo store's pages
+
+`devtools/demo_pages/*.json` are the demo store's pages and menus (home,
+about, contact, feedback, the footer and the mobile menu) in the same
+`{key, document, i18n}` shape, exported from production's demo store. What
+differs per store is a placeholder: `{{asset:<key>}}` for an image (the
+committed demo asset, copied into the store's media) and
+`{{product:<slug>}}` for a product id. `manage.py seed_demo_store` (step
+`pages`, after products and content pages) resolves them and calls
+`seeding.seed_with_content`, which releases them in ONE release (note "Demo
+content") only on a store whose builder data is nothing or exactly the
+untouched defaults: a store where anyone saved a draft, named a save,
+scheduled, deleted a page or published is left alone and the step reports
+`pages_left_alone`. A staging refresh restores production first, so there
+it never overwrites the demo pages the editor keeps. Unlike the defaults,
+this content names the store's records, so every document is validated
+against the store's catalogue, references included, like a publish, and
+nothing is written when the storefront does not answer.
+`tests/unit/devtools/test_demo_pages.py` holds the files to the pinned real
+catalogue.
+
 ## Not here yet
 
 The `builder_block_usage` command that will gate removing a block type is its

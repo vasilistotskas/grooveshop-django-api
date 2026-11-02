@@ -4,7 +4,7 @@ Data migrations aren't covered by the normal model/view test path, so
 this loads the module (numeric-prefixed, hence importlib rather than a
 plain import) and calls its RunPython callables against the live app
 registry and the real test connection — matching the lightweight style
-already used for ``page_config.defaults`` seed functions, since the
+already used for ``page_config.content_pages`` seed functions, since the
 project has no dedicated migration-testing harness.
 """
 

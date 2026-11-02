@@ -169,7 +169,7 @@ def _body(paragraphs: list[str], heading: str, bullets: list[str]) -> str:
 # The elements the storefront's blog typography styles
 # (``Blog/Article.vue``) and ``core.utils.sanitize`` keeps whole: nothing
 # below is stripped or normalised on save, which
-# ``tests/unit/devtools/test_demo_home_and_blog.py`` pins. A save the
+# ``tests/unit/devtools/test_demo_blog.py`` pins. A save the
 # policy would trim is REFUSED (``RichTextField``), so a body that
 # drifted off it would fail the seed rather than lose content.
 

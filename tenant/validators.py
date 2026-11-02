@@ -135,8 +135,7 @@ def validate_store_offices_setting(value: object) -> bool:
     "area"?, "city"?, "role"?}}}``. ``label`` and ``street`` are
     required; the rest are optional.
 
-    ``i18n`` is a PARTIAL per-locale override of the text keys only,
-    the same shape and the same reasoning as ``PageSection.i18n``: a
+    ``i18n`` is a PARTIAL per-locale override of the text keys only: a
     postcode and a phone number are the same in every language, so
     duplicating them per locale would only invite drift. The default
     locale is not a valid key — those values ARE the entry's own.
@@ -255,7 +254,7 @@ def validate_announcement_bar_setting(value: object) -> bool:
     "link"?, "icon"?, "color"?, "dismissible"?, "id"?}``. ``text``
     carries the DEFAULT locale's wording and ``i18n`` overrides it per
     locale — the same partial-override convention as
-    ``PageSection.i18n`` and ``STORE_OFFICES``, so the default locale
+    ``STORE_OFFICES``, so the default locale
     is not a valid key there.
 
     ``shortText`` is the phone's copy (the bar is one line, and a
@@ -537,7 +536,7 @@ def validate_funding_banner_setting(value: object) -> bool:
     ``{"enabled": false}``.
 
     ``i18n`` is a PARTIAL per-locale override, the same convention as
-    ``ANNOUNCEMENT_BAR`` and ``PageSection.i18n`` (so the default locale
+    ``ANNOUNCEMENT_BAR`` and ``STORE_OFFICES`` (so the default locale
     is not a key): ``{"<locale>": {"image"?, "width"?, "height"?,
     "alt"?, "label"?}}``. The artwork is per language — the programme
     publishes the strip in Greek and in English — so an override may

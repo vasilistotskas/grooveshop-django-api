@@ -558,7 +558,7 @@ class TestDemoStoreMailboxes(TestCase):
         from devtools import demo_store
 
         with mock.patch(
-            "page_config.defaults.tenant_document_context",
+            "page_config.content_pages.tenant_document_context",
             return_value=("demo-staging.grooveshop.space", "GrooveShop Demo"),
         ):
             self.assertEqual(
@@ -571,7 +571,7 @@ class TestDemoStoreMailboxes(TestCase):
 
         with (
             mock.patch(
-                "page_config.defaults.tenant_document_context",
+                "page_config.content_pages.tenant_document_context",
                 return_value=("", "GrooveShop Demo"),
             ),
             self.settings(

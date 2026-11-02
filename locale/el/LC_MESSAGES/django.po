@@ -514,10 +514,6 @@ msgid "%(seen)d/%(total)d seen (%(rate).0f%%)"
 msgstr "%(seen)d/%(total)d ορατά (%(rate).0f%%)"
 
 #, python-format
-msgid "%(slot)s navigation"
-msgstr "Πλοήγηση: %(slot)s"
-
-#, python-format
 msgid "%(store)s reached billing stage %(stage)s"
 msgstr "Το %(store)s έφτασε στο στάδιο χρέωσης %(stage)s"
 
@@ -1118,9 +1114,6 @@ msgstr "Υπενθύμιση ολοκλήρωσης αγοράς"
 msgid "Abandonment Notified"
 msgstr "Ενημερώθηκε για εγκατάλειψη"
 
-msgid "About Content"
-msgstr "Περιεχόμενο «Σχετικά με εμάς»"
-
 msgid "Accent Hex"
 msgstr "Χρώμα Accent (Hex)"
 
@@ -1353,9 +1346,6 @@ msgstr "Διαχειριστής"
 msgid "Admin History"
 msgstr "Ιστορικό διαχειριστή"
 
-msgid "Admin display name for this layout."
-msgstr "Όνομα εμφάνισης αυτής της διάταξης στη διαχείριση."
-
 msgid "Admin who created this adjustment. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Διαχειριστής που δημιούργησε αυτή την προσαρμογή. Αναγνωριστικό λογαριασμού προσωπικού της πλατφόρμας (public schema), όχι χρήστη του καταστήματος."
 
@@ -1507,9 +1497,6 @@ msgstr "Ποσό προς Είσπραξη"
 msgid "An IP address is not a store domain; use a host name."
 msgstr "Μια διεύθυνση IP δεν είναι domain καταστήματος· χρησιμοποιήστε όνομα host."
 
-msgid "An absolute https URL on another site."
-msgstr "Απόλυτο https URL σε άλλον ιστότοπο."
-
 msgid "An email address is required for guest alerts."
 msgstr "Απαιτείται διεύθυνση email για ειδοποιήσεις επισκεπτών."
 
@@ -1527,9 +1514,6 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επεξεργα
 
 msgid "An error occurred while restocking the item. Please try again later."
 msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορά του προϊόντος στο απόθεμα. Δοκιμάστε ξανά αργότερα."
-
-msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
-msgstr "Όνομα εικονιδίου i-*, π.χ. i-heroicons-light-bulb."
 
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "Μια παραγγελία είναι πώληση στην περίοδο που έφυγε από το κατάστημα, όποιος κι αν είναι ο τρόπος πληρωμής: η αντικαταβολή μετράει όταν αποστέλλεται το δέμα, όχι όταν την αποδίδει ο courier. Ό,τι οφείλει ακόμη ο πελάτης στις αποσταλμένες παραγγελίες εμφανίζεται ως «Αναμένεται είσπραξη». Ένα δέμα που ο πελάτης αρνήθηκε αφαιρείται στην περίοδο που επέστρεψε."
@@ -2020,9 +2004,6 @@ msgstr "Συντάκτες Blog"
 msgid "Blog Categories"
 msgstr "Κατηγορίες Blog"
 
-msgid "Blog Categories Rail"
-msgstr "Λωρίδα κατηγοριών Blog"
-
 msgid "Blog Category"
 msgstr "Κατηγορία Blog"
 
@@ -2046,15 +2027,6 @@ msgstr "Μεταφράσεις άρθρου"
 
 msgid "Blog Posts"
 msgstr "Άρθρα Blog"
-
-msgid "Blog Posts Carousel"
-msgstr "Καρουζέλ άρθρων Blog"
-
-msgid "Blog Posts Grid"
-msgstr "Πλέγμα άρθρων Blog"
-
-msgid "Blog Posts List"
-msgstr "Λίστα άρθρων Blog"
 
 msgid "Blog Tag"
 msgstr "Ετικέτα Blog"
@@ -2251,9 +2223,6 @@ msgstr "Έκδοση εγγράφου δημιουργού"
 msgid "Builder versions"
 msgstr "Εκδόσεις εγγράφων δημιουργού"
 
-msgid "Built-in page"
-msgstr "Ενσωματωμένη σελίδα"
-
 msgid "Bulk update category images"
 msgstr "Μαζική ενημέρωση εικόνων κατηγορίας"
 
@@ -2269,9 +2238,6 @@ msgstr "Πακέτο με"
 # Greek translations added by fill_admin_greek_translations.py
 msgid "Business Customers"
 msgstr "Εταιρικοί Πελάτες"
-
-msgid "Business Hours"
-msgstr "Ωράριο λειτουργίας"
 
 msgid "Business Profile"
 msgstr "Εταιρικό Προφίλ"
@@ -2443,9 +2409,6 @@ msgstr "PDF εκτύπωσης σε cache (base64), λίστα μη εκτυπω
 
 msgid "Calculations"
 msgstr "Υπολογισμοί"
-
-msgid "Call to Action Banner"
-msgstr "Banner παρότρυνσης για δράση"
 
 msgid "Called by the storefront confirmation page. The token names any email type of the store; every marketing type is opted out and, for an account, its active subscriptions end. Idempotent: repeating it changes nothing."
 msgstr "Καλείται από τη σελίδα επιβεβαίωσης του καταστήματος. Το token αναφέρει οποιονδήποτε τύπο email του καταστήματος· όλοι οι τύποι μάρκετινγκ απενεργοποιούνται και, για λογαριασμό, λήγουν οι ενεργές συνδρομές του. Idempotent: η επανάληψη δεν αλλάζει τίποτα."
@@ -3059,14 +3022,6 @@ msgstr "Εισπράχθηκαν"
 msgid "Collected off-platform"
 msgstr "Εισπράχθηκε εκτός πλατφόρμας"
 
-msgid "Column"
-msgstr "Στήλη"
-
-# Greek translations added by fill_admin_greek_translations.py
-#, python-format
-msgid "Column #%(id)s"
-msgstr "Στήλη #%(id)s"
-
 msgid "Come back and see what's new"
 msgstr "Επιστρέψτε και δείτε τι νέο υπάρχει"
 
@@ -3172,12 +3127,6 @@ msgstr "Ολοκληρώθηκε"
 
 msgid "Completeness"
 msgstr "Πληρότητα"
-
-msgid "Component Type"
-msgstr "Τύπος στοιχείου"
-
-msgid "Component-specific configuration as JSON."
-msgstr "Ρυθμίσεις του στοιχείου σε μορφή JSON."
 
 msgid "Computed at"
 msgstr "Υπολογίστηκε στις"
@@ -3300,9 +3249,6 @@ msgstr "Email Επικοινωνίας"
 msgid "Contact Information"
 msgstr "Στοιχεία Επικοινωνίας"
 
-msgid "Contact Panel"
-msgstr "Πλαίσιο επικοινωνίας"
-
 msgid "Contact Period"
 msgstr "Περίοδος Επικοινωνίας"
 
@@ -3354,6 +3300,9 @@ msgstr "Αποτύπωμα περιεχομένου"
 
 msgid "Content page"
 msgstr "Σελίδα περιεχομένου"
+
+msgid "Content pages"
+msgstr "Σελίδες περιεχομένου"
 
 msgid "Content type"
 msgstr "Τύπος περιεχομένου"
@@ -3667,9 +3616,6 @@ msgstr "Δείκτης (cursor) για σελιδοποίηση"
 
 msgid "Custom"
 msgstr "Προσαρμοσμένο"
-
-msgid "Custom page"
-msgstr "Προσαρμοσμένη σελίδα"
 
 msgid "Customer"
 msgstr "Πελάτης"
@@ -4132,9 +4078,6 @@ msgstr "Απόσταση από τη δεδομένη διεύθυνση σε χ
 msgid "Distinctive title"
 msgstr "Διακριτικός τίτλος"
 
-msgid "Divider"
-msgstr "Διαχωριστικό"
-
 msgid "Django"
 msgstr "Django"
 
@@ -4555,9 +4498,6 @@ msgstr "Enterprise"
 msgid "Entire order"
 msgstr "Ολόκληρη η παραγγελία"
 
-msgid "Entries"
-msgstr "Καταχωρήσεις"
-
 msgid "Entries are kept indefinitely (CONTACT_RETENTION_DAYS is 0)."
 msgstr "Οι εγγραφές διατηρούνται επ' αόριστον (το CONTACT_RETENTION_DAYS είναι 0)."
 
@@ -4748,12 +4688,6 @@ msgstr "Εξαγωγή δεδομένων καταστήματος (πριν α�
 msgid "External ID"
 msgstr "Εξωτερικό ID"
 
-msgid "External link"
-msgstr "Εξωτερικός σύνδεσμος"
-
-msgid "FAQ Accordion"
-msgstr "Συχνές ερωτήσεις (accordion)"
-
 msgid "Facebook Profile"
 msgstr "Προφίλ Facebook"
 
@@ -4850,14 +4784,8 @@ msgstr "Χαρακτηριστική εικόνα"
 msgid "Featured"
 msgstr "Προτεινόμενο"
 
-msgid "Featured Products"
-msgstr "Προτεινόμενα Προϊόντα"
-
 msgid "Features"
 msgstr "Λειτουργίες"
-
-msgid "Features Grid"
-msgstr "Πλέγμα χαρακτηριστικών"
 
 msgid "Fee charged by the payment method (e.g., Cash on Delivery fee)"
 msgstr "Χρέωση από τη μέθοδο πληρωμής (π.χ. τέλος αντικαταβολής)"
@@ -6118,9 +6046,6 @@ msgstr "Τρόφιμα & ποτά"
 msgid "Footer"
 msgstr "Υποσέλιδο"
 
-msgid "Footer links belong to a column."
-msgstr "Οι σύνδεσμοι του υποσέλιδου ανήκουν σε μια στήλη."
-
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "Για ειδοποιήσεις price_drop: ενεργοποιείται όταν η τιμή του προϊόντος πέσει στο ή κάτω από αυτή την τιμή. Αγνοείται για ειδοποιήσεις επαναδιαθεσιμότητας."
 
@@ -6834,9 +6759,6 @@ msgstr "Αποτύπωμα"
 msgid "Header"
 msgstr "Κεφαλίδα"
 
-msgid "Header and mobile links hang off the menu directly."
-msgstr "Οι σύνδεσμοι της κεφαλίδας και του κινητού συνδέονται απευθείας στο μενού."
-
 msgid "Heaviest parcel the rate carries, or null for no cap."
 msgstr "Το βαρύτερο δέμα που μεταφέρει η τιμή αποστολής, ή null όταν δεν υπάρχει όριο."
 
@@ -6864,12 +6786,6 @@ msgstr "Βοήθεια & Οδηγοί"
 
 msgid "Here's what you might have missed:"
 msgstr "Να τι μπορεί να σας ξέφυγε:"
-
-msgid "Hero Banner"
-msgstr "Κεντρικό banner"
-
-msgid "Hero Carousel"
-msgstr "Κεντρικό καρουζέλ"
 
 msgid "Hero Image"
 msgstr "Εικόνα εξωφύλλου"
@@ -7080,9 +6996,6 @@ msgstr "Κλειδί μοναδικότητας αιτήματος"
 msgid "Identification"
 msgstr "Ταυτοποίηση"
 
-msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
-msgstr "Αναγνωριστικό της σελίδας (π.χ. \"home\", \"products\", \"blog\")."
-
 msgid "Identity"
 msgstr "Ταυτότητα"
 
@@ -7158,9 +7071,6 @@ msgstr "Εικόνα"
 
 msgid "Image Flag"
 msgstr "Εικόνα σημαίας"
-
-msgid "Image Gallery"
-msgstr "Συλλογή εικόνων"
 
 msgid "Image Information"
 msgstr "Πληροφορίες εικόνας"
@@ -7440,9 +7350,6 @@ msgstr "Έχει επιστραφεί"
 msgid "Is Variant Axis"
 msgstr "Είναι Άξονας Παραλλαγής"
 
-msgid "Is Visible"
-msgstr "Ορατό"
-
 msgid "Is active"
 msgstr "Ενεργό"
 
@@ -7669,14 +7576,8 @@ msgstr "Γεωγραφικό πλάτος"
 msgid "Latitude (string as returned by BoxNow)"
 msgstr "Γεωγραφικό πλάτος (συμβολοσειρά όπως επιστρέφεται από το BoxNow)"
 
-msgid "Layout"
-msgstr "Διάταξη"
-
 msgid "Learn weights"
 msgstr "Εκμάθηση βαρών"
-
-msgid "Leave empty for a page link to use the page's own title, which is already translated."
-msgstr "Αφήστε το κενό ώστε ένας σύνδεσμος σελίδας να χρησιμοποιεί τον τίτλο της ίδιας της σελίδας, ο οποίος είναι ήδη μεταφρασμένος."
 
 msgid "Ledger"
 msgstr "Καθολικό"
@@ -7763,11 +7664,6 @@ msgstr "Σύνολο γραμμής"
 msgid "Link"
 msgstr "Σύνδεσμος"
 
-# Greek translations added by fill_admin_greek_translations.py
-#, python-format
-msgid "Link #%(id)s"
-msgstr "Σύνδεσμος #%(id)s"
-
 #, python-format
 msgid "Link expires on %(expires)s."
 msgstr "Ο σύνδεσμος λήγει στις %(expires)s."
@@ -7780,9 +7676,6 @@ msgstr "URL LinkedIn"
 
 msgid "LinkedIn company page URL. Must use https://. Empty → link hidden in storefront footer."
 msgstr "URL εταιρικής σελίδας LinkedIn. Πρέπει να χρησιμοποιεί https://. Κενό → ο σύνδεσμος κρύβεται στο footer του storefront."
-
-msgid "Links"
-msgstr "Σύνδεσμοι"
 
 msgid "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
 msgstr "Συνδέει αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ. το ίδιο είδος σε άλλα χρώματα). Τα μέλη μοιράζονται επιλογείς παραλλαγής στο κατάστημα."
@@ -7882,9 +7775,6 @@ msgstr "Οι τρέχουσες μετρήσεις κλειδιών δεν εί�
 msgid "Live promotion"
 msgstr "Ενεργή προσφορά"
 
-msgid "Locale Overrides"
-msgstr "Παρακάμψεις ανά γλώσσα"
-
 msgid "Locale-neutral storefront path (e.g. /account/orders/42) or empty string; open it under the viewer's locale"
 msgstr "Διαδρομή του καταστήματος χωρίς γλώσσα (π.χ. /account/orders/42) ή κενή τιμή· ανοίγει στη γλώσσα του αναγνώστη"
 
@@ -7896,9 +7786,6 @@ msgstr "Όνομα προϊόντος στην τρέχουσα γλώσσα"
 
 msgid "Location"
 msgstr "Τοποθεσία"
-
-msgid "Location Map"
-msgstr "Χάρτης τοποθεσίας"
 
 msgid "Location Type"
 msgstr "Τύπος τοποθεσίας"
@@ -8037,9 +7924,6 @@ msgstr "Παύσεις πιστότητας"
 msgid "Loyalty Points"
 msgstr "Πόντοι πιστότητας"
 
-msgid "Loyalty Program Hero"
-msgstr "Κεντρική ενότητα προγράμματος πιστότητας"
-
 msgid "Loyalty Tier"
 msgstr "Βαθμίδα Πιστότητας"
 
@@ -8062,9 +7946,6 @@ msgstr "Πιστότητα ανενεργή από %(start)s"
 
 msgid "Loyalty points the shopper will redeem at order creation. The intent amount subtracts the resulting discount so the provider captures what the customer was shown. Pass the same value in the order-create body. Requires an authenticated request."
 msgstr "Πόντοι πιστότητας που θα εξαργυρώσει ο αγοραστής κατά τη δημιουργία της παραγγελίας. Από το ποσό του intent αφαιρείται η έκπτωση που προκύπτει, ώστε ο πάροχος να χρεώσει ό,τι εμφανίστηκε στον πελάτη. Στείλτε την ίδια τιμή στο σώμα της δημιουργίας παραγγελίας. Απαιτεί πιστοποιημένο αίτημα."
-
-msgid "Loyalty program"
-msgstr "Πρόγραμμα πιστότητας"
 
 #, python-brace-format
 msgid "Loyalty redemption cannot be applied: {reason}"
@@ -8268,9 +8149,6 @@ msgstr "Πολυμέσα"
 msgid "Media & Sync"
 msgstr "Πολυμέσα & Συγχρονισμός"
 
-msgid "Media + Text"
-msgstr "Πολυμέσα + κείμενο"
-
 msgid "Media asset"
 msgstr "Αρχείο πολυμέσων"
 
@@ -8297,15 +8175,6 @@ msgstr "Μέλη"
 
 msgid "Memberships"
 msgstr "Συμμετοχές"
-
-msgid "Menu"
-msgstr "Μενού"
-
-msgid "Menu Columns"
-msgstr "Στήλες μενού"
-
-msgid "Menus"
-msgstr "Μενού"
 
 msgid "Merchant curated"
 msgstr "Επιλογή εμπόρου"
@@ -8451,9 +8320,6 @@ msgstr "Λείπει το uuid."
 msgid "Mixed"
 msgstr "Μικτό"
 
-msgid "Mobile"
-msgstr "Κινητό"
-
 msgid "Mode"
 msgstr "Λειτουργία"
 
@@ -8538,36 +8404,6 @@ msgstr "Τα ονόματα των παραμέτρων click-id διαφημί�
 
 msgid "Namespace"
 msgstr "Χώρος ονομάτων"
-
-msgid "Navigation Column"
-msgstr "Στήλη πλοήγησης"
-
-msgid "Navigation Column Translation"
-msgstr "Μετάφραση στήλης πλοήγησης"
-
-msgid "Navigation Column Translations"
-msgstr "Μεταφράσεις στήλης πλοήγησης"
-
-msgid "Navigation Columns"
-msgstr "Στήλες πλοήγησης"
-
-msgid "Navigation Link"
-msgstr "Σύνδεσμος πλοήγησης"
-
-msgid "Navigation Link Translation"
-msgstr "Μετάφραση συνδέσμου πλοήγησης"
-
-msgid "Navigation Link Translations"
-msgstr "Μεταφράσεις συνδέσμου πλοήγησης"
-
-msgid "Navigation Links"
-msgstr "Σύνδεσμοι πλοήγησης"
-
-msgid "Navigation Menu"
-msgstr "Μενού πλοήγησης"
-
-msgid "Navigation Menus"
-msgstr "Μενού πλοήγησης"
 
 msgid "Needs attention"
 msgstr "Χρειάζονται προσοχή"
@@ -8704,9 +8540,6 @@ msgstr "Νέα τιμή των πεδίων που άλλαξαν."
 
 msgid "Newsletter"
 msgstr "Newsletter"
-
-msgid "Newsletter Signup"
-msgstr "Εγγραφή στο newsletter"
 
 msgid "Newsletter confirmation"
 msgstr "Επιβεβαίωση εγγραφής στο newsletter"
@@ -9172,12 +9005,6 @@ msgstr "Ανενεργό"
 #, python-format
 msgid "Off: %(reason)s"
 msgstr "Κλειστό: %(reason)s"
-
-msgid "Offers"
-msgstr "Προσφορές"
-
-msgid "Offers Preview"
-msgstr "Προεπισκόπηση προσφορών"
 
 msgid "Office"
 msgstr "Γραφείο"
@@ -9788,27 +9615,6 @@ msgstr "Σελίδα %(number)s από %(total)s"
 msgid "Page Configuration"
 msgstr "Διαμόρφωση σελίδων"
 
-msgid "Page Layout"
-msgstr "Διάταξη σελίδας"
-
-msgid "Page Layout Translation"
-msgstr "Μετάφραση διάταξης σελίδας"
-
-msgid "Page Layout Translations"
-msgstr "Μεταφράσεις διάταξης σελίδας"
-
-msgid "Page Layouts"
-msgstr "Διατάξεις σελίδων"
-
-msgid "Page Section"
-msgstr "Ενότητα σελίδας"
-
-msgid "Page Sections"
-msgstr "Ενότητες σελίδας"
-
-msgid "Page Type"
-msgstr "Τύπος σελίδας"
-
 msgid "Page builder"
 msgstr "Δημιουργός σελίδων"
 
@@ -9823,9 +9629,6 @@ msgstr "Αριθμός σελίδας (στρατηγική σελιδοποίη
 
 msgid "Pages"
 msgstr "Σελίδες"
-
-msgid "Pages & navigation"
-msgstr "Σελίδες & πλοήγηση"
 
 msgid "Pagination strategy type"
 msgstr "Τύπος στρατηγικής σελιδοποίησης"
@@ -9945,9 +9748,6 @@ msgstr "Μερική ενημέρωση πληροφοριών είδους κα
 
 msgid "Partly back in stock"
 msgstr "Εν μέρει επέστρεψε στο απόθεμα"
-
-msgid "Partner Strip"
-msgstr "Λωρίδα συνεργατών"
 
 msgid "Partner shop (2)"
 msgstr "Συνεργαζόμενο κατάστημα (2)"
@@ -10264,9 +10064,6 @@ msgstr "Σε αναμονή υποβολής"
 
 msgid "Per-customer Usage Limit"
 msgstr "Όριο χρήσης ανά πελάτη"
-
-msgid "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
-msgstr "Παρακάμψεις ανά γλώσσα, π.χ. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Μόνο τα κλειδιά που διαφέρουν· όλα τα υπόλοιπα προέρχονται από τα παραπάνω πεδία. Η προεπιλεγμένη γλώσσα δεν είναι έγκυρο κλειδί — αυτή ΕΙΝΑΙ τα παραπάνω πεδία."
 
 msgid "Per-promotion breakdown of promotion_discount: one entry per offer that actually took money off, with the coupon code that earned it when there was one. The storefront needs this to tell the shopper WHICH offers applied, and to show a coupon its OWN amount instead of the cart total."
 msgstr "Ανάλυση του promotion_discount ανά προσφορά: μία εγγραφή για κάθε προσφορά που πράγματι μείωσε το ποσό, με τον κωδικό κουπονιού που την ενεργοποίησε, όταν υπήρχε. Το storefront τη χρειάζεται για να δείξει στον αγοραστή ΠΟΙΕΣ προσφορές εφαρμόστηκαν και να εμφανίσει σε κάθε κουπόνι το ΔΙΚΟ του ποσό αντί για το σύνολο του καλαθιού."
@@ -10906,12 +10703,6 @@ msgstr "Production"
 msgid "Products"
 msgstr "Προϊόντα"
 
-msgid "Products Grid"
-msgstr "Πλέγμα προϊόντων"
-
-msgid "Products Slider"
-msgstr "Slider προϊόντων"
-
 msgid "Products Using This VAT"
 msgstr "Προϊόντα που χρησιμοποιούν αυτόν τον ΦΠΑ"
 
@@ -10982,9 +10773,6 @@ msgstr "Ενεργοποιημένες Προσφορές"
 
 msgid "Proof of delivery"
 msgstr "Απόδειξη παράδοσης"
-
-msgid "Props"
-msgstr "Ιδιότητες"
 
 msgid "Protected"
 msgstr "Προστατευμένο"
@@ -11057,9 +10845,6 @@ msgstr "Δημοσιευμένη αναθεώρηση"
 
 msgid "Publishing"
 msgstr "Δημοσίευση"
-
-msgid "Pull Quote"
-msgstr "Επισημασμένο απόσπασμα"
 
 msgid "Purchase"
 msgstr "Αγορά"
@@ -11313,9 +11098,6 @@ msgstr "Πρόσφατα προστέθηκε"
 
 msgid "Recently Created"
 msgstr "Πρόσφατα δημιουργήθηκε"
-
-msgid "Recently Viewed Rail"
-msgstr "Λωρίδα πρόσφατα προβληθέντων"
 
 msgid "Recipient"
 msgstr "Παραλήπτης"
@@ -12031,9 +11813,6 @@ msgstr "Αναθεωρήσεις"
 msgid "Reward Products"
 msgstr "Προϊόντα ανταμοιβής"
 
-msgid "Rich Text Block"
-msgstr "Μπλοκ εμπλουτισμένου κειμένου"
-
 msgid "Role"
 msgstr "Ρόλος"
 
@@ -12256,9 +12035,6 @@ msgstr "Αναζήτηση"
 msgctxt "order source type"
 msgid "Search"
 msgstr "Αναζήτηση"
-
-msgid "Search Bar"
-msgstr "Γραμμή αναζήτησης"
 
 msgid "Search Configuration"
 msgstr "Διαμόρφωση αναζήτησης"
@@ -12821,14 +12597,8 @@ msgstr "Εμφάνιση λεπτομερών ρυθμίσεων index"
 msgid "Show nothing rather than fewer than this many suggestions."
 msgstr "Να μην εμφανίζεται τίποτα αντί για λιγότερες προτάσεις από αυτόν τον αριθμό."
 
-msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
-msgstr "Εμφανίζει τα νομικά στοιχεία του καταστήματος (επωνυμία, ΑΦΜ, διεύθυνση) κάτω από τους συνδέσμους αυτής της στήλης. Μόνο μία στήλη του υποσέλιδου μπορεί να το κάνει. Όταν καμία δεν το κάνει, τα στοιχεία μένουν εκεί που τα βάζει από προεπιλογή η βιτρίνα."
-
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
-
-msgid "Shows the seller's details"
-msgstr "Δείχνει τα στοιχεία του πωλητή"
 
 msgid "Sign-in code"
 msgstr "Κωδικός σύνδεσης"
@@ -12905,9 +12675,6 @@ msgstr "Παραλείφθηκε: ο παραλήπτης έχει διαγρα�
 
 msgid "Skipped: switched off"
 msgstr "Παραλείφθηκε: το email είναι απενεργοποιημένο"
-
-msgid "Slot"
-msgstr "Θέση"
 
 msgid "Slots"
 msgstr "Θέσεις"
@@ -13014,9 +12781,6 @@ msgstr "Εγγραφή προέλευσης"
 
 msgid "Source type"
 msgstr "Τύπος πηγής"
-
-msgid "Spacer"
-msgstr "Κενό διάστημα"
 
 msgid "Spam complaint"
 msgstr "Καταγγελία ως ανεπιθύμητο"
@@ -13126,9 +12890,6 @@ msgstr "Κατάσταση"
 
 msgid "Statistics"
 msgstr "Στατιστικά"
-
-msgid "Stats Strip"
-msgstr "Λωρίδα στατιστικών"
 
 msgid "Status"
 msgstr "Κατάσταση"
@@ -13290,9 +13051,6 @@ msgstr "Καταστήματα"
 
 msgid "Stores a PLATFORM-schema user id; not FK-enforced."
 msgstr "Αποθηκεύει το αναγνωριστικό χρήστη του σχήματος πλατφόρμας· χωρίς περιορισμό ξένου κλειδιού."
-
-msgid "Story Timeline"
-msgstr "Χρονολόγιο ιστορίας"
 
 msgid "Strategy"
 msgstr "Στρατηγική"
@@ -13753,10 +13511,6 @@ msgstr "Λήξη περιόδου"
 msgid "Test send"
 msgstr "Δοκιμαστική αποστολή"
 
-# Email Template Translations
-msgid "Testimonials"
-msgstr "Μαρτυρίες πελατών"
-
 msgid "Text"
 msgstr "Κείμενο"
 
@@ -13929,6 +13683,9 @@ msgstr "Ο κωδικός δεν υπάρχει"
 msgid "The code has reached its usage limit"
 msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης του"
 
+msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
+msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."
+
 msgid "The cost without VAT: this is what the profit report uses."
 msgstr "Το κόστος χωρίς ΦΠΑ: αυτό χρησιμοποιεί η αναφορά κέρδους."
 
@@ -14100,9 +13857,6 @@ msgstr "Το σύνολο της παραγγελίας είναι κάτω απ
 
 msgid "The order's UUID. Required when the order belongs to a guest (no account); ignored for signed-in owners and store staff."
 msgstr "Το UUID της παραγγελίας. Απαιτείται όταν η παραγγελία ανήκει σε επισκέπτη (χωρίς λογαριασμό)· αγνοείται για συνδεδεμένους ιδιοκτήτες και προσωπικό του καταστήματος."
-
-msgid "The page-builder layouts, the navigation menus and the RENDERED pages built from them. Purge after editing a layout, a section's props, a content page or a menu."
-msgstr "Οι διατάξεις του page builder, τα μενού πλοήγησης και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που παράγονται από αυτά. Εκκαθαρίστε μετά από επεξεργασία μιας διάταξης, των props μιας ενότητας, μιας σελίδας περιεχομένου ή ενός μενού."
 
 msgid "The pages, theme and sections a store published with the page builder, and every page rendered with them. Purges itself when a release is published or rolled back; saving a draft purges nothing."
 msgstr "Οι σελίδες, το θέμα και οι ενότητες που δημοσίευσε ένα κατάστημα με τον δημιουργό σελίδων, και κάθε σελίδα που εμφανίζεται με αυτά. Καθαρίζει μόνη της όταν δημοσιεύεται ή επαναφέρεται μια έκδοση· η αποθήκευση πρόχειρου δεν καθαρίζει τίποτα."
@@ -14316,9 +14070,6 @@ msgstr "Το κατάστημα δεν έχει κείμενο σε αυτή τ�
 
 msgid "The storefront unsubscribe confirmation page."
 msgstr "Η σελίδα επιβεβαίωσης απεγγραφής του καταστήματος."
-
-msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
-msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."
 
 msgid "The stores on this platform, their plans and the health of background work."
 msgstr "Τα καταστήματα της πλατφόρμας, τα πλάνα τους και η κατάσταση των εργασιών παρασκηνίου."
@@ -14657,8 +14408,8 @@ msgstr "Αυτό ξεπερνά το όριο που μπορεί να βάλε�
 msgid "This tenant cannot be destroyed right now."
 msgstr "Αυτό το κατάστημα δεν μπορεί να διαγραφεί αυτή τη στιγμή."
 
-msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue, layouts and navigation without --force. Never set this on a store that takes real orders."
-msgstr "Αυτό το κατάστημα είναι αναλώσιμο δείγμα επίδειξης, όχι πραγματικός έμπορος. Επιτρέπει στο manage.py seed_demo_store να αντικαθιστά τον κατάλογο, τις διατάξεις και την πλοήγησή του χωρίς --force. Μην το ενεργοποιείτε ποτέ σε κατάστημα που δέχεται πραγματικές παραγγελίες."
+msgid "This tenant is a disposable showcase, not a real merchant. Allows manage.py seed_demo_store to overwrite its catalogue and showcase content without --force. Never set this on a store that takes real orders."
+msgstr "Αυτό το κατάστημα είναι αναλώσιμο δείγμα επίδειξης, όχι πραγματικός έμπορος. Επιτρέπει στο manage.py seed_demo_store να αντικαθιστά τον κατάλογο και το περιεχόμενο επίδειξης χωρίς --force. Μην το ενεργοποιείτε ποτέ σε κατάστημα που δέχεται πραγματικές παραγγελίες."
 
 #, python-format
 msgid "This text has %(n)s forms, separated by |."
@@ -14966,9 +14717,6 @@ msgstr "Αληθές όταν το καλάθι του καλούντος (πο�
 
 msgid "True when the store has a default newsletter topic, i.e. when a newsletter form submission can be honoured."
 msgstr "True όταν το κατάστημα έχει προεπιλεγμένο θέμα newsletter, δηλαδή όταν μια υποβολή της φόρμας newsletter μπορεί να εξυπηρετηθεί."
-
-msgid "Trust Badges"
-msgstr "Σήματα εμπιστοσύνης"
 
 msgid "Try again"
 msgstr "Δοκιμάστε ξανά"
@@ -15629,9 +15377,6 @@ msgstr "Προβολή της παραγγελίας σας"
 msgid "View your orders and their status"
 msgstr "Προβολή των παραγγελιών σας και της κατάστασής τους"
 
-msgid "Vision Content"
-msgstr "Περιεχόμενο «Όραμα»"
-
 msgid "Visit our website"
 msgstr "Επισκεφτείτε την ιστοσελίδα μας"
 
@@ -15838,9 +15583,6 @@ msgstr "Καλώς ήρθατε ξανά στο"
 
 msgid "Well Reviewed (>7.0)"
 msgstr "Καλά Αξιολογημένα (>7.0)"
-
-msgid "What Is Microlearning"
-msgstr "Τι είναι η μικρομάθηση"
 
 msgid "What This Means"
 msgstr "Τι Σημαίνει Αυτό"
@@ -16069,9 +15811,6 @@ msgstr "Με τιμές χονδρικής"
 
 msgid "Why"
 msgstr "Γιατί"
-
-msgid "Why Microlearning"
-msgstr "Γιατί μικρομάθηση"
 
 msgid "Why it could not be released: [{path, code, message}]"
 msgstr "Γιατί δεν μπόρεσε να δημοσιευτεί: [{path, code, message}]"
@@ -16990,6 +16729,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgstr[1] "%(counter)s εργασίες απέτυχαν τις τελευταίες 24 ώρες"
 
 #, python-format
+#~ msgid "%(slot)s navigation"
+#~ msgstr "Πλοήγηση: %(slot)s"
+
+#, python-format
 #~ msgid "... and %(n)d more"
 #~ msgstr "... και %(n)d ακόμα"
 
@@ -17038,6 +16781,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
 
+#~ msgid "About Content"
+#~ msgstr "Περιεχόμενο «Σχετικά με εμάς»"
+
 #~ msgid "Account security"
 #~ msgstr "Ασφάλεια λογαριασμού"
 
@@ -17066,6 +16812,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Admin adjustment of %(points)d points applied to %(user)s. This action is logged and cannot be undone."
 #~ msgstr "Εφαρμόστηκε προσαρμογή διαχειριστή %(points)d πόντων στον/στην %(user)s. Αυτή η ενέργεια καταγράφεται και δεν μπορεί να αναιρεθεί."
 
+#~ msgid "Admin display name for this layout."
+#~ msgstr "Όνομα εμφάνισης αυτής της διάταξης στη διαχείριση."
+
 #~ msgid "Admin user who created this adjustment"
 #~ msgstr "Χρήστης διαχειριστής που δημιούργησε αυτή την προσαρμογή"
 
@@ -17087,11 +16836,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "American Countries"
 #~ msgstr "Αμερικανικές χώρες"
 
+#~ msgid "An absolute https URL on another site."
+#~ msgstr "Απόλυτο https URL σε άλλον ιστότοπο."
+
 #~ msgid "An error occurred while confirming the subscription."
 #~ msgstr "Παρουσιάστηκε σφάλμα κατά την επιβεβαίωση της εγγραφής."
 
 #~ msgid "An error occurred while processing the refund."
 #~ msgstr "Παρουσιάστηκε σφάλμα κατά την επεξεργασία της επιστροφής χρημάτων."
+
+#~ msgid "An i-* icon name, e.g. i-heroicons-light-bulb."
+#~ msgstr "Όνομα εικονιδίου i-*, π.χ. i-heroicons-light-bulb."
 
 #~ msgid "An order counts once its payment is collected, in the month it was placed. Canceled orders and cash on delivery not yet collected are not counted."
 #~ msgstr "Μια παραγγελία μετράει όταν εισπραχθεί η πληρωμή της, στον μήνα που υποβλήθηκε. Οι ακυρωμένες παραγγελίες και οι αντικαταβολές που δεν έχουν εισπραχθεί δεν μετράνε."
@@ -17124,6 +16879,18 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Bio & Description"
 #~ msgstr "Βιογραφικό & Περιγραφή"
 
+#~ msgid "Blog Categories Rail"
+#~ msgstr "Λωρίδα κατηγοριών Blog"
+
+#~ msgid "Blog Posts Carousel"
+#~ msgstr "Καρουζέλ άρθρων Blog"
+
+#~ msgid "Blog Posts Grid"
+#~ msgstr "Πλέγμα άρθρων Blog"
+
+#~ msgid "Blog Posts List"
+#~ msgstr "Λίστα άρθρων Blog"
+
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "Μέγεθος θυρίδας BoxNow: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"
 
@@ -17131,11 +16898,20 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "BoxNow locker sync complete: %(created)d created, %(updated)d updated, %(deactivated)d deactivated."
 #~ msgstr "Ο συγχρονισμός locker BoxNow ολοκληρώθηκε: %(created)d δημιουργήθηκαν, %(updated)d ενημερώθηκαν, %(deactivated)d απενεργοποιήθηκαν."
 
+#~ msgid "Built-in page"
+#~ msgstr "Ενσωματωμένη σελίδα"
+
+#~ msgid "Business Hours"
+#~ msgstr "Ωράριο λειτουργίας"
+
 #~ msgid "COD"
 #~ msgstr "Αντικαταβολή"
 
 #~ msgid "Calculation Examples"
 #~ msgstr "Παραδείγματα υπολογισμών"
+
+#~ msgid "Call to Action Banner"
+#~ msgstr "Banner παρότρυνσης για δράση"
 
 #~ msgid "Cannot refund more than the ordered quantity. "
 #~ msgstr "Δεν είναι δυνατή η επιστροφή περισσότερων από την παραγγελθείσα ποσότητα. "
@@ -17153,6 +16929,14 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Collapse/Expand"
 #~ msgstr "Σύμπτυξη/Επέκταση"
 
+#~ msgid "Column"
+#~ msgstr "Στήλη"
+
+# Greek translations added by fill_admin_greek_translations.py
+#, python-format
+#~ msgid "Column #%(id)s"
+#~ msgstr "Στήλη #%(id)s"
+
 #~ msgid "Comma-separated facet fields for counts and stats"
 #~ msgstr "Πεδία facet διαχωρισμένα με κόμμα για πλήθη και στατιστικά"
 
@@ -17164,6 +16948,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Completed Orders"
 #~ msgstr "Ολοκληρωμένες παραγγελίες"
+
+#~ msgid "Component Type"
+#~ msgstr "Τύπος στοιχείου"
+
+#~ msgid "Component-specific configuration as JSON."
+#~ msgstr "Ρυθμίσεις του στοιχείου σε μορφή JSON."
 
 #~ msgid "Configuration Preview"
 #~ msgstr "Προεπισκόπηση Διαμόρφωσης"
@@ -17181,6 +16971,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Contact Numbers"
 #~ msgstr "Τηλέφωνα επικοινωνίας"
 
+#~ msgid "Contact Panel"
+#~ msgstr "Πλαίσιο επικοινωνίας"
+
 #~ msgid "Content Analytics"
 #~ msgstr "Στατιστικά Περιεχομένου"
 
@@ -17195,6 +16988,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Currency is required when amount is provided"
 #~ msgstr "Το νόμισμα είναι υποχρεωτικό όταν δίνεται ποσό"
+
+#~ msgid "Custom page"
+#~ msgstr "Προσαρμοσμένη σελίδα"
 
 #~ msgid "Customer Summary"
 #~ msgstr "Σύνοψη Πελάτη"
@@ -17216,6 +17012,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Display & Branding"
 #~ msgstr "Εμφάνιση & Branding"
+
+#~ msgid "Divider"
+#~ msgstr "Διαχωριστικό"
 
 #, python-format
 #~ msgid "Each CSP source must start with 'https://', 'http://localhost', or 'wss://'. Invalid entries: %(bad)s"
@@ -17239,11 +17038,20 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "End-to-end"
 #~ msgstr "Συνολικά"
 
+#~ msgid "Entries"
+#~ msgstr "Καταχωρήσεις"
+
 #~ msgid "European Countries"
 #~ msgstr "Ευρωπαϊκές χώρες"
 
 #~ msgid "Export search analytics data to JSON format"
 #~ msgstr "Εξαγωγή δεδομένων αναλυτικών αναζήτησης σε μορφή JSON"
+
+#~ msgid "External link"
+#~ msgstr "Εξωτερικός σύνδεσμος"
+
+#~ msgid "FAQ Accordion"
+#~ msgstr "Συχνές ερωτήσεις (accordion)"
 
 #~ msgid "FEATURED ARTICLES"
 #~ msgstr "ΠΡΟΤΕΙΝΟΜΕΝΑ ΑΡΘΡΑ"
@@ -17264,8 +17072,14 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Featured Articles"
 #~ msgstr "Προβεβλημένα Άρθρα"
 
+#~ msgid "Featured Products"
+#~ msgstr "Προτεινόμενα Προϊόντα"
+
 #~ msgid "Featured content image"
 #~ msgstr "Εικόνα προτεινόμενου περιεχομένου"
+
+#~ msgid "Features Grid"
+#~ msgstr "Πλέγμα χαρακτηριστικών"
 
 #~ msgid "Federated search across products and blog posts"
 #~ msgstr "Ομοσπονδιακή αναζήτηση σε προϊόντα και άρθρα"
@@ -17312,6 +17126,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Flow Steps"
 #~ msgstr "Βήματα ροής"
 
+#~ msgid "Footer links belong to a column."
+#~ msgstr "Οι σύνδεσμοι του υποσέλιδου ανήκουν σε μια στήλη."
+
 #~ msgid "Free Threshold Range"
 #~ msgstr "Εύρος ορίου δωρεάν"
 
@@ -17345,9 +17162,18 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Go to Your Account"
 #~ msgstr "Μετάβαση στον Λογαριασμό σας"
 
+#~ msgid "Header and mobile links hang off the menu directly."
+#~ msgstr "Οι σύνδεσμοι της κεφαλίδας και του κινητού συνδέονται απευθείας στο μενού."
+
 #, python-format
 #~ msgid "Hello from %(site_name)s!"
 #~ msgstr "Γεια σας από το %(site_name)s!"
+
+#~ msgid "Hero Banner"
+#~ msgstr "Κεντρικό banner"
+
+#~ msgid "Hero Carousel"
+#~ msgstr "Κεντρικό καρουζέλ"
 
 #~ msgid "Hero section image"
 #~ msgstr "Εικόνα ενότητας hero"
@@ -17361,6 +17187,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "ISO 3166-1 alpha-2 country code (e.g. 'GR')."
 #~ msgstr "Κωδικός χώρας ISO 3166-1 alpha-2 (π.χ. 'GR')."
 
+#~ msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
+#~ msgstr "Αναγνωριστικό της σελίδας (π.χ. \"home\", \"products\", \"blog\")."
+
 #~ msgid "Idle"
 #~ msgstr "Αδρανής"
 
@@ -17369,6 +17198,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team."
 #~ msgstr "Αν αντιμετωπίζετε προβλήματα με την πληρωμή σας ή έχετε ερωτήσεις σχετικά με την παραγγελία σας, μη διστάσετε να επικοινωνήσετε με την ομάδα εξυπηρέτησης πελατών μας."
+
+#~ msgid "Image Gallery"
+#~ msgstr "Συλλογή εικόνων"
 
 #~ msgid "In Fulfillment (Shipped/Delivered)"
 #~ msgstr "Σε Διεκπεραίωση (Απεσταλμένες/Παραδομένες)"
@@ -17401,6 +17233,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Is Online Payment"
 #~ msgstr "Είναι online πληρωμή"
 
+#~ msgid "Is Visible"
+#~ msgstr "Ορατό"
+
 #~ msgid "Item Analytics"
 #~ msgstr "Αναλυτικά αντικειμένων"
 
@@ -17416,14 +17251,28 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Last activity"
 #~ msgstr "Τελευταία δραστηριότητα"
 
+#~ msgid "Layout"
+#~ msgstr "Διάταξη"
+
+#~ msgid "Leave empty for a page link to use the page's own title, which is already translated."
+#~ msgstr "Αφήστε το κενό ώστε ένας σύνδεσμος σελίδας να χρησιμοποιεί τον τίτλο της ίδιας της σελίδας, ο οποίος είναι ήδη μεταφρασμένος."
+
 #~ msgid "Letters, digits and @/./+/-/_ only."
 #~ msgstr "Μόνο γράμματα, ψηφία και @/./+/-/_."
 
 #~ msgid "Likes count"
 #~ msgstr "Πλήθος επισημάνσεων"
 
+# Greek translations added by fill_admin_greek_translations.py
+#, python-format
+#~ msgid "Link #%(id)s"
+#~ msgstr "Σύνδεσμος #%(id)s"
+
 #~ msgid "Link must be a valid URL or relative path."
 #~ msgstr "Ο σύνδεσμος πρέπει να είναι έγκυρο URL ή σχετική διαδρομή."
+
+#~ msgid "Links"
+#~ msgstr "Σύνδεσμοι"
 
 #~ msgid "List of address IDs to delete"
 #~ msgstr "Λίστα IDs διευθύνσεων προς διαγραφή"
@@ -17431,11 +17280,17 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "List of stock reservation IDs that were converted to this order. Provides audit trail linking reservations to final orders."
 #~ msgstr "Λίστα ID δεσμεύσεων αποθέματος που μετατράπηκαν σε αυτή την παραγγελία. Παρέχει ίχνος ελέγχου που συνδέει τις δεσμεύσεις με τις τελικές παραγγελίες."
 
+#~ msgid "Locale Overrides"
+#~ msgstr "Παρακάμψεις ανά γλώσσα"
+
 #~ msgid "Localization"
 #~ msgstr "Τοπικές ρυθμίσεις"
 
 #~ msgid "Location & Address"
 #~ msgstr "Τοποθεσία & Διεύθυνση"
+
+#~ msgid "Location Map"
+#~ msgstr "Χάρτης τοποθεσίας"
 
 #~ msgid "Location type, e.g. HOME or OFFICE (optional)"
 #~ msgstr "Τύπος τοποθεσίας, π.χ. HOME ή OFFICE (προαιρετικό)"
@@ -17452,6 +17307,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Loyalty & Rewards"
 #~ msgstr "Πιστότητα & Ανταμοιβές"
 
+#~ msgid "Loyalty Program Hero"
+#~ msgstr "Κεντρική ενότητα προγράμματος πιστότητας"
+
+#~ msgid "Loyalty program"
+#~ msgstr "Πρόγραμμα πιστότητας"
+
 #~ msgid "Main"
 #~ msgstr "Κύρια"
 
@@ -17460,6 +17321,18 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Maximum total number of results to return"
 #~ msgstr "Μέγιστος συνολικός αριθμός αποτελεσμάτων προς επιστροφή"
+
+#~ msgid "Media + Text"
+#~ msgstr "Πολυμέσα + κείμενο"
+
+#~ msgid "Menu"
+#~ msgstr "Μενού"
+
+#~ msgid "Menu Columns"
+#~ msgstr "Στήλες μενού"
+
+#~ msgid "Menus"
+#~ msgstr "Μενού"
 
 #~ msgid "Message Analytics"
 #~ msgstr "Αναλυτικά μηνυμάτων"
@@ -17470,6 +17343,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Αναγνωριστικό dataset (pixel) του Meta Conversions API που χρησιμοποιείται για αποφυγή διπλότυπων συμβάντων server-side. Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί το Meta CAPI."
 
+#~ msgid "Mobile"
+#~ msgstr "Κινητό"
+
 #~ msgid "Months"
 #~ msgstr "Μήνες"
 
@@ -17479,8 +17355,41 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Move selected items up in sort order"
 #~ msgstr "Μετακίνηση επιλεγμένων ειδών πάνω στη σειρά ταξινόμησης"
 
+#~ msgid "Navigation Column"
+#~ msgstr "Στήλη πλοήγησης"
+
+#~ msgid "Navigation Column Translation"
+#~ msgstr "Μετάφραση στήλης πλοήγησης"
+
+#~ msgid "Navigation Column Translations"
+#~ msgstr "Μεταφράσεις στήλης πλοήγησης"
+
+#~ msgid "Navigation Columns"
+#~ msgstr "Στήλες πλοήγησης"
+
+#~ msgid "Navigation Link"
+#~ msgstr "Σύνδεσμος πλοήγησης"
+
+#~ msgid "Navigation Link Translation"
+#~ msgstr "Μετάφραση συνδέσμου πλοήγησης"
+
+#~ msgid "Navigation Link Translations"
+#~ msgstr "Μεταφράσεις συνδέσμου πλοήγησης"
+
+#~ msgid "Navigation Links"
+#~ msgstr "Σύνδεσμοι πλοήγησης"
+
+#~ msgid "Navigation Menu"
+#~ msgstr "Μενού πλοήγησης"
+
+#~ msgid "Navigation Menus"
+#~ msgstr "Μενού πλοήγησης"
+
 #~ msgid "Needs Attention (Failed/Pending)"
 #~ msgstr "Χρειάζεται προσοχή (Απέτυχε/Εκκρεμεί)"
+
+#~ msgid "Newsletter Signup"
+#~ msgstr "Εγγραφή στο newsletter"
 
 #~ msgid "No Configuration Needed"
 #~ msgstr "Δεν απαιτείται διαμόρφωση"
@@ -17535,6 +17444,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Oceania Countries"
 #~ msgstr "Χώρες Ωκεανίας"
+
+#~ msgid "Offers"
+#~ msgstr "Προσφορές"
+
+#~ msgid "Offers Preview"
+#~ msgstr "Προεπισκόπηση προσφορών"
 
 #~ msgid "Offline"
 #~ msgstr "Εκτός σύνδεσης"
@@ -17622,6 +17537,30 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Page Hero"
 #~ msgstr "Κεντρική ενότητα σελίδας"
 
+#~ msgid "Page Layout"
+#~ msgstr "Διάταξη σελίδας"
+
+#~ msgid "Page Layout Translation"
+#~ msgstr "Μετάφραση διάταξης σελίδας"
+
+#~ msgid "Page Layout Translations"
+#~ msgstr "Μεταφράσεις διάταξης σελίδας"
+
+#~ msgid "Page Layouts"
+#~ msgstr "Διατάξεις σελίδων"
+
+#~ msgid "Page Section"
+#~ msgstr "Ενότητα σελίδας"
+
+#~ msgid "Page Sections"
+#~ msgstr "Ενότητες σελίδας"
+
+#~ msgid "Page Type"
+#~ msgstr "Τύπος σελίδας"
+
+#~ msgid "Pages & navigation"
+#~ msgstr "Σελίδες & πλοήγηση"
+
 #~ msgid "Paid orders"
 #~ msgstr "Πληρωμένες παραγγελίες"
 
@@ -17635,6 +17574,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Partial refund amount. Leave empty for full refund."
 #~ msgstr "Ποσό μερικής επιστροφής. Αφήστε κενό για πλήρη επιστροφή."
 
+#~ msgid "Partner Strip"
+#~ msgstr "Λωρίδα συνεργατών"
+
 #~ msgid "Payment Configuration"
 #~ msgstr "Διαμόρφωση Πληρωμής"
 
@@ -17646,6 +17588,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Pending Reviews"
 #~ msgstr "Κριτικές προς Έγκριση"
+
+#~ msgid "Per-locale overrides, e.g. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Only the keys that differ; everything else falls back to the fields above. The default locale is not a valid key — those ARE the fields above."
+#~ msgstr "Παρακάμψεις ανά γλώσσα, π.χ. {\"en\": {\"title\": \"Hero\", \"props\": {\"heading\": \"...\"}}}. Μόνο τα κλειδιά που διαφέρουν· όλα τα υπόλοιπα προέρχονται από τα παραπάνω πεδία. Η προεπιλεγμένη γλώσσα δεν είναι έγκυρο κλειδί — αυτή ΕΙΝΑΙ τα παραπάνω πεδία."
 
 #~ msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
 #~ msgstr "Cache μεταφράσεων parler ανά γραμμή. Η εκκαθάρισή της αναγκάζει επανάκτηση από την Postgres στο επόμενο αίτημα για κάθε μεταφράσιμη γραμμή που επηρεάζεται. Χρησιμοποιήστε το φειδωλά."
@@ -17704,11 +17649,20 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Product with id '{product_name}' is not available."
 #~ msgstr "Το προϊόν με id '{product_name}' δεν είναι διαθέσιμο."
 
+#~ msgid "Products Grid"
+#~ msgstr "Πλέγμα προϊόντων"
+
+#~ msgid "Products Slider"
+#~ msgstr "Slider προϊόντων"
+
 #~ msgid "Project Register"
 #~ msgstr "Μητρώο έργων"
 
 #~ msgid "Promotional campaigns"
 #~ msgstr "Προωθητικές καμπάνιες"
+
+#~ msgid "Props"
+#~ msgstr "Ιδιότητες"
 
 #~ msgid "Provider Configuration"
 #~ msgstr "Διαμόρφωση Παρόχου"
@@ -17721,6 +17675,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Public contact email shown in storefront footer and contact page. Empty falls back to settings.INFO_EMAIL."
 #~ msgstr "Δημόσιο email επικοινωνίας που εμφανίζεται στο footer του storefront και στη σελίδα επικοινωνίας. Κενό → χρησιμοποιείται η τιμή settings.INFO_EMAIL."
+
+#~ msgid "Pull Quote"
+#~ msgstr "Επισημασμένο απόσπασμα"
 
 #~ msgid "RFC 8058 one-click unsubscribe from a topic"
 #~ msgstr "Απεγγραφή με ένα κλικ από θέμα κατά RFC 8058"
@@ -17745,6 +17702,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Recent Activity"
 #~ msgstr "Πρόσφατη δραστηριότητα"
+
+#~ msgid "Recently Viewed Rail"
+#~ msgstr "Λωρίδα πρόσφατα προβληθέντων"
 
 #~ msgid "Reference Cards"
 #~ msgstr "Κάρτες αναφοράς"
@@ -17781,8 +17741,14 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Review #%(id)s: %(comment)s"
 #~ msgstr "Κριτική #%(id)s: %(comment)s"
 
+#~ msgid "Rich Text Block"
+#~ msgstr "Μπλοκ εμπλουτισμένου κειμένου"
+
 #~ msgid "SPECIAL OFFERS"
 #~ msgstr "ΕΙΔΙΚΕΣ ΠΡΟΣΦΟΡΕΣ"
+
+#~ msgid "Search Bar"
+#~ msgstr "Γραμμή αναζήτησης"
 
 #~ msgid "Search failed. Please try again later."
 #~ msgstr "Η αναζήτηση απέτυχε. Παρακαλούμε δοκιμάστε ξανά αργότερα."
@@ -17836,11 +17802,20 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Shop Now"
 #~ msgstr "Αγορά τώρα"
 
+#~ msgid "Show the store's legal details (company name, tax ID, address) under this column's links. Only one column of the footer can. When none does, the details stay where the storefront puts them by default."
+#~ msgstr "Εμφανίζει τα νομικά στοιχεία του καταστήματος (επωνυμία, ΑΦΜ, διεύθυνση) κάτω από τους συνδέσμους αυτής της στήλης. Μόνο μία στήλη του υποσέλιδου μπορεί να το κάνει. Όταν καμία δεν το κάνει, τα στοιχεία μένουν εκεί που τα βάζει από προεπιλογή η βιτρίνα."
+
 #, python-format
 #~ msgid "Showing last %(counter)s entry"
 #~ msgid_plural "Showing last %(counter)s entries"
 #~ msgstr[0] "Εμφάνιση τελευταίας %(counter)s εγγραφής"
 #~ msgstr[1] "Εμφάνιση τελευταίων %(counter)s εγγραφών"
+
+#~ msgid "Shows the seller's details"
+#~ msgstr "Δείχνει τα στοιχεία του πωλητή"
+
+#~ msgid "Slot"
+#~ msgstr "Θέση"
 
 #~ msgid "Small icon representation"
 #~ msgstr "Μικρή αναπαράσταση εικονιδίου"
@@ -17858,6 +17833,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Sort order has been reset for %(count)d payment methods."
 #~ msgstr "Η σειρά ταξινόμησης επαναφέρθηκε για %(count)d μεθόδους πληρωμής."
 
+#~ msgid "Spacer"
+#~ msgstr "Κενό διάστημα"
+
 #~ msgid "Specialized"
 #~ msgstr "Εξειδικευμένο"
 
@@ -17869,6 +17847,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Stats"
 #~ msgstr "Στατιστικά"
+
+#~ msgid "Stats Strip"
+#~ msgstr "Λωρίδα στατιστικών"
 
 #~ msgid "Status Age"
 #~ msgstr "Διάρκεια κατάστασης"
@@ -17895,6 +17876,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Stock Reservation IDs"
 #~ msgstr "ID Δεσμεύσεων Αποθέματος"
+
+#~ msgid "Story Timeline"
+#~ msgstr "Χρονολόγιο ιστορίας"
 
 #~ msgid "Subscribes an email address to the store's default newsletter topic. Always answers 202: a confirmation email is sent unless the address is already confirmed or one was sent in the last 10 minutes."
 #~ msgstr "Εγγράφει μια διεύθυνση email στο προεπιλεγμένο θέμα newsletter του καταστήματος. Απαντά πάντα 202: αποστέλλεται email επιβεβαίωσης, εκτός αν η διεύθυνση έχει ήδη επιβεβαιωθεί ή έχει ήδη σταλεί ένα τα τελευταία 10 λεπτά."
@@ -17923,6 +17907,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Test federated search functionality with sample queries"
 #~ msgstr "Δοκιμή λειτουργίας ομοσπονδιακής αναζήτησης με δείγματα ερωτημάτων"
 
+# Email Template Translations
+#~ msgid "Testimonials"
+#~ msgstr "Μαρτυρίες πελατών"
+
 #, python-format
 #~ msgid "Thank you for being part of the %(site_name)s community!"
 #~ msgstr "Ευχαριστούμε που είστε μέλος της κοινότητας %(site_name)s!"
@@ -17937,6 +17925,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Thank you for your order!"
 #~ msgstr "Ευχαριστούμε για την παραγγελία σας!"
+
+#~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
+#~ msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."
 
 #~ msgid "There is a named save (checkpoint)."
 #~ msgstr "Υπάρχει ονομασμένη αποθήκευση (σημείο ελέγχου)."
@@ -17991,6 +17982,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "True"
 #~ msgstr "Ναι"
+
+#~ msgid "Trust Badges"
+#~ msgstr "Σήματα εμπιστοσύνης"
 
 #~ msgid "Two-factor authentication"
 #~ msgstr "Διπλή επαλήθευση"
@@ -18047,6 +18041,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "View count increased by 100 for %(count)d posts."
 #~ msgstr "Ο μετρητής προβολών αυξήθηκε κατά 100 για %(count)d άρθρα."
 
+#~ msgid "Vision Content"
+#~ msgstr "Περιεχόμενο «Όραμα»"
+
 #~ msgid "Viva Wallet merchant ID. Empty falls back to settings.VIVA_WALLET_MERCHANT_ID."
 #~ msgstr "Αναγνωριστικό εμπόρου Viva Wallet. Κενό → χρησιμοποιείται η τιμή settings.VIVA_WALLET_MERCHANT_ID."
 
@@ -18078,6 +18075,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Welcome to your weekly newsletter from %(site_name)s. Here's what's been happening:"
 #~ msgstr "Καλώς ήρθατε στο εβδομαδιαίο newsletter του %(site_name)s. Δείτε τι συνέβη:"
 
+#~ msgid "What Is Microlearning"
+#~ msgstr "Τι είναι η μικρομάθηση"
+
 #~ msgid "Whether new users are automatically subscribed to this topic"
 #~ msgstr "Αν οι νέοι χρήστες εγγράφονται αυτόματα σε αυτό το θέμα"
 
@@ -18086,6 +18086,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Whether this payment method requires manual confirmation (e.g., bank transfer)"
 #~ msgstr "Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση (π.χ. τραπεζική κατάθεση)"
+
+#~ msgid "Why Microlearning"
+#~ msgstr "Γιατί μικρομάθηση"
 
 #~ msgid "You can view your order status by logging into your account on our website."
 #~ msgstr "Μπορείτε να δείτε την κατάσταση της παραγγελίας σας συνδέοντας στον λογαριασμό σας στην ιστοσελίδα μας."

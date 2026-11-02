@@ -767,7 +767,7 @@ class StoreAlerts(DashboardWidget):
     def _legal_updates(self) -> list[dict[str, Any]]:
         if not self.request.user.has_perm("page_config.change_contentpage"):
             return []
-        from page_config.defaults import pending_legal_reviews
+        from page_config.content_pages import pending_legal_reviews
 
         pages = {page.pk: page for page, _update in pending_legal_reviews()}
         if not pages:

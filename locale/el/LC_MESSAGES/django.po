@@ -700,21 +700,12 @@ msgstr "Μια ημερήσια εργασία χρέωσης διατρέχει
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr "Υπάρχει ανοιχτή αμφισβήτηση για αυτή την πληρωμή και ο πάροχος πληρωμών δεν δέχεται επιστροφή μέχρι να κριθεί. Κάντε την επιστροφή αφού κλείσει."
 
-msgid "A document has more than one version."
-msgstr "Ένα έγγραφο έχει περισσότερες από μία εκδόσεις."
-
-msgid "A document was deleted."
-msgstr "Ένα έγγραφο διαγράφηκε."
-
 #, python-format
 msgid "A domain is at most %(max)d characters long."
 msgstr "Ένα domain έχει το πολύ %(max)d χαρακτήρες."
 
 msgid "A domain needs at least two labels, such as shop.example.com."
 msgstr "Ένα domain χρειάζεται τουλάχιστον δύο τμήματα, όπως shop.example.com."
-
-msgid "A draft was edited."
-msgstr "Ένα προσχέδιο έχει επεξεργαστεί."
 
 msgid "A focal point is between 0 and 1."
 msgstr "Το σημείο εστίασης είναι μεταξύ 0 και 1."
@@ -771,9 +762,6 @@ msgstr "Υπάρχει ήδη άρθρο με αυτό το slug."
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "Μια προσφορά εκπτώνει γραμμή του καλαθιού που δεν ανήκει στην παραγγελία."
 
-msgid "A publication is scheduled."
-msgstr "Υπάρχει προγραμματισμένη δημοσίευση."
-
 #, python-format
 msgid "A publish can be scheduled at most %(days)s days ahead."
 msgstr "Μια δημοσίευση μπορεί να προγραμματιστεί το πολύ %(days)s ημέρες μπροστά."
@@ -795,9 +783,6 @@ msgstr "Μια επιστροφή με αυτή την αναφορά έχει �
 
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "Μια επιστροφή χρημάτων, ή αξία που επέστρεψε σε δωροκάρτα, μετράει στην περίοδο που έγινε και όχι στην περίοδο της πώλησης, και μοιράζεται ανάμεσα σε προϊόντα, μεταφορικά και χρεώσεις αναλογικά με την απόδειξη."
-
-msgid "A release was published by a staff member."
-msgstr "Μια κυκλοφορία δημοσιεύτηκε από μέλος του προσωπικού."
 
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
@@ -889,9 +874,6 @@ msgstr "Απαιτείται έγκυρο ΑΦΜ κατά το αίτημα έκ
 #, python-format
 msgid "A verified %(carrier)s webhook could not be applied."
 msgstr "Ένα επαληθευμένο webhook του %(carrier)s δεν μπόρεσε να εφαρμοστεί."
-
-msgid "A version was saved by a staff member."
-msgstr "Μια έκδοση αποθηκεύτηκε από μέλος του προσωπικού."
 
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "Πεδίο ``aa`` ΑΑΔΕ — αυστηρά αύξων ακέραιος εντός ``(series, year)``. Πρέπει να είναι χωρίς κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
@@ -14408,12 +14390,6 @@ msgstr "Προκαθορισμένο Θέμα"
 msgid "There can only be one main address per user."
 msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυνση ανά χρήστη."
 
-msgid "There is a named save (checkpoint)."
-msgstr "Υπάρχει ονομασμένη αποθήκευση (σημείο ελέγχου)."
-
-msgid "There is a release after the first: someone published."
-msgstr "Υπάρχει κυκλοφορία μετά την πρώτη: κάποιος δημοσίευσε."
-
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο κανάλι χρέωσης της πλατφόρμας. Οι έμποροι πληρώνουν την πλατφόρμα εκτός συστήματος (τιμολόγιο / τραπεζική μεταφορά) και το προσωπικό καταχωρεί το αποτέλεσμα ορίζοντας την ημερομηνία «Πληρωμένο έως» του tenant — επεκτείνετέ την κατά την πληρωμένη περίοδο σε κάθε ανανέωση. Τα δοκιμαστικά αποκτούν περίοδο κατά τη δημιουργία (tenant_create --trial-days, προεπιλογή 30)· κενό «Πληρωμένο έως» σημαίνει ότι η περίοδος δεν λήγει ποτέ."
 
@@ -14650,9 +14626,6 @@ msgstr "Αυτό το διακριτικό προσωπικού ισχύει μ�
 
 msgid "This status means"
 msgstr "Αυτή η κατάσταση σημαίνει"
-
-msgid "This store already has page builder data."
-msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."
 
 #, python-format
 msgid "This store has no block called %(type)s."
@@ -17035,11 +17008,29 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "90 days"
 #~ msgstr "90 ημέρες"
 
+#~ msgid "A document has more than one version."
+#~ msgstr "Ένα έγγραφο έχει περισσότερες από μία εκδόσεις."
+
+#~ msgid "A document was deleted."
+#~ msgstr "Ένα έγγραφο διαγράφηκε."
+
+#~ msgid "A draft was edited."
+#~ msgstr "Ένα προσχέδιο έχει επεξεργαστεί."
+
+#~ msgid "A publication is scheduled."
+#~ msgstr "Υπάρχει προγραμματισμένη δημοσίευση."
+
+#~ msgid "A release was published by a staff member."
+#~ msgstr "Μια κυκλοφορία δημοσιεύτηκε από μέλος του προσωπικού."
+
 #~ msgid "A user with this email already exists."
 #~ msgstr "Υπάρχει ήδη χρήστης με αυτό το email."
 
 #~ msgid "A validation error occurred while restocking the item. Please check your input and try again."
 #~ msgstr "Παρουσιάστηκε σφάλμα επικύρωσης κατά την επαναφορά του προϊόντος στο απόθεμα. Ελέγξτε τα στοιχεία σας και δοκιμάστε ξανά."
+
+#~ msgid "A version was saved by a staff member."
+#~ msgstr "Μια έκδοση αποθηκεύτηκε από μέλος του προσωπικού."
 
 #~ msgid "ACS order without an AcsShipment row — likely a race during order creation or an upgrade-time data gap. Inspect order.history for clues."
 #~ msgstr "Παραγγελία ACS χωρίς εγγραφή AcsShipment — πιθανόν race condition κατά τη δημιουργία της παραγγελίας ή κενό δεδομένων κατά την αναβάθμιση. Ελέγξτε το order.history για ενδείξεις."
@@ -17947,12 +17938,21 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Thank you for your order!"
 #~ msgstr "Ευχαριστούμε για την παραγγελία σας!"
 
+#~ msgid "There is a named save (checkpoint)."
+#~ msgstr "Υπάρχει ονομασμένη αποθήκευση (σημείο ελέγχου)."
+
+#~ msgid "There is a release after the first: someone published."
+#~ msgstr "Υπάρχει κυκλοφορία μετά την πρώτη: κάποιος δημοσίευσε."
+
 #~ msgid "This Week's Highlights"
 #~ msgstr "Τα σημαντικότερα της εβδομάδας"
 
 #, python-format
 #~ msgid "This Week's Highlights: %(start)s to %(end)s"
 #~ msgstr "Τα σημαντικότερα της εβδομάδας: %(start)s έως %(end)s"
+
+#~ msgid "This store already has page builder data."
+#~ msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."
 
 #~ msgid "This user already has this notification."
 #~ msgstr "Αυτός ο χρήστης έχει ήδη αυτή την ειδοποίηση."

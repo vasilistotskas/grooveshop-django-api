@@ -1,7 +1,7 @@
 """What a document points at, and whether it still exists.
 
 A setting the catalogue marks as a reference stores an id, never a copy:
-a product id, a category id, a page slug, a menu slot, a media id. The
+a product id, a category id, a page slug, a media id. The
 storefront resolves it at render and shows an empty state for a target
 that is gone, so a dangling reference never breaks a page, but publishing
 one is refused (``check_exists``): a merchant must not release a block
@@ -33,7 +33,7 @@ Refs = dict[str, dict[str, list[str]]]
 
 
 MAX_ID = 2**63 - 1  # a bigint primary key
-_MAX_NAME = 64  # a page slug or a menu slot, as ``BuilderReference.target``
+_MAX_NAME = 64  # a page or content page slug, as ``BuilderReference.target``
 
 
 def accepts_value(kind: str, value: Any) -> bool:
@@ -125,22 +125,12 @@ def _existing_pages(targets: set[str]) -> set[str]:
 
 def _existing_content_pages(targets: set[str]) -> set[str]:
     """A content page (a policy, an info page) by slug, in any state: a
-    store can import its menus before it publishes the page."""
+    menu may link a page before the store publishes it."""
     from page_config.models import ContentPage
 
     return set(
         ContentPage.objects.filter(slug__in=targets).values_list(
             "slug", flat=True
-        )
-    )
-
-
-def _existing_menus(targets: set[str]) -> set[str]:
-    from page_config.models import NavigationMenu
-
-    return set(
-        NavigationMenu.objects.filter(slot__in=targets).values_list(
-            "slot", flat=True
         )
     )
 
@@ -163,7 +153,6 @@ _EXISTS: dict[str, Callable[[set[str]], set[str]]] = {
     ReferenceKind.BLOG_POST: _existing_blog_posts,
     ReferenceKind.PAGE: _existing_pages,
     ReferenceKind.CONTENT_PAGE: _existing_content_pages,
-    ReferenceKind.MENU: _existing_menus,
     ReferenceKind.MEDIA: _existing_media,
 }
 

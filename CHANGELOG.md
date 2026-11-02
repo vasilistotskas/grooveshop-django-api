@@ -3,6 +3,159 @@
 
 
 
+## v3.190.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): forget the page cache keys of a reset release
+
+A page read is cached under the page key the reader asked for (home, the
+suffix of template:home), not under the document key, so the reset deleted
+keys nothing reads and a re-import's fresh release 1 was served the old
+release 1 from the cache. Found on staging after a reset and re-import.
+
+forget_releases now takes the document keys and derives the page keys
+itself (a group has none, only the chrome). The tests read a page through
+published_page before and after a reset and re-import.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+* fix(builder): key the published-read caches by release id, not release number
+
+A release number comes back: a store whose builder data is reset starts at
+release 1 again, and a cache keyed by the number served the old release 1
+to the new one (found on staging after a reset and re-import). Deleting
+the keys of the gone release cannot be made reliable, since any path that
+misses one serves stale content, so the page and chrome reads are keyed by
+the release's primary key, which a sequence never reuses. forget_releases
+and the reset's key deletion are removed; a reset keeps its cache
+generation bump, so a cached current release id never points at a deleted
+row.
+
+The tests read a page and the page index before and after a reset and
+re-import, and assert the two release-1 rows have different keys.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+* fix(builder): key the published-read caches by release id, not number (#421) ([`5f4d243`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4d2433076e4c9868b1cfaf3aff8dbbe74c382e))
+
+* fix(builder): forget the page cache keys of a reset release
+
+A page read is cached under the page key the reader asked for (home, the
+suffix of template:home), not under the document key, so the reset deleted
+keys nothing reads and a re-import's fresh release 1 was served the old
+release 1 from the cache. Found on staging after a reset and re-import.
+
+forget_releases now takes the document keys and derives the page keys
+itself (a group has none, only the chrome). The tests read a page through
+published_page before and after a reset and re-import.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5f4d243`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4d2433076e4c9868b1cfaf3aff8dbbe74c382e))
+
+* fix(builder): key the published-read caches by release id, not release number
+
+A release number comes back: a store whose builder data is reset starts at
+release 1 again, and a cache keyed by the number served the old release 1
+to the new one (found on staging after a reset and re-import). Deleting
+the keys of the gone release cannot be made reliable, since any path that
+misses one serves stale content, so the page and chrome reads are keyed by
+the release's primary key, which a sequence never reuses. forget_releases
+and the reset's key deletion are removed; a reset keeps its cache
+generation bump, so a cached current release id never points at a deleted
+row.
+
+The tests read a page and the page index before and after a reset and
+re-import, and assert the two release-1 rows have different keys.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5f4d243`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4d2433076e4c9868b1cfaf3aff8dbbe74c382e))
+
+### Chores
+
+* chore(builder): pin the storefront's converter fixtures and check them for drift
+
+tests/fixtures/builder/legacy/ is a copy of the storefront's golden
+converter fixtures, and a copy can drift silently. It is now pinned to a
+storefront commit by its git tree id (legacy.source.json). A unit test
+recomputes the tree id of the copy, with no network, and fails when it is
+not the pinned one, so the copy cannot be edited by hand or half refreshed.
+.github/scripts/sync_converter_fixtures.py is the only thing that writes the
+copy and the pin (the tree id is read from GitHub, every file is checked
+against its blob id), and a weekly workflow runs it with --check, going red
+when the storefront's main has moved, without blocking unrelated pull
+requests. The tree hashing is tested against git itself.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+### Documentation
+
+* docs(builder): link and cache expectations in the run sheet
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+* docs(builder): link and cache expectations in the run sheet
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5f4d243`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4d2433076e4c9868b1cfaf3aff8dbbe74c382e))
+
+### Features
+
+* feat(builder): seed new stores with the storefront's default documents (#416) ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+* feat(builder): seed new stores with the storefront's default documents
+
+The storefront owns the blocks, so what a new store starts with comes from
+it: builder/seeds/*.json are pinned, drift-checked copies of its seed
+files, beside a snapshot of its block catalogue for the tests. The sync
+script, lock file, pin test and weekly workflow now cover three sources
+(the converter fixtures, the catalogue snapshot, the seeds).
+
+Provisioning stores each seed as a document, one version and ONE release
+(number 1), replacing the page_config layout seeding. It calls no storefront
+and does not validate; tests validate every seed against the vendored
+catalogue and check what seeding derives equals what validation derives.
+
+The converter fixture replay now also replays the storefront's refusal
+(422) cases.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+### Testing
+
+* test(builder): the import and the reset purge and move the generation like a publish
+
+Release numbers restart at 1 after a reset, so a fresh release 1 must not
+be served from the storefront caches of the old one. The tests pin that
+the import (and not its dry run) and the reset (and not its dry run) queue
+the builder surface purge and move the cache generation.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`9010aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9010aa48be52e1b1c7961915e1e88f0e894a74bb))
+
+* test(builder): the import and the reset purge and move the generation like a publish
+
+Release numbers restart at 1 after a reset, so a fresh release 1 must not
+be served from the storefront caches of the old one. The tests pin that
+the import (and not its dry run) and the reset (and not its dry run) queue
+the builder surface purge and move the cache generation.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5f4d243`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f4d2433076e4c9868b1cfaf3aff8dbbe74c382e))
+
 ## v3.189.0 (2026-11-02)
 
 ### Bug fixes

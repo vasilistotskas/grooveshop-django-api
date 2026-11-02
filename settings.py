@@ -4215,8 +4215,11 @@ SESSION_FILE_PATH = None
 SESSION_SERIALIZER = "django.contrib.sessions.serializers.JSONSerializer"
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": getenv("DJANGO_SPECTACULAR_SETTINGS_TITLE", "Django"),
-    "DESCRIPTION": getenv("DJANGO_SPECTACULAR_SETTINGS_DESCRIPTION", "Django"),
+    # Constants, not environment: the committed ``schema.yml`` is the API
+    # contract, and a title read from ``.env`` made every machine's
+    # regeneration differ (tests/unit/test_schema_info.py).
+    "TITLE": "GrooveShop API",
+    "DESCRIPTION": "GrooveShop API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,

@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Django
+  title: GrooveShop API
   version: 1.0.0
-  description: Django
+  description: GrooveShop API
 paths:
   /api/v1/agent/me:
     get:

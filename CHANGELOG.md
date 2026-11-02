@@ -3,6 +3,22 @@
 
 
 
+## v3.198.0 (2026-11-02)
+
+### Features
+
+* feat(builder): share a preview of unpublished pages by link (#435)
+
+POST builder/preview-links freezes the current drafts behind an unguessable
+token, outside the version history; GET lists the open links and DELETE revokes
+one. GET builder/preview/<token>/<pageKey> shows the page with the frozen
+documents over the current release, through the same code as the editor preview,
+never cached and not indexed. A token that is unknown, revoked or expired is
+one answer, preview_link_expired. Only the token's SHA-256 is stored, expired
+links are swept daily per store, and the staging anonymiser deletes the table.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`41cab27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41cab2702e41b5e2f0ed9bf3afe67f863f30e329))
+
 ## v3.197.0 (2026-11-02)
 
 ### Features

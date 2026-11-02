@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 from allauth.headless.base.response import APIResponse
 from allauth.headless.mfa import response
@@ -9,11 +10,44 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils import translation
 from django.views import View
+from django.views.i18n import set_language as django_set_language
 
 from core.utils.files import sanitize_filename
 
 logger = logging.getLogger(__name__)
+
+
+def set_language(request):
+    """Django's ``set_language``, with ``next`` resolved in its own language.
+
+    ``set_language`` finds the translated address of ``next`` with
+    ``translate_url``, which resolves the path under the ACTIVE language.
+    This view is mounted outside ``i18n_patterns`` and our urlconfs have
+    ``prefix_default_language=False``, so ``LocaleMiddleware`` answers it
+    in ``LANGUAGE_CODE`` whatever the operator's cookie says. Leaving
+    ``/en/admin/`` for Greek therefore asked Django to resolve
+    ``/en/admin/`` as Greek, which cannot match: the redirect came back
+    unchanged and the page stayed English (the admin's switcher posts no
+    ``next``, so the referrer is the address).
+
+    Activating the language the address already carries makes the
+    resolution succeed; the redirect, the cookie and every safety check
+    are still Django's.
+    """
+    target = (
+        request.POST.get("next")
+        or request.GET.get("next")
+        or request.META.get("HTTP_REFERER")
+        or ""
+    )
+    language = (
+        translation.get_language_from_path(urlsplit(target).path)
+        or settings.LANGUAGE_CODE
+    )
+    with translation.override(language):
+        return django_set_language(request)
 
 
 def robots_txt(request):

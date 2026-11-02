@@ -3565,7 +3565,18 @@ ADMIN_OPS_LINKS = [
     if entry["link"]
 ]
 
+# The language switcher both admin sites show: one entry per ``LANGUAGES``
+# code. ``UNFOLD_PLATFORM`` is merged over Unfold's defaults, not over
+# ``UNFOLD``, so a key set only on ``UNFOLD`` is absent on the control
+# plane; the platform admin had no switcher for that reason.
+ADMIN_LANGUAGE_FLAGS = {
+    "el": "🇬🇷",
+    "en": "🇬🇧",
+}
+
 UNFOLD_PLATFORM = {
+    "SHOW_LANGUAGES": True,
+    "LANGUAGE_FLAGS": ADMIN_LANGUAGE_FLAGS,
     "SITE_TITLE": _("Platform Admin"),
     "SITE_HEADER": "GrooveShop Platform",
     "SITE_SUBHEADER": _("Control plane"),
@@ -3889,10 +3900,7 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
-    "LANGUAGE_FLAGS": {
-        "el": "🇬🇷",
-        "en": "🇬🇧",
-    },
+    "LANGUAGE_FLAGS": ADMIN_LANGUAGE_FLAGS,
     # ⌘K / Ctrl+K command palette history. What the palette finds is
     # decided by admin.search.CommandSearchMixin, not by this block.
     "COMMAND": {

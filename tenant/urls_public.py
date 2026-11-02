@@ -21,7 +21,9 @@ an ``include()``.
 """
 
 from django.conf import settings
+from django.conf.urls.i18n import i18n_patterns
 from django.urls import include, path
+from django.utils.translation import gettext_lazy as _
 
 from admin.platform_site import platform_admin_site
 from core.urls import public_shared_urlpatterns
@@ -60,7 +62,20 @@ urlpatterns = [
     # same path: Django resolves in order, and on the public schema the
     # platform site is the one that should answer. Tenant hosts never
     # reach this module — it is only loaded via PUBLIC_SCHEMA_URLCONF.
-    path("admin/", platform_admin_site.urls),
+    #
+    # Locale-prefixed exactly like the store admin
+    # (``core.urls._storefront_admin_i18n_patterns``): Greek at
+    # ``/admin/``, English at ``/en/admin/``. Unprefixed only, an
+    # operator could never leave Greek here. The urlconf has
+    # ``i18n_patterns`` (the shared block below), so ``LocaleMiddleware``
+    # answers every unprefixed path in ``LANGUAGE_CODE`` and ignores the
+    # ``django_language`` cookie; the language switcher's
+    # ``set_language`` redirects to the translated URL, which did not
+    # exist on this host and 404'd.
+    *i18n_patterns(
+        path(_("admin/"), platform_admin_site.urls),
+        prefix_default_language=False,
+    ),
     # Staff API tokens are minted on the PLATFORM host only — the
     # storefront URLconf never mounts these, which is half of the wall
     # that keeps customer logins from ever producing a staff token

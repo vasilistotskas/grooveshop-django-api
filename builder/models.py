@@ -491,6 +491,17 @@ class MediaAsset(TranslatableModel, TimeStampMixinModel):
         db_default=0.5,
         help_text=_("0 is the top edge, 1 the bottom."),
     )
+    content_hash = models.CharField(
+        _("Content hash"),
+        max_length=64,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "SHA-256 of the file: the same image uploaded or imported twice "
+            "is one asset."
+        ),
+    )
     uploaded_by_staff_id = models.BigIntegerField(
         _("Uploaded by (staff)"), null=True, blank=True
     )
@@ -513,7 +524,10 @@ class MediaAsset(TranslatableModel, TimeStampMixinModel):
                 name="builder_asset_focal_in_unit_square",
             ),
         ]
-        indexes = [*TimeStampMixinModel.Meta.indexes]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            models.Index(fields=["content_hash"], name="builder_asset_hash_ix"),
+        ]
 
     def __str__(self) -> str:
         return self.file.name.rsplit("/", 1)[-1]

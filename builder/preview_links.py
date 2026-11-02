@@ -32,7 +32,7 @@ from django.utils.translation import gettext as _
 
 from builder import published
 from builder.errors import DocumentInvalid, Issue, NotFoundError
-from builder.models import BuilderDocument, BuilderPreviewLink
+from builder.models import BuilderDocument, BuilderPreviewLink, ReferenceKind
 from builder.services import (
     CHANGE_PERMISSION,
     _catalogue,
@@ -107,6 +107,7 @@ def create(
             snapshots[key] = {
                 "data": validated.data,
                 "i18n": validated.i18n,
+                "refs": validated.refs,
             }
     if problems:
         raise DocumentInvalid(problems)
@@ -145,6 +146,20 @@ def open_link(token: str, page_key: str, locale: str) -> dict[str, Any] | None:
         for key, snapshot in link.snapshots.items()
     }
     return published.preview(page_key, locale, copies)
+
+
+def media_ids(token: str) -> set[int]:
+    """The media assets the link's frozen documents reference. Raises
+    ``NotFoundError`` (``preview_link_expired``) for a token that opens
+    nothing."""
+    link = active().filter(token_hash=hash_token(token)).first()
+    if link is None:
+        raise NotFoundError(code="preview_link_expired")
+    return {
+        int(target)
+        for snapshot in link.snapshots.values()
+        for target in snapshot.get("refs", {}).get(ReferenceKind.MEDIA, {})
+    }
 
 
 def purge_expired() -> int:

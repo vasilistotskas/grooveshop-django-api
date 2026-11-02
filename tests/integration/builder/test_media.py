@@ -221,7 +221,7 @@ class TestMaintain:
         self, client, admin, catalogue, features_on
     ):
         old = upload(client).json()["id"]
-        new = upload(client).json()["id"]
+        new = upload(client, upload_file("new.png", size=(41, 20))).json()["id"]
         services.save_draft(
             admin,
             key=HOME,
@@ -346,8 +346,14 @@ class TestResolve:
     @pytest.fixture
     def assets(self, client, admin, catalogue, features_on):
         used = upload(client, alt='{"el": "Κόκκινο", "en": "Red"}').json()["id"]
-        greek_only = upload(client, alt='{"el": "Μόνο ελληνικά"}').json()["id"]
-        unused = upload(client).json()["id"]
+        greek_only = upload(
+            client,
+            upload_file("greek.png", size=(41, 20)),
+            alt='{"el": "Μόνο ελληνικά"}',
+        ).json()["id"]
+        unused = upload(
+            client, upload_file("unused.png", size=(42, 20))
+        ).json()["id"]
         services.save_draft(
             admin,
             key=HOME,

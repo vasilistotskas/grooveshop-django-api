@@ -61,6 +61,21 @@ urlpatterns = [
         name="media-resolve",
     ),
     path(
+        "builder/media/import",
+        media_api.AssetImportView.as_view(),
+        name="media-import",
+    ),
+    path(
+        "builder/media/staff-resolve",
+        media_api.StaffResolvedMediaView.as_view(),
+        name="media-staff-resolve",
+    ),
+    path(
+        "builder/preview-media/<str:token>",
+        media_api.SharedPreviewMediaView.as_view(),
+        name="preview-media",
+    ),
+    path(
         "builder/media/<int:pk>",
         media_api.AssetDetailView.as_view(),
         name="media-detail",

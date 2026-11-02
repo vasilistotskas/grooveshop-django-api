@@ -141,7 +141,7 @@ def test_an_upload_lands_in_its_stores_media_directory(mt_tenant, mt_tenant_b):
     paths = []
     for tenant in (mt_tenant, mt_tenant_b):
         with schema_context(tenant.schema_name):
-            asset = media_services.create_asset(_Staff(), upload=png())
+            asset = media_services.create_asset(_Staff(), upload=png()).asset
             paths.append((tenant.schema_name, asset.file.path, asset.file.url))
 
     for schema, path, url in paths:

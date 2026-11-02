@@ -3,10 +3,11 @@ person switches one on, for the editor's "Turn on <feature>"."""
 
 from __future__ import annotations
 
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 import pytest
 from django.urls import reverse
+from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -38,8 +39,12 @@ def camel(name: str) -> str:
     return head + "".join(part.title() for part in rest)
 
 
-def searched_for(url: str) -> str:
-    return parse_qs(urlsplit(url).query)["q"][0]
+def change_page_of(name: str) -> str:
+    """The path of the admin page that edits setting *name*."""
+    return reverse(
+        "admin:extra_settings_setting_change",
+        args=[Setting.objects.get(name=name).pk],
+    )
 
 
 def test_the_answer_names_every_feature_of_the_table():
@@ -68,8 +73,7 @@ class TestAnAdmin:
         assert response.status_code == status.HTTP_200_OK
         assert loyalty["on"] is False
         url = urlsplit(loyalty["turnOnUrl"])
-        assert url.path == reverse("admin:extra_settings_setting_changelist")
-        assert searched_for(loyalty["turnOnUrl"]) == "LOYALTY_ENABLED"
+        assert url.path == change_page_of("LOYALTY_ENABLED")
         assert get(admin).json()["features"]["blog"]["turnOnUrl"] is None
 
     def test_the_first_setting_that_is_off_is_the_one_offered(
@@ -81,12 +85,9 @@ class TestAnAdmin:
         features = get(admin).json()["features"]
 
         # The cart needs the catalogue first.
-        assert searched_for(features["cart"]["turnOnUrl"]) == (
-            "CATALOGUE_ENABLED"
-        )
-        assert searched_for(features["catalogue"]["turnOnUrl"]) == (
-            "CATALOGUE_ENABLED"
-        )
+        catalogue = urlsplit(features["catalogue"]["turnOnUrl"]).path
+        assert catalogue == change_page_of("CATALOGUE_ENABLED")
+        assert urlsplit(features["cart"]["turnOnUrl"]).path == catalogue
 
     def test_a_feature_the_plan_keeps_off_has_no_link(self, admin, tenant):
         every_feature_on(tenant)
@@ -96,6 +97,14 @@ class TestAnAdmin:
 
         assert loyalty == {"on": False, "turnOnUrl": None}
 
+    def test_a_setting_with_no_row_has_no_page_to_link_to(self, admin, tenant):
+        every_feature_on(tenant)
+        Setting.objects.filter(name="NEWSLETTER_ENABLED").delete()
+
+        newsletter = get(admin).json()["features"]["newsletter"]
+
+        assert newsletter["turnOnUrl"] is None
+
     def test_the_link_is_for_the_stores_own_admin_host(self, admin, tenant):
         every_feature_on(tenant)
         switch_store_settings(NEWSLETTER_ENABLED=False)
@@ -103,6 +112,7 @@ class TestAnAdmin:
         url = get(admin).json()["features"]["newsletter"]["turnOnUrl"]
 
         assert url.startswith(get_tenant_api_base_url() + "/")
+        assert url.endswith(change_page_of("NEWSLETTER_ENABLED"))
 
 
 class TestOtherRoles:

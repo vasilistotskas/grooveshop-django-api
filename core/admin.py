@@ -41,6 +41,7 @@ from admin.mixins import (
     WithheldOnTenantHostModelAdmin,
 )
 from core.result_backend import ran_in_store, ran_on_platform, store_of
+from core.store_settings import DECLARED_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +293,14 @@ class SettingAdmin(BaseModelAdmin):
     list_display_links = ["name_display"]
     list_filter = [SettingCategoryFilter, "value_type"]
     search_fields = ["name", "description"]
+
+    def has_delete_permission(self, request, obj=None):
+        """A setting the platform declares is not the merchant's to delete:
+        its row is how the admin, the builder's "turn on" link and the
+        switch itself find it, and ``migrate`` would only recreate it."""
+        if obj is not None and obj.name in DECLARED_DEFAULTS:
+            return False
+        return super().has_delete_permission(request, obj)
 
     class Media:
         css = {"all": ("extra_settings/css/extra_settings_admin.css",)}

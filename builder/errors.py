@@ -67,6 +67,11 @@ class InvalidLinkTargets(BuilderError):
     default_detail = _("The ids to resolve are not valid.")
 
 
+class InvalidKind(BuilderError):
+    default_code = "invalid_kind"
+    default_detail = _("The kind of document is not valid.")
+
+
 class InvalidLinkSearch(BuilderError):
     default_code = "invalid_link_search"
     default_detail = _("The link search is not valid.")

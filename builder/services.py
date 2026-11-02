@@ -45,6 +45,7 @@ from core.storefront import StorefrontUnavailable
 from tenant.features import feature_on
 from tenant.staff_actors import staff_id
 
+VIEW_PERMISSION = "builder.view_builderdocument"
 CHANGE_PERMISSION = "builder.change_builderdocument"
 PUBLISH_PERMISSION = "builder.add_builderrelease"
 

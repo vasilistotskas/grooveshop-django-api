@@ -13808,6 +13808,9 @@ msgstr "The image has more than %(limit)s megapixels."
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."
 
+msgid "The kind of document is not valid."
+msgstr "The kind of document is not valid."
+
 msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 msgstr "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 
@@ -16472,6 +16475,10 @@ msgstr "inactive"
 #, python-format
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
 msgstr "items %(items)s + shipping %(shipping)s (currency mismatch)"
+
+#, python-format
+msgid "kind must be one of: %(kinds)s."
+msgstr "kind must be one of: %(kinds)s."
 
 #, python-format
 msgid "kinds must be a comma-separated list of: %(kinds)s."

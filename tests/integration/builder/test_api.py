@@ -241,6 +241,16 @@ class TestLifecycle:
             "group:header"
         ]
 
+    def test_an_unknown_kind_is_refused_not_ignored(self, client):
+        response = client.get(
+            reverse("builder:document-list"), {"kind": "layout"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert body["code"] == "invalid_kind"
+        assert body["param"] == "kind"
+
 
 class TestWhoMay:
     def test_staff_may_look_but_not_touch(

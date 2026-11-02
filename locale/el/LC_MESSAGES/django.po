@@ -13811,6 +13811,9 @@ msgstr "Η εικόνα έχει περισσότερα από %(limit)s megapix
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "Το τιμολόγιο ή η απόδειξη (PDF ή εικόνα). Παραμένει ιδιωτικό."
 
+msgid "The kind of document is not valid."
+msgstr "Ο τύπος εγγράφου δεν είναι έγκυρος."
+
 msgid "The landing page's ``document.referrer``. Only its host is kept, and not at all when it is one of the store's own domains."
 msgstr "Το ``document.referrer`` της σελίδας προσγείωσης. Κρατείται μόνο ο ιστότοπος, και καθόλου όταν είναι ένα από τα domain του ίδιου του καταστήματος."
 
@@ -16475,6 +16478,10 @@ msgstr "ανενεργό"
 #, python-format
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
 msgstr "είδη %(items)s + αποστολή %(shipping)s (ασυμφωνία νομίσματος)"
+
+#, python-format
+msgid "kind must be one of: %(kinds)s."
+msgstr "Το kind πρέπει να είναι ένα από: %(kinds)s."
 
 #, python-format
 msgid "kinds must be a comma-separated list of: %(kinds)s."

@@ -175,13 +175,12 @@ detail.
 
 ## Related repositories
 
-- [grooveshop-django-api](https://github.com/vasilistotskas/grooveshop-django-api): the multi-tenant REST API, admin and background jobs (Django).
-- [grooveshop-storefront-ui-node-nuxt](https://github.com/vasilistotskas/grooveshop-storefront-ui-node-nuxt): the server-rendered storefront and API proxy (Nuxt).
-- [grooveshop-media-stream](https://github.com/vasilistotskas/grooveshop-media-stream): image resizing, conversion and caching for the storefront (NestJS).
-- [grooveshop-agent-gateway](https://github.com/vasilistotskas/grooveshop-agent-gateway): MCP, UCP and ACP endpoints for AI shopping agents (Go).
-- [grooveshop-infrastructure](https://github.com/vasilistotskas/grooveshop-infrastructure): Kubernetes manifests deployed by Argo CD (K3s; private).
-- [grooveshop-docs](https://github.com/vasilistotskas/grooveshop-docs): the documentation site at docs.grooveshop.space (VitePress).
+- [grooveshop-storefront-ui-node-nuxt](https://github.com/vasilistotskas/grooveshop-storefront-ui-node-nuxt): Nuxt server-rendered storefront for every store
+- [grooveshop-media-stream](https://github.com/vasilistotskas/grooveshop-media-stream): NestJS image processing and caching service
+- [grooveshop-agent-gateway](https://github.com/vasilistotskas/grooveshop-agent-gateway): Go gateway for AI agents (MCP, UCP, ACP), catalogue feeds and the storefront chat
+- grooveshop-infrastructure (private): Kubernetes manifests deployed by Argo CD
+- [grooveshop-docs](https://github.com/vasilistotskas/grooveshop-docs): the documentation site at docs.grooveshop.space
 
 ## Licence
 
-See [LICENSE.md](LICENSE.md).
+Source-available under a custom non-commercial licence; see [LICENSE.md](LICENSE.md).

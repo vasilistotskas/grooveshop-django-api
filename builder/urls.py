@@ -98,6 +98,11 @@ urlpatterns = [
         name="published-index",
     ),
     path(
+        "builder/preview/resolve",
+        views.PreviewResolveView.as_view(),
+        name="preview-resolve",
+    ),
+    path(
         "builder/link-targets",
         views.LinkTargetsView.as_view(),
         name="link-targets",

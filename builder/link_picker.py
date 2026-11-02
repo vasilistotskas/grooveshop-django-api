@@ -53,8 +53,8 @@ PICKER_KINDS: tuple[ReferenceKind, ...] = (
 
 #: As choices, for the schema (``ENUM_NAME_OVERRIDES`` names them).
 KIND_CHOICES = [(kind.value, kind.label) for kind in PICKER_KINDS]
-#: Where a page result's target is defined: a store page or a fixed type.
-PAGE_SOURCE_CHOICES = [
+#: Which kind of document a page is: a store page or a fixed page type.
+PAGE_KIND_CHOICES = [
     (kind.value, kind.label)
     for kind in (DocumentKind.PAGE, DocumentKind.TEMPLATE)
 ]

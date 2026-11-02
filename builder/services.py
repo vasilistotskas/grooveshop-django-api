@@ -21,7 +21,7 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Max
 from django.utils.translation import gettext as _
 
-from builder import references, storefront, validation
+from builder import published, references, storefront, validation
 from builder.errors import (
     DocumentInvalid,
     Issue,
@@ -94,6 +94,46 @@ def _validated(
     if validated is None:
         raise DocumentInvalid(issues)
     return validated
+
+
+def preview(
+    user: Any,
+    *,
+    page_key: str,
+    locale: str,
+    copies: dict[str, tuple[Any, Any]],
+) -> dict[str, Any] | None:
+    """The page *page_key* as the public read would answer it if the
+    editor's unsaved working copies *copies* (``{key: (draft, i18n)}``)
+    were released now, resolved through ``published.preview``. Each copy is
+    validated like a draft save (references are not checked, as on a save)
+    and nothing is stored. ``None`` when the page does not exist."""
+    require_permission(user, VIEW_PERMISSION)
+    if len(copies) > settings.BUILDER_PREVIEW_MAX_DOCUMENTS:
+        raise DocumentInvalid(
+            [
+                Issue(
+                    path="/documents",
+                    code="too_many_documents",
+                    message=_(
+                        "A preview can carry at most %(limit)s documents."
+                    )
+                    % {"limit": settings.BUILDER_PREVIEW_MAX_DOCUMENTS},
+                )
+            ]
+        )
+    sources: dict[str, published.Source] = {}
+    if copies:
+        catalogue = _catalogue()
+        problems: list[Issue] = []
+        for key, (draft, i18n) in copies.items():
+            issues, validated = _issues(key, draft, i18n, catalogue)
+            problems.extend(replace(issue, document=key) for issue in issues)
+            if validated is not None:
+                sources[key] = published.Source(validated.data, validated.i18n)
+        if problems:
+            raise DocumentInvalid(problems)
+    return published.preview(page_key, locale, sources)
 
 
 def current_release() -> BuilderRelease | None:

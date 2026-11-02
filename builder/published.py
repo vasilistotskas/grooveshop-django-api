@@ -44,19 +44,30 @@ def _page_cache_key(release: int, page_key: str, locale: str) -> str:
 
 
 def forget_releases(
-    numbers: Iterable[int], keys: Iterable[str], locales: Iterable[str]
+    numbers: Iterable[int],
+    document_keys: Iterable[str],
+    locales: Iterable[str],
 ) -> None:
     """Drop the cached reads of releases that are gone. A cached read is
     immutable per release number, which holds only while a number is never
     reused; ``builder.resetting`` deletes releases, so the next import's
-    release 1 must not meet the old one's pages."""
-    numbers, keys, locales = list(numbers), list(keys), list(locales)
+    release 1 must not meet the old one's pages.
+
+    A page read is cached under the PAGE key the reader asked for (``home``,
+    the suffix of ``template:home`` or ``page:home``), not under the document
+    key; a group document has no page read of its own, only the chrome."""
+    numbers, locales = list(numbers), list(locales)
+    page_keys = {
+        key.partition(":")[2]
+        for key in document_keys
+        if not key.startswith(GROUP_PREFIX)
+    }
     cache.delete_many(
         [
             *(
-                _page_cache_key(number, key, locale)
+                _page_cache_key(number, page_key, locale)
                 for number in numbers
-                for key in keys
+                for page_key in page_keys
                 for locale in locales
             ),
             *(

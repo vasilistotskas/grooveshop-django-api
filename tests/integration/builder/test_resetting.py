@@ -25,7 +25,7 @@ from builder.models import (
 pytestmark = pytest.mark.django_db
 
 
-def an_import() -> BuilderRelease:
+def an_import(text: str = "x") -> BuilderRelease:
     """What an import or a seed leaves: documents at draft revision 1, one
     publish version each, and release 1 holding them."""
     versions = {}
@@ -37,7 +37,15 @@ def an_import() -> BuilderRelease:
             published_revision=1,
         )
         version = BuilderVersionFactory(
-            document=document, kind=VersionKind.PUBLISH, number=1
+            document=document,
+            kind=VersionKind.PUBLISH,
+            number=1,
+            data={
+                "sections": {
+                    "a": {"type": "banner@1", "settings": {"text": text}}
+                },
+                "order": ["a"],
+            },
         )
         versions[key] = version.pk
     return BuilderReleaseFactory.create(number=1, versions=versions)
@@ -92,7 +100,9 @@ class TestAnUnusedStore:
     ):
         # Release numbers restart at 1, and a cached page is keyed by the
         # number only: the next release 1 must not meet the old one's pages.
-        page = published._page_cache_key(1, "template:home", "el")
+        # A page read is keyed by the page key the reader asked for, the
+        # suffix of ``template:home``, not by the document key.
+        page = published._page_cache_key(1, "home", "el")
         chrome = published._chrome_cache_key(1, "el")
         cache.set(page, {"stale": True})
         cache.set(chrome, {"stale": True})
@@ -102,6 +112,25 @@ class TestAnUnusedStore:
 
         assert cache.get(page) is None
         assert cache.get(chrome) is None
+
+
+class TestTheReadAfterAReimport:
+    def test_a_new_release_one_is_not_served_from_the_old_ones_cache(
+        self, tenant, django_capture_on_commit_callbacks
+    ):
+        cache.clear()
+        an_import("old")
+        first = published.published_page("home", "el")
+        assert first is not None
+        assert first["page"]["sections"]["a"]["settings"]["text"] == "old"
+
+        with django_capture_on_commit_callbacks(execute=True):
+            resetting.reset_store()
+        an_import("new")
+        again = published.published_page("home", "el")
+
+        assert again is not None
+        assert again["page"]["sections"]["a"]["settings"]["text"] == "new"
 
 
 class TestAStoreInUse:

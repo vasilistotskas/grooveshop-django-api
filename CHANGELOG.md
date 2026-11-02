@@ -3,6 +3,33 @@
 
 
 
+## v3.193.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): add the invalid kind messages to the catalogues
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`708005f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/708005fe363fcc507437eb6d5d4a3c5cf451c601))
+
+### Features
+
+* feat(builder): let STAFF open the editor read-only and name the staff-session schemas (#428) ([`708005f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/708005fe363fcc507437eb6d5d4a3c5cf451c601))
+
+* feat(builder): open the editor read only to STAFF, name the session schemas, declare ?kind=
+
+Edit storefront and the ticket spend now ask for builder.view_builderdocument
+instead of change, so a STAFF member can open the editor; every write stays
+refused by role. The staff-session serializers get StaffSession* names so the
+generated components no longer collide with the storefront's SessionResponse.
+GET builder/documents declares ?kind= as an enum and answers 400 invalid_kind
+for another value instead of ignoring it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`708005f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/708005fe363fcc507437eb6d5d4a3c5cf451c601))
+
 ## v3.192.0 (2026-11-02)
 
 ### Bug fixes

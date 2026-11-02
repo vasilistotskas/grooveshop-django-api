@@ -333,6 +333,10 @@ msgid "%(kind)s %(target)s does not exist in this store."
 msgstr "%(kind)s %(target)s does not exist in this store."
 
 #, python-format
+msgid "%(kind)s must be at most %(limit)s positive ids."
+msgstr "%(kind)s must be at most %(limit)s positive ids."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — product %(product)s"
 
@@ -2079,6 +2083,9 @@ msgstr "Blog comment liked"
 
 msgid "Blog comments to approve"
 msgstr "Blog comments to approve"
+
+msgid "Blog post"
+msgstr "Blog post"
 
 msgid "Blog post list/detail, related posts, comments, categories, tags, and authors."
 msgstr "Blog post list/detail, related posts, comments, categories, tags, and authors."
@@ -8966,6 +8973,9 @@ msgstr "Not a valid document key."
 msgid "Not a valid id."
 msgstr "Not a valid id."
 
+msgid "Not a valid reference."
+msgstr "Not a valid reference."
+
 #, python-format
 msgid "Not an email type you can choose: %(keys)s."
 msgstr "Not an email type you can choose: %(keys)s."
@@ -14042,6 +14052,9 @@ msgstr "The gross unit price a consumer paid: price plus VAT, minus the product 
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
+
+msgid "The ids to resolve are not valid."
+msgstr "The ids to resolve are not valid."
 
 #, python-format
 msgid "The image has more than %(limit)s megapixels."

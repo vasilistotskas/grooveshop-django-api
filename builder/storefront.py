@@ -29,6 +29,8 @@ from django.conf import settings
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
 
+from builder import pointers
+from builder.models import ReferenceKind
 from core.storefront import StorefrontUnavailable, base_url
 
 logger = logging.getLogger(__name__)
@@ -37,17 +39,7 @@ logger = logging.getLogger(__name__)
 KIND_SECTION = "section"
 KIND_BLOCK = "block"
 
-REFERENCE_KINDS = frozenset(
-    {
-        "product",
-        "category",
-        "page",
-        "media",
-        "menu",
-        "blogCategory",
-        "contentPage",
-    }
-)
+REFERENCE_KINDS = frozenset(ReferenceKind.values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +53,10 @@ class BlockDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    #: Pointer patterns (``linkRefs``) of the settings that are links: ``{href}``,
+    #: ``{route}`` or ``{ref: {kind, id}}``. Only the last one points at
+    #: something of ours, and its kind is in the data, not here.
+    link_refs: tuple[str, ...]
     max_blocks: int | None
     max_per_template: int | None
     children_allowed: frozenset[str]
@@ -87,6 +83,7 @@ class RootDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    link_refs: tuple[str, ...]
     validator: Validator = field(compare=False, repr=False)
 
 
@@ -140,14 +137,16 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
     limits = raw.get("limits") or {}
     children = raw.get("children") or {}
     refs = _parse_refs(raw.get("refs"))
+    translatable = tuple(str(p) for p in raw.get("translatable") or ())
     return BlockDefinition(
         type=str(raw["type"]),
         version=int(raw["version"]),
         accepts=frozenset(int(v) for v in raw.get("accepts") or ()),
         schema=schema,
-        translatable=tuple(str(p) for p in raw.get("translatable") or ()),
+        translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=refs,
+        link_refs=_parse_link_refs(raw.get("linkRefs"), translatable),
         max_blocks=limits.get("maxBlocks"),
         max_per_template=limits.get("maxPerTemplate"),
         children_allowed=frozenset(
@@ -165,6 +164,34 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
     )
 
 
+def _overlaps(first: str, second: str) -> bool:
+    """Whether two pointer patterns can name the same place or one lies
+    under the other (``*`` matches any one segment)."""
+    return all(
+        a == b or pointers.WILDCARD in (a, b)
+        for a, b in zip(pointers.parse(first), pointers.parse(second))
+    )
+
+
+def _parse_link_refs(
+    raw: Any, translatable: tuple[str, ...]
+) -> tuple[str, ...]:
+    """The link pointers of a block or a root. A link resolves to the path
+    of the viewer's language, so it is never translatable, and neither is
+    anything in it or around it: a link pointer that equals, lies under or
+    holds a translatable pointer is a catalogue bug, refused when the
+    catalogue is read."""
+    link_refs = tuple(str(p) for p in raw or ())
+    if both := sorted(
+        (link, text)
+        for link in link_refs
+        for text in translatable
+        if _overlaps(link, text)
+    ):
+        raise ValueError(f"link settings cannot be translatable: {both}")
+    return link_refs
+
+
 def _parse_refs(raw: Any) -> dict[str, str]:
     refs = {str(k): str(v) for k, v in (raw or {}).items()}
     if not set(refs.values()) <= REFERENCE_KINDS:
@@ -174,11 +201,13 @@ def _parse_refs(raw: Any) -> dict[str, str]:
 
 def _parse_root(raw: dict[str, Any]) -> RootDefinition:
     schema = raw["schema"]
+    translatable = tuple(str(p) for p in raw.get("translatable") or ())
     return RootDefinition(
         schema=schema,
-        translatable=tuple(str(p) for p in raw.get("translatable") or ()),
+        translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=_parse_refs(raw.get("refs")),
+        link_refs=_parse_link_refs(raw.get("linkRefs"), translatable),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),

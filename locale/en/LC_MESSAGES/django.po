@@ -337,6 +337,10 @@ msgid "%(kind)s must be at most %(limit)s positive ids."
 msgstr "%(kind)s must be at most %(limit)s positive ids."
 
 #, python-format
+msgid "%(kind)s must be at most %(limit)s valid ids."
+msgstr "%(kind)s must be at most %(limit)s valid ids."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — product %(product)s"
 
@@ -13835,6 +13839,9 @@ msgstr "The link a store's staff member asked for to choose a new admin password
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 
+msgid "The link search is not valid."
+msgstr "The link search is not valid."
+
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "The marketing emails this store sends, each with whether your account's address still receives it."
 
@@ -16465,6 +16472,10 @@ msgstr "inactive"
 #, python-format
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
 msgstr "items %(items)s + shipping %(shipping)s (currency mismatch)"
+
+#, python-format
+msgid "kinds must be a comma-separated list of: %(kinds)s."
+msgstr "kinds must be a comma-separated list of: %(kinds)s."
 
 msgid "last movement"
 msgstr "last movement"

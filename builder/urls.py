@@ -98,6 +98,16 @@ urlpatterns = [
         name="link-targets",
     ),
     path(
+        "builder/link-search",
+        views.LinkSearchView.as_view(),
+        name="link-search",
+    ),
+    path(
+        "builder/link-labels",
+        views.LinkLabelsView.as_view(),
+        name="link-labels",
+    ),
+    path(
         "builder/published/<slug:page_key>",
         views.PublishedPageView.as_view(),
         name="published",

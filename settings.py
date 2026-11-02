@@ -939,6 +939,12 @@ BUILDER_MAX_BLOCKS_PER_NODE = int(getenv("BUILDER_MAX_BLOCKS_PER_NODE", "50"))
 BUILDER_LINK_TARGETS_MAX_IDS = int(
     getenv("BUILDER_LINK_TARGETS_MAX_IDS", "100")
 )
+# The editor's link picker (``builder/link-search``): results per kind, and
+# the shortest query that searches (a shorter one answers an empty list).
+BUILDER_LINK_SEARCH_LIMIT = int(getenv("BUILDER_LINK_SEARCH_LIMIT", "20"))
+BUILDER_LINK_SEARCH_MIN_CHARS = int(
+    getenv("BUILDER_LINK_SEARCH_MIN_CHARS", "2")
+)
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(

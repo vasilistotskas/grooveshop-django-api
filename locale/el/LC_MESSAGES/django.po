@@ -342,6 +342,10 @@ msgid "%(kind)s must be at most %(limit)s positive ids."
 msgstr "Το %(kind)s δέχεται το πολύ %(limit)s θετικά αναγνωριστικά."
 
 #, python-format
+msgid "%(kind)s must be at most %(limit)s valid ids."
+msgstr "Το %(kind)s δέχεται το πολύ %(limit)s έγκυρα αναγνωριστικά."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — προϊόν %(product)s"
 
@@ -13838,6 +13842,9 @@ msgstr "Ο σύνδεσμος που ζήτησε ένα μέλος του πρ�
 msgid "The link expires on %(expires)s. After that you can request a new export from the privacy settings page."
 msgstr "Ο σύνδεσμος λήγει στις %(expires)s. Μετά από αυτό μπορείτε να ζητήσετε νέα εξαγωγή από τη σελίδα ρυθμίσεων απορρήτου."
 
+msgid "The link search is not valid."
+msgstr "Η αναζήτηση συνδέσμων δεν είναι έγκυρη."
+
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη."
 
@@ -16468,6 +16475,10 @@ msgstr "ανενεργό"
 #, python-format
 msgid "items %(items)s + shipping %(shipping)s (currency mismatch)"
 msgstr "είδη %(items)s + αποστολή %(shipping)s (ασυμφωνία νομίσματος)"
+
+#, python-format
+msgid "kinds must be a comma-separated list of: %(kinds)s."
+msgstr "Το kinds πρέπει να είναι λίστα, διαχωρισμένη με κόμμα, από: %(kinds)s."
 
 msgid "last movement"
 msgstr "τελευταία κίνηση"

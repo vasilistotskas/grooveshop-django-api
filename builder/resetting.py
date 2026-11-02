@@ -29,7 +29,6 @@ from dataclasses import dataclass, field
 from django.db import connection, transaction
 from django.utils.translation import gettext as _
 
-from builder import legacy, published
 from builder.models import (
     BuilderDocument,
     BuilderReference,
@@ -128,7 +127,6 @@ def reset_store(*, dry_run: bool = False) -> ResetReport:
         BuilderDocument.objects.all_with_deleted().values_list("key", flat=True)
     )
     numbers = list(BuilderRelease.objects.values_list("number", flat=True))
-    locales = legacy.store_locales()
     with transaction.atomic():
         report.documents = sorted(keys)
         report.versions = BuilderVersion.objects.count()
@@ -141,8 +139,10 @@ def reset_store(*, dry_run: bool = False) -> ResetReport:
         else:
             report.applied = True
 
+            # The cached reads are keyed by release id, which is never
+            # reused, so there is nothing of them to delete: the next
+            # release reads keys of its own.
             def forget() -> None:
-                published.forget_releases(numbers, keys, locales)
                 bump_cache_generation(schema_name=connection.schema_name)
                 mark_surface_stale(SURFACE)
 

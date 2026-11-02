@@ -226,6 +226,12 @@ msgstr[0] "%(count)d tag was deactivated."
 msgstr[1] "%(count)d tags were deactivated."
 
 #, python-format
+msgid "%(count)s email of the platform did not arrive in the last 7 days: a billing notice, a password reset or an alert to the operators."
+msgid_plural "%(count)s emails of the platform did not arrive in the last 7 days: billing notices, password resets or alerts to the operators."
+msgstr[0] "%(count)s email of the platform did not arrive in the last 7 days: a billing notice, a password reset or an alert to the operators."
+msgstr[1] "%(count)s emails of the platform did not arrive in the last 7 days: billing notices, password resets or alerts to the operators."
+
+#, python-format
 msgid "%(count)s failed"
 msgid_plural "%(count)s failed"
 msgstr[0] "%(count)s failed"
@@ -9253,6 +9259,9 @@ msgstr "Opaque cursor (cursor pagination strategy)"
 msgid "Open full stock history chart"
 msgstr "Open full stock history chart"
 
+msgid "Open the email log"
+msgstr "Open the email log"
+
 msgid "Open the failed publishes"
 msgstr "Open the failed publishes"
 
@@ -13972,6 +13981,9 @@ msgstr "The document is larger than %(limit)s KB."
 msgid "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 msgstr "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 
+msgid "The emails the platform itself sends: billing notices to the stores' owners, the staff password reset and the alerts to the platform's operators. All of them are required, so none can be switched off."
+msgstr "The emails the platform itself sends: billing notices to the stores' owners, the staff password reset and the alerts to the platform's operators. All of them are required, so none can be switched off."
+
 msgid "The end is before the start."
 msgstr "The end is before the start."
 
@@ -14132,6 +14144,9 @@ msgstr "The platform manages this text (legal, consent, cookie or error wording)
 
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
+
+msgid "The platform's emails are failing"
+msgstr "The platform's emails are failing"
 
 msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 msgstr "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
@@ -14793,6 +14808,12 @@ msgstr "To product"
 #, python-format
 msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 msgstr "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
+
+msgid "To stores"
+msgstr "To stores"
+
+msgid "To the platform's operators"
+msgstr "To the platform's operators"
 
 msgid "To your team"
 msgstr "To your team"

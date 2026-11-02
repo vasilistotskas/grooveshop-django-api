@@ -49,7 +49,7 @@ class TypeFigures:
     last_sent_at: datetime | None = None
 
 
-@dashboard_query("store:emails:v1", ttl=60)
+@dashboard_query("emails:figures:v1", ttl=60)
 def type_figures() -> dict[str, TypeFigures]:
     """Per type key, the last 30 days; a type with no row sent nothing."""
     since = timezone.now() - timedelta(days=WINDOW_DAYS)

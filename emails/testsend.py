@@ -18,6 +18,7 @@ from django.utils import translation
 
 from emails.preview import preview_subject
 from emails.recipients import Recipient
+from emails.render import owner_schema
 from emails.send import Delivery, deliver_to
 from emails.types import EmailType
 
@@ -55,7 +56,9 @@ def send_test(
     if not user.email:
         raise NoAddress
     _spend(user)
-    with translation.override(language):
+    # A platform email is read, logged and sent from ``public``, as
+    # ``send_email`` does it, whichever schema the admin request is in.
+    with owner_schema(email_type), translation.override(language):
         obj, _env = preview_subject(
             email_type, order_id=order_id, language=language
         )

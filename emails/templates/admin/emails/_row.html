@@ -41,7 +41,7 @@
                     {% include "unfold/helpers/label.html" with text=on_label variant="success" %}
                 {% endif %}
                 {% if row.switchable %}
-                    <form hx-post="{% url 'admin:emails_emailswitch_toggle' %}"
+                    <form hx-post="{{ toggle_url }}"
                           hx-trigger="change"
                           hx-target="closest article"
                           hx-swap="outerHTML">
@@ -55,7 +55,7 @@
                 {% trans "Preview" as preview_label %}
                 {% component "unfold/components/button.html" with href=page_url icon="visibility" variant="default" size="sm" %}{{ preview_label }}{% endcomponent %}
                 {% if can_test %}
-                    <form method="post" action="{% url 'admin:emails_emailswitch_test_send' %}">
+                    <form method="post" action="{{ test_send_url }}">
                         {% csrf_token %}
                         <input type="hidden" name="type_key" value="{{ row.email_type.key }}">
                         {% trans "Send test" as test_label %}

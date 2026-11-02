@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 
 from emails.registry import registry
-from emails.switches import AREA_TITLES, switch_groups
+from emails.switches import (
+    AREA_TITLES,
+    PLATFORM_AUDIENCE_TITLES,
+    switch_groups,
+)
 from emails.types import Owner
 
 pytestmark = pytest.mark.django_db
@@ -41,3 +45,41 @@ def test_a_platform_type_is_never_on_the_stores_page():
 
     assert platform
     assert platform.isdisjoint(listed)
+
+
+def test_every_audience_of_a_platform_type_has_a_title():
+    audiences = {t.audience for t in registry.types_for(Owner.PLATFORM)}
+
+    assert audiences <= set(PLATFORM_AUDIENCE_TITLES)
+
+
+def test_the_platform_page_lists_every_platform_type_once_by_audience():
+    groups = switch_groups(owner=Owner.PLATFORM)
+
+    listed = [row.email_type.key for group in groups for row in group.rows]
+    assert sorted(listed) == sorted(
+        t.key for t in registry.types_for(Owner.PLATFORM)
+    )
+    for group in groups:
+        assert {row.email_type.audience.value for row in group.rows} == {
+            group.area
+        }
+
+
+def test_the_platform_page_lists_no_store_type():
+    store = {t.key for t in registry.types_for(Owner.STORE)}
+    listed = {
+        row.email_type.key
+        for group in switch_groups(owner=Owner.PLATFORM)
+        for row in group.rows
+    }
+
+    assert store.isdisjoint(listed)
+
+
+def test_every_platform_type_is_required_so_nothing_is_switchable():
+    assert not any(
+        row.switchable
+        for group in switch_groups(owner=Owner.PLATFORM)
+        for row in group.rows
+    )

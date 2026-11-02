@@ -85,11 +85,17 @@ class EmailPreviewForm(forms.Form):
         widget=UnfoldAdminRadioSelectWidget(radio_style=HORIZONTAL),
     )
 
-    def __init__(self, *args, with_orders: bool = True, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        owner: Owner = Owner.STORE,
+        with_orders: bool = True,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.fields["type_key"].choices = [
             (email_type.key, email_type.key)
-            for email_type in registry.types_for(Owner.STORE)
+            for email_type in registry.types_for(owner)
         ]
         if not with_orders:
             # A viewer without the order permission previews sample data

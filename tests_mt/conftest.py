@@ -27,6 +27,7 @@ from __future__ import annotations
 import pytest
 from django.conf import settings
 
+from tests.db_lifecycle import django_db_keepdb  # noqa: F401
 from tests.utils.emails import catalogue, probe_templates  # noqa: F401
 
 # ── its own test DATABASE, not just its own settings ────────────────

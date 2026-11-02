@@ -15,6 +15,8 @@ from hypothesis import settings as hypothesis_settings
 from pytest_django.fixtures import validate_django_db
 from redis.exceptions import ConnectionError as RedisConnectionError
 
+from tests.db_lifecycle import django_db_keepdb  # noqa: F401
+
 # The logger Django reports a failed robust ``on_commit`` callback to.
 _on_commit_logger = logging.getLogger("django.db.backends.base")
 

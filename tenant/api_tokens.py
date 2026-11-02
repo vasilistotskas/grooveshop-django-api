@@ -21,10 +21,12 @@ from __future__ import annotations
 import binascii
 from hmac import compare_digest
 
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name, schema_context
 from knox.crypto import hash_token
 from knox.settings import CONSTANTS, knox_settings
+from knox.signals import token_expired
 from rest_framework import exceptions
 
 from core.api.tokens import BoundedTokenAuthentication
@@ -91,6 +93,37 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
                 code="staff_token_scope",
             )
         return result
+
+    def _cleanup_token(self, auth_token) -> bool:
+        """knox's cleanup, on the STAFF token table.
+
+        knox 5.1.0 walks ``auth_token.user.auth_token_set``: the reverse
+        accessor of the tenant-only ``knox.AuthToken``, which
+        ``PlatformStaffToken`` gives up for ``platform_staff_tokens``
+        (``tenant/models.py``). Inherited, it queried ``knox_authtoken``
+        inside the public-schema block below, where that table does not
+        exist, and every staff token request answered 500. Same contract
+        as knox's: delete the user's other expired staff tokens, delete
+        this one and answer ``True`` when it has expired, sending
+        ``token_expired`` for each.
+        """
+        now = timezone.now()
+        expired_others = self.token_model.objects.filter(
+            user=auth_token.user, expiry__lt=now
+        ).exclude(digest=auth_token.digest)
+        username = auth_token.user.get_username()
+        for other_token in expired_others:
+            other_token.delete()
+            token_expired.send(
+                sender=self.__class__, username=username, source="other_token"
+            )
+        if auth_token.expiry is not None and auth_token.expiry < now:
+            auth_token.delete()
+            token_expired.send(
+                sender=self.__class__, username=username, source="auth_token"
+            )
+            return True
+        return False
 
     def renew_token(self, auth_token) -> None:
         """A builder session ends at its expiry; only an API token is

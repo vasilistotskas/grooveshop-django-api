@@ -352,6 +352,52 @@ class BuilderScheduledPublish(TimeStampMixinModel):
         return f"{self.scheduled_for:%Y-%m-%d %H:%M} ({self.status})"
 
 
+class BuilderPreviewLink(TimeStampMixinModel):
+    """A link that shows unpublished work to someone without an account.
+
+    The drafts it names are frozen when it is made (``snapshots``,
+    ``{document key: {data, i18n}}``), outside the version history: no
+    ``BuilderVersion`` is created, so a link never changes numbering,
+    retention or what a release can point at. Opened, the snapshots stand
+    in for the current release's documents of the same keys
+    (``builder.published.preview``). Only the SHA-256 of the token is
+    stored, so a copy of the database cannot open anyone's link; the token
+    itself is shown once, when the link is made. Expired links are deleted
+    by ``builder.tasks.purge_expired_preview_links``. Written only through
+    ``builder.preview_links``.
+    """
+
+    token_hash = models.CharField(
+        _("Token hash"), max_length=64, unique=True, editable=False
+    )
+    snapshots = models.JSONField(
+        _("Snapshots"),
+        editable=False,
+        help_text=_("{document key: {data, i18n}} as they were when shared"),
+    )
+    note = models.CharField(_("Note"), max_length=255, blank=True, default="")
+    expires_at = models.DateTimeField(_("Expires at"))
+    created_by_staff_id = models.BigIntegerField(
+        _("Shared by (staff)"), null=True, blank=True
+    )
+    created_by_staff = StaffActor()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Preview link")
+        verbose_name_plural = _("Preview links")
+        ordering = ["-created_at"]
+        indexes = [
+            BTreeIndex(fields=["created_at"], name="builder_plink_created_ix"),
+            BTreeIndex(fields=["updated_at"], name="builder_plink_updated_ix"),
+            models.Index(
+                fields=["expires_at"], name="builder_plink_expires_ix"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.pk} ({self.expires_at:%Y-%m-%d %H:%M})"
+
+
 def document_label(key: str) -> str:
     """``Template: home`` for ``template:home``: what a person reads."""
     kind = kind_of_key(key)

@@ -103,6 +103,21 @@ urlpatterns = [
         name="preview-resolve",
     ),
     path(
+        "builder/preview-links",
+        views.PreviewLinkListView.as_view(),
+        name="preview-link-list",
+    ),
+    path(
+        "builder/preview-links/<int:pk>",
+        views.PreviewLinkView.as_view(),
+        name="preview-link-detail",
+    ),
+    path(
+        "builder/preview/<str:token>/<slug:page_key>",
+        views.SharedPreviewView.as_view(),
+        name="preview-shared",
+    ),
+    path(
         "builder/presence",
         views.PresenceView.as_view(),
         name="presence",

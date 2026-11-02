@@ -16,6 +16,7 @@ from rest_framework import serializers
 from builder.link_picker import KIND_CHOICES, PAGE_KIND_CHOICES
 from builder.models import (
     BuilderDocument,
+    BuilderPreviewLink,
     BuilderRelease,
     BuilderScheduledPublish,
     BuilderVersion,
@@ -122,6 +123,50 @@ class PublishedIndexSerializer(serializers.Serializer):
     theme = ResolvedDocumentSerializer(allow_null=True)
     groups = serializers.DictField(child=ResolvedDocumentSerializer())
     pages = PublishedPageEntrySerializer(many=True)
+
+
+class PreviewLinkWriteSerializer(serializers.Serializer):
+    documents = serializers.ListField(
+        child=serializers.CharField(max_length=80), allow_empty=False
+    )
+    note = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+
+class PreviewLinkSerializer(serializers.ModelSerializer):
+    """A link as the staff list shows it. The token is not here: it exists
+    only in the answer that made the link."""
+
+    documents = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BuilderPreviewLink
+        fields = (
+            "id",
+            "documents",
+            "note",
+            "created_by",
+            "created_at",
+            "expires_at",
+        )
+
+    def get_documents(self, obj: BuilderPreviewLink) -> list[str]:
+        return sorted(obj.snapshots)
+
+    @extend_schema_field(StaffSerializer(allow_null=True))
+    def get_created_by(self, obj: BuilderPreviewLink) -> dict[str, Any] | None:
+        return staff_summary(obj.created_by_staff)
+
+
+class PreviewLinkCreatedSerializer(PreviewLinkSerializer):
+    """The answer that makes a link: the token, once."""
+
+    token = serializers.CharField()
+
+    class Meta(PreviewLinkSerializer.Meta):
+        fields = ("token", *PreviewLinkSerializer.Meta.fields)
 
 
 class PresenceWriteSerializer(serializers.Serializer):

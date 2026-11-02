@@ -324,6 +324,45 @@ it. No route is built here: the storefront composes the path from the slug.
 Both cost one query per kind: the label is a database annotation, not a read
 per row.
 
+## Share-preview links
+
+`builder/preview_links.py`, `BuilderPreviewLink`. A store shows unpublished work
+to someone without an account:
+
+- `POST preview-links {documents, note?}` (the change permission: ADMIN and
+  OWNER) validates the current drafts like a draft save (references are not
+  checked) and **freezes** them in the link, outside the version history: no
+  `BuilderVersion` is made, so numbering, retention and releases are untouched.
+  It answers `{token, id, documents, note, createdBy, createdAt, expiresAt}`;
+  the token (`secrets.token_urlsafe(32)`, 256 random bits) is in this answer
+  only, the database holds its SHA-256. A link lives
+  `BUILDER_PREVIEW_LINK_TTL_SECONDS`; `BUILDER_MAX_PREVIEW_LINKS` may be open
+  at once (`too_many_preview_links`) and a link takes at most
+  `BUILDER_PREVIEW_MAX_DOCUMENTS` documents.
+- `GET preview-links` lists the open ones (no token), `DELETE
+  preview-links/<id>` revokes one at once (the change permission; STAFF may
+  list).
+- `GET preview/<token>/<pageKey>?locale=` (AllowAny) answers the shape of
+  `published/<pageKey>`, the frozen documents standing in for the current
+  release's of the same keys, through the same code as the preview
+  (`published.preview`): later edits and publishes do not change what was
+  shared, the rest of the page is the live release's. A token that is
+  unknown, revoked or expired is one answer, `404 preview_link_expired`;
+  a page neither the link nor the release has is `404 page_not_published`.
+- **Not cached, not indexed**: `Cache-Control: private, no-store` and
+  `X-Robots-Tag: noindex, nofollow`. The edge's storefront-pages rule already
+  excludes `/api`, so this route is never stored; the storefront page that
+  renders a shared preview must answer `private, no-store` too, because the
+  rule caches anything else an origin marks cacheable
+  (`grooveshop-infrastructure/docs/cloudflare-zone-settings.md`).
+- It shows nothing the published read does not: the live release's documents
+  and the shared drafts, no store data, no staff identity (the list names who
+  shared a link, to staff only).
+- `builder.tasks.purge_expired_preview_links` (daily, per store, suspended
+  stores included: `tenant.tasks.fanout_purge_expired_builder_preview_links`)
+  deletes the expired links and the drafts they hold. The staging anonymiser
+  deletes the table (`devtools/anonymise/rules.py`): a link is a credential.
+
 ## Presence
 
 `POST builder/presence {documents: [key]}` is the editor's heartbeat and

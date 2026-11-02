@@ -90,7 +90,8 @@ uv run celery --app core beat --loglevel=info \
   --scheduler django_celery_beat.schedulers:DatabaseScheduler
 ```
 
-`manage.py runserver` is not the dev server: the project is ASGI only.
+`manage.py runserver` is not the dev server: it serves no WebSocket; use
+`uv run uvicorn asgi:application --reload`.
 `docker compose up -d --build` runs the whole stack in containers instead
 (`docker-compose.yml` includes `infra.compose.yml` and `app.compose.yml`).
 

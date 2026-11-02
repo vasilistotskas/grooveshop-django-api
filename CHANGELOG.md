@@ -3,6 +3,37 @@
 
 
 
+## v3.188.1 (2026-11-02)
+
+### Bug fixes
+
+* fix(admin): let an operator switch the platform admin to English (#419)
+
+The control plane's admin could not leave Greek, and neither admin
+could switch from English back to Greek.
+
+- tenant/urls_public.py mounted the platform admin at the unprefixed
+  admin/ only. The urlconf has i18n_patterns, so LocaleMiddleware
+  answered every unprefixed path in LANGUAGE_CODE and ignored the
+  language cookie, and set_language redirected to /en/admin/, which did
+  not exist on that host. It is now locale-prefixed like the store
+  admin (/admin/ and /en/admin/).
+- UNFOLD_PLATFORM lacked SHOW_LANGUAGES and LANGUAGE_FLAGS (it is
+  merged over Unfold's defaults, not over UNFOLD), so no switcher was
+  rendered. Both sites share ADMIN_LANGUAGE_FLAGS.
+- Django's set_language resolves next under the active language, which
+  is LANGUAGE_CODE on this unprefixed view, so /en/admin/ could never be
+  translated to Greek on either host. core.views.set_language activates
+  the language the address carries and delegates to Django's view.
+
+tests_mt/test_admin_language_switch.py presses the rendered switcher on
+both hosts in both directions.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`bb6a484`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb6a4845fca5e603f3f24df9c7e3fd0e0a9d820f))
+
 ## v3.188.0 (2026-11-02)
 
 ### Features

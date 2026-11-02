@@ -3,6 +3,61 @@
 
 
 
+## v3.199.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): link the exact settings page, and keep declared settings from being deleted
+
+The turn-on link was a search of Store Settings because a row could be missing.
+Production has every declared row in every store (checked read-only), migrate
+creates the missing ones, and the one way to lose one was the settings admin
+deleting it. That admin now refuses to delete a declared setting, so the link
+is the setting's own change page.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d69cef3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d69cef363fcaac9161cf8f937c86ab3e856cceb5))
+
+* fix(tests): keep fixture setup out of the per-test timeout (#432)
+
+pytest-timeout charged fixture setup to the test that triggers it, so
+the multi-tenant lane's first test paid for every session-scoped
+schema build inside its own 600 s: the test database's public and
+webside schemas, then mt_smoke. That took 366 s on one CI run and more
+than 600 s on another, which failed the lane with 188 cascading errors.
+timeout_func_only applies the timeout to the test body only; a hung
+fixture is still bounded by the CI job's timeout-minutes.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`8488250`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8488250b4330aafe1c9fac10a11324627717bb4c))
+
+### Chores
+
+* chore(builder): sync the storefront catalogue with presets and feature gates, and pin the placement cases (#438)
+
+Re-vendors the storefront catalogue (presets on 51 blocks, a feature on 12) and
+adds the storefront's placement-cases.json as a third pinned source. A
+parametrised test runs _placement_allowed over those cases, the same ones the
+editor's placement filter is tested with, so a change to the rule on one side
+that the other lacks fails a suite.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b62c90d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b62c90d50d17078983af3575d1598f89f09b1a66))
+
+### Features
+
+* feat(builder): say which store features are on and where to turn one on (#437) ([`d69cef3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d69cef363fcaac9161cf8f937c86ab3e856cceb5))
+
+* feat(builder): say which store features are on and where to turn one on
+
+GET builder/features answers, for every store feature, whether it is on and the
+store admin page of the first setting that is off, for a role that may change
+settings. It reads the same table and request state as the admin and the 404
+gates, so the editor needs neither the plan/setting split nor admin addresses.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d69cef3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d69cef363fcaac9161cf8f937c86ab3e856cceb5))
+
 ## v3.198.1 (2026-11-02)
 
 ### Bug fixes

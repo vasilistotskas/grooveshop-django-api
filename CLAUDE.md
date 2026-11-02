@@ -42,7 +42,10 @@ uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serve
 # Django's default WSGI handler but no WebSocket (ws/notifications/)
 uv run python manage.py seed_all
 
-# Generate OpenAPI schema (used by Nuxt frontend for types)
+# Generate OpenAPI schema (used by Nuxt frontend for types). The output is
+# the same on every machine (nothing in it comes from .env); the one thing
+# that varies is the language of descriptions, so compile the catalogues first
+# (`manage.py compilemessages`) or the diff shows Greek/English prose churn.
 uv run python manage.py spectacular --color --file schema.yml
 
 # Translations: extract new messages into the Greek and English catalogues.

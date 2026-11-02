@@ -209,7 +209,7 @@ Staff (`StoreStaffModelPermissions`):
 
 | Route | |
 |---|---|
-| `GET documents` (`?kind=`), `GET documents/<key>` | List / draft + `draftRevision` + `ETag` |
+| `GET documents` (`?kind=theme\|group\|template\|page`, another value is `400 invalid_kind`), `GET documents/<key>` | List / draft + `draftRevision` + `ETag` |
 | `PUT documents/<key>/draft` | Autosave, `If-Match` required (`428 precondition_required`) |
 | `DELETE documents/<key>` | A page, `If-Match` required |
 | `POST documents/<key>/discard`, `.../checkpoint` | |
@@ -308,8 +308,9 @@ The editor runs on the store's own host, where nobody is signed in as staff
 `builder/staff_session.py`:
 
 1. Store admin, **Content -> Edit storefront** (`admin:edit-storefront`,
-   `builder/admin_views.py`; only for a holder of
-   `builder.change_builderdocument`, so ADMIN and OWNER; `never_cache`).
+   `builder/admin_views.py`; for a holder of `builder.view_builderdocument`,
+   so every role: ADMIN and OWNER edit in the editor, STAFF open it read only,
+   and the session's `role` tells the editor which; `never_cache`).
    It stores the staff id in Redis under a random key for
    `BUILDER_STAFF_TICKET_TTL_SECONDS` (a minute) and redirects to
    `https://<store>/_builder?ticket=<ticket>`.
@@ -329,9 +330,10 @@ Security properties, each with a test:
   cache namespace, so an unreachable Redis raises instead of failing open.
   Intercepting it after use gains nothing, and unused it dies in a minute.
 - **Checked when spent, not when minted.** The person must still be an
-  active staff account with the right to change this store's pages (the role
-  backend, through the provenance stamp), so a role lost in between is
-  `invalid_ticket`.
+  active staff account with the right to see this store's pages (the role
+  backend, through the provenance stamp), so a membership lost in between is
+  `invalid_ticket`. A STAFF session is read only: `StoreStaffModelPermissions`
+  refuses every write by role (`403`), exactly as for a signed-in STAFF.
 - **One store.** The cache key function puts the schema in every key, so a
   ticket minted on store A finds nothing on store B
   (`tests_mt/test_builder_staff_ticket.py`).

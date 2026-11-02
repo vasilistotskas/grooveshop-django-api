@@ -34,7 +34,7 @@ from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from builder.errors import BuilderError
-from builder.services import CHANGE_PERMISSION
+from builder.services import VIEW_PERMISSION
 from core import tickets
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.membership import get_current_tenant, get_membership
@@ -84,7 +84,7 @@ def open_session(ticket: str) -> Session:
     """Trade a ticket for a builder session token.
 
     Everything is checked when the ticket is spent, not when it was
-    minted: the person must still be an active staff member who may change
+    minted: the person must still be an active staff member who may see
     this store's pages (the role backend, through the provenance stamp).
     Any failure is the same ``invalid_ticket``, so a probe learns nothing.
     """
@@ -99,7 +99,7 @@ def open_session(ticket: str) -> Session:
     if user is None or not (user.is_active and user.is_staff):
         raise InvalidTicket()
     setattr(user, PLATFORM_IDENTITY_ATTR, True)
-    if not user.has_perm(CHANGE_PERMISSION):
+    if not user.has_perm(VIEW_PERMISSION):
         raise InvalidTicket()
 
     with schema_context(get_public_schema_name()):

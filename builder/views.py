@@ -15,6 +15,7 @@ from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from djangorestframework_camel_case.util import camel_to_underscore
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -30,6 +31,7 @@ from rest_framework.views import APIView
 from builder import published, references, scheduling, services
 from builder.errors import (
     BuilderError,
+    InvalidKind,
     InvalidLinkTargets,
     NotFoundError,
     PreconditionRequired,
@@ -115,7 +117,23 @@ _IF_MATCH = OpenApiParameter(
 )
 
 
-@extend_schema(tags=TAGS)
+@extend_schema(
+    tags=TAGS,
+    parameters=[
+        OpenApiParameter(
+            name="kind",
+            location=OpenApiParameter.QUERY,
+            required=False,
+            type=OpenApiTypes.STR,
+            enum=DocumentKind.values,
+            description="Only the documents of this kind.",
+        )
+    ],
+    responses={
+        200: DocumentListSerializer(many=True),
+        400: OpenApiResponse(response=ErrorResponseSerializer),
+    },
+)
 class DocumentListView(StaffListView):
     queryset = BuilderDocument.objects.all()
     serializer_class = DocumentListSerializer
@@ -123,7 +141,13 @@ class DocumentListView(StaffListView):
     def get_queryset(self) -> QuerySet[BuilderDocument]:
         queryset = BuilderDocument.objects.prefetch_related("updated_by_staff")
         kind = self.request.query_params.get("kind")
-        if kind in DocumentKind.values:
+        if kind is not None:
+            if kind not in DocumentKind.values:
+                raise InvalidKind(
+                    _("kind must be one of: %(kinds)s.")
+                    % {"kinds": ", ".join(DocumentKind.values)},
+                    param="kind",
+                )
             queryset = queryset.filter(kind=kind)
         return queryset.order_by("key")
 

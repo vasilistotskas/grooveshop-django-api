@@ -391,7 +391,7 @@ def store_sidebar(request: Any) -> list[Item]:
             _tool(
                 _("Edit storefront"), "edit", reverse("admin:edit-storefront")
             )
-            if user.has_perm("builder.change_builderdocument")
+            if user.has_perm("builder.view_builderdocument")
             else None,
             # What the page builder holds, read only: the editor itself is
             # the storefront's.

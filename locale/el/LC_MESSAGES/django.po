@@ -322,6 +322,10 @@ msgid "%(group)s → product %(product)s: %(price)s"
 msgstr "%(group)s → προϊόν %(product)s: %(price)s"
 
 #, python-format
+msgid "%(key)s is not a document key."
+msgstr "Το %(key)s δεν είναι κλειδί εγγράφου."
+
+#, python-format
 msgid "%(key)s no longer exists."
 msgstr "Το έγγραφο %(key)s δεν υπάρχει πια."
 
@@ -709,6 +713,10 @@ msgstr "Ένα domain χρειάζεται τουλάχιστον δύο τμή�
 
 msgid "A focal point is between 0 and 1."
 msgstr "Το σημείο εστίασης είναι μεταξύ 0 και 1."
+
+#, python-format
+msgid "A heartbeat can name at most %(limit)s documents."
+msgstr "Ένας παλμός μπορεί να αναφέρει το πολύ %(limit)s έγγραφα."
 
 msgid "A known channel's key (e.g. ``instagram``), the referring host, or the raw ``utm_source``. Empty for a direct visit."
 msgstr "Το κλειδί ενός γνωστού καναλιού (π.χ. ``instagram``), ο ιστότοπος παραπομπής ή το ``utm_source`` όπως ήρθε. Κενό για απευθείας επίσκεψη."

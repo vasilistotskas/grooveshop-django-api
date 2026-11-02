@@ -21,7 +21,13 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Max
 from django.utils.translation import gettext as _
 
-from builder import published, references, storefront, validation
+from builder import (
+    presence,
+    published,
+    references,
+    storefront,
+    validation,
+)
 from builder.errors import (
     DocumentInvalid,
     Issue,
@@ -134,6 +140,24 @@ def preview(
         if problems:
             raise DocumentInvalid(problems)
     return published.preview(page_key, locale, sources)
+
+
+def heartbeat(
+    user: Any, *, documents: list[str]
+) -> dict[str, list[dict[str, Any]]]:
+    """Record that *user* has *documents* open and answer who else has
+    each of them (``builder.presence``). Any role that may look may say so."""
+    require_permission(user, VIEW_PERMISSION)
+    actor = staff_summary(user)
+    assert actor is not None  # an authenticated staff identity
+    return presence.heartbeat(
+        staff=actor["id"], name=actor["name"], documents=documents
+    )
+
+
+def leave_presence(user: Any) -> None:
+    require_permission(user, VIEW_PERMISSION)
+    presence.leave(user.pk)
 
 
 def current_release() -> BuilderRelease | None:

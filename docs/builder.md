@@ -324,6 +324,28 @@ it. No route is built here: the storefront composes the path from the slug.
 Both cost one query per kind: the label is a database annotation, not a read
 per row.
 
+## Presence
+
+`POST builder/presence {documents: [key]}` is the editor's heartbeat and
+`DELETE builder/presence` its sign-out (`builder/presence.py`). The heartbeat
+names the documents the editor has open (the full list: ones left out are let
+go of) and answers `{documents: {key: [{id, name, since}]}}`: who ELSE sent a
+heartbeat for each, oldest first, the caller left out. It is a hint, not a
+lock: the draft's `If-Match` revision still decides a save.
+
+- Kept in the cache under the active schema (a heartbeat on one store is
+  invisible on another, `tests_mt/test_builder_presence_isolation.py`), never
+  in the database: a record per person and document for
+  `BUILDER_PRESENCE_TTL_SECONDS`, a Redis set of ids per document so a read
+  never scans, and a set of what each person has open. A person whose record
+  expired drops out of the answer and out of the set at the next read;
+  `since` survives heartbeats and starts again after a lapse.
+- A key that is not a document key is `400 invalid_document` (`invalid_key`),
+  more than `BUILDER_PRESENCE_MAX_DOCUMENTS` is `too_many_documents`; a
+  refused heartbeat changes nothing.
+- Every store role may call it (`builder.view_builderdocument`), so the
+  read-only editor of a STAFF member is seen too.
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an

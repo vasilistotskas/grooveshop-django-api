@@ -436,6 +436,25 @@ class CustomCache(RedisCache):
         pipe.expire(name, timeout)
         pipe.execute()
 
+    def set_members(self, key: str) -> frozenset[str]:
+        """The members of the Redis set at ``key`` (empty when there is
+        none), schema-scoped like ``add_to_set`` and raising on a Redis
+        error for the same reason."""
+        name = self.make_key(key)
+        members = self._cache.get_client(key).smembers(name)
+        return frozenset(
+            m.decode("utf-8") if isinstance(m, bytes) else m for m in members
+        )
+
+    def remove_from_set(self, key: str, members: list[str]) -> None:
+        """Remove ``members`` from the Redis set at ``key``; raises on a
+        Redis error, like ``add_to_set``."""
+        if not members:
+            return
+        self._cache.get_client(key, write=True).srem(
+            self.make_key(key), *members
+        )
+
     def pop_set(self, key: str) -> frozenset[str]:
         """Atomically read and delete the Redis set at ``key``.
 

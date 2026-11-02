@@ -3,6 +3,21 @@
 
 
 
+## v3.198.1 (2026-11-02)
+
+### Bug fixes
+
+* fix(api): make the OpenAPI info block the same on every machine (#436)
+
+The schema title and description were read from DJANGO_SPECTACULAR_SETTINGS_*
+environment variables, defaulting to "Django", so a developer whose .env set
+them regenerated a different schema.yml than CI and production. They are
+constants now (the value production already serves), schema.yml carries them,
+and two tests pin that the committed info block is what the code generates and
+that settings do not read it from the environment.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f026837`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f026837a06eeed2d1002e505a997131af4805d0d))
+
 ## v3.198.0 (2026-11-02)
 
 ### Features

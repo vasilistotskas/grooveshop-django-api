@@ -74,6 +74,8 @@ from builder.serializers import (
     LinkLabelsResponseSerializer,
     LinkSearchResponseSerializer,
     LinkTargetsResponseSerializer,
+    PresenceSerializer,
+    PresenceWriteSerializer,
     PreviewLinkCreatedSerializer,
     PreviewLinkSerializer,
     PreviewLinkWriteSerializer,
@@ -939,6 +941,45 @@ class SharedPreviewView(APIView):
         patch_cache_control(response, private=True, no_store=True)
         response["X-Robots-Tag"] = "noindex, nofollow"
         return response
+
+
+class PresenceView(StaffView):
+    """Who else has a document open: a heartbeat, and sign-out."""
+
+    # Nothing is stored in the database; the service asks for VIEW.
+    permission_classes = [IsStoreStaff]
+
+    @extend_schema(
+        tags=TAGS,
+        request=PresenceWriteSerializer,
+        responses={
+            200: PresenceSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description=(
+            "A heartbeat: the documents this editor has open (the full "
+            "list; ones left out are let go of). Answers who ELSE has each "
+            "of them open, `{documents: {key: [{id, name, since}]}}`, the "
+            "caller excluded. A person lapses `BUILDER_PRESENCE_TTL_"
+            "SECONDS` after their last heartbeat. It is a hint: the "
+            "draft's `If-Match` revision still decides a save."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        body = PresenceWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        return Response(
+            {
+                "documents": services.heartbeat(
+                    request.user, documents=body.validated_data["documents"]
+                )
+            }
+        )
+
+    @extend_schema(tags=TAGS, request=None, responses={204: None})
+    def delete(self, request: Request) -> Response:
+        services.leave_presence(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class PublishedPageView(APIView):

@@ -169,6 +169,25 @@ class PreviewLinkCreatedSerializer(PreviewLinkSerializer):
         fields = ("token", *PreviewLinkSerializer.Meta.fields)
 
 
+class PresenceWriteSerializer(serializers.Serializer):
+    documents = serializers.ListField(
+        child=serializers.CharField(max_length=80), allow_empty=True
+    )
+
+
+class PresenceEntrySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    since = serializers.DateTimeField()
+
+
+class PresenceSerializer(serializers.Serializer):
+    """``{documents: {key: [{id, name, since}]}}``: who else has each of the
+    documents named in the heartbeat open."""
+
+    documents = serializers.DictField(child=PresenceEntrySerializer(many=True))
+
+
 class PreviewCopySerializer(serializers.Serializer):
     draft = serializers.JSONField()
     i18n = serializers.JSONField(required=False, default=dict)

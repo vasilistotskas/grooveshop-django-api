@@ -118,6 +118,11 @@ urlpatterns = [
         name="preview-shared",
     ),
     path(
+        "builder/presence",
+        views.PresenceView.as_view(),
+        name="presence",
+    ),
+    path(
         "builder/link-targets",
         views.LinkTargetsView.as_view(),
         name="link-targets",

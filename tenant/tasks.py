@@ -109,6 +109,15 @@ def fanout_run_due_builder_publishes():
     return run_for_all_tenants("builder.tasks.run_due_publishes")
 
 
+# Frozen drafts that nobody can open any more: removed like the other
+# sweeps, SUSPENDED tenants included.
+@celery_app.task(base=TenantTask)
+def fanout_purge_expired_builder_preview_links():
+    return run_for_all_tenants(
+        "builder.tasks.purge_expired_preview_links", include_suspended=True
+    )
+
+
 @celery_app.task(base=TenantTask)
 def fanout_expire_gift_cards():
     return run_for_all_tenants("giftcard.tasks.expire_gift_cards")

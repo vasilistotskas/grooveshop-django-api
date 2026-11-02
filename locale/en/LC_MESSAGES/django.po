@@ -818,6 +818,10 @@ msgid "A signed-in session is required."
 msgstr "A signed-in session is required."
 
 #, python-format
+msgid "A store can have at most %(limit)s open preview links."
+msgstr "A store can have at most %(limit)s open preview links."
+
+#, python-format
 msgid "A store can have at most %(limit)s pages."
 msgstr "A store can have at most %(limit)s pages."
 
@@ -2937,6 +2941,9 @@ msgstr "Choose a time in the future."
 msgid "Choose at least one document to publish."
 msgstr "Choose at least one document to publish."
 
+msgid "Choose at least one document to share."
+msgstr "Choose at least one document to share."
+
 msgid "City"
 msgstr "City"
 
@@ -4646,6 +4653,9 @@ msgstr "Expires At"
 
 msgid "Expires In"
 msgstr "Expires In"
+
+msgid "Expires at"
+msgstr "Expires at"
 
 msgid "Expires soon"
 msgstr "Expires soon"
@@ -10432,6 +10442,12 @@ msgstr "Present when wholesale group pricing is applied to this cart's line pric
 msgid "Preview"
 msgstr "Preview"
 
+msgid "Preview link"
+msgstr "Preview link"
+
+msgid "Preview links"
+msgstr "Preview links"
+
 msgid "Previous"
 msgstr "Previous"
 
@@ -12469,6 +12485,9 @@ msgstr "Seven"
 msgid "Shared attributes, tags and brand"
 msgstr "Shared attributes, tags and brand"
 
+msgid "Shared by (staff)"
+msgstr "Shared by (staff)"
+
 msgid "Shared text"
 msgstr "Shared text"
 
@@ -14165,6 +14184,9 @@ msgstr "There is no such document."
 msgid "There is no such document: %(keys)s."
 msgstr "There is no such document: %(keys)s."
 
+msgid "There is no such preview link."
+msgstr "There is no such preview link."
+
 msgid "There is no such release."
 msgstr "There is no such release."
 
@@ -14588,6 +14610,9 @@ msgstr "Token for email confirmation if required"
 
 msgid "Token has exceeded its maximum lifetime. Please log in again."
 msgstr "Token has exceeded its maximum lifetime. Please log in again."
+
+msgid "Token hash"
+msgstr "Token hash"
 
 #, python-brace-format
 msgid "Too many ids — request at most {max} per call."
@@ -16653,6 +16678,9 @@ msgstr "{document key: draft revision it was taken from}"
 
 msgid "{document key: version id}"
 msgstr "{document key: version id}"
+
+msgid "{document key: {data, i18n}} as they were when shared"
+msgstr "{document key: {data, i18n}} as they were when shared"
 
 msgid "{kind: {target id: [node pointers]}}"
 msgstr "{kind: {target id: [node pointers]}}"

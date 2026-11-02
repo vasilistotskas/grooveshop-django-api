@@ -31,6 +31,7 @@ from rest_framework.views import APIView
 
 from builder import (
     link_picker,
+    preview_links,
     published,
     references,
     scheduling,
@@ -51,6 +52,7 @@ from builder.localization import (
 )
 from builder.models import (
     BuilderDocument,
+    BuilderPreviewLink,
     BuilderRelease,
     BuilderScheduledPublish,
     BuilderVersion,
@@ -72,6 +74,9 @@ from builder.serializers import (
     LinkLabelsResponseSerializer,
     LinkSearchResponseSerializer,
     LinkTargetsResponseSerializer,
+    PreviewLinkCreatedSerializer,
+    PreviewLinkSerializer,
+    PreviewLinkWriteSerializer,
     PreviewResolveSerializer,
     PublishedIndexSerializer,
     PublishedPageSerializer,
@@ -839,6 +844,101 @@ class LinkLabelsView(StaffView):
                 )
             wanted[kind] = ids
         return wanted
+
+
+class PreviewLinkListView(StaffView):
+    """Share-preview links: make one, list the open ones."""
+
+    queryset = BuilderPreviewLink.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        responses={200: PreviewLinkSerializer(many=True)},
+        description="The links that still open, newest first.",
+    )
+    def get(self, request: Request) -> Response:
+        return Response(
+            PreviewLinkSerializer(
+                preview_links.active().prefetch_related("created_by_staff"),
+                many=True,
+            ).data
+        )
+
+    @extend_schema(
+        tags=TAGS,
+        request=PreviewLinkWriteSerializer,
+        responses={201: PreviewLinkCreatedSerializer, **ERRORS},
+        description=(
+            "Freeze the current drafts of the named documents behind a link "
+            "anyone can open without signing in, for "
+            "`BUILDER_PREVIEW_LINK_TTL_SECONDS`. Every draft is validated "
+            "like a save (400 `invalid_document` with each problem's "
+            "`document`). The `token` is in this answer only; open "
+            "`published`-style at `preview/<token>/<pageKey>`."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        body = PreviewLinkWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        link, token = preview_links.create(
+            request.user,
+            keys=body.validated_data["documents"],
+            note=body.validated_data["note"],
+        )
+        link.token = token
+        return Response(
+            PreviewLinkCreatedSerializer(link).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PreviewLinkView(StaffView):
+    queryset = BuilderPreviewLink.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=None,
+        responses={204: None, 404: OpenApiResponse(ErrorResponseSerializer)},
+        description="Revoke a link at once.",
+    )
+    def delete(self, request: Request, pk: int) -> Response:
+        preview_links.revoke(request.user, pk=pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SharedPreviewView(APIView):
+    """What a share-preview link shows: the page with the shared drafts
+    over the current release. The token is the credential."""
+
+    renderer_classes = [BuilderJSONRenderer]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[LOCALE_OPENAPI_PARAMETER],
+        responses={
+            200: PublishedPageSerializer,
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description=(
+            "The shape of `published/<pageKey>`, with the documents frozen in "
+            "the link standing in for the current release's. 404 "
+            "`preview_link_expired` for a token that is unknown, revoked or "
+            "past its time, `page_not_published` when neither the link nor "
+            "the release has the page. Never cached: `Cache-Control: "
+            "private, no-store`, and not for search engines."
+        ),
+    )
+    def get(self, request: Request, token: str, page_key: str) -> Response:
+        payload = preview_links.open_link(
+            token, page_key, requested_locale(request)
+        )
+        if payload is None:
+            raise NotFoundError(code="page_not_published")
+        response = Response(payload)
+        patch_cache_control(response, private=True, no_store=True)
+        response["X-Robots-Tag"] = "noindex, nofollow"
+        return response
 
 
 class PublishedPageView(APIView):

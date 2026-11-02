@@ -949,6 +949,12 @@ BUILDER_LINK_SEARCH_LIMIT = int(getenv("BUILDER_LINK_SEARCH_LIMIT", "20"))
 BUILDER_LINK_SEARCH_MIN_CHARS = int(
     getenv("BUILDER_LINK_SEARCH_MIN_CHARS", "2")
 )
+# Share-preview links (``builder.preview_links``): how long one opens, and
+# how many may be open at once.
+BUILDER_PREVIEW_LINK_TTL_SECONDS = int(
+    getenv("BUILDER_PREVIEW_LINK_TTL_SECONDS", str(7 * 24 * 60 * 60))
+)
+BUILDER_MAX_PREVIEW_LINKS = int(getenv("BUILDER_MAX_PREVIEW_LINKS", "50"))
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
@@ -1448,6 +1454,14 @@ def get_celery_beat_schedule():
             # when idle: one indexed query per store.
             "task": "tenant.tasks.fanout_run_due_builder_publishes",
             "schedule": SCHEDULE_PRESETS["every_minute"],
+        },
+        "purge-expired-builder-preview-links": {
+            # Fanout: share-preview links hold frozen drafts; an expired one
+            # opens nothing and is removed (``builder.preview_links``).
+            "task": "tenant.tasks.fanout_purge_expired_builder_preview_links",
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "purge-expired-contact-records": {
             # Fanout: Contact and Feedback are per-tenant. Deletes the

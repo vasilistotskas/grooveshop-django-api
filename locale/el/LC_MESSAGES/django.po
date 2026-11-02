@@ -823,6 +823,10 @@ msgid "A signed-in session is required."
 msgstr "Απαιτείται συνδεδεμένη συνεδρία."
 
 #, python-format
+msgid "A store can have at most %(limit)s open preview links."
+msgstr "Ένα κατάστημα μπορεί να έχει το πολύ %(limit)s ανοιχτούς συνδέσμους προεπισκόπησης."
+
+#, python-format
 msgid "A store can have at most %(limit)s pages."
 msgstr "Ένα κατάστημα μπορεί να έχει το πολύ %(limit)s σελίδες."
 
@@ -2944,6 +2948,9 @@ msgstr "Διάλεξε μια ώρα στο μέλλον."
 msgid "Choose at least one document to publish."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δημοσίευση."
 
+msgid "Choose at least one document to share."
+msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για κοινοποίηση."
+
 msgid "City"
 msgstr "Πόλη"
 
@@ -4651,6 +4658,9 @@ msgstr "Λήγει στις"
 
 msgid "Expires In"
 msgstr "Λήγει σε"
+
+msgid "Expires at"
+msgstr "Λήγει στις"
 
 msgid "Expires soon"
 msgstr "Λήγει σύντομα"
@@ -10440,6 +10450,12 @@ msgstr "Υπάρχει όταν στις τιμές γραμμών αυτού τ
 msgid "Preview"
 msgstr "Προεπισκόπηση"
 
+msgid "Preview link"
+msgstr "Σύνδεσμος προεπισκόπησης"
+
+msgid "Preview links"
+msgstr "Σύνδεσμοι προεπισκόπησης"
+
 msgid "Previous"
 msgstr "Προηγούμενη"
 
@@ -12476,6 +12492,9 @@ msgstr "Επτά"
 msgid "Shared attributes, tags and brand"
 msgstr "Κοινά χαρακτηριστικά, ετικέτες και μάρκα"
 
+msgid "Shared by (staff)"
+msgstr "Κοινοποιήθηκε από (προσωπικό)"
+
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
 
@@ -14168,6 +14187,9 @@ msgstr "Δεν υπάρχει τέτοιο έγγραφο."
 msgid "There is no such document: %(keys)s."
 msgstr "Δεν υπάρχει τέτοιο έγγραφο: %(keys)s."
 
+msgid "There is no such preview link."
+msgstr "Δεν υπάρχει τέτοιος σύνδεσμος προεπισκόπησης."
+
 msgid "There is no such release."
 msgstr "Δεν υπάρχει τέτοια δημοσίευση."
 
@@ -14591,6 +14613,9 @@ msgstr "Token για επιβεβαίωση email, αν απαιτείται"
 
 msgid "Token has exceeded its maximum lifetime. Please log in again."
 msgstr "Το token έχει υπερβεί τη μέγιστη διάρκεια ζωής του. Παρακαλούμε συνδεθείτε ξανά."
+
+msgid "Token hash"
+msgstr "Αποτύπωμα κωδικού"
 
 #, python-brace-format
 msgid "Too many ids — request at most {max} per call."
@@ -16656,6 +16681,9 @@ msgstr "{κλειδί εγγράφου: αναθεώρηση του πρόχει
 
 msgid "{document key: version id}"
 msgstr "{κλειδί εγγράφου: αναγνωριστικό έκδοσης}"
+
+msgid "{document key: {data, i18n}} as they were when shared"
+msgstr "{κλειδί εγγράφου: {data, i18n}} όπως ήταν όταν κοινοποιήθηκαν"
 
 msgid "{kind: {target id: [node pointers]}}"
 msgstr "{είδος: {αναγνωριστικό στόχου: [δείκτες κόμβων]}}"

@@ -411,6 +411,8 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "emails.EmailEvent": Delete(),
     "emails.EmailSuppression": Delete(),
     "admin.LogEntry": Delete(),
+    # A share-preview link is a bearer credential to unpublished pages.
+    "builder.BuilderPreviewLink": Delete(),
 }
 
 #: Apps whose every model is deleted except the named ones. A model added

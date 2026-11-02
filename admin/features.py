@@ -241,6 +241,8 @@ class StoreFeatures:
     questions the admin asks of it."""
 
     states: Mapping[str, Availability]
+    #: The value of every store setting a feature needs, as read.
+    values: Mapping[str, Any] = field(default_factory=dict)
     _memo: dict[Any, bool] = field(default_factory=dict)
 
     @classmethod
@@ -255,7 +257,8 @@ class StoreFeatures:
             {
                 name: _availability(feature, values)
                 for name, feature in FEATURES.items()
-            }
+            },
+            values,
         )
 
     def state(self, name: str) -> Availability:
@@ -263,6 +266,16 @@ class StoreFeatures:
 
     def live(self, name: str) -> bool:
         return self.states[name].live
+
+    def settings_off(self, name: str) -> tuple[str, ...]:
+        """The store settings ``name`` needs that are off, in the order it
+        lists them: what a person switches on to make it live (empty when
+        they are all on, and it is the plan that keeps it off)."""
+        return tuple(
+            gate.setting_key
+            for gate in FEATURES[name].settings
+            if not self.values[gate.setting_key]
+        )
 
     def placement(self, label: str) -> Placement | None:
         return PLACEMENTS.get(label)

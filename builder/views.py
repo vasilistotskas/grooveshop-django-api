@@ -30,6 +30,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from builder import (
+    features,
     link_picker,
     preview_links,
     published,
@@ -67,6 +68,7 @@ from builder.rendering import (
     PreviewJSONParser,
 )
 from builder.serializers import (
+    BuilderFeaturesSerializer,
     CheckpointWriteSerializer,
     DocumentDetailSerializer,
     DocumentListSerializer,
@@ -980,6 +982,25 @@ class PresenceView(StaffView):
     def delete(self, request: Request) -> Response:
         services.leave_presence(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FeaturesView(StaffView):
+    """Which store features are on, and where this person turns one on."""
+
+    @extend_schema(
+        tags=TAGS,
+        responses={200: BuilderFeaturesSerializer},
+        description=(
+            "`{features: {<name>: {on, turnOnUrl}}}` for every store feature "
+            "(the names of the tenant payload's `features`). `on`: its plan "
+            "flag and every setting it needs are on. `turnOnUrl`: the store "
+            "admin page of the first setting that is off, only for a role "
+            "that may change settings (Admin, Owner); null when the feature "
+            "is on, when the plan keeps it off, or for any other role."
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response({"features": features.feature_states(request)})
 
 
 class PublishedPageView(APIView):

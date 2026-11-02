@@ -8,8 +8,9 @@ translation tables first. The content types of the eight models go too,
 and with them their permissions, so no permission picker offers a model
 that does not exist.
 
-Not reversible: the rows are gone with the tables, and the code that
-used them was removed by the release before this one.
+Irreversible on purpose (no reverse operations, so Django refuses to
+unapply it): the rows are gone with the tables, and a no-op reverse would
+let a rollback walk on into 0040's reverse, which needs the link table.
 """
 
 from django.db import migrations
@@ -55,9 +56,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             "".join(f"DROP TABLE IF EXISTS {table} CASCADE;\n" for table in TABLES),
-            reverse_sql=migrations.RunSQL.noop,
         ),
-        migrations.RunPython(
-            delete_content_types, reverse_code=migrations.RunPython.noop
-        ),
+        migrations.RunPython(delete_content_types),
     ]

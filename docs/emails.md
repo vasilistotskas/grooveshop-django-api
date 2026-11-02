@@ -452,7 +452,7 @@ with none). Each row has a badge (**On**, **Required** with no switch, **Off:
 count, and the time of the last send), a **failed** count linking to the log
 filtered to that email, the switch, **Preview** (its page) and **Send test**.
 The figures are one aggregate over `EmailLog` for the whole store
-(`figures.type_figures`, grouped by type, `@dashboard_query("store:emails:v1",
+(`figures.type_figures`, grouped by type, `@dashboard_query("emails:figures:v1",
 ttl=60)` with no `depends_on`, because log writes never stop), so the page
 costs the same queries for 2 types and for 30
 (`tests/integration/emails/test_email_pages.py`). A test send is not counted.
@@ -489,6 +489,39 @@ suppression); it is also in `STAFF_READ_ONLY_APP_LABELS`, so STAFF only **look**
 (the page, the log and the suppression list, with the switch disabled and no
 Send test). The audit of a switch is the simple-history row with the staff member
 (`EmailSwitch.history`). Platform types (`Owner.PLATFORM`) are not on these pages.
+
+**The control plane's page** (`PlatformEmailSwitchAdmin`, `Settings`-like
+entry "Emails" in the platform sidebar's Platform group, registered because
+`emails` is in `PLATFORM_APP_LABELS`). It is the same admin over the `public`
+schema: the `Owner.PLATFORM` types, grouped by who receives them ("To stores",
+"To the platform's operators") instead of by area and tabs, with the same
+badge ("Required": every platform type is required and ungated, so nothing
+can be switched and the toggle answers 404), figures, filter (All, Failing),
+preview, Send test, log and suppression list. Three things differ because the
+schema does:
+
+- **Which emails.** `EmailSwitchAdmin.owner` is `Owner.STORE` and the
+  platform subclass's is `Owner.PLATFORM`: it decides which types the page and
+  a type's page serve (a store type's page on the platform, and the reverse, is
+  a 404), and `switches.switch_groups(owner=...)` groups them. The log and the
+  suppression list are one admin class on both sites; `serving_owner()` (the
+  schema in use) picks the email filter's choices.
+- **No orders.** A platform email is about no order and the orders table is not
+  in `public`: the preview form has no order field and a posted order id is not
+  read (`_may_pick_orders`).
+- **Where a test is sent from.** `testsend.send_test` runs under
+  `owner_schema(email_type)`, as `send_email` does, so a platform email's test is
+  rendered, logged (`is_test`) and sent from `public` whatever schema the request
+  is in. The operator receives it at their own address, throttled per operator.
+
+Every admin URL the pages build is looked up on `self.admin_site.name`
+(`admin` or `platform_admin`), and the templates take theirs from the view,
+because a fixed `admin:` namespace would point the platform at the store's.
+The figures are cached under a key that carries the schema
+(`tenant.cache.make_tenant_key`), so the platform's page and a store's never
+share an answer (`tests_mt/test_platform_email_pages.py`). The platform
+dashboard flags the platform's own mail that failed in the last 7 days
+(`PlatformAlerts`, from the `public` log) next to the "no Resend key" alert.
 
 **Dashboard.** "Emails failing" in the store dashboard's Needs attention card
 counts the last 7 days of failed, bounced, complained and provider-suppressed
@@ -880,8 +913,6 @@ tables (`devtools/anonymise/rules.py`).
   is suppressed (it needs a hook on `EmailType` the order types implement),
   and moving a newsletter subscription to `BOUNCED` on a hard bounce (the
   event carries an address, the log only its hash).
-- The platform admin's own page for the platform types (they have no
-  switches, so it would be a listing and the log).
 - "Edit the wording" on an email's page (Step 4). A real object is chosen only
   for the order types, every other type previews its `sample`.
 
@@ -946,6 +977,11 @@ tables (`devtools/anonymise/rules.py`).
 - `tests/integration/emails/test_golden_render_ops.py` records the
   operational alerts through the real code that sends them. They had no
   template and no translation before, so the files record what they are now.
+- `tests_mt/test_platform_email_pages.py`: the control plane's page with real
+  schemas (only the platform's emails, the `public` figures, log and suppression
+  list, no orders, Send test to the operator and logged in `public`, throttle,
+  no toggle, the dashboard alert, the sidebar entry, cached figures never shared
+  across schemas).
 - `tests/integration/emails/test_email_pages.py`: the status page (tabs,
   search, state filter, figures against a hand-computed fixture, flat queries),
   one email's page, the Send test (only the signed-in account, throttle,

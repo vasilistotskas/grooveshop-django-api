@@ -231,6 +231,12 @@ msgstr[0] "%(count)d ετικέτα απενεργοποιήθηκε."
 msgstr[1] "%(count)d ετικέτες απενεργοποιήθηκαν."
 
 #, python-format
+msgid "%(count)s email of the platform did not arrive in the last 7 days: a billing notice, a password reset or an alert to the operators."
+msgid_plural "%(count)s emails of the platform did not arrive in the last 7 days: billing notices, password resets or alerts to the operators."
+msgstr[0] "%(count)s email της πλατφόρμας δεν έφτασε τις τελευταίες 7 ημέρες: ειδοποίηση χρέωσης, επαναφορά κωδικού ή ειδοποίηση προς τους διαχειριστές."
+msgstr[1] "%(count)s email της πλατφόρμας δεν έφτασαν τις τελευταίες 7 ημέρες: ειδοποιήσεις χρέωσης, επαναφορές κωδικού ή ειδοποιήσεις προς τους διαχειριστές."
+
+#, python-format
 msgid "%(count)s failed"
 msgid_plural "%(count)s failed"
 msgstr[0] "%(count)s απέτυχε"
@@ -9262,6 +9268,9 @@ msgstr "Αδιαφανής δείκτης (στρατηγική σελιδοπο
 msgid "Open full stock history chart"
 msgstr "Άνοιγμα πλήρους ιστορικού αποθέματος →"
 
+msgid "Open the email log"
+msgstr "Άνοιγμα του αρχείου email"
+
 msgid "Open the failed publishes"
 msgstr "Άνοιγμα των δημοσιεύσεων που απέτυχαν"
 
@@ -13977,6 +13986,9 @@ msgstr "Το έγγραφο είναι μεγαλύτερο από %(limit)s KB.
 msgid "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 msgstr "Η αναθεώρηση του πρόχειρου που περιέχει η τρέχουσα δημοσίευση, κενή όταν δεν είναι γνωστή (μετά από επαναφορά, πριν από την πρώτη δημοσίευση). Ένα πρόχειρο με άλλη αναθεώρηση έχει αλλαγές που δεν έχουν δημοσιευτεί."
 
+msgid "The emails the platform itself sends: billing notices to the stores' owners, the staff password reset and the alerts to the platform's operators. All of them are required, so none can be switched off."
+msgstr "Τα email που στέλνει η ίδια η πλατφόρμα: ειδοποιήσεις χρέωσης προς τους ιδιοκτήτες των καταστημάτων, επαναφορά κωδικού του προσωπικού και ειδοποιήσεις προς τους διαχειριστές της πλατφόρμας. Όλα είναι υποχρεωτικά, οπότε κανένα δεν μπορεί να απενεργοποιηθεί."
+
 msgid "The end is before the start."
 msgstr "Η λήξη είναι πριν από την έναρξη."
 
@@ -14137,6 +14149,9 @@ msgstr "Αυτό το κείμενο διαχειρίζεται η πλατφό�
 
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "Η πλατφόρμα μπορεί να εκδίδει αποδείξεις λιανικής μόνο για επιχείρηση που απαλλάσσεται από τον φορολογικό ηλεκτρονικό μηχανισμό (ΦΗΜ). Καταχωρίστε τη νομική βάση στο MYDATA_FHM_EXEMPTION_GROUND ή απενεργοποιήστε το MYDATA_ENABLED και εκδίδετε τις αποδείξεις από τον ΦΗΜ ή τον πάροχο ηλεκτρονικής τιμολόγησής σας."
+
+msgid "The platform's emails are failing"
+msgstr "Τα email της πλατφόρμας αποτυγχάνουν"
 
 msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 msgstr "Οι πόντοι που θα κέρδιζε ο συνδεδεμένος πελάτης ανά προϊόν, για κάθε προϊόν της λίστας που υπάρχει. Ένα προϊόν που δεν υπάρχει παραλείπεται."
@@ -14798,6 +14813,12 @@ msgstr "Προς προϊόν"
 #, python-format
 msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 msgstr "Για ανανέωση, απαντήστε σε αυτό το email ή επικοινωνήστε μαζί μας στο %(email)s. Μόλις καταχωρηθεί η ανανέωση, όλα συνεχίζουν κανονικά."
+
+msgid "To stores"
+msgstr "Προς τα καταστήματα"
+
+msgid "To the platform's operators"
+msgstr "Προς τους διαχειριστές της πλατφόρμας"
 
 msgid "To your team"
 msgstr "Προς την ομάδα σας"

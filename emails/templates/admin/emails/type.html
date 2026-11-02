@@ -47,7 +47,7 @@
 
         {% trans "Preview" as preview_title %}
         {% component "unfold/components/card.html" with title=preview_title %}
-            <form hx-post="{% url 'admin:emails_emailswitch_preview_render' %}"
+            <form hx-post="{{ preview_render_url }}"
                   hx-target="#email-preview"
                   hx-trigger="load, change"
                   class="flex flex-wrap gap-4 items-end mb-4">

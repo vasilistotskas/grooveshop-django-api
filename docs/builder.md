@@ -226,10 +226,12 @@ release, resolved for the locale (overlay merged, disabled nodes dropped
 with their children, `disabled` removed); `page` is the page of that key,
 else the template of that name; `404 page_not_published` otherwise. It
 never reads a draft and never calls the storefront. The resolved page is
-cached under `builder:<schema>:r<release>:<page_key>:<locale>`: immutable
-per release, never purged. The current release number is kept under the
-store's cache generation, so a warm read touches neither the database nor
-anything else.
+cached under `builder:<schema>:r<release id>:<page_key>:<locale>`: immutable
+per release, never purged. The key holds the release's PRIMARY KEY, not its
+number: numbers restart at 1 after `builder_reset`, a key that came back would
+serve the old release's content, and an id never does. The current release id
+is kept under the store's cache generation, so a warm read touches neither the
+database nor anything else.
 
 `GET published?locale=` (AllowAny) is the page-less read: what every page needs
 and none owns. `{release, locale, theme, groups, pages}`: the theme and groups
@@ -237,7 +239,7 @@ resolved like the page read, and `pages` listing every `page:` and `template:`
 document of the current release as `{key, kind, updatedAt}` (`key` the
 suffix, `updatedAt` when its version was made, for the sitemap's `lastmod`).
 A store with no release answers `{release: 0, theme: null, groups: {}, pages:
-[]}`, not 404. Cached under `builder:<schema>:r<release>:chrome:<locale>`,
+[]}`, not 404. Cached under `builder:<schema>:r<release id>:chrome:<locale>`,
 immutable per release; the `builder` surface purges the storefront's
 `builderPage` and `builderChrome` handlers.
 
@@ -482,12 +484,12 @@ changes for a visitor until the storefront switch.
    **Caches.** An import or a reset moves the cache generation and purges the
    `builder` surface after commit, like a publish; look for
    `Cache auto-invalidated surfaces=['builder'] ... failed=[]` per store in the
-   worker's log. A reset also drops the cached reads of the deleted release,
-   because release numbers restart at 1.
+   worker's log. A reset needs no cache key deleted: the reads are keyed by
+   release id, which a new release never shares with a deleted one.
 5. **Rollback, before the storefront reads the builder.**
    `builder_reset --tenant <schema>` reports what it would delete;
    `--confirm` deletes it (documents, versions, the release, the reference
-   index; cached reads of the release go with it). It refuses, and says why,
+   index). It refuses, and says why,
    unless the data is exactly what an import leaves: one release, no staff
    behind a release or version, no edited draft, named save, deleted document
    or schedule. It cannot see whether the storefront already reads the

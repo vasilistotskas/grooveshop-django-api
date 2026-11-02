@@ -7,16 +7,18 @@ detail: the per-language overlay is merged over the default content and
 every disabled section or block is dropped with its children.
 
 Like the texts, this read never calls the storefront and never reads a
-draft. The resolved page is cached under the RELEASE number, which an
+draft. The resolved page is cached under the release's PRIMARY KEY, which an
 immutable release makes safe for good: a new release reads a new key and
-nothing is ever purged. The number of the current release is itself kept
-under the store's cache generation, which a release moves.
+nothing is ever purged. It is the key, not the release NUMBER, because a
+number can come back (a store whose builder data was reset starts at 1
+again) and a key that comes back serves the content of the release that held
+it. The id of the current release is itself kept under the store's cache
+generation, which a release moves.
 """
 
 from __future__ import annotations
 
 import copy
-from collections.abc import Iterable
 from typing import Any
 
 from django.conf import settings
@@ -31,73 +33,35 @@ from tenant.membership import bound_tenant
 GROUP_PREFIX = f"{DocumentKind.GROUP.value}:"
 
 
-def _current_number_key(generation: int) -> str:
+def _current_id_key(generation: int) -> str:
     return f"builder:{connection.schema_name}:current:{generation}"
 
 
-def _chrome_cache_key(release: int, locale: str) -> str:
-    return f"builder:{connection.schema_name}:r{release}:chrome:{locale}"
+def _chrome_cache_key(release_id: int, locale: str) -> str:
+    return f"builder:{connection.schema_name}:r{release_id}:chrome:{locale}"
 
 
-def _page_cache_key(release: int, page_key: str, locale: str) -> str:
-    return f"builder:{connection.schema_name}:r{release}:{page_key}:{locale}"
+def _page_cache_key(release_id: int, page_key: str, locale: str) -> str:
+    return f"builder:{connection.schema_name}:r{release_id}:{page_key}:{locale}"
 
 
-def forget_releases(
-    numbers: Iterable[int],
-    document_keys: Iterable[str],
-    locales: Iterable[str],
-) -> None:
-    """Drop the cached reads of releases that are gone. A cached read is
-    immutable per release number, which holds only while a number is never
-    reused; ``builder.resetting`` deletes releases, so the next import's
-    release 1 must not meet the old one's pages.
-
-    A page read is cached under the PAGE key the reader asked for (``home``,
-    the suffix of ``template:home`` or ``page:home``), not under the document
-    key; a group document has no page read of its own, only the chrome."""
-    numbers, locales = list(numbers), list(locales)
-    page_keys = {
-        key.partition(":")[2]
-        for key in document_keys
-        if not key.startswith(GROUP_PREFIX)
-    }
-    cache.delete_many(
-        [
-            *(
-                _page_cache_key(number, page_key, locale)
-                for number in numbers
-                for page_key in page_keys
-                for locale in locales
-            ),
-            *(
-                _chrome_cache_key(number, locale)
-                for number in numbers
-                for locale in locales
-            ),
-        ]
-    )
-
-
-def current_release_number() -> int:
-    """The number of the current release, 0 when nothing is released."""
+def current_release_id() -> int:
+    """The primary key of the current release, 0 when nothing is released."""
     tenant = bound_tenant()
     key = (
-        _current_number_key(tenant.cache_generation)
-        if tenant is not None
-        else None
+        _current_id_key(tenant.cache_generation) if tenant is not None else None
     )
     if key is not None and (held := cache.get(key)) is not None:
         return held
     top = (
         BuilderRelease.objects.order_by("-number")
-        .values_list("number", flat=True)
+        .values_list("pk", flat=True)
         .first()
     )
-    number = top or 0
+    release_id = top or 0
     if key is not None:
-        cache.set(key, number, settings.BUILDER_PUBLISHED_CACHE_SECONDS)
-    return number
+        cache.set(key, release_id, settings.BUILDER_PUBLISHED_CACHE_SECONDS)
+    return release_id
 
 
 def _overlay_for(i18n: dict[str, Any], locale: str) -> dict[str, Any]:
@@ -208,8 +172,8 @@ def _chrome(documents: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _build(release_number: int, page_key: str, locale: str) -> dict | None:
-    release = BuilderRelease.objects.filter(number=release_number).first()
+def _build(release_id: int, page_key: str, locale: str) -> dict | None:
+    release = BuilderRelease.objects.filter(pk=release_id).first()
     if release is None:
         return None
     page_document = _page_document_key(release.versions, page_key)
@@ -227,20 +191,20 @@ def _build(release_number: int, page_key: str, locale: str) -> dict | None:
 def published_page(page_key: str, locale: str) -> dict[str, Any] | None:
     """The page as the current release has it, or ``None`` when the
     release has neither a page nor a template of that name."""
-    number = current_release_number()
-    if number == 0:
+    release_id = current_release_id()
+    if release_id == 0:
         return None
-    key = _page_cache_key(number, page_key, locale)
+    key = _page_cache_key(release_id, page_key, locale)
     if (held := cache.get(key)) is not None:
         return held
-    built = _build(number, page_key, locale)
+    built = _build(release_id, page_key, locale)
     if built is not None:
         cache.set(key, built, settings.BUILDER_PUBLISHED_CACHE_SECONDS)
     return built
 
 
-def _build_index(release_number: int, locale: str) -> dict[str, Any] | None:
-    release = BuilderRelease.objects.filter(number=release_number).first()
+def _build_index(release_id: int, locale: str) -> dict[str, Any] | None:
+    release = BuilderRelease.objects.filter(pk=release_id).first()
     if release is None:
         return None
     pages = {
@@ -275,8 +239,8 @@ def published_index(locale: str) -> dict[str, Any]:
 
     A store with no release is a valid, empty answer, not a 404: the chrome
     and the sitemap render from nothing."""
-    number = current_release_number()
-    if number == 0:
+    release_id = current_release_id()
+    if release_id == 0:
         return {
             "release": 0,
             "locale": locale,
@@ -284,10 +248,10 @@ def published_index(locale: str) -> dict[str, Any]:
             "groups": {},
             "pages": [],
         }
-    key = _chrome_cache_key(number, locale)
+    key = _chrome_cache_key(release_id, locale)
     if (held := cache.get(key)) is not None:
         return held
-    built = _build_index(number, locale)
-    assert built is not None  # the number came from a release row
+    built = _build_index(release_id, locale)
+    assert built is not None  # the id came from a release row
     cache.set(key, built, settings.BUILDER_PUBLISHED_CACHE_SECONDS)
     return built

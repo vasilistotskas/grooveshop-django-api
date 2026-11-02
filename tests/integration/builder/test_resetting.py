@@ -25,11 +25,13 @@ from builder.models import (
 pytestmark = pytest.mark.django_db
 
 
-def an_import(text: str = "x") -> BuilderRelease:
+def an_import(
+    text: str = "x", keys: tuple[str, ...] = ("template:home", "group:footer")
+) -> BuilderRelease:
     """What an import or a seed leaves: documents at draft revision 1, one
     publish version each, and release 1 holding them."""
     versions = {}
-    for key in ("template:home", "group:footer"):
+    for key in keys:
         document = BuilderDocumentFactory(
             key=key,
             kind=key.partition(":")[0],
@@ -95,42 +97,51 @@ class TestAnUnusedStore:
         assert again.number == 1
         assert BuilderRelease.objects.count() == 1
 
-    def test_cached_reads_of_the_deleted_release_are_dropped(
-        self, seeded, tenant, django_capture_on_commit_callbacks
-    ):
-        # Release numbers restart at 1, and a cached page is keyed by the
-        # number only: the next release 1 must not meet the old one's pages.
-        # A page read is keyed by the page key the reader asked for, the
-        # suffix of ``template:home``, not by the document key.
-        page = published._page_cache_key(1, "home", "el")
-        chrome = published._chrome_cache_key(1, "el")
-        cache.set(page, {"stale": True})
-        cache.set(chrome, {"stale": True})
-
-        with django_capture_on_commit_callbacks(execute=True):
-            resetting.reset_store()
-
-        assert cache.get(page) is None
-        assert cache.get(chrome) is None
-
 
 class TestTheReadAfterAReimport:
+    """Release numbers restart at 1 after a reset; what the public reads
+    cache is keyed by the release's primary key, which never comes back, so
+    a re-import is never served the old release's content and a reset has
+    no cache key to forget."""
+
     def test_a_new_release_one_is_not_served_from_the_old_ones_cache(
-        self, tenant, django_capture_on_commit_callbacks
+        self, tenant
     ):
         cache.clear()
         an_import("old")
+        # The bound tenant is read once per request in production; here it
+        # is one object, so it is reloaded where a request would start.
+        tenant.refresh_from_db()
         first = published.published_page("home", "el")
         assert first is not None
         assert first["page"]["sections"]["a"]["settings"]["text"] == "old"
+        assert [p["key"] for p in published.published_index("el")["pages"]] == [
+            "home"
+        ]
 
-        with django_capture_on_commit_callbacks(execute=True):
-            resetting.reset_store()
-        an_import("new")
+        resetting.reset_store()
+        an_import("new", ("template:home", "page:extra", "group:footer"))
+        tenant.refresh_from_db()
         again = published.published_page("home", "el")
+        index = published.published_index("el")
 
         assert again is not None
+        assert again["release"] == 1
         assert again["page"]["sections"]["a"]["settings"]["text"] == "new"
+        assert [p["key"] for p in index["pages"]] == ["extra", "home"]
+
+    def test_the_two_releases_number_one_have_different_cache_keys(
+        self, tenant
+    ):
+        first = an_import()
+        old_key = published._page_cache_key(first.pk, "home", "el")
+        resetting.reset_store()
+
+        second = an_import()
+
+        assert second.number == first.number == 1
+        assert second.pk != first.pk
+        assert published._page_cache_key(second.pk, "home", "el") != old_key
 
 
 class TestAStoreInUse:

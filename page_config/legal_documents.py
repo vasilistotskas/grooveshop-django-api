@@ -244,7 +244,7 @@ def missing_legal_translations(
     usable body; ``locales`` is the set the store intends to serve.
 
     Pure, so the rule is testable without a tenant schema. The reader
-    that builds ``coverage`` lives in ``page_config.defaults``.
+    that builds ``coverage`` lives in ``page_config.content_pages``.
 
     A legal route renders the tenant's ContentPage for the ACTIVE
     locale and throws a hard 404 on an empty body — ``extractTranslated``

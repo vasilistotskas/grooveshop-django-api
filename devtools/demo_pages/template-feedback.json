@@ -1,0 +1,63 @@
+{
+  "key": "template:feedback",
+  "document": {
+    "order": [
+      "da78692f-97cf-49ef-abbf-840d2bbca88c"
+    ],
+    "sections": {
+      "da78692f-97cf-49ef-abbf-840d2bbca88c": {
+        "blockOrder": [
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-1",
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-2",
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-3"
+        ],
+        "blocks": {
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-1": {
+            "settings": {
+              "name": "Γιώργος Π.",
+              "text": "Παρέλαβα την επόμενη μέρα, όλα σωστά."
+            },
+            "type": "testimonial@1"
+          },
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-2": {
+            "settings": {
+              "name": "Μαρία Κ.",
+              "text": "Ρώτησα κάτι στο chat και απάντησαν αμέσως."
+            },
+            "type": "testimonial@1"
+          },
+          "da78692f-97cf-49ef-abbf-840d2bbca88c-3": {
+            "settings": {
+              "name": "Νίκος Α.",
+              "text": "Καλές τιμές και σοβαρή εξυπηρέτηση."
+            },
+            "type": "testimonial@1"
+          }
+        },
+        "settings": {
+          "title": "Τι λένε οι πελάτες μας"
+        },
+        "type": "testimonials@1"
+      }
+    }
+  },
+  "i18n": {
+    "en": {
+      "da78692f-97cf-49ef-abbf-840d2bbca88c": {
+        "/title": "What our customers say"
+      },
+      "da78692f-97cf-49ef-abbf-840d2bbca88c-1": {
+        "/name": "George P.",
+        "/text": "Arrived the next day, everything correct."
+      },
+      "da78692f-97cf-49ef-abbf-840d2bbca88c-2": {
+        "/name": "Maria K.",
+        "/text": "Asked a question in the chat and got an answer straight away."
+      },
+      "da78692f-97cf-49ef-abbf-840d2bbca88c-3": {
+        "/name": "Nikos A.",
+        "/text": "Good prices and service that takes you seriously."
+      }
+    }
+  }
+}

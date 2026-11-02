@@ -427,7 +427,7 @@ def _seed_recommendation_slots(tenant: Tenant) -> bool:
 
 def _seed_content_pages(tenant: Tenant) -> bool:
     try:
-        from page_config.defaults import seed_content_pages
+        from page_config.content_pages import seed_content_pages
 
         seed_content_pages()
         logger.info("Seeded content pages for %s", tenant.schema_name)

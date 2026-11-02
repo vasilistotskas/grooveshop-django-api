@@ -45,7 +45,6 @@ STOREFRONT_PATHS = [
     "/api/v1/shipping/boxnow/lockers",
     "/api/v1/notification/ids",
     "/api/v1/contact",
-    "/api/v1/page-config/navigation",
     "/api/v1/agent/me",
 ]
 

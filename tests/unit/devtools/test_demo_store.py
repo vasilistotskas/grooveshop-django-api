@@ -2,12 +2,10 @@
 
 ``devtools/demo_store.py`` is a large hand-authored dataset applied to
 non-production tenants by ``manage.py seed_demo_store``. Nothing else
-type-checks it: a props key that drifts from
-``page_config.schemas``, a review pointing at a product slug that was
-renamed, or a wholesale net price above retail all fail silently at
-runtime — the storefront strips unknown props and renders component
-defaults, so the mistake shows up as a blank band on staging rather
-than an error.
+type-checks it: a review pointing at a product slug that was renamed,
+or a wholesale net price above retail, fails silently at runtime and
+shows up on staging rather than as an error. The demo pages have their
+own tests (``test_demo_pages.py``).
 
 These tests are the write-side guard, and they run without a database
 for everything except the two seed functions at the end.
@@ -39,12 +37,6 @@ from devtools.demo_catalogue import (
     view_count,
 )
 from devtools.management.commands import seed_demo_store
-from page_config.models import ComponentType, NavigationSlot
-from page_config.schemas import (
-    validate_navigation_items,
-    validate_section_i18n,
-    validate_section_props,
-)
 from product.enum.review import RateEnum
 from product.models import Product
 from tenant.validators import validate_business_hours_setting
@@ -64,119 +56,6 @@ def _has_greek(value: object) -> bool:
     if isinstance(value, (list, tuple)):
         return any(_has_greek(item) for item in value)
     return False
-
-
-class TestSectionProps(TestCase):
-    """Every layout section must satisfy the write-side props contract.
-
-    ``validate_section_props`` is wired into the admin and the
-    serializers but NOT the model, so ``seed_layouts`` calls it
-    explicitly. These assertions make sure the DATA can pass it.
-    """
-
-    def test_component_types_are_valid_choices(self):
-        valid = {choice[0] for choice in ComponentType.choices}
-        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
-            for section in sections:
-                assert section["component_type"] in valid, (
-                    f"{page_type}: {section['component_type']} is not a "
-                    f"ComponentType choice"
-                )
-
-    def test_props_pass_validation(self):
-        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
-            for section in sections:
-                # Raises ValidationError on a bad key or value.
-                validate_section_props(
-                    section["component_type"], section["props"]
-                )
-                assert section["props"] is not None, page_type
-
-    def test_sort_order_is_unique_per_layout(self):
-        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
-            orders = [section["sort_order"] for section in sections]
-            assert len(orders) == len(set(orders)), page_type
-
-    def test_no_listing_sections_on_products_or_blog(self):
-        """Those layouts must stay absent from the plan entirely.
-
-        ``page_config.defaults`` records the regression: a listing
-        section there double-renders the page, because products_grid
-        mounts its own ProductsList over the page's own breadcrumb,
-        sidebar and list.
-        """
-        assert "products" not in demo_store.LAYOUT_PLAN
-        assert "blog" not in demo_store.LAYOUT_PLAN
-
-    def test_i18n_overrides_pass_validation(self):
-        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
-            for section in sections:
-                # Raises ValidationError on an unknown locale, an
-                # unknown key, or a prop the component does not have.
-                validate_section_i18n(
-                    section["component_type"], section.get("i18n") or {}
-                )
-                assert page_type
-
-    def test_every_greek_string_is_covered_by_an_english_override(self):
-        """A band whose copy is only Greek renders Greek on ``/en``.
-
-        The demo store is the platform's shop window and serves both
-        locales, so an untranslated prop is a visible defect rather
-        than a missing nicety — ``/about`` shipped thirty-six Greek
-        lines to English readers this way. The rule is per TOP-LEVEL
-        prop key because ``i18n.<locale>.props`` is merged SHALLOWLY:
-        an override of ``items`` replaces the whole list, so a partial
-        one is not a thing that exists.
-        """
-        for page_type, (sections, _mode) in demo_store.LAYOUT_PLAN.items():
-            for section in sections:
-                english = (section.get("i18n") or {}).get("en") or {}
-                if _has_greek(section["title"]):
-                    assert english.get("title"), (
-                        f"{page_type}/{section['component_type']}: the "
-                        "section title has no English override"
-                    )
-                translated = english.get("props") or {}
-                for key, value in section["props"].items():
-                    if not _has_greek(value):
-                        continue
-                    assert key in translated, (
-                        f"{page_type}/{section['component_type']}: prop "
-                        f"{key!r} is Greek with no English override"
-                    )
-
-    def test_no_heading_section_on_a_page_that_owns_its_h1(self):
-        """``hero_banner`` is the only type in the storefront's
-        HEADING_SECTION_TYPES: it takes over the page's <h1> and makes
-        the page stand its own PageTitle down. contact/feedback carry
-        their own heading, so a hero there would silently remove it.
-        """
-        for page_type in ("contact", "feedback"):
-            sections, _mode = demo_store.LAYOUT_PLAN[page_type]
-            types = {section["component_type"] for section in sections}
-            assert "hero_banner" not in types, page_type
-
-
-class TestNavigation(TestCase):
-    def test_navigation_payloads_pass_validation(self):
-        for slot, items in (
-            (NavigationSlot.MOBILE, demo_store.NAV_MOBILE),
-            (NavigationSlot.FOOTER, demo_store.NAV_FOOTER),
-        ):
-            validate_navigation_items(slot, items)
-
-    def test_navigation_never_links_an_unpublished_layout(self):
-        """The seed unpublishes the microlearning boilerplate, so a menu
-        that still points at those routes would advertise a 404.
-        """
-        unpublished_paths = {
-            f"/{page_type}" for page_type in demo_store.UNPUBLISH_LAYOUTS
-        }
-        targets = {item.get("to", "") for item in demo_store.NAV_MOBILE}
-        for column in demo_store.NAV_FOOTER:
-            targets |= {child.get("to", "") for child in column["children"]}
-        assert not (targets & unpublished_paths)
 
 
 class TestSettings(TestCase):
@@ -1054,52 +933,18 @@ class TestContentPages(TestCase):
             assert not _has_greek(content["seo_title_en"]), slug
             assert not _has_greek(content["seo_description_en"]), slug
 
-
-class TestLayoutSeo(TestCase):
-    def test_home_carries_seo_in_both_languages(self):
-        home = demo_store.LAYOUT_SEO["home"]
-        assert set(home) == {"el", "en"}
-        for language, (title, description) in home.items():
-            # What a results page shows without truncating.
-            assert len(title) <= 60, language
-            assert 140 <= len(description) <= 160, language
-        assert not _has_greek(home["en"][0])
-        assert not _has_greek(home["en"][1])
-        assert _has_greek(home["el"][1])
-
-    def test_writes_each_language_and_keeps_an_operators_own(self):
-        from page_config.models import PageLayout
-
-        layout = PageLayout.objects.create(page_type="home", title="Home")
-        layout.set_current_language("en")
-        layout.seo_title = "The operator's own"
-        layout.save()
-        report: dict[str, int] = {}
-
-        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], report)
-
-        layout = PageLayout.objects.get(pk=layout.pk)
-        greek_title, greek_description = demo_store.LAYOUT_SEO["home"]["el"]
-        el = layout.translations.get(language_code="el")
-        en = layout.translations.get(language_code="en")
-        assert (el.seo_title, el.seo_description) == (
-            greek_title,
-            greek_description,
-        )
-        assert en.seo_title == "The operator's own"
-        assert en.seo_description == ""
-        assert report == {"seo_written": 1, "seo_kept": 1}
-
-    def test_a_rerun_changes_nothing(self):
-        from page_config.models import PageLayout
-
-        layout = PageLayout.objects.create(page_type="home", title="Home")
-        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], {})
-        report: dict[str, int] = {}
-
-        demo_store._write_seo(layout, demo_store.LAYOUT_SEO["home"], report)
-
-        assert report == {"seo_kept": 2}
+    def test_every_seeded_content_page_carries_english(self):
+        """A nav link to one of these renders the PAGE's title."""
+        for slug, content in demo_store.CONTENT_PAGES.items():
+            with self.subTest(slug=slug):
+                self.assertTrue(content.get("title_en"))
+                self.assertTrue(content.get("body_en"))
+                self.assertFalse(
+                    any(
+                        "\u0370" <= ch <= "\u03ff" for ch in content["title_en"]
+                    ),
+                    "the English title still has Greek in it",
+                )
 
 
 class TestSeedFunctions(TestCase):
@@ -1419,87 +1264,6 @@ class TestCachePurge(TestCase):
         purge_all.assert_not_called()
 
 
-class TestEnglishNavigation(TestCase):
-    """Every menu label and every seeded page needs an English twin.
-
-    The menus are relational rows and a content-page link takes its
-    label from the PAGE's translated title, so nothing on the storefront
-    can translate either. Until 2026-09-19 the demo store served a Greek
-    header and a Greek four-column footer on every `/en` page.
-    """
-
-    MENUS = (
-        (NavigationSlot.MOBILE, demo_store.NAV_MOBILE),
-        (NavigationSlot.FOOTER, demo_store.NAV_FOOTER),
-    )
-
-    def test_every_label_has_an_english_translation(self):
-        """`english_menu` raises on a miss, so this is where it surfaces."""
-        for slot, items in self.MENUS:
-            with self.subTest(slot=slot):
-                demo_store.english_menu(items)
-
-    def test_the_english_copy_keeps_the_shape(self):
-        """`build_navigation_menu` matches by POSITION.
-
-        A copy of a different shape is ignored rather than
-        mis-assigned, so a drift here is a silently untranslated menu
-        rather than a crash.
-        """
-
-        def shape(items):
-            return [
-                (sorted(set(item) - {"label"}), shape(item.get("children", [])))
-                for item in items
-            ]
-
-        for slot, items in self.MENUS:
-            with self.subTest(slot=slot):
-                self.assertEqual(
-                    shape(demo_store.english_menu(items)), shape(items)
-                )
-
-    def test_the_english_copy_passes_the_locale_validator(self):
-        """It goes through the full link validator, not a label check.
-
-        So an override needs its `to` on every entry — a labels-only
-        copy is rejected.
-        """
-        from page_config.schemas import validate_navigation_i18n
-
-        for slot, items in self.MENUS:
-            with self.subTest(slot=slot):
-                validate_navigation_i18n(
-                    slot, {"en": demo_store.english_menu(items)}
-                )
-
-    def test_no_label_is_left_in_greek(self):
-        greek = []
-
-        def walk(items, path="en"):
-            for item in items:
-                if any("\u0370" <= ch <= "\u03ff" for ch in item["label"]):
-                    greek.append(f"{path}: {item['label']}")
-                walk(item.get("children", []), path)
-
-        for _slot, items in self.MENUS:
-            walk(demo_store.english_menu(items))
-        self.assertEqual(greek, [])
-
-    def test_every_seeded_content_page_carries_english(self):
-        """A nav link to one of these renders the PAGE's title."""
-        for slug, content in demo_store.CONTENT_PAGES.items():
-            with self.subTest(slug=slug):
-                self.assertTrue(content.get("title_en"))
-                self.assertTrue(content.get("body_en"))
-                self.assertFalse(
-                    any(
-                        "\u0370" <= ch <= "\u03ff" for ch in content["title_en"]
-                    ),
-                    "the English title still has Greek in it",
-                )
-
-
 @pytest.fixture
 def demo_tenant(db):
     from tenant.models import Tenant, TenantDomain
@@ -1768,47 +1532,6 @@ class TestProductVariantGroups:
         assert mint.active is False
         assert mint.variant_group is None
         assert not ProductVariantGroup.objects.filter(pk=old.pk).exists()
-
-
-class TestHeaderMenu:
-    """The demo gets the storefront's code navbar, not a seeded copy."""
-
-    @staticmethod
-    def _slots():
-        from page_config.models import NavigationMenu
-
-        return set(NavigationMenu.objects.values_list("slot", flat=True))
-
-    def test_a_demo_rerun_removes_the_header_row_an_earlier_run_made(
-        self, demo_tenant
-    ):
-        from page_config.models import NavigationMenu
-
-        NavigationMenu.objects.get_or_create(slot=NavigationSlot.HEADER)
-
-        report = demo_store.seed_navigation()
-
-        assert report["header_removed"] == 1
-        assert NavigationSlot.HEADER not in self._slots()
-        assert {NavigationSlot.MOBILE, NavigationSlot.FOOTER} <= self._slots()
-
-    def test_a_store_that_is_not_a_demo_keeps_its_header(self, demo_tenant):
-        from page_config.models import NavigationMenu
-
-        type(demo_tenant).objects.filter(pk=demo_tenant.pk).update(
-            is_demo=False
-        )
-        NavigationMenu.objects.get_or_create(slot=NavigationSlot.HEADER)
-
-        report = demo_store.seed_navigation()
-
-        assert "header_removed" not in report
-        assert NavigationSlot.HEADER in self._slots()
-
-    def test_a_second_run_has_nothing_to_remove(self, demo_tenant):
-        demo_store.seed_navigation()
-
-        assert "header_removed" not in demo_store.seed_navigation()
 
 
 class TestPayWays:

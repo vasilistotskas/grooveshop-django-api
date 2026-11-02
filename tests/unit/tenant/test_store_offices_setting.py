@@ -88,7 +88,7 @@ def test_the_i18n_overlay_covers_text_only():
 
     A postcode and a phone number read the same in every language, so
     letting a locale override them would only invite the two copies to
-    drift — the same rule as ``PageSection.i18n``.
+    drift.
     """
     assert not validate_store_offices_setting(
         [{**_VALID[0], "i18n": {"en": {"postal": "55132"}}}]

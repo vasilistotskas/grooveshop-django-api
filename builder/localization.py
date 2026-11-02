@@ -1,12 +1,11 @@
-"""Which locale a public page-config request is answered in.
+"""Which locale a public builder read is answered in.
 
-Page sections and navigation menus are OPERATOR CONTENT held in JSON,
-not parler translations, so the usual "ship every translation, let the
-client pick" route is not open to them: ``props`` is one field mixing
-layout configuration with customer-facing copy, and duplicating the
-whole blob per language would let ``columns`` drift between them.
+A builder document is OPERATOR CONTENT held in JSON with a per-language
+overlay, not parler translations, so the usual "ship every translation,
+let the client pick" route is not open to it: the structure is one, and
+only the overlay varies by language.
 
-They are resolved server-side from an explicit ``?locale=``. The
+It is resolved server-side from an explicit ``?locale=``. The
 storefront proxies these endpoints and already knows the locale it is
 rendering (``event.context.locale``), which it passes both as this
 parameter and as ``X-Language`` — the header the request is answered in

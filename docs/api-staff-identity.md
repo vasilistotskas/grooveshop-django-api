@@ -258,8 +258,7 @@ storefront never writes catalogue resources (no POST/PUT/DELETE under
 customer actions like comments and likes), and the agent gateway only
 reads them (`/product*`, `/pay_way`, `/search/*`,
 `/shipping/acs/stations/nearest`) while its writes are customer cart and
-order operations. `page_config`'s own comment records that nothing
-consumes its admin routes yet.
+order operations.
 
 Building a second staff-identity system for an API with no caller is
 speculative. `IsPlatformSuperuser` removes the exposure now at zero cost

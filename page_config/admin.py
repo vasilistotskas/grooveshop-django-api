@@ -1,25 +1,18 @@
-from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
-from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Count
 from django.utils.html import escape, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import npgettext_lazy
-from unfold.admin import StackedInline
 from unfold.decorators import action
-from unfold.fields import UnfoldAdminJSONSchemaField
-from unfold.widgets import UnfoldAdminJSONSchemaWidget
 
 from admin.base import (
     BaseModelAdmin,
     BaseTranslatableAdmin,
-    BaseTranslatableTabularInline,
 )
 from core.store_settings import store_settings
 from core.utils.sanitize import sanitize_html
-from page_config.defaults import (
+from page_config.content_pages import (
     pending_legal_reviews,
     tenant_document_context,
 )
@@ -40,233 +33,7 @@ from page_config.models import (
     ContentPage,
     ContentPageTranslation,
     LegalDocumentVersion,
-    NavigationColumn,
-    NavigationLink,
-    NavigationMenu,
-    NavigationSlot,
-    PageLayout,
-    PageSection,
 )
-from page_config.section_schemas import (
-    SECTION_PROPS,
-    i18n_schema,
-    props_schema,
-)
-
-
-class PageSectionForm(forms.ModelForm):
-    """A saved section edits ``props`` and ``i18n`` through its type's
-    schema (``page_config.section_schemas``). A new row is plain JSON
-    until its type is saved: the schema depends on the type, and Unfold
-    builds its editors once, when the page loads."""
-
-    class Meta:
-        model = PageSection
-        fields = ("component_type", "title", "is_visible", "props", "i18n")
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        component_type = self.instance.component_type
-        if self.instance.pk is None or component_type not in SECTION_PROPS:
-            return
-        for name, schema in (
-            ("props", props_schema(component_type)),
-            ("i18n", i18n_schema(component_type)),
-        ):
-            field = self.fields[name]
-            self.fields[name] = UnfoldAdminJSONSchemaField(
-                schema=schema,
-                widget=UnfoldAdminJSONSchemaWidget,
-                encoder=DjangoJSONEncoder,
-                required=False,
-                label=field.label,
-                help_text=field.help_text,
-            )
-
-
-class PageSectionInline(StackedInline):
-    model = PageSection
-    form = PageSectionForm
-    extra = 0
-    tab = True
-    collapsible = True
-    fields = (
-        "component_type",
-        "title",
-        "is_visible",
-        "props",
-        "i18n",
-        "sort_order",
-    )
-    readonly_fields = ("sort_order",)
-    ordering = ("sort_order",)
-
-
-@admin.register(PageLayout)
-class PageLayoutAdmin(BaseTranslatableAdmin):
-    list_display = (
-        "page_type",
-        "title",
-        "is_published",
-        "updated_at",
-    )
-    list_filter = ("is_published", "page_type")
-    list_editable = ("is_published",)
-    search_fields = ("page_type", "title")
-    readonly_fields = ("id", "uuid", "created_at", "updated_at")
-
-    fieldsets = (
-        (
-            _("Page"),
-            {"fields": ("page_type", "title")},
-        ),
-        (
-            _("Publishing"),
-            {"fields": ("is_published",)},
-        ),
-        (
-            _("SEO"),
-            {
-                "fields": ("seo_title", "seo_description", "seo_keywords"),
-                "description": _(
-                    "The storefront's page title and meta description for "
-                    "this page. Left empty, the page keeps its built-in "
-                    "title and the store description."
-                ),
-            },
-        ),
-        (
-            _("Metadata"),
-            {
-                "fields": ("metadata",),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("System"),
-            {
-                "fields": (
-                    "id",
-                    "uuid",
-                    "created_at",
-                    "updated_at",
-                ),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    inlines = [PageSectionInline]
-
-
-@admin.register(NavigationMenu)
-class NavigationMenuAdmin(BaseModelAdmin):
-    """The chrome menu for one slot.
-
-    The row is only the slot; everything a visitor sees is the columns
-    and links edited through the inlines below.
-    """
-
-    list_display = ("slot", "entry_count", "updated_at")
-    fields = ("slot",)
-
-    def get_inlines(self, request, obj=None):
-        # Only the footer groups its links under headings.
-        if obj is not None and obj.slot == NavigationSlot.FOOTER:
-            return [NavigationColumnInline]
-        return [NavigationMenuLinkInline]
-
-    @admin.display(description=_("Entries"))
-    def entry_count(self, obj: NavigationMenu) -> int:
-        if obj.slot == NavigationSlot.FOOTER:
-            return obj.columns.count()
-        return obj.links.count()
-
-
-class NavigationLinkInline(BaseTranslatableTabularInline):
-    """The links inside one footer column, or one flat menu.
-
-    Four target fields rather than a typed path: the operator picks
-    WHAT the link points at and the path is derived, so it follows a
-    renamed slug and vanishes when the page is unpublished.
-
-    ``label`` is left blank for a page link on purpose — the page's own
-    translated title is used, so a bilingual store translates the
-    document once instead of once per menu per locale.
-    """
-
-    model = NavigationLink
-    extra = 0
-    fields = (
-        "content_page",
-        "page_layout",
-        "route",
-        "url",
-        "label",
-        "sort_order",
-    )
-    autocomplete_fields = ("content_page", "page_layout")
-    ordering_field = "sort_order"
-    hide_ordering_field = True
-    tab = True
-
-
-@admin.register(NavigationColumn)
-class NavigationColumnAdmin(BaseTranslatableAdmin):
-    """One footer heading and its links.
-
-    Django has no nested inlines (ticket #9025) and Unfold adds none,
-    so the menu lists its columns and each column is edited here —
-    the same drill-through ``RegionInline`` uses.
-    """
-
-    list_display = ("__str__", "menu", "link_count", "sort_order")
-    list_filter = ("menu__slot",)
-    fields = (
-        "menu",
-        "label",
-        "icon",
-        "shows_merchant_identity",
-        "sort_order",
-    )
-    inlines = [NavigationLinkInline]
-
-    list_select_related = ("menu",)
-
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related("translations")
-            .annotate(links_total=Count("links"))
-        )
-
-    @admin.display(description=_("Links"), ordering="links_total")
-    def link_count(self, obj: NavigationColumn) -> int:
-        return obj.links_total
-
-
-class NavigationColumnInline(BaseTranslatableTabularInline):
-    """The footer's columns, in order.
-
-    Links are edited one level down — follow "Change" on a row.
-    """
-
-    model = NavigationColumn
-    extra = 0
-    fields = ("label", "icon", "shows_merchant_identity", "sort_order")
-    ordering_field = "sort_order"
-    hide_ordering_field = True
-    show_change_link = True
-    tab = True
-
-
-class NavigationMenuLinkInline(NavigationLinkInline):
-    """Header and mobile links, which have no columns to sit in."""
-
-    fk_name = "menu"
-    verbose_name = _("Link")
-    verbose_name_plural = _("Links")
 
 
 @admin.register(LegalDocumentVersion)

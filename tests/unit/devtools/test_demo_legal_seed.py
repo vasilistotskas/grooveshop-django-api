@@ -8,7 +8,7 @@ first seeded, and the page stayed listed for review.
 from django.test import TestCase
 
 from devtools.demo_legal import seed_english_legal_documents
-from page_config.defaults import seed_content_pages
+from page_config.content_pages import seed_content_pages
 from page_config.legal_documents import LEGAL_TEXT_REVISION
 from page_config.models import ContentPage, ContentPageTranslation
 

@@ -80,15 +80,6 @@ def _build_stock_log():
     )
 
 
-def _build_navigation_column():
-    from page_config.models import NavigationColumn, NavigationMenu
-
-    menu, _created = NavigationMenu.objects.get_or_create(
-        slot=_first_choice("page_config.NavigationMenu", "slot")
-    )
-    NavigationColumn.objects.create(menu=menu)
-
-
 def _build_legal_document_version():
     from page_config.models import (
         ContentPage,
@@ -293,10 +284,6 @@ BUILDERS: dict[str, Callable[[], object]] = {
         kind=_first_choice("giftcard.GiftCardTransaction", "kind"),
         amount=1,
     ),
-    "page_config.PageLayout": lambda: __import__(
-        "page_config.models", fromlist=["PageLayout"]
-    ).PageLayout.objects.create(page_type=f"growth-{_uid()}", title="Growth"),
-    "page_config.NavigationColumn": _build_navigation_column,
     "page_config.LegalDocumentVersion": _build_legal_document_version,
     "page_config.ContentPage": lambda: __import__(
         "page_config.models", fromlist=["ContentPage"]
@@ -353,7 +340,6 @@ EXEMPT: dict[str, str] = {
     "order.InvoiceCounter": "one row per numbering series",
     "order.CreditCounter": "one row per numbering series",
     "recommendation.RecommendationSlot": "one row per surface, seeded",
-    "page_config.NavigationMenu": "one row per menu slot, seeded",
     "django_celery_beat.SolarSchedule": "one row per solar event and place",
     "emails.EmailSwitch": "a page of the registry's types, not a list of rows",
 }

@@ -1,219 +1,25 @@
 from __future__ import annotations
 
-from django.db.models import Prefetch
-from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    extend_schema,
-    extend_schema_view,
-)
-from rest_framework.decorators import api_view, permission_classes
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
-    ActionConfig,
     SerializersConfig,
     create_schema_view_config,
     crud_config,
 )
 from page_config.legal_guard import NOT_DELETABLE, is_legal_page
-from page_config.localization import LOCALE_PARAM, requested_locale
-from page_config.models import (
-    ContentPage,
-    NavigationMenu,
-    PageLayout,
-    PageSection,
-)
+from page_config.models import ContentPage
 from page_config.serializers import (
     ContentPageDetailSerializer,
     ContentPageSerializer,
     ContentPageWriteSerializer,
-    NavigationMenuSerializer,
-    PageLayoutAdminDetailSerializer,
-    PageLayoutAdminSerializer,
-    PageLayoutSerializer,
-    PublishedPageLayoutSerializer,
 )
 from tenant.membership import is_store_staff
-
-# `@extend_schema` over `@api_view` is drf-spectacular's own documented
-# pattern (see its FAQ). The suppressions on the decorators below are a ty
-# limitation, not a defect here: `djangorestframework-stubs` declares
-# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
-# annotated with the class's own TypeVar — and ty will not resolve that
-# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
-# Reduced to 25 lines with no Django involved: the same Protocol with a
-# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
-# Upstream master still declares it the same way, so a stubs bump does
-# not help. Suppressed per line rather than per file so real
-# argument-type errors in these modules are still reported.
-_LOCALE_PARAMETER = OpenApiParameter(
-    name=LOCALE_PARAM,
-    location=OpenApiParameter.QUERY,
-    required=False,
-    type=str,
-    description=(
-        "Language to answer operator-authored copy in. Section titles, "
-        "section props and navigation labels are JSON held per store, "
-        "not parler translations, so they are resolved here rather than "
-        "shipped per locale. A layout's SEO title, description and "
-        "keywords are resolved for it too, strictly: a locale with no "
-        "translation answers them empty. Unknown or omitted means the "
-        "store's default language."
-    ),
-)
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    responses=PageLayoutSerializer,
-    parameters=[_LOCALE_PARAMETER],
-    tags=["Page Config"],
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def public_page_config(request, page_type):
-    layout = get_object_or_404(
-        PageLayout.objects.published().prefetch_related(
-            "translations",
-            Prefetch(
-                "sections",
-                queryset=PageSection.objects.filter(is_visible=True).order_by(
-                    "sort_order"
-                ),
-            ),
-        ),
-        page_type=page_type,
-    )
-    serializer = PageLayoutSerializer(
-        layout, context={"locale": requested_locale(request)}
-    )
-    return Response(serializer.data)
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    responses={
-        200: {
-            "type": "object",
-            "additionalProperties": {"type": "array", "items": {}},
-            "description": "Navigation items keyed by slot "
-            "(header/footer/mobile). Missing slots mean 'use the "
-            "storefront's built-in menu'.",
-        }
-    },
-    parameters=[_LOCALE_PARAMETER],
-    tags=["Page Config"],
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def public_navigation(request):
-    """All configured navigation menus for the current tenant, keyed by
-    slot. Slots without a row are OMITTED — the storefront renders its
-    code-level menus for those, so an unconfigured tenant keeps the
-    platform chrome untouched.
-
-    A slot whose ``i18n`` has no entry for the requested locale answers
-    with its default-locale menu, so a partially translated store keeps
-    a working header rather than losing one."""
-    locale = requested_locale(request)
-    menus = {}
-    for menu in NavigationMenu.objects.with_entries():
-        items = menu.localized(locale)
-        if items:
-            menus[menu.slot] = items
-    return Response(menus)
-
-
-@extend_schema(  # ty: ignore[invalid-argument-type]
-    responses=PublishedPageLayoutSerializer(many=True),
-    tags=["Page Config"],
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def public_published_layouts(request):
-    """Every layout this store has published, with when its page last
-    changed.
-
-    One read for what used to take one request per page type: the
-    storefront's sitemap lists the store's custom pages from it, and
-    gates the static routes that answer 404 until their layout is
-    published. Which page type a static route renders, and so which
-    layouts are custom pages, is the storefront's routing and stays
-    there."""
-    layouts = (
-        PageLayout.objects.published()
-        .with_last_modified()
-        .order_by("page_type")
-    )
-    return Response(PublishedPageLayoutSerializer(layouts, many=True).data)
-
-
-class NavigationMenuAdminViewSet(BaseModelViewSet):
-    queryset = NavigationMenu.objects.all()
-    # Role-derived — same rationale as PageLayoutAdminViewSet below.
-    permission_classes = [StoreStaffModelPermissions]
-    # One entry per ACTION. ``BaseModelViewSet.get_serializer_class``
-    # looks the current action up by name (core/api/views.py) — there is
-    # no "default" key anywhere in the codebase, so every one of these
-    # six routes raised ImproperlyConfigured and 500'd, and schema
-    # generation emitted an error per action instead of a request body.
-    # Nothing consumes them yet, which is why it went unnoticed.
-    serializers_config = {
-        "list": ActionConfig(response=NavigationMenuSerializer),
-        "retrieve": ActionConfig(response=NavigationMenuSerializer),
-        "create": ActionConfig(
-            request=NavigationMenuSerializer,
-            response=NavigationMenuSerializer,
-        ),
-        "update": ActionConfig(
-            request=NavigationMenuSerializer,
-            response=NavigationMenuSerializer,
-        ),
-        "partial_update": ActionConfig(
-            request=NavigationMenuSerializer,
-            response=NavigationMenuSerializer,
-        ),
-        "destroy": ActionConfig(response=NavigationMenuSerializer),
-    }
-
-
-class PageLayoutAdminViewSet(BaseModelViewSet):
-    queryset = PageLayout.objects.prefetch_related("translations", "sections")
-    # A platform-staff user must not be
-    # able to mutate ANOTHER tenant's layout. The original fix paired
-    # ``IsAdminUser`` with ``HasTenantAccess``, which was unsound on an
-    # API request (the membership lookup compared primary keys ACROSS
-    # schemas — see docs/api-staff-identity.md); the interim fix locked
-    # these routes to platform superusers.
-    #
-    # ``StoreStaffModelPermissions`` is the end state: the permission
-    # set is derived from the caller's ROLE in the tenant currently on
-    # the connection, so an OWNER of store A holds nothing when the
-    # request arrives on store B's host — H22 by construction, and
-    # is_staff is not the gate at all.
-    permission_classes = [StoreStaffModelPermissions]
-    serializers_config = {
-        "list": ActionConfig(response=PageLayoutAdminDetailSerializer),
-        "retrieve": ActionConfig(response=PageLayoutAdminDetailSerializer),
-        "create": ActionConfig(
-            request=PageLayoutAdminSerializer,
-            response=PageLayoutAdminDetailSerializer,
-        ),
-        "update": ActionConfig(
-            request=PageLayoutAdminSerializer,
-            response=PageLayoutAdminDetailSerializer,
-        ),
-        "partial_update": ActionConfig(
-            request=PageLayoutAdminSerializer,
-            response=PageLayoutAdminDetailSerializer,
-        ),
-        "destroy": ActionConfig(response=PageLayoutAdminDetailSerializer),
-    }
-
 
 content_page_serializers_config: SerializersConfig = crud_config(
     list=ContentPageSerializer,

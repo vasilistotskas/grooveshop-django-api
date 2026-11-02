@@ -111,5 +111,5 @@ def test_presentation_kwargs_are_left_to_each_action():
 def test_the_mixin_describes_no_operation():
     """drf-spectacular describes an operation with the first docstring in
     the view's MRO, so one on this mixin became the public description of
-    every hand-wired viewset without its own (``page-config/admin``)."""
+    every hand-wired viewset without its own."""
     assert RouterActionOverridesMixin.__doc__ is None

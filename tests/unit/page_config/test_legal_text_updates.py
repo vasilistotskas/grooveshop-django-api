@@ -19,7 +19,7 @@ from django.test import RequestFactory, TestCase
 from admin.dashboard.store.widgets import StoreAlerts
 from core.utils.sanitize import sanitize_html
 from page_config.admin import ContentPageAdmin
-from page_config.defaults import pending_legal_reviews, seed_content_pages
+from page_config.content_pages import pending_legal_reviews, seed_content_pages
 from page_config.legal_documents import (
     LEGAL_DOCUMENT_SLUGS,
     LEGAL_DOCUMENTS,

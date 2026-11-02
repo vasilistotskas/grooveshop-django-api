@@ -231,7 +231,7 @@ class TestHealthProbeBypass:
 
 
 @pytest.mark.django_db
-def test_page_layout_admin_refuses_the_owner_of_another_store(bind_tenant):
+def test_builder_admin_refuses_the_owner_of_another_store(bind_tenant):
     """H22: permissions derive from the caller's ROLE in the tenant on
     the connection (``StoreStaffModelPermissions`` →
     ``TenantRolePermissionBackend``), never from ``is_staff``. See
@@ -244,9 +244,9 @@ def test_page_layout_admin_refuses_the_owner_of_another_store(bind_tenant):
     )
 
     bind_tenant(store_a)
-    assert client.get("/api/v1/page-config/admin").status_code == 200
+    assert client.get("/api/v1/builder/documents").status_code == 200
     bind_tenant(store_b)
-    assert client.get("/api/v1/page-config/admin").status_code == 403
+    assert client.get("/api/v1/builder/documents").status_code == 403
 
 
 # ---------------------------------------------------------------------------

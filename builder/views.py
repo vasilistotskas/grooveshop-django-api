@@ -34,6 +34,7 @@ from builder.errors import (
     NotFoundError,
     PreconditionRequired,
 )
+from builder.localization import LOCALE_PARAM, requested_locale
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
@@ -60,7 +61,6 @@ from builder.serializers import (
 )
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
-from page_config.localization import LOCALE_PARAM, requested_locale
 
 TAGS = ["Builder"]
 ERRORS = {

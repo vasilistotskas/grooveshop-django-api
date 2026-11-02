@@ -39,7 +39,7 @@ def _run_clean(tenant: Tenant, coverage: dict[str, set[str]]) -> None:
         mock.patch("django_tenants.utils.schema_exists", return_value=True),
         mock.patch("django_tenants.utils.tenant_context"),
         mock.patch(
-            "page_config.defaults.legal_translation_coverage",
+            "page_config.content_pages.legal_translation_coverage",
             return_value=coverage,
         ),
     ):
@@ -122,7 +122,7 @@ class TestLegalDocumentGuard:
                 "django_tenants.utils.schema_exists", return_value=False
             ),
             mock.patch(
-                "page_config.defaults.legal_translation_coverage"
+                "page_config.content_pages.legal_translation_coverage"
             ) as reader,
         ):
             tenant._validate_legal_documents_for_new_locales()
@@ -139,7 +139,7 @@ class TestLegalDocumentGuard:
             mock.patch("django_tenants.utils.schema_exists", return_value=True),
             mock.patch("django_tenants.utils.tenant_context"),
             mock.patch(
-                "page_config.defaults.legal_translation_coverage",
+                "page_config.content_pages.legal_translation_coverage",
                 return_value=GREEK_ONLY,
             ),
             pytest.raises(ValidationError) as excinfo,
@@ -152,7 +152,7 @@ class TestLegalDocumentGuard:
         self, tenant: Tenant
     ) -> None:
         with mock.patch(
-            "page_config.defaults.legal_translation_coverage"
+            "page_config.content_pages.legal_translation_coverage"
         ) as reader:
             tenant._validate_legal_documents_for_new_locales()
 

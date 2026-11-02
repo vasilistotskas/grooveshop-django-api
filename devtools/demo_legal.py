@@ -200,7 +200,7 @@ def seed_english_legal_documents() -> dict[str, int]:
     """
     from django.conf import settings
 
-    from page_config.defaults import tenant_document_context
+    from page_config.content_pages import tenant_document_context
     from page_config.legal_documents import (
         LEGAL_TEXT_REVISION,
         render_legal_document,

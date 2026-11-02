@@ -22,7 +22,7 @@ class Command(BaseCommand):
     help = "List legal pages that still lack a platform legal-text update."
 
     def handle(self, *args, **options):
-        from page_config.defaults import pending_legal_reviews
+        from page_config.content_pages import pending_legal_reviews
 
         schemas = (
             Tenant.objects.exclude(schema_name=get_public_schema_name())

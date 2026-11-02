@@ -455,7 +455,9 @@ changes for a visitor until the storefront switch.
    empty in the backend's shell, since an absent key would let a raw link
    through unindexed.
 2. **Pre-check, on that environment's data.**
-   `builder_import_legacy --all-tenants --dry-run --json`. Every store must
+   `builder_import_legacy --all-tenants --dry-run --json`. (On a store that
+   already has builder data the import refuses first, so a RE-import is checked
+   by resetting and dry-run importing in one transaction that is rolled back.) Every store must
    show `problems: []` and `applied: false`. Read each `warnings` entry
    (`dropped_title` is expected, anything else is a decision). A store
    reporting `already_imported` has builder data already: stop and look at it.
@@ -470,6 +472,18 @@ changes for a visitor until the storefront switch.
    `?locale=en` answer 200 with the layout's sections, and the English
    overlay is there where the legacy layout had English text. A second
    `--dry-run` answers `already_imported` for every store.
+   **Links.** Every link setting of a released document (the catalogue's
+   `linkRefs` pointers) is `{ref}`, `{route}` or `{href}`, never a bare string,
+   and each `{ref}` has its `BuilderReference` row at the link's own pointer
+   (a product link is `kind=product`, a page or content-page link `page` or
+   `contentPage`). Through the storefront, the page renders the target's
+   current path: a product link is `/products/<id>/<slug>`. A dangling link
+   would have stopped the dry run with `reference_not_found`.
+   **Caches.** An import or a reset moves the cache generation and purges the
+   `builder` surface after commit, like a publish; look for
+   `Cache auto-invalidated surfaces=['builder'] ... failed=[]` per store in the
+   worker's log. A reset also drops the cached reads of the deleted release,
+   because release numbers restart at 1.
 5. **Rollback, before the storefront reads the builder.**
    `builder_reset --tenant <schema>` reports what it would delete;
    `--confirm` deletes it (documents, versions, the release, the reference

@@ -33,6 +33,50 @@ def _schema(**properties: Any) -> dict[str, Any]:
 
 TEXT = {"type": "string", "maxLength": 100}
 
+#: The storefront's link union: an external address, a fixed route, or a
+#: reference whose kind is in the data.
+LINK = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {"href": {"type": "string", "maxLength": 1000}},
+            "required": ["href"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {"route": {"enum": ["/", "/products", "/offers"]}},
+            "required": ["route"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {
+                "ref": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "enum": [
+                                "product",
+                                "category",
+                                "blogCategory",
+                                "blogPost",
+                                "page",
+                                "contentPage",
+                            ]
+                        },
+                        "id": {"type": ["integer", "string"]},
+                    },
+                    "required": ["kind", "id"],
+                    "additionalProperties": False,
+                }
+            },
+            "required": ["ref"],
+            "additionalProperties": False,
+        },
+    ]
+}
+
 
 def default_blocks() -> list[dict[str, Any]]:
     return [
@@ -49,6 +93,12 @@ def default_blocks() -> list[dict[str, Any]]:
                 contentSlug={"type": "string"},
                 mediaId={"type": "integer"},
                 blogCategoryId={"type": "integer"},
+                link=LINK,
+                cards={
+                    "type": "array",
+                    "items": _schema(link=LINK),
+                    "maxItems": 5,
+                },
                 bullets={
                     "type": "array",
                     "items": {"type": "string", "maxLength": 20},
@@ -64,6 +114,7 @@ def default_blocks() -> list[dict[str, Any]]:
                 "/mediaId": "media",
                 "/blogCategoryId": "blogCategory",
             },
+            "links": ["/link", "/cards/*/link"],
             "limits": {"maxBlocks": 3},
             "children": {"allowed": ["slide"], "maxDepth": 1},
             "kinds": ["section"],

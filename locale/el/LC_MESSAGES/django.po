@@ -338,6 +338,10 @@ msgid "%(kind)s %(target)s does not exist in this store."
 msgstr "Το στοιχείο %(kind)s %(target)s δεν υπάρχει σε αυτό το κατάστημα."
 
 #, python-format
+msgid "%(kind)s must be at most %(limit)s positive ids."
+msgstr "Το %(kind)s δέχεται το πολύ %(limit)s θετικά αναγνωριστικά."
+
+#, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
 msgstr "%(kind)s — %(recipient)s — προϊόν %(product)s"
 
@@ -2084,6 +2088,9 @@ msgstr "Επισήμανση σχολίου blog"
 
 msgid "Blog comments to approve"
 msgstr "Σχόλια blog προς έγκριση"
+
+msgid "Blog post"
+msgstr "Άρθρο ιστολογίου"
 
 msgid "Blog post list/detail, related posts, comments, categories, tags, and authors."
 msgstr "Λίστα/λεπτομέρειες άρθρων, σχετικά άρθρα, σχόλια, κατηγορίες, ετικέτες και συντάκτες."
@@ -8975,6 +8982,9 @@ msgstr "Δεν είναι έγκυρο κλειδί εγγράφου."
 msgid "Not a valid id."
 msgstr "Δεν είναι έγκυρο αναγνωριστικό."
 
+msgid "Not a valid reference."
+msgstr "Δεν είναι έγκυρη αναφορά."
+
 #, python-format
 msgid "Not an email type you can choose: %(keys)s."
 msgstr "Δεν είναι τύπος email που μπορείτε να επιλέξετε: %(keys)s."
@@ -14047,6 +14057,9 @@ msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πλήρω�
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "Το αναγνωριστικό που επέστρεψε ο πάροχος. Κενό μέσω SMTP, που δεν επιστρέφει κάποιο."
+
+msgid "The ids to resolve are not valid."
+msgstr "Τα αναγνωριστικά προς επίλυση δεν είναι έγκυρα."
 
 #, python-format
 msgid "The image has more than %(limit)s megapixels."

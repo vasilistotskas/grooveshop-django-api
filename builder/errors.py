@@ -62,6 +62,11 @@ class PreconditionRequired(BuilderError):
     default_detail = _("Send the revision you are changing in If-Match.")
 
 
+class InvalidLinkTargets(BuilderError):
+    default_code = "invalid_link_targets"
+    default_detail = _("The ids to resolve are not valid.")
+
+
 class NotFoundError(BuilderError):
     status_code = status.HTTP_404_NOT_FOUND
     default_code = "not_found"

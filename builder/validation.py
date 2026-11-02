@@ -184,6 +184,26 @@ def _collect_references(
                 )
                 continue
             walk.refs.append((kind, str(value), where))
+    for pattern in definition.links:
+        for path, value in pointers.walk(settings_, pointers.parse(pattern)):
+            # ``href`` and ``route`` point at nothing of ours (the
+            # catalogue's schema holds them to https or a fixed route).
+            if not isinstance(value, dict) or "ref" not in value:
+                continue
+            where = f"{base}{pointers.format_path(path)}"
+            target = value["ref"]
+            kind = target.get("kind") if isinstance(target, dict) else None
+            ident = target.get("id") if isinstance(target, dict) else None
+            if not (
+                isinstance(kind, str) and references.accepts_value(kind, ident)
+            ):
+                walk.add(
+                    where,
+                    "invalid_reference",
+                    _("Not a valid reference."),
+                )
+                continue
+            walk.refs.append((kind, str(ident), where))
 
 
 def _check_node(

@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
+from djangorestframework_camel_case.util import camel_to_underscore
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -25,9 +27,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from builder import published, scheduling, services
+from builder import published, references, scheduling, services
 from builder.errors import (
     BuilderError,
+    InvalidLinkTargets,
     NotFoundError,
     PreconditionRequired,
 )
@@ -37,6 +40,7 @@ from builder.models import (
     BuilderScheduledPublish,
     BuilderVersion,
     DocumentKind,
+    ReferenceKind,
     ScheduleStatus,
 )
 from builder.rendering import BuilderJSONParser, BuilderJSONRenderer
@@ -467,6 +471,76 @@ class PublishedIndexView(APIView):
     )
     def get(self, request: Request) -> Response:
         return Response(published.published_index(requested_locale(request)))
+
+
+def _parse_ids(raw: str) -> set[int] | None:
+    """The positive ids of a comma-separated list, or ``None`` when it has
+    something else in it or more ids than a call may resolve."""
+    try:
+        ids = {int(part) for part in raw.split(",") if part}
+    except ValueError:
+        return None
+    if len(ids) > settings.BUILDER_LINK_TARGETS_MAX_IDS or not all(
+        0 < pk <= references.MAX_ID for pk in ids
+    ):
+        return None
+    return ids
+
+
+class LinkTargetsView(APIView):
+    """The slug of each product, category, post and blog category a link
+    points at, for the storefront to build the path."""
+
+    renderer_classes = [BuilderJSONRenderer]
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[
+            OpenApiParameter(
+                name=kind.value,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+                description=(
+                    f"Comma-separated {kind.label.lower()} ids to resolve "
+                    "(at most `BUILDER_LINK_TARGETS_MAX_IDS`)."
+                ),
+            )
+            for kind in references.LINK_TARGET_KINDS
+        ],
+        responses={200: dict, 400: OpenApiResponse(ErrorResponseSerializer)},
+        description=(
+            "`{kind: {id: slug}}` for the kinds asked about. An id that is "
+            "missing, inactive or unpublished is absent, by the rules a "
+            "publish checks references with. Slugs are the same in every "
+            "language. Reads no draft and never calls the storefront."
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response(references.link_targets(self._ids(request)))
+
+    @staticmethod
+    def _ids(request: Request) -> dict[ReferenceKind, set[int]]:
+        ids: dict[ReferenceKind, set[int]] = {}
+        for kind in references.LINK_TARGET_KINDS:
+            # The camel-case middleware has already underscored the query
+            # keys: a client's ``blogPost`` arrives as ``blog_post``.
+            raw = request.query_params.get(camel_to_underscore(kind.value))
+            if raw is None:
+                continue
+            wanted = _parse_ids(raw)
+            if wanted is None:
+                raise InvalidLinkTargets(
+                    _("%(kind)s must be at most %(limit)s positive ids.")
+                    % {
+                        "kind": kind.value,
+                        "limit": settings.BUILDER_LINK_TARGETS_MAX_IDS,
+                    },
+                    param=kind.value,
+                )
+            ids[kind] = wanted
+        return ids
 
 
 class PublishedPageView(APIView):

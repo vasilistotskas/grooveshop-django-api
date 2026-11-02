@@ -89,7 +89,9 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `limits` (`maxBlocks`, `maxPerTemplate`), `children` (`allowed`,
 `maxDepth`), `kinds` (`section`, `block`), optional `groups`, `templates`,
 `feature` and `deprecated`. A setting whose schema says
-`contentMediaType: "text/html"` is rich text.
+`contentMediaType: "text/html"` is rich text. `links` (optional, same pointer
+syntax) names the link settings, see "References, not copies"; a pointer
+cannot be in both `links` and `translatable`.
 
 ## What a save checks
 
@@ -148,11 +150,24 @@ Settings the catalogue marks as `refs` hold ids: `product` and `category`
 (active, numeric id), `page` (a page key: the store's `page:<key>` document or the
 `template:<key>` of a fixed page type, draft or released), `contentPage` (a
 ContentPage slug, in any state), `blogCategory` (a blog category id), `menu`
-(a navigation slot), `media` (a `MediaAsset` id). A draft may point at something
+(a navigation slot), `media` (a `MediaAsset` id), `blogPost` (a published post's
+id). A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a
 thing is used.
+
+**Links.** A setting listed in the block's `links` holds one of `{href}` (an
+external address), `{route}` (a fixed route) or `{ref: {kind, id}}`, and the
+catalogue's schema checks the first two. Only `{ref}` points at something of
+ours, and its kind is in the data, so a static `refs` entry cannot carry it:
+for each `{ref}` found at a `links` pointer, validation checks `id` has the
+shape of `kind` (an unknown kind is `invalid_reference`) and records
+`(kind, id, the link's own pointer)` with the other references. The version's
+`refs`, the `BuilderReference` index, the publish check (`reference_not_found`)
+and "where is it used" then treat it like any other reference. A link is not
+translatable: it resolves to the path of the viewer's language, so an overlay
+value on it is `untranslatable_setting`.
 
 ## Writes
 
@@ -220,6 +235,17 @@ A store with no release answers `{release: 0, theme: null, groups: {}, pages:
 []}`, not 404. Cached under `builder:<schema>:r<release>:chrome:<locale>`,
 immutable per release; the `builder` surface purges the storefront's
 `builderPage` and `builderChrome` handlers.
+
+`GET link-targets?product=1,2&category=3&blogPost=4&blogCategory=5`
+(AllowAny) is what the storefront resolves link references with:
+`{kind: {id: slug}}` for the kinds asked about, one query per kind. An id
+that is missing, inactive or unpublished is absent (the rules a publish
+checks references with: active product and category, published post, any
+blog category). Slugs are the same in every language. At most
+`BUILDER_LINK_TARGETS_MAX_IDS` ids per kind; an id that is not a positive
+integer, or too many, is `400 invalid_link_targets` naming the `param`. The
+query keys are camelCase on the wire (the camel-case middleware underscores
+them before the view reads them).
 
 ## The media library
 

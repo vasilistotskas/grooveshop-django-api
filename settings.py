@@ -935,6 +935,10 @@ BUILDER_MAX_SECTIONS_PER_DOCUMENT = int(
     getenv("BUILDER_MAX_SECTIONS_PER_DOCUMENT", "40")
 )
 BUILDER_MAX_BLOCKS_PER_NODE = int(getenv("BUILDER_MAX_BLOCKS_PER_NODE", "50"))
+# Ids a single ``builder/link-targets`` call resolves, per kind.
+BUILDER_LINK_TARGETS_MAX_IDS = int(
+    getenv("BUILDER_LINK_TARGETS_MAX_IDS", "100")
+)
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(

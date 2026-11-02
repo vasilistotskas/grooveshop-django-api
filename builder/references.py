@@ -32,23 +32,27 @@ from builder.models import (
 Refs = dict[str, dict[str, list[str]]]
 
 
-_MAX_ID = 2**63 - 1  # a bigint primary key
+MAX_ID = 2**63 - 1  # a bigint primary key
 _MAX_NAME = 64  # a page slug or a menu slot, as ``BuilderReference.target``
 
 
 def accepts_value(kind: str, value: Any) -> bool:
     """Whether ``value`` has the shape of a ``kind`` reference: a numeric
-    id for products, categories, blog categories and media; a non-empty name otherwise."""
+    id for products, categories, blog posts and categories and media; a
+    non-empty name otherwise. ``False`` for a kind that is not one."""
+    if kind not in ReferenceKind.values:
+        return False
     if kind in {
         ReferenceKind.PRODUCT,
         ReferenceKind.CATEGORY,
         ReferenceKind.BLOG_CATEGORY,
+        ReferenceKind.BLOG_POST,
         ReferenceKind.MEDIA,
     }:
         return (
             isinstance(value, int)
             and not isinstance(value, bool)
-            and 0 < value <= _MAX_ID
+            and 0 < value <= MAX_ID
         )
     return isinstance(value, str) and 0 < len(value) <= _MAX_NAME
 
@@ -83,6 +87,18 @@ def _existing_blog_categories(targets: set[str]) -> set[str]:
         for pk in BlogCategory.objects.filter(
             pk__in=[int(t) for t in targets]
         ).values_list("pk", flat=True)
+    }
+
+
+def _existing_blog_posts(targets: set[str]) -> set[str]:
+    """A post the public blog shows: published, not scheduled for later."""
+    from blog.models.post import BlogPost
+
+    return {
+        str(pk)
+        for pk in BlogPost.objects.published()
+        .filter(pk__in=[int(t) for t in targets])
+        .values_list("pk", flat=True)
     }
 
 
@@ -144,6 +160,7 @@ _EXISTS: dict[str, Callable[[set[str]], set[str]]] = {
     ReferenceKind.PRODUCT: _existing_products,
     ReferenceKind.CATEGORY: _existing_categories,
     ReferenceKind.BLOG_CATEGORY: _existing_blog_categories,
+    ReferenceKind.BLOG_POST: _existing_blog_posts,
     ReferenceKind.PAGE: _existing_pages,
     ReferenceKind.CONTENT_PAGE: _existing_content_pages,
     ReferenceKind.MENU: _existing_menus,
@@ -198,3 +215,44 @@ def used_by(kind: str, target: str | int) -> list[str]:
             ).values_list("document", flat=True)
         )
     )
+
+
+#: The kinds whose links the storefront turns into a path, and what names
+#: that path: a product's, category's, post's and blog category's slug.
+LINK_TARGET_KINDS = (
+    ReferenceKind.PRODUCT,
+    ReferenceKind.CATEGORY,
+    ReferenceKind.BLOG_POST,
+    ReferenceKind.BLOG_CATEGORY,
+)
+
+
+def link_targets(
+    ids: dict[ReferenceKind, set[int]],
+) -> dict[ReferenceKind, dict[str, str]]:
+    """``{kind: {id: slug}}`` for the ids that exist and are visible: the
+    same rule as the existence checks above, so what a publish accepted
+    resolves here. An id that is missing, inactive or unpublished is
+    absent. One query per kind asked about."""
+    from blog.models.category import BlogCategory
+    from blog.models.post import BlogPost
+    from product.models.category import ProductCategory
+    from product.models.product import Product
+
+    querysets = {
+        ReferenceKind.PRODUCT: lambda: Product.objects.active(),
+        ReferenceKind.CATEGORY: lambda: ProductCategory.objects.filter(
+            active=True
+        ),
+        ReferenceKind.BLOG_POST: lambda: BlogPost.objects.published(),
+        ReferenceKind.BLOG_CATEGORY: lambda: BlogCategory.objects.all(),
+    }
+    return {
+        kind: {
+            str(pk): slug
+            for pk, slug in querysets[kind]()
+            .filter(pk__in=wanted)
+            .values_list("pk", "slug")
+        }
+        for kind, wanted in ids.items()
+    }

@@ -3739,6 +3739,33 @@ UNFOLD_PLATFORM = {
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
+                    # The platform's own mail (billing notices, staff
+                    # password reset, health and backup alerts): what it
+                    # sent and what failed, its log and suppression list.
+                    {
+                        "title": _("Emails"),
+                        "icon": "mail",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emailswitch_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Email log"),
+                        "icon": "history",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emaillog_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Suppression list"),
+                        "icon": "block",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emailsuppression_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
                 ],
             },
             # The Celery beat schedule and the task-result tables live in

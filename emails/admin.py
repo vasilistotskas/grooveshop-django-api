@@ -24,6 +24,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import connection
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -32,6 +33,7 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import get_language, gettext
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
+from django_tenants.utils import get_public_schema_name
 from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
@@ -123,6 +125,16 @@ class EmailPageForm(forms.Form):
         widget=UnfoldAdminSelectWidget,
     )
 
+    def __init__(self, *args, platform: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if platform:
+            # The platform's emails are all required and ungated: none is
+            # "off", and nothing is switched.
+            self.fields["status"].choices = [
+                ("", _("All emails")),
+                (switches.Condition.FAILING, _("Failing")),
+            ]
+
 
 class HashedAddressSearch:
     """Search by an exact address, hashed here and matched on the hash. Any
@@ -142,6 +154,16 @@ class HashedAddressSearch:
 class EmailSwitchAdmin(BaseModelAdmin):
     # The page replaces the changelist; nothing of ModelAdmin's list is used.
     list_display = ("type_key",)
+    #: Whose emails the page lists. ``PlatformEmailSwitchAdmin`` is the
+    #: platform's.
+    owner = Owner.STORE
+    #: The sentence under the page's title.
+    intro = _(
+        "Every email your store sends. Switch one off and your store stops "
+        "sending it, and only that one. Emails that a customer or the law "
+        "needs, such as an order confirmation or a password reset, cannot be "
+        "switched off."
+    )
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
@@ -183,10 +205,15 @@ class EmailSwitchAdmin(BaseModelAdmin):
             *super().get_urls(),
         ]
 
-    def _url(self, name: str) -> str:
-        return reverse(
-            f"admin:{self.opts.app_label}_{self.opts.model_name}_{name}"
+    def _url(self, name: str, *args) -> str:
+        return self._reverse(
+            f"{self.opts.app_label}_{self.opts.model_name}_{name}", *args
         )
+
+    def _reverse(self, name: str, *args) -> str:
+        """*name* on the site that serves this admin: ``admin`` for a store,
+        ``platform_admin`` for the control plane."""
+        return reverse(f"{self.admin_site.name}:{name}", args=args)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         return redirect(self._url("changelist"))
@@ -197,11 +224,11 @@ class EmailSwitchAdmin(BaseModelAdmin):
         """The pages beside this one, for those who may open them."""
         user = request.user
         return {
-            "log_url": reverse("admin:emails_emaillog_changelist")
+            "log_url": self._reverse("emails_emaillog_changelist")
             if user.has_perm("emails.view_emaillog")
             else None,
-            "suppressions_url": reverse(
-                "admin:emails_emailsuppression_changelist"
+            "suppressions_url": self._reverse(
+                "emails_emailsuppression_changelist"
             )
             if user.has_perm("emails.view_emailsuppression")
             else None,
@@ -210,17 +237,19 @@ class EmailSwitchAdmin(BaseModelAdmin):
     def changelist_view(self, request, extra_context=None):
         if not self.has_view_permission(request):
             raise PermissionDenied
-        form = EmailPageForm(request.GET)
+        platform = self.owner is Owner.PLATFORM
+        form = EmailPageForm(request.GET, platform=platform)
         data = form.cleaned_data if form.is_valid() else {}
         tab = data.get("tab") or switches.CUSTOMERS
         # The tab is chosen by a link, so the form's own value is the one
         # the link carries.
         form = EmailPageForm(
+            platform=platform,
             initial={
                 "tab": tab,
                 "q": data.get("q", ""),
                 "status": data.get("status", ""),
-            }
+            },
         )
         query = {
             key: value
@@ -237,10 +266,15 @@ class EmailSwitchAdmin(BaseModelAdmin):
             {
                 **self.admin_site.each_context(request),
                 "title": _("Emails"),
+                "intro": self.intro,
                 "opts": self.opts,
                 "form": form,
                 "tab": tab,
-                "tabs": [
+                # A store's page has two audiences; the platform's groups
+                # its emails by audience instead.
+                "tabs": []
+                if platform
+                else [
                     {
                         "label": label,
                         "active": key == tab,
@@ -255,6 +289,7 @@ class EmailSwitchAdmin(BaseModelAdmin):
                 "groups": [
                     (group, [self._row(request, row) for row in group.rows])
                     for group in switches.switch_groups(
+                        owner=self.owner,
                         tab=tab,
                         query=data.get("q", ""),
                         condition=data.get("status", ""),
@@ -288,12 +323,11 @@ class EmailSwitchAdmin(BaseModelAdmin):
             "last_sent": relative_time(row.figures.last_sent_at)
             if row.figures.last_sent_at
             else "",
-            "page_url": reverse(
-                f"admin:{self.opts.app_label}_{self.opts.model_name}_type",
-                args=[key],
-            ),
+            "page_url": self._url("type", key),
+            "toggle_url": self._url("toggle"),
+            "test_send_url": self._url("test_send"),
             "failing_url": (
-                reverse("admin:emails_emaillog_changelist")
+                self._reverse("emails_emaillog_changelist")
                 + "?"
                 + self._query({"type_key": key, "failing": "30"})
             )
@@ -304,12 +338,20 @@ class EmailSwitchAdmin(BaseModelAdmin):
 
     # ------------------------------------------------------------ one email
 
+    def _may_pick_orders(self, request: HttpRequest) -> bool:
+        """A store's viewer with the order permission may preview or test
+        with a real order; the platform has no orders (they live in the
+        stores' schemas), whoever asks."""
+        return self.owner is Owner.STORE and request.user.has_perm(
+            ORDER_PERMISSION
+        )
+
     def _type_or_404(self, key: str) -> EmailType:
         try:
             email_type = registry.get(key)
         except UnknownEmailType:
             raise Http404 from None
-        if email_type.owner is not Owner.STORE:
+        if email_type.owner is not self.owner:
             raise Http404
         return email_type
 
@@ -328,10 +370,10 @@ class EmailSwitchAdmin(BaseModelAdmin):
                 figures=figures.type_figures.get().get(key),
             ),
         )
-        may_see_orders = request.user.has_perm(ORDER_PERMISSION)
         form = EmailPreviewForm(
             initial={"type_key": key, "language": get_language()},
-            with_orders=may_see_orders,
+            owner=self.owner,
+            with_orders=self._may_pick_orders(request),
         )
         recent = EmailLog.objects.filter(type_key=key).prefetch_related(
             "events"
@@ -346,6 +388,7 @@ class EmailSwitchAdmin(BaseModelAdmin):
                 "email_type": email_type,
                 "item": row,
                 "form": form,
+                "preview_render_url": self._url("preview_render"),
                 "back_url": self._url("changelist"),
                 "table": self._recent_table(recent),
                 "can_test": row["can_test"],
@@ -398,7 +441,8 @@ class EmailSwitchAdmin(BaseModelAdmin):
             raise PermissionDenied
         form = EmailPreviewForm(
             request.POST,
-            with_orders=request.user.has_perm(ORDER_PERMISSION),
+            owner=self.owner,
+            with_orders=self._may_pick_orders(request),
         )
         if not form.is_valid():
             return TemplateResponse(
@@ -440,13 +484,10 @@ class EmailSwitchAdmin(BaseModelAdmin):
         order = request.POST.get("order", "")
         order_id = (
             int(order)
-            if order.isdigit() and request.user.has_perm(ORDER_PERMISSION)
+            if order.isdigit() and self._may_pick_orders(request)
             else None
         )
-        back = reverse(
-            f"admin:{self.opts.app_label}_{self.opts.model_name}_type",
-            args=[email_type.key],
-        )
+        back = self._url("type", email_type.key)
         try:
             testsend.send_test(
                 request.user,
@@ -529,7 +570,37 @@ class EmailSwitchAdmin(BaseModelAdmin):
         )
 
 
+class PlatformEmailSwitchAdmin(EmailSwitchAdmin):
+    """The control plane's emails page: the platform's own mail (billing
+    notices, the staff password reset, the health and backup alerts), sent
+    from ``public``. Every one is required, so there is nothing to switch
+    (the toggle answers 404 for them, as for any email of the other
+    owner), and there are no orders to preview or test with; the figures,
+    the preview, Send test, the log and the suppression list are the
+    store page's, over the ``public`` schema."""
+
+    owner = Owner.PLATFORM
+    intro = _(
+        "The emails the platform itself sends: billing notices to the "
+        "stores' owners, the staff password reset and the alerts to the "
+        "platform's operators. All of them are required, so none can be "
+        "switched off."
+    )
+
+    def toggle_view(self, request: HttpRequest) -> HttpResponse:
+        raise Http404
+
+
 # ------------------------------------------------------------------- the log
+
+
+def serving_owner() -> Owner:
+    """Whose emails the schema in use holds: the platform's in ``public``,
+    a store's in a store's schema. The log and the suppression list are one
+    admin class on both sites, so they ask here."""
+    if connection.schema_name == get_public_schema_name():
+        return Owner.PLATFORM
+    return Owner.STORE
 
 
 class EmailTypeFilter(DropdownFilter):
@@ -539,7 +610,7 @@ class EmailTypeFilter(DropdownFilter):
     def lookups(self, request, model_admin):
         return [
             (email_type.key, email_type.title)
-            for email_type in registry.types_for(Owner.STORE)
+            for email_type in registry.types_for(serving_owner())
         ]
 
     def queryset(self, request, queryset):

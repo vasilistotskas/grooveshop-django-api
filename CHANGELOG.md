@@ -3,6 +3,36 @@
 
 
 
+## v3.188.0 (2026-11-02)
+
+### Features
+
+* feat(emails): platform admin Emails page, log and suppression list (#418)
+
+The control plane gets the same Emails pages a store has, over the
+public schema: the Owner.PLATFORM types grouped by who receives them,
+the platform email log, the suppression list, a sidebar entry and a
+throttled Send test to the operator.
+
+- EmailSwitchAdmin takes an owner; PlatformEmailSwitchAdmin serves the
+  platform's types (all required, so the toggle answers 404) and a
+  store type's page is a 404 on the platform and the reverse.
+- Admin URLs are looked up on the serving admin site's name and the
+  templates take them from the view.
+- A platform email is about no order: the preview form drops the order
+  field and a posted order id is not read.
+- send_test runs under owner_schema, so a platform test is rendered and
+  logged in public whatever schema the request is in.
+- The cached figures key carries the schema, so the platform page and a
+  store's never share an answer (proved by test).
+- The platform dashboard flags the platform's own mail that failed in
+  the last 7 days.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0fff827`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fff827d5212e4b6c4770c6477174296d201d734))
+
 ## v3.187.0 (2026-11-02)
 
 ### Bug fixes

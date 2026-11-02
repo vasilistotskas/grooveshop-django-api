@@ -20,6 +20,13 @@ from emails.models import EmailSwitch
 from emails.registry import registry
 from emails.types import Audience, EmailType, Owner
 
+#: The groups of the platform's page, by who receives the email: the
+#: platform's types have no areas of their own (and no switch, being required).
+PLATFORM_AUDIENCE_TITLES: dict[Audience, StrOrPromise] = {
+    Audience.STORE_STAFF: _("To stores"),
+    Audience.PLATFORM_OPERATOR: _("To the platform's operators"),
+}
+
 #: The page's two tabs: what customers receive, and what the store's team
 #: receives. A type belongs to exactly one, by its audience.
 CUSTOMERS = "customers"
@@ -112,14 +119,16 @@ def _matches(row: SwitchRow, query: str, condition: str) -> bool:
 
 def switch_groups(
     *,
+    owner: Owner = Owner.STORE,
     tab: str | None = None,
     query: str = "",
     condition: str = "",
     figures: dict[str, TypeFigures] | None = None,
 ) -> list[SwitchGroup]:
-    """The store's email types by area, each with its state and figures.
+    """The *owner*'s email types, each with its state and figures: a
+    store's by area, the platform's by who receives them.
 
-    *tab* keeps one audience (``CUSTOMERS`` or ``TEAM``), *query* a text
+    *tab* (a store's page only) keeps one audience (``CUSTOMERS`` or ``TEAM``), *query* a text
     match on key, title and description, *condition* one :class:`Condition`;
     a group left with no row is dropped. Two queries at most, whatever the
     number of types: the switches and the (cached) figures.
@@ -128,9 +137,18 @@ def switch_groups(
     known = figures or {}
     audiences = TAB_AUDIENCES.get(tab or "")
     needle = query.strip().lower()
-    by_area: dict[str, list[SwitchRow]] = {area: [] for area in AREA_TITLES}
-    for email_type in registry.types_for(Owner.STORE):
-        if audiences is not None and email_type.audience not in audiences:
+    titles: dict[str, StrOrPromise] = (
+        AREA_TITLES
+        if owner is Owner.STORE
+        else {a.value: t for a, t in PLATFORM_AUDIENCE_TITLES.items()}
+    )
+    by_group: dict[str, list[SwitchRow]] = {key: [] for key in titles}
+    for email_type in registry.types_for(owner):
+        if (
+            owner is Owner.STORE
+            and audiences is not None
+            and email_type.audience not in audiences
+        ):
             continue
         row = row_for(
             email_type,
@@ -138,9 +156,14 @@ def switch_groups(
             figures=known.get(email_type.key),
         )
         if _matches(row, needle, condition):
-            by_area[email_type.area].append(row)
+            key = (
+                email_type.area
+                if owner is Owner.STORE
+                else email_type.audience.value
+            )
+            by_group[key].append(row)
     return [
-        SwitchGroup(area, AREA_TITLES[area], tuple(rows))
-        for area, rows in by_area.items()
+        SwitchGroup(key, titles[key], tuple(rows))
+        for key, rows in by_group.items()
         if rows
     ]

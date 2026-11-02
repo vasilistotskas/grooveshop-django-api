@@ -13590,6 +13590,9 @@ msgstr "Αυτός ο τύπος αρχείου δεν γίνεται δεκτό
 msgid "That release is already the current one."
 msgstr "Αυτή η δημοσίευση είναι ήδη η τρέχουσα."
 
+msgid "That version is already the published one."
+msgstr "Αυτή η έκδοση είναι ήδη η δημοσιευμένη."
+
 #, python-format
 msgid "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
 msgstr "Το API του %(carrier)s απέρριψε οριστικά την αποστολή για την παραγγελία #%(order_id)s."

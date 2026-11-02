@@ -66,6 +66,7 @@ from builder.serializers import (
     LinkLabelsResponseSerializer,
     LinkSearchResponseSerializer,
     LinkTargetsResponseSerializer,
+    PublishVersionWriteSerializer,
     PublishWriteSerializer,
     ReleaseSerializer,
     RescheduleSerializer,
@@ -323,6 +324,35 @@ class RestoreView(StaffView):
         )
         return _etagged(
             Response(DocumentDetailSerializer(document).data), document
+        )
+
+
+class PublishVersionView(StaffView):
+    queryset = BuilderRelease.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=PublishVersionWriteSerializer,
+        responses={201: ReleaseSerializer, **ERRORS},
+        description=(
+            "Release one stored version of ONE document: the previous "
+            "release with only that key repointed. The draft is left as "
+            "it is. Its references must still exist (`reference_not_found` "
+            "with the `document`); `nothing_to_publish` when it is already "
+            "the published version."
+        ),
+    )
+    def post(self, request: Request, key: str, number: int) -> Response:
+        body = PublishVersionWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        release = services.publish_version(
+            request.user,
+            key=key,
+            number=number,
+            note=body.validated_data["note"],
+        )
+        return Response(
+            ReleaseSerializer(release).data, status=status.HTTP_201_CREATED
         )
 
 

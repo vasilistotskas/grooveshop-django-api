@@ -144,6 +144,12 @@ class ReleaseSerializer(serializers.ModelSerializer):
         return staff_summary(obj.published_by_staff)
 
 
+class PublishVersionWriteSerializer(serializers.Serializer):
+    note = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+
 class PublishWriteSerializer(serializers.Serializer):
     documents = serializers.ListField(
         child=serializers.CharField(max_length=80), allow_empty=False

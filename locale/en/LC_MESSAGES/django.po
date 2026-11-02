@@ -13587,6 +13587,9 @@ msgstr "That file type is not accepted. Allowed: %(types)s."
 msgid "That release is already the current one."
 msgstr "That release is already the current one."
 
+msgid "That version is already the published one."
+msgstr "That version is already the published one."
+
 #, python-format
 msgid "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."
 msgstr "The %(carrier)s API permanently rejected the shipment for order #%(order_id)s."

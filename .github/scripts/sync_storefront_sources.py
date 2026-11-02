@@ -1,6 +1,6 @@
 """Keep the files this repository copies from the storefront in step with it.
 
-The storefront owns the page builder's blocks, so two things it produces
+The storefront owns the page builder's blocks, so three things it produces
 are COPIED here, and a copy can drift silently:
 
 * ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``tests/
@@ -10,6 +10,11 @@ are COPIED here, and a copy can drift silently:
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   others this one is application data, not a test input.
+* ``placement``: ``test/fixtures/builder/placement-cases.json`` -> ``tests/
+  fixtures/builder/placement-cases.json``, the cases both the editor's
+  placement filter (``shared/builder/placement.ts``) and ``builder.validation.
+  _placement_allowed`` are run over (``tests/unit/builder/test_placement_
+  parity.py``), so a change to one rule that the other lacks fails a suite.
 
 Each copy is pinned: ``tests/fixtures/builder/storefront.lock.json`` names the
 storefront commit and, per source, the git id of what it held there (the TREE
@@ -75,6 +80,12 @@ SOURCES: tuple[Source, ...] = (
         "test/fixtures/builder/seeds",
         "builder/seeds",
         "tree",
+    ),
+    Source(
+        "placement",
+        "test/fixtures/builder/placement-cases.json",
+        "tests/fixtures/builder/placement-cases.json",
+        "blob",
     ),
 )
 

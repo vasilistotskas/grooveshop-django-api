@@ -107,17 +107,19 @@ class TestGitHashes:
 
 class FakeGitHub:
     """The GitHub API reads the script makes, over an in-memory repository
-    holding one file (``catalogue``) and one directory (``seeds``), laid
-    out at the sources' upstream paths."""
+    holding two files (``catalogue``, ``placement``) and one directory
+    (``seeds``), laid out at the sources' upstream paths."""
 
     def __init__(
         self,
         *,
         seeds: dict[str, bytes],
         catalogue: bytes = b'{"hash": "h"}\n',
+        placement: bytes = b"[]\n",
     ) -> None:
         self.directories = {"seeds": seeds}
         self.catalogue = catalogue
+        self.placement = placement
         # Every tree this repository has: sha -> entries.
         self.trees: dict[str, list[dict]] = {}
         self.blobs: dict[str, bytes] = {}
@@ -151,6 +153,11 @@ class FakeGitHub:
                     "path": "catalogue.json",
                     "type": "blob",
                     "sha": self._blob(self.catalogue),
+                },
+                {
+                    "path": "placement-cases.json",
+                    "type": "blob",
+                    "sha": self._blob(self.placement),
                 },
                 {
                     "path": "seeds",
@@ -214,6 +221,7 @@ class TestSyncing:
         assert (
             local(workspace, "catalogue").read_bytes() == b'{"hash": "abc"}\n'
         )
+        assert local(workspace, "placement").read_bytes() == b"[]\n"
         lock = json.loads(sync.LOCK.read_text(encoding="utf-8"))
         assert lock["commit"] == COMMIT
         for source in sync.SOURCES:
@@ -263,6 +271,10 @@ class TestChecking:
                 "catalogue",
             ),
             ({"seeds": {"a.json": b'{"changed": true}\n'}}, "seeds"),
+            (
+                {"seeds": {"a.json": b"{}\n"}, "placement": b"[1]\n"},
+                "placement",
+            ),
         ],
     )
     def test_a_source_that_moved_is_named(self, workspace, capsys, moved, name):

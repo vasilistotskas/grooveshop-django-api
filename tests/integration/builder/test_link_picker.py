@@ -76,15 +76,21 @@ class TestSearching:
 
         assert found(response) == [("product", product.pk, "Μόνο ελληνικά")]
 
-    def test_the_slug_and_the_id_find_it_too(self, admin, tenant):
+    def test_the_slug_finds_it_too(self, admin, tenant):
         product = named(ProductFactory(active=True), el="Κάτι", en="Something")
-        product.translations.update(name="Ονομα")
 
-        by_slug = search(admin, q=product.slug[:6], kinds="product")
-        by_id = search(admin, q=str(product.pk), kinds="product")
+        response = search(admin, q=product.slug[:6], kinds="product")
 
-        assert product.pk in {r["id"] for r in by_slug.json()["results"]}
-        assert product.pk in {r["id"] for r in by_id.json()["results"]}
+        assert product.pk in {r["id"] for r in response.json()["results"]}
+
+    def test_a_product_id_finds_it(self, admin, tenant, settings):
+        # An id is as short as its digits: the first product's is "1".
+        settings.BUILDER_LINK_SEARCH_MIN_CHARS = 1
+        product = named(ProductFactory(active=True), el="Κάτι", en="Something")
+
+        response = search(admin, q=str(product.pk), kinds="product")
+
+        assert product.pk in {r["id"] for r in response.json()["results"]}
 
     def test_what_a_publish_would_refuse_is_not_offered(self, admin, tenant):
         shown = named(ProductFactory(active=True), el="Ζάχαρη", en="Sugar")

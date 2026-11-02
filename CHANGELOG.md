@@ -3,6 +3,62 @@
 
 
 
+## v3.194.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(tests): drop a side run's test databases and give dev Postgres 1g shm (#424)
+
+addopts passes --reuse-db, so every run kept its test databases, including
+runs under a one-off DB_NAME (the documented way to run beside another
+session). Nobody reuses those names, and 854 test databases had piled up
+on the local Postgres. Each of their tables and indexes holds a
+cumulative statistics entry in dynamic shared memory (/dev/shm), and the
+statistics area grew until a 256 MB segment no longer fit in the
+container's 512 MB /dev/shm: "could not resize shared memory segment ...
+No space left on device", then a backend segfault and crash recovery.
+
+tests/db_lifecycle.py overrides pytest-django's django_db_keepdb in both
+lanes: only the configured DB_NAME (the .env value, or the settings
+default) keeps its databases, and any other name drops them when the
+session ends. The dev compose file raises shm_size to 1g as headroom for
+the databases that stay. docs/testing.md describes both and the sweep
+for sets a killed run leaves behind.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6afcf39`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6afcf39f5bfd21d6e954dbe5485e16e2a6bf1491))
+
+### Features
+
+* feat(builder): search and label link targets for the editor's pickers (#430) ([`417cf0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/417cf0f3b36549a25fc9385794a466873154caa8))
+
+* feat(builder): staff link pickers: search targets and name stored references
+
+GET builder/link-search finds products, categories, posts, blog categories,
+pages and content pages by label or slug, per kind and by label, limited by
+BUILDER_LINK_SEARCH_LIMIT. GET builder/link-labels names the targets a stored
+reference points at, including inactive and missing ones, so the editor can
+show a name and a "no longer available" warning. Both read the one existence
+rule, now references.VISIBLE, which the publish check and link-targets share
+instead of each holding a copy. Labels are a database annotation, so each
+route costs one query per kind.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`417cf0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/417cf0f3b36549a25fc9385794a466873154caa8))
+
+* feat(builder): declare typed responses for link-search, link-labels and link-targets
+
+The three link routes answered a free-form object in the schema, which leaves
+the storefront to hand-write their types. They now declare their real shapes:
+a results array for link-search and a per-kind map of entries for the other two.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`417cf0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/417cf0f3b36549a25fc9385794a466873154caa8))
+
 ## v3.193.0 (2026-11-02)
 
 ### Bug fixes

@@ -6,7 +6,16 @@ services:
     # parallel DDL (xdist suite errored with out-of-shared-memory at
     # defaults; shm-size alone did NOT fix it — max_locks did).
     command: postgres -c max_locks_per_transaction=256
-    shm_size: 512m
+    # /dev/shm holds Postgres's dynamic shared memory: parallel query
+    # and the cumulative statistics, one entry per table and index in
+    # EVERY database. On 2026-11-02 854 leftover test databases grew
+    # the statistics area until a 256 MB segment no longer fit in
+    # 512m and a backend crashed ("could not resize shared memory
+    # segment ... No space left on device"). tests/db_lifecycle.py
+    # stops the pile-up; 1g is headroom for the databases that stay.
+    # tmpfs: only what Postgres writes takes memory. Applies on the
+    # next recreate: docker compose up -d --force-recreate db
+    shm_size: 1g
     restart: no
     volumes:
       # postgres18_data: fresh volume for the PG18 major (the old

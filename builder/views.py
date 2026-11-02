@@ -73,6 +73,8 @@ from builder.serializers import (
     LinkSearchResponseSerializer,
     LinkTargetsResponseSerializer,
     PreviewResolveSerializer,
+    PublishedIndexSerializer,
+    PublishedPageSerializer,
     PublishWriteSerializer,
     ReleaseSerializer,
     RescheduleSerializer,
@@ -501,7 +503,7 @@ class PublishedIndexView(APIView):
         operation_id="builder_published_index",
         tags=TAGS,
         parameters=[LOCALE_OPENAPI_PARAMETER],
-        responses={200: dict},
+        responses={200: PublishedIndexSerializer},
         description=(
             "`{release, locale, theme, groups, pages}`: what every page "
             "needs and none owns. `theme` and `groups` are resolved like "
@@ -614,7 +616,7 @@ class PreviewResolveView(StaffView):
         tags=TAGS,
         request=PreviewResolveSerializer,
         responses={
-            200: dict,
+            200: PublishedPageSerializer,
             400: OpenApiResponse(ErrorResponseSerializer),
             404: OpenApiResponse(ErrorResponseSerializer),
             503: OpenApiResponse(ErrorResponseSerializer),
@@ -818,7 +820,10 @@ class PublishedPageView(APIView):
     @extend_schema(
         tags=TAGS,
         parameters=[LOCALE_OPENAPI_PARAMETER],
-        responses={200: dict, 404: OpenApiResponse(ErrorResponseSerializer)},
+        responses={
+            200: PublishedPageSerializer,
+            404: OpenApiResponse(ErrorResponseSerializer),
+        },
         description=(
             "`{release, locale, theme, groups, page}`: the documents of "
             "the CURRENT release resolved for the locale (overlay merged, "

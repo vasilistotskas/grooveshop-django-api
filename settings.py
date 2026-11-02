@@ -4237,9 +4237,9 @@ SPECTACULAR_SETTINGS = {
         # types. ``TypeEnum`` keeps the name it already had.
         "TypeEnum": "shipping_boxnow.enum.locker_type.BoxNowLockerType",
         # The link pickers' answers: the kinds a link can point at (a subset
-        # of ``ReferenceKind``) and where a page result is defined.
+        # of ``ReferenceKind``) and the two kinds a page can be.
         "LinkKindEnum": "builder.link_picker.KIND_CHOICES",
-        "LinkPageSourceEnum": "builder.link_picker.PAGE_SOURCE_CHOICES",
+        "BuilderPageKindEnum": "builder.link_picker.PAGE_KIND_CHOICES",
         # ``BuilderDocument.kind`` and ``BuilderVersion.kind`` are two choice
         # sets behind one field name; named, they do not become hashed
         # ``Kind1e3Enum``/``KindCbcEnum`` in the generated frontend types.

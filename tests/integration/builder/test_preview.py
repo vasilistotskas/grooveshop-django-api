@@ -241,6 +241,62 @@ class TestWorkingCopies:
         assert "main_menu" in response.json()["groups"]
 
 
+class TestNothingBelowDocumentsIsRecased:
+    """The camel-case layer must leave a document's own keys alone, in the
+    request and in the answer: node ids, settings keys, ``blockOrder``
+    contents and the overlay's locale, node-id and pointer keys."""
+
+    def test_ids_settings_and_overlay_keys_travel_untouched(self, released):
+        copy = {
+            "draft": {
+                "sections": {
+                    "hero_1": {
+                        "type": "hero@2",
+                        "settings": {"title": "El", "productId": 7},
+                        "blocks": {
+                            "slide_a_1": {
+                                "type": "slide@1",
+                                "settings": {"caption": "El caption"},
+                            }
+                        },
+                        "blockOrder": ["slide_a_1"],
+                    },
+                    "s_2": {
+                        "type": "banner@1",
+                        "settings": {"text": "Banner"},
+                    },
+                },
+                "order": ["hero_1", "s_2"],
+            },
+            "i18n": {
+                "en": {
+                    "hero_1": {"/title": "En"},
+                    "slide_a_1": {"/caption": "En caption"},
+                    "s_2": {"/text": "En banner"},
+                }
+            },
+        }
+
+        response = preview(
+            released,
+            {HOME: copy, "group:main_menu": copy_of()},
+            locale="en",
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.json()
+        page = response.json()["page"]
+        assert page["order"] == ["hero_1", "s_2"]
+        assert list(page["sections"]) == ["hero_1", "s_2"]
+        hero_ = page["sections"]["hero_1"]
+        assert hero_["settings"] == {"title": "En", "productId": 7}
+        assert hero_["blockOrder"] == ["slide_a_1"]
+        assert hero_["blocks"]["slide_a_1"]["settings"] == {
+            "caption": "En caption"
+        }
+        assert page["sections"]["s_2"]["settings"] == {"text": "En banner"}
+        assert "main_menu" in response.json()["groups"]
+
+
 class TestRefusing:
     def test_a_copy_is_validated_like_a_draft_save(self, released):
         bad = copy_of(("a", section("hero@2", {"nope": 1})))

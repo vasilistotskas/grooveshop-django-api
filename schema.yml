@@ -9560,8 +9560,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/PublishedPage'
           description: ''
         '400':
           content:
@@ -9646,8 +9645,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/PublishedIndex'
           description: ''
   /api/v1/builder/published/{page_key}:
     get:
@@ -9679,8 +9677,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/PublishedPage'
           description: ''
         '404':
           content:
@@ -37668,6 +37665,14 @@ components:
         * `group` - Ομάδα ενοτήτων
         * `template` - Πρότυπο
         * `page` - Σελίδα
+    BuilderPageKindEnum:
+      enum:
+      - page
+      - template
+      type: string
+      description: |-
+        * `page` - Σελίδα
+        * `template` - Πρότυπο
     BuilderVersionKindEnum:
       enum:
       - checkpoint
@@ -40408,7 +40413,7 @@ components:
         active:
           type: boolean
         source:
-          $ref: '#/components/schemas/LinkPageSourceEnum'
+          $ref: '#/components/schemas/BuilderPageKindEnum'
       required:
       - active
       - label
@@ -40440,14 +40445,6 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/LinkLabel'
-    LinkPageSourceEnum:
-      enum:
-      - page
-      - template
-      type: string
-      description: |-
-        * `page` - Σελίδα
-        * `template` - Πρότυπο
     LinkSearchResponse:
       type: object
       properties:
@@ -40476,7 +40473,7 @@ components:
         active:
           type: boolean
         source:
-          $ref: '#/components/schemas/LinkPageSourceEnum'
+          $ref: '#/components/schemas/BuilderPageKindEnum'
       required:
       - active
       - id
@@ -48916,6 +48913,70 @@ components:
           maxLength: 255
       required:
       - documents
+    PublishedIndex:
+      type: object
+      description: '``GET published``: the chrome and the list of pages.'
+      properties:
+        release:
+          type: integer
+        locale:
+          type: string
+        theme:
+          allOf:
+          - $ref: '#/components/schemas/ResolvedDocument'
+          nullable: true
+        groups:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ResolvedDocument'
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublishedPageEntry'
+      required:
+      - groups
+      - locale
+      - pages
+      - release
+      - theme
+    PublishedPage:
+      type: object
+      description: '``GET published/<pageKey>`` and ``POST preview/resolve``.'
+      properties:
+        release:
+          type: integer
+        locale:
+          type: string
+        theme:
+          allOf:
+          - $ref: '#/components/schemas/ResolvedDocument'
+          nullable: true
+        groups:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ResolvedDocument'
+        page:
+          $ref: '#/components/schemas/ResolvedDocument'
+      required:
+      - groups
+      - locale
+      - page
+      - release
+      - theme
+    PublishedPageEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/BuilderPageKindEnum'
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - key
+      - kind
+      - updatedAt
     RateEnum:
       enum:
       - 1
@@ -49430,6 +49491,32 @@ components:
       - mime
       - path
       - width
+    ResolvedDocument:
+      type: object
+      description: |-
+        A document of the current release as the public read answers it.
+        The envelope is ours; the section trees in ``sections`` are shaped by
+        the storefront's block catalogue, so they stay open.
+      properties:
+        key:
+          type: string
+        version:
+          type: integer
+        sections:
+          type: object
+          additionalProperties: true
+        order:
+          type: array
+          items:
+            type: string
+        settings:
+          type: object
+          additionalProperties: true
+      required:
+      - key
+      - order
+      - sections
+      - version
     ResolvedMedia:
       type: object
       properties:

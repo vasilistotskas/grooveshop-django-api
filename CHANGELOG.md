@@ -3,6 +3,21 @@
 
 
 
+## v3.197.0 (2026-11-02)
+
+### Features
+
+* feat(builder): show who else has a document open in the editor (#434)
+
+POST builder/presence takes the editor's heartbeat (the documents it has open)
+and answers who else has each of them open; DELETE builder/presence is the
+sign-out. Kept in the cache per store with a TTL from
+BUILDER_PRESENCE_TTL_SECONDS and a Redis set per document, so a read never
+scans the keyspace. CustomCache gains set_members and remove_from_set beside
+add_to_set.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6677424`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66774243bfd54aabe0346a148e222947b278db17))
+
 ## v3.196.0 (2026-11-02)
 
 ### Features

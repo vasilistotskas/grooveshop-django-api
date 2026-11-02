@@ -3,6 +3,110 @@
 
 
 
+## v3.191.0 (2026-11-02)
+
+### Documentation
+
+* docs: rewrite the README and adopt the PolyForm Strict License 1.0.0 (#423) ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs: rewrite the README against the current code
+
+The README described an older project: it claimed an MIT licence while
+LICENSE.md holds non-commercial terms, documented MEILISEARCH_* variables
+the settings never read, listed manual Meilisearch tuning that MeiliMeta
+and meilisearch_apply_settings now apply on every deploy, gave a Celery
+worker command without the meilisearch queue, and left out the tenant
+setup every request needs and four apps (builder, texts,
+recommendation, emails).
+
+Rewrite it as an entry point: role in the platform, features, stack
+(majors only), local setup with bootstrap_platform and tenant_create,
+commands, layout, release and deploy, and links to docs/ and
+docs.grooveshop.space.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs: use the shared related-repositories wording and state the licence
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs: say why runserver is not the dev server
+
+It serves plain HTTP but no WebSocket; uvicorn serves both.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs(claude): correct the runserver note
+
+runserver starts and serves plain HTTP through Django's default WSGI handler; it is not the dev server because it serves no WebSocket. The project has no wsgi module, but Django falls back to its own handler.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs(license): adopt the PolyForm Strict License 1.0.0
+
+Replace LICENSE.md with the official PolyForm Strict 1.0.0 text plus the
+required notice, point the package metadata at it, and state the terms in
+the README.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs: name the Meilisearch command that is not tenant-scoped and mark the reference link as basic auth
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs(env): list staging among the SYSTEM_ENV values
+
+settings.py treats staging as its own environment (production profile, no
+real orders), so the example must name it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxJvqL838kW6n6JN4JQ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`595a557`](https://github.com/vasilistotskas/grooveshop-django-api/commit/595a5571fe6a9e9a764bed82fd7037d0885632ba))
+
+* docs(builder): run sheet for importing before the storefront is promoted (#422)
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`a94eed6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a94eed69a19ff1cc3f0499ad5299603a43c62e3a))
+
+### Features
+
+* feat(builder): require linkRefs and retire the legacy import (#425)
+
+Every store renders from the builder and was imported from page_config,
+so the one-time import path goes:
+
+- builder_import_legacy, builder_export_legacy and builder_reset, with
+  builder/legacy.py, convert.py, importing.py and resetting.py. A reset
+  only undid an import before the storefront read the builder; it has no
+  job left.
+- the converter fixtures, their replay and the import and reset tests,
+  and the `legacy` source of the storefront-sources sync.
+
+The catalogue's `linkRefs` is now a required key on every block and
+every document root. The storefront states it everywhere, and a
+catalogue that left it out would have indexed no link at all.
+test_real_catalogue holds the pinned real catalogue to that: each
+linkRefs is exactly the settings its schema marks as links.
+
+The seeds the storefront ships are now {key, document, i18n}. The
+storefront copies (catalogue and seeds) are re-synced from its main.
+
+The `menu` reference kind goes: no block declares it, and a menu is a
+group:<slot> document that the editor edits directly. Its check read
+page_config's NavigationMenu, which is retired next.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c656bb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c656bb11a353f0aef42a86085fc668c25a9d08b8))
+
 ## v3.190.0 (2026-11-02)
 
 ### Bug fixes

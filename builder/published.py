@@ -16,6 +16,7 @@ under the store's cache generation, which a release moves.
 from __future__ import annotations
 
 import copy
+from collections.abc import Iterable
 from typing import Any
 
 from django.conf import settings
@@ -40,6 +41,31 @@ def _chrome_cache_key(release: int, locale: str) -> str:
 
 def _page_cache_key(release: int, page_key: str, locale: str) -> str:
     return f"builder:{connection.schema_name}:r{release}:{page_key}:{locale}"
+
+
+def forget_releases(
+    numbers: Iterable[int], keys: Iterable[str], locales: Iterable[str]
+) -> None:
+    """Drop the cached reads of releases that are gone. A cached read is
+    immutable per release number, which holds only while a number is never
+    reused; ``builder.resetting`` deletes releases, so the next import's
+    release 1 must not meet the old one's pages."""
+    numbers, keys, locales = list(numbers), list(keys), list(locales)
+    cache.delete_many(
+        [
+            *(
+                _page_cache_key(number, key, locale)
+                for number in numbers
+                for key in keys
+                for locale in locales
+            ),
+            *(
+                _chrome_cache_key(number, locale)
+                for number in numbers
+                for locale in locales
+            ),
+        ]
+    )
 
 
 def current_release_number() -> int:

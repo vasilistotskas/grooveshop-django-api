@@ -3,6 +3,112 @@
 
 
 
+## v3.187.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): refuse a reset by code, and make ContactFactory emails unique
+
+builder_reset reports a refusal as a stable code beside its message, so
+callers and tests do not depend on translated copy (CI renders Greek).
+
+ContactFactory gets-or-creates on the email and drew it from Faker, so two
+colliding addresses silently returned one row; the admin changelist growth
+test counts the rows it builds and flaked on that. The default email is now
+a sequence.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* fix(emails): the email pages fit a phone and the log reads on one
+
+Checked in a browser at 390 and 1280 px, in Greek and English: the actions
+of a row (badge, switch, Preview, Send test) no longer overflow the card in
+Greek, the latest sends table keeps its header and last row (a wrapper of
+ours clipped Unfold negative margins), the log lists the email and its status
+first so they show before the table scrolls sideways, and a send in the table
+says how long ago and whether it was a test.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+### Features
+
+* feat(builder): builder_reset, the way back from an unused import (#417) ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* feat(builder): builder_reset, the way back from an unused import
+
+An import or a seed that turned out wrong had no way back short of SQL.
+builder_reset --tenant S reports what it would delete; --confirm deletes
+the store's documents, versions, release and reference index and drops
+the cached reads of the deleted release (release numbers restart at 1 and
+a cached page is keyed by the number alone).
+
+It refuses unless the store's builder data is exactly what an import or a
+seed leaves: one release without staff, publish versions without staff,
+drafts at revision 1, nothing deleted or scheduled. It is per store, with
+no --all-tenants. It cannot know whether the storefront already reads the
+builder, so the run sheet in docs/builder.md puts it before that switch.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* feat(emails): the store admin shows status, log, suppressions and a test send (#413) ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+* feat(emails): the store admin shows status, log, suppressions and a test send
+
+The Emails page grows into a status page: two tabs (to customers, to your
+team), a text search and an On, Off or Failing filter, and per email a badge,
+what it sent in 30 days, the time of the last send, a failed count that opens
+the log, the switch, Preview and Send test. The figures are one cached
+aggregate over EmailLog, so the page costs the same queries for 2 emails and
+for 30. Each email has a page with its preview, a test send and its last 20
+sends with the events the provider reported; the separate Email Templates
+entry folds into it.
+
+Send test mails an email to the signed-in staff member only (no posted
+address is read), in the chosen language, from the sample or an order the
+viewer may open. It skips the gates, the switch and the suppression list,
+goes through the real transport, leaves an is_test row naming the staff
+member, prefixes the subject and is throttled per staff member per hour.
+
+The email log and the suppression list are read-only admin pages. Neither
+shows an address: an exact address typed in the search box is hashed and
+matched on the hash. Removing a suppression is behind the standard
+confirmation, whose dialog says the address must also leave Resend own list,
+and the admin log names the actor. STAFF may look at all of it, not change it.
+
+"Emails failing" joins the store dashboard Needs attention card.
+
+The migration only adds two columns.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+### Testing
+
+* test(builder): type the import helper of the reset tests
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* test(emails): do not match an order id inside the sample order number
+
+The preview test asserted that the order's id is absent from a sample
+render, but the factory can draw an id such as 123, a prefix of the sample's
+own order number 12345, which made it fail one run in a while.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
 ## v3.186.0 (2026-11-01)
 
 ### Features

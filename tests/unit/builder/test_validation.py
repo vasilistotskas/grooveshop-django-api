@@ -726,6 +726,98 @@ class TestLinkReferences:
         assert codes(issues) == {"/i18n/en/a/link": "untranslatable_setting"}
 
 
+class TestNestedTranslatablesBesideALink:
+    """``features_grid``'s shape: text leaves of an object are translated,
+    the link in the same object is not."""
+
+    CATALOGUE = parse_catalogue(
+        {
+            "hash": HASH,
+            "blocks": [
+                {
+                    "type": "grid",
+                    "version": 1,
+                    "accepts": [],
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string"},
+                                    "text": {"type": "string"},
+                                    "ctaLink": {"type": "object"},
+                                },
+                            }
+                        },
+                    },
+                    "translatable": ["/prompt/title", "/prompt/text"],
+                    "linkRefs": ["/prompt/ctaLink"],
+                    "kinds": ["section"],
+                }
+            ],
+            "documentKinds": default_document_kinds(),
+            "templates": ["home"],
+        }
+    )
+    DOCUMENT = document(
+        (
+            "a",
+            section(
+                "grid@1",
+                {
+                    "prompt": {
+                        "title": "Τίτλος",
+                        "text": "Κείμενο",
+                        "ctaLink": {"ref": {"kind": "product", "id": 2}},
+                    }
+                },
+            ),
+        )
+    )
+
+    def run(self, i18n):
+        return validate_document(
+            key="template:home",
+            data=self.DOCUMENT,
+            i18n=i18n,
+            catalogue=self.CATALOGUE,
+            feature_on=lambda name: True,
+        )
+
+    def test_the_text_leaves_take_an_overlay_at_their_nested_pointers(self):
+        overlay = {
+            "en": {"a": {"/prompt/title": "Title", "/prompt/text": "Text"}}
+        }
+
+        issues, validated = self.run(overlay)
+
+        assert issues == []
+        assert validated is not None
+        assert validated.i18n == overlay
+        assert validated.refs == {
+            "product": {"2": ["/sections/a/settings/prompt/ctaLink"]}
+        }
+
+    def test_the_link_beside_them_is_refused_in_an_overlay(self):
+        overlay = {
+            "en": {
+                "a": {"/prompt/ctaLink": {"ref": {"kind": "product", "id": 2}}}
+            }
+        }
+
+        issues, _ = self.run(overlay)
+
+        assert codes(issues) == {
+            "/i18n/en/a/prompt/ctaLink": "untranslatable_setting"
+        }
+
+    def test_the_whole_object_is_not_translatable(self):
+        issues, _ = self.run({"en": {"a": {"/prompt": {"title": "T"}}}})
+
+        assert codes(issues) == {"/i18n/en/a/prompt": "untranslatable_setting"}
+
+
 class TestTheCatalogueReadsLinks:
     def block(self, **extra):
         return {

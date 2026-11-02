@@ -255,6 +255,39 @@ integer, or too many, is `400 invalid_link_targets` naming the `param`. The
 query keys are camelCase on the wire (the camel-case middleware underscores
 them before the view reads them).
 
+## The editor's link pickers
+
+Staff routes (`StoreStaffModelPermissions`, so every role looks), in
+`builder/link_picker.py`. The existence rule is `references.VISIBLE`, the one
+the publish check and `link-targets` use; the pickers add no second copy of
+it. No route is built here: the storefront composes the path from the slug.
+
+- `GET link-search?q=&kinds=&locale=` answers `{results: [{kind, id, label,
+  slug, active}]}` over `product`, `category`, `blogPost`, `blogCategory`,
+  `page` and `contentPage` (`kinds` a comma-separated list, all when omitted,
+  an unknown one `400 invalid_link_search`). Grouped by kind in the order of
+  `kinds`, each group by label, at most `BUILDER_LINK_SEARCH_LIMIT` of a kind.
+  `q` matches the label (in `locale`, else the default language, else the
+  slug) or the slug, and a product's id. A `q` shorter than
+  `BUILDER_LINK_SEARCH_MIN_CHARS` is an empty list, not an error. Only what a
+  link may point at is offered, so `active` is always true. `id` is a number
+  for the four catalogue kinds and the key or slug for `page` and
+  `contentPage`; a `page` result also has `source` (`page` for a store page,
+  `template` for a fixed page type). A page is labelled with its SEO title in
+  `locale`, else its default one, else its key; a template with its key.
+- `GET link-labels?product=1,2&category=&blogPost=&blogCategory=&page=&contentPage=&locale=`
+  answers `{kind: {id: {label, active}}}` for the ids asked about, so a stored
+  reference shows its name: `active` is the same rule, an inactive or
+  unpublished record keeps its `label` with `active: false`, and an id that
+  exists nowhere is `{label: null, active: false}`. A `page` entry also has
+  `source`; a key that is both a store page and a fixed page type is answered
+  as the page, as the public read does. At most `BUILDER_LINK_TARGETS_MAX_IDS`
+  per kind, otherwise `400 invalid_link_targets` with the `param`. The ids
+  are keys of the answer and are not camel-cased (`LinkLabelsRenderer`).
+
+Both cost one query per kind: the label is a database annotation, not a read
+per row.
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an

@@ -34,3 +34,15 @@ class BuilderJSONRenderer(CamelCaseJSONRenderer):
 
 class BuilderJSONParser(CamelCaseJSONParser):
     json_underscoreize = _OPTIONS
+
+
+#: The link labels answer holds ids as KEYS (a content page's slug may carry
+#: an underscore), which camel-casing would rewrite.
+_LABEL_OPTIONS = {
+    "ignore_fields": (*DOCUMENT_FIELDS, "contentPage"),
+    "ignore_keys": ("i18n",),
+}
+
+
+class LinkLabelsRenderer(CamelCaseJSONRenderer):
+    json_underscoreize = _LABEL_OPTIONS

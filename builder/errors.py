@@ -72,6 +72,11 @@ class InvalidKind(BuilderError):
     default_detail = _("The kind of document is not valid.")
 
 
+class InvalidLinkSearch(BuilderError):
+    default_code = "invalid_link_search"
+    default_detail = _("The link search is not valid.")
+
+
 class NotFoundError(BuilderError):
     status_code = status.HTTP_404_NOT_FOUND
     default_code = "not_found"

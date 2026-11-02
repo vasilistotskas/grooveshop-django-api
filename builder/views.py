@@ -61,6 +61,9 @@ from builder.serializers import (
     DocumentDetailSerializer,
     DocumentListSerializer,
     DraftWriteSerializer,
+    LinkLabelsResponseSerializer,
+    LinkSearchResponseSerializer,
+    LinkTargetsResponseSerializer,
     PublishWriteSerializer,
     ReleaseSerializer,
     RescheduleSerializer,
@@ -530,7 +533,10 @@ class LinkTargetsView(APIView):
             )
             for kind in references.LINK_TARGET_KINDS
         ],
-        responses={200: dict, 400: OpenApiResponse(ErrorResponseSerializer)},
+        responses={
+            200: LinkTargetsResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
         description=(
             "`{kind: {id: slug}}` for the kinds asked about. An id that is "
             "missing, inactive or unpublished is absent, by the rules a "
@@ -595,7 +601,10 @@ class LinkSearchView(StaffView):
             ),
             LOCALE_OPENAPI_PARAMETER,
         ],
-        responses={200: dict, 400: OpenApiResponse(ErrorResponseSerializer)},
+        responses={
+            200: LinkSearchResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
         description=(
             "`{results: [{kind, id, label, slug, active}]}`, grouped by "
             "kind and ordered by label, at most `BUILDER_LINK_SEARCH_LIMIT` "
@@ -669,7 +678,10 @@ class LinkLabelsView(StaffView):
             ),
             LOCALE_OPENAPI_PARAMETER,
         ],
-        responses={200: dict, 400: OpenApiResponse(ErrorResponseSerializer)},
+        responses={
+            200: LinkLabelsResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
         description=(
             "`{kind: {id: {label, active}}}` for the ids asked about, "
             "whether or not they can still be linked: `active` is the rule "

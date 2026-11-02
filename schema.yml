@@ -9178,8 +9178,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/LinkLabelsResponse'
           description: ''
         '400':
           content:
@@ -9227,8 +9226,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/LinkSearchResponse'
           description: ''
         '400':
           content:
@@ -9277,8 +9275,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/LinkTargetsResponse'
           description: ''
         '400':
           content:
@@ -40317,6 +40314,126 @@ components:
       - total
       - totalVat
       - vatBreakdown
+    LinkKindEnum:
+      enum:
+      - product
+      - category
+      - blogPost
+      - blogCategory
+      - page
+      - contentPage
+      type: string
+      description: |-
+        * `product` - Προϊόν
+        * `category` - Κατηγορία
+        * `blogPost` - Άρθρο ιστολογίου
+        * `blogCategory` - Κατηγορία ιστολογίου
+        * `page` - Σελίδα
+        * `contentPage` - Σελίδα περιεχομένου
+    LinkLabel:
+      type: object
+      properties:
+        label:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/LinkPageSourceEnum'
+      required:
+      - active
+      - label
+    LinkLabelsResponse:
+      type: object
+      description: '``{kind: {id: {label, active}}}`` for the kinds asked about.'
+      properties:
+        product:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        category:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        blogPost:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        blogCategory:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        page:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        contentPage:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+    LinkPageSourceEnum:
+      enum:
+      - page
+      - template
+      type: string
+      description: |-
+        * `page` - Σελίδα
+        * `template` - Πρότυπο
+    LinkSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LinkSearchResult'
+      required:
+      - results
+    LinkSearchResult:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/LinkKindEnum'
+        id:
+          oneOf:
+          - type: integer
+          - type: string
+          description: A number for products, categories, posts and blog categories;
+            the key or slug for pages and content pages.
+        label:
+          type: string
+          nullable: true
+        slug:
+          type: string
+        active:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/LinkPageSourceEnum'
+      required:
+      - active
+      - id
+      - kind
+      - label
+      - slug
+    LinkTargetsResponse:
+      type: object
+      description: '``{kind: {id: slug}}`` for the kinds asked about.'
+      properties:
+        product:
+          type: object
+          additionalProperties:
+            type: string
+        category:
+          type: object
+          additionalProperties:
+            type: string
+        blogPost:
+          type: object
+          additionalProperties:
+            type: string
+        blogCategory:
+          type: object
+          additionalProperties:
+            type: string
     LocationTypeEnum:
       enum:
       - HOME

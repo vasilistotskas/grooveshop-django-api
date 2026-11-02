@@ -93,6 +93,11 @@ urlpatterns = [
         name="published-index",
     ),
     path(
+        "builder/link-targets",
+        views.LinkTargetsView.as_view(),
+        name="link-targets",
+    ),
+    path(
         "builder/published/<slug:page_key>",
         views.PublishedPageView.as_view(),
         name="published",

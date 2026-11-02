@@ -85,12 +85,23 @@ class EmailPreviewForm(forms.Form):
         widget=UnfoldAdminRadioSelectWidget(radio_style=HORIZONTAL),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        owner: Owner = Owner.STORE,
+        with_orders: bool = True,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.fields["type_key"].choices = [
             (email_type.key, email_type.key)
-            for email_type in registry.types_for(Owner.STORE)
+            for email_type in registry.types_for(owner)
         ]
+        if not with_orders:
+            # A viewer without the order permission previews sample data
+            # only: a real order carries a customer's name and address.
+            del self.fields["order"]
+            return
         # values_list, not .only(): Order.__init__ reads deferred fields,
         # and loading one builds another instance, which reads again.
         recent = Order.objects.order_by("-created_at").values_list(
@@ -117,18 +128,10 @@ def build_preview(
     # is a lazy message, read when the preview is built.
     with translation.override(language):
         try:
-            real = None
-            if order_id and email_type.key in ORDER_EMAIL_KEYS:
-                order = Order.objects.filter(pk=order_id).first()
-                if order is None:
-                    raise NothingToPreview(f"Order {order_id} not found.")
-                real = preview_object(email_type.key, order)
-            env = _env(email_type, real, language)
-            rendered = render(
-                email_type,
-                real if real is not None else email_type.sample(env),
-                env,
+            obj, env = preview_subject(
+                email_type, order_id=order_id, language=language
             )
+            rendered = render(email_type, obj, env)
         except NothingToPreview as nothing:
             return Preview(subject="", html="", text="", error=str(nothing))
         except Exception as error:
@@ -141,6 +144,23 @@ def build_preview(
     return Preview(
         subject=rendered.subject, html=rendered.html, text=rendered.text
     )
+
+
+def preview_subject(
+    email_type: EmailType, *, order_id: int | None, language: str
+) -> tuple[object, RenderEnv]:
+    """What a preview (and the admin's Send test) renders: the real record
+    an order email is about when one is chosen, else the type's sample, with
+    the environment of its recipient. Raises ``NothingToPreview`` when the
+    chosen order has no such record."""
+    real = None
+    if order_id and email_type.key in ORDER_EMAIL_KEYS:
+        order = Order.objects.filter(pk=order_id).first()
+        if order is None:
+            raise NothingToPreview(f"Order {order_id} not found.")
+        real = preview_object(email_type.key, order)
+    env = _env(email_type, real, language)
+    return (real if real is not None else email_type.sample(env)), env
 
 
 def _env(email_type: EmailType, real: object, language: str) -> RenderEnv:

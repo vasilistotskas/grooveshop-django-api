@@ -935,6 +935,10 @@ BUILDER_MAX_SECTIONS_PER_DOCUMENT = int(
     getenv("BUILDER_MAX_SECTIONS_PER_DOCUMENT", "40")
 )
 BUILDER_MAX_BLOCKS_PER_NODE = int(getenv("BUILDER_MAX_BLOCKS_PER_NODE", "50"))
+# Ids a single ``builder/link-targets`` call resolves, per kind.
+BUILDER_LINK_TARGETS_MAX_IDS = int(
+    getenv("BUILDER_LINK_TARGETS_MAX_IDS", "100")
+)
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
@@ -3114,11 +3118,8 @@ RESEND_API_KEY = getenv("RESEND_API_KEY", "")
 # the platform host (``emails.webhooks``). A store with its own team keeps
 # its secret on its Tenant row. Empty: the platform host answers 503.
 RESEND_WEBHOOK_SECRET = getenv("RESEND_WEBHOOK_SECRET", "")
-# How old (or far ahead) a delivery's timestamp may be before it is refused
-# as a replay; Svix's own default.
-RESEND_WEBHOOK_TOLERANCE_SECONDS = int(
-    getenv("RESEND_WEBHOOK_TOLERANCE_SECONDS", "300")
-)
+# How many times a staff member may use the admin's Send test per hour.
+EMAIL_TEST_SENDS_PER_HOUR = int(getenv("EMAIL_TEST_SENDS_PER_HOUR", "10"))
 RESEND_WEBHOOK_MAX_BODY_BYTES = int(
     getenv("RESEND_WEBHOOK_MAX_BODY_BYTES", str(256 * 1024))
 )
@@ -3568,7 +3569,18 @@ ADMIN_OPS_LINKS = [
     if entry["link"]
 ]
 
+# The language switcher both admin sites show: one entry per ``LANGUAGES``
+# code. ``UNFOLD_PLATFORM`` is merged over Unfold's defaults, not over
+# ``UNFOLD``, so a key set only on ``UNFOLD`` is absent on the control
+# plane; the platform admin had no switcher for that reason.
+ADMIN_LANGUAGE_FLAGS = {
+    "el": "🇬🇷",
+    "en": "🇬🇧",
+}
+
 UNFOLD_PLATFORM = {
+    "SHOW_LANGUAGES": True,
+    "LANGUAGE_FLAGS": ADMIN_LANGUAGE_FLAGS,
     "SITE_TITLE": _("Platform Admin"),
     "SITE_HEADER": "GrooveShop Platform",
     "SITE_SUBHEADER": _("Control plane"),
@@ -3731,6 +3743,33 @@ UNFOLD_PLATFORM = {
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },
+                    # The platform's own mail (billing notices, staff
+                    # password reset, health and backup alerts): what it
+                    # sent and what failed, its log and suppression list.
+                    {
+                        "title": _("Emails"),
+                        "icon": "mail",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emailswitch_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Email log"),
+                        "icon": "history",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emaillog_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
+                    {
+                        "title": _("Suppression list"),
+                        "icon": "block",
+                        "link": reverse_lazy(
+                            "platform_admin:emails_emailsuppression_changelist",
+                            urlconf=PUBLIC_SCHEMA_URLCONF,
+                        ),
+                    },
                 ],
             },
             # The Celery beat schedule and the task-result tables live in
@@ -3865,10 +3904,7 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
-    "LANGUAGE_FLAGS": {
-        "el": "🇬🇷",
-        "en": "🇬🇧",
-    },
+    "LANGUAGE_FLAGS": ADMIN_LANGUAGE_FLAGS,
     # ⌘K / Ctrl+K command palette history. What the palette finds is
     # decided by admin.search.CommandSearchMixin, not by this block.
     "COMMAND": {

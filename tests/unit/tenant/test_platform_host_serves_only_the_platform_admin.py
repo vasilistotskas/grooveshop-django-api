@@ -60,11 +60,19 @@ def test_the_store_admin_is_not_reachable_on_the_platform_host(language, path):
 
 @pytest.mark.parametrize("language", _LANGUAGES)
 def test_the_platform_admin_is_still_reachable(language):
-    """The fix must not take the control plane down with it."""
-    with translation.override(language):
-        site = _resolved_site("/admin/login/", "tenant.urls_public")
+    """The fix must not take the control plane down with it.
 
-    assert site is PlatformAdminSite
+    ``prefix_default_language=False``: the unprefixed form is the default
+    language's and the prefixed one every other language's, as on the
+    store admin.
+    """
+    with translation.override(language):
+        sites = {
+            _resolved_site(path, "tenant.urls_public")
+            for path in ("/admin/login/", f"/{language}/admin/login/")
+        }
+
+    assert PlatformAdminSite in sites
 
 
 @pytest.mark.parametrize("language", _LANGUAGES)

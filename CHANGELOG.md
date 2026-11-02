@@ -3,6 +3,341 @@
 
 
 
+## v3.189.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): name the catalogue key linkRefs and refuse links under translatables
+
+The storefront emits `linkRefs`, not `links`. A link pointer that equals,
+lies under or holds a translatable pointer (wildcards count either way)
+is a catalogue error, not only an exact duplicate: a link resolves to the
+viewer's language path, so nothing in it is translated.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Chores
+
+* chore(builder): drop a stray patch backup
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Documentation
+
+* docs(builder): linkRefs is optional only for the deploy order
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Features
+
+* feat(builder): link references, a blogPost kind and a link-targets read (#420) ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+* feat(builder): link references, a blogPost kind and a link-targets read
+
+A link setting stores a reference instead of a raw internal address, so a
+slug change cannot rot it. The catalogue's blocks may declare `links`
+(pointer patterns, like `refs`); for each `{ref: {kind, id}}` found there,
+validation checks the id has the shape of its kind (an unknown kind is
+invalid_reference rather than a KeyError at the existence check) and
+records (kind, id, the link's own pointer) with the other references, so
+the version's refs, BuilderReference, the publish check and "where used"
+treat it like any other. `{href}` and `{route}` are the schema's. A
+pointer in both `links` and `translatable` is a catalogue error: a link
+resolves to the viewer's language path and is never translatable.
+
+blogPost is a new reference kind (a published post).
+
+GET builder/link-targets?product=..&category=..&blogPost=..&blogCategory=..
+answers {kind: {id: slug}} for the ids that exist and are visible by the
+rules of the existence checks, one query per kind, capped by
+BUILDER_LINK_TARGETS_MAX_IDS.
+
+Additive: a catalogue without `links` is valid.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+### Testing
+
+* test(builder): nested translatable leaves beside a link
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5851e40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5851e40b30506d0221d08b52004397e4143427b8))
+
+## v3.188.1 (2026-11-02)
+
+### Bug fixes
+
+* fix(admin): let an operator switch the platform admin to English (#419)
+
+The control plane's admin could not leave Greek, and neither admin
+could switch from English back to Greek.
+
+- tenant/urls_public.py mounted the platform admin at the unprefixed
+  admin/ only. The urlconf has i18n_patterns, so LocaleMiddleware
+  answered every unprefixed path in LANGUAGE_CODE and ignored the
+  language cookie, and set_language redirected to /en/admin/, which did
+  not exist on that host. It is now locale-prefixed like the store
+  admin (/admin/ and /en/admin/).
+- UNFOLD_PLATFORM lacked SHOW_LANGUAGES and LANGUAGE_FLAGS (it is
+  merged over Unfold's defaults, not over UNFOLD), so no switcher was
+  rendered. Both sites share ADMIN_LANGUAGE_FLAGS.
+- Django's set_language resolves next under the active language, which
+  is LANGUAGE_CODE on this unprefixed view, so /en/admin/ could never be
+  translated to Greek on either host. core.views.set_language activates
+  the language the address carries and delegates to Django's view.
+
+tests_mt/test_admin_language_switch.py presses the rendered switcher on
+both hosts in both directions.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`bb6a484`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb6a4845fca5e603f3f24df9c7e3fd0e0a9d820f))
+
+## v3.188.0 (2026-11-02)
+
+### Features
+
+* feat(emails): platform admin Emails page, log and suppression list (#418)
+
+The control plane gets the same Emails pages a store has, over the
+public schema: the Owner.PLATFORM types grouped by who receives them,
+the platform email log, the suppression list, a sidebar entry and a
+throttled Send test to the operator.
+
+- EmailSwitchAdmin takes an owner; PlatformEmailSwitchAdmin serves the
+  platform's types (all required, so the toggle answers 404) and a
+  store type's page is a 404 on the platform and the reverse.
+- Admin URLs are looked up on the serving admin site's name and the
+  templates take them from the view.
+- A platform email is about no order: the preview form drops the order
+  field and a posted order id is not read.
+- send_test runs under owner_schema, so a platform test is rendered and
+  logged in public whatever schema the request is in.
+- The cached figures key carries the schema, so the platform page and a
+  store's never share an answer (proved by test).
+- The platform dashboard flags the platform's own mail that failed in
+  the last 7 days.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0fff827`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fff827d5212e4b6c4770c6477174296d201d734))
+
+## v3.187.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(builder): refuse a reset by code, and make ContactFactory emails unique
+
+builder_reset reports a refusal as a stable code beside its message, so
+callers and tests do not depend on translated copy (CI renders Greek).
+
+ContactFactory gets-or-creates on the email and drew it from Faker, so two
+colliding addresses silently returned one row; the admin changelist growth
+test counts the rows it builds and flaked on that. The default email is now
+a sequence.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* fix(emails): the email pages fit a phone and the log reads on one
+
+Checked in a browser at 390 and 1280 px, in Greek and English: the actions
+of a row (badge, switch, Preview, Send test) no longer overflow the card in
+Greek, the latest sends table keeps its header and last row (a wrapper of
+ours clipped Unfold negative margins), the log lists the email and its status
+first so they show before the table scrolls sideways, and a send in the table
+says how long ago and whether it was a test.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+### Features
+
+* feat(builder): builder_reset, the way back from an unused import (#417) ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* feat(builder): builder_reset, the way back from an unused import
+
+An import or a seed that turned out wrong had no way back short of SQL.
+builder_reset --tenant S reports what it would delete; --confirm deletes
+the store's documents, versions, release and reference index and drops
+the cached reads of the deleted release (release numbers restart at 1 and
+a cached page is keyed by the number alone).
+
+It refuses unless the store's builder data is exactly what an import or a
+seed leaves: one release without staff, publish versions without staff,
+drafts at revision 1, nothing deleted or scheduled. It is per store, with
+no --all-tenants. It cannot know whether the storefront already reads the
+builder, so the run sheet in docs/builder.md puts it before that switch.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* feat(emails): the store admin shows status, log, suppressions and a test send (#413) ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+* feat(emails): the store admin shows status, log, suppressions and a test send
+
+The Emails page grows into a status page: two tabs (to customers, to your
+team), a text search and an On, Off or Failing filter, and per email a badge,
+what it sent in 30 days, the time of the last send, a failed count that opens
+the log, the switch, Preview and Send test. The figures are one cached
+aggregate over EmailLog, so the page costs the same queries for 2 emails and
+for 30. Each email has a page with its preview, a test send and its last 20
+sends with the events the provider reported; the separate Email Templates
+entry folds into it.
+
+Send test mails an email to the signed-in staff member only (no posted
+address is read), in the chosen language, from the sample or an order the
+viewer may open. It skips the gates, the switch and the suppression list,
+goes through the real transport, leaves an is_test row naming the staff
+member, prefixes the subject and is throttled per staff member per hour.
+
+The email log and the suppression list are read-only admin pages. Neither
+shows an address: an exact address typed in the search box is hashed and
+matched on the hash. Removing a suppression is behind the standard
+confirmation, whose dialog says the address must also leave Resend own list,
+and the admin log names the actor. STAFF may look at all of it, not change it.
+
+"Emails failing" joins the store dashboard Needs attention card.
+
+The migration only adds two columns.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+### Testing
+
+* test(builder): type the import helper of the reset tests
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5 ([`765e585`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765e5851f5267ad1bf6075dd178dbef7114f930e))
+
+* test(emails): do not match an order id inside the sample order number
+
+The preview test asserted that the order's id is absent from a sample
+render, but the factory can draw an id such as 123, a prefix of the sample's
+own order number 12345, which made it fail one run in a while.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cd10798`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd107989a5d110ca6a1783434088d77ce97d183a))
+
+## v3.186.0 (2026-11-01)
+
+### Features
+
+* feat(builder): count each imported document's sections and blocks in the report (#414)
+
+The import report (and --json) now gives, per document, how many sections it
+has and how many blocks at every depth, so a dry run says what would be
+imported and not only which documents.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`07cbd1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07cbd1cc955fc36935fb2f4e6c714cb05b5469fe))
+
+### Refactoring
+
+* refactor(emails): verify the Resend webhook with the Standard Webhooks library (#415)
+
+The Svix signature check was hand-written. Signature verification is
+security code, so it is now the maintained reference implementation: the
+standardwebhooks package, which the svix client itself delegates to and
+which has no dependencies of its own (the svix package would add httpx and
+the whole API client for the same verifier).
+
+A thin adapter in emails.webhooks renames Resend svix-* headers to the
+webhook-* names the library reads and turns everything it can raise for a
+request that is not a delivery (missing header, malformed signature or
+secret, non UTF-8 body) into one InvalidSignature, so a forged request is a
+400, never a 500; tests cover each. The five minute replay window is the
+library, so RESEND_WEBHOOK_TOLERANCE_SECONDS is removed. emails/svix.py is
+deleted; the real-svix signature vector is kept.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5021399`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5021399763ae6d303d4e617fc342e3ad4884c502))
+
+## v3.185.0 (2026-11-01)
+
+### Chores
+
+* chore(builder): pin the storefront's converter fixtures and check them for drift (#411)
+
+tests/fixtures/builder/legacy/ is a copy of the storefront's golden
+converter fixtures, and a copy can drift silently. It is now pinned to a
+storefront commit by its git tree id (legacy.source.json). A unit test
+recomputes the tree id of the copy, with no network, and fails when it is
+not the pinned one, so the copy cannot be edited by hand or half refreshed.
+.github/scripts/sync_converter_fixtures.py is the only thing that writes the
+copy and the pin (the tree id is read from GitHub, every file is checked
+against its blob id), and a weekly workflow runs it with --check, going red
+when the storefront's main has moved, without blocking unrelated pull
+requests. The tree hashing is tested against git itself.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`92e05a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92e05a7164ea1ae3591655444b32bf01715fbfee))
+
+### Features
+
+* feat(builder): a page-less published read for the chrome and the sitemap (#412)
+
+GET /api/v1/builder/published?locale= answers what every page needs and
+none owns: the theme and section groups resolved for the locale, and the
+page: and template: documents of the current release as key, kind and when
+the version was made (the sitemap's lastmod). A store with no release is a
+valid empty answer, not a 404. It is cached per release like the page read,
+and the builder cache surface purges the storefront's builderChrome handler
+beside builderPage.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0aeed9d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0aeed9d693da7c3ca9d34aad91f5d43ec26676c9))
+
+### Refactoring
+
+* refactor: one single-use ticket helper; the builder catalogue refuses when the storefront is silent (#410)
+
+core.tickets mints and spends the single-use tickets of the WebSocket and
+of the page builder's editor sign-in, which each had their own copy of the
+Redis GETDEL. Spending goes through CustomCache.getdel. Every ticket now
+lives under the strict: cache namespace, so an unreachable Redis raises
+instead of failing open: the builder's ticket was not under a strict
+prefix, so a lost write would have handed out a ticket nobody could redeem.
+The WebSocket middleware tests use the helper instead of mocking the raw
+cache client, and the helper has its own tests against real Redis,
+including a concurrent spend.
+
+The builder catalogue no longer outlives a failed revalidation: like the
+texts catalogue, when the storefront does not answer nothing is saved,
+whether or not a copy is held.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseR5L6psGVfGNSLAzQ5
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e7d99f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7d99f4b856d2ea9171e799b589bf670fbc6853e))
+
 ## v3.184.0 (2026-11-01)
 
 ### Bug fixes

@@ -578,6 +578,113 @@ class TestBlogCategoryReference:
         assert issue_codes(caught.value) == {(HOME, "reference_not_found")}
 
 
+class TestLinkReferences:
+    """A link that is ``{ref: {kind, id}}`` is a reference like any other:
+    indexed, and refused at publish when its target is gone."""
+
+    def link(self, kind, ident):
+        return {"link": {"ref": {"kind": kind, "id": ident}}}
+
+    @pytest.fixture
+    def targets(self, db):
+        from blog.factories.category import BlogCategoryFactory
+        from blog.factories.post import BlogPostFactory
+        from page_config.models import ContentPage
+        from product.factories.category import ProductCategoryFactory
+
+        ContentPage.objects.create(slug="privacy-policy", is_published=False)
+        return {
+            "product": ProductFactory(active=True).pk,
+            "category": ProductCategoryFactory(active=True).pk,
+            "blogCategory": BlogCategoryFactory().pk,
+            "blogPost": BlogPostFactory(is_published=True).pk,
+            "contentPage": "privacy-policy",
+        }
+
+    @pytest.mark.parametrize(
+        "kind",
+        ["product", "category", "blogCategory", "blogPost", "contentPage"],
+    )
+    def test_it_is_indexed_and_must_exist_to_be_published(
+        self, admin, catalogue, features_on, targets, kind
+    ):
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(**self.link(kind, targets[kind])))),
+        )
+        services.publish(admin, keys=[HOME])
+        row = BuilderReference.objects.get()
+        assert (row.kind, row.target, row.node_path) == (
+            kind,
+            str(targets[kind]),
+            "/sections/a/settings/link",
+        )
+
+        gone = "no-such-page" if kind == "contentPage" else 987654
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(**self.link(kind, gone)))),
+            revision=1,
+        )
+        with pytest.raises(DocumentInvalid) as caught:
+            services.publish(admin, keys=[HOME])
+
+        assert issue_codes(caught.value) == {(HOME, "reference_not_found")}
+
+    def test_a_page_link_names_a_page_or_template_document(
+        self, admin, catalogue, features_on
+    ):
+        banner = document(("b", section("banner@1", {"text": "x"})))
+        save(admin, "page:kelari", draft=banner)
+        save(
+            admin,
+            HOME,
+            draft=document(("a", hero(**self.link("page", "kelari")))),
+        )
+
+        services.publish(admin, keys=[HOME])
+
+        row = BuilderReference.objects.get()
+        assert (row.kind, row.target) == ("page", "kelari")
+
+    def test_a_link_inside_a_list_is_indexed_at_its_own_pointer(
+        self, admin, catalogue, features_on, targets
+    ):
+        cards = [
+            self.link("product", targets["product"]),
+            {"link": {"href": "https://example.com"}},
+            self.link("blogPost", targets["blogPost"]),
+        ]
+        save(admin, HOME, draft=document(("a", hero(cards=cards))))
+
+        services.publish(admin, keys=[HOME])
+
+        assert {
+            (r.kind, r.node_path) for r in BuilderReference.objects.all()
+        } == {
+            ("product", "/sections/a/settings/cards/0/link"),
+            ("blogPost", "/sections/a/settings/cards/2/link"),
+        }
+
+    def test_an_href_and_a_route_point_at_nothing_of_ours(
+        self, admin, catalogue, features_on
+    ):
+        save(
+            admin,
+            HOME,
+            draft=document(
+                ("a", hero(link={"href": "https://example.com/x"})),
+                ("b", hero(link={"route": "/offers"})),
+            ),
+        )
+
+        services.publish(admin, keys=[HOME])
+
+        assert not BuilderReference.objects.exists()
+
+
 class TestPageReferences:
     def test_a_page_is_named_by_the_key_of_a_page_or_a_template(
         self, admin, catalogue, features_on

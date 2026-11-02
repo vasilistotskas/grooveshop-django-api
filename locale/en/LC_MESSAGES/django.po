@@ -34,6 +34,10 @@ msgid "%(active)d/%(total)d active"
 msgstr "%(active)d/%(total)d active"
 
 #, python-format
+msgid "%(ago)s ago"
+msgstr "%(ago)s ago"
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
@@ -222,6 +226,18 @@ msgstr[0] "%(count)d tag was deactivated."
 msgstr[1] "%(count)d tags were deactivated."
 
 #, python-format
+msgid "%(count)s email of the platform did not arrive in the last 7 days: a billing notice, a password reset or an alert to the operators."
+msgid_plural "%(count)s emails of the platform did not arrive in the last 7 days: billing notices, password resets or alerts to the operators."
+msgstr[0] "%(count)s email of the platform did not arrive in the last 7 days: a billing notice, a password reset or an alert to the operators."
+msgstr[1] "%(count)s emails of the platform did not arrive in the last 7 days: billing notices, password resets or alerts to the operators."
+
+#, python-format
+msgid "%(count)s failed"
+msgid_plural "%(count)s failed"
+msgstr[0] "%(count)s failed"
+msgstr[1] "%(count)s failed"
+
+#, python-format
 msgid "%(count)s failure(s) acknowledged."
 msgstr "%(count)s failure(s) acknowledged."
 
@@ -248,6 +264,12 @@ msgid "%(count)s scheduled task enabled"
 msgid_plural "%(count)s scheduled tasks enabled"
 msgstr[0] "%(count)s scheduled task enabled"
 msgstr[1] "%(count)s scheduled tasks enabled"
+
+#, python-format
+msgid "%(count)s sent in 30 days"
+msgid_plural "%(count)s sent in 30 days"
+msgstr[0] "%(count)s sent in 30 days"
+msgstr[1] "%(count)s sent in 30 days"
 
 #, python-format
 msgid "%(counter)s COD parcel was delivered more than %(older_than_days)s days ago and ACS has still not reported a payout for it:"
@@ -309,6 +331,10 @@ msgstr "%(kind)s %(amount)s on order %(order)s"
 #, python-format
 msgid "%(kind)s %(target)s does not exist in this store."
 msgstr "%(kind)s %(target)s does not exist in this store."
+
+#, python-format
+msgid "%(kind)s must be at most %(limit)s positive ids."
+msgstr "%(kind)s must be at most %(limit)s positive ids."
 
 #, python-format
 msgid "%(kind)s — %(recipient)s — product %(product)s"
@@ -669,12 +695,21 @@ msgstr "A daily billing task walks the estate and notifies the store owner at th
 msgid "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 msgstr "A dispute is open on this payment and the payment provider does not accept a refund until it is decided. Refund once it has closed."
 
+msgid "A document has more than one version."
+msgstr "A document has more than one version."
+
+msgid "A document was deleted."
+msgstr "A document was deleted."
+
 #, python-format
 msgid "A domain is at most %(max)d characters long."
 msgstr "A domain is at most %(max)d characters long."
 
 msgid "A domain needs at least two labels, such as shop.example.com."
 msgstr "A domain needs at least two labels, such as shop.example.com."
+
+msgid "A draft was edited."
+msgstr "A draft was edited."
 
 msgid "A focal point is between 0 and 1."
 msgstr "A focal point is between 0 and 1."
@@ -731,6 +766,9 @@ msgstr "A post with this slug already exists."
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "A promotion discounts a cart line that is not part of the order."
 
+msgid "A publication is scheduled."
+msgstr "A publication is scheduled."
+
 #, python-format
 msgid "A publish can be scheduled at most %(days)s days ahead."
 msgstr "A publish can be scheduled at most %(days)s days ahead."
@@ -752,6 +790,9 @@ msgstr "A refund with this reference is already recorded for this order."
 
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
+
+msgid "A release was published by a staff member."
+msgstr "A release was published by a staff member."
 
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
@@ -804,6 +845,10 @@ msgid "A subscription topic with this slug already exists."
 msgstr "A subscription topic with this slug already exists."
 
 #, python-format
+msgid "A test of “%(title)s” was sent to %(address)s."
+msgstr "A test of “%(title)s” was sent to %(address)s."
+
+#, python-format
 msgid "A third-party account from %(provider)s has been connected to your account."
 msgstr "A third-party account from %(provider)s has been connected to your account."
 
@@ -839,6 +884,9 @@ msgstr "A valid ΑΦΜ is required when requesting an invoice (document_type=INV
 #, python-format
 msgid "A verified %(carrier)s webhook could not be applied."
 msgstr "A verified %(carrier)s webhook could not be applied."
+
+msgid "A version was saved by a staff member."
+msgstr "A version was saved by a staff member."
 
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
@@ -1385,6 +1433,9 @@ msgstr "All caught up: nothing is waiting for you."
 msgid "All email"
 msgstr "All email"
 
+msgid "All emails"
+msgstr "All emails"
+
 msgid "All rights reserved."
 msgstr "All rights reserved."
 
@@ -1526,6 +1577,9 @@ msgstr[1] "Applied %(discount)s%% discount to %(count)d products."
 
 msgid "Applies to the whole order"
 msgstr "Applies to the whole order"
+
+msgid "Apply"
+msgstr "Apply"
 
 msgid "Apply Custom Discount"
 msgstr "Apply Custom Discount"
@@ -2030,6 +2084,9 @@ msgstr "Blog comment liked"
 msgid "Blog comments to approve"
 msgstr "Blog comments to approve"
 
+msgid "Blog post"
+msgstr "Blog post"
+
 msgid "Blog post list/detail, related posts, comments, categories, tags, and authors."
 msgstr "Blog post list/detail, related posts, comments, categories, tags, and authors."
 
@@ -2050,6 +2107,9 @@ msgstr "Bought together"
 
 msgid "Bounced"
 msgstr "Bounced"
+
+msgid "Bounced, failed or marked as spam in the last 7 days"
+msgstr "Bounced, failed or marked as spam in the last 7 days"
 
 msgid "BoxNow APM identifier"
 msgstr "BoxNow APM identifier"
@@ -4276,9 +4336,6 @@ msgstr "Email Address"
 msgid "Email Addresses"
 msgstr "Email Addresses"
 
-msgid "Email Templates"
-msgstr "Email Templates"
-
 msgid "Email address"
 msgstr "Email address"
 
@@ -4361,6 +4418,9 @@ msgstr "Emails can't be sent from %(domain)s until its Resend key is saved"
 
 msgid "Emails cannot be sent until a Resend key is saved"
 msgstr "Emails cannot be sent until a Resend key is saved"
+
+msgid "Emails failing"
+msgstr "Emails failing"
 
 msgid "Empty cart"
 msgstr "Empty cart"
@@ -4765,6 +4825,9 @@ msgstr "Failed to retrieve settings"
 
 msgid "Failed to start the payment."
 msgstr "Failed to start the payment."
+
+msgid "Failing"
+msgstr "Failing"
 
 msgid "Failure"
 msgstr "Failure"
@@ -7015,6 +7078,9 @@ msgstr "Id of the platform staff member who last saved this text (public schema,
 msgid "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 msgstr "Id of the platform staff member who made the change (public schema, not a store user). Read it through ``performed_by_staff``."
 
+msgid "Id of the platform staff member who sent this test (public schema, not a store user). Read it through ``triggered_by_staff``."
+msgstr "Id of the platform staff member who sent this test (public schema, not a store user). Read it through ``triggered_by_staff``."
+
 msgid "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
 msgstr "Id of the platform staff member who switched this type off (public schema, not a store user). Read it through ``changed_by_staff``."
 
@@ -7154,6 +7220,12 @@ msgstr "In stock (%(stock)s)"
 #, python-format
 msgid "In the last %(days)s days"
 msgstr "In the last %(days)s days"
+
+msgid "In the last 30 days"
+msgstr "In the last 30 days"
+
+msgid "In the last 7 days"
+msgstr "In the last 7 days"
 
 msgid "In transit"
 msgstr "In transit"
@@ -7578,6 +7650,10 @@ msgstr "Last order"
 msgid "Last polled at"
 msgstr "Last polled at"
 
+#, python-format
+msgid "Last sent %(ago)s ago"
+msgstr "Last sent %(ago)s ago"
+
 msgid "Last synced at"
 msgstr "Last synced at"
 
@@ -7592,6 +7668,9 @@ msgstr "Latest expected delivery date, fixed when the order was placed from the 
 
 msgid "Latest orders"
 msgstr "Latest orders"
+
+msgid "Latest sends"
+msgstr "Latest sends"
 
 msgid "Latitude"
 msgstr "Latitude"
@@ -8735,6 +8814,9 @@ msgstr "No description"
 msgid "No discounts applied"
 msgstr "No discounts applied"
 
+msgid "No email matches."
+msgstr "No email matches."
+
 msgid "No item in the cart qualifies for this promotion"
 msgstr "No item in the cart qualifies for this promotion"
 
@@ -8891,6 +8973,9 @@ msgstr "Not a valid document key."
 msgid "Not a valid id."
 msgstr "Not a valid id."
 
+msgid "Not a valid reference."
+msgstr "Not a valid reference."
+
 #, python-format
 msgid "Not an email type you can choose: %(keys)s."
 msgstr "Not an email type you can choose: %(keys)s."
@@ -8924,6 +9009,9 @@ msgstr "Not scanned"
 msgid "Not sent"
 msgstr "Not sent"
 
+msgid "Not sent in the last 30 days"
+msgstr "Not sent in the last 30 days"
+
 msgid "Not set"
 msgstr "Not set"
 
@@ -8953,6 +9041,9 @@ msgstr "Nothing has been changed yet."
 
 msgid "Nothing has been deleted — your products, orders, and settings are all intact."
 msgstr "Nothing has been deleted — your products, orders, and settings are all intact."
+
+msgid "Nothing has been sent yet."
+msgstr "Nothing has been sent yet."
 
 msgid "Nothing has changed since the last release."
 msgstr "Nothing has changed since the last release."
@@ -9177,6 +9268,9 @@ msgstr "Opaque cursor (cursor pagination strategy)"
 
 msgid "Open full stock history chart"
 msgstr "Open full stock history chart"
+
+msgid "Open the email log"
+msgstr "Open the email log"
 
 msgid "Open the failed publishes"
 msgstr "Open the failed publishes"
@@ -11589,6 +11683,9 @@ msgstr "Remove the applied coupon code from the cart"
 msgid "Remove this store's wording and go back to the default?"
 msgstr "Remove this store's wording and go back to the default?"
 
+msgid "Removing an address here lets this store write to it again. Resend keeps its own suppression list for the whole team, and nothing here changes it: if the address is on it, also remove it in the Resend dashboard (Emails, Suppressions), or its emails will still be refused."
+msgstr "Removing an address here lets this store write to it again. Resend keeps its own suppression list for the whole team, and nothing here changes it: if the address is on it, also remove it in the Resend dashboard (Emails, Suppressions), or its emails will still be refused."
+
 msgid "Rendered"
 msgstr "Rendered"
 
@@ -12286,9 +12383,6 @@ msgstr "Select all"
 msgid "Select an ACS Smartpoint locker before placing an order with locker delivery."
 msgstr "Select an ACS Smartpoint locker before placing an order with locker delivery."
 
-msgid "Select an email to preview"
-msgstr "Select an email to preview"
-
 msgid "Select an email to preview."
 msgstr "Select an email to preview."
 
@@ -12325,6 +12419,12 @@ msgstr "Send as the X-Cart-Token header."
 msgid "Send receipt to myDATA"
 msgstr "Send receipt to myDATA"
 
+msgid "Send test"
+msgstr "Send test"
+
+msgid "Send test goes only to the email address of your own account, in the language and with the data chosen above, and is marked as a test in the log."
+msgstr "Send test goes only to the email address of your own account, in the language and with the data chosen above, and is marked as a test in the log."
+
 msgid "Send the link"
 msgstr "Send the link"
 
@@ -12342,6 +12442,9 @@ msgstr "Sent after sign-up to confirm the address, with a link or a code."
 
 msgid "Sent at"
 msgstr "Sent at"
+
+msgid "Sent from the admin's Send test, to the staff member."
+msgstr "Sent from the admin's Send test, to the staff member."
 
 msgid "Sent once for every refund paid back to the customer."
 msgstr "Sent once for every refund paid back to the customer."
@@ -13422,6 +13525,9 @@ msgstr "Supports Pickup Point"
 msgid "Suppressed by the provider"
 msgstr "Suppressed by the provider"
 
+msgid "Suppression list"
+msgstr "Suppression list"
+
 msgid "Surface"
 msgstr "Surface"
 
@@ -13452,6 +13558,12 @@ msgstr "Suspended via platform admin"
 
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
+
+msgid "Switch on or off"
+msgstr "Switch on or off"
+
+msgid "Switched off"
+msgstr "Switched off"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Sync lockers from BoxNow API"
@@ -13650,6 +13762,9 @@ msgstr "Tenants"
 
 msgid "Term ended"
 msgstr "Term ended"
+
+msgid "Test send"
+msgstr "Test send"
 
 # Email Template Translations
 msgid "Testimonials"
@@ -13876,6 +13991,9 @@ msgstr "The document is larger than %(limit)s KB."
 msgid "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 msgstr "The draft revision the current release carries, empty when unknown (after a rollback, before a first publish). A draft with another revision has unpublished changes."
 
+msgid "The emails the platform itself sends: billing notices to the stores' owners, the staff password reset and the alerts to the platform's operators. All of them are required, so none can be switched off."
+msgstr "The emails the platform itself sends: billing notices to the stores' owners, the staff password reset and the alerts to the platform's operators. All of them are required, so none can be switched off."
+
 msgid "The end is before the start."
 msgstr "The end is before the start."
 
@@ -13934,6 +14052,9 @@ msgstr "The gross unit price a consumer paid: price plus VAT, minus the product 
 
 msgid "The id the provider returned. Empty over SMTP, which returns none."
 msgstr "The id the provider returned. Empty over SMTP, which returns none."
+
+msgid "The ids to resolve are not valid."
+msgstr "The ids to resolve are not valid."
 
 #, python-format
 msgid "The image has more than %(limit)s megapixels."
@@ -14036,6 +14157,9 @@ msgstr "The platform manages this text (legal, consent, cookie or error wording)
 
 msgid "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
 msgstr "The platform may issue retail receipts only for a business exempt from the fiscal device (ΦΗΜ). Record the legal ground in MYDATA_FHM_EXEMPTION_GROUND, or switch MYDATA_ENABLED off and issue receipts in your fiscal device or e-invoicing provider."
+
+msgid "The platform's emails are failing"
+msgstr "The platform's emails are failing"
 
 msgid "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
 msgstr "The points the signed-in customer would earn per product, for every listed product that exists. A product that does not exist is left out."
@@ -14215,6 +14339,9 @@ msgstr "The stores on this platform, their plans and the health of background wo
 msgid "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 msgstr "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* or a restricted rk_* key). Secret — never expose to the browser. Empty means Stripe is unavailable for this tenant — there is no platform-wide fallback."
 
+msgid "The test email could not be sent. The email log has the reason."
+msgstr "The test email could not be sent. The email log has the reason."
+
 msgid "The text is not valid. Check the braces { }, the | separators and the @ references."
 msgstr "The text is not valid. Check the braces { }, the | separators and the @ references."
 
@@ -14275,6 +14402,12 @@ msgstr "Theme Preset"
 
 msgid "There can only be one main address per user."
 msgstr "There can only be one main address per user."
+
+msgid "There is a named save (checkpoint)."
+msgstr "There is a named save (checkpoint)."
+
+msgid "There is a release after the first: someone published."
+msgstr "There is a release after the first: someone published."
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
@@ -14676,6 +14809,9 @@ msgstr "To bring your store back, arrange the renewal by replying to this email 
 msgid "To confirm your email address, open this link:"
 msgstr "To confirm your email address, open this link:"
 
+msgid "To customers"
+msgstr "To customers"
+
 msgid "To issue in timologio"
 msgstr "To issue in timologio"
 
@@ -14685,6 +14821,12 @@ msgstr "To product"
 #, python-format
 msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
 msgstr "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
+
+msgid "To stores"
+msgstr "To stores"
+
+msgid "To the platform's operators"
+msgstr "To the platform's operators"
 
 msgid "To your team"
 msgstr "To your team"
@@ -14829,6 +14971,9 @@ msgstr "Trigger"
 msgid "Triggered by"
 msgstr "Triggered by"
 
+msgid "Triggered by (staff)"
+msgstr "Triggered by (staff)"
+
 msgid "True if reservation was converted to actual stock decrement"
 msgstr "True if reservation was converted to actual stock decrement"
 
@@ -14879,6 +15024,12 @@ msgstr "Type"
 
 msgid "Type DELETE exactly to confirm account deletion."
 msgstr "Type DELETE exactly to confirm account deletion."
+
+msgid "Type an exact email address to find the emails sent to it."
+msgstr "Type an exact email address to find the emails sent to it."
+
+msgid "Type an exact email address to find whether it is suppressed."
+msgstr "Type an exact email address to find whether it is suppressed."
 
 msgid "Type cannot be changed after creation"
 msgstr "Type cannot be changed after creation"
@@ -15740,6 +15891,9 @@ msgstr "What the customer owes for the order, fixed at creation: lines and extra
 msgid "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 msgstr "What the provider charged for this movement, as the provider reported it. Empty until reported; never an estimate."
 
+msgid "What the provider reported"
+msgstr "What the provider reported"
+
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 
@@ -15913,6 +16067,9 @@ msgstr "Which provider flow the client must run"
 
 msgid "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
 msgstr "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
+
+msgid "Who receives the email"
+msgstr "Who receives the email"
 
 msgid "Who sees what"
 msgstr "Who sees what"
@@ -16107,6 +16264,9 @@ msgstr "You do not have permission to perform this action."
 msgid "You have already reviewed this product."
 msgstr "You have already reviewed this product."
 
+msgid "You have used all your test emails for this hour. Try again later."
+msgstr "You have used all your test emails for this hour. Try again later."
+
 msgid "You left something behind"
 msgstr "You left something behind"
 
@@ -16183,6 +16343,9 @@ msgstr "Your Order Has Shipped"
 
 msgid "Your Receipt"
 msgstr "Your Receipt"
+
+msgid "Your account has no email address to send it to."
+msgstr "Your account has no email address to send it to."
 
 msgid "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
 msgstr "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
@@ -16414,6 +16577,9 @@ msgstr "Zipcode"
 
 msgid "Zipcode is required."
 msgstr "Zipcode is required."
+
+msgid "[Test]"
+msgstr "[Test]"
 
 #, python-brace-format
 msgid "[{site}] A scheduled publish failed"
@@ -16708,6 +16874,9 @@ msgstr "surfaces"
 msgid "target_price is required for price-drop alerts."
 msgstr "target_price is required for price-drop alerts."
 
+msgid "test"
+msgstr "test"
+
 msgid "threshold"
 msgstr "threshold"
 
@@ -16839,6 +17008,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"
+
+#~ msgid "Email Templates"
+#~ msgstr "Email Templates"
 
 #~ msgid "Email template"
 #~ msgstr "Email template"
@@ -17000,6 +17172,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
 #~ msgstr "Search multiple content types simultaneously using Meilisearch multi_search API with federation mode. Results are weighted and merged with products having weight 1.0 and blog posts having weight 0.7."
+
+#~ msgid "Select an email to preview"
+#~ msgstr "Select an email to preview"
 
 #~ msgid "Sent when order is canceled"
 #~ msgstr "Sent when order is canceled"

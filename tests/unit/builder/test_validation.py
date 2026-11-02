@@ -13,6 +13,7 @@ import pytest
 
 from builder.storefront import parse_catalogue
 from builder.validation import validate_document
+from core.storefront import StorefrontUnavailable
 from tests.utils.builder import (
     HASH,
     default_blocks,
@@ -603,3 +604,277 @@ def test_a_template_must_be_a_page_type_the_storefront_has():
     # A custom page is not a template: any slug goes.
     banner = document(("a", section("banner@1", {"text": "x"})))
     assert run(banner, key="page:nowhere")[0] == []
+
+
+class TestLinkReferences:
+    def ref(self, kind, ident):
+        return {"ref": {"kind": kind, "id": ident}}
+
+    @pytest.mark.parametrize(
+        ("kind", "ident"),
+        [
+            ("product", 7),
+            ("category", 3),
+            ("blogCategory", 4),
+            ("blogPost", 9),
+            ("page", "kelari"),
+            ("contentPage", "privacy-policy"),
+        ],
+    )
+    def test_each_kind_is_recorded_at_the_links_own_pointer(self, kind, ident):
+        issues, validated = run(
+            document(("a", hero(link=self.ref(kind, ident))))
+        )
+
+        assert issues == []
+        assert validated is not None
+        assert validated.refs == {
+            kind: {str(ident): ["/sections/a/settings/link"]}
+        }
+
+    def test_links_in_a_list_are_each_recorded(self):
+        issues, validated = run(
+            document(
+                (
+                    "a",
+                    hero(
+                        cards=[
+                            {"link": self.ref("product", 1)},
+                            {"link": {"route": "/offers"}},
+                            {"link": self.ref("product", 2)},
+                        ]
+                    ),
+                )
+            )
+        )
+
+        assert issues == []
+        assert validated is not None
+        assert validated.refs == {
+            "product": {
+                "1": ["/sections/a/settings/cards/0/link"],
+                "2": ["/sections/a/settings/cards/2/link"],
+            }
+        }
+
+    def test_an_href_and_a_route_are_not_references(self):
+        issues, validated = run(
+            document(
+                ("a", hero(link={"href": "https://example.com"})),
+                ("b", hero(link={"route": "/products"})),
+            )
+        )
+
+        assert issues == []
+        assert validated is not None
+        assert validated.refs == {}
+
+    @pytest.mark.parametrize(
+        "link",
+        [
+            {"ref": {"kind": "product", "id": "7"}},
+            {"ref": {"kind": "product", "id": True}},
+            {"ref": {"kind": "product", "id": 0}},
+            {"ref": {"kind": "blogPost", "id": -1}},
+            {"ref": {"kind": "page", "id": 5}},
+            {"ref": {"kind": "contentPage", "id": ""}},
+            {"ref": {"kind": "page", "id": "x" * 65}},
+        ],
+    )
+    def test_an_id_that_is_not_the_shape_of_its_kind_is_refused(self, link):
+        issues, _ = run(document(("a", hero(link=link))))
+
+        assert "/sections/a/settings/link" in codes(issues)
+        assert codes(issues)["/sections/a/settings/link"] in {
+            "invalid_reference",
+            "invalid_settings",
+        }
+
+    def test_a_kind_that_is_not_a_reference_kind_is_refused(self):
+        # The catalogue's schema refuses it first; what must hold even for a
+        # schema that does not is that it never reaches the existence check.
+        blocks = default_blocks()
+        blocks[0]["schema"]["properties"]["link"] = {"type": "object"}
+        catalogue = parse_catalogue(
+            {
+                "hash": HASH,
+                "blocks": blocks,
+                "documentKinds": default_document_kinds(),
+                "templates": ["home"],
+            }
+        )
+
+        issues, validated = validate_document(
+            key="template:home",
+            data=document(("a", hero(link=self.ref("order", 5)))),
+            i18n={},
+            catalogue=catalogue,
+            feature_on=lambda name: True,
+        )
+
+        assert validated is None
+        assert codes(issues) == {
+            "/sections/a/settings/link": "invalid_reference"
+        }
+
+    def test_a_link_is_the_same_in_every_language(self):
+        issues, _ = run(
+            document(("a", hero(link=self.ref("product", 1)))),
+            i18n={"en": {"a": {"/link": self.ref("product", 2)}}},
+        )
+
+        assert codes(issues) == {"/i18n/en/a/link": "untranslatable_setting"}
+
+
+class TestNestedTranslatablesBesideALink:
+    """``features_grid``'s shape: text leaves of an object are translated,
+    the link in the same object is not."""
+
+    CATALOGUE = parse_catalogue(
+        {
+            "hash": HASH,
+            "blocks": [
+                {
+                    "type": "grid",
+                    "version": 1,
+                    "accepts": [],
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string"},
+                                    "text": {"type": "string"},
+                                    "ctaLink": {"type": "object"},
+                                },
+                            }
+                        },
+                    },
+                    "translatable": ["/prompt/title", "/prompt/text"],
+                    "linkRefs": ["/prompt/ctaLink"],
+                    "kinds": ["section"],
+                }
+            ],
+            "documentKinds": default_document_kinds(),
+            "templates": ["home"],
+        }
+    )
+    DOCUMENT = document(
+        (
+            "a",
+            section(
+                "grid@1",
+                {
+                    "prompt": {
+                        "title": "Τίτλος",
+                        "text": "Κείμενο",
+                        "ctaLink": {"ref": {"kind": "product", "id": 2}},
+                    }
+                },
+            ),
+        )
+    )
+
+    def run(self, i18n):
+        return validate_document(
+            key="template:home",
+            data=self.DOCUMENT,
+            i18n=i18n,
+            catalogue=self.CATALOGUE,
+            feature_on=lambda name: True,
+        )
+
+    def test_the_text_leaves_take_an_overlay_at_their_nested_pointers(self):
+        overlay = {
+            "en": {"a": {"/prompt/title": "Title", "/prompt/text": "Text"}}
+        }
+
+        issues, validated = self.run(overlay)
+
+        assert issues == []
+        assert validated is not None
+        assert validated.i18n == overlay
+        assert validated.refs == {
+            "product": {"2": ["/sections/a/settings/prompt/ctaLink"]}
+        }
+
+    def test_the_link_beside_them_is_refused_in_an_overlay(self):
+        overlay = {
+            "en": {
+                "a": {"/prompt/ctaLink": {"ref": {"kind": "product", "id": 2}}}
+            }
+        }
+
+        issues, _ = self.run(overlay)
+
+        assert codes(issues) == {
+            "/i18n/en/a/prompt/ctaLink": "untranslatable_setting"
+        }
+
+    def test_the_whole_object_is_not_translatable(self):
+        issues, _ = self.run({"en": {"a": {"/prompt": {"title": "T"}}}})
+
+        assert codes(issues) == {"/i18n/en/a/prompt": "untranslatable_setting"}
+
+
+class TestTheCatalogueReadsLinks:
+    def block(self, **extra):
+        return {
+            "hash": HASH,
+            "blocks": [
+                {
+                    "type": "cta",
+                    "version": 1,
+                    "accepts": [],
+                    "schema": {"type": "object"},
+                    "kinds": ["section"],
+                    **extra,
+                }
+            ],
+        }
+
+    def test_a_block_may_declare_links(self):
+        catalogue = parse_catalogue(self.block(linkRefs=["/link", "/a/*/link"]))
+
+        assert catalogue.get("cta").link_refs == ("/link", "/a/*/link")
+
+    def test_a_block_without_links_has_none(self):
+        assert parse_catalogue(self.block()).get("cta").link_refs == ()
+
+    @pytest.mark.parametrize(
+        ("link_refs", "translatable"),
+        [
+            (["/link"], ["/link", "/title"]),
+            # A link under a translatable setting, and a translatable
+            # setting inside a link.
+            (["/prompt/ctaLink"], ["/prompt"]),
+            (["/link"], ["/link/label"]),
+            # Wildcards count, in either pattern.
+            (["/cards/*/link"], ["/cards/0/link"]),
+            (["/cards/0/link"], ["/cards/*"]),
+            (["/cards/*/link"], ["/cards/*/link/x"]),
+        ],
+    )
+    def test_a_link_cannot_be_translatable_or_inside_something_that_is(
+        self, link_refs, translatable
+    ):
+        with pytest.raises(StorefrontUnavailable) as caught:
+            parse_catalogue(
+                self.block(linkRefs=link_refs, translatable=translatable)
+            )
+
+        assert "cannot be translatable" in str(caught.value.__cause__)
+
+    def test_a_link_beside_translatable_settings_is_fine(self):
+        catalogue = parse_catalogue(
+            self.block(
+                linkRefs=["/prompt/ctaLink", "/cards/*/link"],
+                translatable=["/prompt/text", "/cards/*/title", "/title"],
+            )
+        )
+
+        assert catalogue.get("cta").link_refs == (
+            "/prompt/ctaLink",
+            "/cards/*/link",
+        )

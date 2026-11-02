@@ -60,6 +60,10 @@ PLATFORM_APP_LABELS: frozenset[str] = frozenset(
         "region",
         "django_celery_beat",
         "django_celery_results",
+        # The platform's own mail: its log and its suppression list live in
+        # ``public`` (``send_email`` runs a platform type under it), and the
+        # emails page lists the ``Owner.PLATFORM`` types.
+        "emails",
         # ``allauth_idp_oidc`` deliberately ABSENT: allauth.idp.oidc is
         # in TENANT_APPS only, so its tables do not exist in the public
         # schema — the sections rendered on the control plane but 500'd
@@ -89,6 +93,7 @@ PLATFORM_EXCLUDED_MODELS: frozenset[str] = frozenset(
 # public, and the store's admin reads store-only tables.
 PLATFORM_ADMIN_CLASSES: dict[str, str] = {
     "user.UserAccount": "user.admin.PlatformUserAdmin",
+    "emails.EmailSwitch": "emails.admin.PlatformEmailSwitchAdmin",
 }
 
 

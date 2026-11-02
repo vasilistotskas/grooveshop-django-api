@@ -254,7 +254,7 @@ class TestRoles:
         )
 
         assert "Orders" in entries
-        assert "Email Templates" in entries
+        assert "Emails" in entries
         for title in ("Store Settings", "Cache", "System", "Security & Access"):
             assert title not in entries, title
 
@@ -319,9 +319,12 @@ def test_the_site_menu_is_the_ops_consoles_for_platform_superusers():
 
 # Registered, and deliberately absent from the sidebar: rows edited inside
 # their parent's form, and a token table nobody browses. Order items have
-# a tab on every order page instead (``UNFOLD["TABS"]``).
+# a tab on every order page instead (``UNFOLD["TABS"]``). The email log and
+# the suppression list are buttons on the Emails page.
 REACHED_FROM_THEIR_PARENT = frozenset(
     {
+        "emails.EmailLog",
+        "emails.EmailSuppression",
         "cart.CartItem",
         "tag.TaggedItem",
         "socialaccount.SocialToken",

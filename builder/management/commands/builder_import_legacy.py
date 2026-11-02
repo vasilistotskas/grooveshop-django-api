@@ -85,6 +85,13 @@ class Command(TenantCommandMixin, BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f"{report.schema}: not imported")
             )
+        for key in report.documents:
+            counts = report.counts[key]
+            state = "released" if key in report.published else "draft"
+            self.stdout.write(
+                f"    {key} ({state}): {counts['sections']} section(s), "
+                f"{counts['blocks']} block(s)"
+            )
         for problem in report.problems:
             self.stdout.write(
                 f"    problem {problem['document']} {problem['path']} "

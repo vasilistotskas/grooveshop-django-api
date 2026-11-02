@@ -29,6 +29,7 @@ from core.views import (
     HomeView,
     ManageTOTPSvgView,
     robots_txt,
+    set_language,
     upload_image,
 )
 from emails.webhooks import ResendWebhookView
@@ -62,7 +63,7 @@ app_name = "core"
 # discovery + headless-auth endpoints.
 _root_shared_patterns = [
     path("robots.txt", robots_txt, name="robots-txt"),
-    path("i18n/", include("django.conf.urls.i18n")),
+    path("i18n/setlang/", set_language, name="set_language"),
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
     path(
         "viva-wallet/webhook/",

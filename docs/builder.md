@@ -89,7 +89,14 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `limits` (`maxBlocks`, `maxPerTemplate`), `children` (`allowed`,
 `maxDepth`), `kinds` (`section`, `block`), optional `groups`, `templates`,
 `feature` and `deprecated`. A setting whose schema says
-`contentMediaType: "text/html"` is rich text.
+`contentMediaType: "text/html"` is rich text. `linkRefs` (same pointer
+syntax) names the link settings, see "References, not copies"; a link pointer
+cannot equal, lie under or hold a `translatable` pointer (`*` counts).
+`linkRefs` is optional ONLY so that Django can deploy before the storefront
+that emits it on every block (`[]` where a block has no link); a later change
+makes it required, and until then a catalogue that omits it silently indexes
+no link. Check the key against the real catalogue after a storefront
+deployment (step 1 of the run sheet).
 
 ## What a save checks
 
@@ -148,11 +155,24 @@ Settings the catalogue marks as `refs` hold ids: `product` and `category`
 (active, numeric id), `page` (a page key: the store's `page:<key>` document or the
 `template:<key>` of a fixed page type, draft or released), `contentPage` (a
 ContentPage slug, in any state), `blogCategory` (a blog category id), `menu`
-(a navigation slot), `media` (a `MediaAsset` id). A draft may point at something
+(a navigation slot), `media` (a `MediaAsset` id), `blogPost` (a published post's
+id). A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a
 thing is used.
+
+**Links.** A setting listed in the block's `linkRefs` holds one of `{href}` (an
+external address), `{route}` (a fixed route) or `{ref: {kind, id}}`, and the
+catalogue's schema checks the first two. Only `{ref}` points at something of
+ours, and its kind is in the data, so a static `refs` entry cannot carry it:
+for each `{ref}` found at a `linkRefs` pointer, validation checks `id` has the
+shape of `kind` (an unknown kind is `invalid_reference`) and records
+`(kind, id, the link's own pointer)` with the other references. The version's
+`refs`, the `BuilderReference` index, the publish check (`reference_not_found`)
+and "where is it used" then treat it like any other reference. A link is not
+translatable: it resolves to the path of the viewer's language, so an overlay
+value on it is `untranslatable_setting`.
 
 ## Writes
 
@@ -220,6 +240,17 @@ A store with no release answers `{release: 0, theme: null, groups: {}, pages:
 []}`, not 404. Cached under `builder:<schema>:r<release>:chrome:<locale>`,
 immutable per release; the `builder` surface purges the storefront's
 `builderPage` and `builderChrome` handlers.
+
+`GET link-targets?product=1,2&category=3&blogPost=4&blogCategory=5`
+(AllowAny) is what the storefront resolves link references with:
+`{kind: {id: slug}}` for the kinds asked about, one query per kind. An id
+that is missing, inactive or unpublished is absent (the rules a publish
+checks references with: active product and category, published post, any
+blog category). Slugs are the same in every language. At most
+`BUILDER_LINK_TARGETS_MAX_IDS` ids per kind; an id that is not a positive
+integer, or too many, is `400 invalid_link_targets` naming the `param`. The
+query keys are camelCase on the wire (the camel-case middleware underscores
+them before the view reads them).
 
 ## The media library
 
@@ -394,12 +425,56 @@ settings); Django never converts:
   released one, and ONE release (number 1, no staff, note "Imported from page
   layouts"). A problem anywhere, including a reference to nothing, writes
   nothing. A store that already has builder data is refused. `--dry-run` does
-  everything and rolls it back. The legacy tables are not touched.
+  everything and rolls it back; the `--json` report also gives each document's
+  `counts` (`sections` and `blocks` at every depth). The legacy tables are not
+  touched.
 - The storefront's golden fixtures (`{request, response}` per section type,
   and the menus) are copied under `tests/fixtures/builder/legacy/` and
   replayed by `tests/integration/builder/test_converter_fixtures.py`.
 - `manage.py builder_export_legacy --all-tenants --out DIR` writes every
   request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
+
+## Run sheet: importing a live environment
+
+Every command is `kubectl --context grooveshop -n <namespace> exec
+deploy/backend -- /home/app/.venv/bin/python manage.py ...` (`grooveshop` is
+production, `grooveshop-staging` staging; from Git Bash prefix
+`MSYS_NO_PATHCONV=1`, or the path is rewritten). The import only writes builder
+tables: `page_config` and every storefront read stay as they are, so nothing
+changes for a visitor until the storefront switch.
+
+1. **Before.** The backend carries the builder import and the storefront
+   serves the strict converter (`POST /api/builder/convert-legacy` answers; the
+   storefront image is the one the staging run used). Its catalogue declares
+   `linkRefs`: `fetch_catalogue(<schema>).get("hero_carousel").link_refs` is not
+   empty in the backend's shell, since an absent key would let a raw link
+   through unindexed.
+2. **Pre-check, on that environment's data.**
+   `builder_import_legacy --all-tenants --dry-run --json`. Every store must
+   show `problems: []` and `applied: false`. Read each `warnings` entry
+   (`dropped_title` is expected, anything else is a decision). A store
+   reporting `already_imported` has builder data already: stop and look at it.
+3. **Import.** The same command without `--dry-run`. One transaction per
+   store; a store with a problem is skipped and reported, nothing of it is
+   written, and the command exits non-zero. Each store ends at release 1,
+   note "Imported from page layouts", no staff.
+4. **Verify (read only).** Per store: the release is 1; each document key and
+   kind is the dry run's; every released document has one version (number 1)
+   and `published_revision` 1; a draft layout has no version and is not in
+   the release. Then `GET /api/v1/builder/published/home?locale=el` and
+   `?locale=en` answer 200 with the layout's sections, and the English
+   overlay is there where the legacy layout had English text. A second
+   `--dry-run` answers `already_imported` for every store.
+5. **Rollback, before the storefront reads the builder.**
+   `builder_reset --tenant <schema>` reports what it would delete;
+   `--confirm` deletes it (documents, versions, the release, the reference
+   index; cached reads of the release go with it). It refuses, and says why,
+   unless the data is exactly what an import leaves: one release, no staff
+   behind a release or version, no edited draft, named save, deleted document
+   or schedule. It cannot see whether the storefront already reads the
+   builder: that is the storefront deployment, so a reset belongs before it,
+   never after. The media library and `page_config` are never touched.
+   Afterwards the import can be run again.
 
 ## What is copied from the storefront
 

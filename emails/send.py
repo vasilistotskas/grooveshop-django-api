@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from django.core.cache import cache
+from django.utils import translation
+from django.utils.translation import gettext
 
 from emails import log, optout, sender, suppression, transport
 from emails.headers import build_headers
@@ -130,12 +132,35 @@ def _send_to(
                 extra={"email_type": email_type.key},
             )
         return _skip(email_type, Status.SKIPPED_SUPPRESSED, recipient=recipient)
+    return deliver_to(email_type, obj, recipient, attachments)
+
+
+def deliver_to(
+    email_type: EmailType,
+    obj: Any,
+    recipient: Recipient,
+    attachments: Sequence[Attachment] = (),
+    *,
+    test_by: Any = None,
+) -> Delivery:
+    """Render, log and hand one recipient's message to the transport: the
+    part of a send after the gates, the switch, the opt-out and the
+    suppression list. ``test_by`` (the staff member of the admin's Send
+    test) marks the row as a test and prefixes the subject; a test goes
+    through the same transport, so it proves the real path."""
     rendered = render(
         email_type,
         obj,
         RenderEnv(language=recipient.language, recipient=recipient),
     )
-    entry = log.start(email_type.key, recipient, rendered.subject)
+    if test_by is not None:
+        with translation.override(recipient.language):
+            rendered = replace(
+                rendered, subject=f"{gettext('[Test]')} {rendered.subject}"
+            )
+    entry = log.start(
+        email_type.key, recipient, rendered.subject, test_by=test_by
+    )
     if entry.status not in NOT_SENT:
         # An earlier attempt of this task already sent it (a retry after a
         # later recipient failed): never send it twice.

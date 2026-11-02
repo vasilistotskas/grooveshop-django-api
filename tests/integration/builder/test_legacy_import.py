@@ -246,6 +246,73 @@ class TestImporting:
             == "page"
         )
 
+    def test_the_report_counts_each_documents_sections_and_blocks(self):
+        make_layout("home")
+        make_layout("about", published=False)
+        nested = Converted(
+            document={
+                "sections": {
+                    "h": {
+                        "type": "hero@2",
+                        "settings": {"title": "t"},
+                        "blocks": {
+                            "h-1": {"type": "slide@1", "settings": {}},
+                            "h-2": {"type": "slide@1", "settings": {}},
+                        },
+                        "blockOrder": ["h-1", "h-2"],
+                    },
+                    "b": {"type": "banner@1", "settings": {"text": "x"}},
+                },
+                "order": ["h", "b"],
+            },
+            i18n={},
+        )
+
+        def convert(body):
+            if body["key"] == "template:home":
+                return nested
+            return fake_convert(body)
+
+        with mock.patch(
+            "builder.importing.convert_legacy", side_effect=convert
+        ):
+            report = importing.import_store(dry_run=True)
+
+        assert report.counts == {
+            "template:home": {"sections": 2, "blocks": 2},
+            "template:about": {"sections": 1, "blocks": 0},
+        }
+        assert asdict(report)["counts"] == report.counts
+
+    def test_blocks_are_counted_at_every_depth(self):
+        columns = {
+            "sections": {
+                "c": {
+                    "type": "columns@1",
+                    "settings": {},
+                    "blocks": {
+                        "c-1": {
+                            "type": "column@1",
+                            "settings": {},
+                            "blocks": {
+                                "c-1-1": {"type": "item@1", "settings": {}},
+                                "c-1-2": {"type": "item@1", "settings": {}},
+                            },
+                            "blockOrder": ["c-1-1", "c-1-2"],
+                        }
+                    },
+                    "blockOrder": ["c-1"],
+                }
+            },
+            "order": ["c"],
+        }
+
+        assert importing.count_nodes(columns) == {"sections": 1, "blocks": 3}
+        assert importing.count_nodes({"sections": {}, "order": []}) == {
+            "sections": 0,
+            "blocks": 0,
+        }
+
     def test_the_seo_of_the_default_language_becomes_the_documents_settings(
         self, converter
     ):

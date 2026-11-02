@@ -35,17 +35,53 @@ def _stores():
 
 @register_component
 class PlatformAlerts(DashboardWidget):
-    """What the platform's operators must fix: today, a store whose mail
-    cannot be sent through the selected transport (``emails.setup``)."""
+    """What the platform's operators must fix: the platform's own mail
+    that failed this week, and a store whose mail cannot be sent through
+    the selected transport (``emails.setup``)."""
+
+    def _failing_platform_emails(self) -> list[dict[str, Any]]:
+        """The platform's own emails (billing notices, the staff password
+        reset, the health and backup alerts) that did not arrive in the last
+        7 days: read from the ``public`` log, which this page is in."""
+        from emails import figures
+        from emails.models import EmailLog
+
+        failing = EmailLog.objects.filter(figures.failing_since()).count()
+        if not failing:
+            return []
+        return [
+            {
+                "variant": "danger",
+                "icon": "mail",
+                "title": _("The platform's emails are failing"),
+                "text": ngettext(
+                    "%(count)s email of the platform did not arrive in the "
+                    "last 7 days: a billing notice, a password reset or an "
+                    "alert to the operators.",
+                    "%(count)s emails of the platform did not arrive in the "
+                    "last 7 days: billing notices, password resets or "
+                    "alerts to the operators.",
+                    failing,
+                )
+                % {"count": failing},
+                "items": [],
+                "link": {
+                    "href": self.changelist_url("emails.EmailLog", "failing=7"),
+                    "text": _("Open the email log"),
+                },
+            }
+        ]
 
     def shape(self, data: None) -> dict[str, Any]:
         from emails import setup
 
+        alerts = self._failing_platform_emails()
         stores = setup.stores_lacking_resend_key()
         if not stores:
-            return {"alerts": []}
+            return {"alerts": alerts}
         return {
             "alerts": [
+                *alerts,
                 {
                     "variant": "danger",
                     "icon": "mail",
@@ -70,7 +106,7 @@ class PlatformAlerts(DashboardWidget):
                         for store in stores
                     ],
                     "link": None,
-                }
+                },
             ]
         }
 

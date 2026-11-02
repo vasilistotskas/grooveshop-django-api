@@ -494,8 +494,9 @@ class MediaAsset(TranslatableModel, TimeStampMixinModel):
     content_hash = models.CharField(
         _("Content hash"),
         max_length=64,
-        null=True,
         blank=True,
+        default="",
+        db_default="",
         editable=False,
         help_text=_(
             "SHA-256 of the file: the same image uploaded or imported twice "

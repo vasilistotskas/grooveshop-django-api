@@ -44,5 +44,17 @@ _PREVIEW_OPTIONS = {
 }
 
 
+#: The link labels answer holds ids as KEYS (a content page's slug may carry
+#: an underscore), which camel-casing would rewrite.
+_LABEL_OPTIONS = {
+    "ignore_fields": (*DOCUMENT_FIELDS, "contentPage"),
+    "ignore_keys": ("i18n",),
+}
+
+
 class PreviewJSONParser(CamelCaseJSONParser):
     json_underscoreize = _PREVIEW_OPTIONS
+
+
+class LinkLabelsRenderer(CamelCaseJSONRenderer):
+    json_underscoreize = _LABEL_OPTIONS

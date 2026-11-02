@@ -9139,6 +9139,121 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/link-labels:
+    get:
+      operationId: api_v1_builder_link_labels_retrieve
+      description: '`{kind: {id: {label, active}}}` for the ids asked about, whether
+        or not they can still be linked: `active` is the rule a publish checks references
+        with, so an inactive or unpublished record keeps its `label` with `active:
+        false`, and one that exists nowhere is `{label: null, active: false}`. A page
+        also has `source` (`page` or `template`). The label is in `locale`, else the
+        default language.'
+      parameters:
+      - in: query
+        name: blogCategory
+        schema:
+          type: string
+        description: Comma-separated ids (at most `BUILDER_LINK_TARGETS_MAX_IDS`).
+      - in: query
+        name: blogPost
+        schema:
+          type: string
+        description: Comma-separated ids (at most `BUILDER_LINK_TARGETS_MAX_IDS`).
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: Comma-separated ids (at most `BUILDER_LINK_TARGETS_MAX_IDS`).
+      - in: query
+        name: contentPage
+        schema:
+          type: string
+        description: Comma-separated keys (page keys, content page slugs) (at most
+          `BUILDER_LINK_TARGETS_MAX_IDS`).
+      - in: query
+        name: locale
+        schema:
+          type: string
+        description: Language to resolve the content in; unknown or omitted means
+          the store's default language.
+      - in: query
+        name: page
+        schema:
+          type: string
+        description: Comma-separated keys (page keys, content page slugs) (at most
+          `BUILDER_LINK_TARGETS_MAX_IDS`).
+      - in: query
+        name: product
+        schema:
+          type: string
+        description: Comma-separated ids (at most `BUILDER_LINK_TARGETS_MAX_IDS`).
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkLabelsResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+  /api/v1/builder/link-search:
+    get:
+      operationId: api_v1_builder_link_search_retrieve
+      description: '`{results: [{kind, id, label, slug, active}]}`, grouped by kind
+        and ordered by label, at most `BUILDER_LINK_SEARCH_LIMIT` of each kind. Only
+        what a link may point at (the rule a publish checks references with), so `active`
+        is always true. `id` is a number for products, categories, posts and blog
+        categories and the key or slug for pages and content pages; a page result
+        also has `source` (`page` or `template`). The label is in `locale`, else the
+        default language, else the slug. The storefront builds the path from the slug.'
+      parameters:
+      - in: query
+        name: kinds
+        schema:
+          type: string
+        description: 'Comma-separated kinds to search, in the order of the answer:
+          product, category, blogPost, blogCategory, page, contentPage. All when omitted.'
+      - in: query
+        name: locale
+        schema:
+          type: string
+        description: Language to resolve the content in; unknown or omitted means
+          the store's default language.
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Text the label or slug contains. Shorter than `BUILDER_LINK_SEARCH_MIN_CHARS`
+          (2 by default) answers an empty list, not an error.
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkSearchResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
   /api/v1/builder/link-targets:
     get:
       operationId: api_v1_builder_link_targets_retrieve
@@ -9178,8 +9293,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/LinkTargetsResponse'
           description: ''
         '400':
           content:
@@ -40269,6 +40383,126 @@ components:
       - total
       - totalVat
       - vatBreakdown
+    LinkKindEnum:
+      enum:
+      - product
+      - category
+      - blogPost
+      - blogCategory
+      - page
+      - contentPage
+      type: string
+      description: |-
+        * `product` - Προϊόν
+        * `category` - Κατηγορία
+        * `blogPost` - Άρθρο ιστολογίου
+        * `blogCategory` - Κατηγορία ιστολογίου
+        * `page` - Σελίδα
+        * `contentPage` - Σελίδα περιεχομένου
+    LinkLabel:
+      type: object
+      properties:
+        label:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/LinkPageSourceEnum'
+      required:
+      - active
+      - label
+    LinkLabelsResponse:
+      type: object
+      description: '``{kind: {id: {label, active}}}`` for the kinds asked about.'
+      properties:
+        product:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        category:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        blogPost:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        blogCategory:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        page:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+        contentPage:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/LinkLabel'
+    LinkPageSourceEnum:
+      enum:
+      - page
+      - template
+      type: string
+      description: |-
+        * `page` - Σελίδα
+        * `template` - Πρότυπο
+    LinkSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LinkSearchResult'
+      required:
+      - results
+    LinkSearchResult:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/LinkKindEnum'
+        id:
+          oneOf:
+          - type: integer
+          - type: string
+          description: A number for products, categories, posts and blog categories;
+            the key or slug for pages and content pages.
+        label:
+          type: string
+          nullable: true
+        slug:
+          type: string
+        active:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/LinkPageSourceEnum'
+      required:
+      - active
+      - id
+      - kind
+      - label
+      - slug
+    LinkTargetsResponse:
+      type: object
+      description: '``{kind: {id: slug}}`` for the kinds asked about.'
+      properties:
+        product:
+          type: object
+          additionalProperties:
+            type: string
+        category:
+          type: object
+          additionalProperties:
+            type: string
+        blogPost:
+          type: object
+          additionalProperties:
+            type: string
+        blogCategory:
+          type: object
+          additionalProperties:
+            type: string
     LocationTypeEnum:
       enum:
       - HOME

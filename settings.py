@@ -943,6 +943,12 @@ BUILDER_LINK_TARGETS_MAX_IDS = int(
 BUILDER_PREVIEW_MAX_DOCUMENTS = int(
     getenv("BUILDER_PREVIEW_MAX_DOCUMENTS", "10")
 )
+# The editor's link picker (``builder/link-search``): results per kind, and
+# the shortest query that searches (a shorter one answers an empty list).
+BUILDER_LINK_SEARCH_LIMIT = int(getenv("BUILDER_LINK_SEARCH_LIMIT", "20"))
+BUILDER_LINK_SEARCH_MIN_CHARS = int(
+    getenv("BUILDER_LINK_SEARCH_MIN_CHARS", "2")
+)
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
@@ -4230,6 +4236,10 @@ SPECTACULAR_SETTINGS = {
         # ``Type8dcEnum``, which bleeds into the generated frontend
         # types. ``TypeEnum`` keeps the name it already had.
         "TypeEnum": "shipping_boxnow.enum.locker_type.BoxNowLockerType",
+        # The link pickers' answers: the kinds a link can point at (a subset
+        # of ``ReferenceKind``) and where a page result is defined.
+        "LinkKindEnum": "builder.link_picker.KIND_CHOICES",
+        "LinkPageSourceEnum": "builder.link_picker.PAGE_SOURCE_CHOICES",
         # ``BuilderDocument.kind`` and ``BuilderVersion.kind`` are two choice
         # sets behind one field name; named, they do not become hashed
         # ``Kind1e3Enum``/``KindCbcEnum`` in the generated frontend types.

@@ -13,6 +13,7 @@ from typing import Any
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from builder.link_picker import KIND_CHOICES, PAGE_SOURCE_CHOICES
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
@@ -216,3 +217,81 @@ class ScheduleWriteSerializer(serializers.Serializer):
 
 class RescheduleSerializer(serializers.Serializer):
     scheduled_for = serializers.DateTimeField()
+
+
+@extend_schema_field(
+    {
+        "oneOf": [{"type": "integer"}, {"type": "string"}],
+        "description": (
+            "A number for products, categories, posts and blog categories; "
+            "the key or slug for pages and content pages."
+        ),
+    }
+)
+class LinkTargetIdField(serializers.Field):
+    """Only describes the id of a link result in the schema."""
+
+
+class LinkSearchResultSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=KIND_CHOICES)
+    id = LinkTargetIdField()
+    # ``label`` and ``source`` are also attributes of a serializer field.
+    label = serializers.CharField(  # ty: ignore[invalid-assignment]
+        allow_null=True
+    )
+    slug = serializers.CharField()
+    active = serializers.BooleanField()
+    source = serializers.ChoiceField(  # ty: ignore[invalid-assignment]
+        choices=PAGE_SOURCE_CHOICES, required=False
+    )
+
+
+class LinkSearchResponseSerializer(serializers.Serializer):
+    results = LinkSearchResultSerializer(many=True)
+
+
+class LinkLabelSerializer(serializers.Serializer):
+    # ``label`` and ``source`` are also attributes of a serializer field.
+    label = serializers.CharField(  # ty: ignore[invalid-assignment]
+        allow_null=True
+    )
+    active = serializers.BooleanField()
+    source = serializers.ChoiceField(  # ty: ignore[invalid-assignment]
+        choices=PAGE_SOURCE_CHOICES, required=False
+    )
+
+
+class LinkLabelsResponseSerializer(serializers.Serializer):
+    """``{kind: {id: {label, active}}}`` for the kinds asked about."""
+
+    product = serializers.DictField(child=LinkLabelSerializer(), required=False)
+    category = serializers.DictField(
+        child=LinkLabelSerializer(), required=False
+    )
+    blog_post = serializers.DictField(
+        child=LinkLabelSerializer(), required=False
+    )
+    blog_category = serializers.DictField(
+        child=LinkLabelSerializer(), required=False
+    )
+    page = serializers.DictField(child=LinkLabelSerializer(), required=False)
+    content_page = serializers.DictField(
+        child=LinkLabelSerializer(), required=False
+    )
+
+
+class LinkTargetsResponseSerializer(serializers.Serializer):
+    """``{kind: {id: slug}}`` for the kinds asked about."""
+
+    product = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+    category = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+    blog_post = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )
+    blog_category = serializers.DictField(
+        child=serializers.CharField(), required=False
+    )

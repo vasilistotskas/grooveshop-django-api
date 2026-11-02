@@ -29,10 +29,17 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from builder import published, references, scheduling, services
+from builder import (
+    link_picker,
+    published,
+    references,
+    scheduling,
+    services,
+)
 from builder.errors import (
     BuilderError,
     InvalidKind,
+    InvalidLinkSearch,
     InvalidLinkTargets,
     NotFoundError,
     PreconditionRequired,
@@ -54,6 +61,7 @@ from builder.models import (
 from builder.rendering import (
     BuilderJSONParser,
     BuilderJSONRenderer,
+    LinkLabelsRenderer,
     PreviewJSONParser,
 )
 from builder.serializers import (
@@ -61,6 +69,9 @@ from builder.serializers import (
     DocumentDetailSerializer,
     DocumentListSerializer,
     DraftWriteSerializer,
+    LinkLabelsResponseSerializer,
+    LinkSearchResponseSerializer,
+    LinkTargetsResponseSerializer,
     PreviewResolveSerializer,
     PublishWriteSerializer,
     ReleaseSerializer,
@@ -75,6 +86,16 @@ from core.api.permissions import IsStoreStaff, StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 
 TAGS = ["Builder"]
+LOCALE_OPENAPI_PARAMETER = OpenApiParameter(
+    name=LOCALE_PARAM,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    type=str,
+    description=(
+        "Language to resolve the content in; unknown or omitted means the "
+        "store's default language."
+    ),
+)
 ERRORS = {
     400: OpenApiResponse(response=ErrorResponseSerializer),
     409: OpenApiResponse(response=ErrorResponseSerializer),
@@ -479,18 +500,7 @@ class PublishedIndexView(APIView):
     @extend_schema(
         operation_id="builder_published_index",
         tags=TAGS,
-        parameters=[
-            OpenApiParameter(
-                name=LOCALE_PARAM,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                type=str,
-                description=(
-                    "Language to resolve the content in; unknown or "
-                    "omitted means the store's default language."
-                ),
-            )
-        ],
+        parameters=[LOCALE_OPENAPI_PARAMETER],
         responses={200: dict},
         description=(
             "`{release, locale, theme, groups, pages}`: what every page "
@@ -521,6 +531,17 @@ def _parse_ids(raw: str) -> set[int] | None:
     return ids
 
 
+def _parse_keys(kind: ReferenceKind, raw: str) -> set[str] | None:
+    """The page keys or content page slugs of a comma-separated list, or
+    ``None`` when one is not a valid name or there are too many."""
+    keys = {part for part in raw.split(",") if part}
+    if len(keys) > settings.BUILDER_LINK_TARGETS_MAX_IDS or not all(
+        references.accepts_value(kind, key) for key in keys
+    ):
+        return None
+    return keys
+
+
 class LinkTargetsView(APIView):
     """The slug of each product, category, post and blog category a link
     points at, for the storefront to build the path."""
@@ -543,7 +564,10 @@ class LinkTargetsView(APIView):
             )
             for kind in references.LINK_TARGET_KINDS
         ],
-        responses={200: dict, 400: OpenApiResponse(ErrorResponseSerializer)},
+        responses={
+            200: LinkTargetsResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
         description=(
             "`{kind: {id: slug}}` for the kinds asked about. An id that is "
             "missing, inactive or unpublished is absent, by the rules a "
@@ -632,6 +656,159 @@ class PreviewResolveView(StaffView):
         return response
 
 
+class LinkSearchView(StaffView):
+    """The targets a link can point at that match what the person typed."""
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+                description=(
+                    "Text the label or slug contains. Shorter than "
+                    "`BUILDER_LINK_SEARCH_MIN_CHARS` (2 by default) "
+                    "answers an empty list, not an error."
+                ),
+            ),
+            OpenApiParameter(
+                name="kinds",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type=str,
+                description=(
+                    "Comma-separated kinds to search, in the order of the "
+                    "answer: "
+                    + ", ".join(k.value for k in link_picker.PICKER_KINDS)
+                    + ". All when omitted."
+                ),
+            ),
+            LOCALE_OPENAPI_PARAMETER,
+        ],
+        responses={
+            200: LinkSearchResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description=(
+            "`{results: [{kind, id, label, slug, active}]}`, grouped by "
+            "kind and ordered by label, at most `BUILDER_LINK_SEARCH_LIMIT` "
+            "of each kind. Only what a link may point at (the rule a "
+            "publish checks references with), so `active` is always true. "
+            "`id` is a number for products, categories, posts and blog "
+            "categories and the key or slug for pages and content pages; "
+            "a page result also has `source` (`page` or `template`). The "
+            "label is in `locale`, else the default language, else the "
+            "slug. The storefront builds the path from the slug."
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response(
+            {
+                "results": link_picker.search(
+                    request.query_params.get("q", ""),
+                    self._kinds(request),
+                    requested_locale(request),
+                )
+            }
+        )
+
+    @staticmethod
+    def _kinds(request: Request) -> list[ReferenceKind]:
+        raw = request.query_params.get("kinds")
+        if not raw:
+            return list(link_picker.PICKER_KINDS)
+        kinds: list[ReferenceKind] = []
+        for part in raw.split(","):
+            if part not in link_picker.PICKER_KINDS:
+                raise InvalidLinkSearch(
+                    _("kinds must be a comma-separated list of: %(kinds)s.")
+                    % {
+                        "kinds": ", ".join(
+                            k.value for k in link_picker.PICKER_KINDS
+                        )
+                    },
+                    param="kinds",
+                )
+            if (kind := ReferenceKind(part)) not in kinds:
+                kinds.append(kind)
+        return kinds
+
+
+class LinkLabelsView(StaffView):
+    """The name of each target a stored link points at, found or not."""
+
+    renderer_classes = [LinkLabelsRenderer]
+
+    @extend_schema(
+        tags=TAGS,
+        parameters=[
+            *(
+                OpenApiParameter(
+                    name=kind.value,
+                    location=OpenApiParameter.QUERY,
+                    required=False,
+                    type=str,
+                    description=(
+                        "Comma-separated "
+                        + (
+                            "ids"
+                            if kind in link_picker.NUMERIC_KINDS
+                            else "keys (page keys, content page slugs)"
+                        )
+                        + " (at most `BUILDER_LINK_TARGETS_MAX_IDS`)."
+                    ),
+                )
+                for kind in link_picker.PICKER_KINDS
+            ),
+            LOCALE_OPENAPI_PARAMETER,
+        ],
+        responses={
+            200: LinkLabelsResponseSerializer,
+            400: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description=(
+            "`{kind: {id: {label, active}}}` for the ids asked about, "
+            "whether or not they can still be linked: `active` is the rule "
+            "a publish checks references with, so an inactive or "
+            "unpublished record keeps its `label` with `active: false`, "
+            "and one that exists nowhere is `{label: null, active: "
+            "false}`. A page also has `source` (`page` or `template`). "
+            "The label is in `locale`, else the default language."
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response(
+            link_picker.labels(self._wanted(request), requested_locale(request))
+        )
+
+    @staticmethod
+    def _wanted(request: Request) -> dict[ReferenceKind, set[Any]]:
+        wanted: dict[ReferenceKind, set[Any]] = {}
+        for kind in link_picker.PICKER_KINDS:
+            # Underscored by the camel-case middleware, like link-targets.
+            raw = request.query_params.get(camel_to_underscore(kind.value))
+            if raw is None:
+                continue
+            ids = (
+                _parse_ids(raw)
+                if kind in link_picker.NUMERIC_KINDS
+                else _parse_keys(kind, raw)
+            )
+            if ids is None:
+                raise InvalidLinkTargets(
+                    _("%(kind)s must be at most %(limit)s valid ids.")
+                    % {
+                        "kind": kind.value,
+                        "limit": settings.BUILDER_LINK_TARGETS_MAX_IDS,
+                    },
+                    param=kind.value,
+                )
+            wanted[kind] = ids
+        return wanted
+
+
 class PublishedPageView(APIView):
     """The current release's theme, groups and page, for one locale."""
 
@@ -640,18 +817,7 @@ class PublishedPageView(APIView):
 
     @extend_schema(
         tags=TAGS,
-        parameters=[
-            OpenApiParameter(
-                name=LOCALE_PARAM,
-                location=OpenApiParameter.QUERY,
-                required=False,
-                type=str,
-                description=(
-                    "Language to resolve the content in; unknown or "
-                    "omitted means the store's default language."
-                ),
-            )
-        ],
+        parameters=[LOCALE_OPENAPI_PARAMETER],
         responses={200: dict, 404: OpenApiResponse(ErrorResponseSerializer)},
         description=(
             "`{release, locale, theme, groups, page}`: the documents of "

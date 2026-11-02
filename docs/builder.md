@@ -492,6 +492,37 @@ changes for a visitor until the storefront switch.
    never after. The media library and `page_config` are never touched.
    Afterwards the import can be run again.
 
+### Importing before the storefront is promoted
+
+The importer takes the catalogue and the converter from the storefront at
+`NUXT_INTERNAL_BASE_URL` (`core/storefront.py`; both endpoints are tenant-free
+and the converter is pure). A store's builder data is written with the
+converter of the build that will render it, so when the build that carries a
+new converter or catalogue is not yet what the store's storefront runs, and
+promoting it first would blank every page until the import finished, import
+BEFORE the promote against an internal instance of that build:
+
+1. Run an instance of the exact image that will be promoted, reachable only
+   inside the cluster (a ClusterIP Service, no Ingress), with the target
+   environment's own frontend secret and config: the converter checks the same
+   `NUXT_CACHE_PURGE_TOKEN` the importer sends, and each environment has its
+   own. Declare it in GitOps like any other workload and remove it once the
+   promote is done.
+2. Point the one-off process at it with the environment variable, nothing in
+   the code or the command line: `kubectl ... exec deploy/backend -- env
+   NUXT_INTERNAL_BASE_URL=http://<internal service> /home/app/.venv/bin/python
+   manage.py builder_import_legacy ...`. Only that process is redirected. The
+   cache purge an import queues runs in the worker, on the worker's own
+   environment, so it still reaches the real storefront.
+3. Before any write, in the same process, compare what that instance serves
+   with what will be live. The catalogue is a constant of the server bundle, so
+   the same image gives the same `hash` (print `fetch_catalogue(<schema>).hash`
+   with the override and again after the promote: they must be equal), and
+   `fetch_catalogue(<schema>).get("hero_carousel").link_refs` must be non-empty.
+   Stop on either.
+4. Run the pre-check, the import and the verification (steps 2 to 4 above) with
+   the override. Verify the storefront-side read only after the promote.
+
 ## What is copied from the storefront
 
 The storefront owns the blocks, so three things are pinned COPIES of its

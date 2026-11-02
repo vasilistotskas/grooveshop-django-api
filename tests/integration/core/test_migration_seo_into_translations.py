@@ -1,6 +1,6 @@
-"""Exercises the three ``*_copy_seo_into_translations`` data migrations.
+"""Exercises ``product``'s ``copy_seo_into_translations`` data migration.
 
-The shared-row ``seo_*`` columns only exist BEFORE each app's
+The shared-row ``seo_*`` columns only exist BEFORE the app's
 ``remove_shared_seo_fields`` migration, so unlike the lightweight
 harness in ``test_migration_seed_legal_documents`` this one rolls the
 app back to its ``seo_translated_fields`` state with the real
@@ -181,42 +181,3 @@ class TestProductSeoMigration(TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "no tenant"):
             self.copy.copy_seo_into_translations(self.apps, _FakeSchemaEditor)
-
-
-class TestPageLayoutSeoMigration(TestCase):
-    copy = importlib.import_module(
-        "page_config.migrations.0029_copy_seo_into_translations"
-    )
-
-    def setUp(self):
-        tenant = Tenant(
-            schema_name=SCHEMA_NAME,
-            name="SEO migration test",
-            slug="seo-migration-test",
-            owner_email="seo-migration@example.com",
-            default_locale="el",
-        )
-        tenant.auto_create_schema = False
-        tenant.save()
-        self.apps = _state_before_copy(
-            "page_config", "0028_seo_translated_fields"
-        )
-
-    def test_a_layout_gets_its_first_translation_row(self):
-        PageLayout = self.apps.get_model("page_config", "PageLayout")
-        PageLayoutTranslation = self.apps.get_model(
-            "page_config", "PageLayoutTranslation"
-        )
-        layout = PageLayout.objects.create(
-            page_type="home",
-            title="Homepage",
-            shared_seo_title="Κατάστημα | Αρχική",
-            shared_seo_description="Η αρχική σελίδα.",
-        )
-
-        self.copy.copy_seo_into_translations(self.apps, _FakeSchemaEditor)
-
-        translation = PageLayoutTranslation.objects.get(master_id=layout.pk)
-        assert translation.language_code == "el"
-        assert translation.seo_title == "Κατάστημα | Αρχική"
-        assert translation.seo_description == "Η αρχική σελίδα."

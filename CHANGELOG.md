@@ -3,6 +3,124 @@
 
 
 
+## v3.192.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(tenant): stop staff tokens reading the customer token table (#427)
+
+PlatformStaffTokenAuthentication inherited knox's _cleanup_token, which
+walks auth_token.user.auth_token_set: the reverse accessor of the
+tenant-only knox.AuthToken (PlatformStaffToken uses
+platform_staff_tokens instead). It ran inside the public-schema block,
+where knox_authtoken does not exist, so every StaffBearer request (the
+page builder's staff routes, the editor's sign-out, and API-scope staff
+tokens alike) failed with a 500 before reaching its view.
+
+The authenticator now runs knox's cleanup on its own token model: it
+deletes the staff member's other expired staff tokens, then deletes and
+refuses this token if it has expired, and sends token_expired for each,
+as knox does. knox's other paths that assume its own token model
+(LoginView's token limit, LogoutView, LogoutAllView) are not routed for
+staff tokens. The editor's sign-out deletes request.auth directly, and
+renew, validate and the absolute-age cap act on the token in hand.
+
+The main suite could not catch this: tests/ runs every app's tables in
+public, knox's included. tests_mt runs the real schema layout, and its
+new test_staff_token_schema_binding asserts that layout (no knox table
+in public), then reads builder documents, purges expired tokens, refuses
+an expired token and signs out with a StaffBearer token on a store host.
+Without the fix, four of its five tests fail with this 500.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fcc939d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fcc939d5d8b2891bbf65657d307ed728c4cf39e1))
+
+### Features
+
+* feat(page_config): retire layouts and menus (#426) ([`51f586d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51f586d75e1ac03bc0eb3495cabc21e2bd08825b))
+
+* feat(builder): require linkRefs and retire the legacy import
+
+Every store renders from the builder and was imported from page_config,
+so the one-time import path goes:
+
+- builder_import_legacy, builder_export_legacy and builder_reset, with
+  builder/legacy.py, convert.py, importing.py and resetting.py. A reset
+  only undid an import before the storefront read the builder; it has no
+  job left.
+- the converter fixtures, their replay and the import and reset tests,
+  and the `legacy` source of the storefront-sources sync.
+
+The catalogue's `linkRefs` is now a required key on every block and
+every document root. The storefront states it everywhere, and a
+catalogue that left it out would have indexed no link at all.
+test_real_catalogue holds the pinned real catalogue to that: each
+linkRefs is exactly the settings its schema marks as links.
+
+The seeds the storefront ships are now {key, document, i18n}. The
+storefront copies (catalogue and seeds) are re-synced from its main.
+
+The `menu` reference kind goes: no block declares it, and a menu is a
+group:<slot> document that the editor edits directly. Its check read
+page_config's NavigationMenu, which is retired next.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`51f586d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51f586d75e1ac03bc0eb3495cabc21e2bd08825b))
+
+* feat(page_config): retire layouts and menus, the page builder serves them
+
+Every store's pages and menus are the page builder's, so page_config
+keeps only its content pages and legal documents. This is release N of
+two:
+
+- PageLayout, PageSection, NavigationMenu, NavigationColumn and
+  NavigationLink (with their translations) leave Django's state
+  (page_config 0040, SeparateDatabaseAndState). Their tables stay for
+  the release still serving; the next release drops them. The one
+  database change drops the deferred FK from the link table to
+  ContentPage, which no longer cascades once the link model is out of
+  state.
+- The public page-config routes, the layout and menu admin API, their
+  serializers, the section and navigation schemas, the OpenAPI section
+  hook, the admin pages and the Content menu entries go.
+- defaults.py goes. Its legal half moves to page_config/content_pages.py;
+  the layout seeds and seed_brand_pages go.
+- builder/localization.py takes the ?locale= helper, whose only callers
+  are the builder's public reads.
+- The page_config cache surface covers content pages only. Its
+  pageConfig* handler names matched nothing since the storefront moved to
+  the builder.
+- seed_demo_store's layouts and navigation steps become a `pages` step.
+  It releases devtools/demo_pages (production's demo documents, with
+  per-store asset and product placeholders) through the new
+  builder.seeding.seed_with_content. That function writes one release,
+  validated like a publish with references, and only on a store with no
+  builder data or the untouched defaults, so it never overwrites an
+  editor's work.
+
+API: /api/v1/page-config, /page-config/{page_type},
+/page-config/admin[/{id}], /page-config/navigation and
+/page-config/navigation/admin[/{id}] are removed. No live client calls
+them; the storefront release regenerated from this schema must be in
+production first.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`51f586d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51f586d75e1ac03bc0eb3495cabc21e2bd08825b))
+
+### Testing
+
+* test(admin): derive the full-sidebar check from what the sidebar declares
+
+test_every_feature_on_lists_every_section kept a hand list of titles,
+which still named the Menus and Page Layouts entries this branch
+removes. It now records every model page store_sidebar declares and
+asserts that, with every feature on and a superuser looking, none is
+hidden and each is listed. Adding or removing an entry needs no edit.
+The no-Off-badge check reads every entry instead of four titles.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`51f586d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51f586d75e1ac03bc0eb3495cabc21e2bd08825b))
+
 ## v3.191.0 (2026-11-02)
 
 ### Documentation

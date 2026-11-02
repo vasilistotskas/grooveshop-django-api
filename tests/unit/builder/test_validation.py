@@ -743,15 +743,46 @@ class TestTheCatalogueReadsLinks:
         }
 
     def test_a_block_may_declare_links(self):
-        catalogue = parse_catalogue(self.block(links=["/link", "/a/*/link"]))
+        catalogue = parse_catalogue(self.block(linkRefs=["/link", "/a/*/link"]))
 
-        assert catalogue.get("cta").links == ("/link", "/a/*/link")
+        assert catalogue.get("cta").link_refs == ("/link", "/a/*/link")
 
     def test_a_block_without_links_has_none(self):
-        assert parse_catalogue(self.block()).get("cta").links == ()
+        assert parse_catalogue(self.block()).get("cta").link_refs == ()
 
-    def test_a_link_cannot_also_be_translatable(self):
-        with pytest.raises(StorefrontUnavailable):
+    @pytest.mark.parametrize(
+        ("link_refs", "translatable"),
+        [
+            (["/link"], ["/link", "/title"]),
+            # A link under a translatable setting, and a translatable
+            # setting inside a link.
+            (["/prompt/ctaLink"], ["/prompt"]),
+            (["/link"], ["/link/label"]),
+            # Wildcards count, in either pattern.
+            (["/cards/*/link"], ["/cards/0/link"]),
+            (["/cards/0/link"], ["/cards/*"]),
+            (["/cards/*/link"], ["/cards/*/link/x"]),
+        ],
+    )
+    def test_a_link_cannot_be_translatable_or_inside_something_that_is(
+        self, link_refs, translatable
+    ):
+        with pytest.raises(StorefrontUnavailable) as caught:
             parse_catalogue(
-                self.block(links=["/link"], translatable=["/link", "/title"])
+                self.block(linkRefs=link_refs, translatable=translatable)
             )
+
+        assert "cannot be translatable" in str(caught.value.__cause__)
+
+    def test_a_link_beside_translatable_settings_is_fine(self):
+        catalogue = parse_catalogue(
+            self.block(
+                linkRefs=["/prompt/ctaLink", "/cards/*/link"],
+                translatable=["/prompt/text", "/cards/*/title", "/title"],
+            )
+        )
+
+        assert catalogue.get("cta").link_refs == (
+            "/prompt/ctaLink",
+            "/cards/*/link",
+        )

@@ -184,7 +184,7 @@ def _collect_references(
                 )
                 continue
             walk.refs.append((kind, str(value), where))
-    for pattern in definition.links:
+    for pattern in definition.link_refs:
         for path, value in pointers.walk(settings_, pointers.parse(pattern)):
             # ``href`` and ``route`` point at nothing of ours (the
             # catalogue's schema holds them to https or a fixed route).

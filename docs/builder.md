@@ -89,9 +89,9 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `limits` (`maxBlocks`, `maxPerTemplate`), `children` (`allowed`,
 `maxDepth`), `kinds` (`section`, `block`), optional `groups`, `templates`,
 `feature` and `deprecated`. A setting whose schema says
-`contentMediaType: "text/html"` is rich text. `links` (optional, same pointer
-syntax) names the link settings, see "References, not copies"; a pointer
-cannot be in both `links` and `translatable`.
+`contentMediaType: "text/html"` is rich text. `linkRefs` (optional, same pointer
+syntax) names the link settings, see "References, not copies"; a link pointer
+cannot equal, lie under or hold a `translatable` pointer (`*` counts).
 
 ## What a save checks
 
@@ -157,11 +157,11 @@ the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a
 thing is used.
 
-**Links.** A setting listed in the block's `links` holds one of `{href}` (an
+**Links.** A setting listed in the block's `linkRefs` holds one of `{href}` (an
 external address), `{route}` (a fixed route) or `{ref: {kind, id}}`, and the
 catalogue's schema checks the first two. Only `{ref}` points at something of
 ours, and its kind is in the data, so a static `refs` entry cannot carry it:
-for each `{ref}` found at a `links` pointer, validation checks `id` has the
+for each `{ref}` found at a `linkRefs` pointer, validation checks `id` has the
 shape of `kind` (an unknown kind is `invalid_reference`) and records
 `(kind, id, the link's own pointer)` with the other references. The version's
 `refs`, the `BuilderReference` index, the publish check (`reference_not_found`)

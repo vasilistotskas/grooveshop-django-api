@@ -114,7 +114,7 @@ def default_blocks() -> list[dict[str, Any]]:
                 "/mediaId": "media",
                 "/blogCategoryId": "blogCategory",
             },
-            "links": ["/link", "/cards/*/link"],
+            "linkRefs": ["/link", "/cards/*/link"],
             "limits": {"maxBlocks": 3},
             "children": {"allowed": ["slide"], "maxDepth": 1},
             "kinds": ["section"],

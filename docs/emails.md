@@ -4,7 +4,7 @@ The email pipeline: one catalogue of email types, one function that sends
 them, and the switch and opt-out a store or a recipient uses to stop one.
 Source: `emails/` (`types.py`, `registry.py`, `gates.py`, `recipients.py`,
 `sender.py`, `headers.py`, `optout.py`, `render.py`, `send.py`,
-`transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `models.py`,
+`transport.py`, `resend.py`, `log.py`, `status.py`, `tasks.py`, `preview.py`, `figures.py`, `testsend.py`, `models.py`,
 `services.py`), `tests/utils/emails.py` and
 `tests/utils/golden.py` (the test helpers). The code wins over this page.
 
@@ -29,6 +29,7 @@ equal (see Tests).
 | `optout.py` | The address hash, `is_opted_out`, `opt_out`, the signed unsubscribe token. |
 | `views.py`, `urls.py` | `EmailUnsubscribeView`, the RFC 8058 one-click target. |
 | `preview.py` | `build_preview`, the admin preview of any registered type, and its form. |
+| `figures.py`, `testsend.py` | The per-type sent and failed counts of the admin pages and the dashboard; the admin's Send test. |
 | `render.py` | `render`: subject and both bodies in one language; `clean_header_text`; `owner_schema`, the schema a type is read and sent under. |
 | `transport.py` | The pipeline's only sender: builds the message and hands it to the transport `EMAIL_TRANSPORT` names (SMTP through Django, or Resend), returning a `Receipt` (provider and its message id). |
 | `resend.py` | The Resend HTTP client: which team's key, one `POST`, the error text. |
@@ -435,36 +436,75 @@ request or task sees it. A request that already holds the store row keeps
 the old list until it ends. The public schema has no generation and reads
 the table directly.
 
-### The store's email page (`emails/admin.py`, `emails/switches.py`)
+### The store's email pages (`emails/admin.py`, `emails/switches.py`, `emails/figures.py`)
 
-`Settings -> Emails` in the store admin. One dedicated page, like the text
-editor, not a changelist: `EmailSwitchAdmin.changelist_view` lists every
-`Owner.STORE` type grouped by `EmailType.area` (`switches.AREA_TITLES`, one
-title per area; `tests/unit/emails/test_switches.py` fails when a type is
-declared in an area with none), with its title and description from the
-declaration. A required type shows a "Required" label and no switch; a type
-whose gate is closed also shows "Off: <gate label>", whatever the switch
-says. A switch posts to `toggle/` (htmx), which calls `set_switch` and
-answers with the row; a required or unknown type is a 400 or 404 and writes
-nothing. The page reads `EmailSwitch` directly, not the pipeline's cached
-list, so it shows what was just written.
+`Settings -> Emails` in the store admin. A dedicated page, like the text
+editor, not a changelist: `EmailSwitchAdmin.changelist_view` is the **status
+page** and `type_view` (`type/<key>/`) the page of one email.
 
-Permission: `emails` is in `STORE_SETTINGS_APP_LABELS` and
-`STORE_SHARED_APP_LABELS` (`tenant/role_scopes.py`), so ADMIN and OWNER hold
-`emails.view_emailswitch` and `change_emailswitch`; STAFF hold neither and
-the page answers 403 and is not in their sidebar. The audit is the
-simple-history row with the staff member (`EmailSwitch.history`). Platform
-types (`Owner.PLATFORM`) are not on this page.
+**Status page.** Two tabs by `EmailType.audience` ("To customers", "To your
+team"), a text search over key, title and description, and a state filter (All,
+On, Off, Failing), all GET parameters so a filtered view is a URL. Rows are
+grouped by `EmailType.area` (`switches.AREA_TITLES`, one title per area;
+`tests/unit/emails/test_switches.py` fails when a type is declared in an area
+with none). Each row has a badge (**On**, **Required** with no switch, **Off:
+<gate label>**, **Switched off**), what it sent in the last 30 days (a
+count, and the time of the last send), a **failed** count linking to the log
+filtered to that email, the switch, **Preview** (its page) and **Send test**.
+The figures are one aggregate over `EmailLog` for the whole store
+(`figures.type_figures`, grouped by type, `@dashboard_query("store:emails:v1",
+ttl=60)` with no `depends_on`, because log writes never stop), so the page
+costs the same queries for 2 types and for 30
+(`tests/integration/emails/test_email_pages.py`). A test send is not counted.
+A switch posts to `toggle/` (htmx), which calls `set_switch` and answers with
+the row; a required or unknown type is a 400 or 404 and writes nothing. The
+page reads `EmailSwitch` directly, not the pipeline's cached list, so it shows
+what was just written. The page never shows an address.
 
-### The preview (`emails/preview.py`, `Settings -> Email Templates`)
+**One email.** The preview (below), **Send test**, and its latest 20 sends with
+the masked recipient, the status and what the provider reported (the
+`EmailEvent` timeline), in a table that scrolls sideways on a phone.
 
-`EmailSwitchAdmin.preview_view` (`preview/`) lists every `Owner.STORE` type
-by area (marked "Off" or "Off: <gate label>" when the store does not send it), and a panel that an htmx form fills
-(`preview/render/`, POST only): the type, a language, the data (sample data,
-or one of the store's ten most recent orders) and HTML or text. HTML is shown
-in a sandboxed `srcdoc` frame, text in a `pre`. Both views need
-`order.view_order` on top of the admin site's own tenant-membership gate,
-because the panel can render a real order; `is_staff` alone is never enough.
+**Send test** (`emails/testsend.py`, `test_send_view`) mails the email to the
+signed-in staff member's own address and to nobody else (the request's `to`,
+`email` or `address` fields are never read), in the chosen language and from
+the sample or a chosen order. It skips the gates, the switch, the opt-out and
+the suppression list, so a switched-off email can be checked, goes through the
+real transport and leaves an `EmailLog` row with `is_test` and
+`triggered_by_staff`; the subject is prefixed `[Test]`; no business flag is
+written. Each staff member may send `EMAIL_TEST_SENDS_PER_HOUR` (10) per hour
+(counted per attempt, in the cache).
+
+**Log** (`EmailLogAdmin`): read-only, filters by email, status, "Failing" (7 or
+30 days) and date; the search box takes an **exact address**, hashed here and
+matched on `recipient_hash` (any other text searches the subject), so the admin
+never holds or shows an address. **Suppression list** (`EmailSuppressionAdmin`):
+read-only except removing a row, behind the standard delete confirmation whose
+dialog says the address must also be removed in Resend's dashboard (Resend
+keeps its own list; no API removes an address); the admin log names the actor.
+
+Permissions (`tenant/role_scopes.py`): `emails` is in `STORE_SETTINGS_APP_LABELS`,
+so ADMIN and OWNER hold every `emails.*` permission (switch, send a test, remove a
+suppression); it is also in `STAFF_READ_ONLY_APP_LABELS`, so STAFF only **look**
+(the page, the log and the suppression list, with the switch disabled and no
+Send test). The audit of a switch is the simple-history row with the staff member
+(`EmailSwitch.history`). Platform types (`Owner.PLATFORM`) are not on these pages.
+
+**Dashboard.** "Emails failing" in the store dashboard's Needs attention card
+counts the last 7 days of failed, bounced, complained and provider-suppressed
+rows (`figures.failing_since`, in `attention_counts`), and opens the log under
+the same filter.
+
+### The preview (`emails/preview.py`)
+
+`EmailSwitchAdmin.type_view` embeds a panel that an htmx form fills
+(`preview/render/`, POST only): a language, the data (sample data, or one of
+the store's ten most recent orders) and HTML or text. HTML is shown in a
+sandboxed `srcdoc` frame, text in a `pre`. A viewer needs the admin site's own
+tenant-membership gate and `emails.view_emailswitch`; the choice of a real order
+is offered, and a posted order id honoured, only with `order.view_order`,
+because an order carries a customer's name and address; `is_staff` alone is never
+enough.
 
 `build_preview` calls `emails.render.render`, the function `send_email`
 calls, so the preview is the mail that is sent (`test_preview_matches_send`
@@ -841,10 +881,9 @@ tables (`devtools/anonymise/rules.py`).
   and moving a newsletter subscription to `BOUNCED` on a hard bounce (the
   event carries an address, the log only its hash).
 - The platform admin's own page for the platform types (they have no
-  switches, so it would be a listing and the log); the rest of the store's
-  admin page (status, log, test-send); the switches and the preview are on
-  it already. A real object is chosen only for the order types, every other
-  type previews its `sample`.
+  switches, so it would be a listing and the log).
+- "Edit the wording" on an email's page (Step 4). A real object is chosen only
+  for the order types, every other type previews its `sample`.
 
 ## Tests
 
@@ -907,8 +946,13 @@ tables (`devtools/anonymise/rules.py`).
 - `tests/integration/emails/test_golden_render_ops.py` records the
   operational alerts through the real code that sends them. They had no
   template and no translation before, so the files record what they are now.
+- `tests/integration/emails/test_email_pages.py`: the status page (tabs,
+  search, state filter, figures against a hand-computed fixture, flat queries),
+  one email's page, the Send test (only the signed-in account, throttle,
+  marked as a test), the log (masked, exact-address search, filters, read-only),
+  the suppression list and its removal, and the dashboard count.
 - `tests/integration/emails/test_switch_admin.py`: the page's permissions
-  (ADMIN and OWNER yes, STAFF 403 and no sidebar entry), toggling changes
+  (ADMIN and OWNER switch, STAFF only look), toggling changes
   what `send_email` does, history, the cache generation, and a required or
   unknown type refused.
 - `tests/integration/emails/test_ops_alerts.py`: each real sender honours

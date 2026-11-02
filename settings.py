@@ -3114,6 +3114,8 @@ RESEND_API_KEY = getenv("RESEND_API_KEY", "")
 # the platform host (``emails.webhooks``). A store with its own team keeps
 # its secret on its Tenant row. Empty: the platform host answers 503.
 RESEND_WEBHOOK_SECRET = getenv("RESEND_WEBHOOK_SECRET", "")
+# How many times a staff member may use the admin's Send test per hour.
+EMAIL_TEST_SENDS_PER_HOUR = int(getenv("EMAIL_TEST_SENDS_PER_HOUR", "10"))
 RESEND_WEBHOOK_MAX_BODY_BYTES = int(
     getenv("RESEND_WEBHOOK_MAX_BODY_BYTES", str(256 * 1024))
 )

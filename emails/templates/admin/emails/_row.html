@@ -3,13 +3,42 @@
     {% component "unfold/components/card.html" with size="md" %}
         <div class="flex flex-wrap gap-3 items-start justify-between">
             <div class="flex flex-col flex-1 min-w-[12rem]">
-                <h3 class="font-semibold text-important text-sm">{{ row.email_type.title }}</h3>
+                <h3 class="font-semibold text-important text-sm">
+                    <a href="{{ page_url }}" class="hover:underline">{{ row.email_type.title }}</a>
+                </h3>
                 <span class="text-subtle text-xs">{{ row.email_type.description }}</span>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-subtle text-xs">
+                    <span>
+                        {% if last_sent %}
+                            {% blocktrans trimmed with ago=last_sent %}Last sent {{ ago }} ago{% endblocktrans %}
+                        {% else %}
+                            {% trans "Not sent in the last 30 days" %}
+                        {% endif %}
+                    </span>
+                    <span>{% blocktrans trimmed count count=row.figures.sent %}{{ count }} sent in 30 days{% plural %}{{ count }} sent in 30 days{% endblocktrans %}</span>
+                    {% if row.figures.failing %}
+                        {% blocktrans trimmed count count=row.figures.failing asvar failing_label %}{{ count }} failed{% plural %}{{ count }} failed{% endblocktrans %}
+                        {% if failing_url %}
+                            <a href="{{ failing_url }}">{% include "unfold/helpers/label.html" with text=failing_label variant="danger" %}</a>
+                        {% else %}
+                            {% include "unfold/helpers/label.html" with text=failing_label variant="danger" %}
+                        {% endif %}
+                    {% endif %}
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2 items-center shrink-0">
-                {% if row.closed_gate %}
+            <div class="flex flex-wrap gap-2 items-center">
+                {% if not row.switchable %}
+                    {% trans "Required" as required_label %}
+                    {% include "unfold/helpers/label.html" with text=required_label variant="info" icon="lock" %}
+                {% elif row.closed_gate %}
                     {% blocktrans trimmed with reason=row.closed_gate asvar gate_label %}Off: {{ reason }}{% endblocktrans %}
-                    {% include "unfold/helpers/label.html" with text=gate_label variant="warning" %}
+                    {% include "unfold/helpers/label.html" with text=gate_label variant="default" %}
+                {% elif not row.enabled %}
+                    {% trans "Switched off" as off_label %}
+                    {% include "unfold/helpers/label.html" with text=off_label variant="warning" %}
+                {% else %}
+                    {% trans "On" as on_label %}
+                    {% include "unfold/helpers/label.html" with text=on_label variant="success" %}
                 {% endif %}
                 {% if row.switchable %}
                     <form hx-post="{% url 'admin:emails_emailswitch_toggle' %}"
@@ -18,13 +47,20 @@
                           hx-swap="outerHTML">
                         <input type="hidden" name="type_key" value="{{ row.email_type.key }}">
                         <label class="flex gap-2 items-center text-sm" for="switch-{{ row.email_type.key }}">
-                            {% if row.enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}
+                            <span class="sr-only">{% trans "Switch on or off" %}</span>
                             {{ control }}
                         </label>
                     </form>
-                {% else %}
-                    {% trans "Required" as required_label %}
-                    {% include "unfold/helpers/label.html" with text=required_label variant="info" icon="lock" %}
+                {% endif %}
+                {% trans "Preview" as preview_label %}
+                {% component "unfold/components/button.html" with href=page_url icon="visibility" variant="default" size="sm" %}{{ preview_label }}{% endcomponent %}
+                {% if can_test %}
+                    <form method="post" action="{% url 'admin:emails_emailswitch_test_send' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="type_key" value="{{ row.email_type.key }}">
+                        {% trans "Send test" as test_label %}
+                        {% component "unfold/components/button.html" with submit=True icon="send" variant="default" size="sm" %}{{ test_label }}{% endcomponent %}
+                    </form>
                 {% endif %}
             </div>
         </div>

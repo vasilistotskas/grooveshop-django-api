@@ -189,6 +189,23 @@ class EmailLog(TimeStampMixinModel, UUIDModel):
     last_event_at = models.DateTimeField(
         _("Last event at"), null=True, blank=True
     )
+    is_test = models.BooleanField(
+        _("Test send"),
+        default=False,
+        db_default=False,
+        help_text=_("Sent from the admin's Send test, to the staff member."),
+    )
+    triggered_by_staff_id = models.BigIntegerField(
+        _("Triggered by (staff)"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Id of the platform staff member who sent this test (public "
+            "schema, not a store user). Read it through "
+            "``triggered_by_staff``."
+        ),
+    )
+    triggered_by_staff = StaffActor()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Email log")

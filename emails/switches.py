@@ -9,14 +9,34 @@ the page shows what was just written.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext import StrOrPromise
 
+from emails.figures import TypeFigures
 from emails.models import EmailSwitch
 from emails.registry import registry
-from emails.types import EmailType, Owner
+from emails.types import Audience, EmailType, Owner
+
+#: The page's two tabs: what customers receive, and what the store's team
+#: receives. A type belongs to exactly one, by its audience.
+CUSTOMERS = "customers"
+TEAM = "team"
+TAB_AUDIENCES = {
+    CUSTOMERS: frozenset({Audience.CUSTOMER}),
+    TEAM: frozenset({Audience.STORE_STAFF}),
+}
+
+
+class Condition(StrEnum):
+    """The page's status filter."""
+
+    ON = "on"
+    OFF = "off"
+    FAILING = "failing"
+
 
 #: The groups of the page, in order. Every ``EmailType.area`` has a title
 #: here (``tests/unit/emails/test_switches.py`` checks), so a type declared in
@@ -40,10 +60,16 @@ class SwitchRow:
     enabled: bool
     #: The label of the first closed gate, shown as "Off: <label>".
     closed_gate: StrOrPromise | None
+    figures: TypeFigures = field(default_factory=TypeFigures)
 
     @property
     def switchable(self) -> bool:
         return self.email_type.switchable
+
+    @property
+    def is_on(self) -> bool:
+        """Sent today: not switched off and no gate closed."""
+        return self.enabled and self.closed_gate is None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,19 +79,66 @@ class SwitchGroup:
     rows: tuple[SwitchRow, ...]
 
 
-def row_for(email_type: EmailType, *, enabled: bool) -> SwitchRow:
+def row_for(
+    email_type: EmailType,
+    *,
+    enabled: bool,
+    figures: TypeFigures | None = None,
+) -> SwitchRow:
     closed = next((g for g in email_type.gates if not g.is_open()), None)
-    return SwitchRow(email_type, enabled, closed.label if closed else None)
+    return SwitchRow(
+        email_type,
+        enabled,
+        closed.label if closed else None,
+        figures or TypeFigures(),
+    )
 
 
-def switch_groups() -> list[SwitchGroup]:
-    """The store's email types by area, each with its state."""
+def _matches(row: SwitchRow, query: str, condition: str) -> bool:
+    email_type = row.email_type
+    if query and query not in (
+        f"{email_type.key} {email_type.title} {email_type.description}".lower()
+    ):
+        return False
+    match condition:
+        case Condition.ON:
+            return row.is_on
+        case Condition.OFF:
+            return not row.is_on
+        case Condition.FAILING:
+            return row.figures.failing > 0
+    return True
+
+
+def switch_groups(
+    *,
+    tab: str | None = None,
+    query: str = "",
+    condition: str = "",
+    figures: dict[str, TypeFigures] | None = None,
+) -> list[SwitchGroup]:
+    """The store's email types by area, each with its state and figures.
+
+    *tab* keeps one audience (``CUSTOMERS`` or ``TEAM``), *query* a text
+    match on key, title and description, *condition* one :class:`Condition`;
+    a group left with no row is dropped. Two queries at most, whatever the
+    number of types: the switches and the (cached) figures.
+    """
     off = set(EmailSwitch.objects.values_list("type_key", flat=True))
+    known = figures or {}
+    audiences = TAB_AUDIENCES.get(tab or "")
+    needle = query.strip().lower()
     by_area: dict[str, list[SwitchRow]] = {area: [] for area in AREA_TITLES}
     for email_type in registry.types_for(Owner.STORE):
-        by_area[email_type.area].append(
-            row_for(email_type, enabled=email_type.key not in off)
+        if audiences is not None and email_type.audience not in audiences:
+            continue
+        row = row_for(
+            email_type,
+            enabled=email_type.key not in off,
+            figures=known.get(email_type.key),
         )
+        if _matches(row, needle, condition):
+            by_area[email_type.area].append(row)
     return [
         SwitchGroup(area, AREA_TITLES[area], tuple(rows))
         for area, rows in by_area.items()

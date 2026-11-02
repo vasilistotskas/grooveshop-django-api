@@ -377,6 +377,16 @@ class StoreAttention(DashboardWidget):
             ),
             (
                 True,
+                "failing_emails",
+                "mail",
+                "danger",
+                _("Emails failing"),
+                _("Bounced, failed or marked as spam in the last 7 days"),
+                "emails.EmailLog",
+                urlencode({"failing": "7"}),
+            ),
+            (
+                True,
                 "low_stock",
                 "inventory_2",
                 "warning",

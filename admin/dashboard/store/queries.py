@@ -443,6 +443,7 @@ def attention_counts() -> dict[str, int]:
     """Work that is waiting, in one cache entry: the sidebar badges and
     the dashboard's "Needs attention" list read the same numbers."""
     from b2b.enum import BusinessProfileStatus
+    from emails import figures
     from order.enum.status import OrderStatus
     from order.models.invoice import MyDataStatus
     from product.enum.review import ReviewStatus
@@ -474,6 +475,12 @@ def attention_counts() -> dict[str, int]:
         # if the receipt is credited, and only staff know.
         "chargebacks_to_settle": model("order.Order")
         .objects.awaiting_chargeback_decision()
+        .count(),
+        # Mail that did not arrive (failed, bounced, marked as spam,
+        # refused by the provider) in the last week; the email log lists
+        # the same rows under its "Failing" filter.
+        "failing_emails": model("emails.EmailLog")
+        .objects.filter(figures.failing_since())
         .count(),
         "low_stock": model("product.Product")
         .objects.filter(active=True, stock__gt=0, stock__lt=LOW_STOCK_BELOW)

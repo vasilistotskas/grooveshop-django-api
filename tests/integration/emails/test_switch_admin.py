@@ -84,44 +84,57 @@ class TestThePermissions:
         assert user.has_perm("emails.view_emailswitch")
         assert user.has_perm("emails.change_emailswitch")
 
-    def test_staff_hold_nothing_of_it(self, tenant):
+    def test_staff_only_look(self, tenant):
         user = store_staff(tenant, role=TenantMembershipRole.STAFF)
 
-        for action in ("view", "add", "change", "delete"):
-            assert not user.has_perm(f"emails.{action}_emailswitch"), action
+        for model in ("emailswitch", "emaillog", "emailsuppression"):
+            assert user.has_perm(f"emails.view_{model}"), model
+            for action in ("add", "change", "delete"):
+                assert not user.has_perm(f"emails.{action}_{model}"), (
+                    action,
+                    model,
+                )
         assert user.has_perm("order.change_order")
 
-    def test_staff_cannot_open_the_page_or_toggle(self, staff):
+    def test_staff_can_open_the_page_but_not_toggle(self, staff):
         client, _user = staff
 
-        assert client.get(url()).status_code == 403
+        assert client.get(url()).status_code == 200
         response = toggle(client, KEY, on=False)
 
         assert response.status_code == 403
         assert not EmailSwitch.objects.exists()
 
-    def test_the_sidebar_offers_it_to_admin_and_not_to_staff(
-        self, admin, staff
-    ):
-        admin_html = admin[0].get(reverse("admin:index")).content.decode()
-        staff_html = staff[0].get(reverse("admin:index")).content.decode()
+    def test_the_page_tells_staff_they_cannot_switch(self, staff):
+        html = staff[0].get(url()).content.decode()
 
-        # The link itself: the preview page's address starts with it.
-        assert f'href="{url()}"' in admin_html
-        assert f'href="{url()}"' not in staff_html
+        assert "do not have permission to switch" in html
+        assert 'name="type_key"' not in html or " disabled" in html
+
+    def test_the_sidebar_offers_it_to_admin_and_staff(self, admin, staff):
+        for client, _user in (admin, staff):
+            html = client.get(reverse("admin:index")).content.decode()
+
+            assert f'href="{url()}"' in html
 
 
 class TestThePage:
-    def test_it_lists_every_store_email_by_area(self, admin):
+    def test_it_lists_every_store_email_by_area_across_the_two_tabs(
+        self, admin
+    ):
         client, _user = admin
 
-        response = client.get(url())
+        customers = client.get(url())
+        team = client.get(url(), {"tab": "team"})
 
-        html = response.content.decode()
-        assert response.status_code == 200
+        html = customers.content.decode() + team.content.decode()
+        assert customers.status_code == 200
         for email_type in registry.types_for(Owner.STORE):
             assert str(email_type.title) in html, email_type.key
-        assert "Alerts when something needs a person" in html
+        assert "Alerts when something needs a person" in team.content.decode()
+        assert "Alerts when something needs a person" not in (
+            customers.content.decode()
+        )
 
     def test_a_required_email_has_no_switch_and_says_so(self, admin):
         client, _user = admin
@@ -129,22 +142,33 @@ class TestThePage:
             t for t in registry.types_for(Owner.STORE) if t.switchable
         ]
 
-        html = client.get(url()).content.decode()
+        html = "".join(
+            client.get(url(), {"tab": tab}).content.decode()
+            for tab in ("customers", "team")
+        )
 
-        assert html.count('name="type_key"') == len(switchable)
-        assert f'value="{REQUIRED_KEY}"' not in html
-        assert "Required" in html
+        # One hidden type_key per switch, and one per Send test button.
+        assert html.count('name="type_key"') == len(switchable) + len(
+            list(registry.types_for(Owner.STORE))
+        )
+        assert f'hx-post="{url("toggle")}"' in html
+        assert f'name="type_key" value="{REQUIRED_KEY}"' in html
+        article = html.split(f'id="email-{REQUIRED_KEY}"')[1].split(
+            "</article>"
+        )[0]
+        assert "toggle" not in article
+        assert "Required" in article
 
     def test_a_switched_off_email_shows_off(self, admin):
         client, _user = admin
         toggle(client, KEY, on=False)
 
-        html = client.get(url()).content.decode()
+        html = client.get(url(), {"tab": "team"}).content.decode()
 
         article = html.split('id="email-ops.webhook_failed"')[1].split(
             "</article>"
         )[0]
-        assert "Off" in article
+        assert "Switched off" in article
         assert not is_checked(article)
 
     def test_a_closed_gate_is_named(self, admin):

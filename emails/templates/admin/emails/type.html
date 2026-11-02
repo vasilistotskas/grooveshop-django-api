@@ -1,0 +1,92 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div class="flex flex-col gap-1">
+                {% component "unfold/components/title.html" %}{{ email_type.title }}{% endcomponent %}
+                {% component "unfold/components/text.html" with class="max-w-3xl" %}{{ email_type.description }}{% endcomponent %}
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                {% if not item.row.switchable %}
+                    {% trans "Required" as required_label %}
+                    {% include "unfold/helpers/label.html" with text=required_label variant="info" icon="lock" %}
+                {% elif item.row.closed_gate %}
+                    {% blocktrans trimmed with reason=item.row.closed_gate asvar gate_label %}Off: {{ reason }}{% endblocktrans %}
+                    {% include "unfold/helpers/label.html" with text=gate_label variant="default" %}
+                {% elif not item.row.enabled %}
+                    {% trans "Switched off" as off_label %}
+                    {% include "unfold/helpers/label.html" with text=off_label variant="warning" %}
+                {% else %}
+                    {% trans "On" as on_label %}
+                    {% include "unfold/helpers/label.html" with text=on_label variant="success" %}
+                {% endif %}
+                {% trans "All emails" as back_label %}
+                {% component "unfold/components/button.html" with href=back_url icon="arrow_back" variant="default" size="sm" %}{{ back_label }}{% endcomponent %}
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-subtle">
+            <span>
+                {% if item.last_sent %}
+                    {% blocktrans trimmed with ago=item.last_sent %}Last sent {{ ago }} ago{% endblocktrans %}
+                {% else %}
+                    {% trans "Not sent in the last 30 days" %}
+                {% endif %}
+            </span>
+            <span>{% blocktrans trimmed count count=item.row.figures.sent %}{{ count }} sent in 30 days{% plural %}{{ count }} sent in 30 days{% endblocktrans %}</span>
+            {% if item.row.figures.failing %}
+                <span class="text-red-600 dark:text-red-400">{% blocktrans trimmed count count=item.row.figures.failing %}{{ count }} failed{% plural %}{{ count }} failed{% endblocktrans %}</span>
+            {% endif %}
+        </div>
+
+        {% trans "Preview" as preview_title %}
+        {% component "unfold/components/card.html" with title=preview_title %}
+            <form hx-post="{% url 'admin:emails_emailswitch_preview_render' %}"
+                  hx-target="#email-preview"
+                  hx-trigger="load, change"
+                  class="flex flex-wrap gap-4 items-end mb-4">
+                {% csrf_token %}
+                <input type="hidden" name="{{ form.type_key.html_name }}" value="{{ email_type.key }}">
+                {% include "unfold/helpers/field.html" with field=form.language %}
+                {% if form.order %}{% include "unfold/helpers/field.html" with field=form.order %}{% endif %}
+                {% include "unfold/helpers/field.html" with field=form.format %}
+                {% if can_test %}
+                    {% comment %}
+                        Posts this same form (type, language, data) to the test
+                        send instead of the preview; htmx only listens for
+                        load and change, so the browser submits it natively.
+                    {% endcomment %}
+                    {% trans "Send test" as test_label %}
+                    {% component "unfold/components/button.html" with submit=True icon="send" variant="primary" attrs=test_send_attrs %}{{ test_label }}{% endcomponent %}
+                {% endif %}
+            </form>
+            {% if can_test %}
+                {% component "unfold/components/text.html" with class="mb-4" %}
+                    {% blocktrans trimmed %}
+                        Send test goes only to the email address of your own
+                        account, in the language and with the data chosen above,
+                        and is marked as a test in the log.
+                    {% endblocktrans %}
+                {% endcomponent %}
+            {% endif %}
+            <div id="email-preview"></div>
+        {% endcomponent %}
+
+        {% trans "Latest sends" as recent_title %}
+        {% component "unfold/components/card.html" with title=recent_title %}
+            {% if table.rows %}
+                {# Unfold's table scrolls sideways inside the card by itself; a wrapper of ours would clip its negative margins. #}
+                {% component "unfold/components/table.html" with table=table card_included=1 %}{% endcomponent %}
+            {% else %}
+                {% trans "Nothing has been sent yet." as empty_label %}
+                {% component "unfold/components/text.html" %}{{ empty_label }}{% endcomponent %}
+            {% endif %}
+        {% endcomponent %}
+    </div>
+{% endblock %}

@@ -444,8 +444,10 @@ Staff (`StoreStaffModelPermissions`, so ADMIN and OWNER write, STAFF look):
 
 | Route | |
 |---|---|
-| `GET media` (`?search=`, `?ordering=createdAt\|sizeBytes`) | The library, newest first, each with `usedBy` |
-| `POST media` | Multipart: `file`, optional `focalX`, `focalY`, `alt` (a JSON object, language to text) |
+| `GET media` (`?search=` on the file name and the alt text, `?ordering=createdAt\|sizeBytes`) | The library, newest first, each with `usedBy` |
+| `POST media` | Multipart: `file`, optional `focalX`, `focalY`, `alt` (a JSON object, language to text). The same image again (SHA-256 of the bytes, `MediaAsset.content_hash`) is not stored twice: the answer is the asset already there (its alt text and focal point kept) with `duplicate: true` |
+| `POST media/import` `{url, focalX?, focalY?, alt?}` | Bring in an image of THIS store by path (below); `duplicate: true` when it was already there |
+| `GET media/staff-resolve?ids=&locale=` | Any asset of the library resolved like `media/resolve`, published or not; `private, no-store` |
 | `GET/PATCH/DELETE media/<id>` | `PATCH` changes `focalX`, `focalY` and the alt of the languages named |
 
 Public: `GET media/resolve?ids=1,2&locale=` (AllowAny) answers
@@ -454,6 +456,39 @@ alt in the asked language, else the default one. **Only assets the current
 release uses are answered** (ids are sequential, and an image nobody
 published is not the public's to list); any other id is left out and the
 storefront shows that block empty.
+
+### Importing an image the store already shows
+
+`media_services.import_url` (`POST media/import`, ADMIN and OWNER) turns an
+existing image into an asset so a block can reference it. Only a PATH of this
+store is a source, never an address:
+
+- `/img/...` (a file the storefront serves): fetched from
+  `NUXT_INTERNAL_BASE_URL` with `allow_redirects=False` and the upload size
+  limit while streaming; a redirect is `import_redirect`, a non-200
+  `import_not_found`, an unreachable storefront `503 storefront_unavailable`.
+- `media/<this store>/uploads/...` (already uploaded): read from the store's
+  storage and COPIED into `uploads/builder/`, so deleting the asset never
+  removes the original; another store's path is `import_other_store`, anything
+  outside `uploads/` is `invalid_import_url`.
+- A scheme or a host (`https://...`, `//host/...`, `file:`, `data:`) is
+  `external_url_not_allowed`: the server does not fetch internet addresses on a
+  staff member's behalf (an internal service could be one) and does not own them.
+  A query, a fragment, a backslash, a dot segment, a space or a control
+  character is `invalid_import_url`.
+
+The bytes then go through the upload checks (`invalid_image`,
+`unsupported_image_type`, `file_too_large`, `image_too_large`).
+
+### Resolving media for a draft, a preview and a share link
+
+The public `media/resolve` answers only what the CURRENT release uses, so an
+image picked in the editor but not yet published would render empty.
+`media/staff-resolve` answers any asset to staff for the editor's preview. A
+share-preview link (below) has its own `GET preview-media/<token>?ids=`: it
+answers only the assets the link's frozen documents reference (their `refs`
+are frozen with them), so a token never opens the library; an unknown, revoked
+or expired token is `404 preview_link_expired`. Both are `private, no-store`.
 
 ## Signing in to the editor
 

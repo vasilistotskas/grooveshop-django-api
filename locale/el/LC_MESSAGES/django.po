@@ -8405,6 +8405,9 @@ msgstr "N/A"
 msgid "Name"
 msgstr "Όνομα"
 
+msgid "Name an image path of this store."
+msgstr "Δώστε τη διαδρομή μιας εικόνας αυτού του καταστήματος."
+
 #, python-format
 msgid "Name between 1 and %(limit)s asset ids."
 msgstr "Δώσε από 1 έως %(limit)s αναγνωριστικά αρχείων."
@@ -9082,6 +9085,9 @@ msgstr "Επιβεβαίωση χρειάζεται μόνο ένας προγρ
 
 msgid "Only a page can be deleted."
 msgstr "Μόνο μια σελίδα μπορεί να διαγραφεί."
+
+msgid "Only images of this store can be imported, not other sites."
+msgstr "Εισάγονται μόνο εικόνες αυτού του καταστήματος, όχι άλλων ιστότοπων."
 
 msgid "Only one active newsletter topic can be the default."
 msgstr "Μόνο ένα ενεργό θέμα ενημερωτικού δελτίου μπορεί να είναι το προεπιλεγμένο."
@@ -11881,6 +11887,9 @@ msgstr "SHA-256 των πεδίων ACS που ταυτοποιούν τη γρ�
 msgid "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 msgstr "SHA-256 των bytes του 'data' με υπογραφή HMAC. Η υπογραφή καλύπτει μόνο το 'data', όχι το 'id' του φακέλου, οπότε ο εντοπισμός διπλότυπων επαναλήψεων (replay) βασίζεται και σε αυτό το hash περιεχομένου — ένα υποκλαπέν συμβάν που υποβάλλεται ξανά με νέο/πλαστό 'id' εξακολουθεί να συγκρούεται εδώ."
 
+msgid "SHA-256 of the file: the same image uploaded or imported twice is one asset."
+msgstr "SHA-256 του αρχείου: η ίδια εικόνα που ανεβαίνει ή εισάγεται δύο φορές είναι ένα στοιχείο."
+
 msgid "SHA-256 of the title and body, as accepted."
 msgstr "SHA-256 του τίτλου και του κειμένου, όπως έγιναν αποδεκτά."
 
@@ -13608,6 +13617,9 @@ msgstr ""
 msgid "Thanks,<br>The %(site_name)s team"
 msgstr "Ευχαριστούμε,<br>Η ομάδα του %(site_name)s"
 
+msgid "That address redirects, so it is not imported."
+msgstr "Η διεύθυνση ανακατευθύνει, οπότε δεν εισάγεται."
+
 msgid "That code is not correct."
 msgstr "Ο κωδικός δεν είναι σωστός."
 
@@ -13617,6 +13629,15 @@ msgstr "Αυτό το αρχείο είναι πολύ μεγάλο."
 #, python-format
 msgid "That file type is not accepted. Allowed: %(types)s."
 msgstr "Αυτός ο τύπος αρχείου δεν γίνεται δεκτός. Επιτρέπονται: %(types)s."
+
+msgid "That image belongs to another store."
+msgstr "Αυτή η εικόνα ανήκει σε άλλο κατάστημα."
+
+msgid "That is not a valid image path."
+msgstr "Αυτή δεν είναι έγκυρη διαδρομή εικόνας."
+
+msgid "That is not an uploaded image."
+msgstr "Αυτή δεν είναι εικόνα που έχει ανέβει."
 
 msgid "That release is already the current one."
 msgstr "Αυτή η δημοσίευση είναι ήδη η τρέχουσα."
@@ -14194,6 +14215,9 @@ msgstr "Δεν υπάρχει τέτοιο έγγραφο."
 #, python-format
 msgid "There is no such document: %(keys)s."
 msgstr "Δεν υπάρχει τέτοιο έγγραφο: %(keys)s."
+
+msgid "There is no such image."
+msgstr "Δεν υπάρχει τέτοια εικόνα."
 
 msgid "There is no such preview link."
 msgstr "Δεν υπάρχει τέτοιος σύνδεσμος προεπισκόπησης."

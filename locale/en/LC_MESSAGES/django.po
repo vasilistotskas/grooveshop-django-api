@@ -8397,6 +8397,9 @@ msgstr "N/A"
 msgid "Name"
 msgstr "Name"
 
+msgid "Name an image path of this store."
+msgstr "Name an image path of this store."
+
 #, python-format
 msgid "Name between 1 and %(limit)s asset ids."
 msgstr "Name between 1 and %(limit)s asset ids."
@@ -9075,6 +9078,9 @@ msgstr "Only a failed schedule needs acknowledging."
 
 msgid "Only a page can be deleted."
 msgstr "Only a page can be deleted."
+
+msgid "Only images of this store can be imported, not other sites."
+msgstr "Only images of this store can be imported, not other sites."
 
 msgid "Only one active newsletter topic can be the default."
 msgstr "Only one active newsletter topic can be the default."
@@ -11874,6 +11880,9 @@ msgstr "SHA-256 of the ACS fields that identify the row. Set only for a row with
 msgid "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 msgstr "SHA-256 of the HMAC-signed 'data' bytes. The signature covers only 'data', not the envelope 'id', so replay dedup keys on this content hash as well — a captured event resubmitted under a new/forged 'id' still collides here."
 
+msgid "SHA-256 of the file: the same image uploaded or imported twice is one asset."
+msgstr "SHA-256 of the file: the same image uploaded or imported twice is one asset."
+
 msgid "SHA-256 of the title and body, as accepted."
 msgstr "SHA-256 of the title and body, as accepted."
 
@@ -13605,6 +13614,9 @@ msgstr ""
 msgid "Thanks,<br>The %(site_name)s team"
 msgstr "Thanks,<br>The %(site_name)s team"
 
+msgid "That address redirects, so it is not imported."
+msgstr "That address redirects, so it is not imported."
+
 msgid "That code is not correct."
 msgstr "That code is not correct."
 
@@ -13614,6 +13626,15 @@ msgstr "That file is too large."
 #, python-format
 msgid "That file type is not accepted. Allowed: %(types)s."
 msgstr "That file type is not accepted. Allowed: %(types)s."
+
+msgid "That image belongs to another store."
+msgstr "That image belongs to another store."
+
+msgid "That is not a valid image path."
+msgstr "That is not a valid image path."
+
+msgid "That is not an uploaded image."
+msgstr "That is not an uploaded image."
 
 msgid "That release is already the current one."
 msgstr "That release is already the current one."
@@ -14191,6 +14212,9 @@ msgstr "There is no such document."
 #, python-format
 msgid "There is no such document: %(keys)s."
 msgstr "There is no such document: %(keys)s."
+
+msgid "There is no such image."
+msgstr "There is no such image."
 
 msgid "There is no such preview link."
 msgstr "There is no such preview link."

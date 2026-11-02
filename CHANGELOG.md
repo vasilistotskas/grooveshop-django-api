@@ -3,6 +3,35 @@
 
 
 
+## v3.196.0 (2026-11-02)
+
+### Features
+
+* feat(builder): publish one stored version of one document (#433) ([`944c077`](https://github.com/vasilistotskas/grooveshop-django-api/commit/944c077b1e673cfd592e697c07c3436b79a18e47))
+
+* feat(builder): publish one stored version of one document
+
+POST builder/documents/<key>/versions/<n>/publish makes a release that
+repoints only that key at the version and leaves every other document and the
+draft alone. Its references must still exist, and a version that is already
+the published one is nothing_to_publish.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`944c077`](https://github.com/vasilistotskas/grooveshop-django-api/commit/944c077b1e673cfd592e697c07c3436b79a18e47))
+
+### Testing
+
+* test(builder): do not let a one-digit product id fall under the search minimum
+
+The id search test used the first product's pk, which is one character and so
+below BUILDER_LINK_SEARCH_MIN_CHARS: it passed only when earlier tests had
+advanced the sequence.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`944c077`](https://github.com/vasilistotskas/grooveshop-django-api/commit/944c077b1e673cfd592e697c07c3436b79a18e47))
+
 ## v3.195.0 (2026-11-02)
 
 ### Bug fixes

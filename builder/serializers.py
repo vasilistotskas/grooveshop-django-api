@@ -188,6 +188,50 @@ class PresenceSerializer(serializers.Serializer):
     documents = serializers.DictField(child=PresenceEntrySerializer(many=True))
 
 
+class FeatureStateSerializer(serializers.Serializer):
+    """One store feature as the editor needs it."""
+
+    on = serializers.BooleanField(
+        help_text="Plan flag and every setting it needs are on."
+    )
+    turn_on_url = serializers.URLField(
+        allow_null=True,
+        help_text=(
+            "The store admin page where this person switches it on; null "
+            "when it is on, when only the platform can (the plan), or when "
+            "their role cannot change settings."
+        ),
+    )
+
+
+class StoreFeatureStatesSerializer(serializers.Serializer):
+    """Every ``TenantConfig.features`` name, with its state."""
+
+    blog = FeatureStateSerializer(read_only=True)
+    blog_comments = FeatureStateSerializer(read_only=True)
+    product_reviews = FeatureStateSerializer(read_only=True)
+    account_reviews = FeatureStateSerializer(read_only=True)
+    favourites = FeatureStateSerializer(read_only=True)
+    newsletter = FeatureStateSerializer(read_only=True)
+    feedback = FeatureStateSerializer(read_only=True)
+    loyalty = FeatureStateSerializer(read_only=True)
+    promotions = FeatureStateSerializer(read_only=True)
+    gift_cards = FeatureStateSerializer(read_only=True)
+    wholesale = FeatureStateSerializer(read_only=True)
+    b2b_invoicing = FeatureStateSerializer(read_only=True)
+    product_suggestions = FeatureStateSerializer(read_only=True)
+    product_alerts = FeatureStateSerializer(read_only=True)
+    price_history = FeatureStateSerializer(read_only=True)
+    contact_attachments = FeatureStateSerializer(read_only=True)
+    chat_widget = FeatureStateSerializer(read_only=True)
+    catalogue = FeatureStateSerializer(read_only=True)
+    cart = FeatureStateSerializer(read_only=True)
+
+
+class BuilderFeaturesSerializer(serializers.Serializer):
+    features = StoreFeatureStatesSerializer()
+
+
 class PreviewCopySerializer(serializers.Serializer):
     draft = serializers.JSONField()
     i18n = serializers.JSONField(required=False, default=dict)

@@ -385,6 +385,30 @@ lock: the draft's `If-Match` revision still decides a save.
 - Every store role may call it (`builder.view_builderdocument`), so the
   read-only editor of a STAFF member is seen too.
 
+## Which features are on, and where to turn one on
+
+`GET features` (`builder/features.py`, any store role) answers `{features:
+{<name>: {on, turnOnUrl}}}` for every name of `TenantConfig.features`
+(`tenant/features.py: STORE_FEATURES`), so the editor can mark a block whose
+feature is off (`feature_disabled`) and offer "Turn on <feature>" without
+copying the plan/setting split or guessing admin addresses. It reads the table
+and the request-scoped state the admin uses (`admin.features.StoreFeatures`),
+so it cannot disagree with the 404 gates or the sidebar.
+
+- `on`: the plan flag and every setting the feature needs are on.
+- `turnOnUrl`: the store admin's change page of the first setting that is off,
+  on the store's own API host (`get_tenant_api_base_url`). Every declared
+  setting has its row (`migrate` creates the missing ones, and the settings
+  admin refuses to delete a declared one: `core/admin.py: SettingAdmin`), so
+  the page exists; a name with no row, which only an undeclared setting can
+  be, has no link.
+  `null` when the feature is on, when the plan keeps it off (only the platform
+  can change that), or when the caller's role lacks
+  `extra_settings.change_setting` (`CONFIGURE_PERMISSION`: Admin and Owner hold
+  it, Staff do not).
+- A feature that needs several settings offers the first off one in the order
+  the table lists them (the cart needs the catalogue first).
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an

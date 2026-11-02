@@ -230,7 +230,15 @@ python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# The 600 s timeout guards a test BODY. ``timeout_func_only`` keeps
+# fixture setup out of it: pytest-timeout otherwise charges a
+# session fixture to whichever test triggers it, so the first test of
+# the multi-tenant lane paid for three full schema builds (the test
+# database's public and webside schemas, then mt_smoke): 366 s on one
+# CI run, over 600 s on another. A hung fixture is still bounded by
+# the CI job's ``timeout-minutes``.
 timeout = 600
+timeout_func_only = true
 # ``--dist loadfile`` keeps every test inside a file pinned to one xdist
 # worker. With ``worksteal``, tests from different files end up
 # interleaved on the same process — fine for pure unit tests but

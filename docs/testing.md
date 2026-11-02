@@ -24,7 +24,7 @@ Settings read while Django sets up live in `tests/settings.py`, selected with `-
 - WebSocket tests drive the ASGI application with `asgiref.testing.ApplicationCommunicator` and raw `websocket.*` events (`tests/unit/asgi/test_websocket_stack.py`). Do not import `channels.testing`: its `__init__` imports `daphne.testing`, and neither daphne nor Twisted is a dependency
 - `requires_meilisearch` marker for tests needing a live engine; `tests/utils/meilisearch.py` indexes real documents for them
 - Query counts: Django's `CaptureQueriesContext` and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
-- Coverage minimum: 70% (`fail_under = 70`, enforced on the combined CI shards), per-test timeout: 600s
+- Coverage minimum: 70% (`fail_under = 70`, enforced on the combined CI shards), per-test timeout: 600s on the test body only (`timeout_func_only`): fixture setup is excluded, because pytest-timeout would otherwise charge a session fixture, such as a full tenant schema build, to whichever test triggers it. The multi-tenant lane's first test paid for three schema builds that way, 366 s on one CI run and over 600 s on another. A hung fixture is bounded by the CI job's `timeout-minutes`, and locally by nothing
 
 On Windows with Docker Desktop a fresh connection to `localhost` can stall 1-30 s (its IPv6 port relay); test durations that are exact multiples of ~30 s mean that, not slow code — run locally with `REDIS_HOST=127.0.0.1`.
 

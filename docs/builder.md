@@ -89,9 +89,14 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `limits` (`maxBlocks`, `maxPerTemplate`), `children` (`allowed`,
 `maxDepth`), `kinds` (`section`, `block`), optional `groups`, `templates`,
 `feature` and `deprecated`. A setting whose schema says
-`contentMediaType: "text/html"` is rich text. `linkRefs` (optional, same pointer
+`contentMediaType: "text/html"` is rich text. `linkRefs` (same pointer
 syntax) names the link settings, see "References, not copies"; a link pointer
 cannot equal, lie under or hold a `translatable` pointer (`*` counts).
+`linkRefs` is optional ONLY so that Django can deploy before the storefront
+that emits it on every block (`[]` where a block has no link); a later change
+makes it required, and until then a catalogue that omits it silently indexes
+no link. Check the key against the real catalogue after a storefront
+deployment (step 1 of the run sheet).
 
 ## What a save checks
 
@@ -445,7 +450,10 @@ changes for a visitor until the storefront switch.
 
 1. **Before.** The backend carries the builder import and the storefront
    serves the strict converter (`POST /api/builder/convert-legacy` answers; the
-   storefront image is the one the staging run used).
+   storefront image is the one the staging run used). Its catalogue declares
+   `linkRefs`: `fetch_catalogue(<schema>).get("hero_carousel").link_refs` is not
+   empty in the backend's shell, since an absent key would let a raw link
+   through unindexed.
 2. **Pre-check, on that environment's data.**
    `builder_import_legacy --all-tenants --dry-run --json`. Every store must
    show `problems: []` and `applied: false`. Read each `warnings` entry

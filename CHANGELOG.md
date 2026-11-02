@@ -3,6 +3,91 @@
 
 
 
+## v3.195.0 (2026-11-02)
+
+### Bug fixes
+
+* fix(page_config): drop the layout and menu tables (#429) ([`0151992`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01519929549c22797a162900d197d374e31e874a))
+
+* fix(page_config): drop the layout and menu tables
+
+Release N+1 of retiring page_config's layouts and menus: 0040 took the
+models out of state and the release that still read their tables is
+gone, so 0041 drops the eight tables (translations first) and deletes
+their content types, and with them their permissions. It declares
+contract_of 0040, so migration_preflight refuses it until 0040 was
+applied by an earlier deploy. Not reversible.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0151992`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01519929549c22797a162900d197d374e31e874a))
+
+### Features
+
+* feat(builder): resolve the editor's unsaved working copies for the live preview (#431) ([`e91dae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e91dae5e50d708e2861c641f15c50deb1e271158))
+
+* feat(builder): resolve the editor's unsaved working copies for the live preview
+
+POST builder/preview/resolve answers what the public read would answer if the
+given working copies were released now. published.assemble is now the one place
+a page is put together, for a release and for the preview alike; the preview
+only supplies the documents, so there is no second resolver. Each copy is
+validated like a draft save, nothing is stored, and the answer is
+Cache-Control private, no-store.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e91dae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e91dae5e50d708e2861c641f15c50deb1e271158))
+
+* feat(builder): type the published and preview envelopes in the schema
+
+GET published/<pageKey>, GET published and POST preview/resolve declared a
+free-form object, which left the storefront to hand-write their types. They now
+declare the envelope (release, locale, theme, groups, page / pages) with typed
+scalars; only a document's section trees stay open objects, because the block
+catalogue is the storefront's. Also pins that nothing below documents is
+camel-cased by a preview, in either direction.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e91dae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e91dae5e50d708e2861c641f15c50deb1e271158))
+
+### Testing
+
+* test(builder): the live preview stays inside the store it is asked on
+
+A staff token of store A is refused on store B, a preview never resolves
+another store's release or documents whatever keys the body names, and a
+preview stores nothing in either schema.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`e91dae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e91dae5e50d708e2861c641f15c50deb1e271158))
+
+* test(builder): do not let a one-digit product id fall under the search minimum
+
+The id search test used the first product's pk, which is one character and so
+below BUILDER_LINK_SEARCH_MIN_CHARS: it passed only when earlier tests had
+advanced the sequence.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e91dae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e91dae5e50d708e2861c641f15c50deb1e271158))
+
+* test(core): drop the PageLayout SEO replay and make 0041 irreversible
+
+test_migration_seo_into_translations rolled page_config back to 0028 to
+replay its SEO copy on PageLayout. With 0041 dropping that table, the
+rollback ran 0041's no-op reverse and then 0040's, which re-adds a
+foreign key on page_config_navigationlink, a table that no longer
+exists. A replay of a data migration for tables that are gone proves
+nothing about the code that is left, so the PageLayout case goes and
+the file covers product's SEO copy only.
+
+0041 now has no reverse operations, so Django refuses to unapply it
+with IrreversibleError instead of walking on into 0040's reverse and
+failing on the missing table.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0151992`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01519929549c22797a162900d197d374e31e874a))
+
 ## v3.194.0 (2026-11-02)
 
 ### Bug fixes

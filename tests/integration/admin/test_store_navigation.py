@@ -13,6 +13,7 @@ import pytest
 from django.test import RequestFactory, override_settings
 from django.utils import translation
 
+from admin import navigation
 from admin.navigation import ops_site_dropdown, store_sidebar
 from shipping.models import ShippingProvider
 from tenant.models import TenantMembershipRole
@@ -119,7 +120,37 @@ def _superuser():
 
 
 class TestFeatures:
-    def test_every_feature_on_lists_every_section(
+    def test_every_feature_on_lists_every_page_the_sidebar_declares(
+        self, settings_values, carriers, monkeypatch
+    ):
+        """Derived from the sidebar itself, not a list of titles: every
+        model page it declares (``_page``) is recorded, and with every
+        feature on and a superuser looking, none may come back hidden. A
+        rule that hides an entry by mistake fails here; adding or removing
+        an entry needs no edit."""
+        declared: list[tuple[str, str, Any]] = []
+        real = navigation._page
+
+        def recording(request, label, title, icon="", **extra):
+            item = real(request, label, title, icon, **extra)
+            declared.append((label, str(title), item))
+            return item
+
+        monkeypatch.setattr(navigation, "_page", recording)
+        _tenant, previous = _bound()
+        try:
+            entries = _entries(_sidebar(_superuser()))
+        finally:
+            unbind_store_tenant(previous)
+
+        assert declared
+        assert [
+            (label, title) for label, title, item in declared if not item
+        ] == []
+        for _label, title, _item in declared:
+            assert title in entries, title
+
+    def test_every_feature_on_shows_no_off_badge(
         self, settings_values, carriers
     ):
         _tenant, previous = _bound()
@@ -128,29 +159,11 @@ class TestFeatures:
         finally:
             unbind_store_tenant(previous)
 
-        for title in (
-            "Brands",
-            "Pages",
-            "Menus",
-            "Page Layouts",
-            "Storefront Texts",
-            "Wholesale",
-            "Loyalty",
-            "Promotions",
-            "Gift Cards",
-            "Recommendations",
-            "Blog",
-            "Reviews",
-            "Feedback",
-            "Favourites",
-            "Newsletter",
-            "ACS Shipments",
-            "BoxNow Shipments",
-            "Pickup Points",
-        ):
-            assert title in entries, title
-        for title in ("Wholesale", "Loyalty", "Promotions", "Gift Cards"):
-            assert entries[title].get("badge") != "Off", title
+        assert [
+            title
+            for title, entry in entries.items()
+            if entry.get("badge") == "Off"
+        ] == []
 
     def test_a_feature_off_the_plan_is_not_listed(
         self, settings_values, carriers

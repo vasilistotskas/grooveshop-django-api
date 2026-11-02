@@ -184,4 +184,4 @@ detail.
 
 ## Licence
 
-Source-available under a custom non-commercial licence; see [LICENSE.md](LICENSE.md).
+Source-available under the [PolyForm Strict License 1.0.0](LICENSE.md): you may use it for noncommercial purposes; you may not distribute it or make changes or new works based on it. Commercial use needs a separate licence from the author.

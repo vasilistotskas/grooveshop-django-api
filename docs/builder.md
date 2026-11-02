@@ -255,6 +255,40 @@ integer, or too many, is `400 invalid_link_targets` naming the `param`. The
 query keys are camelCase on the wire (the camel-case middleware underscores
 them before the view reads them).
 
+## The live preview
+
+`POST builder/preview/resolve` (`builder/services.py: preview`,
+`builder/published.py: preview`) answers what the public read would answer if
+the editor's **unsaved working copies** were released now, so the editor can
+render a page without saving or publishing it.
+
+```json
+{"pageKey": "about", "locale": "en",
+ "documents": {"page:about": {"draft": {...}, "i18n": {...}}}}
+```
+
+- The answer is `GET published/<pageKey>`'s: `{release, locale, theme, groups,
+  page}`. Each copy replaces the current release's document of the same key
+  (`theme`, `group:<n>`, `template:<n>`, `page:<n>`, a page before a template
+  of the same name); everything not sent is the release's; a store with no
+  release answers `release: 0`. A working copy has `version: 0`.
+- **One code path.** `published.assemble` puts a page together for the
+  release read and for the preview alike (overlay merged, disabled nodes
+  dropped); the preview only supplies the documents. The test that pins it
+  sends the stored drafts and compares the answer to the public read.
+- Every copy is validated like a draft save (`400 invalid_document`, every
+  problem with its `document`; references are not checked, as on a save; no
+  copies need no catalogue). At most `BUILDER_PREVIEW_MAX_DOCUMENTS` copies
+  (`too_many_documents`). A page that neither a copy nor the release has is
+  `404 page_not_published`. An unknown or missing `locale` is the default one.
+- Nothing is stored and nothing is cached: `Cache-Control: private,
+  no-store`. Allowed to every store role (`builder.view_builderdocument`), so
+  the read-only editor of a STAFF member previews too. A map of document keys
+  is not camel-cased (`PreviewJSONParser`).
+- Cost: a fixed handful of queries (the release, its versions) plus the
+  validation; measured warm in the test client, about 8 ms for 5 sections,
+  17 ms for 20 and 27 ms for 40.
+
 ## The media library
 
 `MediaAsset` (`builder/models.py`) is an image in the store's library; an

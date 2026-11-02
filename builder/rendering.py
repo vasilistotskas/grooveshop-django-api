@@ -34,3 +34,15 @@ class BuilderJSONRenderer(CamelCaseJSONRenderer):
 
 class BuilderJSONParser(CamelCaseJSONParser):
     json_underscoreize = _OPTIONS
+
+
+#: A preview names its documents by key (``group:main_menu``), as keys of a
+#: map, which camel-casing would rewrite.
+_PREVIEW_OPTIONS = {
+    "ignore_fields": (*DOCUMENT_FIELDS, "documents"),
+    "ignore_keys": ("i18n",),
+}
+
+
+class PreviewJSONParser(CamelCaseJSONParser):
+    json_underscoreize = _PREVIEW_OPTIONS

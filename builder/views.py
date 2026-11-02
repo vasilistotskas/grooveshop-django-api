@@ -13,6 +13,7 @@ from typing import Any
 from django.conf import settings
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils.cache import patch_cache_control
 from django.utils.translation import gettext as _
 from djangorestframework_camel_case.util import camel_to_underscore
 from drf_spectacular.types import OpenApiTypes
@@ -36,7 +37,11 @@ from builder.errors import (
     NotFoundError,
     PreconditionRequired,
 )
-from builder.localization import LOCALE_PARAM, requested_locale
+from builder.localization import (
+    LOCALE_PARAM,
+    requested_locale,
+    resolve_locale,
+)
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
@@ -46,12 +51,17 @@ from builder.models import (
     ReferenceKind,
     ScheduleStatus,
 )
-from builder.rendering import BuilderJSONParser, BuilderJSONRenderer
+from builder.rendering import (
+    BuilderJSONParser,
+    BuilderJSONRenderer,
+    PreviewJSONParser,
+)
 from builder.serializers import (
     CheckpointWriteSerializer,
     DocumentDetailSerializer,
     DocumentListSerializer,
     DraftWriteSerializer,
+    PreviewResolveSerializer,
     PublishWriteSerializer,
     ReleaseSerializer,
     RescheduleSerializer,
@@ -61,7 +71,7 @@ from builder.serializers import (
     VersionDetailSerializer,
     VersionListSerializer,
 )
-from core.api.permissions import StoreStaffModelPermissions
+from core.api.permissions import IsStoreStaff, StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 
 TAGS = ["Builder"]
@@ -565,6 +575,61 @@ class LinkTargetsView(APIView):
                 )
             ids[kind] = wanted
         return ids
+
+
+class PreviewResolveView(StaffView):
+    """The editor's live preview: unsaved working copies, resolved the way
+    the public read resolves a release."""
+
+    parser_classes = [PreviewJSONParser]
+    # A POST that stores nothing: ``StoreStaffModelPermissions`` would ask
+    # for the ADD permission, so the service asks for VIEW instead.
+    permission_classes = [IsStoreStaff]
+
+    @extend_schema(
+        tags=TAGS,
+        request=PreviewResolveSerializer,
+        responses={
+            200: dict,
+            400: OpenApiResponse(ErrorResponseSerializer),
+            404: OpenApiResponse(ErrorResponseSerializer),
+            503: OpenApiResponse(ErrorResponseSerializer),
+        },
+        description=(
+            "`{release, locale, theme, groups, page}`, as `published/"
+            "<pageKey>` answers, if the working copies in `documents` "
+            "(`{key: {draft, i18n}}`, at most `BUILDER_PREVIEW_MAX_"
+            "DOCUMENTS`) were released now: each stands in for the current "
+            "release's document of its key and everything else is the "
+            "release's, resolved by the same code (overlay merged, "
+            "disabled nodes dropped). A working copy has `version: 0`. "
+            "Every copy is validated like a draft save (400 "
+            "`invalid_document`, each problem with its `document`; "
+            "references are not checked, as on a save); nothing is stored. "
+            "404 `page_not_published` when neither a copy nor the release "
+            "has the page. Never cached: `Cache-Control: private, "
+            "no-store`. The content keys are the storefront's own and are "
+            "not camelCased."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        body = PreviewResolveSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        data = body.validated_data
+        payload = services.preview(
+            request.user,
+            page_key=data["page_key"],
+            locale=resolve_locale(data.get("locale")),
+            copies={
+                key: (copy["draft"], copy["i18n"])
+                for key, copy in data["documents"].items()
+            },
+        )
+        if payload is None:
+            raise NotFoundError(code="page_not_published")
+        response = Response(payload)
+        patch_cache_control(response, private=True, no_store=True)
+        return response
 
 
 class PublishedPageView(APIView):

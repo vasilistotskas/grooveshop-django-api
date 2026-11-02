@@ -23,15 +23,21 @@ from core.utils.i18n import available_language_codes
 LOCALE_PARAM = "locale"
 
 
-def requested_locale(request) -> str:
-    """The available language code ``request`` asked for.
+def resolve_locale(candidate: str | None) -> str:
+    """The available language code *candidate* names; anything unknown,
+    blank or missing falls back to the default locale rather than failing:
+    these reads mean "serve the store's own language", not "the request is
+    broken"."""
+    return (
+        code
+        if (code := (candidate or "").strip().lower())
+        in available_language_codes()
+        else settings.PARLER_DEFAULT_LANGUAGE_CODE
+    )
 
-    Anything unknown falls back to the default locale rather than 400:
-    these are public read routes and an unrecognised locale means "serve
-    the store's own language", not "the request is broken".
-    """
-    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+def requested_locale(request) -> str:
+    """The available language code ``request`` asked for (``?locale=``)."""
     if request is None:
-        return default
-    candidate = (request.query_params.get(LOCALE_PARAM) or "").strip().lower()
-    return candidate if candidate in available_language_codes() else default
+        return settings.PARLER_DEFAULT_LANGUAGE_CODE
+    return resolve_locale(request.query_params.get(LOCALE_PARAM))

@@ -750,6 +750,10 @@ msgstr "A plan does not switch any feature on or off by itself: the loyalty and 
 msgid "A post with this slug already exists."
 msgstr "A post with this slug already exists."
 
+#, python-format
+msgid "A preview can carry at most %(limit)s documents."
+msgstr "A preview can carry at most %(limit)s documents."
+
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "A promotion discounts a cart line that is not part of the order."
 

@@ -14,11 +14,18 @@ number can come back (a store whose builder data was reset starts at 1
 again) and a key that comes back serves the content of the release that held
 it. The id of the current release is itself kept under the store's cache
 generation, which a release moves.
+
+The editor's live preview resolves unsaved working copies through the same
+code (``preview``): the documents it is given stand in for the release's
+ones of the same keys, and ``assemble`` is the one place a page is put
+together, whether its documents come from a release or from the editor.
 """
 
 from __future__ import annotations
 
 import copy
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
@@ -31,6 +38,24 @@ from builder.validation import DOCUMENT_NODE
 from tenant.membership import bound_tenant
 
 GROUP_PREFIX = f"{DocumentKind.GROUP.value}:"
+
+#: ``version`` of a document that is not a stored version: the editor's
+#: unsaved working copy in a preview.
+UNSAVED_VERSION = 0
+
+
+@dataclass(frozen=True, slots=True)
+class Source:
+    """What a document is resolved from: its content and overlay, and the
+    number of the version they are (``UNSAVED_VERSION`` for none)."""
+
+    data: dict[str, Any]
+    i18n: dict[str, Any]
+    number: int = UNSAVED_VERSION
+
+    @classmethod
+    def of(cls, version: BuilderVersion) -> Source:
+        return cls(version.data, version.i18n, version.number)
 
 
 def _current_id_key(generation: int) -> str:
@@ -107,57 +132,68 @@ def _resolve_node(
     return resolved
 
 
-def resolve_document(
-    key: str, version: BuilderVersion, locale: str
-) -> dict[str, Any]:
-    overlay = _overlay_for(version.i18n, locale)
+def resolve_document(key: str, source: Source, locale: str) -> dict[str, Any]:
+    overlay = _overlay_for(source.i18n, locale)
     sections = {
         section_id: section
-        for section_id in version.data["order"]
+        for section_id in source.data["order"]
         if (
             section := _resolve_node(
-                section_id, version.data["sections"][section_id], overlay
+                section_id, source.data["sections"][section_id], overlay
             )
         )
         is not None
     }
     resolved: dict[str, Any] = {
         "key": key,
-        "version": version.number,
+        "version": source.number,
         "sections": sections,
         "order": list(sections),
     }
-    if "settings" in version.data:
+    if "settings" in source.data:
         resolved["settings"] = _localised(
-            version.data["settings"], overlay.get(DOCUMENT_NODE) or {}
+            source.data["settings"], overlay.get(DOCUMENT_NODE) or {}
         )
     return resolved
 
 
-def _page_document_key(versions: dict[str, int], page_key: str) -> str | None:
+def _page_document_key(keys: Iterable[str], page_key: str) -> str | None:
+    """The document a page key names: the store's page before the fixed
+    page type of the same name."""
+    available = set(keys)
     for kind in (DocumentKind.PAGE, DocumentKind.TEMPLATE):
         key = f"{kind.value}:{page_key}"
-        if key in versions:
+        if key in available:
             return key
     return None
 
 
-def _documents(
-    release: BuilderRelease, locale: str, *, with_keys: set[str]
-) -> dict[str, dict[str, Any]]:
-    """The release's theme and groups, and the documents named in
-    *with_keys*, resolved for *locale*, by document key."""
-    wanted = {
-        key
-        for key in release.versions
-        if key == DocumentKind.THEME.value
-        or key.startswith(GROUP_PREFIX)
-        or key in with_keys
-    }
-    by_id = {release.versions[key]: key for key in wanted}
+def _chrome_keys(keys: Iterable[str]) -> set[str]:
+    """The documents every page needs: the theme and the section groups."""
     return {
-        by_id[version.pk]: resolve_document(by_id[version.pk], version, locale)
+        key
+        for key in keys
+        if key == DocumentKind.THEME.value or key.startswith(GROUP_PREFIX)
+    }
+
+
+def _sources(release: BuilderRelease, keys: set[str]) -> dict[str, Source]:
+    """The release's documents of *keys*, by document key."""
+    by_id = {
+        release.versions[key]: key for key in keys if key in release.versions
+    }
+    return {
+        by_id[version.pk]: Source.of(version)
         for version in BuilderVersion.objects.filter(pk__in=by_id)
+    }
+
+
+def _resolve_all(
+    sources: dict[str, Source], locale: str
+) -> dict[str, dict[str, Any]]:
+    return {
+        key: resolve_document(key, source, locale)
+        for key, source in sources.items()
     }
 
 
@@ -172,6 +208,24 @@ def _chrome(documents: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def assemble(
+    release_number: int,
+    locale: str,
+    sources: dict[str, Source],
+    page_document: str,
+) -> dict[str, Any]:
+    """A page as the storefront reads it: the chrome among *sources*, and
+    the document *page_document*, resolved for *locale*. The one place a
+    page is put together, for a release and for the editor's preview."""
+    documents = _resolve_all(sources, locale)
+    return {
+        "release": release_number,
+        "locale": locale,
+        **_chrome(documents),
+        "page": documents[page_document],
+    }
+
+
 def _build(release_id: int, page_key: str, locale: str) -> dict | None:
     release = BuilderRelease.objects.filter(pk=release_id).first()
     if release is None:
@@ -179,13 +233,36 @@ def _build(release_id: int, page_key: str, locale: str) -> dict | None:
     page_document = _page_document_key(release.versions, page_key)
     if page_document is None:
         return None
-    documents = _documents(release, locale, with_keys={page_document})
-    return {
-        "release": release.number,
-        "locale": locale,
-        **_chrome(documents),
-        "page": documents[page_document],
-    }
+    sources = _sources(
+        release, _chrome_keys(release.versions) | {page_document}
+    )
+    return assemble(release.number, locale, sources, page_document)
+
+
+def preview(
+    page_key: str, locale: str, copies: dict[str, Source]
+) -> dict[str, Any] | None:
+    """The page as it would read if *copies* (unsaved working copies, by
+    document key) were released now: each stands in for the current
+    release's document of its key, and everything else is the release's.
+    ``None`` when neither the copies nor the release have the page. Reads
+    and stores nothing that outlives the call, and is never cached."""
+    release = BuilderRelease.objects.order_by("-number").first()
+    versions = release.versions if release is not None else {}
+    page_document = _page_document_key({*versions, *copies}, page_key)
+    if page_document is None:
+        return None
+    wanted = _chrome_keys({*versions, *copies}) | {page_document}
+    sources = (
+        _sources(release, wanted - copies.keys()) if release is not None else {}
+    )
+    sources.update({key: copies[key] for key in wanted & copies.keys()})
+    return assemble(
+        release.number if release is not None else 0,
+        locale,
+        sources,
+        page_document,
+    )
 
 
 def published_page(page_key: str, locale: str) -> dict[str, Any] | None:
@@ -220,7 +297,11 @@ def _build_index(release_id: int, locale: str) -> dict[str, Any] | None:
     return {
         "release": release.number,
         "locale": locale,
-        **_chrome(_documents(release, locale, with_keys=set())),
+        **_chrome(
+            _resolve_all(
+                _sources(release, _chrome_keys(release.versions)), locale
+            )
+        ),
         "pages": [
             {
                 "key": key.partition(":")[2],

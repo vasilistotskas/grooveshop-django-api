@@ -939,6 +939,10 @@ BUILDER_MAX_BLOCKS_PER_NODE = int(getenv("BUILDER_MAX_BLOCKS_PER_NODE", "50"))
 BUILDER_LINK_TARGETS_MAX_IDS = int(
     getenv("BUILDER_LINK_TARGETS_MAX_IDS", "100")
 )
+# Working copies one ``builder/preview/resolve`` call may carry.
+BUILDER_PREVIEW_MAX_DOCUMENTS = int(
+    getenv("BUILDER_PREVIEW_MAX_DOCUMENTS", "10")
+)
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(

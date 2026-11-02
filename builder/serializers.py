@@ -79,6 +79,19 @@ class DraftWriteSerializer(serializers.Serializer):
     i18n = serializers.JSONField(required=False, default=dict)
 
 
+class PreviewCopySerializer(serializers.Serializer):
+    draft = serializers.JSONField()
+    i18n = serializers.JSONField(required=False, default=dict)
+
+
+class PreviewResolveSerializer(serializers.Serializer):
+    page_key = serializers.SlugField(max_length=64)
+    locale = serializers.CharField(required=False, allow_blank=True)
+    documents = serializers.DictField(
+        child=PreviewCopySerializer(), required=False, default=dict
+    )
+
+
 class VersionListSerializer(serializers.ModelSerializer):
     kind = serializers.ChoiceField(choices=VersionKind.choices)
     created_by = serializers.SerializerMethodField()

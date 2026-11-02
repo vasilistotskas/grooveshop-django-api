@@ -9532,6 +9532,56 @@ paths:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
           description: ''
+  /api/v1/builder/preview/resolve:
+    post:
+      operationId: api_v1_builder_preview_resolve_create
+      description: '`{release, locale, theme, groups, page}`, as `published/<pageKey>`
+        answers, if the working copies in `documents` (`{key: {draft, i18n}}`, at
+        most `BUILDER_PREVIEW_MAX_DOCUMENTS`) were released now: each stands in for
+        the current release''s document of its key and everything else is the release''s,
+        resolved by the same code (overlay merged, disabled nodes dropped). A working
+        copy has `version: 0`. Every copy is validated like a draft save (400 `invalid_document`,
+        each problem with its `document`; references are not checked, as on a save);
+        nothing is stored. 404 `page_not_published` when neither a copy nor the release
+        has the page. Never cached: `Cache-Control: private, no-store`. The content
+        keys are the storefront''s own and are not camelCased.'
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewResolveRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedPage'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/publish:
     post:
       operationId: api_v1_builder_publish_create
@@ -9595,8 +9645,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/PublishedIndex'
           description: ''
   /api/v1/builder/published/{page_key}:
     get:
@@ -9628,8 +9677,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/PublishedPage'
           description: ''
         '404':
           content:
@@ -37617,6 +37665,14 @@ components:
         * `group` - Ομάδα ενοτήτων
         * `template` - Πρότυπο
         * `page` - Σελίδα
+    BuilderPageKindEnum:
+      enum:
+      - page
+      - template
+      type: string
+      description: |-
+        * `page` - Σελίδα
+        * `template` - Πρότυπο
     BuilderVersionKindEnum:
       enum:
       - checkpoint
@@ -40357,7 +40413,7 @@ components:
         active:
           type: boolean
         source:
-          $ref: '#/components/schemas/LinkPageSourceEnum'
+          $ref: '#/components/schemas/BuilderPageKindEnum'
       required:
       - active
       - label
@@ -40389,14 +40445,6 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/LinkLabel'
-    LinkPageSourceEnum:
-      enum:
-      - page
-      - template
-      type: string
-      description: |-
-        * `page` - Σελίδα
-        * `template` - Πρότυπο
     LinkSearchResponse:
       type: object
       properties:
@@ -40425,7 +40473,7 @@ components:
         active:
           type: boolean
         source:
-          $ref: '#/components/schemas/LinkPageSourceEnum'
+          $ref: '#/components/schemas/BuilderPageKindEnum'
       required:
       - active
       - id
@@ -45790,6 +45838,29 @@ components:
       - points
       - referenceOrder
       - transactionType
+    PreviewCopyRequest:
+      type: object
+      properties:
+        draft: {}
+        i18n: {}
+      required:
+      - draft
+    PreviewResolveRequest:
+      type: object
+      properties:
+        pageKey:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[-a-zA-Z0-9_]+$
+        locale:
+          type: string
+        documents:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PreviewCopyRequest'
+      required:
+      - pageKey
     PriorityEnum:
       enum:
       - LOW
@@ -48842,6 +48913,70 @@ components:
           maxLength: 255
       required:
       - documents
+    PublishedIndex:
+      type: object
+      description: '``GET published``: the chrome and the list of pages.'
+      properties:
+        release:
+          type: integer
+        locale:
+          type: string
+        theme:
+          allOf:
+          - $ref: '#/components/schemas/ResolvedDocument'
+          nullable: true
+        groups:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ResolvedDocument'
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublishedPageEntry'
+      required:
+      - groups
+      - locale
+      - pages
+      - release
+      - theme
+    PublishedPage:
+      type: object
+      description: '``GET published/<pageKey>`` and ``POST preview/resolve``.'
+      properties:
+        release:
+          type: integer
+        locale:
+          type: string
+        theme:
+          allOf:
+          - $ref: '#/components/schemas/ResolvedDocument'
+          nullable: true
+        groups:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ResolvedDocument'
+        page:
+          $ref: '#/components/schemas/ResolvedDocument'
+      required:
+      - groups
+      - locale
+      - page
+      - release
+      - theme
+    PublishedPageEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/BuilderPageKindEnum'
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - key
+      - kind
+      - updatedAt
     RateEnum:
       enum:
       - 1
@@ -49356,6 +49491,32 @@ components:
       - mime
       - path
       - width
+    ResolvedDocument:
+      type: object
+      description: |-
+        A document of the current release as the public read answers it.
+        The envelope is ours; the section trees in ``sections`` are shaped by
+        the storefront's block catalogue, so they stay open.
+      properties:
+        key:
+          type: string
+        version:
+          type: integer
+        sections:
+          type: object
+          additionalProperties: true
+        order:
+          type: array
+          items:
+            type: string
+        settings:
+          type: object
+          additionalProperties: true
+      required:
+      - key
+      - order
+      - sections
+      - version
     ResolvedMedia:
       type: object
       properties:

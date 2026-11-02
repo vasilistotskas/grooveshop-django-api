@@ -13,7 +13,7 @@ from typing import Any
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from builder.link_picker import KIND_CHOICES, PAGE_SOURCE_CHOICES
+from builder.link_picker import KIND_CHOICES, PAGE_KIND_CHOICES
 from builder.models import (
     BuilderDocument,
     BuilderRelease,
@@ -78,6 +78,63 @@ class DocumentDetailSerializer(DocumentListSerializer):
 class DraftWriteSerializer(serializers.Serializer):
     draft = serializers.JSONField()
     i18n = serializers.JSONField(required=False, default=dict)
+
+
+@extend_schema_field({"type": "object", "additionalProperties": True})
+class OpenObjectField(serializers.Field):
+    """Only describes an object whose keys are the storefront's own (a
+    document's sections, its root settings) in the schema."""
+
+
+class ResolvedDocumentSerializer(serializers.Serializer):
+    """A document of the current release as the public read answers it.
+    The envelope is ours; the section trees in ``sections`` are shaped by
+    the storefront's block catalogue, so they stay open."""
+
+    key = serializers.CharField()
+    version = serializers.IntegerField()
+    sections = OpenObjectField()
+    order = serializers.ListField(child=serializers.CharField())
+    settings = OpenObjectField(required=False)
+
+
+class PublishedPageSerializer(serializers.Serializer):
+    """``GET published/<pageKey>`` and ``POST preview/resolve``."""
+
+    release = serializers.IntegerField()
+    locale = serializers.CharField()
+    theme = ResolvedDocumentSerializer(allow_null=True)
+    groups = serializers.DictField(child=ResolvedDocumentSerializer())
+    page = ResolvedDocumentSerializer()
+
+
+class PublishedPageEntrySerializer(serializers.Serializer):
+    key = serializers.CharField()
+    kind = serializers.ChoiceField(choices=PAGE_KIND_CHOICES)
+    updated_at = serializers.DateTimeField()
+
+
+class PublishedIndexSerializer(serializers.Serializer):
+    """``GET published``: the chrome and the list of pages."""
+
+    release = serializers.IntegerField()
+    locale = serializers.CharField()
+    theme = ResolvedDocumentSerializer(allow_null=True)
+    groups = serializers.DictField(child=ResolvedDocumentSerializer())
+    pages = PublishedPageEntrySerializer(many=True)
+
+
+class PreviewCopySerializer(serializers.Serializer):
+    draft = serializers.JSONField()
+    i18n = serializers.JSONField(required=False, default=dict)
+
+
+class PreviewResolveSerializer(serializers.Serializer):
+    page_key = serializers.SlugField(max_length=64)
+    locale = serializers.CharField(required=False, allow_blank=True)
+    documents = serializers.DictField(
+        child=PreviewCopySerializer(), required=False, default=dict
+    )
 
 
 class VersionListSerializer(serializers.ModelSerializer):
@@ -229,7 +286,7 @@ class LinkSearchResultSerializer(serializers.Serializer):
     slug = serializers.CharField()
     active = serializers.BooleanField()
     source = serializers.ChoiceField(  # ty: ignore[invalid-assignment]
-        choices=PAGE_SOURCE_CHOICES, required=False
+        choices=PAGE_KIND_CHOICES, required=False
     )
 
 
@@ -244,7 +301,7 @@ class LinkLabelSerializer(serializers.Serializer):
     )
     active = serializers.BooleanField()
     source = serializers.ChoiceField(  # ty: ignore[invalid-assignment]
-        choices=PAGE_SOURCE_CHOICES, required=False
+        choices=PAGE_KIND_CHOICES, required=False
     )
 
 

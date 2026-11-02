@@ -759,6 +759,10 @@ msgstr "Το πλάνο δεν ενεργοποιεί ούτε απενεργο�
 msgid "A post with this slug already exists."
 msgstr "Υπάρχει ήδη άρθρο με αυτό το slug."
 
+#, python-format
+msgid "A preview can carry at most %(limit)s documents."
+msgstr "Μια προεπισκόπηση μπορεί να περιέχει το πολύ %(limit)s έγγραφα."
+
 msgid "A promotion discounts a cart line that is not part of the order."
 msgstr "Μια προσφορά εκπτώνει γραμμή του καλαθιού που δεν ανήκει στην παραγγελία."
 

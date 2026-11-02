@@ -9190,6 +9190,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/features:
+    get:
+      operationId: api_v1_builder_features_retrieve
+      description: '`{features: {<name>: {on, turnOnUrl}}}` for every store feature
+        (the names of the tenant payload''s `features`). `on`: its plan flag and every
+        setting it needs are on. `turnOnUrl`: the store admin page of the first setting
+        that is off, only for a role that may change settings (Admin, Owner); null
+        when the feature is on, when the plan keeps it off, or for any other role.'
+      tags:
+      - Builder
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderFeatures'
+          description: ''
   /api/v1/builder/link-labels:
     get:
       operationId: api_v1_builder_link_labels_retrieve
@@ -37883,6 +37902,13 @@ components:
         * `group` - Ομάδα ενοτήτων
         * `template` - Πρότυπο
         * `page` - Σελίδα
+    BuilderFeatures:
+      type: object
+      properties:
+        features:
+          $ref: '#/components/schemas/StoreFeatureStates'
+      required:
+      - features
     BuilderPageKindEnum:
       enum:
       - page
@@ -40012,6 +40038,23 @@ components:
       required:
       - max
       - min
+    FeatureState:
+      type: object
+      description: One store feature as the editor needs it.
+      properties:
+        'on':
+          type: boolean
+          description: Plan flag and every setting it needs are on.
+        turnOnUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: The store admin page where this person switches it on; null
+            when it is on, when only the platform can (the plan), or when their role
+            cannot change settings.
+      required:
+      - 'on'
+      - turnOnUrl
     FeedbackWrite:
       type: object
       properties:
@@ -50552,6 +50595,106 @@ components:
           maxLength: 128
       required:
       - ticket
+    StoreFeatureStates:
+      type: object
+      description: Every ``TenantConfig.features`` name, with its state.
+      properties:
+        blog:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        blogComments:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        productReviews:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        accountReviews:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        favourites:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        newsletter:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        feedback:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        loyalty:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        promotions:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        giftCards:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        wholesale:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        b2bInvoicing:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        productSuggestions:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        productAlerts:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        priceHistory:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        contactAttachments:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        chatWidget:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        catalogue:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+        cart:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
+      required:
+      - accountReviews
+      - b2bInvoicing
+      - blog
+      - blogComments
+      - cart
+      - catalogue
+      - chatWidget
+      - contactAttachments
+      - favourites
+      - feedback
+      - giftCards
+      - loyalty
+      - newsletter
+      - priceHistory
+      - productAlerts
+      - productReviews
+      - productSuggestions
+      - promotions
+      - wholesale
     StoreFeatures:
       type: object
       description: |-

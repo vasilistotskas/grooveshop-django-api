@@ -123,6 +123,11 @@ urlpatterns = [
         name="presence",
     ),
     path(
+        "builder/features",
+        views.FeaturesView.as_view(),
+        name="features",
+    ),
+    path(
         "builder/link-targets",
         views.LinkTargetsView.as_view(),
         name="link-targets",

@@ -366,7 +366,6 @@ class ReferenceKind(models.TextChoices):
     CATEGORY = "category", _("Category")
     PAGE = "page", _("Page")
     MEDIA = "media", _("Media")
-    MENU = "menu", _("Menu")
     BLOG_CATEGORY = "blogCategory", _("Blog category")
     CONTENT_PAGE = "contentPage", _("Content page")
     BLOG_POST = "blogPost", _("Blog post")

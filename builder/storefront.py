@@ -146,7 +146,7 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=refs,
-        link_refs=_parse_link_refs(raw.get("linkRefs"), translatable),
+        link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         max_blocks=limits.get("maxBlocks"),
         max_per_template=limits.get("maxPerTemplate"),
         children_allowed=frozenset(
@@ -176,12 +176,13 @@ def _overlaps(first: str, second: str) -> bool:
 def _parse_link_refs(
     raw: Any, translatable: tuple[str, ...]
 ) -> tuple[str, ...]:
-    """The link pointers of a block or a root. A link resolves to the path
-    of the viewer's language, so it is never translatable, and neither is
-    anything in it or around it: a link pointer that equals, lies under or
-    holds a translatable pointer is a catalogue bug, refused when the
-    catalogue is read."""
-    link_refs = tuple(str(p) for p in raw or ())
+    """The link pointers of a block or a root, a required key (``[]`` for
+    none): a catalogue that left it out would index no link at all. A link
+    resolves to the path of the viewer's language, so it is never
+    translatable, and neither is anything in it or around it: a link pointer
+    that equals, lies under or holds a translatable pointer is a catalogue
+    bug, refused when the catalogue is read."""
+    link_refs = tuple(str(p) for p in raw)
     if both := sorted(
         (link, text)
         for link in link_refs
@@ -207,7 +208,7 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=_parse_refs(raw.get("refs")),
-        link_refs=_parse_link_refs(raw.get("linkRefs"), translatable),
+        link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),

@@ -90,13 +90,13 @@ Schema, draft 2020-12, of its `settings`), `translatable` and `refs`
 `maxDepth`), `kinds` (`section`, `block`), optional `groups`, `templates`,
 `feature` and `deprecated`. A setting whose schema says
 `contentMediaType: "text/html"` is rich text. `linkRefs` (same pointer
-syntax) names the link settings, see "References, not copies"; a link pointer
-cannot equal, lie under or hold a `translatable` pointer (`*` counts).
-`linkRefs` is optional ONLY so that Django can deploy before the storefront
-that emits it on every block (`[]` where a block has no link); a later change
-makes it required, and until then a catalogue that omits it silently indexes
-no link. Check the key against the real catalogue after a storefront
-deployment (step 1 of the run sheet).
+syntax, required on every block and every `documentKinds` root, `[]` for
+none) names the link settings, see "References, not copies"; a catalogue
+that leaves the key out is refused, since it would index no link. A link
+pointer cannot equal, lie under or hold a `translatable` pointer (`*`
+counts). `tests/unit/builder/test_real_catalogue.py` holds the pinned real
+catalogue to this: each `linkRefs` is exactly the settings its schema marks
+`x-builder-link`.
 
 ## What a save checks
 
@@ -154,9 +154,9 @@ schema over the merged settings, and reported at the overlay's pointer.
 Settings the catalogue marks as `refs` hold ids: `product` and `category`
 (active, numeric id), `page` (a page key: the store's `page:<key>` document or the
 `template:<key>` of a fixed page type, draft or released), `contentPage` (a
-ContentPage slug, in any state), `blogCategory` (a blog category id), `menu`
-(a navigation slot), `media` (a `MediaAsset` id), `blogPost` (a published post's
-id). A draft may point at something
+ContentPage slug, in any state), `blogCategory` (a blog category id),
+`media` (a `MediaAsset` id), `blogPost` (a published post's id). A menu is a
+`group:<slot>` document, never a reference. A draft may point at something
 that no longer exists; **publish refuses it** (`reference_not_found`) with
 the pointer. After a publish a target can still go away; the storefront
 renders the block empty. `references.used_by(kind, target)` answers where a
@@ -228,8 +228,9 @@ else the template of that name; `404 page_not_published` otherwise. It
 never reads a draft and never calls the storefront. The resolved page is
 cached under `builder:<schema>:r<release id>:<page_key>:<locale>`: immutable
 per release, never purged. The key holds the release's PRIMARY KEY, not its
-number: numbers restart at 1 after `builder_reset`, a key that came back would
-serve the old release's content, and an id never does. The current release id
+number: a number can come back (a store's builder data deleted and seeded
+again starts at 1) and would serve the old release's content; an id never
+does. The current release id
 is kept under the store's cache generation, so a warm read touches neither the
 database nor anything else.
 
@@ -396,142 +397,14 @@ publish can wait for a time:
   `POST schedules/<id>/acknowledge` or the **Acknowledge the failure** action of
   Content, Page builder, Scheduled publishes (read-only admin) takes it away.
 
-## Importing the legacy layouts
-
-`page_config` (`PageLayout` + `PageSection`, `NavigationMenu`) is what the
-builder replaces. `manage.py builder_import_legacy [--tenant S | --all-tenants]
-[--dry-run] [--json]` (`builder/importing.py`) turns a store's layouts and
-menus into documents and releases them once. The conversion is **one
-implementation, the storefront's** `fromLegacy` (its blocks know their own
-settings); Django never converts:
-
-- `builder/legacy.py` describes the legacy data as the converter's request
-  (`kind` template or group, `key`, `legacy`: a layout's `sections` with their
-  uuid, `type`, `title`, `isVisible`, stored snake_case `props` and `i18n`, and
-  its SEO per language; a menu's columns and links with the label each would
-  show in every language of the store, and the target). A layout whose page
-  type is one of the catalogue's top-level `templates` (the storefront's fixed
-  page types: home, about, ...; read from the catalogue, never copied) is
-  `template:<page_type>`, any other is the custom page `page:<page_type>`; a
-  menu slot is `group:<slot>`.
-- `builder/convert.py` calls `POST {storefront}/api/builder/convert-legacy`
-  with the secret the cache purge uses (`NUXT_CACHE_PURGE_TOKEN`,
-  header `X-Cache-Purge-Token`) and `defaultLocale`. `200 {document, i18n,
-  warnings}`; `422` is a refusal about the data (unknown block type, props its
-  schema refuses), anything else is the storefront being unavailable.
-- Each result is validated like any other document (`builder.validation`).
-  Feature gates are not applied to the import (a block whose feature is off
-  renders nothing, as before; they apply on every later save).
-- **All or nothing per store**, in one transaction: the documents (a layout
-  that is not published stays a draft, a menu is live), one version for each
-  released one, and ONE release (number 1, no staff, note "Imported from page
-  layouts"). A problem anywhere, including a reference to nothing, writes
-  nothing. A store that already has builder data is refused. `--dry-run` does
-  everything and rolls it back; the `--json` report also gives each document's
-  `counts` (`sections` and `blocks` at every depth). The legacy tables are not
-  touched.
-- The storefront's golden fixtures (`{request, response}` per section type,
-  and the menus) are copied under `tests/fixtures/builder/legacy/` and
-  replayed by `tests/integration/builder/test_converter_fixtures.py`.
-- `manage.py builder_export_legacy --all-tenants --out DIR` writes every
-  request as `DIR/<schema>/<key>.json`: the corpus for the storefront's tests.
-
-## Run sheet: importing a live environment
-
-Every command is `kubectl --context grooveshop -n <namespace> exec
-deploy/backend -- /home/app/.venv/bin/python manage.py ...` (`grooveshop` is
-production, `grooveshop-staging` staging; from Git Bash prefix
-`MSYS_NO_PATHCONV=1`, or the path is rewritten). The import only writes builder
-tables: `page_config` and every storefront read stay as they are, so nothing
-changes for a visitor until the storefront switch.
-
-1. **Before.** The backend carries the builder import and the storefront
-   serves the strict converter (`POST /api/builder/convert-legacy` answers; the
-   storefront image is the one the staging run used). Its catalogue declares
-   `linkRefs`: `fetch_catalogue(<schema>).get("hero_carousel").link_refs` is not
-   empty in the backend's shell, since an absent key would let a raw link
-   through unindexed.
-2. **Pre-check, on that environment's data.**
-   `builder_import_legacy --all-tenants --dry-run --json`. (On a store that
-   already has builder data the import refuses first, so a RE-import is checked
-   by resetting and dry-run importing in one transaction that is rolled back.) Every store must
-   show `problems: []` and `applied: false`. Read each `warnings` entry
-   (`dropped_title` is expected, anything else is a decision). A store
-   reporting `already_imported` has builder data already: stop and look at it.
-3. **Import.** The same command without `--dry-run`. One transaction per
-   store; a store with a problem is skipped and reported, nothing of it is
-   written, and the command exits non-zero. Each store ends at release 1,
-   note "Imported from page layouts", no staff.
-4. **Verify (read only).** Per store: the release is 1; each document key and
-   kind is the dry run's; every released document has one version (number 1)
-   and `published_revision` 1; a draft layout has no version and is not in
-   the release. Then `GET /api/v1/builder/published/home?locale=el` and
-   `?locale=en` answer 200 with the layout's sections, and the English
-   overlay is there where the legacy layout had English text. A second
-   `--dry-run` answers `already_imported` for every store.
-   **Links.** Every link setting of a released document (the catalogue's
-   `linkRefs` pointers) is `{ref}`, `{route}` or `{href}`, never a bare string,
-   and each `{ref}` has its `BuilderReference` row at the link's own pointer
-   (a product link is `kind=product`, a page or content-page link `page` or
-   `contentPage`). Through the storefront, the page renders the target's
-   current path: a product link is `/products/<id>/<slug>`. A dangling link
-   would have stopped the dry run with `reference_not_found`.
-   **Caches.** An import or a reset moves the cache generation and purges the
-   `builder` surface after commit, like a publish; look for
-   `Cache auto-invalidated surfaces=['builder'] ... failed=[]` per store in the
-   worker's log. A reset needs no cache key deleted: the reads are keyed by
-   release id, which a new release never shares with a deleted one.
-5. **Rollback, before the storefront reads the builder.**
-   `builder_reset --tenant <schema>` reports what it would delete;
-   `--confirm` deletes it (documents, versions, the release, the reference
-   index). It refuses, and says why,
-   unless the data is exactly what an import leaves: one release, no staff
-   behind a release or version, no edited draft, named save, deleted document
-   or schedule. It cannot see whether the storefront already reads the
-   builder: that is the storefront deployment, so a reset belongs before it,
-   never after. The media library and `page_config` are never touched.
-   Afterwards the import can be run again.
-
-### Importing before the storefront is promoted
-
-The importer takes the catalogue and the converter from the storefront at
-`NUXT_INTERNAL_BASE_URL` (`core/storefront.py`; both endpoints are tenant-free
-and the converter is pure). A store's builder data is written with the
-converter of the build that will render it, so when the build that carries a
-new converter or catalogue is not yet what the store's storefront runs, and
-promoting it first would blank every page until the import finished, import
-BEFORE the promote against an internal instance of that build:
-
-1. Run an instance of the exact image that will be promoted, reachable only
-   inside the cluster (a ClusterIP Service, no Ingress), with the target
-   environment's own frontend secret and config: the converter checks the same
-   `NUXT_CACHE_PURGE_TOKEN` the importer sends, and each environment has its
-   own. Declare it in GitOps like any other workload and remove it once the
-   promote is done.
-2. Point the one-off process at it with the environment variable, nothing in
-   the code or the command line: `kubectl ... exec deploy/backend -- env
-   NUXT_INTERNAL_BASE_URL=http://<internal service> /home/app/.venv/bin/python
-   manage.py builder_import_legacy ...`. Only that process is redirected. The
-   cache purge an import queues runs in the worker, on the worker's own
-   environment, so it still reaches the real storefront.
-3. Before any write, in the same process, compare what that instance serves
-   with what will be live. The catalogue is a constant of the server bundle, so
-   the same image gives the same `hash` (print `fetch_catalogue(<schema>).hash`
-   with the override and again after the promote: they must be equal), and
-   `fetch_catalogue(<schema>).get("hero_carousel").link_refs` must be non-empty.
-   Stop on either.
-4. Run the pre-check, the import and the verification (steps 2 to 4 above) with
-   the override. Verify the storefront-side read only after the promote.
-
 ## What is copied from the storefront
 
-The storefront owns the blocks, so three things are pinned COPIES of its
+The storefront owns the blocks, so two things are pinned COPIES of its
 files:
 
 | Source | Copy | Used by |
 |---|---|---|
-| `test/fixtures/builder/legacy/` | `tests/fixtures/builder/legacy/` | the converter fixture replay |
-| `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds test: a snapshot of the block catalogue |
+| `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
 | `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
 
 `tests/fixtures/builder/storefront.lock.json` names the storefront commit and
@@ -544,9 +417,8 @@ builder tests, commit.
 
 ## Default documents for a new store
 
-`builder/seeding.py` loads `builder/seeds/*.json` (each a converter fixture:
-the document is `response.document`, its translations `response.i18n`, the key
-`request.key`). Provisioning (`tenant.provisioning`, step "page builder")
+`builder/seeding.py` loads `builder/seeds/*.json` (each `{key, document,
+i18n}`). Provisioning (`tenant.provisioning`, step "page builder")
 stores each as a document whose draft equals its published content, one
 version, and ONE release (number 1) holding them all; today that is
 `template:home`, 11 sections with fixed ids. It calls no service, so a

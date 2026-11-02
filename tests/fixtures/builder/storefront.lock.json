@@ -1,21 +1,16 @@
 {
   "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
-  "commit": "5a82376cdbd4506e9c76f59d5070881edf135fef",
+  "commit": "56fb1b34dc157e73b08cdc38bd92443c576114be",
   "sources": {
-    "legacy": {
-      "path": "test/fixtures/builder/legacy",
-      "kind": "tree",
-      "sha": "f44d1b8718be3c2fc7dcac270654a73544d3a853"
-    },
     "catalogue": {
       "path": "test/fixtures/builder/catalogue.json",
       "kind": "blob",
-      "sha": "dbf83c0534f8151baa6405b5cde9c52185dff24f"
+      "sha": "90fa35103e96de8ab47d9d7d20ce10612dcb3bb2"
     },
     "seeds": {
       "path": "test/fixtures/builder/seeds",
       "kind": "tree",
-      "sha": "c63ec8d0b22402c748cc2ae9e65eb5f257cadfc0"
+      "sha": "3d5c071bcff55fc6a7cdb434f0b16f0856d4a03b"
     }
   }
 }

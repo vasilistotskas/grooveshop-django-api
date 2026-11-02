@@ -3,8 +3,8 @@
 ``builder/seeds/*.json`` are the storefront's default documents, COPIED from
 it (pinned, drift-checked: ``.github/scripts/sync_storefront_sources.py``)
 because the storefront owns the blocks and so what a sensible default is.
-Each file is a converter fixture: the document is ``response.document``, its
-translations ``response.i18n``, and the key it is for ``request.key``.
+Each file is ``{key, document, i18n}``: the key it is for, the document and
+its translations.
 
 Provisioning calls :func:`seed_store`, which stores each one as a document
 (its draft equal to its published content), one version, and ONE release
@@ -55,9 +55,9 @@ def load_seeds(directory: Path = SEEDS) -> list[Seed]:
         payload = json.loads(path.read_text(encoding="utf-8"))
         seeds.append(
             Seed(
-                key=payload["request"]["key"],
-                data=payload["response"]["document"],
-                i18n=payload["response"]["i18n"],
+                key=payload["key"],
+                data=payload["document"],
+                i18n=payload["i18n"],
             )
         )
     return seeds

@@ -50,11 +50,11 @@ class TestTheCommittedCopies:
                 "`python .github/scripts/sync_storefront_sources.py`"
             )
 
-    def test_the_legacy_copy_is_a_directory_of_json_cases(self):
-        legacy = next(s for s in sync.SOURCES if s.name == "legacy")
-        names = sync.local_files(legacy)
+    def test_the_seeds_copy_is_a_directory_of_json_documents(self):
+        seeds = next(s for s in sync.SOURCES if s.name == "seeds")
+        names = sync.local_files(seeds)
 
-        assert len(names) >= 40
+        assert "home.json" in names
         assert all(name.endswith(".json") for name in names)
 
 
@@ -107,20 +107,16 @@ class TestGitHashes:
 
 class FakeGitHub:
     """The GitHub API reads the script makes, over an in-memory repository
-    holding one file (``catalogue``) and two directories (``legacy``,
-    ``seeds``), laid out at the sources' upstream paths."""
+    holding one file (``catalogue``) and one directory (``seeds``), laid
+    out at the sources' upstream paths."""
 
     def __init__(
         self,
         *,
-        legacy: dict[str, bytes],
+        seeds: dict[str, bytes],
         catalogue: bytes = b'{"hash": "h"}\n',
-        seeds: dict[str, bytes] | None = None,
     ) -> None:
-        self.directories = {
-            "legacy": legacy,
-            "seeds": {"home.json": b"{}\n"} if seeds is None else seeds,
-        }
+        self.directories = {"seeds": seeds}
         self.catalogue = catalogue
         # Every tree this repository has: sha -> entries.
         self.trees: dict[str, list[dict]] = {}
@@ -148,14 +144,9 @@ class FakeGitHub:
 
     def _build(self) -> str:
         by_name = {s.name: s for s in sync.SOURCES}
-        # test/fixtures/builder/{legacy,catalogue.json,seeds}
+        # test/fixtures/builder/{catalogue.json,seeds}
         builder = self._tree(
             [
-                {
-                    "path": "legacy",
-                    "type": "tree",
-                    "sha": self._directory(self.directories["legacy"]),
-                },
                 {
                     "path": "catalogue.json",
                     "type": "blob",
@@ -207,32 +198,29 @@ def local(workspace: Path, name: str) -> Path:
 class TestSyncing:
     def test_it_copies_every_source_and_pins_each(self, workspace):
         upstream = FakeGitHub(
-            legacy={"one.json": b'{"x": 1}\n', "two.json": b"{}\n"},
+            seeds={"one.json": b'{"x": 1}\n', "two.json": b"{}\n"},
             catalogue=b'{"hash": "abc"}\n',
         )
-        stale = local(workspace, "legacy") / "stale.json"
+        stale = local(workspace, "seeds") / "stale.json"
         stale.parent.mkdir(parents=True)
         stale.write_text("{}")
 
         assert sync.sync(upstream) == 0
 
-        assert {p.name for p in local(workspace, "legacy").iterdir()} == {
+        assert {p.name for p in local(workspace, "seeds").iterdir()} == {
             "one.json",
             "two.json",
         }
         assert (
             local(workspace, "catalogue").read_bytes() == b'{"hash": "abc"}\n'
         )
-        assert {p.name for p in local(workspace, "seeds").iterdir()} == {
-            "home.json"
-        }
         lock = json.loads(sync.LOCK.read_text(encoding="utf-8"))
         assert lock["commit"] == COMMIT
         for source in sync.SOURCES:
             assert lock["sources"][source.name]["sha"] == sync.local_sha(source)
 
     def test_a_file_that_downloads_wrong_is_refused(self, workspace):
-        upstream = FakeGitHub(legacy={"one.json": b"{}\n"})
+        upstream = FakeGitHub(seeds={"one.json": b"{}\n"})
 
         def corrupting(path: str) -> dict:
             reply = upstream(path)
@@ -245,7 +233,7 @@ class TestSyncing:
         assert not sync.LOCK.exists()
 
     def test_a_storefront_without_a_source_is_refused(self, workspace):
-        upstream = FakeGitHub(legacy={"one.json": b"{}\n"})
+        upstream = FakeGitHub(seeds={"one.json": b"{}\n"})
         upstream.trees[upstream.root] = []
 
         with pytest.raises(SystemExit, match="has no test/fixtures"):
@@ -259,7 +247,7 @@ class TestChecking:
         return upstream
 
     def test_copies_that_are_the_storefronts_pass(self, workspace, capsys):
-        upstream = self.synced(workspace, legacy={"a.json": b"{}\n"})
+        upstream = self.synced(workspace, seeds={"a.json": b"{}\n"})
 
         assert sync.check(upstream) == 0
         assert "at cccccc" in capsys.readouterr().out
@@ -267,25 +255,18 @@ class TestChecking:
     @pytest.mark.parametrize(
         ("moved", "name"),
         [
-            ({"legacy": {"a.json": b'{"changed": true}\n'}}, "legacy"),
             (
                 {
-                    "legacy": {"a.json": b"{}\n"},
+                    "seeds": {"a.json": b"{}\n"},
                     "catalogue": b'{"hash": "z"}\n',
                 },
                 "catalogue",
             ),
-            (
-                {
-                    "legacy": {"a.json": b"{}\n"},
-                    "seeds": {"home.json": b'{"changed": true}\n'},
-                },
-                "seeds",
-            ),
+            ({"seeds": {"a.json": b'{"changed": true}\n'}}, "seeds"),
         ],
     )
     def test_a_source_that_moved_is_named(self, workspace, capsys, moved, name):
-        self.synced(workspace, legacy={"a.json": b"{}\n"})
+        self.synced(workspace, seeds={"a.json": b"{}\n"})
 
         assert sync.check(FakeGitHub(**moved)) == 1
         output = capsys.readouterr().out
@@ -295,7 +276,7 @@ class TestChecking:
     def test_a_copy_edited_by_hand_fails_before_asking_what_moved(
         self, workspace, capsys
     ):
-        upstream = self.synced(workspace, legacy={"a.json": b"{}\n"})
+        upstream = self.synced(workspace, seeds={"a.json": b"{}\n"})
         local(workspace, "catalogue").write_text('{"edited": true}\n')
 
         assert sync.check(upstream) == 1

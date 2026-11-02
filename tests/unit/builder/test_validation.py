@@ -829,6 +829,7 @@ class TestTheCatalogueReadsLinks:
                     "accepts": [],
                     "schema": {"type": "object"},
                     "kinds": ["section"],
+                    "linkRefs": [],
                     **extra,
                 }
             ],
@@ -839,8 +840,24 @@ class TestTheCatalogueReadsLinks:
 
         assert catalogue.get("cta").link_refs == ("/link", "/a/*/link")
 
-    def test_a_block_without_links_has_none(self):
+    def test_a_block_without_links_states_none(self):
         assert parse_catalogue(self.block()).get("cta").link_refs == ()
+
+    def test_a_block_that_leaves_the_key_out_is_refused(self):
+        payload = self.block()
+        del payload["blocks"][0]["linkRefs"]
+
+        with pytest.raises(StorefrontUnavailable):
+            parse_catalogue(payload)
+
+    def test_a_root_that_leaves_the_key_out_is_refused(self):
+        kinds = default_document_kinds()
+        del kinds["page"]["linkRefs"]
+
+        with pytest.raises(StorefrontUnavailable):
+            parse_catalogue(
+                {"hash": HASH, "blocks": [], "documentKinds": kinds}
+            )
 
     @pytest.mark.parametrize(
         ("link_refs", "translatable"),

@@ -1,11 +1,8 @@
 """Keep the files this repository copies from the storefront in step with it.
 
-The storefront owns the page builder's blocks, so three things it produces
+The storefront owns the page builder's blocks, so two things it produces
 are COPIED here, and a copy can drift silently:
 
-* ``legacy``: ``test/fixtures/builder/legacy/`` -> ``tests/fixtures/builder/
-  legacy/``, the golden ``{request, response}`` pairs of its legacy converter
-  (replayed by ``tests/integration/builder/test_converter_fixtures.py``);
 * ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``tests/
   fixtures/builder/catalogue.json``, a snapshot of its block catalogue for the
   default schema (what the seeds are validated against, in CI, without a
@@ -67,12 +64,6 @@ class Source:
 
 
 SOURCES: tuple[Source, ...] = (
-    Source(
-        "legacy",
-        "test/fixtures/builder/legacy",
-        "tests/fixtures/builder/legacy",
-        "tree",
-    ),
     Source(
         "catalogue",
         "test/fixtures/builder/catalogue.json",

@@ -224,3 +224,129 @@ class TestProblems:
     )
     def test_an_issue_is_what_the_serializer_declares(self, issue):
         assert PublishProblemSerializer(issue.as_dict()).data == issue.as_dict()
+
+
+class TestInvalidDocumentIsTyped:
+    """A refusal that lists problems is the third branch of the 400, so the
+    storefront needs no schema of its own for it."""
+
+    BRANCH = "BuilderDocumentInvalidError"
+
+    def refusal_matches(self, openapi, path, method, body):
+        branches = [
+            ref["$ref"].rsplit("/", 1)[-1]
+            for ref in openapi["paths"][path][method]["responses"]["400"][
+                "content"
+            ]["application/json"]["schema"]["anyOf"]
+        ]
+        assert branches == ["ApiValidationError", "ApiError", self.BRANCH]
+        schemas = openapi["components"]["schemas"]
+        jsonschema.Draft4Validator(
+            as_json_schema(schemas[self.BRANCH], schemas)
+        ).validate(body)
+        assert body["code"] == "invalid_document"
+        assert body["errors"]
+
+    def test_a_draft_save(self, client, openapi_schema):
+        path = path_of("builder:document-draft", key=HOME)
+
+        refused = client.put(
+            path,
+            {"draft": {"sections": "nope"}, "i18n": {}},
+            format="json",
+            headers={"If-Match": "99"},
+        )
+
+        assert refused.status_code == status.HTTP_400_BAD_REQUEST
+        self.refusal_matches(
+            openapi_schema,
+            "/api/v1/builder/documents/{key}/draft",
+            "put",
+            refused.json(),
+        )
+
+    def test_a_publish(self, client, openapi_schema):
+        client.post(
+            reverse("builder:publish"), {"documents": [HOME]}, format="json"
+        )
+
+        refused = client.post(
+            reverse("builder:publish"), {"documents": [HOME]}, format="json"
+        )
+
+        self.refusal_matches(
+            openapi_schema,
+            path_of("builder:publish"),
+            "post",
+            refused.json(),
+        )
+
+    def test_a_schedule(self, client, openapi_schema):
+        refused = client.post(
+            reverse("builder:schedule-list"),
+            {
+                "documents": [HOME],
+                "scheduledFor": (
+                    timezone.now() - timedelta(days=1)
+                ).isoformat(),
+            },
+            format="json",
+        )
+
+        assert refused.status_code == status.HTTP_400_BAD_REQUEST
+        self.refusal_matches(
+            openapi_schema,
+            path_of("builder:schedule-list"),
+            "post",
+            refused.json(),
+        )
+
+    def test_every_operation_that_can_refuse_names_the_branch(
+        self, openapi_schema
+    ):
+        named = {
+            (path, method)
+            for path, operations in openapi_schema["paths"].items()
+            for method, operation in operations.items()
+            if method != "parameters"
+            and self.BRANCH
+            in str(operation.get("responses", {}).get("400", ""))
+        }
+
+        assert len(named) == 11
+
+
+class TestAFailedScheduleListsTypedProblems:
+    def test_failure_matches_the_schema(self, admin, client, openapi_schema):
+        failed = scheduling.schedule_publish(
+            admin, keys=[HOME], when=timezone.now() + timedelta(hours=2)
+        )
+        later = scheduling.schedule_publish(
+            admin, keys=[HOME], when=timezone.now() + timedelta(hours=3)
+        )
+        BuilderScheduledPublish.objects.filter(pk=failed.pk).update(
+            status=ScheduleStatus.FAILED,
+            failure=[
+                Issue(
+                    path="/a",
+                    code="reference_not_found",
+                    message="m",
+                    document=HOME,
+                    params={"kind": "product", "target": "1"},
+                ).as_dict()
+            ],
+        )
+        # A failure stored before ``document`` was always written.
+        BuilderScheduledPublish.objects.filter(pk=later.pk).update(
+            status=ScheduleStatus.FAILED,
+            failure=[{"path": "/a", "code": "c", "message": "m"}],
+        )
+
+        listed = client.get(reverse("builder:schedule-list"))
+
+        rows = {r["id"]: r for r in listed.json()["results"]}
+        assert rows[failed.pk]["failure"][0]["document"] == HOME
+        assert rows[later.pk]["failure"][0]["document"] is None
+        assert_matches_response(
+            openapi_schema, path_of("builder:schedule-list"), listed.json()
+        )

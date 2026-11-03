@@ -103,7 +103,13 @@ catalogue to this: each `linkRefs` is exactly the settings its schema marks
 ## What a save checks
 
 `builder/validation.py` collects every problem as `{path, code, message}`,
-`path` being a JSON pointer into what was sent. Codes are stable:
+`path` being a JSON pointer into what was sent. On the wire a problem is
+always `{path, code, message, document, params}` (`Issue.as_dict`, held equal
+to `PublishProblemSerializer`): `document` and `params` are `null` when there
+are none. A refusal that lists them is a `400 invalid_document` whose body is
+`BuilderDocumentInvalidError {detail, code, errors: PublishProblem[]}`, the
+third branch of the 400 `anyOf` on every operation that can raise it; a failed
+schedule's `failure` is the same `PublishProblem[]`. Codes are stable:
 
 - shape: `invalid_document`, `order_mismatch`, `invalid_node_id`,
   `duplicate_node_id`, `invalid_key`, `unknown_template` (a `template:<name>` the catalogue's `templates` does not list), `document_too_large`,

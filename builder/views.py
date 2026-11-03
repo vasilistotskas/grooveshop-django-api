@@ -68,6 +68,7 @@ from builder.rendering import (
     PreviewJSONParser,
 )
 from builder.serializers import (
+    BuilderDocumentInvalidErrorSerializer,
     BuilderFeaturesSerializer,
     CheckpointWriteSerializer,
     DocumentDetailSerializer,
@@ -112,6 +113,12 @@ LOCALE_OPENAPI_PARAMETER = OpenApiParameter(
 ERRORS = {
     400: OpenApiResponse(response=ErrorResponseSerializer),
     409: OpenApiResponse(response=ErrorResponseSerializer),
+}
+#: For an operation that can answer ``invalid_document`` (it checks a
+#: document, a schedule time, a preview or a presence list).
+DOCUMENT_INVALID_ERRORS = {
+    **ERRORS,
+    400: OpenApiResponse(response=BuilderDocumentInvalidErrorSerializer),
 }
 
 
@@ -219,7 +226,7 @@ class DocumentView(StaffView):
     @extend_schema(
         tags=TAGS,
         parameters=[_IF_MATCH],
-        responses={204: None, **ERRORS},
+        responses={204: None, **DOCUMENT_INVALID_ERRORS},
         description="Delete a page. A released page leaves the store with a "
         "new release; a page another released document links to is refused "
         "(`page_in_use`).",
@@ -236,7 +243,7 @@ class DraftView(StaffView):
         tags=TAGS,
         parameters=[_IF_MATCH],
         request=DraftWriteSerializer,
-        responses={200: DocumentDetailSerializer, **ERRORS},
+        responses={200: DocumentDetailSerializer, **DOCUMENT_INVALID_ERRORS},
         description=(
             "Autosave. The document is validated in full against the "
             "storefront's catalogue; the answer is 503 "
@@ -297,7 +304,7 @@ class CheckpointView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=CheckpointWriteSerializer,
-        responses={201: VersionListSerializer, **ERRORS},
+        responses={201: VersionListSerializer, **DOCUMENT_INVALID_ERRORS},
         description="A named save: freeze the current draft as a version.",
     )
     def post(self, request: Request, key: str) -> Response:
@@ -352,7 +359,7 @@ class PublishVersionView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PublishVersionWriteSerializer,
-        responses={201: ReleaseSerializer, **ERRORS},
+        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
         description=(
             "Release one stored version of ONE document: the previous "
             "release with only that key repointed. The draft is left as "
@@ -381,7 +388,7 @@ class PublishView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PublishWriteSerializer,
-        responses={201: ReleaseSerializer, **ERRORS},
+        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
         description=(
             "Release the drafts of the named documents together, or none "
             "of them. Every draft is validated in full, references "
@@ -442,7 +449,7 @@ class RollbackView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=RollbackWriteSerializer,
-        responses={201: ReleaseSerializer, **ERRORS},
+        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
         description=("A new release pointing at the versions of an older one."),
     )
     def post(self, request: Request) -> Response:
@@ -517,7 +524,7 @@ class ScheduleListView(StaffListView):
     @extend_schema(
         tags=TAGS,
         request=ScheduleWriteSerializer,
-        responses={201: ScheduleSerializer, **ERRORS},
+        responses={201: ScheduleSerializer, **DOCUMENT_INVALID_ERRORS},
         description=(
             "Release the drafts of the named documents together at "
             "`scheduledFor` (an ISO 8601 time; one without an offset is read "
@@ -566,7 +573,7 @@ class ScheduleView(StaffView):
 
     @extend_schema(
         tags=TAGS,
-        responses={200: ScheduleSerializer, **ERRORS},
+        responses={200: ScheduleSerializer, **DOCUMENT_INVALID_ERRORS},
         description=(
             "Cancel a pending schedule (it stays listed as `cancelled`); "
             "409 `schedule_not_pending` once it has run."
@@ -720,7 +727,7 @@ class PreviewResolveView(StaffView):
         request=PreviewResolveSerializer,
         responses={
             200: PublishedPageSerializer,
-            400: OpenApiResponse(ErrorResponseSerializer),
+            400: OpenApiResponse(BuilderDocumentInvalidErrorSerializer),
             404: OpenApiResponse(ErrorResponseSerializer),
             503: OpenApiResponse(ErrorResponseSerializer),
         },
@@ -935,7 +942,10 @@ class PreviewLinkListView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PreviewLinkWriteSerializer,
-        responses={201: PreviewLinkCreatedSerializer, **ERRORS},
+        responses={
+            201: PreviewLinkCreatedSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+        },
         description=(
             "Freeze the current drafts of the named documents behind a link "
             "anyone can open without signing in, for "
@@ -1020,7 +1030,7 @@ class PresenceView(StaffView):
         request=PresenceWriteSerializer,
         responses={
             200: PresenceSerializer,
-            400: OpenApiResponse(ErrorResponseSerializer),
+            400: OpenApiResponse(BuilderDocumentInvalidErrorSerializer),
         },
         description=(
             "A heartbeat: the documents this editor has open (the full "

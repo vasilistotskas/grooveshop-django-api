@@ -3,6 +3,92 @@
 
 
 
+## v3.215.0 (2026-11-03)
+
+### Bug fixes
+
+* fix(celery): a publish that fails after its change committed is kept, not a 500 (#468) ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* fix(celery): a publish that fails after its change committed is kept, not a 500
+
+dispatch_on_commit runs after the commit, so a broker that cannot be reached
+could only answer 500 for work that was done (the contact attachment upload
+waited ~11 s and failed with the file stored and its row PENDING). A network
+error on the publish is now logged at ERROR and kept as a DeferredDispatch in
+public; redispatch_deferred_tasks (every minute) publishes it again with a
+backoff and stops a run at the first broker failure. A bug still raises.
+robust= is gone: every caller has this behaviour. Contact attachments still
+PENDING past a threshold are queued by a state sweep, which also covers a
+worker killed between the commit and the publish.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* fix(auth): make allauth-schema.yml say what the endpoints serve (#459) ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(auth): make allauth-schema.yml say what the endpoints serve
+
+The contract test now fails on any key an endpoint serves that the document
+omits, and drives an expired session, the configuration, recovery-code
+regeneration and the TOTP enrolment. Corrections, each read from allauth's
+source, move to core/allauth_spec_corrections.py: meta.is_authenticated and
+OptionalTimestamp are nullable, Flow.providers, mfa.passkey_login_enabled and
+account.authentication_method are declared, POST recovery-codes answers 200,
+and our GET totp/svg is documented.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(auth): declare the 429, the TOTP 404 and the session meta on every answer
+
+RateLimitResponse is documented on every operation, the TOTP status 404 is a
+named schema, and every answer with a status carries an optional
+meta (the session and access tokens APIResponse adds when they rotate).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(settings): serve structured settings strictly and check stored values at deploy (#452) ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
+* fix(settings): serve structured settings strictly and check stored values at deploy
+
+Drop the log-and-serve-as-unset path for a stored value that is not its
+shape: a value is valid because the admin validator refused every other,
+and manage.py check_store_settings now fails a deploy when any store holds
+a value its declared validator refuses.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
+### Features
+
+* feat(api-contract): hold a PR to what is live, with one script and one rule set (#458)
+
+api-contract/ becomes the single home of the API contract rule: api-contract.sh (deploy and pr modes), live_state.py reading GitHub Deployments, ignore.txt with an until release and its checker, the reusable check workflow for the storefront and gateway, and the replay of the 2026-11-03 deadlock. Nothing calls the reusable workflow yet and the existing API contract workflow is unchanged.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`728efee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/728efee4d020a6ce19efd95bab58339eb4080331))
+
+### Testing
+
+* test(product): the moderation mail test no longer selects its dispatch by robust
+
+dispatch_on_commit has no robust option now; the test runs every dispatch the
+request registered after the commit.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* test: store a valid BUSINESS_HOURS in the public settings JSON-encoding test
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
 ## v3.214.0 (2026-11-03)
 
 ### Features

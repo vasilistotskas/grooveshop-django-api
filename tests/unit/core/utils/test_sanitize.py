@@ -1,10 +1,43 @@
 import unittest
 
 from core.utils.sanitize import (
+    drop_empty_headings,
     has_visible_content,
     is_allowed_embed_url,
+    lost_content,
     sanitize_html,
 )
+
+
+class TestDropEmptyHeadings(unittest.TestCase):
+    def test_drops_the_heading_the_editor_left_behind(self):
+        # As stored on webside's power bank description.
+        html = '<p>a</p>\n<h2 id="πόσο"></h2>\n<p>b</p>'
+
+        self.assertEqual(drop_empty_headings(html), "<p>a</p>\n<p>b</p>")
+
+    def test_drops_a_heading_holding_only_formatting_and_space(self):
+        html = "<h3><span><strong>&nbsp;</strong></span><br></h3><p>a</p>"
+
+        self.assertEqual(drop_empty_headings(html), "<p>a</p>")
+
+    def test_keeps_a_heading_with_text(self):
+        html = '<h2 id="a"><span style="font-size: 14pt;">Τίτλος</span></h2>'
+
+        self.assertEqual(drop_empty_headings(html), html)
+
+    def test_keeps_a_heading_holding_an_image(self):
+        html = '<h2><img src="https://static.example/a.png"></h2>'
+
+        self.assertEqual(drop_empty_headings(html), html)
+
+    def test_reads_each_heading_on_its_own(self):
+        html = "<h2></h2><h3>Τίτλος</h3><h4> </h4>"
+
+        self.assertEqual(drop_empty_headings(html), "<h3>Τίτλος</h3>")
+
+    def test_an_empty_heading_is_not_content_the_save_refuses(self):
+        self.assertEqual(lost_content('<h2 id="a"></h2><p>b</p>'), [])
 
 
 class TestSanitizeHtmlEmbeds(unittest.TestCase):

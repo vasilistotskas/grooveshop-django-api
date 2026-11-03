@@ -12,7 +12,12 @@ admin, DRF, a shell, a command), in this order:
    `core/utils/sanitize.py`. Residue no reader sees (`data-*`, event
    handlers, CSS custom properties such as Dark Reader's
    `--darkreader-inline-color` in a `style`) is dropped without refusing.
-3. **Record image sizes.** `core.utils.rich_text_images.record_natural_sizes`.
+3. **Drop empty headings.** `core.utils.sanitize.drop_empty_headings`: the
+   editor leaves `<h2 id="..."></h2>` behind when a heading's text is moved.
+   A screen reader announces it and it is a hole in the page's outline. Not
+   part of `sanitize_html`, so step 1 does not refuse it; a heading holding
+   an image stays.
+4. **Record image sizes.** `core.utils.rich_text_images.record_natural_sizes`.
 
 The storefront re-sanitises the same markup on render, so it can only ever
 show less than what is stored.
@@ -24,7 +29,7 @@ Those percentages are the author's layout, not pixels, so the markup does not
 say how big the picture is and the storefront cannot ask the media service for
 a size that fits the screen or reserve the space.
 
-Step 3 adds the file's real size beside the author's attributes:
+Step 4 adds the file's real size beside the author's attributes:
 
 ```html
 <img src="https://static.example/media/shop/uploads/tinymce/a.png"
@@ -52,7 +57,7 @@ Step 3 adds the file's real size beside the author's attributes:
 Rows saved before this existed are brought up to date with
 
 ```bash
-uv run python manage.py record_rich_text_image_sizes --all-tenants [--dry-run]
+uv run python manage.py normalise_rich_text --all-tenants [--dry-run]
 ```
 
 (`--tenant <schema>` for one store). It discovers the `RichTextField` columns
@@ -86,4 +91,4 @@ change.)
 
 Source: `core/fields/rich_text.py`, `core/utils/sanitize.py`,
 `core/utils/rich_text_images.py`, `core/utils/html_text.py`,
-`core/management/commands/record_rich_text_image_sizes.py`.
+`core/management/commands/normalise_rich_text.py`.

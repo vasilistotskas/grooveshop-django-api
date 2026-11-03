@@ -8,7 +8,11 @@ from django.utils.translation import gettext_lazy as _
 from tinymce.models import HTMLField
 
 from core.utils.rich_text_images import record_natural_sizes
-from core.utils.sanitize import lost_content, sanitize_html
+from core.utils.sanitize import (
+    drop_empty_headings,
+    lost_content,
+    sanitize_html,
+)
 
 # What TinyMCE's media dialog inserts for a video it cannot turn into an
 # allowed player: a file URL, or a host outside EMBED_IFRAME_ORIGINS.
@@ -48,6 +52,11 @@ def validate_rich_text(value: Any) -> None:
     raise ValidationError(errors)
 
 
+def normalise_rich_text(html: str) -> str:
+    """What a save does to sanitised markup, beyond the policy itself."""
+    return record_natural_sizes(drop_empty_headings(html))
+
+
 class RichTextField(HTMLField):
     """An ``HTMLField`` held to the policy in ``core.utils.sanitize``.
 
@@ -79,6 +88,6 @@ class RichTextField(HTMLField):
                 validate_rich_text(value)
             except ValidationError as exc:
                 raise ValidationError({self.name: exc.error_list}) from exc
-            value = record_natural_sizes(sanitize_html(value))
+            value = normalise_rich_text(sanitize_html(value))
             setattr(model_instance, self.attname, value)
         return value

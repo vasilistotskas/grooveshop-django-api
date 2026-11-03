@@ -426,11 +426,13 @@ class PublishCheckView(StaffView):
             request.user, keys=body.validated_data["documents"]
         )
         return Response(
-            {
-                "ok": result.ok,
-                "changed": list(result.changed),
-                "problems": [issue.as_dict() for issue in result.problems],
-            }
+            PublishCheckSerializer(
+                {
+                    "ok": result.ok,
+                    "changed": list(result.changed),
+                    "problems": [issue.as_dict() for issue in result.problems],
+                }
+            ).data
         )
 
 

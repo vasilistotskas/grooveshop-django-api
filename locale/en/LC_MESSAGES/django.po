@@ -13766,6 +13766,10 @@ msgstr "The code does not exist"
 msgid "The code has reached its usage limit"
 msgstr "The code has reached its usage limit"
 
+#, python-format
+msgid "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
+msgstr "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 
@@ -14175,6 +14179,9 @@ msgstr "The storefront has no text in this language."
 
 msgid "The storefront unsubscribe confirmation page."
 msgstr "The storefront unsubscribe confirmation page."
+
+msgid "The storefront's catalogue is not valid, so the change cannot be checked. Try again in a moment."
+msgstr "The storefront's catalogue is not valid, so the change cannot be checked. Try again in a moment."
 
 msgid "The stores on this platform, their plans and the health of background work."
 msgstr "The stores on this platform, their plans and the health of background work."

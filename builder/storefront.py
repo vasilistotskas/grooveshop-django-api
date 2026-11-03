@@ -29,6 +29,7 @@ from django.conf import settings
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
 
+from builder import contrast as contrast_module
 from builder import data_sources, pointers
 from builder.models import ReferenceKind
 from core.storefront import StorefrontUnavailable, base_url
@@ -88,6 +89,9 @@ class RootDefinition:
     refs: dict[str, str]
     data: dict[str, dict[str, Any]]
     link_refs: tuple[str, ...]
+    #: The pairs of colours a theme must keep a contrast between
+    #: (``builder.contrast``); empty for every other kind of document.
+    contrast: tuple[contrast_module.Rule, ...]
     validator: Validator = field(compare=False, repr=False)
 
 
@@ -234,6 +238,7 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         refs=_parse_refs(raw.get("refs")),
         data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
+        contrast=contrast_module.parse_rules(raw.get("contrast")),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),

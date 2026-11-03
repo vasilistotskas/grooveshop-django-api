@@ -13769,6 +13769,10 @@ msgstr "Ο κωδικός δεν υπάρχει"
 msgid "The code has reached its usage limit"
 msgstr "Ο κωδικός έχει φτάσει το όριο χρήσης του"
 
+#, python-format
+msgid "The colours of %(rule)s have a contrast of %(ratio)s, below the required %(min)s."
+msgstr "Τα χρώματα του %(rule)s έχουν αντίθεση %(ratio)s, χαμηλότερη από την απαιτούμενη %(min)s."
+
 msgid "The content pages (policies, FAQ, info pages) and the RENDERED pages that show or link them. Purge after editing a content page."
 msgstr "Οι σελίδες περιεχομένου (πολιτικές, συχνές ερωτήσεις, ενημερωτικές σελίδες) και οι ΑΠΟΔΟΣΜΕΝΕΣ σελίδες που τις εμφανίζουν ή παραπέμπουν σε αυτές. Εκκαθαρίστε μετά από επεξεργασία μιας σελίδας περιεχομένου."
 
@@ -14178,6 +14182,9 @@ msgstr "Το κατάστημα δεν έχει κείμενο σε αυτή τ�
 
 msgid "The storefront unsubscribe confirmation page."
 msgstr "Η σελίδα επιβεβαίωσης απεγγραφής του καταστήματος."
+
+msgid "The storefront's catalogue is not valid, so the change cannot be checked. Try again in a moment."
+msgstr "Ο κατάλογος του καταστήματος δεν είναι έγκυρος, οπότε η αλλαγή δεν μπορεί να ελεγχθεί. Δοκίμασε ξανά σε λίγο."
 
 msgid "The stores on this platform, their plans and the health of background work."
 msgstr "Τα καταστήματα της πλατφόρμας, τα πλάνα τους και η κατάσταση των εργασιών παρασκηνίου."

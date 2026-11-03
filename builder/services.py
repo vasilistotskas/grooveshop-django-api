@@ -534,7 +534,9 @@ def validated_drafts(
             document.key, document.draft, document.draft_i18n, catalogue
         )
         if validated is not None:
-            issues = validation.check_references(validated.refs)
+            issues = validation.check_before_release(
+                document.key, validated, catalogue
+            )
             checked[document.key] = validated
         problems.extend(
             replace(issue, document=document.key) for issue in issues
@@ -585,7 +587,9 @@ def check_publish(user: Any, *, keys: Iterable[str]) -> PublishCheck:
                 document.key, document.draft, document.draft_i18n, catalogue
             )
             if validated is not None:
-                issues = validation.check_references(validated.refs)
+                issues = validation.check_before_release(
+                    document.key, validated, catalogue
+                )
                 checked[document.key] = validated
             problems.extend(
                 replace(issue, document=document.key) for issue in issues

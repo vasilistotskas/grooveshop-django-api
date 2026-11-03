@@ -9,20 +9,23 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import jsonschema
 import pytest
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
 from builder import scheduling, services
+from builder.errors import Issue
 from builder.models import (
     BuilderDocument,
     BuilderScheduledPublish,
     ScheduleStatus,
 )
+from builder.serializers import PublishProblemSerializer
 from tests.integration.builder.conftest import api_as
 from tests.utils.builder import document, hero
-from tests.utils.openapi import assert_matches_response
+from tests.utils.openapi import as_json_schema, assert_matches_response
 
 pytestmark = [
     pytest.mark.django_db,
@@ -155,3 +158,69 @@ class TestSchedules:
         ]["parameters"]
         declared = next(p for p in parameters if p["name"] == "status")
         assert set(declared["schema"]["enum"]) == set(ScheduleStatus.values)
+
+
+class TestProblems:
+    """A problem always has a ``document`` key: the schema requires it."""
+
+    def publish_once(self, client):
+        client.post(
+            reverse("builder:publish"), {"documents": [HOME]}, format="json"
+        )
+
+    def test_a_check_with_nothing_to_publish_matches_the_schema(
+        self, client, openapi_schema
+    ):
+        self.publish_once(client)
+
+        checked = client.post(
+            reverse("builder:publish-check"),
+            {"documents": [HOME]},
+            format="json",
+        )
+
+        problems = checked.json()["problems"]
+        assert [p["code"] for p in problems] == ["nothing_to_publish"]
+        assert "document" in problems[0]
+        assert problems[0]["document"] is None
+        assert_matches_response(
+            openapi_schema,
+            path_of("builder:publish-check"),
+            checked.json(),
+            method="post",
+        )
+
+    def test_the_publish_400_matches_the_schema(self, client, openapi_schema):
+        self.publish_once(client)
+
+        refused = client.post(
+            reverse("builder:publish"), {"documents": [HOME]}, format="json"
+        )
+
+        assert refused.status_code == status.HTTP_400_BAD_REQUEST
+        assert refused.json()["code"] == "invalid_document"
+        assert refused.json()["errors"][0]["document"] is None
+        # The 400 is documented as a plain error; the problems it lists are
+        # the check's problems, and every one satisfies their schema.
+        problem = openapi_schema["components"]["schemas"]["PublishProblem"]
+        for item in refused.json()["errors"]:
+            jsonschema.Draft4Validator(
+                as_json_schema(problem, openapi_schema["components"]["schemas"])
+            ).validate(item)
+
+    @pytest.mark.parametrize(
+        "issue",
+        [
+            Issue(path="/a", code="c", message="m"),
+            Issue(path="/a", code="c", message="m", document=HOME),
+            Issue(
+                path="/a",
+                code="c",
+                message="m",
+                document=HOME,
+                params={"kind": "product"},
+            ),
+        ],
+    )
+    def test_an_issue_is_what_the_serializer_declares(self, issue):
+        assert PublishProblemSerializer(issue.as_dict()).data == issue.as_dict()

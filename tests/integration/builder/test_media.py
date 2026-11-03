@@ -143,10 +143,29 @@ class TestUpload:
         jpeg = SimpleUploadedFile("a.jpg", image_bytes("JPEG"), "image/jpeg")
         assert upload(client, jpeg).status_code == status.HTTP_201_CREATED
 
+    def test_a_photo_over_its_cap_is_shrunk_and_stored(
+        self, client, limits, settings
+    ):
+        settings.UPLOAD_IMAGE_MAX_EDGE = 200
+        big = SimpleUploadedFile(
+            "big.jpg", image_bytes("JPEG", size=(800, 600)), "image/jpeg"
+        )
+        cap = big.size - 1
+        limits(max_file_bytes={"jpeg": cap})
+
+        response = upload(client, big)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        body = response.json()
+        assert body["sizeBytes"] <= cap
+        assert max(body["width"], body["height"]) <= 200
+
     def test_the_pixel_limit_is_the_media_services(self, client, limits):
         limits(source_pixel_limit=100)
 
-        assert upload(client).json()["code"] == "image_too_large"
+        body = upload(client).json()
+
+        assert body["width"] * body["height"] <= 100
 
     @pytest.mark.parametrize(
         ("fields", "code"),

@@ -32,6 +32,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 from PIL import Image, UnidentifiedImageError
 
+from core.image_normalise import Rules, normalise
 from core.utils.rich_text_images import displayed_size
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -125,7 +126,6 @@ def _identify(file: IO[bytes]) -> tuple[str, Image.Image] | None:
         return None
     format_name = PILLOW_FORMATS.get(str(image.format))
     if format_name is None:
-        image.close()
         raise _refuse(
             _("Only %(formats)s images can be uploaded.")
             % {"formats": _format_list(RASTER_MIME)},
@@ -206,6 +206,60 @@ def validate_servable_image(
             file.seek(0)
     return SourceImage(
         format_name, RASTER_MIME[format_name], displayed[0], displayed[1]
+    )
+
+
+def prepare_servable_image(
+    file: Any,
+    *,
+    formats: Collection[str] | None = None,
+    allow_svg: bool = True,
+) -> tuple[Any, SourceImage]:
+    """``(file, what it is)`` for an upload the media service will serve: the
+    upload itself, or, when it is a raster over its format's byte cap or the
+    pixel budget, or one that carries a GPS position, a re-encoded copy
+    (``core.image_normalise``) that fits and holds none. What is returned is
+    then judged by :func:`validate_servable_image`, so nothing it refuses gets
+    through. This is the function every upload path calls.
+    """
+    limits = image_limits()
+    allowed = (
+        limits.formats if formats is None else limits.formats & set(formats)
+    )
+    size = getattr(file, "size", None)
+    if size:
+        file.seek(0)
+        try:
+            identified = _identify(file)
+        except ValidationError:
+            identified = None  # validate_servable_image names the problem
+        except Image.DecompressionBombError as exc:
+            raise _refuse(
+                _("The image has more than %(limit)s megapixels.")
+                % {"limit": limits.max_pixels // 1_000_000},
+                "image_too_large",
+            ) from exc
+        if identified is not None:
+            # Not closed: Pillow would close the upload's own file with it.
+            format_name, _opened = identified
+            if format_name in allowed:
+                file.seek(0)
+                replaced = normalise(
+                    file,
+                    getattr(file, "name", "") or "image",
+                    getattr(file, "content_type", "") or "",
+                    Rules(
+                        max_bytes=limits.max_file_bytes[format_name],
+                        max_pixels=limits.max_pixels,
+                        max_edge=settings.UPLOAD_IMAGE_MAX_EDGE,
+                        quality=settings.UPLOAD_IMAGE_QUALITY,
+                    ),
+                )
+                if replaced is not None:
+                    file = replaced
+        file.seek(0)
+    return file, validate_servable_image(
+        file, formats=formats, allow_svg=allow_svg
     )
 
 
@@ -336,6 +390,7 @@ def stored_image_problem(path: Path) -> str | None:
         with path.open("rb") as handle:
             identified = _identify(handle)
             if identified is None:
+                handle.seek(0)
                 head = handle.read(2048).lstrip()
                 if head.startswith((b"<?xml", b"<svg")) or b"<svg" in head:
                     cap = limits.max_file_bytes[SVG]

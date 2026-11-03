@@ -3,6 +3,81 @@
 
 
 
+## v3.203.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(builder): always send the document of a problem, null when there is none (#446)
+
+Issue.as_dict left document out when it was None, but the schema requires it
+(nullable), so the storefront refused a nothing_to_publish problem with a 422.
+Every problem on the wire (publish/check, every invalid_document 400, a failed
+schedule) is built by that one method, which now always writes document and
+params. publish/check also goes through its declared serializer. Contract tests
+cover nothing_to_publish and the publish 400, and hold as_dict equal to
+PublishProblemSerializer.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e1c65f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e1c65f8d657edf3930a8dbb55f6ff01c29f7ef83))
+
+## v3.203.0 (2026-11-03)
+
+### Features
+
+* feat(uploads): shrink a photo over its cap instead of refusing it, strip GPS (#445)
+
+A raster over its format byte cap or the pixel budget is re-encoded in the same
+format: orientation applied, scaled to UPLOAD_IMAGE_MAX_EDGE and in steps until
+it fits, colour profile kept; refused only when no step fits. GPS (EXIF or an
+XMP packet) is removed from every raster upload at its own size. An animated
+image that needs either is refused rather than flattened; SVG is untouched.
+
+prepare_servable_image is the one call of the admin field, the serializer
+field, TinyMCE and the builder media library, and judges the result with
+validate_servable_image.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`ad30597`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad3059779a484881bd97ef0c94051469b54fabdf))
+
+## v3.202.2 (2026-11-03)
+
+### Bug fixes
+
+* fix(uploads): read a stored SVG from its start in the unservable media report (#444) ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+* fix(uploads): read a stored SVG from its start in the unservable media report
+
+The format probe left the file position after the header, so every SVG was
+reported as not an image. Rewind before sniffing; tests cover a servable SVG
+and one over its cap.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+### Testing
+
+* test(uploads): pin that the upload rule reads a file from its start
+
+Covers every raster format and an SVG left mid-file, so the position bug of the
+report probe cannot appear in validate_servable_image.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+## v3.202.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(builder): type rolledBackFrom and a schedule release as nullable, declare ?status (#443)
+
+A normal release has no rolledBackFrom and a pending or failed schedule has no
+release, yet the schema typed both as integers, so the storefront generated
+Zod answered 422 to every publish, rollback and list. Both are nullable now,
+and ScheduleListView declares the status filter it reads, with its choices.
+Tests validate real responses against the schema.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b9105a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9105a8a67aacc928ff4a2391cdc1d621b0134ed))
+
 ## v3.202.0 (2026-11-03)
 
 ### Features

@@ -1512,6 +1512,9 @@ msgstr "Amount to be Collected"
 msgid "An IP address is not a store domain; use a host name."
 msgstr "An IP address is not a store domain; use a host name."
 
+msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
+msgstr "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
+
 msgid "An email address is required for guest alerts."
 msgstr "An email address is required for guest alerts."
 
@@ -13863,8 +13866,15 @@ msgid "The ids to resolve are not valid."
 msgstr "The ids to resolve are not valid."
 
 #, python-format
+msgid "The image cannot be reduced to fit the %(limit)s MB limit."
+msgstr "The image cannot be reduced to fit the %(limit)s MB limit."
+
+#, python-format
 msgid "The image has more than %(limit)s megapixels."
 msgstr "The image has more than %(limit)s megapixels."
+
+msgid "The image has too many pixels to be resized."
+msgstr "The image has too many pixels to be resized."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."

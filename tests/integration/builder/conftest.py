@@ -82,3 +82,57 @@ def limits(monkeypatch):
         )
 
     return use
+
+
+#: Answered by authentication before any view: no operation declares them.
+UNDECLARED_BY_DESIGN = {401, 403}
+
+
+@pytest.fixture(autouse=True)
+def every_answer_is_in_the_schema(monkeypatch, openapi_schema):
+    """Each answer a builder test provokes is declared by its operation, and
+    its body satisfies the declared schema.
+
+    The storefront generates its parsers from ``schema.yml`` and answers 422
+    to a body they reject, so an undeclared status or a body that differs from
+    its declaration is a bug whichever test happened upon it. This holds every
+    request of this directory to that, not only the ones written for it.
+    """
+    import re
+
+    from tests.utils.openapi import validate_against
+
+    templates = [
+        (re.compile("^" + re.sub(r"\{[^}]+\}", "[^/]+", path) + "$"), path)
+        # A literal route (``media/resolve``) before a templated one it also
+        # fits (``media/{id}``).
+        for path in sorted(
+            (p for p in openapi_schema["paths"] if "/builder/" in p),
+            key=lambda p: p.count("{"),
+        )
+    ]
+    original = APIClient.request
+
+    def checked(self, **kwargs):
+        response = original(self, **kwargs)
+        path = kwargs.get("PATH_INFO", "")
+        method = kwargs.get("REQUEST_METHOD", "").lower()
+        template = next(
+            (t for pattern, t in templates if pattern.match(path)), None
+        )
+        if template is None or response.status_code in UNDECLARED_BY_DESIGN:
+            return response
+        operation = openapi_schema["paths"][template].get(method)
+        if operation is None:  # a method the route does not have: 405
+            return response
+        declared = operation["responses"].get(str(response.status_code))
+        assert declared is not None, (
+            f"{method.upper()} {template} answered {response.status_code} "
+            f"({getattr(response, 'data', None)!r}), which it does not declare"
+        )
+        content = declared.get("content", {}).get("application/json")
+        if content and response["Content-Type"].startswith("application/json"):
+            validate_against(openapi_schema, content["schema"], response.json())
+        return response
+
+    monkeypatch.setattr(APIClient, "request", checked)

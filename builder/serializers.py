@@ -307,6 +307,31 @@ class PublishProblemSerializer(serializers.Serializer):
 INVALID_DOCUMENT_CODE_CHOICES = [("invalid_document", "invalid_document")]
 
 
+MEDIA_IN_USE_CODE_CHOICES = [("media_in_use", "media_in_use")]
+
+
+class BuilderMediaInUseSerializer(serializers.Serializer):
+    """The 409 of deleting an image a published page uses: which documents."""
+
+    detail = serializers.CharField()
+    code = serializers.ChoiceField(choices=MEDIA_IN_USE_CODE_CHOICES)
+    used_by = serializers.ListField(child=serializers.CharField())
+
+
+REVISION_CONFLICT_CODE_CHOICES = [("revision_conflict", "revision_conflict")]
+
+
+class BuilderRevisionConflictSerializer(serializers.Serializer):
+    """The 409 of a change made against a revision that is no longer the
+    current one: the revision to reload and who moved it."""
+
+    detail = serializers.CharField()
+    code = serializers.ChoiceField(choices=REVISION_CONFLICT_CODE_CHOICES)
+    current_revision = serializers.IntegerField()
+    updated_by = StaffSerializer(allow_null=True)
+    updated_at = serializers.DateTimeField()
+
+
 class BuilderDocumentInvalidErrorSerializer(serializers.Serializer):
     """The 400 of an operation that checks a document (``invalid_document``):
     the refusal and everything wrong, each with the document it is in."""

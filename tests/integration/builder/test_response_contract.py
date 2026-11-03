@@ -350,3 +350,80 @@ class TestAFailedScheduleListsTypedProblems:
         assert_matches_response(
             openapi_schema, path_of("builder:schedule-list"), listed.json()
         )
+
+
+class TestEveryErrorStatusIsTyped:
+    """The statuses the builder answers are declared, each with its body, so
+    the storefront needs no schema of its own for a refusal. (Every answer a
+    test in this directory provokes is also checked against its operation by
+    ``every_answer_is_in_the_schema``.)"""
+
+    def test_a_stale_revision_names_the_current_one_and_who_moved_it(
+        self, client, openapi_schema
+    ):
+        draft = path_of("builder:document-draft", key=HOME)
+
+        stale = client.put(
+            draft,
+            {"draft": document(("a", hero("two"))), "i18n": {}},
+            format="json",
+            headers={"If-Match": "99"},
+        )
+
+        assert stale.status_code == status.HTTP_409_CONFLICT
+        body = stale.json()
+        assert body["code"] == "revision_conflict"
+        assert isinstance(body["currentRevision"], int)
+        assert "updatedBy" in body
+        assert body["updatedAt"]
+
+    def test_a_change_without_if_match_is_a_428(self, client):
+        refused = client.put(
+            path_of("builder:document-draft", key=HOME),
+            {"draft": document(("a", hero("two"))), "i18n": {}},
+            format="json",
+        )
+
+        assert refused.status_code == status.HTTP_428_PRECONDITION_REQUIRED
+        assert refused.json()["code"] == "precondition_required"
+
+    def test_an_unknown_document_is_a_404(self, client):
+        missing = client.get(
+            path_of("builder:document-detail", key="page:nowhere")
+        )
+
+        assert missing.status_code == status.HTTP_404_NOT_FOUND
+        assert missing.json()["code"] == "not_found"
+
+    def test_a_schedule_that_is_no_longer_pending_is_a_409(self, admin, client):
+        schedule = scheduling.schedule_publish(
+            admin, keys=[HOME], when=timezone.now() + timedelta(hours=2)
+        )
+        url = path_of("builder:schedule-detail", pk=schedule.pk)
+        client.delete(url)
+
+        again = client.delete(url)
+
+        assert again.status_code == status.HTTP_409_CONFLICT
+        assert again.json()["code"] == "schedule_not_pending"
+
+    def test_every_operation_with_if_match_declares_both_refusals(
+        self, openapi_schema
+    ):
+        for path, operations in openapi_schema["paths"].items():
+            for method, operation in operations.items():
+                if method == "parameters":
+                    continue
+                if not any(
+                    p.get("name") == "If-Match"
+                    for p in operation.get("parameters", [])
+                ):
+                    continue
+                responses = operation["responses"]
+                conflict = responses["409"]["content"]["application/json"][
+                    "schema"
+                ]
+                assert conflict == {
+                    "$ref": "#/components/schemas/BuilderRevisionConflict"
+                }, (method, path)
+                assert "428" in responses, (method, path)

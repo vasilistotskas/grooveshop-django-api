@@ -8836,6 +8836,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentDetail'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     delete:
       operationId: api_v1_builder_documents_destroy
       description: Delete a page. A released page leaves the store with a new release;
@@ -8872,6 +8878,18 @@ paths:
                 - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderRevisionConflict'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '428':
           content:
             application/json:
               schema:
@@ -8918,6 +8936,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/documents/{key}/discard:
     post:
       operationId: api_v1_builder_documents_discard_create
@@ -8957,6 +8987,18 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderRevisionConflict'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '428':
           content:
             application/json:
               schema:
@@ -9011,6 +9053,24 @@ paths:
                 - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderRevisionConflict'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '428':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
           content:
             application/json:
               schema:
@@ -9089,6 +9149,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/VersionDetail'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/documents/{key}/versions/{number}/publish:
     post:
       operationId: api_v1_builder_documents_versions_publish_create
@@ -9136,6 +9202,12 @@ paths:
                 - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -9189,6 +9261,18 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderRevisionConflict'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '428':
           content:
             application/json:
               schema:
@@ -9487,6 +9571,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Asset'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     patch:
       operationId: api_v1_builder_media_partial_update
       description: Change the focal point and the alt text of the languages named;
@@ -9536,6 +9626,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
     delete:
       operationId: api_v1_builder_media_destroy
       description: Delete an asset no published page uses; otherwise 409 `media_in_use`
@@ -9565,6 +9661,12 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuilderMediaInUse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -9606,6 +9708,12 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
           content:
             application/json:
               schema:
@@ -9781,6 +9889,18 @@ paths:
                 - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
           content:
             application/json:
               schema:
@@ -9993,6 +10113,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/publish/check:
     post:
       operationId: api_v1_builder_publish_check_create
@@ -10028,6 +10160,18 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
           content:
             application/json:
               schema:
@@ -10174,6 +10318,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/schedules:
     get:
       operationId: api_v1_builder_schedules_list
@@ -10281,6 +10431,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/schedules/{id}:
     get:
       operationId: api_v1_builder_schedules_retrieve
@@ -10304,6 +10466,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Schedule'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
     patch:
       operationId: api_v1_builder_schedules_partial_update
@@ -10340,8 +10508,15 @@ paths:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -10378,9 +10553,14 @@ paths:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -10420,6 +10600,12 @@ paths:
                 - $ref: '#/components/schemas/ApiError'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
           content:
             application/json:
               schema:
@@ -38241,6 +38427,27 @@ components:
           $ref: '#/components/schemas/StoreFeatureStates'
       required:
       - features
+    BuilderMediaInUse:
+      type: object
+      description: 'The 409 of deleting an image a published page uses: which documents.'
+      properties:
+        detail:
+          type: string
+        code:
+          $ref: '#/components/schemas/BuilderMediaInUseCodeEnum'
+        usedBy:
+          type: array
+          items:
+            type: string
+      required:
+      - code
+      - detail
+      - usedBy
+    BuilderMediaInUseCodeEnum:
+      enum:
+      - media_in_use
+      type: string
+      description: '* `media_in_use` - media_in_use'
     BuilderPageKindEnum:
       enum:
       - page
@@ -38249,6 +38456,36 @@ components:
       description: |-
         * `page` - Σελίδα
         * `template` - Πρότυπο
+    BuilderRevisionConflict:
+      type: object
+      description: |-
+        The 409 of a change made against a revision that is no longer the
+        current one: the revision to reload and who moved it.
+      properties:
+        detail:
+          type: string
+        code:
+          $ref: '#/components/schemas/BuilderRevisionConflictCodeEnum'
+        currentRevision:
+          type: integer
+        updatedBy:
+          allOf:
+          - $ref: '#/components/schemas/Staff'
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - code
+      - currentRevision
+      - detail
+      - updatedAt
+      - updatedBy
+    BuilderRevisionConflictCodeEnum:
+      enum:
+      - revision_conflict
+      type: string
+      description: '* `revision_conflict` - revision_conflict'
     BuilderVersionKindEnum:
       enum:
       - checkpoint

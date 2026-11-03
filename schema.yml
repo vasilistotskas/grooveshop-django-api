@@ -53096,20 +53096,44 @@ components:
         * `VALID` - Έγκυρο
         * `INVALID` - Μη έγκυρο
         * `UNAVAILABLE` - Υπηρεσία μη διαθέσιμη
-    VivaReturnLookupResponse:
+    VivaReturnGiftCardPurchaseResponse:
       type: object
       description: |-
-        Minimal, PII-free payload for the Viva post-payment redirect hop.
+        A Smart Checkout return that resolved to a gift-card PURCHASE.
 
-        ``kind`` discriminates the two things a Smart Checkout return can
-        resolve to: an order, or a gift-card PURCHASE (which shares the
-        same static return URL but is not an order). Order fields are
-        absent for purchases and vice versa.
+        Purchases share the static return URL with orders but are not orders.
       properties:
         kind:
-          allOf:
-          - $ref: '#/components/schemas/VivaReturnLookupResponseKindEnum'
-          default: order
+          $ref: '#/components/schemas/VivaReturnGiftCardPurchaseResponseKindEnum'
+        purchaseUuid:
+          type: string
+          format: uuid
+        purchaseStatus:
+          type: string
+      required:
+      - kind
+      - purchaseStatus
+      - purchaseUuid
+    VivaReturnGiftCardPurchaseResponseKindEnum:
+      enum:
+      - gift_card_purchase
+      type: string
+      description: '* `gift_card_purchase` - gift_card_purchase'
+    VivaReturnLookupResponse:
+      oneOf:
+      - $ref: '#/components/schemas/VivaReturnOrderResponse'
+      - $ref: '#/components/schemas/VivaReturnGiftCardPurchaseResponse'
+      discriminator:
+        propertyName: kind
+        mapping:
+          order: '#/components/schemas/VivaReturnOrderResponse'
+          gift_card_purchase: '#/components/schemas/VivaReturnGiftCardPurchaseResponse'
+    VivaReturnOrderResponse:
+      type: object
+      description: A Smart Checkout return that resolved to an order (PII-free).
+      properties:
+        kind:
+          $ref: '#/components/schemas/VivaReturnOrderResponseKindEnum'
         id:
           type: integer
         uuid:
@@ -53119,19 +53143,17 @@ components:
           type: string
         paymentStatus:
           type: string
-        purchaseUuid:
-          type: string
-          format: uuid
-        purchaseStatus:
-          type: string
-    VivaReturnLookupResponseKindEnum:
+      required:
+      - id
+      - kind
+      - paymentStatus
+      - status
+      - uuid
+    VivaReturnOrderResponseKindEnum:
       enum:
       - order
-      - gift_card_purchase
       type: string
-      description: |-
-        * `order` - order
-        * `gift_card_purchase` - gift_card_purchase
+      description: '* `order` - order'
     WebSocketTicketResponse:
       type: object
       properties:

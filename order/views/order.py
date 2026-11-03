@@ -13,6 +13,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
+    PolymorphicProxySerializer,
     extend_schema,
     extend_schema_view,
 )
@@ -103,7 +104,8 @@ from order.serializers.order import (
     PaymentStatusResponseSerializer,
     ReorderResponseSerializer,
     UpdateStatusSerializer,
-    VivaReturnLookupResponseSerializer,
+    VivaReturnGiftCardPurchaseResponseSerializer,
+    VivaReturnOrderResponseSerializer,
 )
 from order.services import (
     LEGAL_DOCUMENT_UNAVAILABLE_DETAIL,
@@ -2133,7 +2135,18 @@ class OrderViewSet(BaseModelViewSet):
             ),
         ],
         responses={
-            200: VivaReturnLookupResponseSerializer,
+            200: PolymorphicProxySerializer(
+                component_name="VivaReturnLookupResponse",
+                # An explicit mapping: ``kind`` is an enum component, so
+                # spectacular cannot read each branch's value from it.
+                serializers={
+                    "order": VivaReturnOrderResponseSerializer,
+                    "gift_card_purchase": (
+                        VivaReturnGiftCardPurchaseResponseSerializer
+                    ),
+                },
+                resource_type_field_name="kind",
+            ),
             400: None,
             404: None,
         },

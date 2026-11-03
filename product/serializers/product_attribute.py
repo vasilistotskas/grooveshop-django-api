@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from product.enum.attribute import SchemaProperty
 from product.models.product_attribute import ProductAttribute
 
 
@@ -16,6 +17,14 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
     is_variant = serializers.BooleanField(
         source="attribute_value.attribute.is_variant", read_only=True
     )
+    # The standard product property the attribute stands for ("color",
+    # "size", ...), or "" when the merchant set none: structured data.
+    schema_property = serializers.ChoiceField(
+        source="attribute_value.attribute.schema_property",
+        choices=SchemaProperty.choices,
+        allow_blank=True,
+        read_only=True,
+    )
     attribute_value_id = serializers.IntegerField(source="attribute_value.id")
     value = serializers.SerializerMethodField(
         method_name="get_translated_value"
@@ -28,6 +37,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             "attribute_id",
             "attribute_name",
             "is_variant",
+            "schema_property",
             "attribute_value_id",
             "value",
             "created_at",
@@ -37,6 +47,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             "attribute_id",
             "attribute_name",
             "is_variant",
+            "schema_property",
             "value",
             "created_at",
         ]

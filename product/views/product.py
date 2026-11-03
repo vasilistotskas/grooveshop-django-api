@@ -544,6 +544,7 @@ class ProductViewSet(BaseModelViewSet):
                             "name", any_language=True
                         )
                         or "",
+                        "schema_property": attribute.schema_property,
                         "sort_order": attribute.sort_order or 0,
                         "_values": {},
                     },

@@ -3,6 +3,21 @@
 
 
 
+## v3.205.0 (2026-11-03)
+
+### Features
+
+* feat(builder): type the invalid_document 400 and a failed schedule problems (#447)
+
+The 400 of every operation that can raise DocumentInvalid gains a third
+branch, BuilderDocumentInvalidError {detail, code, errors: PublishProblem[]},
+beside ApiValidationError and ApiError, and Schedule.failure is
+PublishProblem[] or null, so the storefront needs no schema of its own for
+either. Contract tests validate real refusals from a draft save, a publish and
+a schedule, and failed schedules.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`534d359`](https://github.com/vasilistotskas/grooveshop-django-api/commit/534d359bde1cd2b1a9b5e1c06def9c5ce1193bef))
+
 ## v3.204.0 (2026-11-03)
 
 ### Features

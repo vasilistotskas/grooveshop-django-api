@@ -9,72 +9,50 @@ import re
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name
 
-# ---------------------------------------------------------------------------
-# BUSINESS_HOURS extra_setting
-# ---------------------------------------------------------------------------
+from core.store_setting_shapes import is_valid_structured
 
-_DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+# ---------------------------------------------------------------------------
+# Structured JSON settings
+# ---------------------------------------------------------------------------
+#
+# ANNOUNCEMENT_BAR, AUTH_PANEL, FUNDING_BANNER, STORE_OFFICES and
+# BUSINESS_HOURS are each a serializer in ``core/store_setting_shapes.py``:
+# the same class validates the save here and describes the value in the
+# OpenAPI schema. These are the dotted paths ``settings.py`` names; a
+# validator returns a BOOLEAN (``Setting.validate()`` wraps a falsy result
+# in its own ``ValidationError``).
 
-_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+def validate_announcement_bar_setting(value: object) -> bool:
+    return is_valid_structured("ANNOUNCEMENT_BAR", value)
+
+
+def validate_auth_panel_setting(value: object) -> bool:
+    return is_valid_structured("AUTH_PANEL", value)
+
+
+def validate_funding_banner_setting(value: object) -> bool:
+    return is_valid_structured("FUNDING_BANNER", value)
+
+
+def validate_store_offices_setting(value: object) -> bool:
+    return is_valid_structured("STORE_OFFICES", value)
 
 
 def validate_business_hours_setting(value: object) -> bool:
-    """django-extra-settings validator for ``BUSINESS_HOURS``.
+    return is_valid_structured("BUSINESS_HOURS", value)
 
-    extra_settings validators return a BOOLEAN (they don't raise) —
-    ``Setting.validate()`` wraps a falsy result in its own
-    ``ValidationError``. Mirrored render-side by ``zBusinessHours``
-    (``shared/schemas/businessHours.ts`` in the Nuxt repo) — keep the
-    two in sync.
 
-    Shape: ``{"timezone": "<IANA zone>", "schedule": {"mon".."sun":
-    null | {"opens": "HH:MM", "closes": "HH:MM"}}}``. All seven day
-    keys required; ``null`` = closed. Empty value = feature unset.
-    """
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+# ---------------------------------------------------------------------------
+# DISPATCH_CUTOFF extra_setting
+# ---------------------------------------------------------------------------
 
-    if value in (None, "", {}):
-        return True
-    if not isinstance(value, dict):
-        return False
-    data: dict[str, object] = {str(k): v for k, v in value.items()}
-    if set(data) != {"timezone", "schedule"}:
-        return False
-
-    try:
-        ZoneInfo(str(data["timezone"]))
-    except ZoneInfoNotFoundError, ValueError, TypeError:
-        return False
-
-    raw_schedule = data["schedule"]
-    if not isinstance(raw_schedule, dict):
-        return False
-    schedule: dict[str, object] = {str(k): v for k, v in raw_schedule.items()}
-    if set(schedule) != set(_DAY_KEYS):
-        return False
-    for raw_entry in schedule.values():
-        if raw_entry is None:
-            continue
-        if not isinstance(raw_entry, dict):
-            return False
-        entry: dict[str, object] = {str(k): v for k, v in raw_entry.items()}
-        if set(entry) != {"opens", "closes"}:
-            return False
-        opens, closes = entry["opens"], entry["closes"]
-        if not isinstance(opens, str) or not _TIME_RE.match(opens):
-            return False
-        if not isinstance(closes, str) or not _TIME_RE.match(closes):
-            return False
-        # Zero-padded HH:MM compares correctly as strings.
-        if opens >= closes:
-            return False
-    return True
+_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 def validate_dispatch_cutoff_setting(value: object) -> bool:
@@ -112,80 +90,6 @@ def validate_return_fees_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# STORE_OFFICES extra_setting
-# ---------------------------------------------------------------------------
-
-# ``role`` is the short word a design prints BESIDE an office —
-# "ΕΔΡΑ" / "ΓΡΑΦΕΙΟ", "Head office" / "Branch". A text key, so the
-# i18n overlay translates it like the rest.
-_OFFICE_TEXT_KEYS = ("label", "street", "area", "city", "role")
-_OFFICE_KEYS = {*_OFFICE_TEXT_KEYS, "postal", "phones", "i18n"}
-
-
-def validate_store_offices_setting(value: object) -> bool:
-    """django-extra-settings validator for ``STORE_OFFICES``.
-
-    Returns a BOOLEAN, like every extra_settings validator —
-    ``Setting.validate()`` wraps a falsy result in its own
-    ``ValidationError``.
-
-    Shape: a list of at most 10 offices, each
-    ``{"label", "street", "area", "postal", "city", "role",
-    "phones": [...], "i18n": {"<locale>": {"label"?, "street"?,
-    "area"?, "city"?, "role"?}}}``. ``label`` and ``street`` are
-    required; the rest are optional.
-
-    ``i18n`` is a PARTIAL per-locale override of the text keys only: a
-    postcode and a phone number are the same in every language, so
-    duplicating them per locale would only invite drift. The default
-    locale is not a valid key — those values ARE the entry's own.
-    """
-    if value in (None, "", []):
-        return True
-    if not isinstance(value, list) or len(value) > 10:
-        return False
-
-    from core.utils.i18n import available_language_codes
-
-    codes = available_language_codes()
-    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
-
-    for raw in value:
-        if not isinstance(raw, dict):
-            return False
-        office = {str(k): v for k, v in raw.items()}
-        if set(office) - _OFFICE_KEYS:
-            return False
-        for key in ("label", "street"):
-            if not isinstance(office.get(key), str) or not office[key].strip():
-                return False
-        for key in ("area", "postal", "city", "role"):
-            entry = office.get(key)
-            if entry is not None and not isinstance(entry, str):
-                return False
-        phones = office.get("phones", [])
-        if not isinstance(phones, list) or len(phones) > 6:
-            return False
-        if any(not isinstance(p, str) or not p.strip() for p in phones):
-            return False
-
-        i18n = office.get("i18n", {})
-        if not isinstance(i18n, dict):
-            return False
-        for code, override in i18n.items():
-            if code not in codes or code == default:
-                return False
-            if not isinstance(override, dict):
-                return False
-            if set(override) - set(_OFFICE_TEXT_KEYS):
-                return False
-            if any(not isinstance(v, str) for v in override.values()):
-                return False
-
-    return True
-
-
-# ---------------------------------------------------------------------------
 # SOCIAL_LOGIN_PROVIDERS extra_setting
 # ---------------------------------------------------------------------------
 
@@ -209,370 +113,6 @@ def validate_social_login_providers_setting(value: object) -> bool:
         isinstance(item, str) and (item == "*" or _PROVIDER_ID_RE.match(item))
         for item in value
     )
-
-
-# ---------------------------------------------------------------------------
-# ANNOUNCEMENT_BAR extra_setting
-# ---------------------------------------------------------------------------
-
-_ANNOUNCEMENT_KEYS = {
-    "enabled",
-    "text",
-    "shortText",
-    "code",
-    "i18n",
-    "link",
-    "icon",
-    "color",
-    "dismissible",
-    "id",
-}
-_ANNOUNCEMENT_COLORS = {
-    "primary",
-    "secondary",
-    "neutral",
-    "info",
-    "success",
-    "warning",
-    "error",
-}
-_ICON_NAME_RE = re.compile(r"^i-[a-z0-9:-]+$")
-_ANNOUNCEMENT_LINK_RE = re.compile(r"^(/|https://)")
-# The wording that differs per locale; ``code`` is not here on purpose.
-_ANNOUNCEMENT_TEXT_LIMITS = {"text": 200, "shortText": 80}
-# One token: a promo code is typed or copied, never read as a sentence.
-_PROMO_CODE_RE = re.compile(r"^\S{1,40}$")
-
-
-def validate_announcement_bar_setting(value: object) -> bool:
-    """django-extra-settings validator for ``ANNOUNCEMENT_BAR``.
-
-    Boolean contract, like ``validate_business_hours_setting``.
-
-    Shape: ``{"enabled": bool, "text": str, "shortText"?: str,
-    "code"?: str, "i18n": {"<locale>": {"text"?, "shortText"?}},
-    "link"?, "icon"?, "color"?, "dismissible"?, "id"?}``. ``text``
-    carries the DEFAULT locale's wording and ``i18n`` overrides it per
-    locale — the same partial-override convention as
-    ``STORE_OFFICES``, so the default locale
-    is not a valid key there.
-
-    ``shortText`` is the phone's copy (the bar is one line, and a
-    phone has less of it); it falls back to ``text`` where absent.
-    ``code`` is a promo code the storefront sets apart from the
-    sentence. It is NOT translatable: a code is the same string in
-    every language, so a per-locale copy could only drift.
-
-    ``id`` is what a dismissal is remembered against in the visitor's
-    browser: changing it re-shows the bar to everyone, which is how a
-    merchant runs a second announcement without every previous
-    dismissal swallowing it.
-    """
-    if value in (None, "", {}):
-        return True
-    if not isinstance(value, dict):
-        return False
-    data = {str(k): v for k, v in value.items()}
-    if set(data) - _ANNOUNCEMENT_KEYS:
-        return False
-
-    enabled = data.get("enabled", False)
-    if not isinstance(enabled, bool):
-        return False
-
-    text = data.get("text", "")
-    if (
-        not isinstance(text, str)
-        or len(text) > _ANNOUNCEMENT_TEXT_LIMITS["text"]
-    ):
-        return False
-    short_text = data.get("shortText")
-    if short_text is not None and (
-        not isinstance(short_text, str)
-        or len(short_text) > _ANNOUNCEMENT_TEXT_LIMITS["shortText"]
-    ):
-        return False
-    code = data.get("code")
-    if code is not None and (
-        not isinstance(code, str) or not _PROMO_CODE_RE.match(code)
-    ):
-        return False
-    # A bar with nothing to say is a blank strip above the header.
-    if enabled and not text.strip():
-        return False
-
-    for key, pattern, limit in (
-        ("link", _ANNOUNCEMENT_LINK_RE, 1000),
-        ("icon", _ICON_NAME_RE, 100),
-    ):
-        entry = data.get(key)
-        if entry is None:
-            continue
-        if not isinstance(entry, str) or len(entry) > limit:
-            return False
-        if entry and not pattern.match(entry):
-            return False
-
-    color = data.get("color")
-    if color is not None and color not in _ANNOUNCEMENT_COLORS:
-        return False
-
-    for key in ("dismissible",):
-        entry = data.get(key)
-        if entry is not None and not isinstance(entry, bool):
-            return False
-
-    identifier = data.get("id")
-    if identifier is not None and (
-        not isinstance(identifier, str) or len(identifier) > 64
-    ):
-        return False
-
-    from core.utils.i18n import available_language_codes
-
-    codes = available_language_codes()
-    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
-    i18n = data.get("i18n", {})
-    if not isinstance(i18n, dict):
-        return False
-    for code, override in i18n.items():
-        if code not in codes or code == default:
-            return False
-        if (
-            not isinstance(override, dict)
-            or not override
-            or set(override) - set(_ANNOUNCEMENT_TEXT_LIMITS)
-        ):
-            return False
-        for key, entry in override.items():
-            if (
-                not isinstance(entry, str)
-                or len(entry) > _ANNOUNCEMENT_TEXT_LIMITS[key]
-            ):
-                return False
-
-    return True
-
-
-# ---------------------------------------------------------------------------
-# AUTH_PANEL extra_setting
-# ---------------------------------------------------------------------------
-
-_AUTH_PANEL_KEYS = {"imageUrl", "tagline", "i18n"}
-_AUTH_PANEL_TAGLINE_MAX = 200
-_AUTH_PANEL_IMAGE_MAX = 1000
-
-
-def validate_auth_panel_setting(value: object) -> bool:
-    """django-extra-settings validator for ``AUTH_PANEL``.
-
-    Boolean contract, like ``validate_business_hours_setting``.
-
-    Shape: ``{"imageUrl"?: str, "tagline"?: str, "i18n": {"<locale>":
-    {"tagline": str}}}`` — the photo and the line on the sign-in
-    pages' ink panel. ``imageUrl`` is a stored media path, the same
-    bare string every page-section image prop holds (an upload is
-    referenced, never inlined). ``tagline`` is the DEFAULT locale's
-    wording and ``i18n`` overrides it per locale, the same
-    partial-override convention as ``ANNOUNCEMENT_BAR`` — the image is
-    not translatable, so it is not an override key. Both are optional:
-    the panel falls back to the store's ink-and-logo layout. Empty
-    value = nothing configured.
-    """
-    if value in (None, "", {}):
-        return True
-    if not isinstance(value, dict):
-        return False
-    data = {str(k): v for k, v in value.items()}
-    if set(data) - _AUTH_PANEL_KEYS:
-        return False
-
-    image = data.get("imageUrl")
-    if image is not None and (
-        not isinstance(image, str) or len(image) > _AUTH_PANEL_IMAGE_MAX
-    ):
-        return False
-    tagline = data.get("tagline")
-    if tagline is not None and (
-        not isinstance(tagline, str) or len(tagline) > _AUTH_PANEL_TAGLINE_MAX
-    ):
-        return False
-
-    from core.utils.i18n import available_language_codes
-
-    codes = available_language_codes()
-    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
-    i18n = data.get("i18n", {})
-    if not isinstance(i18n, dict):
-        return False
-    for code, override in i18n.items():
-        if code not in codes or code == default:
-            return False
-        if not isinstance(override, dict) or set(override) != {"tagline"}:
-            return False
-        entry = override["tagline"]
-        if not isinstance(entry, str) or len(entry) > _AUTH_PANEL_TAGLINE_MAX:
-            return False
-
-    return True
-
-
-# ---------------------------------------------------------------------------
-# FUNDING_BANNER extra_setting
-# ---------------------------------------------------------------------------
-
-_FUNDING_BANNER_KEYS = {
-    "enabled",
-    "image",
-    "alt",
-    "link",
-    "label",
-    "width",
-    "height",
-    "i18n",
-}
-# What a locale may replace: the artwork (the official strip exists per
-# language) and the words. ``link`` and ``enabled`` are one decision for
-# every language — the storefront puts the locale prefix on the path.
-_FUNDING_BANNER_OVERRIDE_KEYS = {"image", "width", "height", "alt", "label"}
-_FUNDING_BANNER_URL_MAX = 1000
-_FUNDING_BANNER_ALT_MAX = 300
-_FUNDING_BANNER_LABEL_MAX = 120
-_FUNDING_BANNER_PIXELS_MAX = 10000
-# A site-relative path (but not protocol-relative ``//host``) or https.
-_FUNDING_BANNER_URL_RE = re.compile(r"^(/(?!/)|https://)\S")
-
-
-def _funding_banner_url_ok(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and len(value) <= _FUNDING_BANNER_URL_MAX
-        and _FUNDING_BANNER_URL_RE.match(value) is not None
-        and not any(c.isspace() for c in value)
-    )
-
-
-def _funding_banner_pixels_ok(value: object) -> bool:
-    return (
-        isinstance(value, int)
-        and not isinstance(value, bool)
-        and 0 < value <= _FUNDING_BANNER_PIXELS_MAX
-    )
-
-
-def _funding_banner_artwork_ok(data: dict) -> bool:
-    """``image`` with its intrinsic ``width`` and ``height``, or none of
-    the three: a size means nothing without the picture it measures."""
-    image = data.get("image")
-    sizes = (data.get("width"), data.get("height"))
-    if image is None:
-        return all(size is None for size in sizes)
-    return _funding_banner_url_ok(image) and all(
-        _funding_banner_pixels_ok(size) for size in sizes
-    )
-
-
-def _funding_banner_text_ok(data: dict) -> bool:
-    alt = data.get("alt")
-    if alt is not None and (
-        not isinstance(alt, str) or len(alt) > _FUNDING_BANNER_ALT_MAX
-    ):
-        return False
-    label = data.get("label")
-    return label is None or (
-        isinstance(label, str) and len(label) <= _FUNDING_BANNER_LABEL_MAX
-    )
-
-
-def _funding_banner_i18n_ok(i18n: object) -> bool:
-    from core.utils.i18n import available_language_codes
-
-    if not isinstance(i18n, dict):
-        return False
-    codes = available_language_codes()
-    default = settings.PARLER_DEFAULT_LANGUAGE_CODE
-    for code, override in i18n.items():
-        if code not in codes or code == default:
-            return False
-        if (
-            not isinstance(override, dict)
-            or not override
-            or set(override) - _FUNDING_BANNER_OVERRIDE_KEYS
-        ):
-            return False
-        if not _funding_banner_artwork_ok(override):
-            return False
-        if not _funding_banner_text_ok(override):
-            return False
-        # The alt is the logos' accessible name in that language: an
-        # override may change it, never blank it, and a localized artwork
-        # brings its own (the default's describes another picture, in
-        # another language).
-        alt = override.get("alt")
-        if alt is not None and not alt.strip():
-            return False
-        if "image" in override and alt is None:
-            return False
-    return True
-
-
-def validate_funding_banner_setting(value: object) -> bool:
-    """django-extra-settings validator for ``FUNDING_BANNER``.
-
-    Boolean contract, like ``validate_business_hours_setting``.
-
-    Shape: ``{"enabled": bool, "image": str, "width": int, "height":
-    int, "alt": str, "link": str, "label"?: str}`` — the EU/ESPA
-    co-funding strip a beneficiary must show above the fold. ``image``
-    and ``link`` are a site-relative path or an ``https://`` URL (never
-    ``http:``, ``javascript:`` or a protocol-relative ``//`` URL).
-    ``width`` and ``height`` are the artwork's intrinsic size in
-    pixels, required with an ``image`` and meaningless without one: the
-    storefront draws the artwork's box at that ratio before it loads, so
-    the strip at the top of every page does not push it down (CLS).
-    ``alt`` is the accessible name of the logos, so it may not be blank.
-    ``enabled`` is required; ``image``, ``alt`` and ``link`` are
-    required when it is true, and a disabled banner may be just
-    ``{"enabled": false}``.
-
-    ``i18n`` is a PARTIAL per-locale override, the same convention as
-    ``ANNOUNCEMENT_BAR`` and ``STORE_OFFICES`` (so the default locale
-    is not a key): ``{"<locale>": {"image"?, "width"?, "height"?,
-    "alt"?, "label"?}}``. The artwork is per language — the programme
-    publishes the strip in Greek and in English — so an override may
-    replace it, always with its own size, and the words with it. The
-    ``link`` stays one value: it is a path the storefront prefixes with
-    the visitor's locale.
-    """
-    if not isinstance(value, dict):
-        return False
-    data = {str(k): v for k, v in value.items()}
-    if set(data) - _FUNDING_BANNER_KEYS:
-        return False
-    enabled = data.get("enabled")
-    if not isinstance(enabled, bool):
-        return False
-
-    if not _funding_banner_artwork_ok(data):
-        return False
-    link = data.get("link")
-    if link is not None and not _funding_banner_url_ok(link):
-        return False
-    if not _funding_banner_text_ok(data):
-        return False
-    if not _funding_banner_i18n_ok(data.get("i18n", {})):
-        return False
-
-    image = data.get("image")
-    alt = data.get("alt")
-    if enabled:
-        return (
-            image is not None
-            and link is not None
-            and isinstance(alt, str)
-            and bool(alt.strip())
-        )
-    return True
 
 
 # ---------------------------------------------------------------------------

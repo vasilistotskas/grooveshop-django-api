@@ -27,6 +27,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - 'schema.yml'
+      - 'allauth-schema.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
@@ -54,28 +55,43 @@ jobs:
         env:
           # The base is read at the exact commit the PR targets. The
           # repository is public, so no token is needed.
-          BASE_SCHEMA: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.base.sha }}/schema.yml
+          BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.base.sha }}
           ACCEPTED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-change') }}
         run: |
-          oasdiff() {
-            docker run --rm --user "$(id -u):$(id -g)" \
-              -v "$PWD/schema.yml:/s/schema.yml:ro" \
-              "$OASDIFF_IMAGE" breaking --allow-external-refs=false "$@" \
-              -- "$BASE_SCHEMA" /s/schema.yml
-          }
-          # Annotations on the PR, then the verdict.
-          oasdiff --format githubactions || true
-          set +e
-          oasdiff --fail-on ERR --format text
-          code=$?
-          set -e
-          if [ "$code" -eq 0 ]; then
+          # schema.yml is ours; allauth-schema.yml is allauth's headless
+          # API as this project serves it (``manage.py allauth_schema``),
+          # which the storefront also generates its parsers from. A file
+          # the base does not have yet is new, so there is nothing to
+          # break.
+          worst=0
+          for file in schema.yml allauth-schema.yml; do
+            if [ ! -f "$file" ]; then continue; fi
+            if ! curl -fsS -o "/tmp/base-$file" "$BASE_URL/$file"; then
+              echo "$file is new on this branch; nothing to compare."
+              continue
+            fi
+            oasdiff() {
+              docker run --rm --user "$(id -u):$(id -g)" \
+                -v "$PWD/$file:/s/new.yml:ro" \
+                -v "/tmp/base-$file:/s/base.yml:ro" \
+                "$OASDIFF_IMAGE" breaking --allow-external-refs=false "$@" \
+                -- /s/base.yml /s/new.yml
+            }
+            # Annotations on the PR, then the verdict.
+            oasdiff --format githubactions || true
+            set +e
+            oasdiff --fail-on ERR --format text
+            code=$?
+            set -e
+            if [ "$code" -gt 1 ]; then
+              echo "::error::oasdiff could not compare $file (exit $code)"
+              exit "$code"
+            fi
+            if [ "$code" -eq 1 ]; then worst=1; fi
+          done
+          if [ "$worst" -eq 0 ]; then
             echo "No breaking changes."
             exit 0
-          fi
-          if [ "$code" -ne 1 ]; then
-            echo "::error::oasdiff could not compare the schemas (exit $code)"
-            exit "$code"
           fi
           if [ "$ACCEPTED" = "true" ]; then
             echo "::warning::Breaking API changes accepted by the '$BREAKING_LABEL' label. Deploy the storefront that no longer relies on them BEFORE this release; the deploy gate refuses the other order."

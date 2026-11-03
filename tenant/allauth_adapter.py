@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from urllib.parse import urlsplit, urlunsplit
 
@@ -341,6 +342,27 @@ class TenantHeadlessAdapter(DefaultHeadlessAdapter):
     ``database_sync_to_async`` thread pooling can leave a stale
     ``connection.tenant`` from an earlier request on the same thread.
     """
+
+    def get_user_dataclass(self):
+        """The user payload's shape, as the OpenAPI document states it.
+
+        ``UserAccount.username`` is blank for a customer who signs up by
+        email, and ``serialize_user`` drops blank values, so the payload
+        has no ``username`` key for them. allauth's own dataclass makes
+        it required, which is not what this API sends.
+        """
+        base = super().get_user_dataclass()
+        return dataclasses.make_dataclass(
+            base.__name__,
+            [
+                (
+                    field.name,
+                    str | None if field.name == "username" else field.type,
+                    dataclasses.field(metadata=field.metadata),
+                )
+                for field in dataclasses.fields(base)
+            ],
+        )
 
     def get_frontend_url(self, urlname: str, **kwargs) -> str | None:
         url = super().get_frontend_url(urlname, **kwargs)

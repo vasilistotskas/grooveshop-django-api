@@ -8,6 +8,13 @@ from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure, MeasureBase
 from rest_framework import serializers
 
+from core.store_setting_shapes import (
+    AnnouncementBarSerializer,
+    AuthPanelSerializer,
+    BusinessHoursSerializer,
+    FundingBannerSerializer,
+    StoreOfficeSerializer,
+)
 from product.models import Product
 
 
@@ -281,4 +288,17 @@ class PublicSettingsSerializer(serializers.Serializer):
     settings = serializers.DictField(
         child=serializers.CharField(),
         help_text=_("Setting values keyed by setting name."),
+    )
+    # The structured settings again, typed: the string form above is the
+    # JSON text of the same value. ``null`` (offices: ``[]``) is nothing
+    # configured. One definition drives the admin's validation and these
+    # shapes (``core/store_setting_shapes.py``).
+    announcement_bar = AnnouncementBarSerializer(allow_null=True)
+    auth_panel = AuthPanelSerializer(allow_null=True)
+    funding_banner = FundingBannerSerializer()
+    store_offices = StoreOfficeSerializer(many=True)
+    business_hours = BusinessHoursSerializer(allow_null=True)
+    contact_attachments_types = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="The MIME types the contact form accepts.",
     )

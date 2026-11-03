@@ -3,6 +3,19 @@
 
 
 
+## v3.205.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(order): publish viva_return as a oneOf discriminated on kind (#448)
+
+The endpoint answers an order or a gift-card purchase but was published
+as one object with every field optional, so the storefront rebuilt the
+union by hand. Each branch is now its own serializer with its fields
+required, joined by a PolymorphicProxySerializer on `kind`.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`66998d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66998d9469b4590907ca57c5eef27f3aa8b3d702))
+
 ## v3.205.0 (2026-11-03)
 
 ### Features

@@ -89,7 +89,7 @@ class StrictSerializer(serializers.Serializer):
             unknown = sorted(set(data) - set(self.fields))
             if unknown:
                 raise serializers.ValidationError(
-                    {key: ("Unknown key.") for key in unknown}
+                    {key: "Unknown key." for key in unknown}, code="unknown_key"
                 )
         return super().to_internal_value(data)
 
@@ -102,7 +102,7 @@ class LocaleOverridesField(serializers.DictField):
     """
 
     default_error_messages = {
-        "unknown_locale": ("{locale} is not a locale with an override."),
+        "unknown_locale": "{locale} is not a locale with an override.",
     }
 
     def run_child_validation(self, data: Any) -> Any:
@@ -132,14 +132,14 @@ def _url_ok(value: str) -> None:
     """A site-relative path (never ``//host``) or an https URL."""
     if not re.match(r"^(/(?!/)|https://)\S", value) or re.search(r"\s", value):
         raise serializers.ValidationError(
-            ("Must be a site-relative path or an https URL."),
+            "Must be a site-relative path or an https URL.",
             code="invalid_url",
         )
 
 
 def _not_blank(value: str) -> None:
     if not value.strip():
-        raise serializers.ValidationError(("May not be blank."), code="blank")
+        raise serializers.ValidationError("May not be blank.", code="blank")
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ class AnnouncementBarOverrideSerializer(StrictSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if not attrs:
             raise serializers.ValidationError(
-                ("An override carries at least one text."), code="empty"
+                "An override carries at least one text.", code="empty"
             )
         return attrs
 
@@ -190,7 +190,7 @@ class AnnouncementBarSerializer(StrictSerializer):
         required=False,
         max_length=40,
         validators=[
-            RegexValidator(r"^\S+$", ("A code is one token, no spaces."))
+            RegexValidator(r"^\S+$", "A code is one token, no spaces.")
         ],
     )
     link = StrictCharField(
@@ -217,7 +217,7 @@ class AnnouncementBarSerializer(StrictSerializer):
         # A bar with nothing to say is a blank strip above the header.
         if attrs["enabled"] and not attrs["text"].strip():
             raise serializers.ValidationError(
-                {"text": ("An enabled bar needs text.")}, code="blank"
+                {"text": "An enabled bar needs text."}, code="blank"
             )
         return attrs
 
@@ -260,11 +260,11 @@ def _artwork(attrs: Mapping[str, Any]) -> None:
     if "image" not in attrs:
         if any(size is not None for size in sizes):
             raise serializers.ValidationError(
-                ("A size means nothing without its image."), code="size"
+                "A size means nothing without its image.", code="size"
             )
     elif any(size is None for size in sizes):
         raise serializers.ValidationError(
-            ("An image carries its width and height."), code="size"
+            "An image carries its width and height.", code="size"
         )
 
 
@@ -292,7 +292,7 @@ class FundingBannerOverrideSerializer(FundingArtworkSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if not attrs:
             raise serializers.ValidationError(
-                ("An override replaces at least one value."), code="empty"
+                "An override replaces at least one value.", code="empty"
             )
         _artwork(attrs)
         # The alt is the logos' accessible name in that language: an
@@ -302,7 +302,7 @@ class FundingBannerOverrideSerializer(FundingArtworkSerializer):
             _not_blank(attrs["alt"])
         if "image" in attrs and "alt" not in attrs:
             raise serializers.ValidationError(
-                {"alt": ("A localized artwork brings its own alt.")},
+                {"alt": "A localized artwork brings its own alt."},
                 code="required",
             )
         return attrs
@@ -327,7 +327,7 @@ class FundingBannerSerializer(FundingArtworkSerializer):
         _artwork(attrs)
         if attrs["enabled"]:
             missing = {
-                key: ("Required when the banner is enabled.")
+                key: "Required when the banner is enabled."
                 for key in ("image", "link", "alt")
                 if key not in attrs
             }
@@ -396,7 +396,7 @@ class DayHoursSerializer(StrictSerializer):
         # Zero-padded HH:MM compares correctly as strings.
         if attrs["opens"] >= attrs["closes"]:
             raise serializers.ValidationError(
-                ("A day opens before it closes."), code="order"
+                "A day opens before it closes.", code="order"
             )
         return attrs
 
@@ -418,7 +418,7 @@ def _timezone_ok(value: str) -> None:
         ZoneInfo(value)
     except ZoneInfoNotFoundError, ValueError:
         raise serializers.ValidationError(
-            ("Not an IANA time zone."), code="timezone"
+            "Not an IANA time zone.", code="timezone"
         ) from None
 
 
@@ -467,7 +467,9 @@ def validated_structured(name: str, value: object) -> Any:
     # a key that is already snake_case, so a value must survive the round
     # trip unchanged or a client reading the camelCase key would miss it.
     if camelize(snake) != value:
-        raise serializers.ValidationError("Keys must be camelCase.")
+        raise serializers.ValidationError(
+            "Keys must be camelCase.", code="camel_case"
+        )
     serializer = STRUCTURED_SETTINGS[name](data=snake)
     serializer.is_valid(raise_exception=True)
     return serializer.validated_data

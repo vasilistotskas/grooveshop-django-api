@@ -17,7 +17,7 @@ def give_every_store_its_own_key(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tenant', '0068_deferred_dispatch'),
+        ('tenant', '0069_seo_catalog_fields'),
     ]
 
     operations = [

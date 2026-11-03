@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -506,3 +506,87 @@ def public_structured_values(values: Mapping[str, object]) -> dict[str, Any]:
             )
             typed[name] = validated_structured(name, declared_default(name))
     return typed
+
+
+# ---------------------------------------------------------------------------
+# The other public settings: typed by their declared type
+# ---------------------------------------------------------------------------
+#
+# A public setting without structure is a number, a flag or a short text.
+# It is served as a string in the ``settings`` map (the encoding
+# ``settings/get`` uses) and again typed in ``values``, in the type its
+# declaration in ``settings.EXTRA_SETTINGS_DEFAULTS`` names, so the type is
+# written down once and no client parses a number out of text.
+
+# Who pays to send a return back: the return is free to the customer, or
+# the customer pays its shipping. Empty = the store has not said.
+RETURN_FEES_CHOICES = frozenset({"", "free", "customer"})
+
+# Served as a list in its own key.
+_SERVED_ELSEWHERE = frozenset({"CONTACT_ATTACHMENTS_TYPES"})
+
+_FIELD_FOR_DECLARED_TYPE: dict[str, Callable[[], serializers.Field]] = {
+    "string": lambda: serializers.CharField(allow_blank=True),
+    "int": serializers.IntegerField,
+    "decimal": serializers.FloatField,
+    "bool": serializers.BooleanField,
+}
+
+
+def _degrees(value: object) -> float | None:
+    """Decimal degrees of a ``STORE_GEO_*`` text; empty is no location."""
+    text = str(value or "").strip()
+    return float(text) if text else None
+
+
+# Where the stored text is not the type clients want. The validator on each
+# of these settings already refuses a value that does not convert.
+_STORED_AS_TEXT = {"STORE_GEO_LAT": _degrees, "STORE_GEO_LNG": _degrees}
+_FIELD_OVERRIDES: dict[str, Callable[[], serializers.Field]] = {
+    "STORE_GEO_LAT": lambda: serializers.FloatField(allow_null=True),
+    "STORE_GEO_LNG": lambda: serializers.FloatField(allow_null=True),
+    "RETURN_FEES": lambda: serializers.ChoiceField(
+        choices=sorted(RETURN_FEES_CHOICES - {""}), allow_blank=True
+    ),
+}
+
+
+def _scalar_names() -> tuple[str, ...]:
+    from core.store_settings import PUBLIC_SETTING_KEYS
+
+    return tuple(
+        sorted(
+            PUBLIC_SETTING_KEYS - STRUCTURED_SETTINGS.keys() - _SERVED_ELSEWHERE
+        )
+    )
+
+
+def _scalar_field(name: str) -> serializers.Field:
+    from core.store_settings import DECLARED_TYPES
+
+    if name in _FIELD_OVERRIDES:
+        return _FIELD_OVERRIDES[name]()
+    return _FIELD_FOR_DECLARED_TYPE[DECLARED_TYPES[name]]()
+
+
+SCALAR_PUBLIC_SETTINGS = _scalar_names()
+
+# One field per public scalar setting, named after it (the camelCase
+# renderer turns ``gift_card_min_amount`` into ``giftCardMinAmount``). A
+# public setting of a type with no field here raises at import.
+PublicValuesSerializer = type(
+    "PublicValuesSerializer",
+    (serializers.Serializer,),
+    {name.lower(): _scalar_field(name) for name in SCALAR_PUBLIC_SETTINGS},
+)
+
+
+def public_scalar_values(values: Mapping[str, object]) -> dict[str, Any]:
+    """The typed values of ``values``' scalar public settings, by lower-case
+    setting name."""
+    return {
+        name.lower(): _STORED_AS_TEXT[name](values[name])
+        if name in _STORED_AS_TEXT
+        else values[name]
+        for name in SCALAR_PUBLIC_SETTINGS
+    }

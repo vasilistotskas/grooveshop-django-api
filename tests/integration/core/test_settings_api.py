@@ -18,7 +18,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.views import PUBLIC_SETTING_KEYS
+from core.store_settings import PUBLIC_SETTING_KEYS
 from tenant.features import feature_setting_keys, preference_setting_keys
 from user.factories.account import UserAccountFactory
 

@@ -49840,6 +49840,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/BusinessHours'
           nullable: true
+        values:
+          $ref: '#/components/schemas/PublicValues'
         contactAttachmentsTypes:
           type: array
           items:
@@ -49853,6 +49855,87 @@ components:
       - fundingBanner
       - settings
       - storeOffices
+      - values
+    PublicValues:
+      type: object
+      properties:
+        contactAttachmentsMaxCount:
+          type: integer
+        contactAttachmentsMaxMb:
+          type: integer
+        contactEmail:
+          type: string
+        demoAccountB2bEmail:
+          type: string
+        demoAccountB2bPassword:
+          type: string
+        demoAccountEmail:
+          type: string
+        demoAccountPassword:
+          type: string
+        dispatchCutoff:
+          type: string
+        giftCardMaxAmount:
+          type: number
+          format: double
+        giftCardMinAmount:
+          type: number
+          format: double
+        giftCardValidityDays:
+          type: integer
+        loyaltyNewCustomerBonusEnabled:
+          type: boolean
+        loyaltyNewCustomerBonusPoints:
+          type: integer
+        loyaltyPointsExpirationDays:
+          type: integer
+        loyaltyPointsFactor:
+          type: number
+          format: double
+        loyaltyRedemptionRatioEur:
+          type: number
+          format: double
+        loyaltyTierMultiplierEnabled:
+          type: boolean
+        loyaltyXpPerLevel:
+          type: integer
+        returnFees:
+          oneOf:
+          - $ref: '#/components/schemas/ReturnFeesEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        returnWindowDays:
+          type: integer
+        storeGeoLat:
+          type: number
+          format: double
+          nullable: true
+        storeGeoLng:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - contactAttachmentsMaxCount
+      - contactAttachmentsMaxMb
+      - contactEmail
+      - demoAccountB2bEmail
+      - demoAccountB2bPassword
+      - demoAccountEmail
+      - demoAccountPassword
+      - dispatchCutoff
+      - giftCardMaxAmount
+      - giftCardMinAmount
+      - giftCardValidityDays
+      - loyaltyNewCustomerBonusEnabled
+      - loyaltyNewCustomerBonusPoints
+      - loyaltyPointsExpirationDays
+      - loyaltyPointsFactor
+      - loyaltyRedemptionRatioEur
+      - loyaltyTierMultiplierEnabled
+      - loyaltyXpPerLevel
+      - returnFees
+      - returnWindowDays
+      - storeGeoLat
+      - storeGeoLng
     PublishCheck:
       type: object
       properties:
@@ -50556,6 +50639,14 @@ components:
       description: |-
         * `product` - product
         * `blog_post` - blog_post
+    ReturnFeesEnum:
+      enum:
+      - customer
+      - free
+      type: string
+      description: |-
+        * `customer` - customer
+        * `free` - free
     ReviewStatus:
       enum:
       - NEW

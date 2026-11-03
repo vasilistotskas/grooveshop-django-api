@@ -26,7 +26,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from core.api.views import PUBLIC_SETTING_KEYS
+from core.store_settings import PUBLIC_SETTING_KEYS
 from devtools import demo_account
 from devtools.demo_catalogue import PRODUCTS
 from tenant.features import preference_setting_keys

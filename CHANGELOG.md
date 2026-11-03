@@ -3,6 +3,20 @@
 
 
 
+## v3.202.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(builder): type rolledBackFrom and a schedule release as nullable, declare ?status (#443)
+
+A normal release has no rolledBackFrom and a pending or failed schedule has no
+release, yet the schema typed both as integers, so the storefront generated
+Zod answered 422 to every publish, rollback and list. Both are nullable now,
+and ScheduleListView declares the status filter it reads, with its choices.
+Tests validate real responses against the schema.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b9105a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9105a8a67aacc928ff4a2391cdc1d621b0134ed))
+
 ## v3.202.0 (2026-11-03)
 
 ### Features

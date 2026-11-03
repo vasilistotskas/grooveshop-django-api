@@ -3,6 +3,20 @@
 
 
 
+## v3.201.0 (2026-11-03)
+
+### Features
+
+* feat(builder): check a publish without doing it, and list each release's documents (#440)
+
+POST builder/publish/check answers what the publish of the same documents would:
+ok, the documents whose draft differs from the released version, and every
+problem with its document. It writes nothing and takes no lock. A release now
+lists documents (key, version number, changed since the release before it); the
+versions map stays until a storefront release stops requiring it.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f5b8833`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f5b883375a6819c634faa1f6d672c85c3d429117))
+
 ## v3.200.0 (2026-11-02)
 
 ### Bug fixes

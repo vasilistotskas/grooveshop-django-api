@@ -29,7 +29,11 @@ from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
-from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.base import (
+    BaseModelAdmin,
+    BaseTranslatableAdmin,
+    BaseTranslatableTabularInline,
+)
 from admin.bulk import update_each
 from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
@@ -643,14 +647,18 @@ class ProductAttributeInline(TabularInline):
         )
 
 
-class ProductImageInline(TabularInline):
-    # Unfold's inline image widget previews the current file itself.
+class ProductImageInline(BaseTranslatableTabularInline):
+    # Unfold's inline image widget previews the current file itself. The
+    # title and alt text are per language: parler shows the language tab
+    # of the product page.
     model = ProductImage
     extra = 0
-    fields = ("image", "is_main")
+    fields = ("image", "is_main", "title", "alt_text")
 
     tab = True
-    per_page = 20
+    # No ``per_page``: Unfold's paged formset and parler's translated one
+    # cannot be combined (it passes ``request`` to a formset that has no
+    # such argument).
     show_change_link = True
 
 
@@ -2278,7 +2286,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title",),
+                "fields": ("title", "alt_text"),
                 "classes": ("wide",),
             },
         ),

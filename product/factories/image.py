@@ -51,6 +51,7 @@ class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
             "Product Comparison",
         ],
     )
+    alt_text = factory.Faker("sentence")
     master = factory.SubFactory("product.factories.image.ProductImageFactory")
 
     class Meta:

@@ -3960,6 +3960,9 @@ msgstr "Denormalised BoxNow APM ID — preserved even if the BoxNowLocker row is
 msgid "Depot"
 msgstr "Depot"
 
+msgid "Describes the photo for screen readers and search engines."
+msgstr "Describes the photo for screen readers and search engines."
+
 msgid "Description"
 msgstr "Description"
 

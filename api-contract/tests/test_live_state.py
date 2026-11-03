@@ -56,7 +56,8 @@ class FakeGitHub(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def log_message(self, *args: object) -> None:
+    # The parameter name is the base class's: a different one breaks the override.
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         return
 
 

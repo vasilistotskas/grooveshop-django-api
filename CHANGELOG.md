@@ -3,6 +3,31 @@
 
 
 
+## v3.213.0 (2026-11-03)
+
+### Features
+
+* feat(tenant): export_theme_fields reads each store theme inputs; drop the palettes copy (#466)
+
+The theme document is seeded by the storefront from what each store renders
+today, so Django only exports the inputs: preset, Tailwind colour names, hex
+colours and theme_metadata, in the names the storefront reads (read only).
+The Tailwind palettes copy is gone with that design, and the catalogue and
+contrast-cases snapshots follow the storefront.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c8fa279`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8fa279912a1f6ae0108454cbb338abc6ddd263b))
+
+### Refactoring
+
+* refactor(builder): read the data prop limits from the catalogue only (#465)
+
+The caps for typed data props (picked ids, filter ids, lists per document, the
+query limit) have one source, the catalogue dataLimits. The Django settings
+that stood in for them are gone; a catalogue that declares data without
+dataLimits is refused like any unexpected shape.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f89dce5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f89dce52475cabe5866c5bacb4bc5c3fda5782b7))
+
 ## v3.212.0 (2026-11-03)
 
 ### Features

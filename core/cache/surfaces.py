@@ -513,7 +513,11 @@ def register_default_surfaces() -> None:
             # every cached page of the store at once, as for
             # ``store_texts``.
             django_patterns=(),
+            # ``builderPageDocument`` is the cached function that replaces
+            # the ``builderPage`` handler; both are purged until the
+            # storefront has dropped the handler.
             nuxt_patterns=_nuxt("builderPage", "builderChrome")
+            + _nuxt_functions("builderPageDocument")
             + (f"{NUXT_ROUTE_PREFIX}_:*",),
             invalidates_tenant_config=True,
             invalidated_by=("builder.BuilderRelease",),

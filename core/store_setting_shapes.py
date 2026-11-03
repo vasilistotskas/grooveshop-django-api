@@ -22,7 +22,6 @@ conversion every request body already goes through.
 
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Mapping
 from functools import partial
@@ -35,9 +34,6 @@ from djangorestframework_camel_case.util import camelize, underscoreize
 from rest_framework import serializers
 
 from core.utils.i18n import available_language_codes
-
-logger = logging.getLogger(__name__)
-
 
 # ---------------------------------------------------------------------------
 # Strict building blocks
@@ -487,22 +483,14 @@ def is_valid_structured(name: str, value: object) -> bool:
 def public_structured_values(values: Mapping[str, object]) -> dict[str, Any]:
     """The typed values of ``values``' structured settings.
 
-    A stored value that is not its shape (it was validated when saved, so
-    only a direct database write gets here) is logged and served as
-    nothing configured: one store's broken optional strip must not take
-    the whole settings payload, and so the page, down with it. Nothing
-    configured is the setting's declared value.
+    A stored value is valid because the admin validator refused every
+    other, a shape change ships with a data migration, and
+    ``manage.py check_store_settings`` stops a deploy that would serve an
+    invalid one. So a value that is not its shape here is a bug, and it
+    raises: it fails the request loudly instead of being served as
+    something else.
     """
-    from core.store_settings import declared_default
-
-    typed: dict[str, Any] = {}
-    for name in STRUCTURED_SETTINGS:
-        try:
-            typed[name] = validated_structured(name, values[name])
-        except serializers.ValidationError as error:
-            logger.error(
-                "Stored store setting is not its shape",
-                extra={"setting": name, "errors": error.detail},
-            )
-            typed[name] = validated_structured(name, declared_default(name))
-    return typed
+    return {
+        name: validated_structured(name, values[name])
+        for name in STRUCTURED_SETTINGS
+    }

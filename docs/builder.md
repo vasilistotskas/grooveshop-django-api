@@ -216,7 +216,8 @@ Staff (`StoreStaffModelPermissions`):
 | `POST documents/<key>/discard`, `.../checkpoint` | |
 | `GET documents/<key>/versions`, `.../versions/<n>`, `POST .../versions/<n>/restore` | |
 | `POST documents/<key>/versions/<n>/publish` `{note}` | Release that version of that key alone (a release, not a rollback: `rolledBackFrom` is empty) |
-| `POST publish` `{documents: [key], note}`, `POST rollback` `{release, note}`, `GET releases` | |
+| `POST publish` `{documents: [key], note}`, `POST rollback` `{release, note}`, `GET releases` | A release lists `versions` (`{key: version id}`) and `documents: [{key, versionNumber, changed}]`: each document it holds at which version number, and whether it differs from the release before it (the first changes everything) |
+| `POST publish/check` `{documents: [key]}` | What the publish would do, writing nothing: `{ok, changed: [key], problems: [{document, path, code, message, params?}]}`. `changed` are the documents whose draft differs from the version the current release holds (by content, so editing back to the released text is not a change); `nothing_to_publish` is a problem when none is. Same permission as the publish, no lock taken; unknown document 404, no catalogue 503 |
 
 Roles: `builder` is in `STORE_SETTINGS_APP_LABELS` and
 `STAFF_READ_ONLY_APP_LABELS`: ADMIN and OWNER edit and publish, STAFF may

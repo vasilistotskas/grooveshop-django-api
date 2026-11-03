@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from rest_framework import status
 
-from product.factories.brand import BrandFactory
-from product.factories.product import ProductFactory
-from tag.factories import TaggedProductFactory
-from tag.factories.tag import TagFactory
+from product.models.brand import Brand
+from product.models.product import Product
+from tag.models.tag import Tag
+from tag.models.tagged_item import TaggedItem
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -20,18 +24,39 @@ def ids(client, **params):
     return {row["id"] for row in response.json()["results"]}
 
 
+def product(sku, **fields):
+    return Product.objects.create(
+        sku=sku,
+        price=Decimal("10.00"),
+        active=True,
+        stock=5,
+        vat=VatFactory(value=Decimal("20.0")),
+        **fields,
+    )
+
+
+def tag_product(item, tag):
+    TaggedItem.objects.create(
+        tag=tag,
+        content_type=ContentType.objects.get_for_model(Product),
+        object_id=item.pk,
+    )
+
+
 @pytest.fixture
 def shop(client):
-    brand_a, brand_b = BrandFactory(), BrandFactory()
-    tag_x, tag_y = TagFactory(active=True), TagFactory(active=True)
-    hidden = TagFactory(active=False)
-    a = ProductFactory(active=True, brand=brand_a)
-    b = ProductFactory(active=True, brand=brand_b)
-    c = ProductFactory(active=True, brand=None)
-    TaggedProductFactory(content_object=a, tag=tag_x)
-    TaggedProductFactory(content_object=a, tag=tag_y)
-    TaggedProductFactory(content_object=b, tag=tag_y)
-    TaggedProductFactory(content_object=c, tag=hidden)
+    brand_a = Brand.objects.create(name="Brand A")
+    brand_b = Brand.objects.create(name="Brand B")
+    tag_x = Tag.objects.create(active=True)
+    tag_y = Tag.objects.create(active=True)
+    hidden = Tag.objects.create(active=False)
+    a = product("BT-A", brand=brand_a)
+    b = product("BT-B", brand=brand_b)
+    c = product("BT-C")
+    tag_product(a, tag_x)
+    tag_product(a, tag_y)
+    tag_product(b, tag_y)
+    tag_product(c, hidden)
     return {
         "client": client,
         "a": a,

@@ -51,6 +51,14 @@ fallback for a setting it could not fetch.
   registry row, a field on `PublicSettingsSerializer` and an example in
   `tests/integration/core/test_public_settings_typed.py`; the storefront
   generates its parser from `schema.yml` and writes none.
+- Every other public setting is also served typed, in `values` (a key per
+  setting, e.g. `giftCardMinAmount: number`, `returnWindowDays: integer`,
+  `storeGeoLat: number | null`) in the type its entry in
+  `EXTRA_SETTINGS_DEFAULTS` declares: `PublicValuesSerializer` is built from
+  `PUBLIC_SETTING_KEYS` (in `core/store_settings.py`) and `DECLARED_TYPES`, so
+  a new public setting gets its typed field by being declared. A type with no
+  field there raises at import. Only the exceptions are written down
+  (`_FIELD_OVERRIDES`: coordinates, return fees).
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
   `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.

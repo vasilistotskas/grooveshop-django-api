@@ -13,6 +13,7 @@ from core.store_setting_shapes import (
     AuthPanelSerializer,
     BusinessHoursSerializer,
     FundingBannerSerializer,
+    PublicValuesSerializer,
     StoreOfficeSerializer,
 )
 from product.models import Product
@@ -298,6 +299,8 @@ class PublicSettingsSerializer(serializers.Serializer):
     funding_banner = FundingBannerSerializer()
     store_offices = StoreOfficeSerializer(many=True)
     business_hours = BusinessHoursSerializer(allow_null=True)
+    # Every other public setting in the type it is declared with.
+    values = PublicValuesSerializer()
     contact_attachments_types = serializers.ListField(
         child=serializers.CharField(),
         help_text="The MIME types the contact form accepts.",

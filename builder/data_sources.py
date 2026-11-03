@@ -29,7 +29,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard
 
-from django.conf import settings
 from django.utils.translation import gettext as _
 
 from builder import references
@@ -74,6 +73,37 @@ def message(code: str) -> str:
         TOO_MANY_IDS: _("There are more ids than a list may name."),
         "too_many_queries": _("The document asks for too many lists."),
     }[code]
+
+
+@dataclass(frozen=True, slots=True)
+class DataLimits:
+    """The caps the catalogue states for typed data props (``dataLimits``):
+    the one place they live, in both repositories."""
+
+    max_picked_ids: int
+    max_filter_ids: int
+    max_queries_per_document: int
+    max_query_limit: int
+
+    @classmethod
+    def parse(cls, raw: Any) -> DataLimits:
+        limits = cls(
+            max_picked_ids=raw["maxPickedIds"],
+            max_filter_ids=raw["maxFilterIds"],
+            max_queries_per_document=raw["maxQueriesPerDocument"],
+            max_query_limit=raw["maxQueryLimit"],
+        )
+        if not all(
+            _is_int(value) and value >= 1
+            for value in (
+                limits.max_picked_ids,
+                limits.max_filter_ids,
+                limits.max_queries_per_document,
+                limits.max_query_limit,
+            )
+        ):
+            raise ValueError("dataLimits must be whole numbers of 1 or more")
+        return limits
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,18 +168,10 @@ def _only(out: Outcome, value: Mapping[str, Any], allowed: set[str]) -> None:
 
 
 def _picked(
-    out: Outcome, value: Mapping[str, Any], source: str, kind: str
+    out: Outcome, value: Mapping[str, Any], limits: DataLimits, kind: str
 ) -> None:
     _only(out, value, {"mode", "ids"})
-    _ids(out, "/ids", value.get("ids"), cap=_picked_cap(), kind=kind)
-
-
-def _picked_cap() -> int:
-    return int(settings.BUILDER_DATA_MAX_PICKED_IDS)
-
-
-def _filter_cap() -> int:
-    return int(settings.BUILDER_DATA_MAX_FILTER_IDS)
+    _ids(out, "/ids", value.get("ids"), cap=limits.max_picked_ids, kind=kind)
 
 
 def _ordering(out: Outcome, value: Mapping[str, Any], source: str) -> None:
@@ -158,11 +180,15 @@ def _ordering(out: Outcome, value: Mapping[str, Any], source: str) -> None:
 
 
 def _product(
-    out: Outcome, value: Mapping[str, Any], max_limit: int, query: str
+    out: Outcome,
+    value: Mapping[str, Any],
+    max_limit: int,
+    query: str,
+    limits: DataLimits,
 ) -> None:
     mode = value.get("mode")
     if mode == "picked":
-        _picked(out, value, "product", ReferenceKind.PRODUCT)
+        _picked(out, value, limits, ReferenceKind.PRODUCT)
     elif mode == "filter":
         _only(out, value, {"mode", "categories", "ordering", "limit"})
         _ordering(out, value, "product")
@@ -172,7 +198,7 @@ def _product(
                 out,
                 "/categories",
                 value["categories"],
-                cap=_filter_cap(),
+                cap=limits.max_filter_ids,
                 kind=ReferenceKind.CATEGORY,
             ):
                 out.deps.add((query, f"category:{category}"))
@@ -183,11 +209,15 @@ def _product(
 
 
 def _blog_post(
-    out: Outcome, value: Mapping[str, Any], max_limit: int, query: str
+    out: Outcome,
+    value: Mapping[str, Any],
+    max_limit: int,
+    query: str,
+    limits: DataLimits,
 ) -> None:
     mode = value.get("mode")
     if mode == "picked":
-        _picked(out, value, "blogPost", ReferenceKind.BLOG_POST)
+        _picked(out, value, limits, ReferenceKind.BLOG_POST)
     elif mode == "filter":
         _only(out, value, {"mode", "category", "featured", "ordering", "limit"})
         _ordering(out, value, "blogPost")
@@ -208,7 +238,11 @@ def _blog_post(
 
 
 def _category(
-    out: Outcome, value: Mapping[str, Any], max_limit: int, query: str
+    out: Outcome,
+    value: Mapping[str, Any],
+    max_limit: int,
+    query: str,
+    limits: DataLimits,
 ) -> None:
     mode = value.get("mode")
     if mode not in ("roots", "children"):
@@ -233,7 +267,11 @@ def _category(
 
 
 def _just_a_limit(
-    out: Outcome, value: Mapping[str, Any], max_limit: int, query: str
+    out: Outcome,
+    value: Mapping[str, Any],
+    max_limit: int,
+    query: str,
+    limits: DataLimits,
 ) -> None:
     _only(out, value, {"limit"})
     _limit(out, value, max_limit)
@@ -250,7 +288,9 @@ _QUERIES = {
 }
 
 
-def check(declaration: Mapping[str, Any], value: Any) -> Outcome:
+def check(
+    declaration: Mapping[str, Any], value: Any, limits: DataLimits
+) -> Outcome:
     """Judge *value* against *declaration* (a ``data`` entry of the
     catalogue) and say what it names and depends on. A value that is not
     valid yields no reference and no dependency."""
@@ -267,7 +307,11 @@ def check(declaration: Mapping[str, Any], value: Any) -> Outcome:
         out.add("", INVALID)
         return out
     _QUERIES[source](
-        out, value, int(declaration["maxLimit"]), QUERY_KIND[source]
+        out,
+        value,
+        min(int(declaration["maxLimit"]), limits.max_query_limit),
+        QUERY_KIND[source],
+        limits,
     )
     if not out.valid:
         out.refs.clear()

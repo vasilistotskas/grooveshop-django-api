@@ -673,6 +673,12 @@ msgstr "A %(provider)s payment collected a different amount than the order is fo
 msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "A Cloudflare zone ID is 32 lowercase hex characters."
 
+msgid "A GTIN contains digits only."
+msgstr "A GTIN contains digits only."
+
+msgid "A GTIN has 8, 12, 13 or 14 digits."
+msgstr "A GTIN has 8, 12, 13 or 14 digits."
+
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 
@@ -1994,6 +2000,12 @@ msgstr "Billing zipcode is required."
 
 msgid "Billing_Code captured at issuance time so historical manifests stay reprintable even if the env var changes."
 msgstr "Billing_Code captured at issuance time so historical manifests stay reprintable even if the env var changes."
+
+msgid "Bing Webmaster Tools verification token (the content of the msvalidate.01 meta tag). Empty → not emitted."
+msgstr "Bing Webmaster Tools verification token (the content of the msvalidate.01 meta tag). Empty → not emitted."
+
+msgid "Bing site verification"
+msgstr "Bing site verification"
 
 msgid "Bio"
 msgstr "Bio"
@@ -4847,6 +4859,9 @@ msgstr "Fee coverage (%)"
 msgid "Fee source"
 msgstr "Fee source"
 
+msgid "Feed title"
+msgstr "Feed title"
+
 msgid "Feedback"
 msgstr "Feedback"
 
@@ -6097,6 +6112,9 @@ msgstr "Food & drink"
 msgid "Footer"
 msgstr "Footer"
 
+msgid "Footer text"
+msgstr "Footer text"
+
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 
@@ -6192,6 +6210,9 @@ msgstr "GEMI number"
 
 msgid "GIFT CARD PURCHASE CONFIRMATION"
 msgstr "GIFT CARD PURCHASE CONFIRMATION"
+
+msgid "GTIN"
+msgstr "GTIN"
 
 msgid "Gallery Image"
 msgstr "Gallery Image"
@@ -8052,6 +8073,9 @@ msgstr "MFA Authenticators"
 
 msgid "MIME type of the data field (expected: 'application/json')"
 msgstr "MIME type of the data field (expected: 'application/json')"
+
+msgid "MPN"
+msgstr "MPN"
 
 msgid "MYDATA_ENVIRONMENT must be 'dev' (the AADE sandbox) or 'prod'. Until it is, no receipt is issued."
 msgstr "MYDATA_ENVIRONMENT must be 'dev' (the AADE sandbox) or 'prod'. Until it is, no receipt is issued."
@@ -13657,6 +13681,9 @@ msgstr "Text override"
 msgid "Text overrides"
 msgstr "Text overrides"
 
+msgid "Text shown below the category's products, such as buying tips or frequently asked questions. The description stays above the products."
+msgstr "Text shown below the category's products, such as buying tips or frequently asked questions. The description stays above the products."
+
 msgid "Text to add"
 msgstr "Text to add"
 
@@ -13985,6 +14012,9 @@ msgstr "The landing page's ``document.referrer``. Only its host is kept, and not
 msgid "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
 msgstr "The language the visitor subscribed in, which their alert email is written in. Empty means the store's language."
 
+msgid "The last digit of this GTIN does not match the others."
+msgstr "The last digit of this GTIN does not match the others."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -14013,6 +14043,9 @@ msgstr "The link expires on %(expires)s. After that you can request a new export
 msgid "The link search is not valid."
 msgstr "The link search is not valid."
 
+msgid "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
+msgstr "The manufacturer's part number, as the manufacturer prints it. Use it for a product without a barcode. This is not your SKU. Leave empty if the product has none."
+
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "The marketing emails this store sends, each with whether your account's address still receives it."
 
@@ -14021,6 +14054,9 @@ msgstr "The newest published posts with their full body, in one response, for th
 
 msgid "The number of the version this one restores (kind restore)."
 msgstr "The number of the version this one restores (kind restore)."
+
+msgid "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
+msgstr "The number printed under the product's barcode (EAN, UPC or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center uses it to recognise the product. Leave empty if the product has none."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."
@@ -14282,6 +14318,9 @@ msgstr "The time needs a timezone."
 
 msgid "The time to pay for this order has run out. Place a new order from your cart."
 msgstr "The time to pay for this order has run out. Place a new order from your cart."
+
+msgid "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
+msgstr "The title shown in Google Merchant Center and the other product feeds instead of the product name. Up to 150 characters. Empty → the product name is used."
 
 msgid "The type must look like name@version."
 msgstr "The type must look like name@version."

@@ -302,6 +302,17 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "the google-site-verification meta tag). Empty → not emitted."
         ),
     )
+    bing_site_verification = models.CharField(
+        _("Bing site verification"),
+        max_length=128,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Bing Webmaster Tools verification token (the content of "
+            "the msvalidate.01 meta tag). Empty → not emitted."
+        ),
+    )
     pinterest_domain_verify = models.CharField(
         _("Pinterest domain verification"),
         max_length=128,

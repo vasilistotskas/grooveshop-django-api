@@ -172,7 +172,9 @@ def missing(refs: Refs) -> dict[str, set[str]]:
     return {
         kind: gone
         for kind, targets in refs.items()
-        if (gone := set(targets) - _EXISTS[kind](set(targets)))
+        # A query kind names a facet of a list, not a record.
+        if kind in _EXISTS
+        and (gone := set(targets) - _EXISTS[kind](set(targets)))
     }
 
 

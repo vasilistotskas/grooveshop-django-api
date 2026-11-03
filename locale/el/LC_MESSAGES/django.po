@@ -2060,6 +2060,9 @@ msgstr "Ετικέτες Blog"
 msgid "Blog category"
 msgstr "Κατηγορία ιστολογίου"
 
+msgid "Blog category list"
+msgstr "Λίστα κατηγοριών ιστολογίου"
+
 msgid "Blog comment liked"
 msgstr "Επισήμανση σχολίου blog"
 
@@ -2068,6 +2071,9 @@ msgstr "Σχόλια blog προς έγκριση"
 
 msgid "Blog post"
 msgstr "Άρθρο ιστολογίου"
+
+msgid "Blog post list"
+msgstr "Λίστα άρθρων ιστολογίου"
 
 msgid "Blog post list/detail, related posts, comments, categories, tags, and authors."
 msgstr "Λίστα/λεπτομέρειες άρθρων, σχετικά άρθρα, σχόλια, κατηγορίες, ετικέτες και συντάκτες."
@@ -2761,6 +2767,9 @@ msgstr "Η κατηγορία δεν μπορεί να είναι γονέας �
 
 msgid "Category cannot have a descendant as parent."
 msgstr "Η κατηγορία δεν μπορεί να έχει απόγονο ως γονέα."
+
+msgid "Category list"
+msgstr "Λίστα κατηγοριών"
 
 msgid "Category of the subscription topic"
 msgstr "Κατηγορία του θέματος εγγραφής"
@@ -10702,6 +10711,9 @@ msgstr "Το προϊόν είναι ήδη στα αγαπημένα"
 msgid "Product is required for order items"
 msgstr "Το προϊόν είναι υποχρεωτικό για τα είδη παραγγελίας"
 
+msgid "Product list"
+msgstr "Λίστα προϊόντων"
+
 msgid "Product list/detail, images, attributes, related products, and the search endpoint."
 msgstr "Λίστα/λεπτομέρειες προϊόντων, εικόνες, χαρακτηριστικά, σχετικά προϊόντα και το endpoint αναζήτησης."
 
@@ -10796,6 +10808,9 @@ msgstr "Εξαργυρώσεις προσφορών"
 
 msgid "Promotion duplicated as an inactive draft."
 msgstr "Η προσφορά αντιγράφηκε ως ανενεργό πρόχειρο."
+
+msgid "Promotion list"
+msgstr "Λίστα προσφορών"
 
 msgid "Promotional"
 msgstr "Προωθητικό"
@@ -13793,6 +13808,9 @@ msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και
 msgid "The dispute closed against you and the money was taken back. Nothing was left on the payment to record as a chargeback, so the payment ledger is unchanged. The order status and payment status have NOT been changed."
 msgstr "Η αμφισβήτηση έκλεισε εις βάρος σας και τα χρήματα αφαιρέθηκαν. Δεν είχε μείνει ποσό στην πληρωμή για να καταγραφεί ως chargeback, άρα το καθολικό πληρωμών δεν άλλαξε. Η κατάσταση της παραγγελίας και της πληρωμής ΔΕΝ άλλαξαν."
 
+msgid "The document asks for too many lists."
+msgstr "Το έγγραφο ζητά υπερβολικά πολλές λίστες."
+
 msgid "The document has problems that must be fixed first."
 msgstr "Το έγγραφο έχει προβλήματα που πρέπει πρώτα να διορθωθούν."
 
@@ -14222,6 +14240,9 @@ msgstr "Μεταδεδομένα Θέματος"
 msgid "Theme Preset"
 msgstr "Προκαθορισμένο Θέμα"
 
+msgid "There are more ids than a list may name."
+msgstr "Υπάρχουν περισσότερα αναγνωριστικά από όσα επιτρέπει μια λίστα."
+
 msgid "There can only be one main address per user."
 msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυνση ανά χρήστη."
 
@@ -14345,6 +14366,9 @@ msgstr "Αυτό το είδος εγγράφου δεν έχει δικές τ�
 
 msgid "This link is no longer valid: it was already used, it expired, or it is not for an account that can sign in here. Ask for a new one."
 msgstr "Αυτός ο σύνδεσμος δεν ισχύει πια: χρησιμοποιήθηκε ήδη, έληξε ή δεν αφορά λογαριασμό που μπορεί να συνδεθεί εδώ. Ζητήστε νέο."
+
+msgid "This list does not take that filter."
+msgstr "Αυτή η λίστα δεν δέχεται αυτό το φίλτρο."
 
 msgid "This looks like a postcode. Enter the street number here and the postcode in the postcode field."
 msgstr "Αυτό μοιάζει με ταχυδρομικό κώδικα. Εισαγάγετε εδώ τον αριθμό οδού και τον ταχυδρομικό κώδικα στο αντίστοιχο πεδίο."
@@ -14525,6 +14549,9 @@ msgstr "Αυτός ο αριθμός μεταφοράς έχει ήδη κατα
 
 msgid "This user already has an author profile."
 msgstr "Αυτός ο χρήστης έχει ήδη προφίλ συντάκτη."
+
+msgid "This value is not valid here."
+msgstr "Αυτή η τιμή δεν είναι έγκυρη εδώ."
 
 msgid "Three"
 msgstr "Τρία"
@@ -16988,9 +17015,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Blog Posts Grid"
 #~ msgstr "Πλέγμα άρθρων Blog"
-
-#~ msgid "Blog Posts List"
-#~ msgstr "Λίστα άρθρων Blog"
 
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "Μέγεθος θυρίδας BoxNow: 1=Μικρό, 2=Μεσαίο, 3=Μεγάλο"

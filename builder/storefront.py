@@ -29,7 +29,7 @@ from django.conf import settings
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
 
-from builder import pointers
+from builder import data_sources, pointers
 from builder.models import ReferenceKind
 from core.storefront import StorefrontUnavailable, base_url
 
@@ -53,6 +53,9 @@ class BlockDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    #: ``data``: pointer -> declaration of a setting that is a typed data
+    #: prop (``builder.data_sources``).
+    data: dict[str, dict[str, Any]]
     #: Pointer patterns (``linkRefs``) of the settings that are links: ``{href}``,
     #: ``{route}`` or ``{ref: {kind, id}}``. Only the last one points at
     #: something of ours, and its kind is in the data, not here.
@@ -83,6 +86,7 @@ class RootDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    data: dict[str, dict[str, Any]]
     link_refs: tuple[str, ...]
     validator: Validator = field(compare=False, repr=False)
 
@@ -146,6 +150,7 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=refs,
+        data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         max_blocks=limits.get("maxBlocks"),
         max_per_template=limits.get("maxPerTemplate"),
@@ -193,6 +198,25 @@ def _parse_link_refs(
     return link_refs
 
 
+def _parse_data(raw: Any) -> dict[str, dict[str, Any]]:
+    """The ``data`` map of a block: ``{pointer: declaration}``. A declaration
+    the catalogue got wrong is a catalogue bug, refused when it is read."""
+    data = {str(k): dict(v) for k, v in (raw or {}).items()}
+    for pointer, declaration in data.items():
+        field_ = declaration.get("field")
+        if field_ == "ref":
+            known = declaration.get("kind") in REFERENCE_KINDS
+        elif field_ == "query":
+            known = declaration.get("source") in data_sources.QUERY_KIND and (
+                isinstance(declaration.get("maxLimit"), int)
+            )
+        else:
+            known = False
+        if not known:
+            raise ValueError(f"unknown data declaration at {pointer}")
+    return data
+
+
 def _parse_refs(raw: Any) -> dict[str, str]:
     refs = {str(k): str(v) for k, v in (raw or {}).items()}
     if not set(refs.values()) <= REFERENCE_KINDS:
@@ -208,6 +232,7 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=_parse_refs(raw.get("refs")),
+        data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER

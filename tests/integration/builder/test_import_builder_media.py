@@ -9,6 +9,7 @@ from io import StringIO
 from unittest import mock
 
 import pytest
+from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import connection
 
@@ -62,7 +63,20 @@ def home_content(**settings_):
 
 
 @pytest.fixture
-def documents(tenant):
+def team_url(tenant):
+    """An image in this store's own uploads, as ``/uploads/<name>``. Written
+    through the real storage: the name it gets is returned, so a file another
+    test left behind cannot collide."""
+    storage = MediaAsset._meta.get_field("file").storage
+    name = storage.save(
+        "uploads/team.png", ContentFile(image_bytes("PNG", size=(43, 20)))
+    )
+    yield "/" + name
+    storage.delete(name)
+
+
+@pytest.fixture
+def documents(tenant, team_url):
     """A draft with images, and a published page that also uses one."""
     BuilderDocument.objects.create(
         key=HOME,
@@ -85,7 +99,7 @@ def documents(tenant):
             "sections": {
                 "m": {
                     "type": "media_text@1",
-                    "settings": {"imageUrl": "/uploads/team.png"},
+                    "settings": {"imageUrl": team_url},
                 }
             },
             "order": ["m"],
@@ -115,26 +129,8 @@ def files_served():
             return FakeResponse(content=contents[path])
         return FakeResponse(404)
 
-    storage = MediaAsset._meta.get_field("file").storage
-    name = "uploads/team.png"
-    with (
-        mock.patch("builder.media_services.requests.get", side_effect=get),
-        mock.patch.object(storage, "exists", side_effect=lambda n: n == name),
-        mock.patch.object(storage, "size", return_value=100),
-        mock.patch.object(
-            storage, "open", side_effect=lambda n, m: mock_file(n, name)
-        ),
-    ):
+    with mock.patch("builder.media_services.requests.get", side_effect=get):
         yield
-
-
-def mock_file(requested, expected):
-    assert requested == expected
-    handle = mock.MagicMock()
-    handle.__enter__.return_value.read.return_value = image_bytes(
-        "PNG", size=(43, 20)
-    )
-    return handle
 
 
 def run(*args):
@@ -150,7 +146,7 @@ def run(*args):
 
 class TestScan:
     def test_images_are_found_by_value_in_drafts_and_published_versions(
-        self, documents
+        self, documents, team_url
     ):
         plan = media_migration.scan()
 
@@ -158,7 +154,7 @@ class TestScan:
             "/img/a.png",
             "/img/b.png",
             "/img/c.png",
-            f"/media/{connection.schema_name}/uploads/team.png",
+            f"/media/{connection.schema_name}{team_url}",
         ]
         where = {(f.document, f.source, f.path) for f in plan.found}
         assert (HOME, "draft", "/sections/c/settings/images/1") in where
@@ -228,7 +224,9 @@ class TestTheCommand:
         assert "4 image(s) of this store (4 would be imported" in output
         assert not MediaAsset.objects.exists()
 
-    def test_a_real_run_imports_dedupes_and_maps(self, documents, tmp_path):
+    def test_a_real_run_imports_dedupes_and_maps(
+        self, documents, team_url, tmp_path
+    ):
         target = tmp_path / "map.json"
         with files_served():
             output = run(f"--mapping-file={target}")
@@ -240,7 +238,7 @@ class TestTheCommand:
             "/img/a.png",
             "/img/b.png",
             "/img/c.png",
-            "/uploads/team.png",
+            team_url,
         }
         assert mapping["/img/a.png"] == (MediaAsset.objects.get(width=40).pk)
         assert "was imported" in output

@@ -3,6 +3,31 @@
 
 
 
+## v3.202.0 (2026-11-03)
+
+### Features
+
+* feat(uploads): hold every image upload to the media service limits (#441)
+
+The media service shows a placeholder for a source above its per-format byte
+cap or pixel limit, yet the API accepted 10 MB builder images, a flat 5 MB
+product check and, for avatars and logos, nothing. validate_servable_image is
+now the one rule: the format is sniffed from the content and held to the
+service cap for that format and to a pixel budget, SVG keeps its sanitiser.
+
+The limits are the media service contract/image-limits.json, copied to
+core/data and pinned by git id through the sync script, now generalised to
+more than one upstream (renamed sync_upstream_sources, lock and weekly
+workflow likewise). ImageAndSvgField, every ModelSerializer image field,
+TinyMCE, the builder media library and product images use the rule, which
+replaces BUILDER_MEDIA_FORMATS, BUILDER_MEDIA_MAX_BYTES and the admin form
+2.5 MB cap (FILE_UPLOAD_MAX_MEMORY_SIZE is a memory threshold, not a policy).
+
+manage.py report_unservable_media lists stored images already over a cap;
+it changes nothing.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`54de15c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/54de15c7662f4198e9ef8bb95bbd63ead1e81d7a))
+
 ## v3.201.0 (2026-11-03)
 
 ### Features

@@ -3,6 +3,22 @@
 
 
 
+## v3.211.0 (2026-11-03)
+
+### Features
+
+* feat(builder): purge the pages a changed record appears on (#462)
+
+Receivers on products, categories, blog posts and categories, promotions and
+their translations work out, from BuilderReference, the documents of the
+current release that name the record or ask for a list it can enter or leave
+(old and new category, with ancestors), queue them after commit, and the
+builder_documents surface sends the storefront builderDocuments in batches of
+64 with no patterns. A stock-only save queues nothing; a promotion reaches the
+offer lists and every page showing a product.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d82c2f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d82c2f580ebf3e0844bdce4447e6d524a71c44bc))
+
 ## v3.210.0 (2026-11-03)
 
 ### Features

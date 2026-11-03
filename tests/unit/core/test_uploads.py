@@ -185,6 +185,19 @@ class TestStoredImageProblem:
         assert problem is not None
         assert "png" in problem
 
+    def test_a_small_svg_has_no_problem(self, tmp_path):
+        path = self.write(tmp_path, "a.svg", SVG_OK)
+
+        assert stored_image_problem(path) is None
+
+    def test_an_svg_over_its_cap_is_named(self, tmp_path, small_caps):
+        small_caps(svg=10)
+
+        problem = stored_image_problem(self.write(tmp_path, "a.svg", SVG_OK))
+
+        assert problem is not None
+        assert "svg" in problem
+
     def test_a_file_that_is_not_an_image_is_named(self, tmp_path):
         problem = stored_image_problem(self.write(tmp_path, "a.png", b"nope"))
 

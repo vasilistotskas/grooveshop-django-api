@@ -336,6 +336,7 @@ def stored_image_problem(path: Path) -> str | None:
         with path.open("rb") as handle:
             identified = _identify(handle)
             if identified is None:
+                handle.seek(0)
                 head = handle.read(2048).lstrip()
                 if head.startswith((b"<?xml", b"<svg")) or b"<svg" in head:
                     cap = limits.max_file_bytes[SVG]

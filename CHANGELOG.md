@@ -3,6 +3,46 @@
 
 
 
+## v3.206.0 (2026-11-03)
+
+### Bug fixes
+
+* fix(settings): give every structured-setting refusal a stable code
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c930d6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c930d6d75159fb4a90cef942981b77ac5f0a24d4))
+
+### Features
+
+* feat(settings): serve the structured store settings typed from one definition (#450) ([`c930d6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c930d6d75159fb4a90cef942981b77ac5f0a24d4))
+
+* feat(settings): serve the structured store settings typed from one definition
+
+ANNOUNCEMENT_BAR, AUTH_PANEL, FUNDING_BANNER, STORE_OFFICES and
+BUSINESS_HOURS were opaque JSON strings in the public settings payload,
+validated by hand-written functions the storefront re-implemented. Each is
+now a strict serializer in core/store_setting_shapes.py that validates the
+admin save, describes the value in schema.yml and produces the typed key
+served next to the string map. contactAttachmentsTypes is served as a list.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c930d6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c930d6d75159fb4a90cef942981b77ac5f0a24d4))
+
+* feat(builder): import_builder_media brings URL images into the media library (#449)
+
+A management command for one store: it reads every string of the drafts and
+the published versions by value (the catalogue does not mark the v1 image
+fields), finds the /img, /uploads and /media/<store>/uploads image paths and
+imports each through the library import, so the upload checks, shrinking and
+de-duplication by content apply and a second run finds the first. It prints
+where each image is used and the asset it became, can write the url to asset id
+map, lists external addresses without fetching them and, with --dry-run,
+writes nothing. Documents are not rewritten.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`5807083`](https://github.com/vasilistotskas/grooveshop-django-api/commit/580708356d0d16a1b25ba65aaa1242e36026416e))
+
 ## v3.205.1 (2026-11-03)
 
 ### Bug fixes

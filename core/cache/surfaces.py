@@ -497,6 +497,23 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
+            code="builder_documents",
+            label=_("Pages showing changed records"),
+            description=_(
+                "The rendered pages of the page builder that show a product,"
+                " category, blog post or promotion that changed. Purges"
+                " itself when one is saved or deleted."
+            ),
+            # No pattern: the storefront maps each document to its routes
+            # (``builder.data_purge``).
+            purges_builder_documents=True,
+            icon="web",
+            group="content",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
             code="builder",
             label=_("Page builder"),
             description=_(

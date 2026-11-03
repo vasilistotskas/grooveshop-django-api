@@ -9674,6 +9674,9 @@ msgstr "Αριθμός σελίδας (στρατηγική σελιδοποίη
 msgid "Pages"
 msgstr "Σελίδες"
 
+msgid "Pages showing changed records"
+msgstr "Σελίδες που εμφανίζουν αλλαγμένες εγγραφές"
+
 msgid "Pagination strategy type"
 msgstr "Τύπος στρατηγικής σελιδοποίησης"
 
@@ -14078,6 +14081,9 @@ msgstr "Η δημοσίευση της οποίας τις εκδόσεις επ
 
 msgid "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
 msgstr "Το παραχθέν PDF. Αποθηκεύεται σε ιδιωτικό χώρο αποθήκευσης ανά tenant — η πρόσβαση πελατών γίνεται μέσω ``OrderViewSet.invoice_download`` (μέσω ροής με ταυτοποίηση Django)· το ιδιωτικό δέντρο βρίσκεται εκτός κάθε δημόσιου web root ως επιπλέον επίπεδο ασφαλείας."
+
+msgid "The rendered pages of the page builder that show a product, category, blog post or promotion that changed. Purges itself when one is saved or deleted."
+msgstr "Οι σελίδες του page builder που εμφανίζουν ένα προϊόν, μια κατηγορία, ένα άρθρο ή μια προσφορά που άλλαξε. Καθαρίζεται από μόνο του όταν κάποιο από αυτά αποθηκεύεται ή διαγράφεται."
 
 #, python-brace-format
 msgid "The repayment reference can be at most {max_length} characters."

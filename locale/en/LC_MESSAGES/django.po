@@ -9666,6 +9666,9 @@ msgstr "Page number (pageNumber pagination strategy)"
 msgid "Pages"
 msgstr "Pages"
 
+msgid "Pages showing changed records"
+msgstr "Pages showing changed records"
+
 msgid "Pagination strategy type"
 msgstr "Pagination strategy type"
 
@@ -14075,6 +14078,9 @@ msgstr "The release whose versions this one restores."
 
 msgid "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
 msgstr "The rendered PDF. Stored in per-tenant private storage — customer access goes through ``OrderViewSet.invoice_download`` (streamed through Django auth); the private tree lives outside every public web root as a defence in depth."
+
+msgid "The rendered pages of the page builder that show a product, category, blog post or promotion that changed. Purges itself when one is saved or deleted."
+msgstr "The rendered pages of the page builder that show a product, category, blog post or promotion that changed. Purges itself when one is saved or deleted."
 
 #, python-brace-format
 msgid "The repayment reference can be at most {max_length} characters."

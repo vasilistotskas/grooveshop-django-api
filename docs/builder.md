@@ -217,6 +217,26 @@ for the current release, `BuilderReference`:
   over-purge and never under-purge. A facet is not a record, so it is never
   existence-checked.
 
+
+### A changed record reaches the pages that show it (`builder/data_purge.py`)
+
+The storefront caches a rendered page, so a product, category, post or
+promotion that changes must purge the pages that show it. The index above
+answers which: `documents_for` looks up the documents of the current release
+that name the record (a `product` row) or ask for a list it can enter or leave
+(a `queryProduct` row whose facet is `*` or one of the record's categories,
+WITH its ancestors, in its old and its new value).
+
+Receivers on `Product`, `ProductCategory`, `BlogPost`, `BlogCategory`,
+`Promotion` and their translations compute the affected documents when the
+transaction commits and queue them in a per-store Redis set; the batched purge
+(`core.cache.invalidation`) then sends the storefront `builderDocuments`
+(document keys, at most 64 per call, `patterns` empty) through the
+`builder_documents` surface, and the storefront maps a key to its own routes.
+A save of `stock` or `updated_at` alone queues nothing. A promotion reaches
+the offer lists and every page that shows a product. Over-purging is safe;
+under-purging is the bug, so a list is matched by ANY of its facets.
+
 ## Writes
 
 `builder/services.py` is the only writer (permission first, then the

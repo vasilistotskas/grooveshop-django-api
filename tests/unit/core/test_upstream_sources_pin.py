@@ -1,9 +1,10 @@
-"""What is copied from the storefront is exactly what its pin says.
+"""What is copied from the storefront and the media service is exactly what
+its pin says.
 
-``tests/fixtures/builder/storefront.lock.json`` pins each copy to a storefront
-commit by its git id (the tree id of a directory, the blob id of a file);
-``.github/scripts/sync_storefront_sources.py`` is the only thing that writes
-either, and a weekly workflow asks whether the storefront has moved since.
+``tests/fixtures/upstream-sources.lock.json`` pins each copy to its owner's
+commit by git id (the tree id of a directory, the blob id of a file);
+``.github/scripts/sync_upstream_sources.py`` is the only thing that writes
+either, and a weekly workflow asks whether an owner has moved since.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ _SCRIPT = (
     Path(__file__).resolve().parents[3]
     / ".github"
     / "scripts"
-    / "sync_storefront_sources.py"
+    / "sync_upstream_sources.py"
 )
 _spec = importlib.util.spec_from_file_location("sync_sources", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
@@ -31,23 +32,25 @@ sys.modules[_spec.name] = sync
 _spec.loader.exec_module(sync)
 
 COMMIT = "c" * 40
+MEDIA_COMMIT = "d" * 40
 
 
 class TestTheCommittedCopies:
     def test_every_copy_is_the_pinned_one(self):
         lock = sync.read_lock()
 
-        assert lock["repository"] == sync.REPOSITORY
-        assert len(lock["commit"]) == 40
+        assert set(lock["commits"]) == {s.repository for s in sync.SOURCES}
+        assert all(len(commit) == 40 for commit in lock["commits"].values())
         assert set(lock["sources"]) == {s.name for s in sync.SOURCES}
         for source in sync.SOURCES:
             pinned = lock["sources"][source.name]
+            assert pinned["repository"] == source.repository
             assert pinned["path"] == source.upstream
             assert pinned["kind"] == source.kind
             assert sync.local_sha(source) == pinned["sha"], (
-                f"{source.target} is not the pinned storefront copy: do not "
-                "edit it by hand, run "
-                "`python .github/scripts/sync_storefront_sources.py`"
+                f"{source.target} is not the pinned copy: do not edit it "
+                "by hand, run "
+                "`python .github/scripts/sync_upstream_sources.py`"
             )
 
     def test_the_seeds_copy_is_a_directory_of_json_documents(self):
@@ -106,9 +109,10 @@ class TestGitHashes:
 
 
 class FakeGitHub:
-    """The GitHub API reads the script makes, over an in-memory repository
-    holding two files (``catalogue``, ``placement``) and one directory
-    (``seeds``), laid out at the sources' upstream paths."""
+    """The GitHub API reads the script makes, over two in-memory
+    repositories: the storefront's, holding two files (``catalogue``,
+    ``placement``) and one directory (``seeds``), and the media service's,
+    holding the ``image-limits`` file, all at the sources' upstream paths."""
 
     def __init__(
         self,
@@ -116,14 +120,17 @@ class FakeGitHub:
         seeds: dict[str, bytes],
         catalogue: bytes = b'{"hash": "h"}\n',
         placement: bytes = b"[]\n",
+        limits: bytes = b'{"maxFileBytes": {}}\n',
     ) -> None:
         self.directories = {"seeds": seeds}
         self.catalogue = catalogue
         self.placement = placement
+        self.limits = limits
         # Every tree this repository has: sha -> entries.
         self.trees: dict[str, list[dict]] = {}
         self.blobs: dict[str, bytes] = {}
         self.root = self._build()
+        self.media_root = self._build_media()
 
     def _blob(self, content: bytes) -> str:
         sha = sync.blob_sha(content)
@@ -169,6 +176,7 @@ class FakeGitHub:
         assert all(
             s.upstream.startswith("test/fixtures/builder/")
             for s in by_name.values()
+            if s.repository == sync.STOREFRONT
         )
         fixtures = self._tree(
             [{"path": "builder", "type": "tree", "sha": builder}]
@@ -178,15 +186,34 @@ class FakeGitHub:
         )
         return self._tree([{"path": "test", "type": "tree", "sha": test}])
 
+    def _build_media(self) -> str:
+        # contract/image-limits.json
+        contract = self._tree(
+            [
+                {
+                    "path": "image-limits.json",
+                    "type": "blob",
+                    "sha": self._blob(self.limits),
+                }
+            ]
+        )
+        return self._tree(
+            [{"path": "contract", "type": "tree", "sha": contract}]
+        )
+
     def __call__(self, path: str) -> dict:
-        repo = f"/repos/{sync.REPOSITORY}"
-        if path == f"{repo}/commits/main":
-            return {"sha": COMMIT, "commit": {"tree": {"sha": self.root}}}
-        if path.startswith(f"{repo}/git/trees/"):
-            return {"tree": self.trees[path.rsplit("/", 1)[1]]}
-        if path.startswith(f"{repo}/git/blobs/"):
-            content = self.blobs[path.rsplit("/", 1)[1]]
-            return {"content": base64.b64encode(content).decode()}
+        for repository, root, commit in (
+            (sync.STOREFRONT, self.root, COMMIT),
+            (sync.MEDIA_STREAM, self.media_root, MEDIA_COMMIT),
+        ):
+            repo = f"/repos/{repository}"
+            if path == f"{repo}/commits/main":
+                return {"sha": commit, "commit": {"tree": {"sha": root}}}
+            if path.startswith(f"{repo}/git/trees/"):
+                return {"tree": self.trees[path.rsplit("/", 1)[1]]}
+            if path.startswith(f"{repo}/git/blobs/"):
+                content = self.blobs[path.rsplit("/", 1)[1]]
+                return {"content": base64.b64encode(content).decode()}
         raise AssertionError(path)
 
 
@@ -194,7 +221,7 @@ class FakeGitHub:
 def workspace(tmp_path, monkeypatch):
     """The copies and the lock, in a temporary tree."""
     monkeypatch.setattr(sync, "ROOT", tmp_path)
-    monkeypatch.setattr(sync, "LOCK", tmp_path / "storefront.lock.json")
+    monkeypatch.setattr(sync, "LOCK", tmp_path / "upstream-sources.lock.json")
     return tmp_path
 
 
@@ -222,8 +249,15 @@ class TestSyncing:
             local(workspace, "catalogue").read_bytes() == b'{"hash": "abc"}\n'
         )
         assert local(workspace, "placement").read_bytes() == b"[]\n"
+        assert (
+            local(workspace, "image-limits").read_bytes()
+            == b'{"maxFileBytes": {}}\n'
+        )
         lock = json.loads(sync.LOCK.read_text(encoding="utf-8"))
-        assert lock["commit"] == COMMIT
+        assert lock["commits"] == {
+            sync.MEDIA_STREAM: MEDIA_COMMIT,
+            sync.STOREFRONT: COMMIT,
+        }
         for source in sync.SOURCES:
             assert lock["sources"][source.name]["sha"] == sync.local_sha(source)
 
@@ -258,7 +292,9 @@ class TestChecking:
         upstream = self.synced(workspace, seeds={"a.json": b"{}\n"})
 
         assert sync.check(upstream) == 0
-        assert "at cccccc" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert f"{sync.STOREFRONT}@ccccccc" in output
+        assert f"{sync.MEDIA_STREAM}@ddddddd" in output
 
     @pytest.mark.parametrize(
         ("moved", "name"),
@@ -272,6 +308,10 @@ class TestChecking:
             ),
             ({"seeds": {"a.json": b'{"changed": true}\n'}}, "seeds"),
             (
+                {"seeds": {"a.json": b"{}\n"}, "limits": b'{"v": 2}\n'},
+                "image-limits",
+            ),
+            (
                 {"seeds": {"a.json": b"{}\n"}, "placement": b"[1]\n"},
                 "placement",
             ),
@@ -282,7 +322,8 @@ class TestChecking:
 
         assert sync.check(FakeGitHub(**moved)) == 1
         output = capsys.readouterr().out
-        assert f"{name}: the storefront's" in output
+        assert f"{name}: " in output
+        assert "'s " in output
         assert "moved" in output
 
     def test_a_copy_edited_by_hand_fails_before_asking_what_moved(

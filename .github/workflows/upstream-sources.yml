@@ -1,0 +1,34 @@
+# Tell us when something we copied from a sibling service changed.
+#
+# The storefront owns the page builder's blocks and the media service owns
+# the limits on a source image, so what this repository copies of theirs is
+# pinned (see .github/scripts/sync_upstream_sources.py and
+# tests/unit/core/test_upstream_sources_pin.py). A pull request can never
+# edit a copy out of step with its pin; what only time can do is let the
+# owner move on. This job asks, weekly, and goes red in the Actions tab when
+# it has, so a stale copy is noticed without blocking an unrelated pull
+# request. Fixing it: run the script, replay the builder and upload tests
+# (tests/unit/builder/, tests/unit/core/test_uploads.py), commit the copies.
+name: Upstream sources
+
+on:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Copies match their owners
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare with the owners' main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/sync_upstream_sources.py --check

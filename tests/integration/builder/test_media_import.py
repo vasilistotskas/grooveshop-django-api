@@ -155,8 +155,8 @@ class TestImportingTheStorefrontsOwnFile:
         assert response.json()["code"] == "invalid_image"
         assert not MediaAsset.objects.exists()
 
-    def test_a_file_over_the_limit_is_cut_off(self, client, settings):
-        settings.BUILDER_MEDIA_MAX_BYTES = 100
+    def test_a_file_over_the_limit_is_cut_off(self, client, limits):
+        limits(max_file_bytes={"png": 100})
 
         with storefront_serves(FakeResponse(content=b"x" * 5000)):
             response = import_url(client, "/img/big.png")

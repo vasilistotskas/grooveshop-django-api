@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import contextlib
-import re
 from typing import TYPE_CHECKING, Any
 
-import defusedxml.ElementTree as ET
 from django import forms
-from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.forms import ImageField
-from django.utils.translation import gettext_lazy as _
+
+from core.uploads import is_safe_svg, validate_servable_image
 
 if TYPE_CHECKING:  # pragma: no cover
     from django.core.files import File
@@ -31,52 +28,30 @@ def validate_image_file_extension(value: File[Any] | None):
 
 
 class ImageAndSvgField(ImageField):
-    default_validators = [validate_image_file_extension]
-    DEFAULT_MAX_FILE_SIZE = 2621440
+    """An image upload, or a safe SVG, that the media service will serve.
 
-    def __init__(self, *args, max_file_size: int | None = None, **kwargs):
-        if max_file_size is None:
-            max_file_size = (
-                settings.FILE_UPLOAD_MAX_MEMORY_SIZE
-                or self.DEFAULT_MAX_FILE_SIZE
-            )
-        self.max_file_size = max_file_size
-        super().__init__(*args, **kwargs)
+    The rule is ``core.uploads.validate_servable_image``: the media service's
+    own per-format size caps and pixel budget (the admin's old flat 2.5 MB cap
+    was Django's in-memory upload threshold, ``FILE_UPLOAD_MAX_MEMORY_SIZE``,
+    which says where a file is held while it uploads, not how large an image
+    may be).
+    """
+
+    default_validators = [validate_image_file_extension]
 
     def to_python(self, data: File[Any] | None):
         if data is None:
             return None
 
-        if (
-            self.max_file_size
-            and hasattr(data, "size")
-            and data.size > self.max_file_size
-        ):
-            if self.max_file_size < 1048576:  # Less than 1MB
-                size_str = f"{self.max_file_size / 1024:.1f}KB"
-            else:
-                size_str = f"{self.max_file_size / 1024 / 1024:.1f}MB"
-            raise ValidationError(
-                f"File size exceeds maximum allowed size of {size_str}",
-                code="file_too_large",
-            )
+        validate_servable_image(data)
 
         try:
             f = super().to_python(data)
         except ValidationError as err:
             if err.code != "invalid_image":
                 raise
-
-            is_svg_valid = self.is_svg(data)
-
-            if not is_svg_valid:
-                raise ValidationError(
-                    _(
-                        "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
-                    ),
-                    code="invalid_image",
-                ) from err
-
+            # Django's ImageField does not read an SVG; the rule above has
+            # already found it a safe one.
             f = data
             if hasattr(f, "content_type"):
                 f.content_type = "image/svg+xml"
@@ -88,93 +63,7 @@ class ImageAndSvgField(ImageField):
 
     @staticmethod
     def is_svg(f: File[Any] | None) -> bool:
-        if f is None:
-            return False
-
-        SVG_TAGS = ["{http://www.w3.org/2000/svg}svg", "svg"]
-
-        original_position = None
-        if hasattr(f, "tell") and callable(f.tell):
-            with contextlib.suppress(OSError):
-                original_position = f.tell()
-
-        if hasattr(f, "seek") and callable(f.seek):
-            f.seek(0)
-
-        try:
-            doc = ET.parse(f)
-            root = doc.getroot()
-
-            if root.tag not in SVG_TAGS:
-                return False
-
-            for elem in root.iter():
-                tag_name = (
-                    elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
-                )
-                if tag_name.lower() == "script":
-                    raise ValidationError(
-                        _(
-                            "SVG files containing script elements are not allowed for security reasons."
-                        ),
-                        code="svg_script_not_allowed",
-                    )
-
-                # <foreignObject> can embed arbitrary HTML (incl. scripts),
-                # bypassing the SVG-only checks (G0098).
-                if tag_name.lower() == "foreignobject":
-                    raise ValidationError(
-                        _(
-                            "SVG files containing foreignObject are not allowed for security reasons."
-                        ),
-                        code="svg_foreign_object_not_allowed",
-                    )
-
-                for attr in elem.attrib:
-                    if attr.lower().startswith("on"):
-                        raise ValidationError(
-                            _(
-                                "SVG files containing event handlers are not allowed for security reasons."
-                            ),
-                            code="svg_event_handler_not_allowed",
-                        )
-
-                    # href / xlink:href / src carrying a javascript: or
-                    # script-capable data: URL is an XSS vector the script /
-                    # on* checks miss (G0098). Strip whitespace first so
-                    # "java\nscript:" can't evade the prefix check.
-                    attr_local = attr.split("}")[-1].lower()
-                    if attr_local in {"href", "src"}:
-                        value = re.sub(
-                            r"\s+", "", (elem.attrib[attr] or "")
-                        ).lower()
-                        if value.startswith(
-                            (
-                                "javascript:",
-                                "data:text/html",
-                                "data:image/svg",
-                            )
-                        ):
-                            raise ValidationError(
-                                _(
-                                    "SVG files with javascript: or data: URLs are not allowed for security reasons."
-                                ),
-                                code="svg_dangerous_url_not_allowed",
-                            )
-
-            return True
-
-        except ET.ParseError, ValueError:
-            return False
-        finally:
-            if hasattr(f, "seek") and callable(f.seek):
-                try:
-                    if original_position is not None:
-                        f.seek(original_position)
-                    else:
-                        f.seek(0)
-                except OSError:
-                    pass
+        return is_safe_svg(f)
 
 
 class ImageUploadForm(forms.Form):

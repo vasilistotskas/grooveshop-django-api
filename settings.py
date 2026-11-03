@@ -973,13 +973,10 @@ BUILDER_UNRELEASED_CHECKPOINTS_KEPT = int(
 )
 # The media library: what an upload may be. Raster formats only (an SVG can
 # carry script, and has no size to reserve); names are Pillow's.
-BUILDER_MEDIA_FORMATS = ("JPEG", "PNG", "WEBP", "GIF", "AVIF")
-BUILDER_MEDIA_MAX_BYTES = int(
-    getenv("BUILDER_MEDIA_MAX_BYTES", str(10 * 1024 * 1024))
-)
-BUILDER_MEDIA_MAX_PIXELS = int(
-    getenv("BUILDER_MEDIA_MAX_PIXELS", str(40_000_000))
-)
+# Most pixels one uploaded image may have, whatever it is uploaded for
+# (``core.uploads``: never above what the media service decodes). The byte
+# caps are the media service's own, copied into ``core/data/image-limits.json``.
+UPLOAD_IMAGE_MAX_PIXELS = int(getenv("UPLOAD_IMAGE_MAX_PIXELS", "40000000"))
 # Most assets one ``builder/media/resolve`` call answers for.
 BUILDER_MEDIA_RESOLVE_MAX_IDS = int(
     getenv("BUILDER_MEDIA_RESOLVE_MAX_IDS", "100")

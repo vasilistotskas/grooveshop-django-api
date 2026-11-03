@@ -425,11 +425,13 @@ media-stream serves). The file is in the store's media directory
 the row stands alone and its text is one plain field, while a block's
 structure must not vary per language.
 
-`builder/media_services.py` is the only writer. Only raster images
-(`BUILDER_MEDIA_FORMATS`; an SVG can carry script and has no size to
-reserve), at most `BUILDER_MEDIA_MAX_BYTES` and `BUILDER_MEDIA_MAX_PIXELS`
-(`file_too_large`, `unsupported_image_type`, `image_too_large`,
-`invalid_image`, `invalid_focal_point`, `unknown_locale`, `invalid_alt`).
+`builder/media_services.py` is the only writer. Only raster images (an
+SVG can carry script and has no size to reserve), held to the rule every
+image upload shares ([`docs/image-uploads.md`](image-uploads.md): the media
+service's per-format byte caps and a pixel budget) (`file_too_large`,
+`unsupported_image_type`, `image_too_large`, `invalid_image`,
+`invalid_focal_point`, `unknown_locale`, `invalid_alt`). An import is cut
+off at the largest of those caps while it streams.
 The file never changes; a new image is a new asset.
 
 A used asset cannot be deleted silently: the reference index of the current
@@ -591,20 +593,21 @@ publish can wait for a time:
 
 ## What is copied from the storefront
 
-The storefront owns the blocks, so two things are pinned COPIES of its
-files:
+The storefront owns the blocks, so these are pinned COPIES of its
+files (the media service's image limits are copied the same way, see
+[`docs/image-uploads.md`](image-uploads.md)):
 
 | Source | Copy | Used by |
 |---|---|---|
 | `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
 | `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
 
-`tests/fixtures/builder/storefront.lock.json` names the storefront commit and
+`tests/fixtures/upstream-sources.lock.json` names each owner's commit and
 the git id of each source (the tree id of a directory, the blob id of a file).
-Only `.github/scripts/sync_storefront_sources.py` writes the copies and the
-lock; `tests/unit/builder/test_storefront_sources_pin.py` fails when a copy is
-not the pinned one, and the weekly `storefront-sources.yml` workflow fails when
-the storefront's `main` has moved on. A refresh is: run the script, replay the
+Only `.github/scripts/sync_upstream_sources.py` writes the copies and the
+lock; `tests/unit/core/test_upstream_sources_pin.py` fails when a copy is
+not the pinned one, and the weekly `upstream-sources.yml` workflow fails when
+an owner's `main` has moved on. A refresh is: run the script, replay the
 builder tests, commit.
 
 ## Default documents for a new store

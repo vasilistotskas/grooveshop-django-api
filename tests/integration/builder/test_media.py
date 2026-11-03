@@ -127,19 +127,25 @@ class TestUpload:
         assert response.json()["code"] == code
         assert not MediaAsset.objects.exists()
 
-    def test_a_format_outside_the_list_is_refused(self, client, settings):
-        settings.BUILDER_MEDIA_FORMATS = ("JPEG",)
-
-        response = upload(client)
+    def test_a_format_the_media_service_does_not_serve_is_refused(self, client):
+        response = upload(
+            client, SimpleUploadedFile("a.bmp", image_bytes("BMP"))
+        )
 
         assert response.json()["code"] == "unsupported_image_type"
 
-    def test_the_limits_come_from_settings(self, client, settings):
-        settings.BUILDER_MEDIA_MAX_BYTES = 10
+    def test_the_cap_is_the_media_services_for_that_format(
+        self, client, limits
+    ):
+        limits(max_file_bytes={"png": 10, "jpeg": 10 * 1024 * 1024})
         assert upload(client).json()["code"] == "file_too_large"
 
-        settings.BUILDER_MEDIA_MAX_BYTES = 10 * 1024 * 1024
-        settings.BUILDER_MEDIA_MAX_PIXELS = 100
+        jpeg = SimpleUploadedFile("a.jpg", image_bytes("JPEG"), "image/jpeg")
+        assert upload(client, jpeg).status_code == status.HTTP_201_CREATED
+
+    def test_the_pixel_limit_is_the_media_services(self, client, limits):
+        limits(source_pixel_limit=100)
+
         assert upload(client).json()["code"] == "image_too_large"
 
     @pytest.mark.parametrize(

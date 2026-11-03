@@ -13,7 +13,17 @@ class CoreConfig(AppConfig):
     def ready(self):
         from django.core.exceptions import ImproperlyConfigured
 
+        # Every image a serializer takes passes the media service's rule,
+        # not only the ones that remember to say so.
+        from rest_framework import serializers
+
         import core.signals.rosetta  # noqa: F401
+        from core.api.image_field import ServableImageField
+        from core.fields.image import ImageAndSvgField
+
+        serializers.ModelSerializer.serializer_field_mapping[
+            ImageAndSvgField
+        ] = ServableImageField
         from core.admin import override_third_party_admins
         from core.tasks import validate_task_configuration
 

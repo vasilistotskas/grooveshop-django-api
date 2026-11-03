@@ -1,0 +1,13 @@
+{
+  "$comment": "What the media service accepts as a SOURCE image. Owned here; copied, pinned by git id, into grooveshop-django-api (core/data/image-limits.json) so the API refuses at upload what this service would refuse at render. src/test/common/constants/image-limits-contract.spec.ts holds it equal to src/MediaStream/common/constants/image-limits.constant.ts.",
+  "maxFileBytes": {
+    "jpeg": 5242880,
+    "png": 8388608,
+    "webp": 3145728,
+    "gif": 2097152,
+    "tiff": 10485760,
+    "avif": 10485760,
+    "svg": 1048576
+  },
+  "sourcePixelLimit": 268402689
+}

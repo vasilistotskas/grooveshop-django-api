@@ -56,3 +56,29 @@ def api_as(user) -> APIClient:
     client = APIClient()
     client.force_authenticate(user=user)
     return client
+
+
+@pytest.fixture
+def limits(monkeypatch):
+    """Replace the media service's image limits for one test: call it with
+    the byte caps (a contract format name to bytes) and/or the pixel limit."""
+    from core import uploads
+
+    real = uploads.image_limits()
+
+    def use(*, max_file_bytes=None, source_pixel_limit=None):
+        uploads.image_limits.cache_clear()
+        monkeypatch.setattr(
+            uploads,
+            "image_limits",
+            lambda: uploads.ImageLimits(
+                max_file_bytes=max_file_bytes or real.max_file_bytes,
+                source_pixel_limit=source_pixel_limit
+                or real.source_pixel_limit,
+            ),
+        )
+        monkeypatch.setattr(
+            "builder.media_services.image_limits", uploads.image_limits
+        )
+
+    return use

@@ -1,12 +1,12 @@
 import os
 
 from django.db import models
-from django.db.models.fields.files import ImageFieldFile
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.image_field import ServableImageField
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.image import ProductImage
@@ -148,10 +148,20 @@ class ProductImageDetailSerializer(ProductImageSerializer):
         }
 
 
+#: The formats a product image may be (contract names).
+PRODUCT_IMAGE_FORMATS = ("jpeg", "png", "webp", "avif", "svg")
+
+
 class ProductImageWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductImage]
 ):
     product = PrimaryKeyRelatedField(queryset=Product.objects.all())
+    # A product shows a still: no GIF or TIFF, whatever the media service
+    # could serve (the size and pixel rules are the shared ones).
+    image = ServableImageField(
+        formats=PRODUCT_IMAGE_FORMATS,
+        label=ProductImage._meta.get_field("image").verbose_name,
+    )
     translations = TranslatedFieldsFieldExtend(shared_model=ProductImage)
 
     class Meta:
@@ -170,58 +180,6 @@ class ProductImageWriteSerializer(
         # demotes the previous main image, and the constraint stays as the
         # database-level safety net.
         validators = []
-
-    def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
-        from PIL import Image as PILImage
-
-        if not value:
-            raise serializers.ValidationError(
-                "Image file is required.", code="image_required"
-            )
-
-        if hasattr(value, "size") and value.size > 5 * 1024 * 1024:
-            raise serializers.ValidationError(
-                "Image file size cannot exceed 5MB.", code="image_too_large"
-            )
-
-        # Use PIL magic-byte verification instead of the browser-supplied
-        # content_type header, which is attacker-controlled.
-        allowed_raster_formats = {"JPEG", "PNG", "WEBP", "AVIF"}
-        filename = getattr(value, "name", "") or ""
-
-        if filename.lower().endswith(".svg"):
-            # SVG validation is handled at the form/field level via
-            # ImageAndSvgField — pass through without PIL (PIL cannot
-            # parse SVGs and UnidentifiedImageError would be a false positive).
-            pass
-        else:
-            try:
-                with PILImage.open(value) as img:
-                    img.verify()
-                    if img.format not in allowed_raster_formats:
-                        raise serializers.ValidationError(
-                            f"Unsupported image format: {img.format}. "
-                            f"Allowed: {', '.join(sorted(allowed_raster_formats))}",
-                            code="image_format_unsupported",
-                        )
-            except serializers.ValidationError:
-                raise
-            except (
-                PILImage.UnidentifiedImageError,
-                OSError,
-                ValueError,
-            ) as exc:
-                raise serializers.ValidationError(
-                    "Invalid image file.", code="image_invalid"
-                ) from exc
-            finally:
-                # Reset stream position so downstream readers (storage
-                # backends, etc.) see the full file.  InMemoryUploadedFile
-                # and TemporaryUploadedFile both support seek(0).
-                if hasattr(value, "seek"):
-                    value.seek(0)
-
-        return value
 
     def validate(self, attrs):
         product = attrs.get("product")

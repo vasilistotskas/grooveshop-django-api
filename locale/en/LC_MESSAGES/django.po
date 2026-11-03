@@ -1612,6 +1612,9 @@ msgstr "Are you sure?"
 msgid "Area"
 msgstr "Area"
 
+msgid "Arguments"
+msgstr "Arguments"
+
 msgid "Arrival notified at"
 msgstr "Arrival notified at"
 
@@ -1689,6 +1692,9 @@ msgstr "Attachment not found."
 
 msgid "Attachments are not accepted."
 msgstr "Attachments are not accepted."
+
+msgid "Attempts"
+msgstr "Attempts"
 
 msgid "Attribute"
 msgstr "Attribute"
@@ -3843,6 +3849,12 @@ msgstr "Default Subscription"
 
 msgid "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
 msgstr "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
+
+msgid "Deferred dispatch"
+msgstr "Deferred dispatch"
+
+msgid "Deferred dispatches"
+msgstr "Deferred dispatches"
 
 msgid "Delayed"
 msgstr "Delayed"
@@ -6790,6 +6802,9 @@ msgstr "Hash"
 msgid "Header"
 msgstr "Header"
 
+msgid "Headers"
+msgstr "Headers"
+
 msgid "Heaviest parcel the rate carries, or null for no cap."
 msgstr "Heaviest parcel the rate carries, or null for no cap."
 
@@ -7464,6 +7479,9 @@ msgstr "Key"
 msgid "Keyed hash of the address; empty when the mail had no recipient to write to."
 msgstr "Keyed hash of the address; empty when the mail had no recipient to write to."
 
+msgid "Keyword arguments"
+msgstr "Keyword arguments"
+
 msgid "Kind"
 msgstr "Kind"
 
@@ -7562,6 +7580,9 @@ msgstr "Last carrier event"
 
 msgid "Last day (inclusive) of the current term — trial or paid. Empty means the term never expires (legacy rows, the platform row). The daily billing task warns, dunns, and optionally suspends from this date."
 msgstr "Last day (inclusive) of the current term — trial or paid. Empty means the term never expires (legacy rows, the platform row). The daily billing task warns, dunns, and optionally suspends from this date."
+
+msgid "Last error"
+msgstr "Last error"
 
 msgid "Last event at"
 msgstr "Last event at"
@@ -8595,6 +8616,9 @@ msgstr "Next Number"
 msgid "Next action required for payment completion"
 msgstr "Next action required for payment completion"
 
+msgid "Next attempt at"
+msgstr "Next attempt at"
+
 msgid "Nine"
 msgstr "Nine"
 
@@ -9214,6 +9238,9 @@ msgstr "Optional region code — drives the region-level shipping adjustment."
 
 msgid "Optional: Full Python path to a validator function (e.g., 'myapp.validators.my_validator')"
 msgstr "Optional: Full Python path to a validator function (e.g., 'myapp.validators.my_validator')"
+
+msgid "Options"
+msgstr "Options"
 
 msgid "Order"
 msgstr "Order"
@@ -13449,6 +13476,9 @@ msgstr "Targets this product"
 
 msgid "Targets this product's category"
 msgstr "Targets this product's category"
+
+msgid "Task"
+msgstr "Task"
 
 msgid "Task Results"
 msgstr "Task Results"

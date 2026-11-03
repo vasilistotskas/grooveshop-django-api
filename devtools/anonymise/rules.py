@@ -394,6 +394,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     # ── credentials, sessions and logs ──────────────────────────────
     "account.EmailConfirmation": Delete(),
     "knox.AuthToken": Delete(),
+    # Work waiting to be published: its payload may name people and
+    # must not be replayed from a restored copy.
+    "tenant.DeferredDispatch": Delete(),
     "mfa.Authenticator": Delete(),
     "allauth_idp_oidc.Token": Delete(),
     "socialaccount.SocialAccount": Delete(),

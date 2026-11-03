@@ -203,6 +203,8 @@ Tasks are split by domain:
 - `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 - `contact/tasks.py` — notification emails, attachment scanning, and the retention sweeps: `purge_expired_attachment_files` (bytes, `CONTACT_ATTACHMENTS_RETENTION_DAYS`) and `purge_expired_contact_records` (deletes enquiries, their files, and feedback older than the per-store `CONTACT_RETENTION_DAYS`, default 365, `0` keeps). Both run per tenant through `tenant.tasks.fanout_*` with `include_suspended=True`
 
+**Queueing after a commit.** Queue a task that follows a change with `tenant.celery.dispatch_on_commit` (schema pinned at the call). A publish that fails because the broker is unreachable never reaches the caller: it is logged at ERROR and kept as a `tenant.DeferredDispatch` that `redispatch_deferred_tasks` publishes again; a task whose work is the state of a row also gets a sweep over that state (`contact.tasks.rescan_pending_attachments`). See [`docs/deferred-dispatch.md`](docs/deferred-dispatch.md).
+
 **Data retention.** Every sweep deletes through `core.retention.delete_in_batches` (batch size `RETENTION_PURGE_BATCH_SIZE`) and per-store tables fan out through `tenant.tasks.fanout_purge_*` with `include_suspended=True`. A model whose `HistoricalRecords` sets `excluded_fields` and is saved by a bookkeeping task uses `core.history.ChangeOnlyHistoricalRecords`, or every poll tick writes a history row. The full table (what, how long, which setting) is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
 **Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps

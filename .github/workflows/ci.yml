@@ -195,6 +195,24 @@ jobs:
             exit 1
           }
 
+      - name: allauth-schema.yml is up to date
+        # allauth's headless API has no serializers of ours to generate
+        # from: its OpenAPI document is allauth's own, adapted to this
+        # project's settings by ``manage.py allauth_schema``. The storefront
+        # generates its all-auth parsers from the committed file, so it
+        # must be the file the installed allauth and our settings produce.
+        run: |
+          uv run python manage.py allauth_schema --file /tmp/_allauth_check.yml
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/allauth-schema.yml:/s/committed.yml:ro" \
+            -v /tmp/_allauth_check.yml:/s/generated.yml:ro \
+            "$OASDIFF_IMAGE" diff --allow-external-refs=false \
+            --exclude-elements description,title,summary,examples \
+            --fail-on-diff /s/committed.yml /s/generated.yml || {
+            echo "::error file=allauth-schema.yml::allauth-schema.yml does not match allauth and our settings. Run: uv run python manage.py allauth_schema"
+            exit 1
+          }
+
   migrations:
     name: Migration Check
     needs: tested-in-pr

@@ -3,6 +3,31 @@
 
 
 
+## v3.212.0 (2026-11-03)
+
+### Features
+
+* feat(builder): block the release of a theme that misses a required contrast (#464)
+
+The catalogue declares, for the theme document, the colour pairs that must keep
+a WCAG 2.2 contrast. builder.contrast evaluates them over the stored scales
+(unrounded ratio, pointer or literal sides); publish, publish/check and
+scheduling refuse a theme whose error rules fail with insufficient_contrast
+(document theme, rule, ratio, min), a save never does, and a rule that points
+at no colour is a 503 invalid_catalogue. contrast-cases.json and the Tailwind
+palettes are vendored through the pinned sync script.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`507f41e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/507f41eee646a7b7813a2859bbc6994477975061))
+
+* feat(cache): purge the storefront page-builder data loaders with the records they read (#463)
+
+The storefront builderData* cached functions (60 s) read products, categories,
+blog posts and categories, offers, link slugs and link targets. Each surface
+now purges the ones it feeds, so a renamed record or a changed price is not
+served from a loader for the rest of its TTL.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`29b8ec6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29b8ec6683005185af7983814f1c6f1eb49a88cd))
+
 ## v3.211.0 (2026-11-03)
 
 ### Features

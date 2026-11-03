@@ -3968,6 +3968,9 @@ msgstr "Μη κανονικοποιημένο ID APM BoxNow — διατηρεί
 msgid "Depot"
 msgstr "Κέντρο διανομής (depot)"
 
+msgid "Describes the photo for screen readers and search engines."
+msgstr "Περιγράφει τη φωτογραφία για αναγνώστες οθόνης και μηχανές αναζήτησης."
+
 msgid "Description"
 msgstr "Περιγραφή"
 

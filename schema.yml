@@ -45845,10 +45845,14 @@ components:
               properties:
                 title:
                   type: string
+                altText:
+                  type: string
             en:
               type: object
               properties:
                 title:
+                  type: string
+                altText:
                   type: string
     PatchedProductReviewWriteRequest:
       type: object
@@ -48423,6 +48427,11 @@ components:
           title: Εικόνα
         altText:
           type: string
+          description: |-
+            The merchant's alt text, else the title, else empty.
+
+            No generated sentence: it would be in one language whatever the
+            store speaks, so the storefront builds its own localized fallback.
           readOnly: true
         isMain:
           type: boolean
@@ -48441,10 +48450,14 @@ components:
               properties:
                 title:
                   type: string
+                altText:
+                  type: string
             en:
               type: object
               properties:
                 title:
+                  type: string
+                altText:
                   type: string
         mainImagePath:
           type: string
@@ -48485,6 +48498,11 @@ components:
           title: Εικόνα
         altText:
           type: string
+          description: |-
+            The merchant's alt text, else the title, else empty.
+
+            No generated sentence: it would be in one language whatever the
+            store speaks, so the storefront builds its own localized fallback.
           readOnly: true
         isMain:
           type: boolean
@@ -48502,10 +48520,14 @@ components:
               properties:
                 title:
                   type: string
+                altText:
+                  type: string
             en:
               type: object
               properties:
                 title:
+                  type: string
+                altText:
                   type: string
         mainImagePath:
           type: string
@@ -48580,10 +48602,14 @@ components:
               properties:
                 title:
                   type: string
+                altText:
+                  type: string
             en:
               type: object
               properties:
                 title:
+                  type: string
+                altText:
                   type: string
       required:
       - image

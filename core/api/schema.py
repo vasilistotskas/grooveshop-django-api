@@ -233,6 +233,9 @@ _SCHEMA_REF = "#/components/schemas/"
 PLAIN_400_BODIES: dict[str, tuple[str, ...]] = {
     "ErrorResponse": ("ApiError",),
     "PaymentProviderError": ("ApiError", "PaymentProviderError"),
+    # The page builder's ``invalid_document``: a plain error that also lists
+    # what is wrong (``errors``), beside the validation and plain bodies.
+    "BuilderDocumentInvalidError": ("ApiError", "BuilderDocumentInvalidError"),
 }
 
 

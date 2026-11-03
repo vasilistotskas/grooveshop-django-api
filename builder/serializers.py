@@ -303,6 +303,19 @@ class PublishProblemSerializer(serializers.Serializer):
     )
 
 
+#: The one code of that refusal (a field of one choice, named for the schema).
+INVALID_DOCUMENT_CODE_CHOICES = [("invalid_document", "invalid_document")]
+
+
+class BuilderDocumentInvalidErrorSerializer(serializers.Serializer):
+    """The 400 of an operation that checks a document (``invalid_document``):
+    the refusal and everything wrong, each with the document it is in."""
+
+    detail = serializers.CharField()
+    code = serializers.ChoiceField(choices=INVALID_DOCUMENT_CODE_CHOICES)
+    errors = PublishProblemSerializer(many=True)
+
+
 class PublishCheckSerializer(serializers.Serializer):
     ok = serializers.BooleanField()
     changed = serializers.ListField(child=serializers.CharField())
@@ -370,6 +383,9 @@ class ScheduleSerializer(serializers.ModelSerializer):
     scheduled_by = serializers.SerializerMethodField()
     release = serializers.SlugRelatedField(
         slug_field="number", read_only=True, allow_null=True
+    )
+    failure = PublishProblemSerializer(
+        many=True, read_only=True, allow_null=True
     )
 
     class Meta:

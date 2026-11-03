@@ -4270,6 +4270,7 @@ SPECTACULAR_SETTINGS = {
         # ``Kind1e3Enum``/``KindCbcEnum`` in the generated frontend types.
         "BuilderDocumentKindEnum": "builder.models.DocumentKind",
         "BuilderVersionKindEnum": "builder.models.VersionKind",
+        "BuilderDocumentInvalidCodeEnum": "builder.serializers.INVALID_DOCUMENT_CODE_CHOICES",
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",

@@ -481,7 +481,22 @@ class ReleaseListView(StaffListView):
         }
 
 
-@extend_schema(tags=TAGS)
+@extend_schema(
+    tags=TAGS,
+    parameters=[
+        OpenApiParameter(
+            name="status",
+            location=OpenApiParameter.QUERY,
+            required=False,
+            type=str,
+            enum=ScheduleStatus.values,
+            description=(
+                "Only the schedules in this state; any other value lists "
+                "them all."
+            ),
+        )
+    ],
+)
 class ScheduleListView(StaffListView):
     """Scheduled publishes, soonest first; ``?status=`` narrows."""
 

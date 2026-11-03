@@ -3,6 +3,47 @@
 
 
 
+## v3.202.2 (2026-11-03)
+
+### Bug fixes
+
+* fix(uploads): read a stored SVG from its start in the unservable media report (#444) ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+* fix(uploads): read a stored SVG from its start in the unservable media report
+
+The format probe left the file position after the header, so every SVG was
+reported as not an image. Rewind before sniffing; tests cover a servable SVG
+and one over its cap.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+### Testing
+
+* test(uploads): pin that the upload rule reads a file from its start
+
+Covers every raster format and an SVG left mid-file, so the position bug of the
+report probe cannot appear in validate_servable_image.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`80e181d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80e181d0fa91bee9ac2f85910f2d1156c857decd))
+
+## v3.202.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(builder): type rolledBackFrom and a schedule release as nullable, declare ?status (#443)
+
+A normal release has no rolledBackFrom and a pending or failed schedule has no
+release, yet the schema typed both as integers, so the storefront generated
+Zod answered 422 to every publish, rollback and list. Both are nullable now,
+and ScheduleListView declares the status filter it reads, with its choices.
+Tests validate real responses against the schema.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b9105a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9105a8a67aacc928ff4a2391cdc1d621b0134ed))
+
 ## v3.202.0 (2026-11-03)
 
 ### Features

@@ -169,6 +169,20 @@ class LiveState(unittest.TestCase):
         self.assertEqual(values, {})
         self.assertIn("cannot say what is live", error)
 
+    def test_a_stopped_recorder_leaves_the_last_success_readable(self) -> None:
+        # Nothing newer than a success is recorded when the recorder stops.
+        # The record carries no age, so the check keeps reading it: only
+        # "no record at all" and "GitHub unreachable" fail closed.
+        self.record(
+            STOREFRONT,
+            "production",
+            (3, "v3.300.1", "success"),
+        )
+        code, values, error = self.run_script("production")
+        self.assertEqual(code, 0)
+        self.assertEqual(values["PRODUCTION_STOREFRONT"], "v3.300.1")
+        self.assertEqual(error, "")
+
     def test_a_missing_environment_fails_closed(self) -> None:
         code, _, error = self.run_script("staging")
         self.assertEqual(code, 1)

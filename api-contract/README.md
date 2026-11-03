@@ -27,6 +27,19 @@ as a GitHub Deployment of the service's own repository (`environment`
 deployment still rolling out. A rollback is a newer deployment of the older
 tag. No record fails the check: it never passes on an unanswered question.
 
+### When the recorder stops
+
+The records carry no age. If the recorder stops, the last `success` record
+of each environment stays readable and the checks keep passing or failing
+against that last recorded release: a stalled recorder can neither block
+every pull request nor silently turn them all green. Only two things fail
+closed (exit 1, "cannot say what is live"): an environment with no
+successful record at all, and GitHub's API not answering. What a stopped
+recorder can do is let a check run against a release that has since been
+replaced; the deploy gate still checks the real pods, and
+`GrooveShopDeploymentRecordsStale` fires. The runbook is "Recorder stalled"
+in `grooveshop-infrastructure/docs/deploying.md`.
+
 ## The direction of a verdict
 
 `oasdiff breaking CONSUMER DJANGO` reports what in Django breaks a client of

@@ -169,6 +169,101 @@ def declare_totp_svg(document: Document) -> None:
     }
 
 
+def name_totp_not_found_response(document: Document) -> None:
+    """The TOTP status 404 is a named schema, so a client generates a type
+    for it. The document declares its body inline, in the response."""
+    response = document["components"]["responses"]["TOTPAuthenticatorNotFound"]
+    content = response["content"]["application/json"]
+    _schemas(document)["TOTPNotFoundResponse"] = content["schema"]
+    content["schema"] = {"$ref": "#/components/schemas/TOTPNotFoundResponse"}
+
+
+def declare_rate_limit_answer(document: Document) -> None:
+    """Any operation can answer 429: ``RateLimitResponse``
+    (``headless/base/response.py``) is what a rate-limited call gets, and
+    the limits are ours to configure (``ACCOUNT_RATE_LIMITS``). The document
+    declares no 429."""
+    _schemas(document)["RateLimitResponse"] = {
+        "type": "object",
+        "description": "Too many requests: the call is rate limited.",
+        "properties": {"status": {"type": "integer", "enum": [429]}},
+        "required": ["status"],
+    }
+    answer = {
+        "description": "Too many requests.",
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/RateLimitResponse"}
+            }
+        },
+    }
+    for path in document["paths"].values():
+        for operation in path.values():
+            if isinstance(operation, dict) and "responses" in operation:
+                operation["responses"].setdefault("429", copy.deepcopy(answer))
+
+
+def _declares(document: Document, schema: dict[str, Any], key: str) -> bool:
+    """Whether ``schema`` declares property ``key``, through ``$ref``,
+    ``allOf`` and ``oneOf``."""
+    while "$ref" in schema:
+        target: Any = document
+        for part in schema["$ref"].removeprefix("#/").split("/"):
+            target = target[part]
+        schema = target
+    if key in schema.get("properties", {}):
+        return True
+    return any(
+        _declares(document, part, key)
+        for name in ("allOf", "oneOf", "anyOf")
+        for part in schema.get(name, [])
+    )
+
+
+def _add_session_meta(document: Document, schema: dict[str, Any]) -> None:
+    if "$ref" in schema:
+        target: Any = document
+        for part in schema["$ref"].removeprefix("#/").split("/"):
+            target = target[part]
+        return _add_session_meta(document, target)
+    if not _declares(document, schema, "status") or _declares(
+        document, schema, "meta"
+    ):
+        return None
+    meta = {"$ref": "#/components/schemas/BaseAuthenticationMeta"}
+    if "properties" in schema:
+        schema["properties"]["meta"] = meta
+    elif "allOf" in schema:
+        schema["allOf"].append({"type": "object", "properties": {"meta": meta}})
+    else:
+        for part in schema.get("oneOf", []):
+            _add_session_meta(document, part)
+    return None
+
+
+def allow_session_meta_on_every_answer(document: Document) -> None:
+    """Every answer to an app client may carry ``meta.session_token`` (and
+    the access token): ``APIResponse._add_session_meta`` adds it to whatever
+    is being answered when the token is exposed, rotated or issued. The
+    document declares ``meta`` only on the authentication answers, so a
+    client parsing ``GET /auth/webauthn/login`` or a resend would drop the
+    token it must send next. Optional ``meta`` on each answer that has a
+    ``status`` and no ``meta`` of its own."""
+    holders = list(document["components"].get("responses", {}).values())
+    for path in document["paths"].values():
+        for operation in path.values():
+            if isinstance(operation, dict) and "responses" in operation:
+                holders += [
+                    response
+                    for response in operation["responses"].values()
+                    if "$ref" not in response
+                ]
+    for holder in holders:
+        content = holder.get("content", {}).get("application/json")
+        if content:
+            _add_session_meta(document, content["schema"])
+
+
 CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_every_flow,
     declare_flow_providers,
@@ -178,6 +273,9 @@ CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_authentication_method,
     declare_recovery_codes_regeneration_answer,
     declare_totp_svg,
+    name_totp_not_found_response,
+    declare_rate_limit_answer,
+    allow_session_meta_on_every_answer,
 )
 
 

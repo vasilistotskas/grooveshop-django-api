@@ -362,3 +362,67 @@ def test_the_totp_enrolment_with_its_qr_code(document, token):
         document, "/account/authenticators/totp/svg", "get", response
     )
     assert body["meta"]["totp_svg"].lstrip().startswith("<")
+
+
+def test_the_totp_status_without_an_authenticator(document, token):
+    response = _call(
+        Client(), "get", "/account/authenticators/totp", token=token
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    body = assert_documented(
+        document, "/account/authenticators/totp", "get", response
+    )
+    assert set(body["meta"]) >= {"secret", "totp_url"}
+
+
+def test_a_rate_limited_call(document, user, settings):
+    settings.ACCOUNT_RATE_LIMITS = {"login_failed": False, "login": "1/m/ip"}
+    client = Client()
+    body = {"email": user.email, "password": PASSWORD}
+
+    first = _call(client, "post", "/auth/login", body)
+    second = _call(client, "post", "/auth/login", body)
+
+    assert first.status_code == status.HTTP_200_OK
+    assert second.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert_documented(document, "/auth/login", "post", second)
+
+
+def test_the_passkey_login_options_carry_the_session_token(document):
+    response = _call(Client(), "get", "/auth/webauthn/login")
+
+    assert response.status_code == status.HTTP_200_OK
+    body = assert_documented(document, "/auth/webauthn/login", "get", response)
+    assert body["meta"]["session_token"]
+
+
+def test_resending_a_login_code_carries_the_session_token(document, user):
+    pending = _call(
+        Client(), "post", "/auth/code/request", {"email": user.email}
+    )
+    token = pending.json()["meta"]["session_token"]
+
+    response = _call(Client(), "post", "/auth/code/resend", token=token)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert_documented(document, "/auth/code/resend", "post", response)
+
+
+def test_resending_an_email_verification_carries_the_session_token(
+    document, settings
+):
+    # The signup just sent one, and a second inside the window is a 429.
+    settings.ACCOUNT_RATE_LIMITS = {"confirm_email": False}
+    signup = _call(
+        Client(),
+        "post",
+        "/auth/signup",
+        {"email": "pending.customer@example.com", "password": PASSWORD},
+    )
+    token = signup.json()["meta"]["session_token"]
+
+    response = _call(Client(), "post", "/auth/email/verify/resend", token=token)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert_documented(document, "/auth/email/verify/resend", "post", response)

@@ -146,3 +146,26 @@ def test_a_refused_publish_moves_nothing(
 
     assert run_queued_purge() == []
     assert _generation(tenant) == before
+
+
+def test_the_data_loaders_are_purged_with_the_records_they_read():
+    """The storefront's ``builderData*`` functions (60 s) read products,
+    categories, posts and offers; each surface purges the ones it feeds."""
+    from core.cache.registry import get_surface
+
+    expected = {
+        "products": {"builderDataProduct", "builderDataSlug"},
+        "categories": {"builderDataCategory", "builderDataSlug"},
+        "blog": {
+            "builderDataBlogPost",
+            "builderDataBlogCategory",
+            "builderDataSlug",
+        },
+        "promotions": {"builderDataPromotion", "builderDataProduct"},
+        "builder": {"builderPageDocument", "builderDataTargets"},
+        "page_config": {"builderDataTargets"},
+    }
+    for code, names in expected.items():
+        patterns = set(get_surface(code).nuxt_patterns)
+        for name in names:
+            assert f"cache:nitro:functions:{name}*" in patterns, (code, name)

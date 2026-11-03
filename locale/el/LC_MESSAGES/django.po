@@ -11644,11 +11644,17 @@ msgstr "Επιστροφή στο απόθεμα"
 msgid "Restock returned units of an order item"
 msgstr "Επαναφορά στο απόθεμα επιστρεφόμενων τεμαχίων προϊόντος παραγγελίας"
 
+msgid "Restore"
+msgstr "Επαναφορά"
+
 msgid "Restore this"
 msgstr "Επαναφορά αυτού"
 
 msgid "Restored"
 msgstr "Επαναφέρθηκε"
+
+msgid "Restored from"
+msgstr "Επαναφορά από"
 
 msgid "Restored."
 msgstr "Επαναφέρθηκε."
@@ -13918,6 +13924,9 @@ msgstr "Τα προωθητικά email που στέλνει αυτό το κα
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
+
+msgid "The number of the version this one restores (kind restore)."
+msgstr "Ο αριθμός της έκδοσης που επαναφέρει αυτή (είδος επαναφορά)."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."

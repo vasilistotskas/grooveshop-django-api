@@ -38219,10 +38219,12 @@ components:
       enum:
       - checkpoint
       - publish
+      - restore
       type: string
       description: |-
         * `checkpoint` - Ονομασμένη αποθήκευση
         * `publish` - Δημοσίευση
+        * `restore` - Επαναφορά
     BulkSubscriptionFailure:
       type: object
       properties:
@@ -52929,6 +52931,12 @@ components:
           title: Αριθμός
         kind:
           $ref: '#/components/schemas/BuilderVersionKindEnum'
+        restoredFrom:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Επαναφορά από
+          description: Ο αριθμός της έκδοσης που επαναφέρει αυτή (είδος επαναφορά).
         note:
           type: string
           readOnly: true
@@ -52978,6 +52986,7 @@ components:
       - note
       - number
       - refs
+      - restoredFrom
       - sizeBytes
     VersionList:
       type: object
@@ -52991,6 +53000,12 @@ components:
           title: Αριθμός
         kind:
           $ref: '#/components/schemas/BuilderVersionKindEnum'
+        restoredFrom:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Επαναφορά από
+          description: Ο αριθμός της έκδοσης που επαναφέρει αυτή (είδος επαναφορά).
         note:
           type: string
           readOnly: true
@@ -53031,6 +53046,7 @@ components:
       - kind
       - note
       - number
+      - restoredFrom
       - sizeBytes
     ViesStatusEnum:
       enum:

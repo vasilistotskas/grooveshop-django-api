@@ -339,8 +339,9 @@ def _new_version(
 
 
 def prune_unreleased_checkpoints(document: BuilderDocument) -> int:
-    """Delete the oldest named saves no release points at, keeping
-    ``BUILDER_UNRELEASED_CHECKPOINTS_KEPT``. Returns how many went."""
+    """Delete the oldest named saves and restores no release points at,
+    keeping ``BUILDER_UNRELEASED_CHECKPOINTS_KEPT``. Returns how many
+    went."""
     released = {
         int(version_id)
         for versions in BuilderRelease.objects.values_list(
@@ -357,7 +358,8 @@ def prune_unreleased_checkpoints(document: BuilderDocument) -> int:
     }
     stale = list(
         BuilderVersion.objects.filter(
-            document=document, kind=VersionKind.CHECKPOINT
+            document=document,
+            kind__in=(VersionKind.CHECKPOINT, VersionKind.RESTORE),
         )
         .exclude(pk__in=released)
         .order_by("-number")
@@ -395,9 +397,13 @@ def create_checkpoint(user: Any, *, key: str, note: str = "") -> BuilderVersion:
 def restore_version(
     user: Any, *, key: str, number: int, expected_revision: int
 ) -> BuilderDocument:
-    """Put version *number* back as the DRAFT. It is not checked against
-    the catalogue: the storefront may have moved on since, and the editor
-    upgrades old blocks when it opens the draft; publishing validates."""
+    """Put version *number* back as the DRAFT, and record it as a new
+    version of kind ``restore`` that names *number* (``restored_from``), so
+    the history can say "restored from version N". When the newest version
+    already holds that content nothing new is recorded, like a named save of
+    unchanged content. It is not checked against the catalogue: the
+    storefront may have moved on since, and the editor upgrades old blocks
+    when it opens the draft; publishing validates."""
     require_permission(user, CHANGE_PERMISSION)
     with transaction.atomic():
         document = _locked(key)
@@ -415,6 +421,23 @@ def restore_version(
             catalogue_hash=version.catalogue_hash,
         )
         document.save()
+        latest = document.versions.order_by("-number").first()
+        if latest is None or latest.content_hash != version.content_hash:
+            BuilderVersion.objects.create(
+                document=document,
+                number=(latest.number if latest else 0) + 1,
+                kind=VersionKind.RESTORE,
+                data=version.data,
+                i18n=version.i18n,
+                block_types=version.block_types,
+                refs=version.refs,
+                catalogue_hash=version.catalogue_hash,
+                content_hash=version.content_hash,
+                size_bytes=version.size_bytes,
+                created_by_staff_id=staff_id(user),
+                restored_from=version.number,
+            )
+            prune_unreleased_checkpoints(document)
     return document
 
 

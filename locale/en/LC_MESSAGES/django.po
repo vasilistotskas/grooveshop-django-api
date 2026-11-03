@@ -11636,12 +11636,18 @@ msgstr "Restock returned items"
 msgid "Restock returned units of an order item"
 msgstr "Restock returned units of an order item"
 
+msgid "Restore"
+msgstr "Restore"
+
 # Email Template Translations
 msgid "Restore this"
 msgstr "Restore this"
 
 msgid "Restored"
 msgstr "Restored"
+
+msgid "Restored from"
+msgstr "Restored from"
 
 msgid "Restored."
 msgstr "Restored."
@@ -13915,6 +13921,9 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
+
+msgid "The number of the version this one restores (kind restore)."
+msgstr "The number of the version this one restores (kind restore)."
 
 #, python-brace-format
 msgid "The order costs {due}; confirm exactly that amount."

@@ -255,6 +255,7 @@ class VersionListSerializer(serializers.ModelSerializer):
             "id",
             "number",
             "kind",
+            "restored_from",
             "note",
             "created_at",
             "created_by",

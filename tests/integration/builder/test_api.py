@@ -163,6 +163,36 @@ class TestLifecycle:
         )
         assert discarded.json()["draftRevision"] == 4
 
+    def test_a_restore_is_listed_with_the_version_it_restores(self, client):
+        put(client, body_of(("a", hero("one"))))
+        client.post(
+            reverse("builder:document-checkpoint", kwargs={"key": HOME}),
+            format="json",
+        )
+        put(client, body_of(("a", hero("two"))), revision="1")
+        client.post(
+            reverse("builder:document-checkpoint", kwargs={"key": HOME}),
+            format="json",
+        )
+
+        client.post(
+            reverse(
+                "builder:version-restore", kwargs={"key": HOME, "number": 1}
+            ),
+            headers={"If-Match": "2"},
+        )
+        listed = client.get(
+            reverse("builder:version-list", kwargs={"key": HOME})
+        ).json()["results"]
+
+        assert [
+            (v["number"], v["kind"], v["restoredFrom"]) for v in listed
+        ] == [
+            (3, "restore", 1),
+            (2, "checkpoint", None),
+            (1, "checkpoint", None),
+        ]
+
     def test_publish_lists_releases_and_rolls_back(self, client):
         put(client, body_of(("a", hero("one"))))
         first = client.post(

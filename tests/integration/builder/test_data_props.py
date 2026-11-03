@@ -31,6 +31,12 @@ def rails(catalogue):
     hero["schema"]["properties"]["rail"] = {"type": "object"}
     hero["schema"]["properties"]["pick"] = {"type": "integer"}
     hero["data"] = {"/rail": RAIL, "/pick": PICK}
+    catalogue.data_limits = {
+        "maxPickedIds": 24,
+        "maxFilterIds": 5,
+        "maxQueriesPerDocument": 12,
+        "maxQueryLimit": 24,
+    }
     return catalogue
 
 
@@ -89,9 +95,9 @@ class TestValidation:
         )
 
     def test_a_document_may_ask_for_only_so_many_lists(
-        self, admin, rails, features_on, settings
+        self, admin, rails, features_on
     ):
-        settings.BUILDER_DATA_MAX_QUERIES = 1
+        rails.data_limits["maxQueriesPerDocument"] = 1
         rail = {"mode": "filter", "ordering": "newest", "limit": 4}
 
         with pytest.raises(DocumentInvalid) as caught:

@@ -224,7 +224,10 @@ A block can declare a setting in the catalogue's `data` map, beside `refs`
 names. A value that is not valid yields problems and nothing else:
 `invalid_data_value`, `unknown_filter` (a key the list does not have) and
 `too_many_ids`, each at the pointer of the offending key; a document that
-asks for more than `BUILDER_DATA_MAX_QUERIES` lists gets `too_many_queries`.
+asks for more lists than the catalogue's `dataLimits.maxQueriesPerDocument`
+gets `too_many_queries`. The caps (`maxPickedIds`, `maxFilterIds`,
+`maxQueriesPerDocument`, `maxQueryLimit`) live in the catalogue only; a
+catalogue that declares `data` without `dataLimits` is refused as unexpected.
 The vocabulary is held equal to the storefront's by
 `tests/fixtures/builder/data-cases.json`, copied and pinned like the other
 sources (`tests/unit/builder/test_data_sources.py` runs every case).

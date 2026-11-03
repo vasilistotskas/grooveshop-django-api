@@ -107,6 +107,9 @@ class Catalogue:
     #: The page types that are fixed templates (home, about, ...); any
     #: other page is a custom ``page:<key>``. The storefront's routing.
     templates: frozenset[str] = frozenset()
+    #: The caps for typed data props (``dataLimits``); the catalogue states
+    #: them whenever a block declares ``data``.
+    data_limits: data_sources.DataLimits | None = None
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -252,11 +255,22 @@ def parse_catalogue(payload: Any) -> Catalogue:
             str(kind): _parse_root(raw)
             for kind, raw in (payload.get("documentKinds") or {}).items()
         }
+        declares_data = any(b.data for b in blocks) or any(
+            r.data for r in roots.values()
+        )
+        raw_limits = payload.get("dataLimits")
+        if declares_data and raw_limits is None:
+            raise ValueError("data is declared without dataLimits")
         return Catalogue(
             hash=str(payload["hash"]),
             blocks=blocks,
             roots=roots,
             templates=frozenset(str(t) for t in payload.get("templates") or ()),
+            data_limits=(
+                data_sources.DataLimits.parse(raw_limits)
+                if raw_limits is not None
+                else None
+            ),
             _index={block.type: block for block in blocks},
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

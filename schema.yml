@@ -20407,6 +20407,18 @@ paths:
         explode: false
         style: form
       - in: query
+        name: brand
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: 'Filter by brand IDs: a product of any of them (repeat the parameter)'
+        explode: true
+        style: form
+      - in: query
         name: category
         schema:
           type: string
@@ -20839,6 +20851,19 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: tags
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: 'Filter by active tag IDs: a product with any of them (repeat
+          the parameter)'
+        explode: true
+        style: form
       - in: query
         name: updatedAfter
         schema:
@@ -25713,6 +25738,18 @@ paths:
         explode: false
         style: form
       - in: query
+        name: brand
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: 'Filter by brand IDs: a product of any of them (repeat the parameter)'
+        explode: true
+        style: form
+      - in: query
         name: category
         schema:
           type: string
@@ -26144,6 +26181,19 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+      - in: query
+        name: tags
+        schema:
+          oneOf:
+          - type: string
+            description: Τιμές διαχωρισμένες με κόμμα
+          - type: array
+            items:
+              type: integer
+        description: 'Filter by active tag IDs: a product with any of them (repeat
+          the parameter)'
+        explode: true
+        style: form
       - in: query
         name: updatedAfter
         schema:

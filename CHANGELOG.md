@@ -3,6 +3,32 @@
 
 
 
+## v3.208.0 (2026-11-03)
+
+### Code style
+
+* style: sort the store_settings imports
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
+### Features
+
+* feat(settings): serve every public scalar setting typed in its declared type (#453) ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
+* feat(settings): serve every public scalar setting typed in its declared type
+
+GET /settings/public gains values: one key per public setting without
+structure, typed from the type its EXTRA_SETTINGS_DEFAULTS entry declares
+(int, decimal, bool, string), coordinates as number or null, return fees as
+an enum. The string map is unchanged. PUBLIC_SETTING_KEYS moves to
+core/store_settings.py beside the declared defaults it is built against.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
 ## v3.207.0 (2026-11-03)
 
 ### Features

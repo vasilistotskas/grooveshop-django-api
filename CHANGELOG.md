@@ -3,6 +3,23 @@
 
 
 
+## v3.214.0 (2026-11-03)
+
+### Features
+
+* feat(builder): give each store a theme document, from the catalogue defaults or a seed file (#467)
+
+A new store installs documentKinds.theme.defaults of its own catalogue view as
+its theme document in a provisioning step of its own (own release, idempotent);
+the platform theme release does not count as work an editor made. A store that
+existed before gets it from import_theme_settings, which reads the storefront
+computed seed, validates each store against its own catalogue view (schema,
+references, contrast error rules), writes and publishes the theme document in
+a release that keeps the other documents, skips a store that has one, and has a
+dry run.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`9d189f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d189f25eea0811ffc8f8e01ba1e274dac10436c))
+
 ## v3.213.0 (2026-11-03)
 
 ### Features

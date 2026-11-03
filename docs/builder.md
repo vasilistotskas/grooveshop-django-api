@@ -27,7 +27,9 @@ the storefront's; Django stores, validates, versions and publishes.
   document, with the derived `block_types` (`type@version`, GIN-indexed, for
   the usage gate that will guard removing a block type), `refs`,
   `catalogue_hash`, `content_hash` (sha256 of the canonical encoding) and
-  `size_bytes`. `kind` is `checkpoint` (a named save) or `publish`.
+  `size_bytes`. `kind` is `checkpoint` (a named save), `publish` or `restore` (a
+  restored version; `restored_from` is the number it restores, `null` for
+  every other kind).
 - `BuilderRelease`: immutable, a monotonic `number` and a map
   `{document key: version id}`. It is the only thing the public storefront
   reads. A publish is the previous release's map with the published keys
@@ -182,8 +184,8 @@ catalogue, then the write):
 | Function | What |
 |---|---|
 | `save_draft` | `If-Match` revision (`0` creates); a stale one is `409 revision_conflict` with `currentRevision`, `updatedBy`, `updatedAt`; saving what is stored changes nothing |
-| `create_checkpoint` | A named save; the same content is the same version; older unreleased checkpoints beyond the setting are pruned |
-| `restore_version` | Back as the draft (revision + 1), not validated |
+| `create_checkpoint` | A named save; the same content is the same version; older unreleased checkpoints and restores beyond the setting are pruned |
+| `restore_version` | Back as the draft (revision + 1), not validated; records a `restore` version naming the source number (nothing new when the newest version already holds that content) |
 | `discard_draft` | The draft becomes the published version |
 | `publish` | Validates every named draft (references included), reports every problem with its `document`, creates the versions, one release, one transaction, per-store advisory lock for the release number; `nothing_to_publish` when nothing changed |
 | `rollback` | A new release with an older release's map |

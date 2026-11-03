@@ -152,6 +152,7 @@ class BuilderDocument(SoftDeleteModel, TimeStampMixinModel):
 class VersionKind(models.TextChoices):
     CHECKPOINT = "checkpoint", _("Named save")
     PUBLISH = "publish", _("Publish")
+    RESTORE = "restore", _("Restore")
 
 
 class _Immutable(models.Model):
@@ -206,6 +207,14 @@ class BuilderVersion(_Immutable):
         _("Created by (staff)"), null=True, blank=True
     )
     created_by_staff = StaffActor()
+    restored_from = models.PositiveIntegerField(
+        _("Restored from"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The number of the version this one restores (kind restore)."
+        ),
+    )
     note = models.CharField(_("Note"), max_length=255, blank=True, default="")
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
 

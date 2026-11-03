@@ -272,6 +272,49 @@ class TestRestoreAndDiscard:
         assert restored.draft_revision == 3
         assert not BuilderRelease.objects.exists()
 
+    def test_restoring_records_a_version_naming_its_source(
+        self, admin, catalogue, features_on
+    ):
+        first = save(admin, draft=document(("a", hero("one"))))
+        services.create_checkpoint(admin, key=HOME)
+        second = save(
+            admin,
+            draft=document(("a", hero("two"))),
+            revision=first.draft_revision,
+        )
+        services.create_checkpoint(admin, key=HOME)
+
+        services.restore_version(
+            admin, key=HOME, number=1, expected_revision=second.draft_revision
+        )
+
+        newest = BuilderVersion.objects.get(document__key=HOME, number=3)
+        assert newest.kind == VersionKind.RESTORE
+        assert newest.restored_from == 1
+        assert newest.content_hash == (
+            BuilderVersion.objects.get(
+                document__key=HOME, number=1
+            ).content_hash
+        )
+        assert (
+            BuilderVersion.objects.get(
+                document__key=HOME, number=2
+            ).restored_from
+            is None
+        )
+
+    def test_restoring_what_the_newest_version_holds_adds_nothing(
+        self, admin, catalogue, features_on
+    ):
+        first = save(admin, draft=document(("a", hero("one"))))
+        services.create_checkpoint(admin, key=HOME)
+
+        services.restore_version(
+            admin, key=HOME, number=1, expected_revision=first.draft_revision
+        )
+
+        assert BuilderVersion.objects.filter(document__key=HOME).count() == 1
+
     def test_restore_checks_the_revision_and_the_version(
         self, admin, catalogue, features_on
     ):

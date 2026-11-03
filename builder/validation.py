@@ -30,8 +30,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 
-from builder import data_sources, pointers, references
-from builder.errors import Issue, message_for
+from builder import contrast, data_sources, pointers, references
+from builder.errors import InvalidCatalogueError, Issue, message_for
 from builder.models import DocumentKind, kind_of_key
 from builder.storefront import (
     KIND_BLOCK,
@@ -716,6 +716,43 @@ def _section_levels(walk: _Walk, section: Any, cap: int) -> int:
     if definition is None or not definition.children_max_depth:
         return cap
     return min(cap, definition.children_max_depth)
+
+
+def check_before_release(
+    key: str, validated: Validated, catalogue: Catalogue
+) -> list[Issue]:
+    """What stops a RELEASE of a document that is valid to save: a reference
+    to something that does not exist, and a theme whose colours miss a
+    contrast the catalogue requires (``severity: error`` rules only; a
+    warning is the editor's)."""
+    issues = check_references(validated.refs)
+    kind = kind_of_key(key)
+    root = catalogue.roots.get(kind.value) if kind else None
+    if root is not None and root.contrast:
+        settings_ = validated.data.get("settings") or {}
+        try:
+            outcomes = contrast.evaluate(root.contrast, settings_)
+        except contrast.ContrastCatalogueError as exc:
+            raise InvalidCatalogueError() from exc
+        issues += [
+            Issue(
+                path=outcome.rule.path,
+                code="insufficient_contrast",
+                message=message_for(
+                    "insufficient_contrast",
+                    params := {
+                        "rule": outcome.rule.id,
+                        "ratio": contrast.format_ratio(outcome.ratio),
+                        "min": f"{outcome.rule.min:g}",
+                    },
+                    "",
+                ),
+                params=params,
+            )
+            for outcome in outcomes
+            if outcome.rule.severity == "error" and not outcome.passed
+        ]
+    return issues
 
 
 def check_references(refs: references.Refs) -> list[Issue]:

@@ -311,7 +311,7 @@ class PublishCheckSerializer(serializers.Serializer):
 class ReleaseSerializer(serializers.ModelSerializer):
     published_by = serializers.SerializerMethodField()
     rolled_back_from = serializers.SlugRelatedField(
-        slug_field="number", read_only=True
+        slug_field="number", read_only=True, allow_null=True
     )
     versions = serializers.JSONField()
     documents = serializers.SerializerMethodField()
@@ -367,7 +367,9 @@ class RollbackWriteSerializer(serializers.Serializer):
 class ScheduleSerializer(serializers.ModelSerializer):
     documents = serializers.SerializerMethodField()
     scheduled_by = serializers.SerializerMethodField()
-    release = serializers.SlugRelatedField(slug_field="number", read_only=True)
+    release = serializers.SlugRelatedField(
+        slug_field="number", read_only=True, allow_null=True
+    )
 
     class Meta:
         model = BuilderScheduledPublish

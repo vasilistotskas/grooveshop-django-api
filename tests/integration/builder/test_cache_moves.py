@@ -75,6 +75,7 @@ def test_the_surface_purges_the_storefront_with_the_tenant_config():
     assert surface.invalidates_tenant_config is True
     assert surface.invalidated_by == ("builder.BuilderRelease",)
     assert "cache:nitro:handlers:builderPage*" in surface.nuxt_patterns
+    assert "cache:nitro:functions:builderPageDocument*" in surface.nuxt_patterns
     assert "cache:nitro:handlers:builderChrome*" in surface.nuxt_patterns
     # A route-family pattern is what queues the Cloudflare edge purge.
     assert "cache:nitro:routes:_:*" in surface.nuxt_patterns

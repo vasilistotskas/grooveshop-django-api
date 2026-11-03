@@ -35,6 +35,22 @@ fallback for a setting it could not fetch.
   public (`PUBLIC_SETTING_KEYS`, enforced by
   `tests/integration/core/test_settings_public_api.py`), so a client reads
   a switch from `TenantConfig` and nowhere else.
+- A store value with structure (`ANNOUNCEMENT_BAR`, `AUTH_PANEL`,
+  `FUNDING_BANNER`, `STORE_OFFICES`, `BUSINESS_HOURS`) is a serializer in
+  `core/store_setting_shapes.py`, registered in `STRUCTURED_SETTINGS`. That
+  one class validates the admin's save (the `"validator"` path on the
+  declaration is a one-line call to `is_valid_structured`), is the schema of
+  the typed key `GET /settings/public` serves next to the string map
+  (`announcementBar`, `authPanel`, `fundingBanner`, `storeOffices`,
+  `businessHours`; `null`, or `[]` for offices, is nothing configured), and
+  produces the value served. It is strict: an unknown key, a wrong type
+  (`"true"`, `5` for text) and a snake_case key are refused, and the stored
+  keys are camelCase, as served. A stored value that is not its shape is
+  logged and served as nothing configured, so one broken strip never takes
+  the settings payload down. A new structured setting is a serializer, a
+  registry row, a field on `PublicSettingsSerializer` and an example in
+  `tests/integration/core/test_public_settings_typed.py`; the storefront
+  generates its parser from `schema.yml` and writes none.
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
   `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.

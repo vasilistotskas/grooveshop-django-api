@@ -27,7 +27,7 @@ def _public_settings() -> dict[str, str]:
     response = APIClient().get(reverse("api-settings-public"))
     assert response.status_code == status.HTTP_200_OK
     payload = response.json()
-    assert set(payload) == {"settings"}
+    assert set(payload) >= {"settings"}
     return payload["settings"]
 
 

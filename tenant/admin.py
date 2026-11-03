@@ -552,6 +552,7 @@ class TenantAdmin(BaseModelAdmin):
                 "fields": [
                     "seo_author",
                     "google_site_verification",
+                    "bing_site_verification",
                     "pinterest_domain_verify",
                     "meta_pixel_id",
                     "tiktok_pixel_id",

@@ -242,6 +242,8 @@ class ProductSerializer(
             "id",
             "translations",
             "slug",
+            "gtin",
+            "mpn",
             "category",
             "variant_group",
             "brand",
@@ -275,6 +277,8 @@ class ProductSerializer(
 
         read_only_fields = (
             "id",
+            "gtin",
+            "mpn",
             # Product.category is SET_NULL and optional in the admin, so a
             # product can have none: read-only, the model field makes it
             # nullable in the schema.
@@ -442,6 +446,8 @@ class ProductWriteSerializer(
         fields = (
             "translations",
             "slug",
+            "gtin",
+            "mpn",
             "category",
             "brand",
             "price",

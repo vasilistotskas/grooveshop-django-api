@@ -147,6 +147,9 @@ class TenantConfigSerializer(serializers.Serializer):
     google_site_verification = serializers.CharField(
         required=False, allow_blank=True
     )
+    bing_site_verification = serializers.CharField(
+        required=False, allow_blank=True
+    )
     pinterest_domain_verify = serializers.CharField(
         required=False, allow_blank=True
     )
@@ -500,6 +503,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "is_platform_storefront",
             "seo_author",
             "google_site_verification",
+            "bing_site_verification",
             "pinterest_domain_verify",
             # --- Theme ---
             "primary_color",

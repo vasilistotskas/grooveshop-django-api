@@ -47002,6 +47002,10 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        potentialPoints:
+          type: integer
+          minimum: 0
+          readOnly: true
         mainImagePath:
           type: string
           readOnly: true
@@ -47066,6 +47070,7 @@ components:
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - potentialPoints
       - price
       - priorPrice
       - reductionStartedAt
@@ -47330,6 +47335,10 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        potentialPoints:
+          type: integer
+          minimum: 0
+          readOnly: true
         mainImagePath:
           type: string
           readOnly: true
@@ -47367,6 +47376,7 @@ components:
       - id
       - lowStockThreshold
       - mainImagePath
+      - potentialPoints
       - priorPrice
       - reviewAverage
       - reviewCount
@@ -47948,6 +47958,10 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        potentialPoints:
+          type: integer
+          minimum: 0
+          readOnly: true
         mainImagePath:
           type: string
           readOnly: true
@@ -48020,6 +48034,7 @@ components:
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - potentialPoints
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -48187,6 +48202,10 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        potentialPoints:
+          type: integer
+          minimum: 0
+          readOnly: true
         mainImagePath:
           type: string
           readOnly: true
@@ -48259,6 +48278,7 @@ components:
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - potentialPoints
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -49147,6 +49167,10 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        potentialPoints:
+          type: integer
+          minimum: 0
+          readOnly: true
         mainImagePath:
           type: string
           readOnly: true
@@ -49224,6 +49248,7 @@ components:
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - potentialPoints
       - price
       - priceDropAlertsEnabled
       - priorPrice

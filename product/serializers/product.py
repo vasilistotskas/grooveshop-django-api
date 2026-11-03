@@ -118,8 +118,34 @@ class HiddenReviewsMixin(serializers.Serializer):
         return data
 
 
+# The loyalty points one unit of a product earns at the store's base rate:
+# no tier multiplier, which depends on who is signed in. Public and the same
+# for every visitor, so it is safe in a cached response; a signed-in
+# shopper's tier-adjusted number is the loyalty endpoint's. A comment, not a
+# docstring: drf-spectacular would publish a docstring as the description of
+# every serializer below it.
+class PotentialPointsMixin(serializers.Serializer):
+    potential_points = serializers.SerializerMethodField()
+
+    @cached_property
+    def loyalty_on(self) -> bool:
+        # One read per response, like ``reviews_visible``.
+        from loyalty.services import LoyaltyService
+
+        return LoyaltyService.is_enabled()
+
+    @extend_schema_field(serializers.IntegerField(min_value=0))
+    def get_potential_points(self, obj: Product) -> int:
+        from loyalty.services import LoyaltyService
+
+        if not self.loyalty_on:
+            return 0
+        return LoyaltyService.calculate_item_points(obj, 1)
+
+
 class ProductCardSerializer(
     HiddenReviewsMixin,
+    PotentialPointsMixin,
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
     EffectivePriceFieldsSerializer,
@@ -164,6 +190,7 @@ class ProductCardSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "potential_points",
             "main_image_path",
             "review_average",
             "review_count",
@@ -181,6 +208,7 @@ class ProductCardSerializer(
 # written through ``ProductWriteSerializer``.
 class ProductSerializer(
     HiddenReviewsMixin,
+    PotentialPointsMixin,
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
     EffectivePriceFieldsSerializer,
@@ -260,6 +288,7 @@ class ProductSerializer(
             "prior_price",
             "announced_discount_percent",
             "reduction_started_at",
+            "potential_points",
             "main_image_path",
             "image_paths",
             "review_average",

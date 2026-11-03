@@ -855,15 +855,28 @@ def get_public_settings(request):
     own that can drift from the declared one.
     """
     try:
+        from contact.attachments import parse_attachment_types
+        from core.store_setting_shapes import public_structured_values
         from core.store_settings import store_settings
 
-        values = {
-            key: _serialize_setting_value(value)
-            for key, value in sorted(
-                store_settings(PUBLIC_SETTING_KEYS).items()
-            )
-        }
-        serializer = PublicSettingsSerializer({"settings": values})
+        raw = store_settings(PUBLIC_SETTING_KEYS)
+        typed = public_structured_values(raw)
+        serializer = PublicSettingsSerializer(
+            {
+                "settings": {
+                    key: _serialize_setting_value(value)
+                    for key, value in sorted(raw.items())
+                },
+                "announcement_bar": typed["ANNOUNCEMENT_BAR"],
+                "auth_panel": typed["AUTH_PANEL"],
+                "funding_banner": typed["FUNDING_BANNER"],
+                "store_offices": typed["STORE_OFFICES"] or [],
+                "business_hours": typed["BUSINESS_HOURS"],
+                "contact_attachments_types": list(
+                    parse_attachment_types(raw["CONTACT_ATTACHMENTS_TYPES"])
+                ),
+            }
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception:

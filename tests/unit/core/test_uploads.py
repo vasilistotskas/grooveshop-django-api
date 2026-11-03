@@ -73,6 +73,20 @@ class TestValidateServableImage:
         assert image.mime == RASTER_MIME[image.format]
         assert (image.width, image.height) == (8, 4)
 
+    @pytest.mark.parametrize("fmt", ["JPEG", "PNG", "WEBP", "GIF", "TIFF"])
+    def test_where_the_file_was_left_does_not_matter(self, fmt):
+        file = upload(raster(fmt))
+        file.seek(7)
+
+        assert validate_servable_image(file).format == PILLOW_FORMATS[fmt]
+
+    def test_an_svg_is_read_from_its_start_wherever_it_was_left(self):
+        file = upload(SVG_OK, "a.svg")
+        file.seek(12)
+
+        assert validate_servable_image(file).format == SVG
+        assert file.tell() == 0
+
     def test_the_format_comes_from_the_content_not_the_name(self):
         image = validate_servable_image(upload(raster("JPEG"), "a.png"))
 
@@ -184,6 +198,19 @@ class TestStoredImageProblem:
 
         assert problem is not None
         assert "png" in problem
+
+    def test_a_small_svg_has_no_problem(self, tmp_path):
+        path = self.write(tmp_path, "a.svg", SVG_OK)
+
+        assert stored_image_problem(path) is None
+
+    def test_an_svg_over_its_cap_is_named(self, tmp_path, small_caps):
+        small_caps(svg=10)
+
+        problem = stored_image_problem(self.write(tmp_path, "a.svg", SVG_OK))
+
+        assert problem is not None
+        assert "svg" in problem
 
     def test_a_file_that_is_not_an_image_is_named(self, tmp_path):
         problem = stored_image_problem(self.write(tmp_path, "a.png", b"nope"))

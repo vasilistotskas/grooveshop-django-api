@@ -3,6 +3,22 @@
 
 
 
+## v3.203.1 (2026-11-03)
+
+### Bug fixes
+
+* fix(builder): always send the document of a problem, null when there is none (#446)
+
+Issue.as_dict left document out when it was None, but the schema requires it
+(nullable), so the storefront refused a nothing_to_publish problem with a 422.
+Every problem on the wire (publish/check, every invalid_document 400, a failed
+schedule) is built by that one method, which now always writes document and
+params. publish/check also goes through its declared serializer. Contract tests
+cover nothing_to_publish and the publish 400, and hold as_dict equal to
+PublishProblemSerializer.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e1c65f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e1c65f8d657edf3930a8dbb55f6ff01c29f7ef83))
+
 ## v3.203.0 (2026-11-03)
 
 ### Features

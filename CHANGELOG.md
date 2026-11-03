@@ -3,6 +3,22 @@
 
 
 
+## v3.210.0 (2026-11-03)
+
+### Features
+
+* feat(builder): validate typed data props and index the records and lists they name (#461)
+
+A block can declare a setting in the catalogue data map as a ref or a query.
+builder.data_sources judges the value against the storefront shared cases
+(copied and pinned like the other sources): invalid_data_value, unknown_filter,
+too_many_ids, and too_many_queries per document. A valid value yields the
+records it names (existence-checked at publish) and the lists it asks for as
+query kinds with a facet target, one row per facet, in the version refs and
+BuilderReference. Inert until the catalogue serves data; refs are still read.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`36b8e2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36b8e2c69d6619b8f42d008c25a738c68431293f))
+
 ## v3.209.0 (2026-11-03)
 
 ### Chores

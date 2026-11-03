@@ -962,6 +962,26 @@ BUILDER_PRESENCE_MAX_DOCUMENTS = int(
     getenv("BUILDER_PRESENCE_MAX_DOCUMENTS", "20")
 )
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
+# A contact attachment still PENDING after this many minutes had its scan
+# lost (``contact.tasks.rescan_pending_attachments``); the sweep queues at
+# most this many per store and run.
+CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
+    getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
+)
+CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# Deferred dispatches (``tenant.models.DeferredDispatch``): the sweep takes
+# this many per run, waits ``base * 2**attempts`` seconds (at most the cap)
+# between tries, and deletes a row, with an ERROR, once it is this old.
+DEFERRED_DISPATCH_BATCH = int(getenv("DEFERRED_DISPATCH_BATCH", "200"))
+DEFERRED_DISPATCH_BACKOFF_SECONDS = int(
+    getenv("DEFERRED_DISPATCH_BACKOFF_SECONDS", "30")
+)
+DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS = int(
+    getenv("DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS", "3600")
+)
+DEFERRED_DISPATCH_RETENTION_DAYS = int(
+    getenv("DEFERRED_DISPATCH_RETENTION_DAYS", "7")
+)
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
     getenv("BUILDER_MAX_DOCUMENT_BYTES", str(256 * 1024))
@@ -1456,6 +1476,14 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "redispatch-deferred-tasks": {
+            # Public scope, no fanout: the rows live in ``public``. A task
+            # whose publish failed after its change committed (the broker
+            # was unreachable) is published again here
+            # (``tenant.celery.dispatch_on_commit``).
+            "task": "tenant.tasks.redispatch_deferred_tasks",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
+        },
         "run-due-builder-publishes": {
             # Fanout: a publish scheduled in the page builder goes live
             # within the minute it is due (``builder.scheduling``). Cheap
@@ -1470,6 +1498,12 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+        },
+        "rescan-pending-contact-attachments": {
+            # Fanout: an attachment whose scan was queued by a worker that
+            # died before the publish stays PENDING; this finds it by state.
+            "task": "tenant.tasks.fanout_rescan_pending_contact_attachments",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
         "purge-expired-contact-records": {
             # Fanout: Contact and Feedback are per-tenant. Deletes the

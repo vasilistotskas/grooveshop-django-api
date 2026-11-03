@@ -225,6 +225,10 @@ class TestBeatScheduleTenantCoverage:
         # schemas they describe have been dropped — there is no tenant
         # left to fan out into.
         "tenant.tasks.purge_expired_tenant_archives",
+        # DeferredDispatch rows (a publish that failed after its change
+        # committed) live in public whatever the store; each row carries
+        # its own schema header.
+        "tenant.tasks.redispatch_deferred_tasks",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):

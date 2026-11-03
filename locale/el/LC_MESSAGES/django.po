@@ -1617,6 +1617,9 @@ msgstr "Είστε σίγουροι;"
 msgid "Area"
 msgstr "Ενότητα"
 
+msgid "Arguments"
+msgstr "Ορίσματα"
+
 msgid "Arrival notified at"
 msgstr "Ειδοποίηση άφιξης στις"
 
@@ -1694,6 +1697,9 @@ msgstr "Το συνημμένο δεν βρέθηκε."
 
 msgid "Attachments are not accepted."
 msgstr "Δεν γίνονται δεκτά συνημμένα."
+
+msgid "Attempts"
+msgstr "Προσπάθειες"
 
 msgid "Attribute"
 msgstr "Χαρακτηριστικό"
@@ -3848,6 +3854,12 @@ msgstr "Προεπιλεγμένη συνδρομή"
 
 msgid "Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law: 5 years); empty means never expires"
 msgstr "Προεπιλογή: GIFT_CARD_VALIDITY_DAYS μετά την έκδοση (ελληνική νομοθεσία: 5 έτη)· κενό σημαίνει ότι δεν λήγει ποτέ"
+
+msgid "Deferred dispatch"
+msgstr "Αναβληθείσα αποστολή"
+
+msgid "Deferred dispatches"
+msgstr "Αναβληθείσες αποστολές"
 
 msgid "Delayed"
 msgstr "Καθυστερημένο"
@@ -6797,6 +6809,9 @@ msgstr "Αποτύπωμα"
 msgid "Header"
 msgstr "Κεφαλίδα"
 
+msgid "Headers"
+msgstr "Κεφαλίδες"
+
 msgid "Heaviest parcel the rate carries, or null for no cap."
 msgstr "Το βαρύτερο δέμα που μεταφέρει η τιμή αποστολής, ή null όταν δεν υπάρχει όριο."
 
@@ -7472,6 +7487,9 @@ msgstr "Κλειδί"
 msgid "Keyed hash of the address; empty when the mail had no recipient to write to."
 msgstr "Κρυπτογραφικό αποτύπωμα της διεύθυνσης· κενό όταν το email δεν είχε παραλήπτη."
 
+msgid "Keyword arguments"
+msgstr "Ονομαστικά ορίσματα"
+
 msgid "Kind"
 msgstr "Είδος"
 
@@ -7570,6 +7588,9 @@ msgstr "Τελευταίο γεγονός μεταφορέα"
 
 msgid "Last day (inclusive) of the current term — trial or paid. Empty means the term never expires (legacy rows, the platform row). The daily billing task warns, dunns, and optionally suspends from this date."
 msgstr "Τελευταία ημέρα (συμπεριλαμβανομένης) της τρέχουσας περιόδου — δοκιμαστικής ή πληρωμένης. Κενό σημαίνει ότι η περίοδος δεν λήγει ποτέ (παλαιές εγγραφές, η εγγραφή της πλατφόρμας). Η ημερήσια εργασία χρέωσης προειδοποιεί, ειδοποιεί και προαιρετικά αναστέλλει με βάση αυτή την ημερομηνία."
+
+msgid "Last error"
+msgstr "Τελευταίο σφάλμα"
 
 msgid "Last event at"
 msgstr "Τελευταίο συμβάν"
@@ -8603,6 +8624,9 @@ msgstr "Επόμενος αριθμός"
 msgid "Next action required for payment completion"
 msgstr "Επόμενη ενέργεια που απαιτείται για την ολοκλήρωση της πληρωμής"
 
+msgid "Next attempt at"
+msgstr "Επόμενη προσπάθεια"
+
 msgid "Nine"
 msgstr "Εννέα"
 
@@ -9221,6 +9245,9 @@ msgstr "Προαιρετικός κωδικός περιφέρειας — κα�
 
 msgid "Optional: Full Python path to a validator function (e.g., 'myapp.validators.my_validator')"
 msgstr "Προαιρετικό: Πλήρης διαδρομή Python προς συνάρτηση επικύρωσης (π.χ. 'myapp.validators.my_validator')"
+
+msgid "Options"
+msgstr "Επιλογές"
 
 msgid "Order"
 msgstr "Παραγγελία"
@@ -13452,6 +13479,9 @@ msgstr "Στοχεύει αυτό το προϊόν"
 
 msgid "Targets this product's category"
 msgstr "Στοχεύει την κατηγορία αυτού του προϊόντος"
+
+msgid "Task"
+msgstr "Εργασία"
 
 msgid "Task Results"
 msgstr "Αποτελέσματα εργασιών"

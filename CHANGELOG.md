@@ -3,6 +3,20 @@
 
 
 
+## v3.204.0 (2026-11-03)
+
+### Features
+
+* feat(builder): record a restore version that names the version it restores (#442)
+
+Restoring a version only moved the draft, so the history could not say where
+the draft came from. It now also records a version of kind restore with
+restored_from, the source number (nothing new when the newest version already
+holds that content). Restores are pruned with the unreleased named saves.
+The versions API lists restoredFrom.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`93c507f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/93c507fd525178a1a76e7f752b82b5581065ab24))
+
 ## v3.203.1 (2026-11-03)
 
 ### Bug fixes

@@ -133,6 +133,24 @@ def _digest(upload: UploadedFile) -> str:
     return sha.hexdigest()
 
 
+@dataclass(frozen=True, slots=True)
+class Prepared:
+    """An upload that passed every check, as it would be stored."""
+
+    upload: UploadedFile
+    mime: str
+    width: int
+    height: int
+    digest: str
+
+
+def prepare(upload: UploadedFile) -> Prepared:
+    """Check *upload* and shrink it if it must be, without storing anything.
+    ``MediaInvalid`` when it is refused."""
+    upload, mime, (width, height) = _inspect(upload)
+    return Prepared(upload, mime, width, height, _digest(upload))
+
+
 def _store(
     user: Any,
     upload: UploadedFile,
@@ -141,16 +159,16 @@ def _store(
     focal_y: float | None,
     alt: Mapping[str, Any] | None,
 ) -> Stored:
-    upload, mime, (width, height) = _inspect(upload)
-    digest = _digest(upload)
+    prepared = prepare(upload)
+    upload, digest = prepared.upload, prepared.digest
     known = MediaAsset.objects.filter(content_hash=digest).first()
     if known is not None:
         return Stored(known, created=False)
     asset = MediaAsset(
         file=upload,
-        width=width,
-        height=height,
-        mime=mime,
+        width=prepared.width,
+        height=prepared.height,
+        mime=prepared.mime,
         size_bytes=upload.size,
         content_hash=digest,
         focal_x=_checked_focal(focal_x),
@@ -284,6 +302,19 @@ def _fetch_storefront_static(path: str) -> bytes:
     return bytes(body)
 
 
+def read_import(url: str) -> SimpleUploadedFile:
+    """The file *url* names, read from where this store owns it: its own
+    uploads (``/media/<store>/uploads/...``) or the storefront
+    (``/img/...``). Nothing outside the store is fetched."""
+    path = _import_path(url)
+    data = (
+        _read_store_media(path)
+        if path.startswith("/media/")
+        else _fetch_storefront_static(path)
+    )
+    return SimpleUploadedFile(path.rsplit("/", 1)[-1], data)
+
+
 def import_url(
     user: Any,
     *,
@@ -297,14 +328,25 @@ def import_url(
     the original) or one the storefront serves (``/img/...``). Both go
     through the checks of an upload. Nothing outside the store is fetched."""
     require_permission(user, ADD_PERMISSION)
-    path = _import_path(url)
-    data = (
-        _read_store_media(path)
-        if path.startswith("/media/")
-        else _fetch_storefront_static(path)
+    return store_import(
+        url, user=user, focal_x=focal_x, focal_y=focal_y, alt=alt
     )
-    upload = SimpleUploadedFile(path.rsplit("/", 1)[-1], data)
-    return _store(user, upload, focal_x=focal_x, focal_y=focal_y, alt=alt)
+
+
+def store_import(
+    url: str,
+    *,
+    user: Any = None,
+    focal_x: float | None = None,
+    focal_y: float | None = None,
+    alt: Mapping[str, Any] | None = None,
+) -> Stored:
+    """:func:`import_url` without the permission check, for the management
+    command that moves a store's documents to the library (``user`` is the
+    staff member it is recorded for, none for a command)."""
+    return _store(
+        user, read_import(url), focal_x=focal_x, focal_y=focal_y, alt=alt
+    )
 
 
 def _reaches_the_storefront(asset: MediaAsset) -> None:

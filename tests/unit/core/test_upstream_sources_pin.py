@@ -120,11 +120,17 @@ class FakeGitHub:
         seeds: dict[str, bytes],
         catalogue: bytes = b'{"hash": "h"}\n',
         placement: bytes = b"[]\n",
+        data_cases: bytes = b"[]\n",
+        contrast_cases: bytes = b"{}\n",
+        palettes: bytes = b"{}\n",
         limits: bytes = b'{"maxFileBytes": {}}\n',
     ) -> None:
         self.directories = {"seeds": seeds}
         self.catalogue = catalogue
         self.placement = placement
+        self.data_cases = data_cases
+        self.contrast_cases = contrast_cases
+        self.palettes = palettes
         self.limits = limits
         # Every tree this repository has: sha -> entries.
         self.trees: dict[str, list[dict]] = {}
@@ -165,6 +171,21 @@ class FakeGitHub:
                     "path": "placement-cases.json",
                     "type": "blob",
                     "sha": self._blob(self.placement),
+                },
+                {
+                    "path": "data-cases.json",
+                    "type": "blob",
+                    "sha": self._blob(self.data_cases),
+                },
+                {
+                    "path": "contrast-cases.json",
+                    "type": "blob",
+                    "sha": self._blob(self.contrast_cases),
+                },
+                {
+                    "path": "tailwind-palettes.json",
+                    "type": "blob",
+                    "sha": self._blob(self.palettes),
                 },
                 {
                     "path": "seeds",
@@ -249,6 +270,9 @@ class TestSyncing:
             local(workspace, "catalogue").read_bytes() == b'{"hash": "abc"}\n'
         )
         assert local(workspace, "placement").read_bytes() == b"[]\n"
+        assert local(workspace, "data-cases").read_bytes() == b"[]\n"
+        assert local(workspace, "contrast-cases").read_bytes() == b"{}\n"
+        assert local(workspace, "tailwind-palettes").read_bytes() == b"{}\n"
         assert (
             local(workspace, "image-limits").read_bytes()
             == b'{"maxFileBytes": {}}\n'
@@ -314,6 +338,14 @@ class TestChecking:
             (
                 {"seeds": {"a.json": b"{}\n"}, "placement": b"[1]\n"},
                 "placement",
+            ),
+            (
+                {"seeds": {"a.json": b"{}\n"}, "data_cases": b"[1]\n"},
+                "data-cases",
+            ),
+            (
+                {"seeds": {"a.json": b"{}\n"}, "palettes": b'{"a": 1}\n'},
+                "tailwind-palettes",
             ),
         ],
     )

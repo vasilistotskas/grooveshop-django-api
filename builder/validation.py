@@ -30,8 +30,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 
-from builder import pointers, references
-from builder.errors import Issue, message_for
+from builder import contrast, data_sources, pointers, references
+from builder.errors import InvalidCatalogueError, Issue, message_for
 from builder.models import DocumentKind, kind_of_key
 from builder.storefront import (
     KIND_BLOCK,
@@ -93,6 +93,8 @@ class _Walk:
     nodes: dict[str, tuple[Spec, pointers.Path]] = field(default_factory=dict)
     block_types: set[str] = field(default_factory=set)
     refs: list[tuple[str, str, str]] = field(default_factory=list)
+    #: How many lists the document asks for (``BUILDER_DATA_MAX_QUERIES``).
+    queries: int = 0
     per_type: dict[str, list[str]] = field(
         default_factory=lambda: defaultdict(list)
     )
@@ -206,6 +208,32 @@ def _collect_references(
             walk.refs.append((kind, str(ident), where))
 
 
+def _collect_data(
+    walk: _Walk,
+    definition: Spec,
+    settings_: Any,
+    base: str,
+) -> None:
+    """Hold every typed data prop to its declaration; what a valid one names
+    and depends on joins the document's references."""
+    for pattern, declaration in definition.data.items():
+        for path, value in pointers.walk(settings_, pointers.parse(pattern)):
+            if value is None:
+                continue
+            where = f"{base}{pointers.format_path(path)}"
+            outcome = data_sources.check(declaration, value)
+            for problem in outcome.problems:
+                walk.add(
+                    f"{where}{problem.path}",
+                    problem.code,
+                    data_sources.message(problem.code),
+                )
+            walk.refs.extend((k, t, where) for k, t in sorted(outcome.refs))
+            walk.refs.extend((k, t, where) for k, t in sorted(outcome.deps))
+            if declaration["field"] == "query":
+                walk.queries += 1
+
+
 def _check_node(
     walk: _Walk,
     *,
@@ -260,6 +288,7 @@ def _check_node(
                 error.message,
             )
         _collect_references(walk, definition, settings_, settings_where)
+        _collect_data(walk, definition, settings_, settings_where)
         _sanitise_rich_text(walk, definition, settings_, settings_where)
         walk.nodes[node_id] = (definition, (*path, "settings"))
 
@@ -476,6 +505,7 @@ def _check_root(walk: _Walk, data: dict[str, Any]) -> None:
             error.message,
         )
     _collect_references(walk, root, settings_, "/settings")
+    _collect_data(walk, root, settings_, "/settings")
     _sanitise_rich_text(walk, root, settings_, "/settings")
     walk.nodes[DOCUMENT_NODE] = (root, ("settings",))
 
@@ -654,6 +684,10 @@ def validate_document(
             levels_allowed=_section_levels(walk, section, definition_levels),
         )
     _check_per_type_limits(walk)
+    if walk.queries > settings.BUILDER_DATA_MAX_QUERIES:
+        walk.add(
+            "", "too_many_queries", data_sources.message("too_many_queries")
+        )
     overlay = _check_overlay(walk, cleaned, i18n)
 
     if walk.issues:
@@ -682,6 +716,43 @@ def _section_levels(walk: _Walk, section: Any, cap: int) -> int:
     if definition is None or not definition.children_max_depth:
         return cap
     return min(cap, definition.children_max_depth)
+
+
+def check_before_release(
+    key: str, validated: Validated, catalogue: Catalogue
+) -> list[Issue]:
+    """What stops a RELEASE of a document that is valid to save: a reference
+    to something that does not exist, and a theme whose colours miss a
+    contrast the catalogue requires (``severity: error`` rules only; a
+    warning is the editor's)."""
+    issues = check_references(validated.refs)
+    kind = kind_of_key(key)
+    root = catalogue.roots.get(kind.value) if kind else None
+    if root is not None and root.contrast:
+        settings_ = validated.data.get("settings") or {}
+        try:
+            outcomes = contrast.evaluate(root.contrast, settings_)
+        except contrast.ContrastCatalogueError as exc:
+            raise InvalidCatalogueError() from exc
+        issues += [
+            Issue(
+                path=outcome.rule.path,
+                code="insufficient_contrast",
+                message=message_for(
+                    "insufficient_contrast",
+                    params := {
+                        "rule": outcome.rule.id,
+                        "ratio": contrast.format_ratio(outcome.ratio),
+                        "min": f"{outcome.rule.min:g}",
+                    },
+                    "",
+                ),
+                params=params,
+            )
+            for outcome in outcomes
+            if outcome.rule.severity == "error" and not outcome.passed
+        ]
+    return issues
 
 
 def check_references(refs: references.Refs) -> list[Issue]:

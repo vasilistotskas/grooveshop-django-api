@@ -3,6 +3,135 @@
 
 
 
+## v3.211.0 (2026-11-03)
+
+### Features
+
+* feat(builder): purge the pages a changed record appears on (#462)
+
+Receivers on products, categories, blog posts and categories, promotions and
+their translations work out, from BuilderReference, the documents of the
+current release that name the record or ask for a list it can enter or leave
+(old and new category, with ancestors), queue them after commit, and the
+builder_documents surface sends the storefront builderDocuments in batches of
+64 with no patterns. A stock-only save queues nothing; a promotion reaches the
+offer lists and every page showing a product.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d82c2f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d82c2f580ebf3e0844bdce4447e6d524a71c44bc))
+
+## v3.210.0 (2026-11-03)
+
+### Features
+
+* feat(builder): validate typed data props and index the records and lists they name (#461)
+
+A block can declare a setting in the catalogue data map as a ref or a query.
+builder.data_sources judges the value against the storefront shared cases
+(copied and pinned like the other sources): invalid_data_value, unknown_filter,
+too_many_ids, and too_many_queries per document. A valid value yields the
+records it names (existence-checked at publish) and the lists it asks for as
+query kinds with a facet target, one row per facet, in the version refs and
+BuilderReference. Inert until the catalogue serves data; refs are still read.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`36b8e2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36b8e2c69d6619b8f42d008c25a738c68431293f))
+
+## v3.209.0 (2026-11-03)
+
+### Chores
+
+* chore(builder): refresh the storefront catalogue snapshot (designs, theme contract) (#460)
+
+Run of sync_upstream_sources.py after storefront v3.304.0: the optional designs
+field of catalogue entries, feature catalogue on search_bar, and the theme
+document contract. Additions only; the builder suites pass against it.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b3179dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b3179dcbb624616eb6574bb61d3f57e6eb5154bb))
+
+### Features
+
+* feat(product): filter the product list by brand and by tag (#456) ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+* feat(product): filter the product list by brand and by tag
+
+?brand=<id> (repeatable) and ?tags=<id> (repeatable, active tags only, an
+inactive or unknown id is a 400 like the blog) narrow the public product
+list, so a page-builder block can ask for the products of a brand or tag.
+Both are any-of; a product with two matching tags is still one row.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+### Testing
+
+* test(product): build the brand and tag filter fixtures with the ORM
+
+The factories reach the search indexing signals that the CI services answer
+slowly; the neighbouring product filter tests create their rows directly.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+* test(builder): read the imported upload from real storage, not a mocked one
+
+The import command test answered storage.exists for one name only, so a file
+an earlier test had left under the same name looked free: Django then tried to
+create it again and looped on FileExistsError until the shard timed out. The
+fixture now saves its file through the storage and uses the name it is given.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+## v3.208.0 (2026-11-03)
+
+### Code style
+
+* style: sort the store_settings imports
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
+### Features
+
+* feat(settings): serve every public scalar setting typed in its declared type (#453) ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
+* feat(settings): serve every public scalar setting typed in its declared type
+
+GET /settings/public gains values: one key per public setting without
+structure, typed from the type its EXTRA_SETTINGS_DEFAULTS entry declares
+(int, decimal, bool, string), coordinates as number or null, return fees as
+an enum. The string map is unchanged. PUBLIC_SETTING_KEYS moves to
+core/store_settings.py beside the declared defaults it is built against.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6d93c49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d93c49ec7f6847553fde5511f8306fc58569058))
+
+## v3.207.0 (2026-11-03)
+
+### Features
+
+* feat(cache): purge the storefront cached builder page document with a release (#457)
+
+The storefront is moving its page document cache from the builderPage handler
+to the builderPageDocument function. The builder surface purges both, so a
+publish is not missed in either state; the handler goes when the storefront
+has dropped it.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d2a7a4c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d2a7a4c8da3eceeee38a3c993c354251a20d9b9b))
+
+* feat(auth): publish allauth's headless OpenAPI document and hold our endpoints to it (#451)
+
+manage.py allauth_schema writes allauth-schema.yml from allauth's own
+specification adapted to our adapter and settings, with the spec route
+enabled for that one call only. CI and the API-contract workflow check it
+like schema.yml. Contract tests drive the real endpoints against it; the
+two disagreements they found are fixed: username is optional in the user
+payload, and Flow.id lists every flow allauth emits.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`db2235b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db2235bddf1dbce37cf4fb2bfd63624c422ee522))
+
 ## v3.206.0 (2026-11-03)
 
 ### Bug fixes

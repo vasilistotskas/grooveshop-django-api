@@ -48,6 +48,18 @@ class StorefrontUnavailableError(BuilderError):
     )
 
 
+class InvalidCatalogueError(BuilderError):
+    """The storefront's catalogue contradicts itself (a contrast rule that
+    points at no colour): nothing can be judged against it."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "invalid_catalogue"
+    default_detail = _(
+        "The storefront's catalogue is not valid, so the change cannot be "
+        "checked. Try again in a moment."
+    )
+
+
 class RevisionConflict(BuilderError):
     status_code = status.HTTP_409_CONFLICT
     default_code = "revision_conflict"
@@ -123,6 +135,10 @@ FAILURE_MESSAGES = {
     ),
     "document_gone": _("%(key)s no longer exists."),
     "nothing_to_publish": _("Nothing has changed since the last release."),
+    "insufficient_contrast": _(
+        "The colours of %(rule)s have a contrast of %(ratio)s, below the "
+        "required %(min)s."
+    ),
 }
 
 

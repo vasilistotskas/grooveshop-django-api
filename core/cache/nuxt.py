@@ -90,6 +90,7 @@ def request_purge(
     *,
     dry_run: bool = False,
     tenant_config: bool = False,
+    builder_documents: list[str] | None = None,
     timeout: float = 5.0,
 ) -> NuxtPurgeResult:
     """Call the Nuxt purge endpoint with the supplied glob patterns.
@@ -97,12 +98,17 @@ def request_purge(
     Returns a structured result; never raises so admin actions stay
     responsive when the frontend is briefly unreachable.
 
+    ``builder_documents`` names page-builder documents (``template:home``,
+    ``page:summer-sale``, ``group:header``, ``theme``; at most 64) whose
+    rendered pages the storefront purges, mapping a key to its own routes;
+    ``patterns`` may then be empty.
+
     ``tenant_config`` tells the storefront this purge follows a change to
     the store's tenant config, so it re-resolves the store and re-keys
     its rendered pages; any other purge leaves both alone.
     """
 
-    if not patterns:
+    if not patterns and not builder_documents:
         return NuxtPurgeResult(matched=0, deleted=0, blocked=0)
 
     endpoint = _resolve_endpoint()
@@ -118,6 +124,8 @@ def request_purge(
     }
     if tenant_config:
         payload["tenantConfig"] = True
+    if builder_documents:
+        payload["builderDocuments"] = builder_documents
     try:
         host = _current_tenant_host()
     except StoreHostUnresolvedError as exc:

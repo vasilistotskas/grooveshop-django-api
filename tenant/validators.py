@@ -14,7 +14,7 @@ from django.utils.deconstruct import deconstructible
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name
 
-from core.store_setting_shapes import is_valid_structured
+from core.store_setting_shapes import RETURN_FEES_CHOICES, is_valid_structured
 
 # ---------------------------------------------------------------------------
 # Structured JSON settings
@@ -69,10 +69,6 @@ def validate_dispatch_cutoff_setting(value: object) -> bool:
 # ---------------------------------------------------------------------------
 # RETURN_WINDOW_DAYS / RETURN_FEES extra_settings
 # ---------------------------------------------------------------------------
-
-# Who pays to send a return back: the return is free to the customer, or
-# the customer pays its shipping. Empty = the store has not said.
-RETURN_FEES_CHOICES = frozenset({"", "free", "customer"})
 
 
 def validate_return_window_days_setting(value: object) -> bool:

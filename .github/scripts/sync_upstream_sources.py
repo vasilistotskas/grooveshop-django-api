@@ -13,6 +13,18 @@ are COPIED here:
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   others this one is application data, not a test input.
+* ``data-cases``: ``test/fixtures/builder/data-cases.json`` -> ``tests/
+  fixtures/builder/data-cases.json``, the cases both repositories run for the
+  typed data props (``builder.data_sources``): a declaration, a value, whether
+  it is valid, the issues, the references and the query dependencies it
+  yields.
+* ``contrast-cases``: ``test/fixtures/builder/contrast-cases.json`` -> ``tests/
+  fixtures/builder/contrast-cases.json``, the WCAG 2.2 ratios, rules and whole
+  themes both repositories run (``builder.contrast``);
+* ``tailwind-palettes``: ``test/fixtures/builder/tailwind-palettes.json`` ->
+  ``builder/data/tailwind-palettes.json``, the 11 shades of every Tailwind
+  palette as sRGB hex, so the theme seeding (``builder.theme_seed``) needs no
+  colour maths;
 * ``placement``: ``test/fixtures/builder/placement-cases.json`` -> ``tests/
   fixtures/builder/placement-cases.json``, the cases both the editor's
   placement filter (``shared/builder/placement.ts``) and ``builder.validation.
@@ -102,6 +114,27 @@ SOURCES: tuple[Source, ...] = (
         STOREFRONT,
         "test/fixtures/builder/placement-cases.json",
         "tests/fixtures/builder/placement-cases.json",
+        "blob",
+    ),
+    Source(
+        "data-cases",
+        STOREFRONT,
+        "test/fixtures/builder/data-cases.json",
+        "tests/fixtures/builder/data-cases.json",
+        "blob",
+    ),
+    Source(
+        "contrast-cases",
+        STOREFRONT,
+        "test/fixtures/builder/contrast-cases.json",
+        "tests/fixtures/builder/contrast-cases.json",
+        "blob",
+    ),
+    Source(
+        "tailwind-palettes",
+        STOREFRONT,
+        "test/fixtures/builder/tailwind-palettes.json",
+        "builder/data/tailwind-palettes.json",
         "blob",
     ),
     Source(

@@ -212,6 +212,19 @@ class CacheService:
             if nuxt_result.error:
                 result.nuxt_error = nuxt_result.error
 
+        if surface.purges_builder_documents and not dry_run:
+            from builder import data_purge
+
+            for batch in data_purge.batches(data_purge.take()):
+                documents_result = nuxt_client.request_purge(
+                    [], builder_documents=batch
+                )
+                result.nuxt_matched += documents_result.matched
+                result.nuxt_deleted += documents_result.deleted
+                result.nuxt_blocked += documents_result.blocked
+                if documents_result.error:
+                    result.nuxt_error = documents_result.error
+
         if surface.invalidates_gateway_feeds and not dry_run:
             # No dry-run equivalent: the gateway endpoint deletes or it
             # does not, and reporting a speculative count would be worse

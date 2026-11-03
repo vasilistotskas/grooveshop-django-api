@@ -963,6 +963,11 @@ BUILDER_PRESENCE_MAX_DOCUMENTS = int(
 )
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
+# Typed data props (``builder.data_sources``): most records a hand-picked list
+# or one filter names, and most lists one document asks for.
+BUILDER_DATA_MAX_PICKED_IDS = int(getenv("BUILDER_DATA_MAX_PICKED_IDS", "24"))
+BUILDER_DATA_MAX_FILTER_IDS = int(getenv("BUILDER_DATA_MAX_FILTER_IDS", "5"))
+BUILDER_DATA_MAX_QUERIES = int(getenv("BUILDER_DATA_MAX_QUERIES", "24"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
     getenv("BUILDER_MAX_DOCUMENT_BYTES", str(256 * 1024))
 )

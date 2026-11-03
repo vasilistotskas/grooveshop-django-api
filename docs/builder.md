@@ -182,6 +182,85 @@ and "where is it used" then treat it like any other reference. A link is not
 translatable: it resolves to the path of the viewer's language, so an overlay
 value on it is `untranslatable_setting`.
 
+
+### A theme keeps its contrast (`builder/contrast.py`)
+
+The catalogue declares, for the theme document, the pairs of colours that must
+keep a WCAG 2.2 contrast (`documentKinds.theme.contrast`): `{id, foreground,
+background, min, severity}`, each side an RFC 6901 pointer into the theme's
+root settings or a literal `#RRGGBB`. The theme stores its colour scales, so
+the rules read stored colours and need no colour maths beyond the one ratio.
+
+- **Saving never refuses for contrast.** The editor shows every rule.
+- **A release blocks on the `error` rules** (`validation.check_before_release`,
+  used by `publish`, `publish/check` and scheduling): an `insufficient_contrast`
+  problem with `document: "theme"`, the pointer side of the rule as `path` (the
+  foreground when both are pointers, `/settings` when neither is) and `params`
+  `{rule, ratio, min}` as strings. The ratio is compared unrounded.
+- **A rule that points at no colour is a catalogue bug**, answered `503
+  invalid_catalogue`, never a pass. A malformed rule is refused when the
+  catalogue is read.
+- Rolling back or republishing a stored version is not re-judged: it was valid
+  when it was released.
+
+`tests/fixtures/builder/contrast-cases.json` (the storefront's, copied and
+pinned) holds the ratios, the boundary cases and four whole themes; the
+storefront runs the same file.
+
+### Typed data props (`builder/data_sources.py`)
+
+A block can declare a setting in the catalogue's `data` map, beside `refs`
+(both are read until the storefront stops serving `refs`):
+
+- `{field: "ref", kind, onMissing}`: the setting holds one record's id (a slug
+  for a page), checked like a `refs` entry;
+- `{field: "query", source, onEmpty, maxLimit}`: the setting holds a descriptor,
+  a hand-picked list (`{mode: "picked", ids}`) or a rule
+  (`{mode: "filter", ...}`, `{mode: "roots" | "children", ...}`, `{limit}`),
+  for `source` in `product`, `blogPost`, `category`, `blogCategory`,
+  `promotion`.
+
+`data_sources.check(declaration, value)` judges a value and says what it
+names. A value that is not valid yields problems and nothing else:
+`invalid_data_value`, `unknown_filter` (a key the list does not have) and
+`too_many_ids`, each at the pointer of the offending key; a document that
+asks for more than `BUILDER_DATA_MAX_QUERIES` lists gets `too_many_queries`.
+The vocabulary is held equal to the storefront's by
+`tests/fixtures/builder/data-cases.json`, copied and pinned like the other
+sources (`tests/unit/builder/test_data_sources.py` runs every case).
+
+A valid value yields two kinds of index row, both in `BuilderVersion.refs` and,
+for the current release, `BuilderReference`:
+
+- the records it names (`product`, `category`, `blogCategory`, `blogPost`):
+  existence-checked at publish and listed by "used on N pages";
+- the lists it asks for, as a query kind (`queryProduct`, `queryBlogPost`,
+  `queryCategory`, `queryBlogCategory`, `queryPromotion`) whose `target` is a
+  facet: `*` when no filter bounds the list, `category:<id>` or `parent:<id>`
+  when one does. One row per facet: a change matches any of them, which can
+  over-purge and never under-purge. A facet is not a record, so it is never
+  existence-checked.
+
+
+### A changed record reaches the pages that show it (`builder/data_purge.py`)
+
+The storefront caches a rendered page, so a product, category, post or
+promotion that changes must purge the pages that show it. The index above
+answers which: `documents_for` looks up the documents of the current release
+that name the record (a `product` row) or ask for a list it can enter or leave
+(a `queryProduct` row whose facet is `*` or one of the record's categories,
+WITH its ancestors, in its old and its new value).
+
+Receivers on `Product`, `ProductCategory`, `BlogPost`, `BlogCategory`,
+`Promotion` and their translations compute the affected documents when the
+transaction commits and queue them in a per-store Redis set; the batched purge
+(`core.cache.invalidation`) then sends the storefront `builderDocuments`
+(document keys, at most 64 per call, `patterns` empty) through the
+`builder_documents` surface, and the storefront maps a key to its own routes.
+A save of `stock` or `updated_at` alone queues nothing. A promotion reaches
+the offer lists and every page that shows a product. Over-purging is safe;
+under-purging is the bug, so a list is matched by ANY of its facets.
+
 ## Writes
 
 `builder/services.py` is the only writer (permission first, then the

@@ -259,6 +259,7 @@ def register_default_surfaces() -> None:
                 "ProductAttributeValueViewSet",
                 "SearchProductViewSet",
             )
+            + _nuxt_functions("builderDataProduct", "builderDataSlug")
             # The rendered pages too, not just the JSON behind them:
             # /products and /products/** are SWR-cached (300s), so
             # without this a price edit stayed visible for the whole TTL.
@@ -311,6 +312,7 @@ def register_default_surfaces() -> None:
                 "ProductCategoryAll",
                 "ProductCategoryDetail",
             )
+            + _nuxt_functions("builderDataCategory", "builderDataSlug")
             # Category pages live under /products/category/**, which the
             # same escaped-path prefix covers.
             + _nuxt_routes("/products"),
@@ -355,7 +357,13 @@ def register_default_surfaces() -> None:
             # ``_nuxt_routes("/blog")`` adds the rendered pages —
             # /blog, /blog/categories, /blog/category/**, /blog/post/**
             # are SWR-cached (600s).
-            nuxt_patterns=_nuxt_matching("Blog") + _nuxt_routes("/blog"),
+            nuxt_patterns=_nuxt_matching("Blog")
+            + _nuxt_functions(
+                "builderDataBlogPost",
+                "builderDataBlogCategory",
+                "builderDataSlug",
+            )
+            + _nuxt_routes("/blog"),
             invalidated_by=(
                 "blog.BlogPost",
                 "blog.BlogPostTranslation",
@@ -459,6 +467,7 @@ def register_default_surfaces() -> None:
                 "ContentPageViewSet",
                 "ContentPageDetailViewSet",
             )
+            + _nuxt_functions("builderDataTargets")
             + (f"{NUXT_ROUTE_PREFIX}_:*",),
             invalidated_by=(
                 "page_config.ContentPage",
@@ -497,6 +506,23 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
+            code="builder_documents",
+            label=_("Pages showing changed records"),
+            description=_(
+                "The rendered pages of the page builder that show a product,"
+                " category, blog post or promotion that changed. Purges"
+                " itself when one is saved or deleted."
+            ),
+            # No pattern: the storefront maps each document to its routes
+            # (``builder.data_purge``).
+            purges_builder_documents=True,
+            icon="web",
+            group="content",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
             code="builder",
             label=_("Page builder"),
             description=_(
@@ -513,7 +539,11 @@ def register_default_surfaces() -> None:
             # every cached page of the store at once, as for
             # ``store_texts``.
             django_patterns=(),
+            # ``builderPageDocument`` is the cached function that replaces
+            # the ``builderPage`` handler; both are purged until the
+            # storefront has dropped the handler.
             nuxt_patterns=_nuxt("builderPage", "builderChrome")
+            + _nuxt_functions("builderPageDocument", "builderDataTargets")
             + (f"{NUXT_ROUTE_PREFIX}_:*",),
             invalidates_tenant_config=True,
             invalidated_by=("builder.BuilderRelease",),
@@ -546,6 +576,7 @@ def register_default_surfaces() -> None:
             # rarely; a stale offer panel would survive the whole
             # SWR window.
             nuxt_patterns=_nuxt("PublicPromotionList", "ProductPromotionList")
+            + _nuxt_functions("builderDataPromotion", "builderDataProduct")
             + _nuxt_routes("/offers", "/products"),
             invalidated_by=(
                 "promotion.Promotion",

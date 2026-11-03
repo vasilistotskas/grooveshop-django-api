@@ -3,6 +3,30 @@
 
 
 
+## v3.207.0 (2026-11-03)
+
+### Features
+
+* feat(cache): purge the storefront cached builder page document with a release (#457)
+
+The storefront is moving its page document cache from the builderPage handler
+to the builderPageDocument function. The builder surface purges both, so a
+publish is not missed in either state; the handler goes when the storefront
+has dropped it.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`d2a7a4c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d2a7a4c8da3eceeee38a3c993c354251a20d9b9b))
+
+* feat(auth): publish allauth's headless OpenAPI document and hold our endpoints to it (#451)
+
+manage.py allauth_schema writes allauth-schema.yml from allauth's own
+specification adapted to our adapter and settings, with the spec route
+enabled for that one call only. CI and the API-contract workflow check it
+like schema.yml. Contract tests drive the real endpoints against it; the
+two disagreements they found are fixed: username is optional in the user
+payload, and Flow.id lists every flow allauth emits.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`db2235b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db2235bddf1dbce37cf4fb2bfd63624c422ee522))
+
 ## v3.206.0 (2026-11-03)
 
 ### Bug fixes

@@ -45,9 +45,12 @@ fallback for a setting it could not fetch.
   `businessHours`; `null`, or `[]` for offices, is nothing configured), and
   produces the value served. It is strict: an unknown key, a wrong type
   (`"true"`, `5` for text) and a snake_case key are refused, and the stored
-  keys are camelCase, as served. A stored value that is not its shape is
-  logged and served as nothing configured, so one broken strip never takes
-  the settings payload down. A new structured setting is a serializer, a
+  keys are camelCase, as served. A stored value that is not its shape fails
+  the request (500 `settings_unavailable`), never served as something else:
+  the admin refuses it at save, a shape change ships with a data migration of
+  the stored values, and `manage.py check_store_settings` (PreSync, after
+  `migrate_schemas`) fails the deploy when any store holds a value its
+  declared validator refuses. A new structured setting is a serializer, a
   registry row, a field on `PublicSettingsSerializer` and an example in
   `tests/integration/core/test_public_settings_typed.py`; the storefront
   generates its parser from `schema.yml` and writes none.

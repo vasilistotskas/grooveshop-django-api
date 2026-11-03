@@ -6766,6 +6766,9 @@ msgstr "HMAC secret for verifying BoxNow webhook deliveries — per-tenant, sinc
 msgid "HMAC-SHA256 hex digest of the raw 'data' JSON object; used for signature verification"
 msgstr "HMAC-SHA256 hex digest of the raw 'data' JSON object; used for signature verification"
 
+msgid "HOW ARE YOU FINDING YOUR ORDER?"
+msgstr "HOW ARE YOU FINDING YOUR ORDER?"
+
 msgid "HOW TO COMPLETE YOUR PAYMENT"
 msgstr "HOW TO COMPLETE YOUR PAYMENT"
 
@@ -6903,6 +6906,13 @@ msgstr "Home page sections"
 
 msgid "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
 msgstr "How and when the money arrived (bank transfer reference, hand delivery, ...), as written by the operator."
+
+#, python-brace-format
+msgid "How are you finding your order #{order_id}?"
+msgstr "How are you finding your order #{order_id}?"
+
+msgid "How are you finding your order?"
+msgstr "How are you finding your order?"
 
 msgid "How far this cart is from free shipping, by its cheapest route: a carrier's free-shipping threshold or a free-shipping promotion, judged by the rules checkout prices shipping with. The one figure to show for free shipping; promotionNearMiss entries flagged freeShipping are routes it has already weighed. Null when the cart has no route to free shipping."
 msgstr "How far this cart is from free shipping, by its cheapest route: a carrier's free-shipping threshold or a free-shipping promotion, judged by the rules checkout prices shipping with. The one figure to show for free shipping; promotionNearMiss entries flagged freeShipping are routes it has already weighed. Null when the cart has no route to free shipping."
@@ -7059,6 +7069,9 @@ msgstr "Idle for up to 7 days"
 
 msgid "If it was you, you can sign up for an account using the link below."
 msgstr "If it was you, you can sign up for an account using the link below."
+
+msgid "If something is not as it should be, please contact our customer service and we will make it right."
+msgstr "If something is not as it should be, please contact our customer service and we will make it right."
 
 msgid "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon."
 msgstr "If the address belongs to a staff account that can sign in here, a link to choose a new password is on its way. It works once and expires soon."
@@ -11886,6 +11899,12 @@ msgstr "Review does not exist"
 msgid "Review it in the admin"
 msgstr "Review it in the admin"
 
+msgid "Review reminder"
+msgstr "Review reminder"
+
+msgid "Review request sent at"
+msgstr "Review request sent at"
+
 msgid "Review the application from the store admin — Business Customers."
 msgstr "Review the application from the store admin — Business Customers."
 
@@ -12324,6 +12343,9 @@ msgstr "Sent once to a customer who asked to hear when a product reaches their t
 
 msgid "Sent once to a signed-in customer who reserved stock and never placed the order."
 msgstr "Sent once to a signed-in customer who reserved stock and never placed the order."
+
+msgid "Sent once, a few days after an order was delivered, to ask for a review of the products the customer has not reviewed yet."
+msgstr "Sent once, a few days after an order was delivered, to ask for a review of the products the customer has not reviewed yet."
 
 msgid "Sent once, shortly before an unused gift card expires."
 msgstr "Sent once, shortly before an unused gift card expires."
@@ -15861,6 +15883,9 @@ msgstr "When the product was favourited"
 msgid "When the reduction in force began; empty when the product is not reduced."
 msgstr "When the reduction in force began; empty when the product is not reduced."
 
+msgid "When the reminder to review this order's products was settled: sent, or skipped because there was nothing left to ask for or the customer opted out. The reminder is never sent twice."
+msgstr "When the reminder to review this order's products was settled: sent, or skipped because there was nothing left to ask for or the customer opted out. The reminder is never sent twice."
+
 msgid "When the retained records were finally erased. Null while retention is still running."
 msgstr "When the retained records were finally erased. Null while retention is still running."
 
@@ -16291,6 +16316,10 @@ msgstr "Your legal pages need an update"
 
 msgid "Your opinion helps other shoppers. Share how you like your products."
 msgstr "Your opinion helps other shoppers. Share how you like your products."
+
+#, python-format
+msgid "Your order #%(order_id)s arrived a little while ago. Now that you have had time to try it, we would love to hear what you think."
+msgstr "Your order #%(order_id)s arrived a little while ago. Now that you have had time to try it, we would love to hear what you think."
 
 #, python-format
 msgid "Your order #%(order_id)s has been canceled as requested."
@@ -17392,9 +17421,6 @@ msgstr "…and {count} more lines with errors."
 #~ msgstr ""
 #~ "Thank you for using %(site_name)s!\n"
 #~ "%(site_domain)s"
-
-#~ msgid "Thank you for your order!"
-#~ msgstr "Thank you for your order!"
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."

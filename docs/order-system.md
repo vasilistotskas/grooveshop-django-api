@@ -1490,8 +1490,9 @@ switched it off or a gate is closed is a deliberate no-op: the task returns
 store-staff tasks, which return `False` as they did for a store without a
 contact address.
 
-`order.delivered` and `order.completed` carry a `review_links` list: one
-"Write a review" link per distinct product (`order.emails._review_links`),
+`order.delivered`, `order.completed` and `order.review_request` carry a
+`review_links` list: one "Write a review" link per distinct product still
+to review (`order.emails._review_links`),
 to the product page with the `#write-review` fragment that opens the
 storefront's review form. It is empty when the store's `product_reviews`
 feature is off, or when `PRODUCT_REVIEWS_PURCHASE_REQUIRED` is on and the
@@ -1502,6 +1503,31 @@ DELIVERED one whose pay way is collected on delivery (the shopper paid the
 courier or carrier; the order stays DELIVERED until the payout is
 reconciled). An online-paid order is COMPLETED milliseconds after the
 carrier reports it delivered, before this mail is sent.
+
+**The review reminder** (`order.review_request`, `order/review_request.py`,
+`order.tasks.send_review_request_emails`) is the second invitation, sent
+once, `REVIEW_REQUEST_DELAY_DAYS` days (store setting, default 8, `0` off,
+validated by `validate_review_request_delay_days_setting`, at most a year)
+after the order's first move to DELIVERED. `Order` has no delivery
+column, so the time is the `OrderHistory` STATUS row of that move
+(`status_updated_at` moves again when a cash-on-delivery order completes
+days later); an order created already delivered has no such row and is
+never reminded. The beat entry `send-review-request-emails` (daily, per
+store, `tenant.tasks.fanout_send_review_request_emails`) takes the orders
+still DELIVERED or COMPLETED whose delivery fell between the delay and
+the delay plus `REVIEW_REQUEST_CATCH_UP_DAYS` (so a store that switches it
+on does not mail its whole history, and a missed run costs nothing).
+Each order is claimed by stamping `Order.review_request_sent_at` where it
+is empty, then mailed: the stamp stays when the order is settled without
+a mail (nothing left to review, the customer opted out, the store
+switched the type off, reviews are off) or after a failure no retry can
+fix, and is released after a transient failure so the next run retries.
+`order.emails.unreviewed_products` is the one definition of what is
+left to ask for (the delivered and completed mails use it too): a product
+the customer has a review of, in any status, is not asked again. The
+type is `Kind.MARKETING`: a request for a review is not part of the
+order, so `EmailOptOut` applies and the mail carries the unsubscribe
+headers and footer; the store can also switch it off.
 
 `order.status_refunded` is the email the REFUNDED status change sends
 through `send_order_status_update_email`; `order.refunded` is the one per

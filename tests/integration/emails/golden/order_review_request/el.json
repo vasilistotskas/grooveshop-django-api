@@ -1,0 +1,16 @@
+{
+  "attachments": [],
+  "from": "Acme Gadgets <noreply@platform.test>",
+  "headers": {
+    "List-ID": "<order_review_request.shop.example>",
+    "List-Unsubscribe": "<mailto:owner@store.test?subject=unsubscribe>, <https://api.shop.example/api/v1/emails/unsubscribe/eyJzY2hlbWEiOiJhY21lIiwiaCI6IjhmY2U3OWE4M2UxMGQ2ZDM2MjEzYzNkM2FhOTAxNDVjMGNjMGY0M2U5NzA2OGUwODc3ZTkxZWE5YTViYmFlODAiLCJ0Ijoib3JkZXIucmV2aWV3X3JlcXVlc3QiLCJhIjo1MDAwMDF9:1AbCdE:bsh0h6u7OTIFuqo6lZelqUZg7-qWk-3rulJO6OBYrQY>",
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+  },
+  "reply_to": [
+    "owner@store.test"
+  ],
+  "subject": "Πώς σας φάνηκε η παραγγελία #900001;",
+  "to": [
+    "customer@example.test"
+  ]
+}

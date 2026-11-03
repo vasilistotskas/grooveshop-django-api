@@ -49,18 +49,20 @@ from core.utils.tenant_urls import get_tenant_frontend_url
 from emails.declare import customer_email, staff_email
 from emails.gates import CarrierGate, FeatureGate, StoreSwitchGate
 from emails.recipients import Recipient, customer_of
-from emails.types import EmailType, RenderEnv
+from emails.types import EmailType, Kind, RenderEnv
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.payment import payment_provider_label
 from order.payment_ledger import PaymentLedger
 from pay_way.enum.settlement import PaySettlement
+from product.models.review import ProductReview
 from recommendation.order_email import EmailStrip, order_email_strip
 from tenant.credentials import tenant_site_name
 from tenant.features import feature_on
 
 if TYPE_CHECKING:
     from order.models import Order, PaymentTransaction
+    from product.models.product import Product
 
 logger = logging.getLogger(__name__)
 
@@ -273,21 +275,35 @@ def _confirmation(order: Order, env: RenderEnv) -> dict[str, Any]:
         return _confirmation_context(order, env.language)
 
 
-def _review_links(order: Order, language: str) -> list[dict[str, str]]:
-    """One "write a review" link per distinct product of *order*, to the
-    storefront page that opens the review form (``REVIEW_FORM_FRAGMENT``).
+def unreviewed_products(order: Order) -> dict[int, Product]:
+    """The distinct products of *order* its shopper may still be invited to
+    review, by product id, in the order of its lines.
 
-    Empty when the store has product reviews off, or when it requires a
-    purchase to review and the order has no account: a guest order can
-    never count as a verified purchase (``product.managers.review.
-    purchase_items`` matches on the order's user), so the link would only
-    lead to a refusal.
+    Empty when the store has product reviews off, when it requires a
+    purchase to review and the order has no account (a guest order can
+    never count as a verified purchase: ``product.managers.review.
+    purchase_items`` matches on the order's user, so the link would only
+    lead to a refusal), and for a product the shopper has reviewed already
+    (one review per product and account).
     """
     if not feature_on("product_reviews"):
-        return []
+        return {}
     if not order.user_id and store_setting("PRODUCT_REVIEWS_PURCHASE_REQUIRED"):
-        return []
+        return {}
     products = {line.product_id: line.product for line in _lines(order)}
+    if order.user_id and not _is_sample(order):
+        reviewed = ProductReview.objects.filter(
+            user_id=order.user_id, product_id__in=products
+        ).values_list("product_id", flat=True)
+        for product_id in reviewed:
+            products.pop(product_id)
+    return products
+
+
+def _review_links(order: Order, language: str) -> list[dict[str, str]]:
+    """One "write a review" link per product of *order* still to review
+    (``unreviewed_products``), to the storefront page that opens the review
+    form (``REVIEW_FORM_FRAGMENT``)."""
     return [
         {
             "name": product.safe_translation_getter("name", any_language=True)
@@ -299,7 +315,7 @@ def _review_links(order: Order, language: str) -> list[dict[str, str]]:
                 + REVIEW_FORM_FRAGMENT
             ),
         }
-        for product in products.values()
+        for product in unreviewed_products(order).values()
     ]
 
 
@@ -315,6 +331,18 @@ def _status_update(order: Order, env: RenderEnv, status: str) -> dict[str, Any]:
                 _review_links(order, env.language)
                 if status in REVIEW_INVITING_STATUSES
                 else []
+            ),
+        }
+
+
+def _review_request(order: Order, env: RenderEnv) -> dict[str, Any]:
+    with _email_language(order, env.language):
+        return {
+            "order_id": order.id,
+            "order": order,
+            "review_links": _review_links(order, env.language),
+            "preferences_url": get_tenant_frontend_url(
+                "/account/subscriptions/", language=env.language
             ),
         }
 
@@ -855,6 +883,27 @@ _status_email(
     description=_("Sent when an order is closed as refunded."),
     templates="order_refunded",
     required=True,
+)
+
+_customer_email(
+    "order.review_request",
+    title=_("Review reminder"),
+    description=_(
+        "Sent once, a few days after an order was delivered, to ask for a "
+        "review of the products the customer has not reviewed yet."
+    ),
+    templates="review_request",
+    subject=gettext_noop("How are you finding your order #{order_id}?"),
+    build_context=_review_request,
+    sample=lambda env: _sample_order(env, status=OrderStatus.DELIVERED),
+    list_id="order_review_request",
+    required=False,
+    kind=Kind.MARKETING,
+    gates=(
+        FeatureGate(
+            feature="product_reviews", label=_("Product reviews feature")
+        ),
+    ),
 )
 
 _mydata = StoreSwitchGate(

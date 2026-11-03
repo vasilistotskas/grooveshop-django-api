@@ -969,6 +969,10 @@ CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
     getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
 )
 CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# The review reminder (``order.tasks.send_review_request_emails``) runs
+# daily: an order delivered up to this many days earlier than its due day
+# is still reminded, so a run that did not happen costs nothing.
+REVIEW_REQUEST_CATCH_UP_DAYS = int(getenv("REVIEW_REQUEST_CATCH_UP_DAYS", "3"))
 # Deferred dispatches (``tenant.models.DeferredDispatch``): the sweep takes
 # this many per run, waits ``base * 2**attempts`` seconds (at most the cap)
 # between tries, and deletes a row, with an ERROR, once it is this old.
@@ -1663,6 +1667,12 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_refresh_stats_snapshots",
             "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
+        "send-review-request-emails": {
+            "task": "tenant.tasks.fanout_send_review_request_emails",
+            "schedule": SCHEDULE_PRESETS["daily_noon"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "send-checkout-abandonment-emails": {
             "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
             "schedule": SCHEDULE_PRESETS["daily_6am"]
@@ -2258,6 +2268,22 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "CHECKOUT_ABANDONMENT_HOURS",
         "type": "int",
         "value": 2,
+    },
+    {
+        "name": "REVIEW_REQUEST_DELAY_DAYS",
+        "type": "int",
+        "value": 8,
+        "validator": (
+            "order.review_request.validate_review_request_delay_days_setting"
+        ),
+        "description": (
+            "Send a customer one reminder email this many days after their "
+            "order was delivered, asking for a review of the products they "
+            "have not reviewed yet. At most one per order, and only while "
+            "product reviews are on and the customer has not opted out of "
+            "marketing email. 0 turns the reminder off. The delivery email "
+            "itself always invites a review."
+        ),
     },
     # Contact / email
     {

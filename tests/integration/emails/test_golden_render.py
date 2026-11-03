@@ -18,7 +18,7 @@ footer's copyright year (``tests/utils/golden.py``).
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
@@ -26,7 +26,7 @@ from unittest.mock import patch
 import pytest
 from django.core import mail
 from django.core.files.base import ContentFile
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext
 from djmoney.money import Money
 from phonenumber_field.phonenumber import PhoneNumber
@@ -38,7 +38,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
-from order.models import Invoice, Order, RetailCredit
+from order.models import Invoice, Order, OrderHistory, RetailCredit
 from order.models.retail_credit import CreditReason
 from order.tasks import (
     send_admin_new_order_email,
@@ -49,6 +49,7 @@ from order.tasks import (
     send_order_status_update_email,
     send_payment_failed_email,
     send_refund_confirmation_email,
+    send_review_request_emails,
     send_shipping_notification_email,
 )
 from pay_way.enum.pay_way import PayWayEnum
@@ -297,6 +298,40 @@ class TestCustomerOrderEmails:
         assert send_order_status_update_email.run(order.id, status) is True
 
         assert_sent(f"order_{status.lower()}", language)
+
+    def test_review_request(self, language, settings):
+        # A marketing mail: its unsubscribe headers carry a signed token,
+        # so the keys and the signer's clock are fixed.
+        settings.SECRET_KEY = "golden-secret-key-not-used-anywhere-else"
+        settings.EMAIL_HASH_KEY = "golden-hash-key-not-used-anywhere-else"
+        settings.API_BASE_URL = "https://api.shop.example"
+        # The unsubscribe token names the account, so its id is fixed.
+        customer = UserAccountFactory(
+            id=500_001,
+            num_addresses=0,
+            email=CUSTOMER_INBOX,
+            first_name="Maria",
+            last_name="Papadopoulou",
+            language_code=language,
+        )
+        order = build_order(
+            language, user=customer, status=OrderStatus.DELIVERED
+        )
+        OrderHistory.log_status_change(
+            order, OrderStatus.SHIPPED, OrderStatus.DELIVERED
+        )
+        OrderHistory.objects.filter(order=order, change_type="STATUS").update(
+            created_at=timezone.now() - timedelta(days=9)
+        )
+        mail.outbox.clear()
+
+        with patch(
+            "django.core.signing.TimestampSigner.timestamp",
+            return_value="1AbCdE",
+        ):
+            assert send_review_request_emails.run()["sent"] == 1
+
+        assert_sent("order_review_request", language)
 
     def test_payment_failed(self, language):
         order = build_order(language, payment_status=PaymentStatus.FAILED)

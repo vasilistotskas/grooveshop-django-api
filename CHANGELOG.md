@@ -3,6 +3,53 @@
 
 
 
+## v3.209.0 (2026-11-03)
+
+### Chores
+
+* chore(builder): refresh the storefront catalogue snapshot (designs, theme contract) (#460)
+
+Run of sync_upstream_sources.py after storefront v3.304.0: the optional designs
+field of catalogue entries, feature catalogue on search_bar, and the theme
+document contract. Additions only; the builder suites pass against it.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`b3179dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b3179dcbb624616eb6574bb61d3f57e6eb5154bb))
+
+### Features
+
+* feat(product): filter the product list by brand and by tag (#456) ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+* feat(product): filter the product list by brand and by tag
+
+?brand=<id> (repeatable) and ?tags=<id> (repeatable, active tags only, an
+inactive or unknown id is a 400 like the blog) narrow the public product
+list, so a page-builder block can ask for the products of a brand or tag.
+Both are any-of; a product with two matching tags is still one row.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+### Testing
+
+* test(product): build the brand and tag filter fixtures with the ORM
+
+The factories reach the search indexing signals that the CI services answer
+slowly; the neighbouring product filter tests create their rows directly.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
+* test(builder): read the imported upload from real storage, not a mocked one
+
+The import command test answered storage.exists for one name only, so a file
+an earlier test had left under the same name looked free: Django then tried to
+create it again and looped on FileExistsError until the shard timed out. The
+fixture now saves its file through the storage and uses the name it is given.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`1803c2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1803c2ca13ded9195c28b44248d8ad8b492dc0bb))
+
 ## v3.208.0 (2026-11-03)
 
 ### Code style

@@ -3,6 +3,78 @@
 
 
 
+## v3.216.0 (2026-11-03)
+
+### Bug fixes
+
+* fix(product): order the attribute migration after the image alt text one
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* fix(rich-text): drop headings that show nothing on save (#472)
+
+The editor leaves an empty heading behind when a heading's text is moved
+(webside's power bank description stores one). A screen reader announces
+it and it is a hole in the page's outline. RichTextField now drops a
+heading with no visible content after sanitising, keeping one that holds
+an image. It stays out of sanitize_html so lost_content does not refuse
+the save.
+
+The backfill command now applies the whole of what a save does, so
+record_rich_text_image_sizes becomes normalise_rich_text.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6c705f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c705f68b0a39022b17bf27a64cda18541694aab))
+
+### Features
+
+* feat(product): let a merchant say which standard property an attribute is (#473) ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): editable alt text per product image
+
+ProductImage gains a translated alt_text (additive migration). The
+product page's images inline now edits title and alt text per language
+tab, and the image admin page shows alt text too.
+
+The API's altText returns the merchant's alt text in the request
+language, else the title, else an empty string. The hardcoded English
+"Main image of X" sentence is gone; the storefront builds its own
+localized fallback. The field stays a required string.
+
+The inline loses per_page: Unfold's paged formset cannot be combined
+with parler's translated one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): let a merchant say which standard property an attribute is
+
+Attribute names are free, translated text, so structured data cannot be
+derived by matching them. A new Attribute.schema_property (color, size,
+material, pattern, suggestedAge, suggestedGender, or blank) is set in the
+admin and served read-only as schemaProperty on product attributes and on
+each axis of the variants response. Additive migration with db_default.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): editable alt text per product image (#471)
+
+ProductImage gains a translated alt_text (additive migration). The
+product page's images inline now edits title and alt text per language
+tab, and the image admin page shows alt text too.
+
+The API's altText returns the merchant's alt text in the request
+language, else the title, else an empty string. The hardcoded English
+"Main image of X" sentence is gone; the storefront builds its own
+localized fallback. The field stays a required string.
+
+The inline loses per_page: Unfold's paged formset cannot be combined
+with parler's translated one.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5390565`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5390565b9ccd46b4a26206fcf4b37fc2655f176b))
+
 ## v3.215.0 (2026-11-03)
 
 ### Bug fixes

@@ -23,7 +23,7 @@ from builder.models import (
     DocumentKind,
     VersionKind,
 )
-from builder.services import staff_summary
+from builder.services import release_documents, staff_summary
 
 
 class StaffSerializer(serializers.Serializer):
@@ -284,12 +284,37 @@ class CheckpointWriteSerializer(serializers.Serializer):
     )
 
 
+class ReleaseDocumentSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    version_number = serializers.IntegerField()
+    changed = serializers.BooleanField(
+        help_text="Differs from the release before it."
+    )
+
+
+class PublishProblemSerializer(serializers.Serializer):
+    document = serializers.CharField(allow_null=True)
+    path = serializers.CharField()
+    code = serializers.CharField()
+    message = serializers.CharField()
+    params = serializers.DictField(
+        child=serializers.CharField(), allow_null=True, required=False
+    )
+
+
+class PublishCheckSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    changed = serializers.ListField(child=serializers.CharField())
+    problems = PublishProblemSerializer(many=True)
+
+
 class ReleaseSerializer(serializers.ModelSerializer):
     published_by = serializers.SerializerMethodField()
     rolled_back_from = serializers.SlugRelatedField(
         slug_field="number", read_only=True
     )
     versions = serializers.JSONField()
+    documents = serializers.SerializerMethodField()
 
     class Meta:
         model = BuilderRelease
@@ -301,8 +326,16 @@ class ReleaseSerializer(serializers.ModelSerializer):
             "note",
             "rolled_back_from",
             "versions",
+            "documents",
         )
         read_only_fields = fields
+
+    @extend_schema_field(ReleaseDocumentSerializer(many=True))
+    def get_documents(self, obj: BuilderRelease) -> list[dict[str, Any]]:
+        held = self.context.get("release_documents")
+        if held is None:
+            held = release_documents([obj])
+        return held[obj.pk]
 
     @extend_schema_field(StaffSerializer(allow_null=True))
     def get_published_by(self, obj: BuilderRelease) -> dict[str, Any] | None:

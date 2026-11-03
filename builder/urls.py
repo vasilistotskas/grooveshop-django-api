@@ -101,6 +101,11 @@ urlpatterns = [
         name="schedule-acknowledge",
     ),
     path("builder/publish", views.PublishView.as_view(), name="publish"),
+    path(
+        "builder/publish/check",
+        views.PublishCheckView.as_view(),
+        name="publish-check",
+    ),
     path("builder/rollback", views.RollbackView.as_view(), name="rollback"),
     path(
         "builder/releases",

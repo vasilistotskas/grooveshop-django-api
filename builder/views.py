@@ -8,7 +8,7 @@ public read of the current release. All of it is a thin layer over
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -82,6 +82,7 @@ from builder.serializers import (
     PreviewLinkSerializer,
     PreviewLinkWriteSerializer,
     PreviewResolveSerializer,
+    PublishCheckSerializer,
     PublishedIndexSerializer,
     PublishedPageSerializer,
     PublishVersionWriteSerializer,
@@ -401,6 +402,38 @@ class PublishView(StaffView):
         )
 
 
+class PublishCheckView(StaffView):
+    queryset = BuilderRelease.objects.none()
+
+    @extend_schema(
+        tags=TAGS,
+        request=PublishWriteSerializer,
+        responses={200: PublishCheckSerializer, **ERRORS},
+        description=(
+            "What `POST publish` of the same documents would do, without "
+            "doing it: `ok`, the documents whose draft differs from the "
+            "released version (`changed`), and every problem with its "
+            "`document` (a draft that fails validation, a reference that "
+            "no longer exists, `nothing_to_publish`). Same permission as "
+            "the publish; stores nothing and takes no lock. An unknown "
+            "document is `404`; no catalogue is `503`."
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        body = PublishWriteSerializer(data=request.data)
+        body.is_valid(raise_exception=True)
+        result = services.check_publish(
+            request.user, keys=body.validated_data["documents"]
+        )
+        return Response(
+            {
+                "ok": result.ok,
+                "changed": list(result.changed),
+                "problems": [issue.as_dict() for issue in result.problems],
+            }
+        )
+
+
 class RollbackView(StaffView):
     queryset = BuilderRelease.objects.none()
 
@@ -432,6 +465,20 @@ class ReleaseListView(StaffListView):
         return BuilderRelease.objects.select_related(
             "rolled_back_from"
         ).prefetch_related("published_by_staff")
+
+    def paginate_queryset(self, queryset: Any) -> Any:
+        page = super().paginate_queryset(queryset)
+        if page is not None:
+            self._release_documents = services.release_documents(
+                cast("list[BuilderRelease]", page)
+            )
+        return page
+
+    def get_serializer_context(self) -> dict[str, Any]:
+        return {
+            **super().get_serializer_context(),
+            "release_documents": getattr(self, "_release_documents", None),
+        }
 
 
 @extend_schema(tags=TAGS)

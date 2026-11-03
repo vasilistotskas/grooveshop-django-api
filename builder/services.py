@@ -479,13 +479,10 @@ class PublishResult:
 
 
 def _publish_documents(
-    keys: Sequence[str],
+    keys: Sequence[str], *, lock: bool = True
 ) -> list[BuilderDocument]:
-    documents = list(
-        BuilderDocument.objects.select_for_update()
-        .filter(key__in=keys)
-        .order_by("key")
-    )
+    queryset = BuilderDocument.objects.filter(key__in=keys).order_by("key")
+    documents = list(queryset.select_for_update() if lock else queryset)
     unknown = sorted(set(keys) - {document.key for document in documents})
     if unknown:
         raise NotFoundError(
@@ -496,13 +493,17 @@ def _publish_documents(
 
 
 def validated_drafts(
-    keys: Sequence[str], catalogue: storefront.Catalogue
+    keys: Sequence[str],
+    catalogue: storefront.Catalogue,
+    *,
+    lock: bool = True,
 ) -> tuple[list[BuilderDocument], dict[str, validation.Validated]]:
     """The locked documents of *keys* with every draft validated in full,
     references included. One problem anywhere is a ``DocumentInvalid``
     listing every problem with its document. The caller holds the
-    transaction."""
-    documents = _publish_documents(keys)
+    transaction; ``lock=False`` reads without taking the row locks, for a
+    check that writes nothing."""
+    documents = _publish_documents(keys, lock=lock)
     problems: list[Issue] = []
     checked: dict[str, validation.Validated] = {}
     for document in documents:
@@ -518,6 +519,115 @@ def validated_drafts(
     if problems:
         raise DocumentInvalid(problems)
     return documents, checked
+
+
+@dataclass(frozen=True, slots=True)
+class PublishCheck:
+    """What a publish of some documents would do, found without doing it."""
+
+    changed: tuple[str, ...]
+    problems: tuple[Issue, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.problems
+
+
+def check_publish(user: Any, *, keys: Iterable[str]) -> PublishCheck:
+    """What ``publish`` of *keys* would answer, writing nothing: every
+    problem it would report (with its document), and the documents whose
+    draft differs from the version the current release holds. Same
+    permission as the publish; takes no lock, so it never holds up a save.
+    An unknown document is still a ``NotFoundError``."""
+    require_permission(user, PUBLISH_PERMISSION)
+    wanted = list(dict.fromkeys(keys))
+    if not wanted:
+        return PublishCheck(
+            (),
+            (
+                Issue(
+                    path="/documents",
+                    code="nothing_to_publish",
+                    message=_("Choose at least one document to publish."),
+                ),
+            ),
+        )
+    catalogue = _catalogue()
+    problems: list[Issue] = []
+    checked: dict[str, validation.Validated] = {}
+    with transaction.atomic():
+        documents = _publish_documents(wanted, lock=False)
+        for document in documents:
+            issues, validated = _issues(
+                document.key, document.draft, document.draft_i18n, catalogue
+            )
+            if validated is not None:
+                issues = validation.check_references(validated.refs)
+                checked[document.key] = validated
+            problems.extend(
+                replace(issue, document=document.key) for issue in issues
+            )
+        held = dict(
+            BuilderVersion.objects.filter(
+                pk__in=published_versions().values()
+            ).values_list("pk", "content_hash")
+        )
+        previous = published_versions()
+    changed = tuple(
+        key
+        for key in wanted
+        if key in checked
+        and held.get(previous.get(key, 0)) != checked[key].content_hash
+    )
+    if not problems and not changed:
+        problems.append(
+            Issue(
+                path="/documents",
+                code="nothing_to_publish",
+                message=_("Nothing has changed since the last release."),
+            )
+        )
+    return PublishCheck(changed, tuple(problems))
+
+
+def release_documents(
+    releases: Sequence[BuilderRelease],
+) -> dict[int, list[dict[str, Any]]]:
+    """``{release id: [{key, version_number, changed}]}``: each document a
+    release holds, at which version number, and whether it differs from the
+    release before it (the first release changes everything). Two queries
+    for any number of releases."""
+    numbers = {release.number for release in releases}
+    before = {
+        release.number: release
+        for release in BuilderRelease.objects.filter(
+            number__in={n - 1 for n in numbers}
+        )
+    }
+    version_ids = {
+        version_id
+        for release in (*releases, *before.values())
+        for version_id in release.versions.values()
+    }
+    version_numbers = dict(
+        BuilderVersion.objects.filter(pk__in=version_ids).values_list(
+            "pk", "number"
+        )
+    )
+    answer: dict[int, list[dict[str, Any]]] = {}
+    for release in releases:
+        earlier = before.get(release.number - 1)
+        held = earlier.versions if earlier is not None else {}
+        answer[release.pk] = [
+            {
+                "key": key,
+                "version_number": version_numbers[version_id],
+                "changed": held.get(key) != version_id,
+            }
+            for key, version_id in sorted(release.versions.items())
+            if version_id in version_numbers
+        ]
+    return answer
 
 
 def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:

@@ -9985,6 +9985,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/builder/publish/check:
+    post:
+      operationId: api_v1_builder_publish_check_create
+      description: 'What `POST publish` of the same documents would do, without doing
+        it: `ok`, the documents whose draft differs from the released version (`changed`),
+        and every problem with its `document` (a draft that fails validation, a reference
+        that no longer exists, `nothing_to_publish`). Same permission as the publish;
+        stores nothing and takes no lock. An unknown document is `404`; no catalogue
+        is `503`.'
+      tags:
+      - Builder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishWriteRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishCheck'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/builder/published:
     get:
       operationId: builder_published_index
@@ -49525,6 +49565,45 @@ components:
           description: Τιμές ρυθμίσεων με κλειδί το όνομα της ρύθμισης.
       required:
       - settings
+    PublishCheck:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        changed:
+          type: array
+          items:
+            type: string
+        problems:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublishProblem'
+      required:
+      - changed
+      - ok
+      - problems
+    PublishProblem:
+      type: object
+      properties:
+        document:
+          type: string
+          nullable: true
+        path:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        params:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+      required:
+      - code
+      - document
+      - message
+      - path
     PublishVersionWriteRequest:
       type: object
       properties:
@@ -49990,7 +50069,13 @@ components:
           title: Αριθμός
           readOnly: true
         versions: {}
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReleaseDocument'
+          readOnly: true
       required:
+      - documents
       - id
       - note
       - number
@@ -49998,6 +50083,20 @@ components:
       - publishedBy
       - rolledBackFrom
       - versions
+    ReleaseDocument:
+      type: object
+      properties:
+        key:
+          type: string
+        versionNumber:
+          type: integer
+        changed:
+          type: boolean
+          description: Differs from the release before it.
+      required:
+      - changed
+      - key
+      - versionNumber
     ReleaseReservationsRequestRequest:
       type: object
       description: Serializer for releasing stock reservations.

@@ -45788,6 +45788,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -45800,6 +45802,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -45899,6 +45903,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -45912,11 +45918,25 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           minLength: 1
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+          maxLength: 14
+        mpn:
+          type: string
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
+          maxLength: 70
         category:
           type: integer
           nullable: true
@@ -46878,6 +46898,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -46891,10 +46913,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -47065,11 +47101,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priorPrice
       - reductionStartedAt
@@ -47402,6 +47440,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -47414,6 +47454,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -47486,6 +47528,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -47498,6 +47542,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -47773,6 +47819,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -47785,6 +47833,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -47830,6 +47880,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -47843,10 +47895,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -48025,11 +48091,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -48069,6 +48137,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -48082,10 +48152,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -48264,11 +48348,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -49051,6 +49137,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49064,10 +49152,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -49251,11 +49353,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -49480,6 +49584,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49492,6 +49598,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                feedTitle:
                   type: string
         slug:
           type: string
@@ -49617,6 +49725,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49630,11 +49740,25 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           minLength: 1
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+          maxLength: 14
+        mpn:
+          type: string
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
+          maxLength: 70
         category:
           type: integer
           nullable: true
@@ -52267,6 +52391,8 @@ components:
         seoAuthor:
           type: string
         googleSiteVerification:
+          type: string
+        bingSiteVerification:
           type: string
         pinterestDomainVerify:
           type: string

@@ -46,6 +46,7 @@ class TestTenantConfigSerializer:
             "is_platform_storefront",
             "seo_author",
             "google_site_verification",
+            "bing_site_verification",
             "pinterest_domain_verify",
         }
         assert expected.issubset(set(serializer.fields.keys()))

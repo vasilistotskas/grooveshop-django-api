@@ -960,8 +960,11 @@ class ProductAdmin(
                     "category",
                     "variant_group",
                     "brand",
+                    "gtin",
+                    "mpn",
                     "active",
                     "name",
+                    "feed_title",
                     "description",
                 ),
                 "classes": ("tab",),
@@ -1767,7 +1770,7 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("name", "description"),
+                "fields": ("name", "description", "footer_text"),
                 "classes": ("wide",),
             },
         ),

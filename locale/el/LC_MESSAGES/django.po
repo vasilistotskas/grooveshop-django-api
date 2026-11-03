@@ -7240,6 +7240,12 @@ msgstr "Το index δεν υπάρχει"
 msgid "Index to update. Available: , "
 msgstr "Index προς ενημέρωση. Διαθέσιμα: , "
 
+msgid "IndexNow"
+msgstr "IndexNow"
+
+msgid "IndexNow key"
+msgstr "Κλειδί IndexNow"
+
 msgid "Indexing"
 msgstr "Ευρετηρίαση"
 
@@ -9871,6 +9877,9 @@ msgstr "Ληξιπρόθεσμα / χωρίς περίοδο"
 msgid "Paste one product per line as sku;net price. Rows are created or updated for THIS group only."
 msgstr "Επικόλλησε ένα προϊόν ανά γραμμή ως sku;καθαρή τιμή. Οι γραμμές δημιουργούνται ή ενημερώνονται μόνο για ΑΥΤΗ την ομάδα."
 
+msgid "Path"
+msgstr "Διαδρομή"
+
 msgid "Path from root comment to this comment"
 msgstr "Διαδρομή από το ριζικό σχόλιο έως αυτό"
 
@@ -10117,6 +10126,12 @@ msgstr "Εκκρεμεί"
 
 msgid "Pending Confirmation"
 msgstr "Εκκρεμεί Επιβεβαίωση"
+
+msgid "Pending IndexNow URL"
+msgstr "Εκκρεμής διεύθυνση IndexNow"
+
+msgid "Pending IndexNow URLs"
+msgstr "Εκκρεμείς διευθύνσεις IndexNow"
 
 msgid "Pending checkout"
 msgstr "Εκκρεμής ολοκλήρωση αγοράς"
@@ -11042,6 +11057,9 @@ msgstr "Ουρά εργασίας που συγκεντρώνει τα προσ�
 
 msgid "Queued"
 msgstr "Σε αναμονή"
+
+msgid "Queued at"
+msgstr "Σε αναμονή από"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "ΑΞΙΟΛΟΓΗΣΤΕ ΤΗΝ ΑΓΟΡΑ ΣΑΣ"
@@ -13957,6 +13975,9 @@ msgstr "Η εικόνα έχει υπερβολικά πολλά pixel για ν
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "Το τιμολόγιο ή η απόδειξη (PDF ή εικόνα). Παραμένει ιδιωτικό."
+
+msgid "The key the store proves its ownership to search engines with when it notifies them through IndexNow. The storefront serves it at /<key>.txt while the store's INDEXNOW_ENABLED setting is on. Public by design."
+msgstr "Το κλειδί με το οποίο το κατάστημα αποδεικνύει στις μηχανές αναζήτησης ότι είναι ιδιοκτήτης του όταν τις ειδοποιεί μέσω IndexNow. Το storefront το σερβίρει στη διεύθυνση /<key>.txt όσο η ρύθμιση INDEXNOW_ENABLED του καταστήματος είναι ενεργή. Δημόσιο εκ σχεδιασμού."
 
 msgid "The kind of document is not valid."
 msgstr "Ο τύπος εγγράφου δεν είναι έγκυρος."

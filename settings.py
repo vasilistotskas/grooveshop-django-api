@@ -314,6 +314,9 @@ TENANT_APPS = [
     "shipping_boxnow",
     "shipping_acs",
     "meta_capi",
+    # Tells search engines through IndexNow which product and blog pages
+    # changed (``docs/indexnow.md``)
+    "indexnow",
     # Per-tenant reference data
     "vat",
     "pay_way",
@@ -969,6 +972,13 @@ CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
     getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
 )
 CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# IndexNow (``indexnow/``): the endpoint the batched notification is posted
+# to (the protocol's shared endpoint, which hands the URLs to every
+# participating search engine) and how long one POST may take.
+INDEXNOW_ENDPOINT = getenv(
+    "INDEXNOW_ENDPOINT", "https://api.indexnow.org/indexnow"
+)
+INDEXNOW_TIMEOUT_SECONDS = int(getenv("INDEXNOW_TIMEOUT_SECONDS", "15"))
 # Deferred dispatches (``tenant.models.DeferredDispatch``): the sweep takes
 # this many per run, waits ``base * 2**attempts`` seconds (at most the cap)
 # between tries, and deletes a row, with an ERROR, once it is this old.
@@ -1663,6 +1673,13 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_refresh_stats_snapshots",
             "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
+        # One IndexNow POST per store per run, with the product and blog
+        # pages that changed since the last one. IndexNow asks for at
+        # least five minutes between two submissions of the same URL.
+        "submit-indexnow-urls": {
+            "task": "tenant.tasks.fanout_submit_indexnow_urls",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
+        },
         "send-checkout-abandonment-emails": {
             "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
             "schedule": SCHEDULE_PRESETS["daily_6am"]
@@ -2344,6 +2361,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "the Test Events feed in Events Manager looks right. The "
             "browser pixel is independent — it gates on the "
             "``ad_storage`` cookie consent on the storefront."
+        ),
+    },
+    # IndexNow
+    {
+        "name": "INDEXNOW_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Tell search engines (Bing, Yandex, Naver and the others that "
+            "support IndexNow) when a published product or blog post is "
+            "created, changed or unpublished, instead of waiting for them "
+            "to crawl it. Off by default. The changes of the last half "
+            "hour go out in one notification. The store's IndexNow key "
+            "file is served by the storefront once this is on."
         ),
     },
     # Storefront UI toggles

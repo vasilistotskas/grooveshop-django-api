@@ -52402,6 +52402,8 @@ components:
         googleAdsPageViewLabel:
           type: string
           readOnly: true
+        indexnowKey:
+          type: string
         totpIssuer:
           type: string
           readOnly: true

@@ -405,6 +405,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "sessions.Session": Delete(tenant_only=True),
     "user.UserDataExport": Delete(),
     "meta_capi.MetaCapiEventLog": Delete(),
+    # Changes waiting to be announced to search engines: staging must not
+    # replay production's pages from a restored copy.
+    "indexnow.PendingUrl": Delete(),
     "search.SearchQuery": Delete(),
     "notification.Notification": Delete(),
     "notification.NotificationTranslation": Delete(),

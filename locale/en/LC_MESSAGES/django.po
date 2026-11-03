@@ -7233,6 +7233,12 @@ msgstr "Index does not exist"
 msgid "Index to update. Available: , "
 msgstr "Index to update. Available: , "
 
+msgid "IndexNow"
+msgstr "IndexNow"
+
+msgid "IndexNow key"
+msgstr "IndexNow key"
+
 msgid "Indexing"
 msgstr "Indexing"
 
@@ -9863,6 +9869,9 @@ msgstr "Past due / no term"
 msgid "Paste one product per line as sku;net price. Rows are created or updated for THIS group only."
 msgstr "Paste one product per line as sku;net price. Rows are created or updated for THIS group only."
 
+msgid "Path"
+msgstr "Path"
+
 msgid "Path from root comment to this comment"
 msgstr "Path from root comment to this comment"
 
@@ -10109,6 +10118,12 @@ msgstr "Pending"
 
 msgid "Pending Confirmation"
 msgstr "Pending Confirmation"
+
+msgid "Pending IndexNow URL"
+msgstr "Pending IndexNow URL"
+
+msgid "Pending IndexNow URLs"
+msgstr "Pending IndexNow URLs"
 
 msgid "Pending checkout"
 msgstr "Pending checkout"
@@ -11034,6 +11049,9 @@ msgstr "Queue a job that compiles the user's personal data and emails a one-off 
 
 msgid "Queued"
 msgstr "Queued"
+
+msgid "Queued at"
+msgstr "Queued at"
 
 msgid "RATE YOUR PURCHASE"
 msgstr "RATE YOUR PURCHASE"
@@ -13954,6 +13972,9 @@ msgstr "The image has too many pixels to be resized."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "The invoice or receipt (PDF or image). Kept private."
+
+msgid "The key the store proves its ownership to search engines with when it notifies them through IndexNow. The storefront serves it at /<key>.txt while the store's INDEXNOW_ENABLED setting is on. Public by design."
+msgstr "The key the store proves its ownership to search engines with when it notifies them through IndexNow. The storefront serves it at /<key>.txt while the store's INDEXNOW_ENABLED setting is on. Public by design."
 
 msgid "The kind of document is not valid."
 msgstr "The kind of document is not valid."

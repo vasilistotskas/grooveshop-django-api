@@ -501,6 +501,30 @@ answers only the assets the link's frozen documents reference (their `refs`
 are frozen with them), so a token never opens the library; an unknown, revoked
 or expired token is `404 preview_link_expired`. Both are `private, no-store`.
 
+### Images documents still name by URL
+
+Before the media picker a block held an image as a string (`/img/x.jpg`,
+`/uploads/y.jpg`). `manage.py import_builder_media --tenant <schema>`
+(`builder/media_migration.py`) brings those into the library:
+
+- It reads every string of the drafts and of the published versions
+  (`--all-versions` for every stored version), by value, never by field name:
+  the catalogue does not mark those fields. An image path of the store is
+  `/img/...`, `/uploads/...` or `/media/<store>/uploads/...` ending in an image
+  extension; `/uploads/x` is read as `/media/<store>/uploads/x`.
+- Each distinct path goes through the same import as `media/import`
+  (`media_services.store_import`: the upload checks, the shrinking of an
+  oversize photo, de-duplication by content), so running it again finds the
+  assets it made. It prints, per image, where it is used (document, source,
+  JSON pointer) and the asset it became, and `--mapping-file` writes the
+  `{url: asset id}` map (a real run, one tenant).
+- An absolute `http(s)` address or another store's file is listed as EXTERNAL
+  and never fetched. An SVG is refused by the library (a raster only) and a
+  file that cannot be read is reported `FAILED (<code>)`; the rest carry on.
+- `--dry-run` reads the same files and writes nothing: no asset, no file.
+- It never rewrites a document. What replaces the URL is the block's
+  decision (its version upgrade), which the storefront owns.
+
 ## Signing in to the editor
 
 The editor runs on the store's own host, where nobody is signed in as staff

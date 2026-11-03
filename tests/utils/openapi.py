@@ -34,17 +34,24 @@ def as_json_schema(node: Any, components: dict) -> Any:
     return converted
 
 
-def response_schema(openapi: dict, path: str, method: str = "get") -> dict:
-    content = openapi["paths"][path][method]["responses"]["200"]["content"]
+def response_schema(
+    openapi: dict, path: str, method: str = "get", status: str = "200"
+) -> dict:
+    content = openapi["paths"][path][method]["responses"][status]["content"]
     return content["application/json"]["schema"]
 
 
 def assert_matches_response(
-    openapi: dict, path: str, body: Any, method: str = "get"
+    openapi: dict,
+    path: str,
+    body: Any,
+    method: str = "get",
+    status: str = "200",
 ) -> None:
-    """Raise if ``body`` is not what ``path``'s 200 response documents."""
+    """Raise if ``body`` is not what ``path``'s ``status`` response (200 by
+    default) documents."""
     schema = as_json_schema(
-        response_schema(openapi, path, method),
+        response_schema(openapi, path, method, status),
         openapi["components"]["schemas"],
     )
     jsonschema.Draft4Validator(schema).validate(body)

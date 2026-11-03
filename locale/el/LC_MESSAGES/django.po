@@ -3063,6 +3063,9 @@ msgstr "Εισπράχθηκαν"
 msgid "Collected off-platform"
 msgstr "Εισπράχθηκε εκτός πλατφόρμας"
 
+msgid "Colour"
+msgstr "Χρώμα"
+
 msgid "Come back and see what's new"
 msgstr "Επιστρέψτε και δείτε τι νέο υπάρχει"
 
@@ -8166,6 +8169,9 @@ msgstr "Αντιστοίχιση μέσω"
 msgid "Matches no shipment, not reconciled"
 msgstr "Δεν αντιστοιχεί σε αποστολή και δεν έχει συμφωνηθεί"
 
+msgid "Material"
+msgstr "Υλικό"
+
 msgid "Max Weight (grams)"
 msgstr "Μέγιστο βάρος (γραμμάρια)"
 
@@ -9870,6 +9876,9 @@ msgstr "Η διαδρομή της πρώτης σελίδας, χωρίς τι�
 
 msgid "Path under MEDIA_ROOT/_private/exports/."
 msgstr "Διαδρομή κάτω από το MEDIA_ROOT/_private/exports/."
+
+msgid "Pattern"
+msgstr "Σχέδιο"
 
 msgid "Pay On Delivery"
 msgstr "Πληρωμή κατά την παράδοση"
@@ -12971,6 +12980,9 @@ msgstr "Σημειώνεται από τον ημερήσιο έλεγχο υπ�
 msgid "Standard Rate"
 msgstr "Κανονικός συντελεστής"
 
+msgid "Standard property"
+msgstr "Βασική ιδιότητα προϊόντος"
+
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Ημερομηνία έναρξης για το εύρος αναλυτικών (μορφή ISO: YYYY-MM-DD). Αν δεν δοθεί, συμπεριλαμβάνει όλα τα ιστορικά δεδομένα."
 
@@ -13343,6 +13355,12 @@ msgstr "Μήνυμα επιτυχίας για ενημέρωση ονόματο
 
 msgid "Successfully unsubscribed."
 msgstr "Επιτυχής απεγγραφή."
+
+msgid "Suggested age"
+msgstr "Προτεινόμενη ηλικία"
+
+msgid "Suggested gender"
+msgstr "Προτεινόμενο φύλο"
 
 msgid "Suggested products for a surface"
 msgstr "Προτεινόμενα προϊόντα για μια επιφάνεια"
@@ -15944,6 +15962,9 @@ msgstr "Σε ποιο περιβάλλον BoxNow ανήκουν τα κλειδ
 
 msgid "Which provider flow the client must run"
 msgstr "Ποια ροή παρόχου πρέπει να εκτελέσει ο client"
+
+msgid "Which standard product property this attribute is (for example Colour or Size). Search engines use it to understand and group your products. Leave empty if it is none of these."
+msgstr "Ποια βασική ιδιότητα προϊόντος είναι αυτό το χαρακτηριστικό (για παράδειγμα Χρώμα ή Μέγεθος). Οι μηχανές αναζήτησης τη χρησιμοποιούν για να καταλάβουν και να ομαδοποιήσουν τα προϊόντα σας. Αφήστε το κενό αν δεν είναι καμία από αυτές."
 
 msgid "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
 msgstr "Ποιος μετακίνησε τα χρήματα: ο κωδικός του παρόχου πληρωμών ή ο κωδικός αντικαταβολής του μεταφορέα."

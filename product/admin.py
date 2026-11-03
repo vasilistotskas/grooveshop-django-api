@@ -344,6 +344,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         "attribute_info",
         "active",
         "is_variant",
+        "schema_property",
         "values_count_display",
         "usage_count_display",
         "sort_order",
@@ -356,6 +357,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
     list_filter = [
         "active",
         "is_variant",
+        "schema_property",
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
@@ -378,7 +380,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         (
             _("Attribute Information"),
             {
-                "fields": ("name", "active", "is_variant"),
+                "fields": ("name", "active", "is_variant", "schema_property"),
                 "classes": ("wide",),
             },
         ),

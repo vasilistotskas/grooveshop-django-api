@@ -3056,6 +3056,9 @@ msgstr "Collected"
 msgid "Collected off-platform"
 msgstr "Collected off-platform"
 
+msgid "Colour"
+msgstr "Colour"
+
 msgid "Come back and see what's new"
 msgstr "Come back and see what's new"
 
@@ -8158,6 +8161,9 @@ msgstr "Matched by"
 msgid "Matches no shipment, not reconciled"
 msgstr "Matches no shipment, not reconciled"
 
+msgid "Material"
+msgstr "Material"
+
 msgid "Max Weight (grams)"
 msgstr "Max Weight (grams)"
 
@@ -9862,6 +9868,9 @@ msgstr "Path of the first page, without its query string."
 
 msgid "Path under MEDIA_ROOT/_private/exports/."
 msgstr "Path under MEDIA_ROOT/_private/exports/."
+
+msgid "Pattern"
+msgstr "Pattern"
 
 msgid "Pay On Delivery"
 msgstr "Pay On Delivery"
@@ -12964,6 +12973,9 @@ msgstr "Stamped by the daily reminder sweep so each card is reminded exactly onc
 msgid "Standard Rate"
 msgstr "Standard Rate"
 
+msgid "Standard property"
+msgstr "Standard property"
+
 msgid "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 msgstr "Start date for analytics range (ISO format: YYYY-MM-DD). If not provided, includes all historical data."
 
@@ -13340,6 +13352,12 @@ msgstr "Success message for username update"
 
 msgid "Successfully unsubscribed."
 msgstr "Successfully unsubscribed."
+
+msgid "Suggested age"
+msgstr "Suggested age"
+
+msgid "Suggested gender"
+msgstr "Suggested gender"
 
 msgid "Suggested products for a surface"
 msgstr "Suggested products for a surface"
@@ -15941,6 +15959,9 @@ msgstr "Which BoxNow environment this tenant's keys belong to: production when o
 
 msgid "Which provider flow the client must run"
 msgstr "Which provider flow the client must run"
+
+msgid "Which standard product property this attribute is (for example Colour or Size). Search engines use it to understand and group your products. Leave empty if it is none of these."
+msgstr "Which standard product property this attribute is (for example Colour or Size). Search engines use it to understand and group your products. Leave empty if it is none of these."
 
 msgid "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."
 msgstr "Who moved the money: the payment provider's code, or the courier's cash-on-delivery code."

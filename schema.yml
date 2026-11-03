@@ -47199,6 +47199,11 @@ components:
         isVariant:
           type: boolean
           readOnly: true
+        schemaProperty:
+          readOnly: true
+          oneOf:
+          - $ref: '#/components/schemas/SchemaPropertyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         attributeValueId:
           type: integer
         value:
@@ -47217,6 +47222,7 @@ components:
       - createdAt
       - id
       - isVariant
+      - schemaProperty
       - value
     ProductBrief:
       type: object
@@ -50832,6 +50838,22 @@ components:
       required:
       - documents
       - scheduledFor
+    SchemaPropertyEnum:
+      enum:
+      - color
+      - size
+      - material
+      - pattern
+      - suggestedAge
+      - suggestedGender
+      type: string
+      description: |-
+        * `color` - Χρώμα
+        * `size` - Μέγεθος
+        * `material` - Υλικό
+        * `pattern` - Σχέδιο
+        * `suggestedAge` - Προτεινόμενη ηλικία
+        * `suggestedGender` - Προτεινόμενο φύλο
     SearchAnalyticsResponse:
       type: object
       description: Serializer for search analytics response.
@@ -53356,6 +53378,10 @@ components:
           type: integer
         name:
           type: string
+        schemaProperty:
+          oneOf:
+          - $ref: '#/components/schemas/SchemaPropertyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         values:
           type: array
           items:
@@ -53363,6 +53389,7 @@ components:
       required:
       - id
       - name
+      - schemaProperty
       - values
     VariantAxisValue:
       type: object

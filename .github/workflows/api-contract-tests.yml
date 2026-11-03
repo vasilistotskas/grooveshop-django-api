@@ -1,0 +1,41 @@
+# The tests of the API contract tooling (api-contract/): the live-state
+# reader and the `until` expiry against fakes, and the 2026-11-03 deadlock
+# (Django #442 / storefront #347) replayed through the PR entry point
+# against the real released documents. Only when the tooling changes.
+name: API contract tooling
+
+on:
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'api-contract/**'
+      - '.github/workflows/api-contract-check.yml'
+      - '.github/workflows/api-contract-tests.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    name: Tooling tests and the #442 / #347 replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Unit tests
+        run: python3 -I -m unittest discover -s api-contract/tests -v
+
+      - name: Shell syntax
+        run: |
+          sh -n api-contract/api-contract.sh
+          bash -n api-contract/tests/replay.sh
+
+      - name: Replay #442 and #347
+        run: bash api-contract/tests/replay.sh

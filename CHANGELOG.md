@@ -3,6 +3,24 @@
 
 
 
+## v3.203.0 (2026-11-03)
+
+### Features
+
+* feat(uploads): shrink a photo over its cap instead of refusing it, strip GPS (#445)
+
+A raster over its format byte cap or the pixel budget is re-encoded in the same
+format: orientation applied, scaled to UPLOAD_IMAGE_MAX_EDGE and in steps until
+it fits, colour profile kept; refused only when no step fits. GPS (EXIF or an
+XMP packet) is removed from every raster upload at its own size. An animated
+image that needs either is refused rather than flattened; SVG is untouched.
+
+prepare_servable_image is the one call of the admin field, the serializer
+field, TinyMCE and the builder media library, and judges the result with
+validate_servable_image.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`ad30597`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad3059779a484881bd97ef0c94051469b54fabdf))
+
 ## v3.202.2 (2026-11-03)
 
 ### Bug fixes

@@ -1517,6 +1517,9 @@ msgstr "Ποσό προς Είσπραξη"
 msgid "An IP address is not a store domain; use a host name."
 msgstr "Μια διεύθυνση IP δεν είναι domain καταστήματος· χρησιμοποιήστε όνομα host."
 
+msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
+msgstr "Μια κινούμενη εικόνα δεν μπορεί να αλλάξει μέγεθος ούτε να χάσει την τοποθεσία της. Ανεβάστε μια μικρότερη ή μια στατική εικόνα."
+
 msgid "An email address is required for guest alerts."
 msgstr "Απαιτείται διεύθυνση email για ειδοποιήσεις επισκεπτών."
 
@@ -13860,8 +13863,15 @@ msgid "The ids to resolve are not valid."
 msgstr "Τα αναγνωριστικά προς επίλυση δεν είναι έγκυρα."
 
 #, python-format
+msgid "The image cannot be reduced to fit the %(limit)s MB limit."
+msgstr "Η εικόνα δεν μπορεί να μικρύνει ώστε να χωρά στο όριο των %(limit)s MB."
+
+#, python-format
 msgid "The image has more than %(limit)s megapixels."
 msgstr "Η εικόνα έχει περισσότερα από %(limit)s megapixels."
+
+msgid "The image has too many pixels to be resized."
+msgstr "Η εικόνα έχει υπερβολικά πολλά pixel για να αλλάξει μέγεθος."
 
 msgid "The invoice or receipt (PDF or image). Kept private."
 msgstr "Το τιμολόγιο ή η απόδειξη (PDF ή εικόνα). Παραμένει ιδιωτικό."

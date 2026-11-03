@@ -99,16 +99,18 @@ class Issue:
     params: dict[str, str] | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        body: dict[str, Any] = {
+        """The one wire shape of a problem (``PublishProblemSerializer``):
+        every key is always present, ``document`` and ``params`` are ``null``
+        when there are none, because the storefront's generated schema
+        requires ``document``. ``tests/integration/builder/
+        test_response_contract.py`` holds this equal to the serializer."""
+        return {
             "path": self.path,
             "code": self.code,
             "message": self.message,
+            "document": self.document,
+            "params": self.params,
         }
-        if self.document is not None:
-            body["document"] = self.document
-        if self.params is not None:
-            body["params"] = self.params
-        return body
 
 
 #: The sentences of the problems a scheduled publish can be left with, by

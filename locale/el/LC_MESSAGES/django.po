@@ -15094,9 +15094,6 @@ msgstr "Ενημερώθηκε από (προσωπικό)"
 msgid "Upload a contact-form attachment"
 msgstr "Ανέβασμα συνημμένου φόρμας επικοινωνίας"
 
-msgid "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
-msgstr "Ανεβάστε μια έγκυρη εικόνα. Το αρχείο που ανεβάσατε είτε δεν ήταν εικόνα είτε ήταν κατεστραμμένο."
-
 msgid "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 msgstr "Ανέβασμα ενός αρχείου για επισύναψη σε μήνυμα επικοινωνίας. Επιστρέφει το id που πρέπει να σταλεί στο attachmentIds του μηνύματος. Διαθέσιμο μόνο όσο το κατάστημα δέχεται συνημμένα."
 
@@ -18094,6 +18091,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "Updated sort order for %(count)d tags."
 #~ msgstr "Ενημερώθηκε η σειρά ταξινόμησης για %(count)d ετικέτες."
+
+#~ msgid "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
+#~ msgstr "Ανεβάστε μια έγκυρη εικόνα. Το αρχείο που ανεβάσατε είτε δεν ήταν εικόνα είτε ήταν κατεστραμμένο."
 
 #~ msgid "Usage Analytics"
 #~ msgstr "Αναλυτικά χρήσης"

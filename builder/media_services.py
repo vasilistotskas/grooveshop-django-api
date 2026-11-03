@@ -1,9 +1,10 @@
 """Every write of the media library.
 
-An upload is measured and checked here before it is stored: only the
-raster formats in ``BUILDER_MEDIA_FORMATS`` (an SVG can carry script, and
-its size is not a size), at most ``BUILDER_MEDIA_MAX_BYTES`` and
-``BUILDER_MEDIA_MAX_PIXELS``. The size recorded is the one a browser shows
+An upload is measured and checked here before it is stored, by the rule
+every image upload shares (``core.uploads.validate_servable_image``: the
+media service's per-format byte caps and pixel budget; only rasters here, an
+SVG can carry script and its size is not a size). The size recorded is the
+one a browser shows
 (EXIF orientation applied), which is what the storefront reserves space
 for.
 
@@ -25,13 +26,13 @@ from urllib.parse import urlsplit
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import (
     SimpleUploadedFile,
     UploadedFile,
 )
 from django.db import connection, transaction
 from django.utils.translation import gettext as _
-from PIL import Image, UnidentifiedImageError
 from rest_framework import status
 
 from builder import references
@@ -40,8 +41,8 @@ from builder.models import MediaAsset, ReferenceKind
 from builder.services import require_permission
 from core import storefront
 from core.cache.invalidation import mark_surface_stale
+from core.uploads import image_limits, validate_servable_image
 from core.utils.i18n import available_language_codes
-from core.utils.rich_text_images import displayed_size
 from tenant.cache import bump_cache_generation
 from tenant.staff_actors import staff_id
 
@@ -64,44 +65,15 @@ class MediaInUse(BuilderError):
 
 
 def _inspect(upload: UploadedFile) -> tuple[str, tuple[int, int]]:
-    """``(mime, displayed size)`` of an acceptable image, else refuse."""
-    if upload.size is None or upload.size > settings.BUILDER_MEDIA_MAX_BYTES:
-        raise MediaInvalid(
-            _("The file is larger than %(limit)s MB.")
-            % {"limit": settings.BUILDER_MEDIA_MAX_BYTES // (1024 * 1024)},
-            code="file_too_large",
-        )
+    """``(mime, displayed size)`` of an acceptable image, else refuse. The rule
+    is the media service's (``core.uploads``); a library image is a raster (an
+    SVG can carry script, and its size is not a size)."""
     try:
-        with Image.open(upload) as image:
-            if image.format not in settings.BUILDER_MEDIA_FORMATS:
-                raise MediaInvalid(
-                    _("Only %(formats)s images can be uploaded.")
-                    % {"formats": ", ".join(settings.BUILDER_MEDIA_FORMATS)},
-                    code="unsupported_image_type",
-                )
-            width, height = image.size
-            if width * height > settings.BUILDER_MEDIA_MAX_PIXELS:
-                raise MediaInvalid(
-                    _("The image has more than %(limit)s megapixels.")
-                    % {"limit": settings.BUILDER_MEDIA_MAX_PIXELS // 1_000_000},
-                    code="image_too_large",
-                )
-            mime = Image.MIME[str(image.format)]
-            image.verify()
-        upload.seek(0)
-        with Image.open(upload) as image:
-            size = displayed_size(image)
-    except (
-        OSError,
-        SyntaxError,
-        UnidentifiedImageError,
-        Image.DecompressionBombError,
-    ) as exc:
-        raise MediaInvalid(
-            _("The file is not a valid image."), code="invalid_image"
-        ) from exc
-    upload.seek(0)
-    return mime, size
+        image = validate_servable_image(upload, allow_svg=False)
+    except DjangoValidationError as exc:
+        raise MediaInvalid(exc.messages[0], code=exc.code) from exc
+    assert image.width is not None and image.height is not None
+    return image.mime, (image.width, image.height)
 
 
 def _checked_focal(value: float | None) -> float:
@@ -240,7 +212,7 @@ def _import_path(url: str) -> str:
 def _too_large() -> MediaInvalid:
     return MediaInvalid(
         _("The file is larger than %(limit)s MB.")
-        % {"limit": settings.BUILDER_MEDIA_MAX_BYTES // (1024 * 1024)},
+        % {"limit": image_limits().largest_file_bytes // (1024 * 1024)},
         code="file_too_large",
     )
 
@@ -263,7 +235,7 @@ def _read_store_media(path: str) -> bytes:
         raise MediaInvalid(
             _("There is no such image."), code="import_not_found"
         )
-    if storage.size(name) > settings.BUILDER_MEDIA_MAX_BYTES:
+    if storage.size(name) > image_limits().largest_file_bytes:
         raise _too_large()
     with storage.open(name, "rb") as handle:
         return handle.read()
@@ -282,7 +254,7 @@ def _fetch_storefront_static(path: str) -> bytes:
         raise MediaInvalid(
             _("That is not a valid image path."), code="invalid_import_url"
         )
-    limit = settings.BUILDER_MEDIA_MAX_BYTES
+    limit = image_limits().largest_file_bytes
     try:
         with requests.get(
             url,

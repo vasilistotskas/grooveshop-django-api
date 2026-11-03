@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.validators.address import validate_postal_code_pattern
 from country.managers import CountryManager
@@ -45,7 +46,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         blank=True,
         null=True,
     )
-    image_flag = models.ImageField(
+    image_flag = ImageAndSvgField(
         _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
     )
     # The country's postcode format, verbatim from Google's Address Data

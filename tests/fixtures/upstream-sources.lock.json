@@ -1,0 +1,32 @@
+{
+  "commits": {
+    "vasilistotskas/grooveshop-media-stream": "3455d4641fa9360076614f35c37f1f57bd6e04e4",
+    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "ee91847315dd2c244591c6e1bb72109fd01c6f33"
+  },
+  "sources": {
+    "catalogue": {
+      "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
+      "path": "test/fixtures/builder/catalogue.json",
+      "kind": "blob",
+      "sha": "1db4965f1b4157cb1850ca741626b31c330a2812"
+    },
+    "seeds": {
+      "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
+      "path": "test/fixtures/builder/seeds",
+      "kind": "tree",
+      "sha": "3d5c071bcff55fc6a7cdb434f0b16f0856d4a03b"
+    },
+    "placement": {
+      "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
+      "path": "test/fixtures/builder/placement-cases.json",
+      "kind": "blob",
+      "sha": "62ca96cb9f10de3d859b133161484bc5ac28f7c7"
+    },
+    "image-limits": {
+      "repository": "vasilistotskas/grooveshop-media-stream",
+      "path": "contract/image-limits.json",
+      "kind": "blob",
+      "sha": "7d43b36fb3cb9251f60e49ff9454799f161ff9c0"
+    }
+  }
+}

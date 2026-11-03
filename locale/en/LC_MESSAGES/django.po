@@ -15091,9 +15091,6 @@ msgstr "Updated by (staff)"
 msgid "Upload a contact-form attachment"
 msgstr "Upload a contact-form attachment"
 
-msgid "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
-msgstr "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
-
 msgid "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 msgstr "Upload one file to attach to a contact enquiry. Returns the id to send back in the enquiry's attachmentIds. Only available while the store accepts attachments."
 
@@ -17334,6 +17331,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Unused"
 #~ msgstr "Unused"
+
+#~ msgid "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
+#~ msgstr "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
 
 #~ msgid "User Management"
 #~ msgstr "User Management"

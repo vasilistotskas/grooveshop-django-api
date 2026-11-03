@@ -1,6 +1,5 @@
 import io
 import os
-from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -8,12 +7,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from core.forms.image import ImageAndSvgField
+from core.uploads import image_limits
 
 
 class ImageAndSvgFieldTest(TestCase):
     def setUp(self):
         self.field = ImageAndSvgField()
-        self.field_with_size_limit = ImageAndSvgField(max_file_size=1024)
 
     def create_test_file(self, content, filename, content_type="text/plain"):
         if isinstance(content, str):
@@ -167,34 +166,17 @@ class ImageAndSvgFieldTest(TestCase):
         result = self.field.to_python(None)
         self.assertIsNone(result)
 
-    def test_file_size_validation(self):
-        large_content = "x" * 2048
-        large_file = self.create_test_file(large_content, "large.txt")
-        large_file.size = 2048
+    def test_svg_over_the_contract_cap_is_refused(self):
+        cap = image_limits().max_file_bytes["svg"]
+        padding = "x" * cap
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
+            f"<!-- {padding} --></svg>"
+        )
+        upload = self.create_test_file(svg, "large.svg", "image/svg+xml")
 
         with self.assertRaises(ValidationError) as cm:
-            self.field_with_size_limit.to_python(large_file)
-        self.assertEqual(cm.exception.code, "file_too_large")
-        self.assertIn("1.0KB", str(cm.exception))
-
-    def test_file_size_validation_svg(self):
-        large_svg = (
-            """<?xml version="1.0" encoding="UTF-8"?>
-                <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">"""
-            + "<!-- "
-            + "x" * 2000
-            + " -->"
-            + """
-                    <circle cx="50" cy="50" r="40" fill="red" />
-                </svg>"""
-        )
-        large_svg_file = self.create_test_file(
-            large_svg, "large.svg", "image/svg+xml"
-        )
-        large_svg_file.size = len(large_svg.encode("utf-8"))
-
-        with self.assertRaises(ValidationError) as cm:
-            self.field_with_size_limit.to_python(large_svg_file)
+            self.field.to_python(upload)
         self.assertEqual(cm.exception.code, "file_too_large")
 
     def test_file_extension_validation(self):
@@ -203,20 +185,14 @@ class ImageAndSvgFieldTest(TestCase):
         with self.assertRaises(ValidationError):
             self.field.to_python(exe_file)
 
-    @override_settings(FILE_UPLOAD_MAX_MEMORY_SIZE=1048576)
-    def test_default_max_file_size_from_settings(self):
-        field = ImageAndSvgField()
-        self.assertEqual(field.max_file_size, 1048576)
+    @override_settings(FILE_UPLOAD_MAX_MEMORY_SIZE=1)
+    def test_in_memory_threshold_is_not_a_size_policy(self):
+        """Where Django holds an upload says nothing about how big an image
+        may be: a 2 KB SVG passes with a 1 byte threshold."""
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
+        upload = self.create_test_file(svg, "ok.svg", "image/svg+xml")
 
-    def test_default_max_file_size_fallback(self):
-        with patch.object(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", None):
-            field = ImageAndSvgField()
-            self.assertEqual(field.max_file_size, 2621440)
-
-    def test_custom_max_file_size(self):
-        custom_size = 5242880
-        field = ImageAndSvgField(max_file_size=custom_size)
-        self.assertEqual(field.max_file_size, custom_size)
+        self.assertIsNotNone(self.field.to_python(upload))
 
     def test_file_seeking_behavior(self):
         valid_svg = """<?xml version="1.0" encoding="UTF-8"?>

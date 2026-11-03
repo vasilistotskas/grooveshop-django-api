@@ -11,4 +11,3 @@
 # django) that no longer needs the override. check-ignore.py fails once the
 # release live in production is at or past it, which forces the line out:
 # delete it, and the same pull request proves it was no longer needed.
-2026-11-03 until storefront v3.304.0 | owner-approved: #447 and #448 describe bodies Django already sends | GET /api/v1/order/viva_return the response body was restructured into a oneOf, so a field that was previously guaranteed may no longer be present

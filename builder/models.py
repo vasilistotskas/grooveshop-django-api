@@ -424,6 +424,13 @@ class ReferenceKind(models.TextChoices):
     BLOG_CATEGORY = "blogCategory", _("Blog category")
     CONTENT_PAGE = "contentPage", _("Content page")
     BLOG_POST = "blogPost", _("Blog post")
+    #: Not records: the lists a document asks for (``builder.data_sources``).
+    #: ``target`` is a facet (``*``, ``category:<id>``, ``parent:<id>``).
+    QUERY_PRODUCT = "queryProduct", _("Product list")
+    QUERY_BLOG_POST = "queryBlogPost", _("Blog post list")
+    QUERY_CATEGORY = "queryCategory", _("Category list")
+    QUERY_BLOG_CATEGORY = "queryBlogCategory", _("Blog category list")
+    QUERY_PROMOTION = "queryPromotion", _("Promotion list")
 
 
 class BuilderReference(models.Model):
@@ -434,7 +441,7 @@ class BuilderReference(models.Model):
     """
 
     kind = models.CharField(
-        _("Kind"), max_length=16, choices=ReferenceKind.choices
+        _("Kind"), max_length=32, choices=ReferenceKind.choices
     )
     target = models.CharField(_("Target"), max_length=64)
     document = models.CharField(_("Document"), max_length=80)

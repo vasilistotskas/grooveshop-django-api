@@ -182,6 +182,41 @@ and "where is it used" then treat it like any other reference. A link is not
 translatable: it resolves to the path of the viewer's language, so an overlay
 value on it is `untranslatable_setting`.
 
+
+### Typed data props (`builder/data_sources.py`)
+
+A block can declare a setting in the catalogue's `data` map, beside `refs`
+(both are read until the storefront stops serving `refs`):
+
+- `{field: "ref", kind, onMissing}`: the setting holds one record's id (a slug
+  for a page), checked like a `refs` entry;
+- `{field: "query", source, onEmpty, maxLimit}`: the setting holds a descriptor,
+  a hand-picked list (`{mode: "picked", ids}`) or a rule
+  (`{mode: "filter", ...}`, `{mode: "roots" | "children", ...}`, `{limit}`),
+  for `source` in `product`, `blogPost`, `category`, `blogCategory`,
+  `promotion`.
+
+`data_sources.check(declaration, value)` judges a value and says what it
+names. A value that is not valid yields problems and nothing else:
+`invalid_data_value`, `unknown_filter` (a key the list does not have) and
+`too_many_ids`, each at the pointer of the offending key; a document that
+asks for more than `BUILDER_DATA_MAX_QUERIES` lists gets `too_many_queries`.
+The vocabulary is held equal to the storefront's by
+`tests/fixtures/builder/data-cases.json`, copied and pinned like the other
+sources (`tests/unit/builder/test_data_sources.py` runs every case).
+
+A valid value yields two kinds of index row, both in `BuilderVersion.refs` and,
+for the current release, `BuilderReference`:
+
+- the records it names (`product`, `category`, `blogCategory`, `blogPost`):
+  existence-checked at publish and listed by "used on N pages";
+- the lists it asks for, as a query kind (`queryProduct`, `queryBlogPost`,
+  `queryCategory`, `queryBlogCategory`, `queryPromotion`) whose `target` is a
+  facet: `*` when no filter bounds the list, `category:<id>` or `parent:<id>`
+  when one does. One row per facet: a change matches any of them, which can
+  over-purge and never under-purge. A facet is not a record, so it is never
+  existence-checked.
+
 ## Writes
 
 `builder/services.py` is the only writer (permission first, then the

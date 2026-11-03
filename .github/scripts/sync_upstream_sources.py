@@ -13,6 +13,11 @@ are COPIED here:
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   others this one is application data, not a test input.
+* ``data-cases``: ``test/fixtures/builder/data-cases.json`` -> ``tests/
+  fixtures/builder/data-cases.json``, the cases both repositories run for the
+  typed data props (``builder.data_sources``): a declaration, a value, whether
+  it is valid, the issues, the references and the query dependencies it
+  yields.
 * ``placement``: ``test/fixtures/builder/placement-cases.json`` -> ``tests/
   fixtures/builder/placement-cases.json``, the cases both the editor's
   placement filter (``shared/builder/placement.ts``) and ``builder.validation.
@@ -102,6 +107,13 @@ SOURCES: tuple[Source, ...] = (
         STOREFRONT,
         "test/fixtures/builder/placement-cases.json",
         "tests/fixtures/builder/placement-cases.json",
+        "blob",
+    ),
+    Source(
+        "data-cases",
+        STOREFRONT,
+        "test/fixtures/builder/data-cases.json",
+        "tests/fixtures/builder/data-cases.json",
         "blob",
     ),
     Source(

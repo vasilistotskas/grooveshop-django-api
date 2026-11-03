@@ -49,11 +49,15 @@ from builder.services import (
     _issues,
     _lock_release_sequence,
     _new_version,
+    published_versions,
 )
 
 SEEDS = Path(__file__).parent / "seeds"
 
 NOTE = "Default content"
+#: The release that gives a new store its theme (and an existing one,
+#: ``import_theme_settings``): made by the platform, like the defaults.
+THEME_NOTE = "Theme"
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,14 +150,19 @@ def _untouched_defaults() -> dict[str, int] | None:
     :func:`seed_store` leaves, ``{}`` for a store with none at all, and
     ``None`` for any other: a draft saved, a page deleted, a named save, a
     schedule or a release by a person all mean someone has worked here."""
-    releases = list(BuilderRelease.objects.order_by("number")[:2])
+    releases = list(BuilderRelease.objects.order_by("number"))
     documents = BuilderDocument.objects.all_with_deleted()
     if not releases:
         return None if documents.exists() else {}
     if (
-        len(releases) > 1
+        len(releases) > 2
         or releases[0].note != NOTE
-        or releases[0].published_by_staff_id is not None
+        or any(
+            r.published_by_staff_id is not None
+            or r.rolled_back_from_id is not None
+            for r in releases
+        )
+        or any(r.note != THEME_NOTE for r in releases[1:])
         or documents.filter(is_deleted=True).exists()
         or documents.exclude(draft_revision=1).exists()
         or BuilderVersion.objects.exclude(kind=VersionKind.PUBLISH).exists()
@@ -161,7 +170,7 @@ def _untouched_defaults() -> dict[str, int] | None:
         or BuilderScheduledPublish.objects.exists()
     ):
         return None
-    return dict(releases[0].versions)
+    return dict(releases[-1].versions)
 
 
 def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
@@ -231,3 +240,78 @@ def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
                 catalogue_hash=catalogue.hash,
             ).pk
         return _create_release(None, versions, note=note)
+
+
+def installable_problems(key: str, data: Any, i18n: Any) -> list[Issue]:
+    """Every problem that would stop :func:`install_document`: the document
+    against the store's catalogue view, then what stops a release (references,
+    a theme's contrast). Writes nothing."""
+    catalogue = _catalogue()
+    issues, validated = _issues(key, data, i18n, catalogue)
+    if validated is not None:
+        issues = validation.check_before_release(key, validated, catalogue)
+    return [replace(issue, document=key) for issue in issues]
+
+
+def install_document(
+    key: str, data: Any, i18n: Any, *, note: str
+) -> BuilderRelease | None:
+    """Create document *key* with *data* and release it in ONE release that
+    keeps every other document as it was; ``None``, writing nothing, when the
+    store already has that document (it never overwrites what an editor has).
+
+    Validated like a publish, against the store's catalogue view, so one
+    problem is a ``DocumentInvalid`` that writes nothing; no catalogue, no
+    write. For the content a store starts with that was not a default seed:
+    the theme of a store that existed before it had one (``import_theme_settings``).
+    """
+    catalogue = _catalogue()
+    with transaction.atomic():
+        _lock_release_sequence()
+        if BuilderDocument.objects.all_with_deleted().filter(key=key).exists():
+            return None
+        issues, validated = _issues(key, data, i18n, catalogue)
+        if validated is not None:
+            issues = validation.check_before_release(key, validated, catalogue)
+        if issues:
+            raise DocumentInvalid(
+                [replace(issue, document=key) for issue in issues]
+            )
+        assert validated is not None
+        kind = kind_of_key(key)
+        assert kind is not None, key
+        document = BuilderDocument.objects.create(
+            kind=kind,
+            key=key,
+            draft=validated.data,
+            draft_i18n=validated.i18n,
+            draft_catalogue_hash=catalogue.hash,
+            draft_revision=1,
+            published_revision=1,
+        )
+        version = _new_version(
+            None,
+            document,
+            validated,
+            kind=VersionKind.PUBLISH,
+            note=note,
+            catalogue_hash=catalogue.hash,
+        )
+        versions = {**published_versions(), key: version.pk}
+        return _create_release(None, versions, note=note)
+
+
+def install_theme_defaults() -> BuilderRelease | None:
+    """The theme a NEW store of this catalogue view's design starts with
+    (``documentKinds.theme.defaults``), installed as its theme document.
+    ``None`` when the catalogue states no defaults or the store already has
+    a theme document."""
+    root = _catalogue().roots.get("theme")
+    if root is None or root.defaults is None:
+        return None
+    return install_document(
+        "theme",
+        {"sections": {}, "order": [], "settings": root.defaults},
+        {},
+        note=THEME_NOTE,
+    )

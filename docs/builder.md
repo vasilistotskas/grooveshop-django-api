@@ -207,6 +207,29 @@ the rules read stored colours and need no colour maths beyond the one ratio.
 pinned) holds the ratios, the boundary cases and four whole themes; the
 storefront runs the same file.
 
+### Where a store's theme document comes from
+
+Django resolves no preset and does no colour maths: the storefront owns what a
+theme is.
+
+- **A new store:** provisioning's `theme` step installs
+  `documentKinds.theme.defaults` of THE STORE'S catalogue view (a design's
+  defaults) as its theme document, validated like a publish and released in its
+  own release (`builder.seeding.install_theme_defaults`). A catalogue without
+  defaults installs nothing; a catalogue that cannot be fetched reports the
+  step, and re-running provisioning finishes it (a store with a theme is left
+  alone). The platform's own `Theme` release does not count as work an editor
+  made (`seed_with_content` still applies).
+- **A store that existed before the theme document:** three steps, none of
+  which writes without being asked. `manage.py export_theme_fields` writes each
+  store's theme inputs as JSON (read only); the storefront's `pnpm theme:seed`
+  turns them into theme settings; `manage.py import_theme_settings <file>
+  [--dry-run]` validates each store's settings against that store's own
+  catalogue view (schema, references, the contrast `error` rules) and creates
+  and publishes the theme document in a release that keeps every other document
+  as it was. A store that already has a theme document is skipped, never
+  overwritten, and the whole file is judged before any store is touched.
+
 ### Typed data props (`builder/data_sources.py`)
 
 A block can declare a setting in the catalogue's `data` map, beside `refs`

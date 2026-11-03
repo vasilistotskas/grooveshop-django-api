@@ -92,6 +92,9 @@ class RootDefinition:
     #: The pairs of colours a theme must keep a contrast between
     #: (``builder.contrast``); empty for every other kind of document.
     contrast: tuple[contrast_module.Rule, ...]
+    #: ``defaults``: the settings a NEW store of this view's design starts
+    #: with (the theme's), or ``None`` when the catalogue states none.
+    defaults: dict[str, Any] | None
     validator: Validator = field(compare=False, repr=False)
 
 
@@ -242,6 +245,9 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         contrast=contrast_module.parse_rules(raw.get("contrast")),
+        defaults=(
+            dict(raw["defaults"]) if raw.get("defaults") is not None else None
+        ),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),

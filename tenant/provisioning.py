@@ -343,6 +343,27 @@ def _seed_builder_documents(tenant: Tenant) -> bool:
         return False
 
 
+def _seed_theme_document(tenant: Tenant) -> bool:
+    """The theme a new store of its design starts with, from the
+    storefront's catalogue view. A store without it is usable (the
+    storefront renders its tokens as before), so a catalogue that cannot be
+    fetched only reports the step; ``install_theme_defaults`` is idempotent
+    and re-running provisioning finishes it."""
+    try:
+        from builder.seeding import install_theme_defaults
+
+        release = install_theme_defaults()
+        logger.info(
+            "Seeded the theme document for %s (release %s)",
+            tenant.schema_name,
+            release.number if release else "none",
+        )
+        return True
+    except Exception:
+        logger.warning("Could not seed the theme document", exc_info=True)
+        return False
+
+
 def _activate_default_carrier(tenant: Tenant) -> bool:
     """Switch on the built-in flat-rate carrier for a NEW store.
 
@@ -498,6 +519,7 @@ def seed_tenant_defaults(tenant: Tenant) -> list[str]:
     steps = (
         ("extra settings", _seed_extra_settings),
         ("page builder", _seed_builder_documents),
+        ("theme", _seed_theme_document),
         ("content pages", _seed_content_pages),
         ("default carrier", _activate_default_carrier),
         ("newsletter topic", _seed_newsletter_topic),

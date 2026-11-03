@@ -1572,6 +1572,8 @@ paths:
       parameters:
       - $ref: '#/components/parameters/SessionToken'
       responses:
+        '200':
+          $ref: '#/components/responses/RecoveryCodes'
         '400':
           description: An input error occurred.
           content:
@@ -1763,6 +1765,24 @@ paths:
           $ref: '#/components/responses/Sessions'
         '401':
           $ref: '#/components/responses/Authentication'
+  /_allauth/app/v1/account/authenticators/totp/svg:
+    get:
+      tags:
+      - 'Account: 2FA'
+      summary: Get the TOTP authenticator, or a secret to enrol
+      description: Like the TOTP status endpoint, but the 404 for a user without an
+        authenticator carries the secret, its otpauth URL and the QR code.
+      parameters:
+      - $ref: '#/components/parameters/SessionToken'
+      responses:
+        '200':
+          $ref: '#/components/responses/TOTPAuthenticator'
+        '404':
+          description: 'No authenticator: the secret to enrol.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TOTPSvgNotFoundResponse'
 components:
   examples:
     User:
@@ -2367,6 +2387,14 @@ components:
           type: boolean
         password_reset_by_code_enabled:
           type: boolean
+        authentication_method:
+          type: string
+          enum:
+          - email
+          - username
+          - username_email
+          deprecated: true
+          description: Derived from `login_methods`.
       required:
       - authentication_method
       - email_verification_by_code_enabled
@@ -2532,6 +2560,7 @@ components:
         properties:
           is_authenticated:
             type: boolean
+            nullable: true
         required:
         - is_authenticated
     AuthenticatedMeta:
@@ -2580,6 +2609,11 @@ components:
           description: Matches `settings.MFA_SUPPORTED_TYPES`.
           items:
             $ref: '#/components/schemas/AuthenticatorType'
+        providers:
+          type: array
+          description: The ids of the providers the flow offers.
+          items:
+            type: string
       required:
       - id
     Authenticated:
@@ -3000,7 +3034,11 @@ components:
             '
           items:
             $ref: '#/components/schemas/AuthenticatorType'
+        passkey_login_enabled:
+          type: boolean
+          description: Matches `settings.MFA_PASSKEY_LOGIN_ENABLED`.
       required:
+      - passkey_login_enabled
       - supported_types
     UserSessionsConfiguration:
       type: object
@@ -3087,8 +3125,12 @@ components:
       required:
       - code
     OptionalTimestamp:
+      type: number
+      description: 'An epoch based timestamp (trivial to parse using: `new Date(value)*1000`)
+
+        '
+      example: 1711555057.065702
       nullable: true
-      $ref: '#/components/schemas/Timestamp'
     Timestamp:
       type: number
       description: 'An epoch based timestamp (trivial to parse using: `new Date(value)*1000`)
@@ -3457,6 +3499,31 @@ components:
             signature: MEUCIE-7sqILygPqGbrRZ4j2nqeqUU...
             userHandle: Mg...
           clientExtensionResults: {}
+    TOTPSvgNotFoundResponse:
+      type: object
+      description: 'No TOTP authenticator yet: the secret to enrol and its QR code.'
+      properties:
+        status:
+          type: integer
+          enum:
+          - 404
+        meta:
+          type: object
+          properties:
+            secret:
+              type: string
+            totp_url:
+              type: string
+            totp_svg:
+              type: string
+              description: The QR code, as SVG markup.
+          required:
+          - secret
+          - totp_url
+          - totp_svg
+      required:
+      - status
+      - meta
   parameters:
     EmailVerificationKey:
       in: header

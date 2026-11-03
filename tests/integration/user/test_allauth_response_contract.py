@@ -63,7 +63,52 @@ def assert_documented(document: dict, path: str, method: str, response) -> dict:
     jsonschema.Draft4Validator(
         as_json_schema(schema, document["components"]["schemas"])
     ).validate(body)
+    # A schema that does not forbid extra keys accepts them, so a field the
+    # endpoint serves and the document omits would pass the check above and
+    # still be missing from the generated parser.
+    assert not undocumented(document, schema, body), undocumented(
+        document, schema, body
+    )
     return body
+
+
+def _properties(document: dict, schema: dict) -> dict:
+    """Every property a schema declares, through ``$ref``, ``allOf`` and the
+    branches of ``oneOf``/``anyOf``."""
+    schema = _resolve(document, schema)
+    properties = dict(schema.get("properties", {}))
+    for key in ("allOf", "oneOf", "anyOf"):
+        for part in schema.get(key, []):
+            for name, value in _properties(document, part).items():
+                properties.setdefault(name, value)
+    return properties
+
+
+def undocumented(
+    document: dict, schema: dict, body: Any, where: str = ""
+) -> list[str]:
+    """The keys of ``body`` that ``schema`` does not declare, by path."""
+    schema = _resolve(document, schema)
+    if isinstance(body, list) and "items" in schema:
+        return [
+            key
+            for item in body
+            for key in undocumented(document, schema["items"], item, where)
+        ]
+    if not isinstance(body, dict):
+        return []
+    properties = _properties(document, schema)
+    if not properties or schema.get("additionalProperties"):
+        return []
+    found = []
+    for key, value in body.items():
+        if key not in properties:
+            found.append(f"{where}{key}")
+        else:
+            found += undocumented(
+                document, properties[key], value, f"{where}{key}."
+            )
+    return found
 
 
 def _call(client: Client, method: str, path: str, body=None, token=None):
@@ -255,3 +300,65 @@ def test_a_login_that_awaits_the_second_factor(document, user):
     )
     assert wrong.status_code == status.HTTP_400_BAD_REQUEST
     assert_documented(document, "/auth/2fa/authenticate", "post", wrong)
+
+
+def test_an_expired_session_is_gone_and_unauthenticated_is_null(document):
+    response = _call(
+        Client(), "get", "/auth/session", token="not-a-session-token"
+    )
+
+    assert response.status_code == status.HTTP_410_GONE
+    body = assert_documented(document, "/auth/session", "get", response)
+    assert body["meta"]["is_authenticated"] is None
+
+
+def test_the_configuration_documents_every_key_it_serves(document):
+    response = _call(Client(), "get", "/config")
+
+    body = assert_documented(document, "/config", "get", response)
+    assert "passkey_login_enabled" in body["data"]["mfa"]
+    assert body["data"]["account"]["authentication_method"] == "email"
+
+
+def test_regenerating_recovery_codes(document, user, token):
+    from allauth.mfa.models import Authenticator
+    from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
+    from allauth.mfa.totp.internal import auth as totp_auth
+
+    # Codes are regenerated for a user who has another authenticator.
+    Authenticator.objects.create(
+        user=user,
+        type=Authenticator.Type.TOTP,
+        data={"secret": totp_auth.generate_totp_secret()},
+    )
+    RecoveryCodes.activate(user)
+    # Regenerating is a sensitive action: it asks for the password again.
+    reauthenticated = _call(
+        Client(),
+        "post",
+        "/auth/reauthenticate",
+        {"password": PASSWORD},
+        token=token,
+    )
+    assert reauthenticated.status_code == status.HTTP_200_OK
+
+    response = _call(
+        Client(), "post", "/account/authenticators/recovery-codes", token=token
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert_documented(
+        document, "/account/authenticators/recovery-codes", "post", response
+    )
+
+
+def test_the_totp_enrolment_with_its_qr_code(document, token):
+    response = _call(
+        Client(), "get", "/account/authenticators/totp/svg", token=token
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    body = assert_documented(
+        document, "/account/authenticators/totp/svg", "get", response
+    )
+    assert body["meta"]["totp_svg"].lstrip().startswith("<")

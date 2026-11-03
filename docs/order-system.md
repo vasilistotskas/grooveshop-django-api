@@ -855,6 +855,13 @@ earlier frontend implementations assumed otherwise and broke the
 success redirect (customer landed on the homepage via the
 ``/checkout`` empty-cart bounce).
 
+The 200 answer is a union published as a `oneOf` discriminated on
+`kind`: `order` carries `id`, `uuid`, `status`, `paymentStatus`;
+`gift_card_purchase` (a purchase shares the static return URL)
+carries `purchaseUuid`, `purchaseStatus`. Every field of a branch is
+required, so the storefront's generated schema needs no local
+rebuild of the union.
+
 ### 4.4 COD / PAY_ON_DELIVERY (offline)
 
 ```

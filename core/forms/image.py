@@ -7,7 +7,7 @@ from django.core import validators
 from django.core.exceptions import ValidationError
 from django.forms import ImageField
 
-from core.uploads import is_safe_svg, validate_servable_image
+from core.uploads import is_safe_svg, prepare_servable_image
 
 if TYPE_CHECKING:  # pragma: no cover
     from django.core.files import File
@@ -43,7 +43,7 @@ class ImageAndSvgField(ImageField):
         if data is None:
             return None
 
-        validate_servable_image(data)
+        data, _image = prepare_servable_image(data)
 
         try:
             f = super().to_python(data)

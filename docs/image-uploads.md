@@ -23,6 +23,10 @@ runtime.
 
 ## The rule
 
+Every upload path calls `core.uploads.prepare_servable_image`. It first makes
+the upload fit (below), then judges what comes out with
+`validate_servable_image`, so nothing the rule refuses gets through.
+
 - The format is sniffed from the content (Pillow), never taken from the name
   or the declared type: a JPEG named `.png` is a JPEG with a JPEG cap.
 - A raster in a format the media service does not serve (BMP, ICO) is
@@ -34,6 +38,27 @@ runtime.
   media service's own limit) (`image_too_large`).
 - Anything else is `invalid_image`.
 
+### A big photo is shrunk, not refused
+
+A raster over its format's byte cap or over the pixel budget is re-encoded in
+the SAME format by `core/image_normalise.py`:
+
+- the EXIF orientation is applied, then the image is scaled down to
+  `UPLOAD_IMAGE_MAX_EDGE` on its long side (default 4096, twice the widest
+  rendition the media service makes) at `UPLOAD_IMAGE_QUALITY` (lossy
+  formats), and scaled further in steps of 25% until it fits its cap;
+- the colour profile is kept; nothing is ever enlarged;
+- it is refused (`file_too_large`) only when no step fits the cap;
+- an upload within its caps is returned untouched.
+
+GPS is removed from EVERY raster upload, not only a shrunk one: an EXIF GPS
+block or an XMP packet naming GPS fields makes the file be re-encoded without
+it, at its own size (the orientation tag stays; the rest of the EXIF stays).
+An animated GIF or WebP cannot be resized or stripped without flattening it,
+so one that needs either is refused (`animated_image_not_normalisable`); one
+within its caps and carrying no position passes unchanged. SVG is never
+re-encoded.
+
 It is applied to a NEW upload only, never to a stored file on every save, so an
 image stored before the rule can still be edited around it.
 
@@ -41,7 +66,7 @@ image stored before the rule can still be edited around it.
 
 | Path | How |
 |---|---|
-| Every model field that is an `ImageAndSvgField` (admin forms, blog, categories, products, avatars, shipping logos, pay way icons, loyalty tiers, country flags) | `core.forms.image.ImageAndSvgField.to_python` |
+| Every model field that is an `ImageAndSvgField` (admin forms, blog, categories, products, avatars, shipping logos, pay way icons, loyalty tiers, country flags) | `core.forms.image.ImageAndSvgField.to_python` (the cleaned file is the shrunk one) |
 | Those same fields through a DRF `ModelSerializer` | `CoreConfig.ready` maps the model field to `core.api.image_field.ServableImageField` |
 | Product images through the API | `ServableImageField(formats=PRODUCT_IMAGE_FORMATS)`: a product shows a still, no GIF or TIFF |
 | TinyMCE image upload (`core.views.upload_image`) | `ImageUploadForm` uses `ImageAndSvgField` |
@@ -58,4 +83,4 @@ caps above.
 stored images in `MEDIA_ROOT` that the media service would not serve (over its
 cap or pixel limit, or not an image). It is read only: it deletes, moves and
 re-encodes nothing. What to do with a store's file is the store owner's call.
-Resizing or re-encoding on upload (normalisation) is deliberately not done.
+Files stored before the rule are never rewritten.

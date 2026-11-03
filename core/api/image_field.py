@@ -14,7 +14,7 @@ from typing import Any
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from core.uploads import validate_servable_image
+from core.uploads import prepare_servable_image
 
 
 class ServableImageField(serializers.ImageField):
@@ -30,7 +30,9 @@ class ServableImageField(serializers.ImageField):
     def to_internal_value(self, data: Any) -> Any:
         upload = serializers.FileField.to_internal_value(self, data)
         try:
-            validate_servable_image(upload, formats=self.formats)
+            upload, _image = prepare_servable_image(
+                upload, formats=self.formats
+            )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
                 exc.messages[0], code=exc.code

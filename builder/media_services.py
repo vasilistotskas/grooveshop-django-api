@@ -41,7 +41,7 @@ from builder.models import MediaAsset, ReferenceKind
 from builder.services import require_permission
 from core import storefront
 from core.cache.invalidation import mark_surface_stale
-from core.uploads import image_limits, validate_servable_image
+from core.uploads import image_limits, prepare_servable_image
 from core.utils.i18n import available_language_codes
 from tenant.cache import bump_cache_generation
 from tenant.staff_actors import staff_id
@@ -64,16 +64,19 @@ class MediaInUse(BuilderError):
     default_detail = _("This image is used by a published page.")
 
 
-def _inspect(upload: UploadedFile) -> tuple[str, tuple[int, int]]:
-    """``(mime, displayed size)`` of an acceptable image, else refuse. The rule
-    is the media service's (``core.uploads``); a library image is a raster (an
-    SVG can carry script, and its size is not a size)."""
+def _inspect(
+    upload: UploadedFile,
+) -> tuple[UploadedFile, str, tuple[int, int]]:
+    """``(file to store, mime, displayed size)`` of an acceptable image, else
+    refuse. The rule is the media service's (``core.uploads``), and a photo
+    over its caps is shrunk rather than refused; a library image is a raster
+    (an SVG can carry script, and its size is not a size)."""
     try:
-        image = validate_servable_image(upload, allow_svg=False)
+        stored, image = prepare_servable_image(upload, allow_svg=False)
     except DjangoValidationError as exc:
         raise MediaInvalid(exc.messages[0], code=exc.code) from exc
     assert image.width is not None and image.height is not None
-    return image.mime, (image.width, image.height)
+    return stored, image.mime, (image.width, image.height)
 
 
 def _checked_focal(value: float | None) -> float:
@@ -138,7 +141,7 @@ def _store(
     focal_y: float | None,
     alt: Mapping[str, Any] | None,
 ) -> Stored:
-    mime, (width, height) = _inspect(upload)
+    upload, mime, (width, height) = _inspect(upload)
     digest = _digest(upload)
     known = MediaAsset.objects.filter(content_hash=digest).first()
     if known is not None:

@@ -977,6 +977,11 @@ BUILDER_UNRELEASED_CHECKPOINTS_KEPT = int(
 # (``core.uploads``: never above what the media service decodes). The byte
 # caps are the media service's own, copied into ``core/data/image-limits.json``.
 UPLOAD_IMAGE_MAX_PIXELS = int(getenv("UPLOAD_IMAGE_MAX_PIXELS", "40000000"))
+# An upload over its byte cap or the pixel budget is scaled down to this long
+# edge (twice the widest rendition the media service makes, 2048) and
+# re-encoded at this quality, instead of refused (``core.image_normalise``).
+UPLOAD_IMAGE_MAX_EDGE = int(getenv("UPLOAD_IMAGE_MAX_EDGE", "4096"))
+UPLOAD_IMAGE_QUALITY = int(getenv("UPLOAD_IMAGE_QUALITY", "85"))
 # Most assets one ``builder/media/resolve`` call answers for.
 BUILDER_MEDIA_RESOLVE_MAX_IDS = int(
     getenv("BUILDER_MEDIA_RESOLVE_MAX_IDS", "100")

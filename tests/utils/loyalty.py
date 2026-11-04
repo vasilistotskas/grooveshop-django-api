@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
 
 @contextmanager
-def loyalty_settings(**values) -> Iterator[None]:
+def loyalty_settings(**values) -> Generator[None]:
     """Answer both ways a store setting is read: ``Setting.get`` for one
     name and ``Setting.objects.filter`` for ``store_settings``' batch.
 

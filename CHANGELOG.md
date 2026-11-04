@@ -3,6 +3,70 @@
 
 
 
+## v3.221.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(builder): seed new stores at the current blocks, with their dependency rows
+
+Pinning the storefront at its current build moved the seeds to the data
+settings. seeding.derive then assumed a seed has no references, so a new
+store would have recorded no dependency rows and its home page would
+not have been purged when its products changed.
+
+A seed is now validated against the catalogue pinned with it, which
+moves to builder/seed_catalogue.json as application data; provisioning
+still asks the storefront nothing. The demo pages move to the current
+blocks through the same port.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
+### Continuous integration
+
+* ci(deps): bump astral-sh/setup-uv from 10.3.0 to 10.3.2 (#470)
+
+Bumps the actions-minor-patch group with 1 update: [astral-sh/setup-uv](https://github.com/astral-sh/setup-uv).
+
+
+Updates `astral-sh/setup-uv` from 10.3.0 to 10.3.2
+- [Release notes](https://github.com/astral-sh/setup-uv/releases)
+- [Commits](https://github.com/astral-sh/setup-uv/compare/1c37ad07a6a961277cf70c0d37d6f313000f5884...07a047e608db84b3d8c06cd9a7c7dcc9c355c18e)
+
+---
+updated-dependencies:
+- dependency-name: astral-sh/setup-uv
+  dependency-version: 10.3.2
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: actions-minor-patch
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com> ([`3aabbe1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3aabbe1cbc93938164eff8975d246273661764f7))
+
+### Features
+
+* feat(builder): write the block upgrades into what is stored (#481) ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
+* feat(builder): write the block upgrades into what is stored
+
+Django accepts only the current version of a block, so a draft nobody
+opened since its block moved is refused at publish, and a release from
+before the data settings records no dependency rows for them.
+
+persist_block_upgrades upgrades every stored draft and version of a
+store, validates each against the catalogue, stores what validation
+returns and rebuilds the reference index. One failure stops the store
+with nothing written. The port is held to the storefront upgrade-cases
+vectors.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLY3BeCyh66eL4wNi7 ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
 ## v3.220.0 (2026-11-04)
 
 ### Bug fixes

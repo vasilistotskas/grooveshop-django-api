@@ -99,7 +99,8 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
         )
 
     def with_main_image(self) -> Self:
-        """Prefetch only the MAIN image to avoid N+1 in main_image_path.
+        """Prefetch only the MAIN image (and its translations) to avoid N+1
+        in main_image_path and main_image_alt.
 
         Mirrors ``ProductQuerySet.with_main_image``. The filter matches
         ``CategoryImageQuerySet.get_main_image`` exactly — image_type
@@ -116,7 +117,7 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
                 "images",
                 queryset=ProductCategoryImage.objects.filter(
                     image_type=CategoryImageTypeEnum.MAIN, active=True
-                ),
+                ).prefetch_related("translations"),
                 to_attr="_prefetched_main_images",
             )
         )

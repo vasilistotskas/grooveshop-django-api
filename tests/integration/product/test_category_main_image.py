@@ -16,7 +16,10 @@ test, which is the part most likely to regress silently.
 from __future__ import annotations
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import translation
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -100,8 +103,108 @@ class TestCategoryMainImagePath:
         assert row["mainImagePath"] == ""
 
 
+def _alt_row(category, language="el"):
+    response = APIClient().get(
+        reverse("product-category-list"), HTTP_ACCEPT_LANGUAGE=language
+    )
+    assert response.status_code == status.HTTP_200_OK
+    return next(
+        item for item in response.json()["results"] if item["id"] == category.id
+    )
+
+
+def _write_alt(image, **alt_by_language):
+    for language, alt in alt_by_language.items():
+        image.set_current_language(language)
+        image.alt_text = alt
+        image.save()
+
+
+@pytest.mark.django_db
+class TestCategoryMainImageAlt:
+    def test_the_alt_text_is_served_in_the_request_language(self):
+        category = ProductCategoryFactory()
+        _write_alt(
+            _with_main_image(category), el="Μαύρο καλώδιο", en="Black cable"
+        )
+
+        assert _alt_row(category, "el")["mainImageAlt"] == "Μαύρο καλώδιο"
+        assert _alt_row(category, "en")["mainImageAlt"] == "Black cable"
+
+    def test_another_language_fills_in_when_the_current_has_none(self):
+        category = ProductCategoryFactory()
+        _write_alt(_with_main_image(category), el="Μαύρο καλώδιο")
+
+        assert _alt_row(category, "en")["mainImageAlt"] == "Μαύρο καλώδιο"
+
+    def test_any_language_fills_in_when_the_request_language_has_none(self):
+        category = ProductCategoryFactory()
+        _write_alt(_with_main_image(category), en="Black cable")
+
+        assert _alt_row(category, "el")["mainImageAlt"] == "Black cable"
+
+    def test_empty_without_a_main_image(self):
+        category = ProductCategoryFactory()
+
+        assert _alt_row(category)["mainImageAlt"] == ""
+
+    def test_empty_when_the_merchant_wrote_no_alt_text(self):
+        category = ProductCategoryFactory()
+        _with_main_image(category)
+
+        row = _alt_row(category)
+
+        assert row["mainImageAlt"] == ""
+        assert row["mainImageAlt"] != category.safe_translation_getter(
+            "name", any_language=True
+        )
+
+    def test_a_banner_alt_text_is_not_the_main_images(self):
+        category = ProductCategoryFactory()
+        banner = ProductCategoryImage.objects.create(
+            category=category,
+            image=IMAGE,
+            image_type=CategoryImageTypeEnum.BANNER,
+            active=True,
+        )
+        _write_alt(banner, el="Banner")
+
+        assert _alt_row(category)["mainImageAlt"] == ""
+
+    def test_the_detail_serves_it_too(self):
+        category = ProductCategoryFactory()
+        _write_alt(_with_main_image(category), el="Μαύρο καλώδιο")
+
+        response = APIClient().get(
+            reverse("product-category-detail", args=[category.pk])
+        )
+
+        assert response.json()["mainImageAlt"] == "Μαύρο καλώδιο"
+
+
 @pytest.mark.django_db
 class TestNoNPlusOne:
+    def test_the_alt_text_costs_the_same_for_one_category_or_many(self):
+        def alts():
+            with translation.override("el"):
+                return [
+                    category.main_image_alt
+                    for category in ProductCategory.objects.for_list()
+                ]
+
+        _write_alt(_with_main_image(ProductCategoryFactory()), el="Ένα")
+        with CaptureQueriesContext(connection) as one:
+            assert alts() == ["Ένα"]
+
+        for n in range(5):
+            _write_alt(
+                _with_main_image(ProductCategoryFactory()), el=f"Alt {n}"
+            )
+        with CaptureQueriesContext(connection) as many:
+            assert len(alts()) == 6
+
+        assert len(many) == len(one)
+
     def test_main_image_is_prefetched_for_a_list(
         self, django_assert_max_num_queries
     ):

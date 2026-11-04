@@ -150,6 +150,19 @@ class TestSurfaceWiring:
         for code in ("products", "categories"):
             assert get_surface(code).invalidates_gateway_feeds, code
 
+    def test_a_highlight_edit_reaches_the_feeds(self):
+        """Highlights live only in the feeds, so without this an edit
+        waits out FEED_FRESH_TTL. Labels resolve to real models, or the
+        connection is skipped with a warning."""
+        labels = {
+            "product.ProductHighlight",
+            "product.ProductHighlightTranslation",
+        }
+
+        assert labels <= set(get_surface("products").invalidated_by)
+        for label in labels:
+            assert apps.get_model(label)
+
     def test_unrelated_surfaces_do_not(self):
         """Purging the blog or the settings must not cost a gateway
         round trip or drop the feeds."""

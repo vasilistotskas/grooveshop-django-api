@@ -121,6 +121,7 @@ class FakeGitHub:
         catalogue: bytes = b'{"hash": "h"}\n',
         placement: bytes = b"[]\n",
         data_cases: bytes = b"[]\n",
+        upgrade_cases: bytes = b"[]\n",
         contrast_cases: bytes = b"{}\n",
         limits: bytes = b'{"maxFileBytes": {}}\n',
     ) -> None:
@@ -128,6 +129,7 @@ class FakeGitHub:
         self.catalogue = catalogue
         self.placement = placement
         self.data_cases = data_cases
+        self.upgrade_cases = upgrade_cases
         self.contrast_cases = contrast_cases
         self.limits = limits
         # Every tree this repository has: sha -> entries.
@@ -174,6 +176,11 @@ class FakeGitHub:
                     "path": "data-cases.json",
                     "type": "blob",
                     "sha": self._blob(self.data_cases),
+                },
+                {
+                    "path": "upgrade-cases.json",
+                    "type": "blob",
+                    "sha": self._blob(self.upgrade_cases),
                 },
                 {
                     "path": "contrast-cases.json",

@@ -9,12 +9,11 @@ its translations.
 Provisioning calls :func:`seed_store`, which stores each one as a document
 (its draft equal to its published content), one version, and ONE release
 (number 1) holding them all: what the storefront reads from the first
-request. It makes no call to the storefront and so does not validate: the
-catalogue is not needed to start a store, and a catalogue fetch that fails
-must not leave a store without its homepage. What stands in for validation
-is ``tests/unit/builder/test_seeds.py``, which validates every seed against
-the vendored catalogue snapshot and checks that what is derived here (block
-types, references) is what validation derives.
+request. It makes no call to the storefront: a catalogue fetch that fails
+must not leave a store without its homepage. What a seed derives (block types,
+the dependency rows of its data settings) comes from ``seed_catalogue.json``,
+the storefront's catalogue pinned with the seeds, so the seeds and the blocks
+they are read against are always of one build.
 
 :func:`seed_with_content` releases richer content in the same files' shape
 (the demo store's pages, ``devtools/demo_pages``) on a store that holds
@@ -25,15 +24,15 @@ publish.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass, replace
+from functools import cache
 from pathlib import Path
 from typing import Any
 
 from django.db import transaction
 
-from builder import validation
+from builder import storefront, validation
 from builder.errors import DocumentInvalid, Issue
 from builder.models import (
     BuilderDocument,
@@ -53,6 +52,7 @@ from builder.services import (
 )
 
 SEEDS = Path(__file__).parent / "seeds"
+SEED_CATALOGUE = Path(__file__).parent / "seed_catalogue.json"
 
 NOTE = "Default content"
 #: The release that gives a new store its theme (and an existing one,
@@ -82,30 +82,33 @@ def load_seeds(directory: Path = SEEDS) -> list[Seed]:
     return seeds
 
 
-def _block_types(nodes: dict[str, Any]) -> set[str]:
-    types: set[str] = set()
-    for node in nodes.values():
-        types.add(node["type"])
-        types |= _block_types(node.get("blocks", {}))
-    return types
+@cache
+def seed_catalogue() -> storefront.Catalogue:
+    """The catalogue of the build the seeds came from."""
+    return storefront.parse_catalogue(
+        json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
+    )
 
 
 def derive(seed: Seed) -> validation.Validated:
-    """What validation would derive from a seed, without the catalogue.
+    """A seed as validation derives it, against :func:`seed_catalogue`.
 
-    A seed holds no references (a default document cannot name a product
-    or a page a new store does not have), so ``refs`` is empty; the seeds
-    test holds every seed to that.
+    A seed names no record a new store does not have, but its lists are
+    data settings, and their dependency rows are what purges the page when
+    the store's products change. Every feature counts as on: whether a
+    block shows is the storefront's to decide when it renders.
+    ``tests/unit/builder/test_seeds.py`` holds every seed to passing.
     """
-    payload = validation.encode(seed.data, seed.i18n)
-    return validation.Validated(
+    issues, validated = validation.validate_document(
+        key=seed.key,
         data=seed.data,
         i18n=seed.i18n,
-        block_types=sorted(_block_types(seed.data["sections"])),
-        refs={},
-        content_hash=hashlib.sha256(payload).hexdigest(),
-        size_bytes=len(payload),
+        catalogue=seed_catalogue(),
+        feature_on=lambda _feature: True,
     )
+    if validated is None:
+        raise DocumentInvalid(issues)
+    return validated
 
 
 def seed_store() -> BuilderRelease | None:

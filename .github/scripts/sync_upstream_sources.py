@@ -6,10 +6,9 @@ they own can drift silently.
 The storefront owns the page builder's blocks, so three things it produces
 are COPIED here:
 
-* ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``tests/
-  fixtures/builder/catalogue.json``, a snapshot of its block catalogue for the
-  default schema (what the seeds are validated against, in CI, without a
-  storefront);
+* ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``builder/
+  seed_catalogue.json``, a snapshot of its block catalogue for the default
+  schema: what a new store's seeds are read against, without a storefront;
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   others this one is application data, not a test input.
@@ -99,7 +98,7 @@ SOURCES: tuple[Source, ...] = (
         "catalogue",
         STOREFRONT,
         "test/fixtures/builder/catalogue.json",
-        "tests/fixtures/builder/catalogue.json",
+        "builder/seed_catalogue.json",
         "blob",
     ),
     Source(

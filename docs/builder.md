@@ -749,7 +749,7 @@ files (the media service's image limits are copied the same way, see
 
 | Source | Copy | Used by |
 |---|---|---|
-| `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
+| `test/fixtures/builder/catalogue.json` | `builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
 | `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
 
 `tests/fixtures/upstream-sources.lock.json` names each owner's commit and

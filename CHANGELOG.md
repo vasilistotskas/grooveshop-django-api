@@ -3,6 +3,70 @@
 
 
 
+## v3.220.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(devtools): a staging refresh switches IndexNow off (#479)
+
+Store settings are restored from production, so INDEXNOW_ENABLED arrived
+on and staging would announce its own URLs to the public IndexNow
+endpoint. staging_anonymise now sets the settings named in
+rules.FORCED_OFF_SETTINGS to off in every schema, through _base_manager,
+and a second run changes nothing.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a5ac69c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5ac69c7a95d87e6fed644684ad13d904031d5d5))
+
+* fix(product): a highlight edit purges the product surface
+
+Highlights exist only in the feeds, so an edit that did not move the
+surface waited out the gateway's fresh TTL.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+### Features
+
+* feat(product): highlights for the Merchant feed (#478) ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+* feat(product): highlights for the Google Merchant product_highlight
+
+A product has a sortable list of short benefits, written per language
+(150 characters each), edited in a tab on the product page. Only the
+catalogue feed publishes them: /product/feed answers with a new
+ProductFeedSerializer whose highlights hold the texts in the request
+language, in the merchant's order, with no fallback to another language,
+because Google requires the feed language to match. The feed queryset
+prefetches them in one query; the product detail, list and hydrated
+recommendations are unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+### Testing
+
+* test(product): read one product from the feed by id (#480)
+
+The feed paginates, so a helper that scanned its first page lost the row
+when other tests in the shard had products of their own.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0d7d001`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d7d00157997143cf8de75631c514b297e2c273e))
+
+* test(product): import apps in the feed surface test
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
 ## v3.219.1 (2026-11-04)
 
 ### Bug fixes

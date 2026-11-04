@@ -314,6 +314,9 @@ TENANT_APPS = [
     "shipping_boxnow",
     "shipping_acs",
     "meta_capi",
+    # Tells search engines through IndexNow which product and blog pages
+    # changed (``docs/indexnow.md``)
+    "indexnow",
     # Per-tenant reference data
     "vat",
     "pay_way",
@@ -962,12 +965,38 @@ BUILDER_PRESENCE_MAX_DOCUMENTS = int(
     getenv("BUILDER_PRESENCE_MAX_DOCUMENTS", "20")
 )
 # Levels of nesting: a section is level 1, its blocks level 2, theirs 3.
+# A contact attachment still PENDING after this many minutes had its scan
+# lost (``contact.tasks.rescan_pending_attachments``); the sweep queues at
+# most this many per store and run.
+CONTACT_SCAN_PENDING_AFTER_MINUTES = int(
+    getenv("CONTACT_SCAN_PENDING_AFTER_MINUTES", "15")
+)
+CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
+# The review reminder (``order.tasks.send_review_request_emails``) runs
+# daily: an order delivered up to this many days earlier than its due day
+# is still reminded, so a run that did not happen costs nothing.
+REVIEW_REQUEST_CATCH_UP_DAYS = int(getenv("REVIEW_REQUEST_CATCH_UP_DAYS", "3"))
+# IndexNow (``indexnow/``): the endpoint the batched notification is posted
+# to (the protocol's shared endpoint, which hands the URLs to every
+# participating search engine) and how long one POST may take.
+INDEXNOW_ENDPOINT = getenv(
+    "INDEXNOW_ENDPOINT", "https://api.indexnow.org/indexnow"
+)
+INDEXNOW_TIMEOUT_SECONDS = int(getenv("INDEXNOW_TIMEOUT_SECONDS", "15"))
+# Deferred dispatches (``tenant.models.DeferredDispatch``): the sweep takes
+# this many per run, waits ``base * 2**attempts`` seconds (at most the cap)
+# between tries, and deletes a row, with an ERROR, once it is this old.
+DEFERRED_DISPATCH_BATCH = int(getenv("DEFERRED_DISPATCH_BATCH", "200"))
+DEFERRED_DISPATCH_BACKOFF_SECONDS = int(
+    getenv("DEFERRED_DISPATCH_BACKOFF_SECONDS", "30")
+)
+DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS = int(
+    getenv("DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS", "3600")
+)
+DEFERRED_DISPATCH_RETENTION_DAYS = int(
+    getenv("DEFERRED_DISPATCH_RETENTION_DAYS", "7")
+)
 BUILDER_MAX_DEPTH = int(getenv("BUILDER_MAX_DEPTH", "3"))
-# Typed data props (``builder.data_sources``): most records a hand-picked list
-# or one filter names, and most lists one document asks for.
-BUILDER_DATA_MAX_PICKED_IDS = int(getenv("BUILDER_DATA_MAX_PICKED_IDS", "24"))
-BUILDER_DATA_MAX_FILTER_IDS = int(getenv("BUILDER_DATA_MAX_FILTER_IDS", "5"))
-BUILDER_DATA_MAX_QUERIES = int(getenv("BUILDER_DATA_MAX_QUERIES", "24"))
 BUILDER_MAX_DOCUMENT_BYTES = int(
     getenv("BUILDER_MAX_DOCUMENT_BYTES", str(256 * 1024))
 )
@@ -1461,6 +1490,14 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "redispatch-deferred-tasks": {
+            # Public scope, no fanout: the rows live in ``public``. A task
+            # whose publish failed after its change committed (the broker
+            # was unreachable) is published again here
+            # (``tenant.celery.dispatch_on_commit``).
+            "task": "tenant.tasks.redispatch_deferred_tasks",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
+        },
         "run-due-builder-publishes": {
             # Fanout: a publish scheduled in the page builder goes live
             # within the minute it is due (``builder.scheduling``). Cheap
@@ -1475,6 +1512,12 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+        },
+        "rescan-pending-contact-attachments": {
+            # Fanout: an attachment whose scan was queued by a worker that
+            # died before the publish stays PENDING; this finds it by state.
+            "task": "tenant.tasks.fanout_rescan_pending_contact_attachments",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
         "purge-expired-contact-records": {
             # Fanout: Contact and Feedback are per-tenant. Deletes the
@@ -1632,6 +1675,19 @@ def get_celery_beat_schedule():
         # The control plane's per-store figures (TenantStatsSnapshot).
         "refresh-tenant-stats": {
             "task": "tenant.tasks.fanout_refresh_stats_snapshots",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
+        },
+        "send-review-request-emails": {
+            "task": "tenant.tasks.fanout_send_review_request_emails",
+            "schedule": SCHEDULE_PRESETS["daily_noon"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # One IndexNow POST per store per run, with the product and blog
+        # pages that changed since the last one. IndexNow asks for at
+        # least five minutes between two submissions of the same URL.
+        "submit-indexnow-urls": {
+            "task": "tenant.tasks.fanout_submit_indexnow_urls",
             "schedule": SCHEDULE_PRESETS["every_30_min"],
         },
         "send-checkout-abandonment-emails": {
@@ -2230,6 +2286,23 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "int",
         "value": 2,
     },
+    {
+        "name": "REVIEW_REQUEST_DELAY_DAYS",
+        "type": "int",
+        "value": 0,
+        "validator": (
+            "order.review_request.validate_review_request_delay_days_setting"
+        ),
+        "description": (
+            "Send a customer one reminder email this many days after their "
+            "order was delivered, asking for a review of the products they "
+            "have not reviewed yet. At most one per order, and only while "
+            "product reviews are on and the customer has not opted out of "
+            "marketing email. 0 is off, the default: a store chooses to send "
+            "this mail. The delivery email "
+            "itself always invites a review."
+        ),
+    },
     # Contact / email
     {
         "name": "CONTACT_EMAIL",
@@ -2315,6 +2388,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "the Test Events feed in Events Manager looks right. The "
             "browser pixel is independent — it gates on the "
             "``ad_storage`` cookie consent on the storefront."
+        ),
+    },
+    # IndexNow
+    {
+        "name": "INDEXNOW_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Tell search engines (Bing, Yandex, Naver and the others that "
+            "support IndexNow) when a published product or blog post is "
+            "created, changed or unpublished, instead of waiting for them "
+            "to crawl it. Off by default. The changes of the last half "
+            "hour go out in one notification. The store's IndexNow key "
+            "file is served by the storefront once this is on."
         ),
     },
     # Storefront UI toggles

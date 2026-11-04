@@ -92,6 +92,9 @@ class RootDefinition:
     #: The pairs of colours a theme must keep a contrast between
     #: (``builder.contrast``); empty for every other kind of document.
     contrast: tuple[contrast_module.Rule, ...]
+    #: ``defaults``: the settings a NEW store of this view's design starts
+    #: with (the theme's), or ``None`` when the catalogue states none.
+    defaults: dict[str, Any] | None
     validator: Validator = field(compare=False, repr=False)
 
 
@@ -107,6 +110,9 @@ class Catalogue:
     #: The page types that are fixed templates (home, about, ...); any
     #: other page is a custom ``page:<key>``. The storefront's routing.
     templates: frozenset[str] = frozenset()
+    #: The caps for typed data props (``dataLimits``); the catalogue states
+    #: them whenever a block declares ``data``.
+    data_limits: data_sources.DataLimits | None = None
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -239,6 +245,9 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         contrast=contrast_module.parse_rules(raw.get("contrast")),
+        defaults=(
+            dict(raw["defaults"]) if raw.get("defaults") is not None else None
+        ),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),
@@ -252,11 +261,22 @@ def parse_catalogue(payload: Any) -> Catalogue:
             str(kind): _parse_root(raw)
             for kind, raw in (payload.get("documentKinds") or {}).items()
         }
+        declares_data = any(b.data for b in blocks) or any(
+            r.data for r in roots.values()
+        )
+        raw_limits = payload.get("dataLimits")
+        if declares_data and raw_limits is None:
+            raise ValueError("data is declared without dataLimits")
         return Catalogue(
             hash=str(payload["hash"]),
             blocks=blocks,
             roots=roots,
             templates=frozenset(str(t) for t in payload.get("templates") or ()),
+            data_limits=(
+                data_sources.DataLimits.parse(raw_limits)
+                if raw_limits is not None
+                else None
+            ),
             _index={block.type: block for block in blocks},
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

@@ -6,10 +6,9 @@ they own can drift silently.
 The storefront owns the page builder's blocks, so three things it produces
 are COPIED here:
 
-* ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``tests/
-  fixtures/builder/catalogue.json``, a snapshot of its block catalogue for the
-  default schema (what the seeds are validated against, in CI, without a
-  storefront);
+* ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``builder/
+  seed_catalogue.json``, a snapshot of its block catalogue for the default
+  schema: what a new store's seeds are read against, without a storefront;
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
   others this one is application data, not a test input.
@@ -18,13 +17,13 @@ are COPIED here:
   typed data props (``builder.data_sources``): a declaration, a value, whether
   it is valid, the issues, the references and the query dependencies it
   yields.
+* ``upgrade-cases``: ``test/fixtures/builder/upgrade-cases.json`` -> ``tests/
+  fixtures/builder/upgrade-cases.json``, the block upgrades as cases, which
+  the storefront proves against its blocks and ``builder.block_upgrades`` is
+  held to (``tests/unit/builder/test_block_upgrades.py``);
 * ``contrast-cases``: ``test/fixtures/builder/contrast-cases.json`` -> ``tests/
   fixtures/builder/contrast-cases.json``, the WCAG 2.2 ratios, rules and whole
   themes both repositories run (``builder.contrast``);
-* ``tailwind-palettes``: ``test/fixtures/builder/tailwind-palettes.json`` ->
-  ``builder/data/tailwind-palettes.json``, the 11 shades of every Tailwind
-  palette as sRGB hex, so the theme seeding (``builder.theme_seed``) needs no
-  colour maths;
 * ``placement``: ``test/fixtures/builder/placement-cases.json`` -> ``tests/
   fixtures/builder/placement-cases.json``, the cases both the editor's
   placement filter (``shared/builder/placement.ts``) and ``builder.validation.
@@ -99,7 +98,7 @@ SOURCES: tuple[Source, ...] = (
         "catalogue",
         STOREFRONT,
         "test/fixtures/builder/catalogue.json",
-        "tests/fixtures/builder/catalogue.json",
+        "builder/seed_catalogue.json",
         "blob",
     ),
     Source(
@@ -124,17 +123,17 @@ SOURCES: tuple[Source, ...] = (
         "blob",
     ),
     Source(
+        "upgrade-cases",
+        STOREFRONT,
+        "test/fixtures/builder/upgrade-cases.json",
+        "tests/fixtures/builder/upgrade-cases.json",
+        "blob",
+    ),
+    Source(
         "contrast-cases",
         STOREFRONT,
         "test/fixtures/builder/contrast-cases.json",
         "tests/fixtures/builder/contrast-cases.json",
-        "blob",
-    ),
-    Source(
-        "tailwind-palettes",
-        STOREFRONT,
-        "test/fixtures/builder/tailwind-palettes.json",
-        "builder/data/tailwind-palettes.json",
         "blob",
     ),
     Source(

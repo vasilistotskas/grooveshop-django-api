@@ -26497,7 +26497,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProductList'
+                $ref: '#/components/schemas/PaginatedProductFeedList'
           description: ''
   /api/v1/product/image:
     get:
@@ -44964,6 +44964,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductFavourite'
+    PaginatedProductFeedList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductFeed'
     PaginatedProductImageList:
       type: object
       required:
@@ -45002,44 +45040,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductImage'
-    PaginatedProductList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        links:
-          type: object
-          properties:
-            next:
-              type: string
-              nullable: true
-              format: uri
-              example: http://api.example.org/accounts/?page=4
-            previous:
-              type: string
-              nullable: true
-              format: uri
-              example: http://api.example.org/accounts/?page=2
-        count:
-          type: integer
-          example: 123
-        totalPages:
-          type: integer
-          example: 123
-        pageSize:
-          type: integer
-          example: 123
-        pageTotalResults:
-          type: integer
-          example: 123
-        page:
-          type: integer
-          example: 123
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/Product'
     PaginatedProductReviewList:
       type: object
       required:
@@ -46000,15 +46000,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
     PatchedProductCategoryWriteRequest:
@@ -46025,6 +46021,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -46037,6 +46035,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -46080,12 +46080,12 @@ components:
             el:
               type: object
               properties:
-                title:
+                altText:
                   type: string
             en:
               type: object
               properties:
-                title:
+                altText:
                   type: string
     PatchedProductReviewWriteRequest:
       type: object
@@ -46132,6 +46132,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -46145,11 +46147,25 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           minLength: 1
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+          maxLength: 14
+        mpn:
+          type: string
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
+          maxLength: 70
         category:
           type: integer
           nullable: true
@@ -47111,6 +47127,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -47124,10 +47142,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -47298,11 +47330,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priorPrice
       - reductionStartedAt
@@ -47436,6 +47470,11 @@ components:
         isVariant:
           type: boolean
           readOnly: true
+        schemaProperty:
+          readOnly: true
+          oneOf:
+          - $ref: '#/components/schemas/SchemaPropertyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         attributeValueId:
           type: integer
         value:
@@ -47454,6 +47493,7 @@ components:
       - createdAt
       - id
       - isVariant
+      - schemaProperty
       - value
     ProductBrief:
       type: object
@@ -47629,6 +47669,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -47641,6 +47683,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -47668,6 +47712,9 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageAlt:
+          type: string
+          readOnly: true
         recursiveProductCount:
           type: integer
           readOnly: true
@@ -47689,6 +47736,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImageAlt
       - mainImagePath
       - recursiveProductCount
       - slug
@@ -47713,6 +47761,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -47725,6 +47775,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -47750,6 +47802,9 @@ components:
           type: integer
           readOnly: true
         mainImagePath:
+          type: string
+          readOnly: true
+        mainImageAlt:
           type: string
           readOnly: true
         recursiveProductCount:
@@ -47779,6 +47834,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImageAlt
       - mainImagePath
       - recursiveProductCount
       - slug
@@ -47821,15 +47877,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         imagePath:
@@ -47908,15 +47960,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         imagePath:
@@ -47971,15 +48019,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
       required:
@@ -48000,6 +48044,8 @@ components:
                   type: string
                 description:
                   type: string
+                footerText:
+                  type: string
                 seoTitle:
                   type: string
                 seoDescription:
@@ -48012,6 +48058,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                footerText:
                   type: string
                 seoTitle:
                   type: string
@@ -48057,6 +48105,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -48070,10 +48120,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -48252,11 +48316,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -48296,6 +48362,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -48309,10 +48377,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -48491,11 +48573,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -48634,6 +48718,264 @@ components:
           type: integer
       required:
       - product
+    ProductFeed:
+      type: object
+      description: |-
+        A product as the catalogue feed (``/product/feed``) publishes it:
+        ``ProductSerializer`` plus the Google Merchant ``product_highlight``
+        list. Only the feed prefetches the highlights
+        (``ProductQuerySet.for_feed``), so only the feed renders them.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        translations:
+          type: object
+          properties:
+            el:
+              type: object
+              properties:
+                seoTitle:
+                  type: string
+                seoDescription:
+                  type: string
+                seoKeywords:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                feedTitle:
+                  type: string
+            en:
+              type: object
+              properties:
+                seoTitle:
+                  type: string
+                seoDescription:
+                  type: string
+                seoKeywords:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                feedTitle:
+                  type: string
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
+        category:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Κατηγορία
+        variantGroup:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Ομάδα παραλλαγών
+          description: Συνδέει αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ.
+            το ίδιο είδος σε άλλα χρώματα). Τα μέλη μοιράζονται επιλογείς παραλλαγής
+            στο κατάστημα.
+        brand:
+          type: integer
+          readOnly: true
+          nullable: true
+          title: Μάρκα
+        brandName:
+          type: string
+          readOnly: true
+          nullable: true
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        vat:
+          type: integer
+          nullable: true
+        viewCount:
+          type: integer
+          readOnly: true
+          title: Προβολές
+        stock:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          readOnly: true
+          title: Απόθεμα
+        lowStockThreshold:
+          type: integer
+          readOnly: true
+          title: Όριο χαμηλού αποθέματος
+          description: Επίπεδο αποθέματος στο ή κάτω από το οποίο οι διαχειριστές
+            λαμβάνουν ειδοποίηση χαμηλού αποθέματος. Ορίστε 0 για απενεργοποίηση των
+            ειδοποιήσεων για αυτό το προϊόν.
+        active:
+          type: boolean
+          readOnly: true
+          title: Ενεργή
+        weight:
+          type: object
+          properties:
+            unit:
+              type: string
+            value:
+              type: number
+          example:
+            unit: kg
+            value: 1.0
+          nullable: true
+        vatPercent:
+          type: number
+          format: double
+          readOnly: true
+        vatValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        effectivePrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        priorPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          nullable: true
+        announcedDiscountPercent:
+          type: integer
+          readOnly: true
+          nullable: true
+        reductionStartedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        mainImagePath:
+          type: string
+          readOnly: true
+        imagePaths:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        reviewAverage:
+          type: number
+          format: double
+          description: Return the average review rating for this product.
+          readOnly: true
+        reviewCount:
+          type: integer
+          description: Return the number of approved reviews for this product.
+          readOnly: true
+        likesCount:
+          type: integer
+          description: Return the number of likes/favourites for this product.
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Ενημερώθηκε στις
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAttribute'
+          readOnly: true
+        offerKind:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/OfferKindEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        variantGroupTitle:
+          type: string
+          nullable: true
+          readOnly: true
+        highlights:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - active
+      - announcedDiscountPercent
+      - attributes
+      - brand
+      - brandName
+      - category
+      - createdAt
+      - effectivePrice
+      - finalPrice
+      - gtin
+      - highlights
+      - id
+      - imagePaths
+      - likesCount
+      - lowStockThreshold
+      - mainImagePath
+      - mpn
+      - price
+      - priorPrice
+      - reductionStartedAt
+      - reviewAverage
+      - reviewCount
+      - slug
+      - stock
+      - translations
+      - updatedAt
+      - uuid
+      - variantGroup
+      - variantGroupTitle
+      - vatPercent
+      - vatValue
+      - viewCount
     ProductImage:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -48654,6 +48996,11 @@ components:
           title: Εικόνα
         altText:
           type: string
+          description: |-
+            The merchant's alt text, else empty.
+
+            No generated sentence: it would be in one language whatever the
+            store speaks, so the storefront builds its own localized fallback.
           readOnly: true
         isMain:
           type: boolean
@@ -48670,12 +49017,12 @@ components:
             el:
               type: object
               properties:
-                title:
+                altText:
                   type: string
             en:
               type: object
               properties:
-                title:
+                altText:
                   type: string
         mainImagePath:
           type: string
@@ -48716,6 +49063,11 @@ components:
           title: Εικόνα
         altText:
           type: string
+          description: |-
+            The merchant's alt text, else empty.
+
+            No generated sentence: it would be in one language whatever the
+            store speaks, so the storefront builds its own localized fallback.
           readOnly: true
         isMain:
           type: boolean
@@ -48731,12 +49083,12 @@ components:
             el:
               type: object
               properties:
-                title:
+                altText:
                   type: string
             en:
               type: object
               properties:
-                title:
+                altText:
                   type: string
         mainImagePath:
           type: string
@@ -48809,12 +49161,12 @@ components:
             el:
               type: object
               properties:
-                title:
+                altText:
                   type: string
             en:
               type: object
               properties:
-                title:
+                altText:
                   type: string
       required:
       - image
@@ -49256,6 +49608,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49269,10 +49623,24 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          readOnly: true
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+        mpn:
+          type: string
+          readOnly: true
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
         category:
           type: integer
           readOnly: true
@@ -49456,11 +49824,13 @@ components:
       - createdAt
       - effectivePrice
       - finalPrice
+      - gtin
       - id
       - imagePaths
       - likesCount
       - lowStockThreshold
       - mainImagePath
+      - mpn
       - price
       - priceDropAlertsEnabled
       - priorPrice
@@ -49685,6 +50055,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49697,6 +50069,8 @@ components:
                 name:
                   type: string
                 description:
+                  type: string
+                feedTitle:
                   type: string
         slug:
           type: string
@@ -49822,6 +50196,8 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
             en:
               type: object
               properties:
@@ -49835,11 +50211,25 @@ components:
                   type: string
                 description:
                   type: string
+                feedTitle:
+                  type: string
         slug:
           type: string
           minLength: 1
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
+        gtin:
+          type: string
+          description: 'Ο αριθμός κάτω από το barcode του προϊόντος (EAN, UPC ή ISBN):
+            8, 12, 13 ή 14 ψηφία. Το Google Merchant Center τον χρησιμοποιεί για να
+            αναγνωρίσει το προϊόν. Αφήστε το κενό αν το προϊόν δεν έχει.'
+          maxLength: 14
+        mpn:
+          type: string
+          description: Ο κωδικός εξαρτήματος του κατασκευαστή (MPN), όπως τον τυπώνει
+            ο κατασκευαστής. Χρησιμοποιήστε τον για προϊόν χωρίς barcode. Δεν είναι
+            ο κωδικός SKU σας. Αφήστε το κενό αν το προϊόν δεν έχει.
+          maxLength: 70
         category:
           type: integer
           nullable: true
@@ -51069,6 +51459,22 @@ components:
       required:
       - documents
       - scheduledFor
+    SchemaPropertyEnum:
+      enum:
+      - color
+      - size
+      - material
+      - pattern
+      - suggestedAge
+      - suggestedGender
+      type: string
+      description: |-
+        * `color` - Χρώμα
+        * `size` - Μέγεθος
+        * `material` - Υλικό
+        * `pattern` - Σχέδιο
+        * `suggestedAge` - Προτεινόμενη ηλικία
+        * `suggestedGender` - Προτεινόμενο φύλο
     SearchAnalyticsResponse:
       type: object
       description: Serializer for search analytics response.
@@ -52457,6 +52863,8 @@ components:
           type: string
         googleSiteVerification:
           type: string
+        bingSiteVerification:
+          type: string
         pinterestDomainVerify:
           type: string
         primaryColor:
@@ -52591,6 +52999,8 @@ components:
         googleAdsPageViewLabel:
           type: string
           readOnly: true
+        indexnowKey:
+          type: string
         totpIssuer:
           type: string
           readOnly: true
@@ -53593,6 +54003,10 @@ components:
           type: integer
         name:
           type: string
+        schemaProperty:
+          oneOf:
+          - $ref: '#/components/schemas/SchemaPropertyEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         values:
           type: array
           items:
@@ -53600,6 +54014,7 @@ components:
       required:
       - id
       - name
+      - schemaProperty
       - values
     VariantAxisValue:
       type: object

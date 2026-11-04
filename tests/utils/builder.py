@@ -247,6 +247,8 @@ class FakeCatalogue:
         self.hash = HASH
         self.calls: list[dict[str, Any]] = []
         self.failure: Exception | None = None
+        #: The catalogue root ``dataLimits``, when blocks declare data.
+        self.data_limits: dict[str, int] | None = None
         self.status = 200
 
     def get(self, url: str, **kwargs: Any) -> mock.Mock:
@@ -261,12 +263,15 @@ class FakeCatalogue:
             return response
         response.status_code = self.status
         response.headers = {"ETag": etag}
-        response.json.return_value = {
+        body: dict[str, Any] = {
             "hash": self.hash,
             "blocks": self.blocks,
             "documentKinds": self.document_kinds,
             "templates": ["home", "about", "contact", "product"],
         }
+        if self.data_limits is not None:
+            body["dataLimits"] = self.data_limits
+        response.json.return_value = body
         return response
 
 

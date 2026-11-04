@@ -151,7 +151,8 @@ detail.
   the committed `schema.yml` matches the code, a migration replay, four test
   shards, the multi-tenant lane and a coverage gate.
 - A separate API contract workflow fails a pull request that breaks the
-  schema's clients unless it carries the `api-breaking-change` label.
+  schema's clients that are live in production or staging; an accepted break
+  is a dated line in `api-contract/ignore.txt`.
 - On `main`, python-semantic-release cuts the version, changelog and GitHub
   release from Conventional Commits (`feat` is a minor, `fix` and `perf` a
   patch).

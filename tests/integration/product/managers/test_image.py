@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 import pytest
-from django.apps import apps
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
@@ -68,42 +67,6 @@ class TestEnhancedImageQuerySet:
         assert product_image in images
         assert image2 in images
         assert image3 not in images
-
-    def test_with_titles(self):
-        image_with_title = ProductImageFactory(product=ProductFactory())
-
-        ProductImageTranslation = apps.get_model(
-            "product", "ProductImageTranslation"
-        )
-
-        image_without_title = ProductImageFactory(product=ProductFactory())
-        image_without_title.translations.all().delete()
-        ProductImageTranslation.objects.create(
-            master=image_without_title, language_code="el", title=None
-        )
-
-        images_with_titles = ProductImage.objects.with_titles()
-
-        assert image_with_title in images_with_titles
-        assert image_without_title not in images_with_titles
-
-    def test_without_titles(self):
-        image_with_title = ProductImageFactory(product=ProductFactory())
-
-        ProductImageTranslation = apps.get_model(
-            "product", "ProductImageTranslation"
-        )
-
-        image_without_title = ProductImageFactory(product=ProductFactory())
-        image_without_title.translations.all().delete()
-        ProductImageTranslation.objects.create(
-            master=image_without_title, language_code="el", title=None
-        )
-
-        images_without_titles = ProductImage.objects.without_titles()
-
-        assert image_without_title in images_without_titles
-        assert image_with_title not in images_without_titles
 
     def test_recent_default_days(self, product_image):
         recent_image = ProductImageFactory()
@@ -275,8 +238,6 @@ class TestEnhancedImageManager:
     def test_empty_queryset_methods(self):
         assert ProductImage.objects.main_images().count() == 0
         assert ProductImage.objects.secondary_images().count() == 0
-        assert ProductImage.objects.with_titles().count() == 0
-        assert ProductImage.objects.without_titles().count() == 0
         assert ProductImage.objects.recent().count() == 0
 
     def test_chained_filters(self, product_image):
@@ -288,37 +249,6 @@ class TestEnhancedImageManager:
         )
 
         assert product_image in chained_images
-
-    def test_complex_title_filtering(self):
-        ProductImageTranslation = apps.get_model(
-            "product", "ProductImageTranslation"
-        )
-
-        image_with_empty_title = ProductImageFactory(product=ProductFactory())
-        image_with_empty_title.translations.all().delete()
-        ProductImageTranslation.objects.create(
-            master=image_with_empty_title, language_code="el", title=""
-        )
-
-        image_with_none_title = ProductImageFactory(product=ProductFactory())
-        image_with_none_title.translations.all().delete()
-        ProductImageTranslation.objects.create(
-            master=image_with_none_title, language_code="el", title=None
-        )
-
-        image_with_whitespace_title = ProductImageFactory(
-            product=ProductFactory()
-        )
-        image_with_whitespace_title.translations.all().delete()
-        ProductImageTranslation.objects.create(
-            master=image_with_whitespace_title, language_code="el", title="   "
-        )
-
-        images_without_titles = ProductImage.objects.without_titles()
-
-        assert image_with_empty_title in images_without_titles
-        assert image_with_none_title in images_without_titles
-        assert image_with_whitespace_title not in images_without_titles
 
     def test_multiple_products_filtering(self):
         product1 = ProductFactory()

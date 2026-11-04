@@ -31,26 +31,7 @@ def get_or_create_product():
 
 class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    title = factory.Faker(
-        "random_element",
-        elements=[
-            "Product Front View",
-            "Product Side View",
-            "Product Back View",
-            "Product Detail Shot",
-            "Product in Use",
-            "Product Packaging",
-            "Product Close-up",
-            "Product Features",
-            "Product Dimensions",
-            "Product Color Options",
-            "Product Texture",
-            "Product Interior",
-            "Product Components",
-            "Product Assembly",
-            "Product Comparison",
-        ],
-    )
+    alt_text = factory.Faker("sentence")
     master = factory.SubFactory("product.factories.image.ProductImageFactory")
 
     class Meta:

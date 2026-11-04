@@ -31,6 +31,7 @@ NEW_FIELDS = (
     "is_platform_storefront",
     "seo_author",
     "google_site_verification",
+    "bing_site_verification",
     "pinterest_domain_verify",
 )
 
@@ -62,6 +63,7 @@ class TestSinglePlatformStorefront:
             "seo_store",
             seo_author="Store Owner",
             google_site_verification="gsv-token",
+            bing_site_verification="bing-token",
             pinterest_domain_verify="pin-token",
         )
 
@@ -69,6 +71,7 @@ class TestSinglePlatformStorefront:
 
         assert data["seo_author"] == "Store Owner"
         assert data["google_site_verification"] == "gsv-token"
+        assert data["bing_site_verification"] == "bing-token"
         assert data["pinterest_domain_verify"] == "pin-token"
         assert data["is_platform_storefront"] is False
 

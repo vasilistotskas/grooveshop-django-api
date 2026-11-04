@@ -140,6 +140,19 @@ because the storefront upgrades them when it renders, and a restored old
 draft is accepted as a draft; the editor upgrades it, and the save and the
 publish validate it.
 
+A draft nobody opened since its block moved would therefore be refused at
+publish, and a release written before a block took data settings records no
+dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
+(or `--all-tenants`; `--dry-run` writes nothing) writes the upgrades into every
+stored draft and version, each validated against the store's catalogue, then
+rebuilds the current release's reference index. One document that does not pass
+stops its store with nothing written. It is the only thing that rewrites a
+`BuilderVersion`: a version keeps its number and what it renders, and a draft
+keeps its revision, so a store is not told it has unpublished changes.
+`builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
+to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
+adds its step there too, or the command stops at it with `no upgrade from`.
+
 Limits come from settings, never from code paths:
 `BUILDER_MAX_SECTIONS_PER_DOCUMENT`, `BUILDER_MAX_BLOCKS_PER_NODE`,
 `BUILDER_MAX_DEPTH`, `BUILDER_MAX_DOCUMENT_BYTES`, `BUILDER_MAX_PAGES`,
@@ -207,6 +220,29 @@ the rules read stored colours and need no colour maths beyond the one ratio.
 pinned) holds the ratios, the boundary cases and four whole themes; the
 storefront runs the same file.
 
+### Where a store's theme document comes from
+
+Django resolves no preset and does no colour maths: the storefront owns what a
+theme is.
+
+- **A new store:** provisioning's `theme` step installs
+  `documentKinds.theme.defaults` of THE STORE'S catalogue view (a design's
+  defaults) as its theme document, validated like a publish and released in its
+  own release (`builder.seeding.install_theme_defaults`). A catalogue without
+  defaults installs nothing; a catalogue that cannot be fetched reports the
+  step, and re-running provisioning finishes it (a store with a theme is left
+  alone). The platform's own `Theme` release does not count as work an editor
+  made (`seed_with_content` still applies).
+- **A store that existed before the theme document:** three steps, none of
+  which writes without being asked. `manage.py export_theme_fields` writes each
+  store's theme inputs as JSON (read only); the storefront's `pnpm theme:seed`
+  turns them into theme settings; `manage.py import_theme_settings <file>
+  [--dry-run]` validates each store's settings against that store's own
+  catalogue view (schema, references, the contrast `error` rules) and creates
+  and publishes the theme document in a release that keeps every other document
+  as it was. A store that already has a theme document is skipped, never
+  overwritten, and the whole file is judged before any store is touched.
+
 ### Typed data props (`builder/data_sources.py`)
 
 A block can declare a setting in the catalogue's `data` map, beside `refs`
@@ -224,7 +260,10 @@ A block can declare a setting in the catalogue's `data` map, beside `refs`
 names. A value that is not valid yields problems and nothing else:
 `invalid_data_value`, `unknown_filter` (a key the list does not have) and
 `too_many_ids`, each at the pointer of the offending key; a document that
-asks for more than `BUILDER_DATA_MAX_QUERIES` lists gets `too_many_queries`.
+asks for more lists than the catalogue's `dataLimits.maxQueriesPerDocument`
+gets `too_many_queries`. The caps (`maxPickedIds`, `maxFilterIds`,
+`maxQueriesPerDocument`, `maxQueryLimit`) live in the catalogue only; a
+catalogue that declares `data` without `dataLimits` is refused as unexpected.
 The vocabulary is held equal to the storefront's by
 `tests/fixtures/builder/data-cases.json`, copied and pinned like the other
 sources (`tests/unit/builder/test_data_sources.py` runs every case).
@@ -733,7 +772,7 @@ files (the media service's image limits are copied the same way, see
 
 | Source | Copy | Used by |
 |---|---|---|
-| `test/fixtures/builder/catalogue.json` | `tests/fixtures/builder/catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
+| `test/fixtures/builder/catalogue.json` | `builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
 | `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
 
 `tests/fixtures/upstream-sources.lock.json` names each owner's commit and

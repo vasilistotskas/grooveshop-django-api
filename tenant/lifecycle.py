@@ -137,8 +137,8 @@ def _dispatch_media_flush(
 
     media-stream re-reads the tenant feed when the flush reaches it, and
     serves or refuses the store's images by what it reads, so the task
-    must never run before the new state is visible. Robust: a broker
-    failure is logged and never fails the change that queued it.
+    must never run before the new state is visible. A broker failure is
+    kept and published again (``dispatch_on_commit``), never raised.
     """
     from django_tenants.utils import get_public_schema_name
 
@@ -149,7 +149,6 @@ def _dispatch_media_flush(
         flush_tenant_media_task,
         [schema_name, edge_purges or []],
         schema_name=get_public_schema_name(),
-        robust=True,
     )
 
 

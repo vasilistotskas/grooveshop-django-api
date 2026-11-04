@@ -101,7 +101,7 @@ class ProductImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Test Product Image",
+                        "alt_text": "Test Product Image",
                     },
                 }
             ),
@@ -140,7 +140,7 @@ class ProductImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Updated Product Image",
+                        "alt_text": "Updated Product Image",
                     },
                 }
             ),
@@ -275,7 +275,7 @@ class ProductImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Complex Product Image",
+                        "alt_text": "Complex Product Image",
                     },
                 }
             ),
@@ -288,7 +288,7 @@ class ProductImageViewSetTestCase(APITestCase):
 
         image = ProductImage.objects.get(id=response.data["id"])
         self.assertEqual(
-            image.safe_translation_getter("title"), "Complex Product Image"
+            image.safe_translation_getter("alt_text"), "Complex Product Image"
         )
 
     def test_sort_order_auto_assignment(self):
@@ -299,7 +299,7 @@ class ProductImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Auto Sort Order Image",
+                        "alt_text": "Auto Sort Order Image",
                     },
                 }
             ),
@@ -324,7 +324,7 @@ class ProductImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Another Main Image",
+                        "alt_text": "Another Main Image",
                     },
                 }
             ),

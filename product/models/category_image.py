@@ -31,9 +31,6 @@ class ProductCategoryImage(
     )
     active = models.BooleanField(_("Active"), default=True)
     translations = TranslatedFields(
-        title=models.CharField(
-            _("Title"), max_length=255, blank=True, null=True
-        ),
         alt_text=models.CharField(
             _("Alt Text"), max_length=255, blank=True, null=True
         ),

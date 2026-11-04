@@ -1,0 +1,38 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "How are you finding your order?" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "How are you finding your order?" %}</h1>
+<p>{% blocktrans with order_id=order.id %}Your order #{{ order_id }} arrived a little while ago. Now that you have had time to try it, we would love to hear what you think.{% endblocktrans %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Rate your purchase" %}</h2>
+    <p>{% trans "Your opinion helps other shoppers. Share how you like your products." %}</p>
+    {% for link in review_links %}
+    <p><strong>{{ link.name }}</strong><br><a href="{{ link.url }}">{% trans "Write a review" %}</a></p>
+    {% endfor %}
+</div>
+
+<p class="mt-3">{% trans "If something is not as it should be, please contact our customer service and we will make it right." %}</p>
+
+<p class="mt-3">{% trans "Thank you for shopping with us!" %}</p>
+{% endblock %}
+
+{% block email_footer %}
+<p class="text-bold">{{ SITE_NAME }}</p>
+{% if INFO_EMAIL %}
+<p>
+    {% trans "Questions?" %}
+    <a href="mailto:{{ INFO_EMAIL }}">{% trans "Contact us" %}</a>
+</p>
+{% endif %}
+<p class="text-muted">
+    &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
+</p>
+<p class="text-muted mt-2" style="font-size: 12px;">
+    {% trans "Don't want to receive these reminders?" %}
+    <a href="{{ preferences_url|default:SITE_URL }}">{% trans "Manage your email preferences" %}</a>
+</p>
+{% endblock %}

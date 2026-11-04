@@ -115,6 +115,12 @@ class BlogPost(
         super().save(*args, **kwargs)
 
     @property
+    def storefront_path(self) -> str:
+        """The post page's path on the storefront, without a locale
+        prefix — ``core.utils.tenant_urls`` adds the host and prefix."""
+        return f"/blog/post/{self.id}/{self.slug}"
+
+    @property
     def main_image_path(self) -> str:
         from core.utils.image_paths import image_to_media_path
 

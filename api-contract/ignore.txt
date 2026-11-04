@@ -1,0 +1,13 @@
+# Breaking API changes accepted on purpose (oasdiff --err-ignore).
+#
+# oasdiff matches EVERY line of this file by content, comment lines
+# included, so this header must never quote a real change. Add an entry in
+# the pull request that makes the change, so it is reviewed with it. One
+# line per change, in this form:
+#
+#   <date> until <service> <vX.Y.Z> | <reason and who decided> | <the line oasdiff printed>
+#
+# `until` names the first release of that consumer (storefront, gateway or
+# django) that no longer needs the override. check-ignore.py fails once the
+# release live in production is at or past it, which forces the line out:
+# delete it, and the same pull request proves it was no longer needed.

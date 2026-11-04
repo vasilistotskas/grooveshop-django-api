@@ -1,0 +1,20 @@
+{% load i18n %}{% trans "HOW ARE YOU FINDING YOUR ORDER?" %}
+
+{% blocktrans with order_id=order.id %}Your order #{{ order_id }} arrived a little while ago. Now that you have had time to try it, we would love to hear what you think.{% endblocktrans %}
+
+{% trans "RATE YOUR PURCHASE" %}
+{% trans "Your opinion helps other shoppers. Share how you like your products." %}
+{% for link in review_links %}
+{{ link.name }}
+{% trans "Write a review" %}: {{ link.url }}
+{% endfor %}
+{% trans "If something is not as it should be, please contact our customer service and we will make it right." %}
+
+{% trans "Thank you for shopping with us!" %}
+
+{{ SITE_NAME }}
+{% if INFO_EMAIL %}{{ INFO_EMAIL }}
+{% endif %}{{ SITE_URL }}
+
+{% trans "Don't want to receive these reminders?" %}
+{% trans "Manage your preferences" %}: {{ preferences_url|default:SITE_URL }}

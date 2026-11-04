@@ -1,0 +1,8 @@
+# The files whose change makes the contract check run: <kind> <path prefix>.
+# Any other change to a pull request makes the check pass at once.
+django schema.yml
+django allauth-schema.yml
+django api-contract/
+storefront openapi/schema.yml
+storefront openapi/allauth-schema.yml
+gateway contract/

@@ -78,7 +78,7 @@ def notify_comment_liked_receiver(
         return
 
     blog_post_url = storefront_path(
-        f"/blog/post/{post.id}/{post.slug}#blog-post-comments"
+        f"{post.storefront_path}#blog-post-comments"
     )
 
     notify_comment_liked_task.delay(

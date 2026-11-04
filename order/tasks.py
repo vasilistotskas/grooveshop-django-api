@@ -15,6 +15,7 @@ from core.retry import (
     TRANSIENT_DB_ERRORS,
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
+    is_permanent_failure,
 )
 from core.store_settings import store_setting
 from core.tasks import MonitoredTask
@@ -26,6 +27,7 @@ from order.emails import (
     OrderDispute,
     is_paid_online,
     suggestion_strip_of,
+    unreviewed_products,
 )
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
@@ -38,6 +40,7 @@ from order.models import (
 )
 from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.payment import get_payment_provider_class
+from order.review_request import awaiting_review_request, delivery_window
 from order.services import OrderService
 from recommendation.order_email import record_impression
 
@@ -1931,6 +1934,61 @@ def send_checkout_abandonment_emails() -> int:
     if sent:
         logger.info("Sent %s checkout-abandonment emails", sent)
     return sent
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=MAIL_TRANSIENT_ERRORS,
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_review_request_emails() -> dict[str, int]:
+    """Remind customers to review an order, once, a few days after delivery.
+
+    Which orders is ``order.review_request.awaiting_review_request`` (the
+    store's ``REVIEW_REQUEST_DELAY_DAYS``; 0 is off). Each order is CLAIMED
+    first, by stamping ``Order.review_request_sent_at`` where it is still
+    empty, so two overlapping runs cannot both mail it. The claim is kept
+    when the order is settled without a mail (nothing left to review, the
+    customer opted out, the store switched the email off) and when the
+    failure cannot succeed on another attempt; it is released after a
+    transient failure, and the next daily run is the retry for as long as
+    the order stays in the catch-up window.
+    """
+    window = delivery_window()
+    if window is None:
+        return {"sent": 0, "skipped": 0, "failed": 0}
+    sent = skipped = failed = 0
+    for order in awaiting_review_request(window).select_related("user"):
+        claimed = Order.objects.filter(
+            pk=order.pk, review_request_sent_at__isnull=True
+        ).update(review_request_sent_at=timezone.now())
+        if not claimed:
+            continue
+        try:
+            if not unreviewed_products(order):
+                skipped += 1
+                continue
+            if was_sent(send_email("order.review_request", order)):
+                sent += 1
+            else:
+                skipped += 1
+        except Exception as error:
+            failed += 1
+            logger.exception("Review request for order #%s failed", order.id)
+            if not is_permanent_failure(error):
+                Order.objects.filter(pk=order.pk).update(
+                    review_request_sent_at=None
+                )
+    if sent or failed:
+        logger.info(
+            "Review requests: sent=%s skipped=%s failed=%s",
+            sent,
+            skipped,
+            failed,
+        )
+    return {"sent": sent, "skipped": skipped, "failed": failed}
 
 
 @celery_app.task(

@@ -93,7 +93,7 @@ class _Walk:
     nodes: dict[str, tuple[Spec, pointers.Path]] = field(default_factory=dict)
     block_types: set[str] = field(default_factory=set)
     refs: list[tuple[str, str, str]] = field(default_factory=list)
-    #: How many lists the document asks for (``BUILDER_DATA_MAX_QUERIES``).
+    #: How many lists the document asks for (``dataLimits.maxQueriesPerDocument``).
     queries: int = 0
     per_type: dict[str, list[str]] = field(
         default_factory=lambda: defaultdict(list)
@@ -216,12 +216,15 @@ def _collect_data(
 ) -> None:
     """Hold every typed data prop to its declaration; what a valid one names
     and depends on joins the document's references."""
+    limits = walk.catalogue.data_limits
+    if limits is None:  # no declaration: ``parse_catalogue`` needs them
+        return
     for pattern, declaration in definition.data.items():
         for path, value in pointers.walk(settings_, pointers.parse(pattern)):
             if value is None:
                 continue
             where = f"{base}{pointers.format_path(path)}"
-            outcome = data_sources.check(declaration, value)
+            outcome = data_sources.check(declaration, value, limits)
             for problem in outcome.problems:
                 walk.add(
                     f"{where}{problem.path}",
@@ -684,7 +687,8 @@ def validate_document(
             levels_allowed=_section_levels(walk, section, definition_levels),
         )
     _check_per_type_limits(walk)
-    if walk.queries > settings.BUILDER_DATA_MAX_QUERIES:
+    limits = walk.catalogue.data_limits
+    if limits is not None and walk.queries > limits.max_queries_per_document:
         walk.add(
             "", "too_many_queries", data_sources.message("too_many_queries")
         )

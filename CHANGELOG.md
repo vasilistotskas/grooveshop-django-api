@@ -3,6 +3,644 @@
 
 
 
+## v3.224.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(product): drop the image title columns (#484) ([`6aad368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aad368fcbc3f14a7e6aea2186070b73f1ca180b))
+
+### Features
+
+* feat(product): serve the alt text of a category's main image
+
+The merchant's alt text on a category image reached no consumer: the
+category payload carried only mainImagePath. Add the read-only
+mainImageAlt next to it, on the category list and detail serializers:
+the MAIN image's alt text in the request language, an empty string
+when there is no main image or no alt text. No fallback to the
+category name, which the storefront writes beside the photo.
+
+It reads through the existing main_image property; the MAIN image
+prefetch now carries the image's translations, so a list costs the
+same number of queries for one category or many.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6aad368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aad368fcbc3f14a7e6aea2186070b73f1ca180b))
+
+### Refactoring
+
+* refactor(product): retire the title of product and category images
+
+The title was shown nowhere. On a product image it only served as a
+fallback for the alt text; alt_text is the one text of an image.
+
+Release N of two: the title leaves the models, the serializers, the
+admin, the search fields, the managers (with_titles, without_titles had
+no caller) and the factories. The columns stay in the database, both
+nullable, so the release still serving keeps working; a state-only
+migration takes them out of Django's state. The next release drops
+them.
+
+The response loses the optional translations.<lang>.title key of
+product images and category images. alt_text on a product image is the
+merchant's alt text, else an empty string.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ ([`6aad368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aad368fcbc3f14a7e6aea2186070b73f1ca180b))
+
+* refactor(product): drop the image title columns
+
+Release N+1 of retiring the image title: the previous release
+stopped reading and writing the columns and took them out of
+Django's state, so the physical DROP COLUMN is safe once that
+release runs in production. IF EXISTS keeps it idempotent across
+tenant schemas.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ ([`6aad368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aad368fcbc3f14a7e6aea2186070b73f1ca180b))
+
+## v3.223.0 (2026-11-04)
+
+### Features
+
+* feat(product): retire the image title and serve the category image alt (#483) ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
+* feat(product): serve the alt text of a category's main image
+
+The merchant's alt text on a category image reached no consumer: the
+category payload carried only mainImagePath. Add the read-only
+mainImageAlt next to it, on the category list and detail serializers:
+the MAIN image's alt text in the request language, an empty string
+when there is no main image or no alt text. No fallback to the
+category name, which the storefront writes beside the photo.
+
+It reads through the existing main_image property; the MAIN image
+prefetch now carries the image's translations, so a list costs the
+same number of queries for one category or many.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
+### Refactoring
+
+* refactor(product): retire the title of product and category images
+
+The title was shown nowhere. On a product image it only served as a
+fallback for the alt text; alt_text is the one text of an image.
+
+Release N of two: the title leaves the models, the serializers, the
+admin, the search fields, the managers (with_titles, without_titles had
+no caller) and the factories. The columns stay in the database, both
+nullable, so the release still serving keeps working; a state-only
+migration takes them out of Django's state. The next release drops
+them.
+
+The response loses the optional translations.<lang>.title key of
+product images and category images. alt_text on a product image is the
+merchant's alt text, else an empty string.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
+## v3.222.0 (2026-11-04)
+
+### Continuous integration
+
+* ci(api-contract): hold Django's own PRs to what is live, and retire the label (#482) ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
+### Features
+
+* feat(api-contract): hold Django's own PRs to what is live, and retire the label
+
+The API contract workflow now calls the shared check with this PR's own
+api-contract/, so a schema.yml or allauth-schema.yml that cannot be live
+together with the storefront and gateway in production and staging fails,
+instead of passing with an api-breaking-change label that had no expiry and
+no knowledge of what is live. CI reads the oasdiff image from
+api-contract/oasdiff-image.txt, the single pin.
+
+Merge only once the cluster records its deployments: until then the check
+has nothing to read and fails closed.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
+### Testing
+
+* test(api-contract): a stopped recorder leaves the last success readable
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
+## v3.221.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(builder): seed new stores at the current blocks, with their dependency rows
+
+Pinning the storefront at its current build moved the seeds to the data
+settings. seeding.derive then assumed a seed has no references, so a new
+store would have recorded no dependency rows and its home page would
+not have been purged when its products changed.
+
+A seed is now validated against the catalogue pinned with it, which
+moves to builder/seed_catalogue.json as application data; provisioning
+still asks the storefront nothing. The demo pages move to the current
+blocks through the same port.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
+### Continuous integration
+
+* ci(deps): bump astral-sh/setup-uv from 10.3.0 to 10.3.2 (#470)
+
+Bumps the actions-minor-patch group with 1 update: [astral-sh/setup-uv](https://github.com/astral-sh/setup-uv).
+
+
+Updates `astral-sh/setup-uv` from 10.3.0 to 10.3.2
+- [Release notes](https://github.com/astral-sh/setup-uv/releases)
+- [Commits](https://github.com/astral-sh/setup-uv/compare/1c37ad07a6a961277cf70c0d37d6f313000f5884...07a047e608db84b3d8c06cd9a7c7dcc9c355c18e)
+
+---
+updated-dependencies:
+- dependency-name: astral-sh/setup-uv
+  dependency-version: 10.3.2
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: actions-minor-patch
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com> ([`3aabbe1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3aabbe1cbc93938164eff8975d246273661764f7))
+
+### Features
+
+* feat(builder): write the block upgrades into what is stored (#481) ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
+* feat(builder): write the block upgrades into what is stored
+
+Django accepts only the current version of a block, so a draft nobody
+opened since its block moved is refused at publish, and a release from
+before the data settings records no dependency rows for them.
+
+persist_block_upgrades upgrades every stored draft and version of a
+store, validates each against the catalogue, stores what validation
+returns and rebuilds the reference index. One failure stops the store
+with nothing written. The port is held to the storefront upgrade-cases
+vectors.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLY3BeCyh66eL4wNi7 ([`fce6b78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fce6b786d3023b579c350bfd939acfce48a96bb9))
+
+## v3.220.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(devtools): a staging refresh switches IndexNow off (#479)
+
+Store settings are restored from production, so INDEXNOW_ENABLED arrived
+on and staging would announce its own URLs to the public IndexNow
+endpoint. staging_anonymise now sets the settings named in
+rules.FORCED_OFF_SETTINGS to off in every schema, through _base_manager,
+and a second run changes nothing.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a5ac69c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5ac69c7a95d87e6fed644684ad13d904031d5d5))
+
+* fix(product): a highlight edit purges the product surface
+
+Highlights exist only in the feeds, so an edit that did not move the
+surface waited out the gateway's fresh TTL.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+### Features
+
+* feat(product): highlights for the Merchant feed (#478) ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+* feat(product): highlights for the Google Merchant product_highlight
+
+A product has a sortable list of short benefits, written per language
+(150 characters each), edited in a tab on the product page. Only the
+catalogue feed publishes them: /product/feed answers with a new
+ProductFeedSerializer whose highlights hold the texts in the request
+language, in the merchant's order, with no fallback to another language,
+because Google requires the feed language to match. The feed queryset
+prefetches them in one query; the product detail, list and hydrated
+recommendations are unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+### Testing
+
+* test(product): read one product from the feed by id (#480)
+
+The feed paginates, so a helper that scanned its first page lost the row
+when other tests in the shard had products of their own.
+
+
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`0d7d001`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d7d00157997143cf8de75631c514b297e2c273e))
+
+* test(product): import apps in the feed surface test
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxMAMUtuN1A1KLYv6vj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b6a24df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6a24df509df0bf1c0d9d86374946d61f5cf4f7d))
+
+## v3.219.1 (2026-11-04)
+
+### Bug fixes
+
+* fix(emails): the Resend guard reads only the columns it needs (#477)
+
+The deploy guard is a database system check, and migration_preflight runs
+it before migrate. It loaded whole Tenant rows, so with EMAIL_TRANSPORT
+on resend the query named every column the release adds to Tenant, and
+the deploy adding one failed in PreSync on a column that did not exist
+yet. Staging, on SMTP, skips the query, so it passed there.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a9df59d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9df59df1463c177fa9c250764ca11942c5e3639))
+
+## v3.219.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(order): the review reminder is off until a store chooses it
+
+A default of 8 days would have started mailing the customers of every
+store on deploy. A store now sets the delay to send it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+### Features
+
+* feat(order): remind customers to review what was delivered (#476) ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+* feat(order): remind customers to review what was delivered
+
+The delivered and completed emails already invite a review at the moment
+of delivery. A new email, order.review_request, is the second invitation,
+sent once per order REVIEW_REQUEST_DELAY_DAYS days after delivery (a store
+setting, default 8, 0 turns it off, validated as a whole number of days up
+to 365).
+
+A daily beat entry fans out send_review_request_emails to every active
+store. An order is due when it is still DELIVERED or COMPLETED, has not
+been reminded, and its first move to DELIVERED (the OrderHistory STATUS
+row; Order has no delivery column and status_updated_at moves again when a
+cash-on-delivery order completes) fell between the delay and the delay plus
+REVIEW_REQUEST_CATCH_UP_DAYS, so enabling the reminder does not mail every
+order ever delivered and a missed run costs nothing.
+
+Each order is claimed by stamping the new Order.review_request_sent_at
+(additive, nullable) where it is still empty, so overlapping runs cannot
+both mail it. The stamp stays when the order is settled without a mail
+(nothing left to review, the customer opted out, the store switched the
+email off, reviews are off) and after a failure no retry can fix; it is
+released after a transient failure and the next run retries.
+
+The email is Kind.MARKETING: a request for a review is not part of the
+order, so EmailOptOut applies and it carries the unsubscribe headers and
+footer. It links straight to each product's review form and leaves out any
+product the customer already reviewed, in any status. That rule is now the
+one definition, order.emails.unreviewed_products, which the delivered and
+completed emails use too.
+
+The email preview access test looked for the order's number behind a
+hash sign in the rendered page, which also matched a CSS colour in the
+email's style block whenever the order id was 1; it now ignores a hex
+digit after the id.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+### Testing
+
+* test(order): the golden reminder sets its delay
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+## v3.218.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(tenant): order the IndexNow migration after the SEO fields one
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
+### Features
+
+* feat(indexnow): tell search engines when products and posts change (#475) ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
+* feat(indexnow): tell search engines when a product or blog post changes
+
+A store can switch on INDEXNOW_ENABLED (off by default). From then on a
+published product (active, not deleted) or blog post that is created,
+changed, unpublished, soft-deleted or removed, or whose translation is
+saved, is queued as a PendingUrl row in the store's schema, written in the
+transaction of the save. A draft or an inactive product queues nothing, and
+neither does a save that touches only view_count or updated_at.
+
+A beat entry every 30 minutes fans out submit_pending_urls to every active
+store. A run sends at most one POST to the IndexNow endpoint per store:
+{host, key, urlList} with each queued path as the canonical storefront URL
+on the store's primary domain, once per language the store serves, up to
+the protocol's 10,000 URLs. The retry rules are core.retry's: a 5xx, 408,
+429, a timeout and a connection error are retried; any other 4xx is not,
+the refused batch is dropped from the queue and logged at ERROR. A store
+that switched the setting off drops its queue.
+
+Each store has its own key, Tenant.indexnow_key (a UUID's 32 hex
+characters, made when the store is created; the migration gives the
+existing stores theirs). tenant/resolve serves it as the optional field
+indexnowKey while the switch is on and as an empty string otherwise, so
+the storefront can serve /<key>.txt, and a switch moves the resolve cache.
+
+BlogPost gets storefront_path, next to Product's. The queue model is
+declared to the staging anonymiser; the key is public by design.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
+## v3.217.0 (2026-11-03)
+
+### Features
+
+* feat(seo): gtin, mpn, feed title, category text and Bing verification (#474)
+
+Product gets two non-translated identifiers Google Merchant Center asks
+for: gtin (digits only, 8/12/13/14 long, valid GS1 check digit, checked
+by product.validators.validate_gtin on the model field, so the admin form
+and the write serializer both enforce it) and mpn. Neither is derived
+from the SKU. ProductTranslation gets feed_title, the title the product
+feeds use instead of the name.
+
+ProductCategory gets a translated footer_text rich-text field shown below
+the category's products. Tenant gets bing_site_verification beside the
+Google and Pinterest tokens and serves it on tenant/resolve.
+
+gtin and mpn are read-only on the product read serializers and writable
+on the product write serializer; feed_title and footer_text arrive
+through translations. The migrations only add columns (db_default on the
+NOT NULL ones). Search indexes are unchanged: neither MeiliMeta lists the
+new fields.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e3d2ec1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3d2ec15e2fe1a315c69184b6f2b02b995f9ce64))
+
+## v3.216.0 (2026-11-03)
+
+### Bug fixes
+
+* fix(product): order the attribute migration after the image alt text one
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* fix(rich-text): drop headings that show nothing on save (#472)
+
+The editor leaves an empty heading behind when a heading's text is moved
+(webside's power bank description stores one). A screen reader announces
+it and it is a hole in the page's outline. RichTextField now drops a
+heading with no visible content after sanitising, keeping one that holds
+an image. It stays out of sanitize_html so lost_content does not refuse
+the save.
+
+The backfill command now applies the whole of what a save does, so
+record_rich_text_image_sizes becomes normalise_rich_text.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6c705f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c705f68b0a39022b17bf27a64cda18541694aab))
+
+### Features
+
+* feat(product): let a merchant say which standard property an attribute is (#473) ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): editable alt text per product image
+
+ProductImage gains a translated alt_text (additive migration). The
+product page's images inline now edits title and alt text per language
+tab, and the image admin page shows alt text too.
+
+The API's altText returns the merchant's alt text in the request
+language, else the title, else an empty string. The hardcoded English
+"Main image of X" sentence is gone; the storefront builds its own
+localized fallback. The field stays a required string.
+
+The inline loses per_page: Unfold's paged formset cannot be combined
+with parler's translated one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): let a merchant say which standard property an attribute is
+
+Attribute names are free, translated text, so structured data cannot be
+derived by matching them. A new Attribute.schema_property (color, size,
+material, pattern, suggestedAge, suggestedGender, or blank) is set in the
+admin and served read-only as schemaProperty on product attributes and on
+each axis of the variants response. Additive migration with db_default.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`eb43141`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb431417299d49d2a4810e22b32de44801665d6f))
+
+* feat(product): editable alt text per product image (#471)
+
+ProductImage gains a translated alt_text (additive migration). The
+product page's images inline now edits title and alt text per language
+tab, and the image admin page shows alt text too.
+
+The API's altText returns the merchant's alt text in the request
+language, else the title, else an empty string. The hardcoded English
+"Main image of X" sentence is gone; the storefront builds its own
+localized fallback. The field stays a required string.
+
+The inline loses per_page: Unfold's paged formset cannot be combined
+with parler's translated one.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5390565`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5390565b9ccd46b4a26206fcf4b37fc2655f176b))
+
+## v3.215.0 (2026-11-03)
+
+### Bug fixes
+
+* fix(celery): a publish that fails after its change committed is kept, not a 500 (#468) ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* fix(celery): a publish that fails after its change committed is kept, not a 500
+
+dispatch_on_commit runs after the commit, so a broker that cannot be reached
+could only answer 500 for work that was done (the contact attachment upload
+waited ~11 s and failed with the file stored and its row PENDING). A network
+error on the publish is now logged at ERROR and kept as a DeferredDispatch in
+public; redispatch_deferred_tasks (every minute) publishes it again with a
+backoff and stops a run at the first broker failure. A bug still raises.
+robust= is gone: every caller has this behaviour. Contact attachments still
+PENDING past a threshold are queued by a state sweep, which also covers a
+worker killed between the commit and the publish.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* fix(auth): make allauth-schema.yml say what the endpoints serve (#459) ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(auth): make allauth-schema.yml say what the endpoints serve
+
+The contract test now fails on any key an endpoint serves that the document
+omits, and drives an expired session, the configuration, recovery-code
+regeneration and the TOTP enrolment. Corrections, each read from allauth's
+source, move to core/allauth_spec_corrections.py: meta.is_authenticated and
+OptionalTimestamp are nullable, Flow.providers, mfa.passkey_login_enabled and
+account.authentication_method are declared, POST recovery-codes answers 200,
+and our GET totp/svg is documented.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(auth): declare the 429, the TOTP 404 and the session meta on every answer
+
+RateLimitResponse is documented on every operation, the TOTP status 404 is a
+named schema, and every answer with a status carries an optional
+meta (the session and access tokens APIResponse adds when they rotate).
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`381e1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/381e1e7be47809e9ee97b88e2dfbad3fec133b48))
+
+* fix(settings): serve structured settings strictly and check stored values at deploy (#452) ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
+* fix(settings): serve structured settings strictly and check stored values at deploy
+
+Drop the log-and-serve-as-unset path for a stored value that is not its
+shape: a value is valid because the admin validator refused every other,
+and manage.py check_store_settings now fails a deploy when any store holds
+a value its declared validator refuses.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
+### Features
+
+* feat(api-contract): hold a PR to what is live, with one script and one rule set (#458)
+
+api-contract/ becomes the single home of the API contract rule: api-contract.sh (deploy and pr modes), live_state.py reading GitHub Deployments, ignore.txt with an until release and its checker, the reusable check workflow for the storefront and gateway, and the replay of the 2026-11-03 deadlock. Nothing calls the reusable workflow yet and the existing API contract workflow is unchanged.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`728efee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/728efee4d020a6ce19efd95bab58339eb4080331))
+
+### Testing
+
+* test(product): the moderation mail test no longer selects its dispatch by robust
+
+dispatch_on_commit has no robust option now; the test runs every dispatch the
+request registered after the commit.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6261c09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6261c099a5ffe5143182861879c750639e15c69a))
+
+* test: store a valid BUSINESS_HOURS in the public settings JSON-encoding test
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`fa8f448`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa8f4484da60edd002aa64e966c1202cf943433c))
+
+## v3.214.0 (2026-11-03)
+
+### Features
+
+* feat(builder): give each store a theme document, from the catalogue defaults or a seed file (#467)
+
+A new store installs documentKinds.theme.defaults of its own catalogue view as
+its theme document in a provisioning step of its own (own release, idempotent);
+the platform theme release does not count as work an editor made. A store that
+existed before gets it from import_theme_settings, which reads the storefront
+computed seed, validates each store against its own catalogue view (schema,
+references, contrast error rules), writes and publishes the theme document in
+a release that keeps the other documents, skips a store that has one, and has a
+dry run.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`9d189f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d189f25eea0811ffc8f8e01ba1e274dac10436c))
+
+## v3.213.0 (2026-11-03)
+
+### Features
+
+* feat(tenant): export_theme_fields reads each store theme inputs; drop the palettes copy (#466)
+
+The theme document is seeded by the storefront from what each store renders
+today, so Django only exports the inputs: preset, Tailwind colour names, hex
+colours and theme_metadata, in the names the storefront reads (read only).
+The Tailwind palettes copy is gone with that design, and the catalogue and
+contrast-cases snapshots follow the storefront.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`c8fa279`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8fa279912a1f6ae0108454cbb338abc6ddd263b))
+
+### Refactoring
+
+* refactor(builder): read the data prop limits from the catalogue only (#465)
+
+The caps for typed data props (picked ids, filter ids, lists per document, the
+query limit) have one source, the catalogue dataLimits. The Django settings
+that stood in for them are gone; a catalogue that declares data without
+dataLimits is refused like any unexpected shape.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f89dce5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f89dce52475cabe5866c5bacb4bc5c3fda5782b7))
+
+## v3.212.0 (2026-11-03)
+
+### Features
+
+* feat(builder): block the release of a theme that misses a required contrast (#464)
+
+The catalogue declares, for the theme document, the colour pairs that must keep
+a WCAG 2.2 contrast. builder.contrast evaluates them over the stored scales
+(unrounded ratio, pointer or literal sides); publish, publish/check and
+scheduling refuse a theme whose error rules fail with insufficient_contrast
+(document theme, rule, ratio, min), a save never does, and a rule that points
+at no colour is a 503 invalid_catalogue. contrast-cases.json and the Tailwind
+palettes are vendored through the pinned sync script.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`507f41e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/507f41eee646a7b7813a2859bbc6994477975061))
+
+* feat(cache): purge the storefront page-builder data loaders with the records they read (#463)
+
+The storefront builderData* cached functions (60 s) read products, categories,
+blog posts and categories, offers, link slugs and link targets. Each surface
+now purges the ones it feeds, so a renamed record or a changed price is not
+served from a loader for the rest of its TTL.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`29b8ec6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29b8ec6683005185af7983814f1c6f1eb49a88cd))
+
 ## v3.211.0 (2026-11-03)
 
 ### Features

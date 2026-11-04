@@ -564,6 +564,7 @@ class TenantAdmin(BaseModelAdmin):
                     "google_ads_add_payment_info_label",
                     "google_ads_page_view_label",
                     "meta_capi_access_token",
+                    "indexnow_key",
                 ],
             },
         ),

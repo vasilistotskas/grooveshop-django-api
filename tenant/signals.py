@@ -123,6 +123,8 @@ def bump_generation_on_agent_setting_change(sender, instance, **kwargs):
         "AGENT_COMMERCE_ENABLED",
         "PRODUCT_FEEDS_ENABLED",
         "AGENT_HOSTED_PAYMENT_ENABLED",
+        # Served as ``TenantConfig.indexnow_key`` while it is on.
+        "INDEXNOW_ENABLED",
         # Folded into ``TenantConfig.features`` and ``.preferences``.
         *feature_setting_keys(),
         *preference_setting_keys(),

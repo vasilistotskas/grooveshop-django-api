@@ -251,7 +251,7 @@ class TestProductImageInline:
 
         assert inline.model == ProductImage
         assert inline.extra == 0
-        assert inline.fields == ("image", "is_main", "title", "alt_text")
+        assert inline.fields == ("image", "is_main", "alt_text")
 
 
 @pytest.mark.django_db

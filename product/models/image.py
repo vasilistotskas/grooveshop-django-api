@@ -26,9 +26,6 @@ class ProductImage(
     image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
     is_main = models.BooleanField(_("Is Main"), default=False)
     translations = TranslatedFields(
-        title=models.CharField(
-            _("Title"), max_length=50, blank=True, null=True
-        ),
         alt_text=models.CharField(
             _("Alt Text"),
             max_length=255,

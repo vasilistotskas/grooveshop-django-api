@@ -131,7 +131,6 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Test Banner Image",
                         "alt_text": "Test alt text",
                     },
                 }
@@ -173,7 +172,6 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Updated Icon Image",
                         "alt_text": "Updated alt text",
                     },
                 }
@@ -274,13 +272,12 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             category=self.category, image_type=CategoryImageTypeEnum.BANNER
         )
         searchable_image.set_current_language(default_language)
-        searchable_image.title = "Searchable Banner Title"
         searchable_image.alt_text = "Unique alt text content"
         searchable_image.save()
 
         url = self.get_product_category_image_list_url()
 
-        response = self.client.get(url, {"search": "Searchable"})
+        response = self.client.get(url, {"search": "Unique"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         image_ids = [img["id"] for img in response.data["results"]]
         self.assertIn(searchable_image.id, image_ids)
@@ -314,7 +311,6 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     default_language: {
-                        "title": "Duplicate Main Image",
                         "alt_text": "This should fail",
                     },
                 }
@@ -418,11 +414,9 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             "translations": json.dumps(
                 {
                     "en": {
-                        "title": "Complex Thumbnail EN",
                         "alt_text": "Complex thumbnail alt text EN",
                     },
                     "el": {
-                        "title": "Complex Thumbnail EL",
                         "alt_text": "Complex thumbnail alt text EL",
                     },
                 }
@@ -440,13 +434,13 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]:
             image.set_current_language("en")
-            self.assertEqual(image.title, "Complex Thumbnail EN")
+            self.assertEqual(image.alt_text, "Complex thumbnail alt text EN")
 
         if "el" in [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]:
             image.set_current_language("el")
-            self.assertEqual(image.title, "Complex Thumbnail EL")
+            self.assertEqual(image.alt_text, "Complex thumbnail alt text EL")
 
     def test_queryset_optimization(self):
         url = self.get_product_category_image_list_url()
@@ -473,7 +467,6 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
                     "translations": json.dumps(
                         {
                             default_language: {
-                                "title": f"Test {image_type} Image",
                                 "alt_text": f"Alt text for {image_type}",
                             },
                         }

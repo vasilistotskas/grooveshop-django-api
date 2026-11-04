@@ -652,11 +652,11 @@ class ProductAttributeInline(TabularInline):
 
 class ProductImageInline(BaseTranslatableTabularInline):
     # Unfold's inline image widget previews the current file itself. The
-    # title and alt text are per language: parler shows the language tab
-    # of the product page.
+    # alt text is per language: parler shows the language tab of the
+    # product page.
     model = ProductImage
     extra = 0
-    fields = ("image", "is_main", "title", "alt_text")
+    fields = ("image", "is_main", "alt_text")
 
     tab = True
     # No ``per_page``: Unfold's paged formset and parler's translated one
@@ -2208,7 +2208,6 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ]
     search_fields = [
         "category__translations__name",
-        "translations__title",
         "translations__alt_text",
     ]
     list_select_related = ["category"]
@@ -2226,7 +2225,7 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title", "alt_text"),
+                "fields": ("alt_text",),
                 "classes": ("wide",),
             },
         ),
@@ -2261,7 +2260,7 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         return header_two_line(
             obj.category.safe_translation_getter("name", any_language=True)
             or _("Unnamed Category"),
-            obj.safe_translation_getter("title", any_language=True),
+            obj.safe_translation_getter("alt_text", any_language=True),
             image_path=obj.image.url if obj.image else None,
             squared=True,
         )
@@ -2291,7 +2290,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     search_fields = [
         "product__translations__name",
         "product__sku",
-        "translations__title",
+        "translations__alt_text",
     ]
     list_select_related = ["product"]
     autocomplete_fields = ("product",)
@@ -2309,7 +2308,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title", "alt_text"),
+                "fields": ("alt_text",),
                 "classes": ("wide",),
             },
         ),

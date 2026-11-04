@@ -121,3 +121,19 @@ class ProductCategory(
     def main_image_path(self) -> str:
         main_img = self.main_image
         return main_img.image_path if main_img else ""
+
+    @property
+    def main_image_alt(self) -> str:
+        """The MAIN image's alt text in the active language.
+
+        Empty without a main image or without alt text: the category's
+        name is shown beside the image, so a generated alt would only
+        repeat it. Same language rule as ``ProductImageSerializer``.
+        """
+        main_img = self.main_image
+        if main_img is None:
+            return ""
+        return (
+            main_img.safe_translation_getter("alt_text", any_language=True)
+            or ""
+        )

@@ -421,6 +421,16 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "builder.BuilderPreviewLink": Delete(),
 }
 
+#: Boolean store settings forced off in every schema after the restore.
+#: ``extra_settings.Setting`` rows are copied from production as they are
+#: (a store's configuration), so a switch that makes the application
+#: reach OUT to the public internet would arrive on. ``INDEXNOW_ENABLED``
+#: is one: staging would announce its own URLs to the public IndexNow
+#: endpoint, which search engines then crawl and index. A switch with a
+#: visible outside effect belongs here; the row stays, only its value
+#: changes, and a store that has no row keeps the declared default (off).
+FORCED_OFF_SETTINGS: tuple[str, ...] = ("INDEXNOW_ENABLED",)
+
 #: Apps whose every model is deleted except the named ones. A model added
 #: to one of them is wiped by default, which is the safe direction: dj-stripe
 #: mirrors Stripe objects whose JSON carries billing details, and the Celery

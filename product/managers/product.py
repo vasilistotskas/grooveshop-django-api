@@ -161,6 +161,15 @@ class ProductQuerySet(
             )
         )
 
+    def with_highlights(self) -> Self:
+        """Prefetch the highlights in the merchant's order, with every
+        translation, for ``ProductFeedSerializer.highlights``."""
+        from product.models.highlight import ProductHighlight
+
+        return self.prefetch_related(
+            Prefetch("highlights", queryset=ProductHighlight.objects.for_list())
+        )
+
     def with_variant_group(self) -> Self:
         """Select the variant group and prefetch its translations, for
         ``variant_group_title``."""
@@ -319,6 +328,17 @@ class ProductQuerySet(
             .with_product_attributes()
         )
 
+    def for_feed(self) -> Self:
+        """
+        Optimized queryset for ``ProductFeedSerializer``: the catalogue
+        feed (``/product/feed``).
+
+        ``for_full_list()`` plus the highlights. Kept apart from it so the
+        hydrated recommendations, which render the same serializer without
+        the highlights, do not pay for the prefetch.
+        """
+        return self.for_full_list().with_highlights()
+
     def for_detail(self) -> Self:
         """
         Optimized queryset for detail views.
@@ -362,6 +382,10 @@ class ProductManager(TranslatableOptimizedManager):
     def for_full_list(self) -> ProductQuerySet:
         """Return optimized queryset for lists of full product rows."""
         return cast(ProductQuerySet, self.get_queryset().for_full_list())
+
+    def for_feed(self) -> ProductQuerySet:
+        """Return optimized queryset for the catalogue feed."""
+        return cast(ProductQuerySet, self.get_queryset().for_feed())
 
     def for_detail(self) -> ProductQuerySet:
         """Return optimized queryset for detail views."""

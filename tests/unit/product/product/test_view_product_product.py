@@ -7,8 +7,8 @@ from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
     ProductCardSerializer,
     ProductDetailSerializer,
+    ProductFeedSerializer,
     ProductRetrieveSerializer,
-    ProductSerializer,
     ProductWriteSerializer,
 )
 from product.serializers.review import ProductReviewSerializer
@@ -126,7 +126,7 @@ class ProductViewSetTestCase(TestCase):
         expected_responses = {
             "create": ProductRetrieveSerializer,
             "list": ProductCardSerializer,
-            "feed": ProductSerializer,
+            "feed": ProductFeedSerializer,
             "retrieve": ProductRetrieveSerializer,
             "update": ProductRetrieveSerializer,
             "partial_update": ProductRetrieveSerializer,

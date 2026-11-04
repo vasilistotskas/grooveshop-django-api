@@ -479,6 +479,8 @@ NOT_PERSONAL: dict[str, str] = {
         "product.ProductCategoryImage",
         "product.ProductCategoryImageTranslation",
         "product.ProductCategoryTranslation",
+        "product.ProductHighlight",
+        "product.ProductHighlightTranslation",
         "product.ProductImage",
         "product.ProductImageTranslation",
         "product.ProductPriceSpell",

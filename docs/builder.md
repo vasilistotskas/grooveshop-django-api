@@ -140,6 +140,19 @@ because the storefront upgrades them when it renders, and a restored old
 draft is accepted as a draft; the editor upgrades it, and the save and the
 publish validate it.
 
+A draft nobody opened since its block moved would therefore be refused at
+publish, and a release written before a block took data settings records no
+dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
+(or `--all-tenants`; `--dry-run` writes nothing) writes the upgrades into every
+stored draft and version, each validated against the store's catalogue, then
+rebuilds the current release's reference index. One document that does not pass
+stops its store with nothing written. It is the only thing that rewrites a
+`BuilderVersion`: a version keeps its number and what it renders, and a draft
+keeps its revision, so a store is not told it has unpublished changes.
+`builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
+to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
+adds its step there too, or the command stops at it with `no upgrade from`.
+
 Limits come from settings, never from code paths:
 `BUILDER_MAX_SECTIONS_PER_DOCUMENT`, `BUILDER_MAX_BLOCKS_PER_NODE`,
 `BUILDER_MAX_DEPTH`, `BUILDER_MAX_DOCUMENT_BYTES`, `BUILDER_MAX_PAGES`,

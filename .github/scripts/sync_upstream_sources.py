@@ -18,6 +18,10 @@ are COPIED here:
   typed data props (``builder.data_sources``): a declaration, a value, whether
   it is valid, the issues, the references and the query dependencies it
   yields.
+* ``upgrade-cases``: ``test/fixtures/builder/upgrade-cases.json`` -> ``tests/
+  fixtures/builder/upgrade-cases.json``, the block upgrades as cases, which
+  the storefront proves against its blocks and ``builder.block_upgrades`` is
+  held to (``tests/unit/builder/test_block_upgrades.py``);
 * ``contrast-cases``: ``test/fixtures/builder/contrast-cases.json`` -> ``tests/
   fixtures/builder/contrast-cases.json``, the WCAG 2.2 ratios, rules and whole
   themes both repositories run (``builder.contrast``);
@@ -117,6 +121,13 @@ SOURCES: tuple[Source, ...] = (
         STOREFRONT,
         "test/fixtures/builder/data-cases.json",
         "tests/fixtures/builder/data-cases.json",
+        "blob",
+    ),
+    Source(
+        "upgrade-cases",
+        STOREFRONT,
+        "test/fixtures/builder/upgrade-cases.json",
+        "tests/fixtures/builder/upgrade-cases.json",
         "blob",
     ),
     Source(

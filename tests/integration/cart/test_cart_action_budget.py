@@ -25,9 +25,11 @@ pytestmark = pytest.mark.django_db
 # Measured on the factory data below (a cart of two lines), with a
 # one-query allowance for the tenant artifacts a cold cache adds. Neither
 # response computes product recommendations (the storefront asks the
-# recommendations endpoint for them), which was most of both.
-GET_CART_QUERIES = 24
-ADD_ITEM_QUERIES = 40
+# recommendations endpoint for them), which was most of both. Each product
+# serializer reads the loyalty rates once, however many lines it draws: a query
+# here, where the rows are absent; one cache read in production.
+GET_CART_QUERIES = 25
+ADD_ITEM_QUERIES = 42
 
 
 def _product():

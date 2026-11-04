@@ -648,6 +648,7 @@ class TestProductsPointsEndpoint:
         user.loyalty_tier = tier
         user.save(update_fields=["loyalty_tier"])
         product = ProductFactory(points=0)
+        switch_store_settings(LOYALTY_TIER_MULTIPLIER_ENABLED=True)
 
         def tiered(key, default=None):
             if key == "LOYALTY_TIER_MULTIPLIER_ENABLED":

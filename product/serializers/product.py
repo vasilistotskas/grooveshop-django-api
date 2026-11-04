@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 from django.db import connection
 from django.db.models import Count
@@ -27,6 +28,9 @@ from product.serializers.product_attribute import ProductAttributeSerializer
 from promotion.enum import OfferKind
 from tenant.features import feature_on
 from vat.models import Vat
+
+if TYPE_CHECKING:
+    from loyalty.services import PointsRates
 
 
 @extend_schema_field(generate_schema_multi_lang(Product))
@@ -119,8 +123,36 @@ class HiddenReviewsMixin(serializers.Serializer):
         return data
 
 
+# The loyalty points one unit of a product earns at the store's base rate:
+# no tier multiplier, which depends on who is signed in. Public and the same
+# for every visitor, so it is safe in a cached response; a signed-in
+# shopper's tier-adjusted number is the loyalty endpoint's. A comment, not a
+# docstring: drf-spectacular would publish a docstring as the description of
+# every serializer below it.
+class PotentialPointsMixin(serializers.Serializer):
+    potential_points = serializers.SerializerMethodField()
+
+    @cached_property
+    def points_rates(self) -> PointsRates | None:
+        # One read per response, like ``reviews_visible``: a list prices
+        # every card with the same rates. None while loyalty is off.
+        from loyalty.services import LoyaltyService
+
+        return LoyaltyService.active_points_rates()
+
+    @extend_schema_field(serializers.IntegerField(min_value=0))
+    def get_potential_points(self, obj: Product) -> int:
+        from loyalty.services import LoyaltyService
+
+        rates = self.points_rates
+        if rates is None:
+            return 0
+        return LoyaltyService.calculate_item_points(obj, 1, rates)
+
+
 class ProductCardSerializer(
     HiddenReviewsMixin,
+    PotentialPointsMixin,
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
     EffectivePriceFieldsSerializer,
@@ -165,6 +197,7 @@ class ProductCardSerializer(
             "effective_price",
             "prior_price",
             "announced_discount_percent",
+            "potential_points",
             "main_image_path",
             "review_average",
             "review_count",
@@ -182,6 +215,7 @@ class ProductCardSerializer(
 # written through ``ProductWriteSerializer``.
 class ProductSerializer(
     HiddenReviewsMixin,
+    PotentialPointsMixin,
     TranslatableModelSerializer,
     serializers.ModelSerializer[Product],
     EffectivePriceFieldsSerializer,
@@ -263,6 +297,7 @@ class ProductSerializer(
             "prior_price",
             "announced_discount_percent",
             "reduction_started_at",
+            "potential_points",
             "main_image_path",
             "image_paths",
             "review_average",

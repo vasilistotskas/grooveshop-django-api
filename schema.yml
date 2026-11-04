@@ -47475,6 +47475,9 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageAlt:
+          type: string
+          readOnly: true
         recursiveProductCount:
           type: integer
           readOnly: true
@@ -47496,6 +47499,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImageAlt
       - mainImagePath
       - recursiveProductCount
       - slug
@@ -47563,6 +47567,9 @@ components:
         mainImagePath:
           type: string
           readOnly: true
+        mainImageAlt:
+          type: string
+          readOnly: true
         recursiveProductCount:
           type: integer
           readOnly: true
@@ -47590,6 +47597,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImageAlt
       - mainImagePath
       - recursiveProductCount
       - slug

@@ -43,7 +43,13 @@ def lacks_resend_key(tenant: Tenant) -> bool:
 def stores_lacking_resend_key() -> list[Tenant]:
     """The active, not suspended stores that :func:`lacks_resend_key`,
     in one query on ``public``; ``[]`` unless Resend is selected. An empty
-    encrypted value stays empty in the column, so the filter is in SQL."""
+    encrypted value stays empty in the column, so the filter is in SQL.
+
+    Only the columns it reads: the deploy guard runs this before ``migrate``
+    (``migration_preflight``), so a full row would name every column the
+    release adds to ``Tenant``, and the deploy that adds one could never
+    start. It stopped v3.219.0 reaching production on a missing
+    ``bing_site_verification``, while staging, on SMTP, skipped the query."""
     if not resend_is_selected():
         return []
     return list(
@@ -56,6 +62,7 @@ def stores_lacking_resend_key() -> list[Tenant]:
         )
         .exclude(from_email="")
         .order_by("schema_name")
+        .only("schema_name", "from_email")
     )
 
 

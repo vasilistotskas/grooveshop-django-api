@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import pytest
 import requests
+from django.apps import apps
 
 from core.cache import gateway
 from core.cache.registry import get_surface

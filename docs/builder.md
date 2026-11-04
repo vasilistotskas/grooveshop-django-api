@@ -384,6 +384,29 @@ integer, or too many, is `400 invalid_link_targets` naming the `param`. The
 query keys are camelCase on the wire (the camel-case middleware underscores
 them before the view reads them).
 
+
+### Every refusal is declared
+
+An operation declares each status it can answer, with its body, so the
+storefront needs no schema of its own for a refusal:
+
+- `400`: `ApiValidationError`, `ApiError` and, where it checks a document, a
+  schedule time, a preview or a presence list, `BuilderDocumentInvalidError`
+  (`errors: PublishProblem[]`).
+- `404` (`not_found`, `preview_link_expired`, ...), `503`
+  (`storefront_unavailable`) and `428` (`precondition_required`): the plain
+  `{detail, code}`.
+- `409`: `BuilderRevisionConflict {code: revision_conflict, currentRevision,
+  updatedBy, updatedAt}` on every operation that takes `If-Match`;
+  `BuilderMediaInUse {code: media_in_use, usedBy}` on deleting an asset;
+  otherwise the plain body (`schedule_not_pending`, `schedule_not_failed`).
+
+`tests/integration/builder/conftest.py` holds every request of that
+directory to it (`every_answer_is_in_the_schema`): an answer whose status its
+operation does not declare, or whose body does not satisfy the declared
+schema, fails the test that provoked it. A new operation or a new refusal
+that a test reaches cannot go undeclared.
+
 ## The live preview
 
 `POST builder/preview/resolve` (`builder/services.py: preview`,

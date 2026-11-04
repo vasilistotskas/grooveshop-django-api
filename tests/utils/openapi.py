@@ -55,3 +55,37 @@ def assert_matches_response(
         openapi["components"]["schemas"],
     )
     jsonschema.Draft4Validator(schema).validate(body)
+
+
+def validate_against(openapi: dict, node: Any, body: Any) -> None:
+    """Raise if ``body`` does not satisfy ``node``, a schema of ``openapi``.
+
+    Unlike :func:`as_json_schema` this keeps ``$ref`` as a reference to the
+    converted components, so a schema that refers to itself (a field error
+    holding field errors) can be judged.
+    """
+
+    def convert(value: Any) -> Any:
+        if isinstance(value, list):
+            return [convert(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        converted = {
+            key: (
+                "#/definitions/" + item.rsplit("/", 1)[-1]
+                if key == "$ref" and isinstance(item, str)
+                else convert(item)
+            )
+            for key, item in value.items()
+            if key != "nullable"
+        }
+        if value.get("nullable"):
+            return {"anyOf": [converted, {"type": "null"}]}
+        return converted
+
+    schema = convert(node)
+    schema["definitions"] = {
+        name: convert(component)
+        for name, component in openapi["components"]["schemas"].items()
+    }
+    jsonschema.Draft4Validator(schema).validate(body)

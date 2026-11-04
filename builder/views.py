@@ -70,6 +70,7 @@ from builder.rendering import (
 from builder.serializers import (
     BuilderDocumentInvalidErrorSerializer,
     BuilderFeaturesSerializer,
+    BuilderRevisionConflictSerializer,
     CheckpointWriteSerializer,
     DocumentDetailSerializer,
     DocumentListSerializer,
@@ -113,6 +114,16 @@ LOCALE_OPENAPI_PARAMETER = OpenApiParameter(
 ERRORS = {
     400: OpenApiResponse(response=ErrorResponseSerializer),
     409: OpenApiResponse(response=ErrorResponseSerializer),
+}
+#: Statuses that more than one operation answers, with their plain body.
+_PLAIN = OpenApiResponse(response=ErrorResponseSerializer)
+NOT_FOUND = {404: _PLAIN}
+STORE_UNAVAILABLE = {503: _PLAIN}
+#: An operation that takes ``If-Match``: ``428`` without it, and a stale one is
+#: the conflict that names the current revision and who made it.
+REVISION_ERRORS = {
+    409: OpenApiResponse(response=BuilderRevisionConflictSerializer),
+    428: _PLAIN,
 }
 #: For an operation that can answer ``invalid_document`` (it checks a
 #: document, a schedule time, a preview or a presence list).
@@ -210,7 +221,9 @@ class DocumentListView(StaffListView):
 
 
 class DocumentView(StaffView):
-    @extend_schema(tags=TAGS, responses=DocumentDetailSerializer)
+    @extend_schema(
+        tags=TAGS, responses={200: DocumentDetailSerializer, **NOT_FOUND}
+    )
     def get(self, request: Request, key: str) -> Response:
         document = get_object_or_404(BuilderDocument, key=key)
         return _etagged(
@@ -226,7 +239,12 @@ class DocumentView(StaffView):
     @extend_schema(
         tags=TAGS,
         parameters=[_IF_MATCH],
-        responses={204: None, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            204: None,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **REVISION_ERRORS,
+        },
         description="Delete a page. A released page leaves the store with a "
         "new release; a page another released document links to is refused "
         "(`page_in_use`).",
@@ -243,7 +261,13 @@ class DraftView(StaffView):
         tags=TAGS,
         parameters=[_IF_MATCH],
         request=DraftWriteSerializer,
-        responses={200: DocumentDetailSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            200: DocumentDetailSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **REVISION_ERRORS,
+            **STORE_UNAVAILABLE,
+        },
         description=(
             "Autosave. The document is validated in full against the "
             "storefront's catalogue; the answer is 503 "
@@ -272,7 +296,12 @@ class DiscardView(StaffView):
         tags=TAGS,
         parameters=[_IF_MATCH],
         request=None,
-        responses={200: DocumentDetailSerializer, **ERRORS},
+        responses={
+            200: DocumentDetailSerializer,
+            **ERRORS,
+            **NOT_FOUND,
+            **REVISION_ERRORS,
+        },
     )
     def post(self, request: Request, key: str) -> Response:
         document = services.discard_draft(
@@ -304,7 +333,12 @@ class CheckpointView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=CheckpointWriteSerializer,
-        responses={201: VersionListSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            201: VersionListSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **STORE_UNAVAILABLE,
+        },
         description="A named save: freeze the current draft as a version.",
     )
     def post(self, request: Request, key: str) -> Response:
@@ -321,7 +355,9 @@ class CheckpointView(StaffView):
 class VersionView(StaffView):
     queryset = BuilderVersion.objects.none()
 
-    @extend_schema(tags=TAGS, responses=VersionDetailSerializer)
+    @extend_schema(
+        tags=TAGS, responses={200: VersionDetailSerializer, **NOT_FOUND}
+    )
     def get(self, request: Request, key: str, number: int) -> Response:
         version = get_object_or_404(
             BuilderVersion, document__key=key, number=number
@@ -334,7 +370,12 @@ class RestoreView(StaffView):
         tags=TAGS,
         parameters=[_IF_MATCH],
         request=None,
-        responses={200: DocumentDetailSerializer, **ERRORS},
+        responses={
+            200: DocumentDetailSerializer,
+            **ERRORS,
+            **NOT_FOUND,
+            **REVISION_ERRORS,
+        },
         description=(
             "Put a version back as the DRAFT. It is not checked against "
             "the catalogue (the editor upgrades old blocks); publishing "
@@ -359,7 +400,11 @@ class PublishVersionView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PublishVersionWriteSerializer,
-        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            201: ReleaseSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+        },
         description=(
             "Release one stored version of ONE document: the previous "
             "release with only that key repointed. The draft is left as "
@@ -388,7 +433,12 @@ class PublishView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PublishWriteSerializer,
-        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            201: ReleaseSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **STORE_UNAVAILABLE,
+        },
         description=(
             "Release the drafts of the named documents together, or none "
             "of them. Every draft is validated in full, references "
@@ -415,7 +465,12 @@ class PublishCheckView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=PublishWriteSerializer,
-        responses={200: PublishCheckSerializer, **ERRORS},
+        responses={
+            200: PublishCheckSerializer,
+            **ERRORS,
+            **NOT_FOUND,
+            **STORE_UNAVAILABLE,
+        },
         description=(
             "What `POST publish` of the same documents would do, without "
             "doing it: `ok`, the documents whose draft differs from the "
@@ -449,7 +504,11 @@ class RollbackView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=RollbackWriteSerializer,
-        responses={201: ReleaseSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            201: ReleaseSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+        },
         description=("A new release pointing at the versions of an older one."),
     )
     def post(self, request: Request) -> Response:
@@ -524,7 +583,12 @@ class ScheduleListView(StaffListView):
     @extend_schema(
         tags=TAGS,
         request=ScheduleWriteSerializer,
-        responses={201: ScheduleSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={
+            201: ScheduleSerializer,
+            **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **STORE_UNAVAILABLE,
+        },
         description=(
             "Release the drafts of the named documents together at "
             "`scheduledFor` (an ISO 8601 time; one without an offset is read "
@@ -549,7 +613,7 @@ class ScheduleListView(StaffListView):
 class ScheduleView(StaffView):
     queryset = BuilderScheduledPublish.objects.none()
 
-    @extend_schema(tags=TAGS, responses=ScheduleSerializer)
+    @extend_schema(tags=TAGS, responses={200: ScheduleSerializer, **NOT_FOUND})
     def get(self, request: Request, pk: int) -> Response:
         return Response(
             ScheduleSerializer(
@@ -560,7 +624,11 @@ class ScheduleView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=RescheduleSerializer,
-        responses={200: ScheduleSerializer, **ERRORS},
+        responses={
+            200: ScheduleSerializer,
+            **ERRORS,
+            **NOT_FOUND,
+        },
         description="Move a pending schedule; 409 `schedule_not_pending` otherwise.",
     )
     def patch(self, request: Request, pk: int) -> Response:
@@ -573,7 +641,7 @@ class ScheduleView(StaffView):
 
     @extend_schema(
         tags=TAGS,
-        responses={200: ScheduleSerializer, **DOCUMENT_INVALID_ERRORS},
+        responses={200: ScheduleSerializer, **ERRORS, **NOT_FOUND},
         description=(
             "Cancel a pending schedule (it stays listed as `cancelled`); "
             "409 `schedule_not_pending` once it has run."
@@ -591,7 +659,7 @@ class ScheduleAcknowledgeView(StaffView):
     @extend_schema(
         tags=TAGS,
         request=None,
-        responses={200: ScheduleSerializer, **ERRORS},
+        responses={200: ScheduleSerializer, **ERRORS, **NOT_FOUND},
         description=(
             "Say that a failed schedule was seen; it stops showing on the "
             "store dashboard. Repeating it changes nothing."
@@ -945,6 +1013,8 @@ class PreviewLinkListView(StaffView):
         responses={
             201: PreviewLinkCreatedSerializer,
             **DOCUMENT_INVALID_ERRORS,
+            **NOT_FOUND,
+            **STORE_UNAVAILABLE,
         },
         description=(
             "Freeze the current drafts of the named documents behind a link "

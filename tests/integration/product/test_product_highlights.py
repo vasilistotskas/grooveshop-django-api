@@ -35,15 +35,16 @@ def _highlight(product, **texts_by_language):
     return highlight
 
 
-def _feed(**headers):
-    response = Client().get(reverse("product-feed"), **headers)
+def _feed(query=None, **headers):
+    response = Client().get(reverse("product-feed"), query, **headers)
     assert response.status_code == status.HTTP_200_OK
     return json.loads(response.content)["results"]
 
 
 def _feed_highlights(language, product):
-    rows = _feed(headers={"X-Language": language})
-    return next(row for row in rows if row["id"] == product.pk)["highlights"]
+    # By id: the feed paginates, and other tests' products may fill a page.
+    [row] = _feed({"id": product.pk}, headers={"X-Language": language})
+    return row["highlights"]
 
 
 @pytest.fixture

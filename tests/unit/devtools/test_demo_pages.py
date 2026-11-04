@@ -19,6 +19,7 @@ from django.test import TestCase
 
 from builder import seeding
 from builder.models import kind_of_key
+from builder.seeding import SEED_CATALOGUE
 from builder.storefront import parse_catalogue
 from builder.validation import validate_document
 from devtools import demo_store
@@ -26,14 +27,7 @@ from devtools.demo_catalogue import PRODUCTS
 from product.factories.product import ProductFactory
 
 CATALOGUE = parse_catalogue(
-    json.loads(
-        (
-            Path(__file__).resolve().parents[2]
-            / "fixtures"
-            / "builder"
-            / "catalogue.json"
-        ).read_text(encoding="utf-8")
-    )
+    json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
 )
 LOCK = json.loads(
     (
@@ -117,7 +111,7 @@ class TestTheDataset(TestCase):
         for seed in SEEDS:
             for value in _strings(seed.data) + _strings(seed.i18n):
                 assert not value.startswith("media/"), (seed.key, value)
-            for value in _values_of("productId", seed.data):
+            for value in _values_of("product", seed.data):
                 assert demo_store._PRODUCT_RE.match(str(value)), seed.key
 
     def test_every_asset_placeholder_is_a_committed_asset(self):
@@ -171,7 +165,7 @@ class TestSeedPages:
         assert written["note"] == demo_store.DEMO_PAGES_NOTE
         text = json.dumps([seed.data for seed in written["seeds"]])
         assert "{{" not in text
-        assert f'"productId": {product.pk}' in text
+        assert f'"product": {product.pk}' in text
         assert "media/demo/uploads/pages/hero-audio.avif" in text
 
     def test_a_store_with_pages_of_its_own_is_left_alone(self, written):

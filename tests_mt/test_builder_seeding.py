@@ -42,7 +42,11 @@ def test_a_store_is_seeded_in_its_own_schema_with_one_release(
             assert document.published_revision == document.draft_revision == 1
             assert version.kind == VersionKind.PUBLISH
             assert version.number == 1
-        assert not BuilderReference.objects.exists()
+        # A seed names no record, but its lists are data settings: their
+        # dependency rows are what purges the page, with no storefront asked.
+        kinds = set(BuilderReference.objects.values_list("kind", flat=True))
+        assert kinds
+        assert all(kind.startswith("query") for kind in kinds)
 
     with schema_context(mt_tenant_b.schema_name):
         assert not BuilderDocument.objects.exists()

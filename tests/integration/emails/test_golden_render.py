@@ -29,6 +29,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone, translation
 from django.utils.translation import gettext
 from djmoney.money import Money
+from extra_settings.models import Setting
 from phonenumber_field.phonenumber import PhoneNumber
 
 from country.models import Country
@@ -305,6 +306,11 @@ class TestCustomerOrderEmails:
         settings.SECRET_KEY = "golden-secret-key-not-used-anywhere-else"
         settings.EMAIL_HASH_KEY = "golden-hash-key-not-used-anywhere-else"
         settings.API_BASE_URL = "https://api.shop.example"
+        # Off by default: a store chooses to send it.
+        Setting.objects.update_or_create(
+            name="REVIEW_REQUEST_DELAY_DAYS",
+            defaults={"value_type": Setting.TYPE_INT, "value_int": 8},
+        )
         # The unsubscribe token names the account, so its id is fixed.
         customer = UserAccountFactory(
             id=500_001,

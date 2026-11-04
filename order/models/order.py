@@ -246,6 +246,17 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             "never shipped has none."
         ),
     )
+    review_request_sent_at = models.DateTimeField(
+        _("Review request sent at"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "When the reminder to review this order's products was settled: "
+            "sent, or skipped because there was nothing left to ask for or "
+            "the customer opted out. The reminder is never sent twice."
+        ),
+    )
     payment_id = models.CharField(
         _("Payment ID"), max_length=255, blank=True, null=True, default=""
     )

@@ -119,8 +119,11 @@ class TestAccess:
         rendered = post(client, type_key=KEY, order=order.pk)
         assert rendered.status_code == 200
         # "#12345" is the sample's own order number, so the order's id must
-        # not be matched as a prefix of it.
-        assert not re.search(rf"#{order.pk}(?!\d)", rendered.content.decode())
+        # not be matched as a prefix of it, nor as the start of a CSS colour
+        # ("#1f2937" when the id is 1).
+        assert not re.search(
+            rf"#{order.pk}(?![0-9a-fA-F])", rendered.content.decode()
+        )
 
     def test_an_admin_is_admitted(self, admin):
         assert admin.get(type_url()).status_code == 200

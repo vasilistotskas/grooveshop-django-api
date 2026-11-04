@@ -52,16 +52,12 @@ class ProductImageSerializer(
         )
 
     def get_alt_text(self, obj: ProductImage) -> str:
-        """The merchant's alt text, else the title, else empty.
+        """The merchant's alt text, else empty.
 
         No generated sentence: it would be in one language whatever the
         store speaks, so the storefront builds its own localized fallback.
         """
-        return (
-            obj.safe_translation_getter("alt_text", any_language=True)
-            or obj.safe_translation_getter("title", any_language=True)
-            or ""
-        )
+        return obj.safe_translation_getter("alt_text", any_language=True) or ""
 
 
 class ProductImageDetailSerializer(ProductImageSerializer):

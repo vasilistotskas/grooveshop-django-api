@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.utils import timezone
 
 from core.managers import (
@@ -68,16 +68,6 @@ class ProductImageQuerySet(TranslatableOptimizedQuerySet):
 
     def for_products(self, product_ids):
         return self.filter(product__in=product_ids)
-
-    def with_titles(self):
-        return self.translated().exclude(
-            Q(translations__title__isnull=True) | Q(translations__title="")
-        )
-
-    def without_titles(self):
-        return self.translated().filter(
-            Q(translations__title__isnull=True) | Q(translations__title="")
-        )
 
     def recent(self, days=7):
         cutoff = timezone.now() - timedelta(days=days)

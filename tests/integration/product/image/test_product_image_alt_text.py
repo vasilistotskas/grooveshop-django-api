@@ -5,9 +5,16 @@ from django.urls import reverse
 from django.utils import translation
 
 from admin.base import BaseTranslatableTabularInline
-from product.admin import ProductAdmin, ProductImageAdmin, ProductImageInline
+from product.admin import (
+    ProductAdmin,
+    ProductCategoryImageAdmin,
+    ProductImageAdmin,
+    ProductImageInline,
+)
+from product.factories.category_image import ProductCategoryImageFactory
 from product.factories.image import ProductImageFactory
-from product.models import Product, ProductImage
+from product.models import Product, ProductCategoryImage, ProductImage
+from product.serializers.category_image import ProductCategoryImageSerializer
 from product.serializers.image import ProductImageSerializer
 from tests.utils.store_settings import switch_every_feature_on
 from user.factories import UserAccountFactory
@@ -34,18 +41,18 @@ def _alt(image, language="el"):
 
 @pytest.mark.django_db
 class TestAltTextPrecedence:
-    def test_the_merchants_alt_text_wins_over_the_title(self):
-        image = _image(el={"title": "Τίτλος", "alt_text": "Κόκκινο παπούτσι"})
+    def test_the_merchants_alt_text_is_served(self):
+        image = _image(el={"alt_text": "Κόκκινο παπούτσι"})
 
         assert _alt(image) == "Κόκκινο παπούτσι"
 
-    def test_the_title_is_used_when_there_is_no_alt_text(self):
-        image = _image(el={"title": "Τίτλος"})
-
-        assert _alt(image) == "Τίτλος"
-
     def test_an_image_with_no_text_has_an_empty_alt_not_a_sentence(self):
-        image = _image(el={"title": ""})
+        image = _image(el={"alt_text": ""})
+
+        assert _alt(image) == ""
+
+    def test_an_image_with_no_translation_has_an_empty_alt(self):
+        image = _image()
 
         assert _alt(image) == ""
 
@@ -70,11 +77,11 @@ class TestAltTextPrecedence:
 
 @pytest.mark.django_db
 class TestAltTextInAdmin:
-    def test_the_product_page_inline_edits_title_and_alt_text(self):
+    def test_the_product_page_inline_edits_alt_text(self):
         inline = ProductImageInline(Product, AdminSite())
 
         assert issubclass(inline.__class__, BaseTranslatableTabularInline)
-        assert inline.fields == ("image", "is_main", "title", "alt_text")
+        assert inline.fields == ("image", "is_main", "alt_text")
 
     def test_the_inline_is_registered_on_the_product_page(self):
         assert ProductImageInline in ProductAdmin.inlines
@@ -102,7 +109,7 @@ class TestAltTextInAdmin:
     def test_saving_the_inline_stores_the_alt_text_in_that_language(self):
         request = RequestFactory().get("/")
         request.user = UserAccountFactory(is_superuser=True, is_staff=True)
-        image = _image(el={"title": "Τίτλος"})
+        image = _image(el={"alt_text": "Παπούτσι"})
         inline = ProductImageInline(Product, AdminSite())
         formset_class = inline.get_formset(request, image.product)
         formset_class.language_code = "en"
@@ -116,7 +123,6 @@ class TestAltTextInAdmin:
                 "images-0-id": str(image.pk),
                 "images-0-product": str(image.product_id),
                 "images-0-is_main": "on" if image.is_main else "",
-                "images-0-title": "Shoe",
                 "images-0-alt_text": "Red shoe",
             },
             instance=image.product,
@@ -129,8 +135,7 @@ class TestAltTextInAdmin:
         stored.set_current_language("en")
         assert stored.alt_text == "Red shoe"
         stored.set_current_language("el")
-        assert stored.alt_text in (None, "")
-        assert stored.title == "Τίτλος"
+        assert stored.alt_text == "Παπούτσι"
 
     def test_the_image_page_edits_alt_text(self):
         fields = [
@@ -140,3 +145,57 @@ class TestAltTextInAdmin:
         ]
 
         assert "alt_text" in fields
+
+
+@pytest.mark.django_db
+class TestTitleIsRetired:
+    """The ``title`` of an image is shown nowhere; ``alt_text`` is the one text."""
+
+    @pytest.mark.parametrize(
+        "model",
+        [ProductImage, ProductCategoryImage],
+        ids=["product", "category"],
+    )
+    def test_the_translations_model_has_no_title(self, model):
+        names = {
+            field.name
+            for field in model._parler_meta.root_model._meta.get_fields()
+        }
+
+        assert "title" not in names
+        assert "alt_text" in names
+
+    def test_the_serialized_translations_carry_no_title(self):
+        image = _image(el={"alt_text": "Κόκκινο παπούτσι"})
+
+        data = ProductImageSerializer(image).data
+
+        assert set(data["translations"]["el"]) == {"alt_text"}
+
+    def test_the_category_image_serializer_carries_no_title(self):
+        image = ProductCategoryImageFactory()
+
+        data = ProductCategoryImageSerializer(image).data
+
+        assert all("title" not in row for row in data["translations"].values())
+
+    def test_no_admin_page_edits_a_title(self):
+        product_fields = [
+            field
+            for _name, options in ProductImageAdmin.fieldsets
+            for field in options["fields"]
+        ]
+        category_fields = [
+            field
+            for _name, options in ProductCategoryImageAdmin.fieldsets
+            for field in options["fields"]
+        ]
+
+        assert "title" not in product_fields + category_fields
+        assert "title" not in ProductImageInline.fields
+
+    def test_the_admin_searches_the_alt_text(self):
+        assert "translations__alt_text" in ProductImageAdmin.search_fields
+        assert "translations__alt_text" in (
+            ProductCategoryImageAdmin.search_fields
+        )

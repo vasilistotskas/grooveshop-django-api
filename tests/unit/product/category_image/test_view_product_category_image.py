@@ -95,7 +95,7 @@ class TestProductCategoryImageViewSetSerializers(TestCase):
         )
 
     def test_search_fields_configuration(self):
-        expected_fields = ["translations__title", "translations__alt_text"]
+        expected_fields = ["translations__alt_text"]
         self.assertEqual(set(self.viewset.search_fields), set(expected_fields))
 
     def test_ordering_fields_configuration(self):

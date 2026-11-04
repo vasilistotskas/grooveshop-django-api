@@ -45763,15 +45763,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
     PatchedProductCategoryWriteRequest:
@@ -45847,15 +45843,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
     PatchedProductReviewWriteRequest:
@@ -47640,15 +47632,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         imagePath:
@@ -47727,15 +47715,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         imagePath:
@@ -47790,15 +47774,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
       required:
@@ -48772,7 +48752,7 @@ components:
         altText:
           type: string
           description: |-
-            The merchant's alt text, else the title, else empty.
+            The merchant's alt text, else empty.
 
             No generated sentence: it would be in one language whatever the
             store speaks, so the storefront builds its own localized fallback.
@@ -48792,15 +48772,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         mainImagePath:
@@ -48843,7 +48819,7 @@ components:
         altText:
           type: string
           description: |-
-            The merchant's alt text, else the title, else empty.
+            The merchant's alt text, else empty.
 
             No generated sentence: it would be in one language whatever the
             store speaks, so the storefront builds its own localized fallback.
@@ -48862,15 +48838,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
         mainImagePath:
@@ -48944,15 +48916,11 @@ components:
             el:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
             en:
               type: object
               properties:
-                title:
-                  type: string
                 altText:
                   type: string
       required:

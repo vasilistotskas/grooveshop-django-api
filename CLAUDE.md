@@ -287,10 +287,15 @@ took add to cart down on webside for ~8 minutes. Three checks enforce it:
 CI's "OpenAPI schema.yml is up to date" step (the committed `schema.yml`
 must match the code structurally — regenerate it with
 `uv run python manage.py spectacular --file schema.yml`), the
-`API contract` workflow (a PR that breaks clients of the base fails unless
-labelled `api-breaking-change`), and the deploy gate in
-`grooveshop-infrastructure` that refuses a deploy pairing a Django release
-with a storefront it breaks.
+`API contract` workflow (a PR whose `schema.yml` or `allauth-schema.yml`
+cannot be live together with the storefront and gateway that production and
+staging run NOW fails, so a change with no safe deploy order has to be
+split), and the deploy gate in `grooveshop-infrastructure` that refuses a
+deploy pairing a Django release with a storefront it breaks. The last two
+run the same script and rules, in `api-contract/` (read its README before
+touching `schema.yml`'s response shapes): an accepted break is a dated
+`until` line in `api-contract/ignore.txt`, added in the PR that makes the
+change.
 
 ### CI/CD
 
@@ -304,7 +309,7 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 6. **Coverage Gate** — combines the shard data and enforces `fail_under`.
 7. **Release** — python-semantic-release (run from the locked dev group) cuts the version, changelog and GitHub release on `main`; its version commit also carries the re-locked `uv.lock` (`build_command` + `assets` in `pyproject.toml`), so `main` never holds a stale lock. The Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
 
-`.github/workflows/api-contract.yml` is separate: on a PR that changes `schema.yml` it runs `oasdiff breaking` from the base branch's schema to the PR's and fails on a break unless the PR has the `api-breaking-change` label (its own workflow so that toggling the label re-runs only it).
+`.github/workflows/api-contract.yml` is separate: it calls the reusable `api-contract-check.yml`, which pairs the PR's documents with the release live in production and in staging (GitHub Deployments, recorded from the pods) and runs `api-contract/api-contract.sh`; the storefront and gateway PR checks call the same workflow. It always reports, so it is a required check; a PR that touches no contract document passes at once.
 
 ## Code Style
 

@@ -50,8 +50,21 @@ CATCH_UP = settings.REVIEW_REQUEST_CATCH_UP_DAYS
 def store():
     tenant = store_tenant("review_store", default_locale="en")
     previous = bind_store_tenant(tenant)
+    Setting.objects.update_or_create(
+        name="REVIEW_REQUEST_DELAY_DAYS",
+        defaults={"value_type": Setting.TYPE_INT, "value_int": DELAY},
+    )
     yield tenant
     unbind_store_tenant(previous)
+
+
+def test_a_store_sends_no_reminder_until_it_chooses_to():
+    # Mail to a store's customers never starts by itself on a deploy.
+    declared = {
+        entry["name"]: entry["value"]
+        for entry in settings.EXTRA_SETTINGS_DEFAULTS
+    }
+    assert declared["REVIEW_REQUEST_DELAY_DAYS"] == 0
 
 
 def set_delay(days: int) -> None:

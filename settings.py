@@ -2272,7 +2272,7 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "REVIEW_REQUEST_DELAY_DAYS",
         "type": "int",
-        "value": 8,
+        "value": 0,
         "validator": (
             "order.review_request.validate_review_request_delay_days_setting"
         ),
@@ -2281,7 +2281,8 @@ EXTRA_SETTINGS_DEFAULTS = [
             "order was delivered, asking for a review of the products they "
             "have not reviewed yet. At most one per order, and only while "
             "product reviews are on and the customer has not opted out of "
-            "marketing email. 0 turns the reminder off. The delivery email "
+            "marketing email. 0 is off, the default: a store chooses to send "
+            "this mail. The delivery email "
             "itself always invites a review."
         ),
     },

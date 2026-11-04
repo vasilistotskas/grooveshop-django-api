@@ -1506,7 +1506,7 @@ carrier reports it delivered, before this mail is sent.
 
 **The review reminder** (`order.review_request`, `order/review_request.py`,
 `order.tasks.send_review_request_emails`) is the second invitation, sent
-once, `REVIEW_REQUEST_DELAY_DAYS` days (store setting, default 8, `0` off,
+once, `REVIEW_REQUEST_DELAY_DAYS` days (store setting, default `0`, off: a store chooses to send it,
 validated by `validate_review_request_delay_days_setting`, at most a year)
 after the order's first move to DELIVERED. `Order` has no delivery
 column, so the time is the `OrderHistory` STATUS row of that move

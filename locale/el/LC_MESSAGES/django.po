@@ -6704,6 +6704,9 @@ msgstr "Google Pay"
 msgid "Google Search Console verification token (the content of the google-site-verification meta tag). Empty → not emitted."
 msgstr "Token επαλήθευσης Google Search Console (το περιεχόμενο του meta tag google-site-verification). Κενό → δεν προστίθεται."
 
+msgid "Google Shopping shows these as the product's selling points. Add 4 to 6 short benefits (at least 2, or Google ignores them). Do not put in the price, shipping, a date, the store's name or a link, do not write in capitals, and do not repeat the title or the description."
+msgstr "Το Google Shopping τα δείχνει ως δυνατά σημεία του προϊόντος. Προσθέστε 4 έως 6 σύντομα οφέλη (τουλάχιστον 2, αλλιώς το Google τα αγνοεί). Μην βάλετε τιμή, μεταφορικά, ημερομηνία, το όνομα του καταστήματος ή σύνδεσμο, μην γράφετε με κεφαλαία και μην επαναλαμβάνετε τον τίτλο ή την περιγραφή."
+
 #, python-format
 msgid "Google is told your return terms from Store Settings, not from this page: return window %(window)s (RETURN_WINDOW_DAYS), return shipping %(fees)s (RETURN_FEES). If you changed either here, change the setting too."
 msgstr "Η Google ενημερώνεται για τους όρους επιστροφών σας από τις Ρυθμίσεις καταστήματος, όχι από αυτή τη σελίδα: προθεσμία επιστροφής %(window)s (RETURN_WINDOW_DAYS), μεταφορικά επιστροφής %(fees)s (RETURN_FEES). Αν αλλάξατε κάποιο από τα δύο εδώ, αλλάξτε και τη ρύθμιση."
@@ -6915,6 +6918,9 @@ msgstr "Το υψηλότερο στάδιο ειδοποίησης που έχ�
 
 msgid "Highest threshold across active providers — the subtotal at which every carrier ships free. Null when no active provider advertises a threshold."
 msgstr "Υψηλότερο όριο μεταξύ των ενεργών παρόχων — το υποσύνολο στο οποίο κάθε μεταφορέας αποστέλλει δωρεάν. Null όταν κανένας ενεργός πάροχος δεν δηλώνει όριο."
+
+msgid "Highlight"
+msgstr "Πλεονέκτημα"
 
 msgid "History"
 msgstr "Ιστορικό"
@@ -10741,6 +10747,12 @@ msgstr "Αγαπημένο Προϊόν"
 
 msgid "Product Favourites"
 msgstr "Αγαπημένα προϊόντα"
+
+msgid "Product Highlight"
+msgstr "Πλεονέκτημα προϊόντος"
+
+msgid "Product Highlights"
+msgstr "Πλεονεκτήματα προϊόντος"
 
 msgid "Product ID"
 msgstr "ID προϊόντος"

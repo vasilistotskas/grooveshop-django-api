@@ -2,6 +2,7 @@ from functools import cached_property
 
 from django.db import connection
 from django.db.models import Count
+from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from djmoney.money import Money
@@ -315,6 +316,36 @@ class ProductSerializer(
         if group is None:
             return None
         return group.safe_translation_getter("name") or None
+
+
+class ProductFeedSerializer(ProductSerializer):
+    """A product as the catalogue feed (``/product/feed``) publishes it:
+    ``ProductSerializer`` plus the Google Merchant ``product_highlight``
+    list. Only the feed prefetches the highlights
+    (``ProductQuerySet.for_feed``), so only the feed renders them."""
+
+    highlights = serializers.SerializerMethodField()
+
+    class Meta(ProductSerializer.Meta):
+        fields = (*ProductSerializer.Meta.fields, "highlights")
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_highlights(self, obj: Product) -> list[str]:
+        """The highlights written in the request language, in the
+        merchant's order. A highlight with no text in that language is
+        left out, never replaced by another language's: Google requires
+        the feed's language to match its text.
+
+        Reads the prefetched translations and nothing else
+        (``translations.all()``), so a missing language costs no query.
+        """
+        language = get_language()
+        return [
+            translation.text
+            for highlight in obj.highlights.all()
+            for translation in highlight.translations.all()
+            if translation.language_code == language
+        ]
 
 
 class RatingDistributionSerializer(serializers.Serializer):

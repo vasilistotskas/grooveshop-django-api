@@ -64,6 +64,7 @@ from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
+from product.models.highlight import ProductHighlight
 from product.models.image import ProductImage
 from product.models.price_spell import ProductPriceSpell
 from product.models.product import (
@@ -664,6 +665,22 @@ class ProductImageInline(BaseTranslatableTabularInline):
     show_change_link = True
 
 
+class ProductHighlightInline(BaseTranslatableTabularInline):
+    """The product's Google Merchant highlights: short benefits, one row
+    each, written per language (the language tab of the product page) and
+    dragged into the order they are published in."""
+
+    model = ProductHighlight
+    extra = 0
+    fields = ("text", "sort_order")
+    tab = True
+    # Dragging a row sets its ``sort_order``.
+    ordering_field = "sort_order"
+    hide_ordering_field = True
+    # No ``per_page``: Unfold's paged formset and parler's translated one
+    # cannot be combined (see ``ProductImageInline``).
+
+
 class ProductPriceSpellInline(TabularInline):
     """The product's price record, newest first. Read-only: it is the
     evidence behind every announced reduction, so nothing here is edited
@@ -911,6 +928,7 @@ class ProductAdmin(
     inlines = [
         ProductAttributeInline,
         ProductImageInline,
+        ProductHighlightInline,
         StockReservationInline,
         ProductPriceSpellInline,
         TaggedItemInline,

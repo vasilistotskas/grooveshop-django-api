@@ -3,6 +3,68 @@
 
 
 
+## v3.219.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(order): the review reminder is off until a store chooses it
+
+A default of 8 days would have started mailing the customers of every
+store on deploy. A store now sets the delay to send it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+### Features
+
+* feat(order): remind customers to review what was delivered (#476) ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+* feat(order): remind customers to review what was delivered
+
+The delivered and completed emails already invite a review at the moment
+of delivery. A new email, order.review_request, is the second invitation,
+sent once per order REVIEW_REQUEST_DELAY_DAYS days after delivery (a store
+setting, default 8, 0 turns it off, validated as a whole number of days up
+to 365).
+
+A daily beat entry fans out send_review_request_emails to every active
+store. An order is due when it is still DELIVERED or COMPLETED, has not
+been reminded, and its first move to DELIVERED (the OrderHistory STATUS
+row; Order has no delivery column and status_updated_at moves again when a
+cash-on-delivery order completes) fell between the delay and the delay plus
+REVIEW_REQUEST_CATCH_UP_DAYS, so enabling the reminder does not mail every
+order ever delivered and a missed run costs nothing.
+
+Each order is claimed by stamping the new Order.review_request_sent_at
+(additive, nullable) where it is still empty, so overlapping runs cannot
+both mail it. The stamp stays when the order is settled without a mail
+(nothing left to review, the customer opted out, the store switched the
+email off, reviews are off) and after a failure no retry can fix; it is
+released after a transient failure and the next run retries.
+
+The email is Kind.MARKETING: a request for a review is not part of the
+order, so EmailOptOut applies and it carries the unsubscribe headers and
+footer. It links straight to each product's review form and leaves out any
+product the customer already reviewed, in any status. That rule is now the
+one definition, order.emails.unreviewed_products, which the delivered and
+completed emails use too.
+
+The email preview access test looked for the order's number behind a
+hash sign in the rendered page, which also matched a CSS colour in the
+email's style block whenever the order id was 1; it now ignores a hex
+digit after the id.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
+### Testing
+
+* test(order): the golden reminder sets its delay
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`f99c660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f99c660f0b1c46d839bdc5fb299c50d59b265d12))
+
 ## v3.218.0 (2026-11-04)
 
 ### Bug fixes

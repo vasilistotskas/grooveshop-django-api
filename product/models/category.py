@@ -38,6 +38,16 @@ class ProductCategory(
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=RichTextField(_("Description"), blank=True, null=True),
+        footer_text=RichTextField(
+            _("Footer text"),
+            blank=True,
+            null=True,
+            help_text=_(
+                "Text shown below the category's products, such as buying "
+                "tips or frequently asked questions. The description stays "
+                "above the products."
+            ),
+        ),
         **SeoTranslationModel.translated_fields(),
     )
 

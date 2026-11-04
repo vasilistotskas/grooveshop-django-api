@@ -3,6 +3,31 @@
 
 
 
+## v3.217.0 (2026-11-03)
+
+### Features
+
+* feat(seo): gtin, mpn, feed title, category text and Bing verification (#474)
+
+Product gets two non-translated identifiers Google Merchant Center asks
+for: gtin (digits only, 8/12/13/14 long, valid GS1 check digit, checked
+by product.validators.validate_gtin on the model field, so the admin form
+and the write serializer both enforce it) and mpn. Neither is derived
+from the SKU. ProductTranslation gets feed_title, the title the product
+feeds use instead of the name.
+
+ProductCategory gets a translated footer_text rich-text field shown below
+the category's products. Tenant gets bing_site_verification beside the
+Google and Pinterest tokens and serves it on tenant/resolve.
+
+gtin and mpn are read-only on the product read serializers and writable
+on the product write serializer; feed_title and footer_text arrive
+through translations. The migrations only add columns (db_default on the
+NOT NULL ones). Search indexes are unchanged: neither MeiliMeta lists the
+new fields.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`e3d2ec1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3d2ec15e2fe1a315c69184b6f2b02b995f9ce64))
+
 ## v3.216.0 (2026-11-03)
 
 ### Bug fixes

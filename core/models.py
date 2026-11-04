@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import zlib
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Self
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -323,18 +323,24 @@ class FeaturePauseModel(models.Model):
     def active_cutoff(cls, moment: datetime, span: timedelta) -> datetime:
         """The point before ``moment`` from which ``span`` of time with
         the feature ON has passed: anything older than it has been
-        live for longer than ``span``, the off time not counted."""
+        live for longer than ``span``, the off time not counted.
+
+        In UTC throughout: arithmetic within one time zone is wall clock,
+        so it would be an hour out across a daylight saving change.
+        """
         remaining = span
+        moment = moment.astimezone(UTC)
         cursor = moment
         for pause in cls._default_manager.filter(
             started_at__lt=moment
         ).order_by("-started_at"):
-            end = min(pause.ended_at or moment, cursor)
+            ended_at = pause.ended_at or moment
+            end = min(ended_at.astimezone(UTC), cursor)
             live = cursor - end
             if live >= remaining:
                 return cursor - remaining
             remaining -= live
-            cursor = min(pause.started_at, cursor)
+            cursor = min(pause.started_at.astimezone(UTC), cursor)
         return cursor - remaining
 
 

@@ -3,6 +3,51 @@
 
 
 
+## v3.218.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(tenant): order the IndexNow migration after the SEO fields one
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
+### Features
+
+* feat(indexnow): tell search engines when products and posts change (#475) ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
+* feat(indexnow): tell search engines when a product or blog post changes
+
+A store can switch on INDEXNOW_ENABLED (off by default). From then on a
+published product (active, not deleted) or blog post that is created,
+changed, unpublished, soft-deleted or removed, or whose translation is
+saved, is queued as a PendingUrl row in the store's schema, written in the
+transaction of the save. A draft or an inactive product queues nothing, and
+neither does a save that touches only view_count or updated_at.
+
+A beat entry every 30 minutes fans out submit_pending_urls to every active
+store. A run sends at most one POST to the IndexNow endpoint per store:
+{host, key, urlList} with each queued path as the canonical storefront URL
+on the store's primary domain, once per language the store serves, up to
+the protocol's 10,000 URLs. The retry rules are core.retry's: a 5xx, 408,
+429, a timeout and a connection error are retried; any other 4xx is not,
+the refused batch is dropped from the queue and logged at ERROR. A store
+that switched the setting off drops its queue.
+
+Each store has its own key, Tenant.indexnow_key (a UUID's 32 hex
+characters, made when the store is created; the migration gives the
+existing stores theirs). tenant/resolve serves it as the optional field
+indexnowKey while the switch is on and as an empty string otherwise, so
+the storefront can serve /<key>.txt, and a switch moves the resolve cache.
+
+BlogPost gets storefront_path, next to Product's. The queue model is
+declared to the staging anonymiser; the key is public by design.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`2285126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/228512676ead13e2608f1ae291c56a132d9bfc6d))
+
 ## v3.217.0 (2026-11-03)
 
 ### Features

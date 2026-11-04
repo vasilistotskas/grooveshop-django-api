@@ -13,7 +13,9 @@ from django.core.checks import ERROR, Error
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import SystemCheckError
+from django.db import connection
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 
 from admin.dashboard.platform import PlatformAlerts
@@ -47,6 +49,20 @@ def _run_check() -> list[Error]:
 
 
 class TestWhoIsLacking:
+    def test_reads_only_the_columns_a_release_cannot_have_added(self, resend):
+        # The guard runs before ``migrate``: a column the release adds to
+        # Tenant does not exist yet, so the query must not name it.
+        _verified("guard_columns")
+
+        with CaptureQueriesContext(connection) as queries:
+            [store] = setup.stores_lacking_resend_key()
+            assert setup.sender_domain(store) == "guard_columns.test"
+
+        [query] = queries.captured_queries
+        selected = query["sql"].partition(" FROM ")[0]
+        assert selected.count('"tenant_tenant".') == 3
+        assert "from_email_verified" not in selected
+
     def test_over_smtp_nobody(self, settings):
         settings.EMAIL_TRANSPORT = "smtp"
         _verified("guard_smtp")

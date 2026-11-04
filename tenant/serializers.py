@@ -147,6 +147,9 @@ class TenantConfigSerializer(serializers.Serializer):
     google_site_verification = serializers.CharField(
         required=False, allow_blank=True
     )
+    bing_site_verification = serializers.CharField(
+        required=False, allow_blank=True
+    )
     pinterest_domain_verify = serializers.CharField(
         required=False, allow_blank=True
     )
@@ -392,6 +395,14 @@ class TenantConfigSerializer(serializers.Serializer):
     # backend rejects every ``/tenant/resolve`` response.
     google_ads_add_payment_info_label = serializers.CharField(required=False)
     google_ads_page_view_label = serializers.CharField(read_only=True)
+    # The IndexNow key the storefront serves at ``/<key>.txt``; empty
+    # unless the store switched IndexNow on. ``required=False`` like
+    # ``openai_pixel_id`` above: a new field must not be REQUIRED in the
+    # schema, or a storefront deployed before this backend rejects every
+    # ``/tenant/resolve`` response.
+    indexnow_key = serializers.CharField(
+        source="published_indexnow_key", required=False, allow_blank=True
+    )
 
     # --- Authentication ---
     totp_issuer = serializers.CharField(read_only=True)
@@ -500,6 +511,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "is_platform_storefront",
             "seo_author",
             "google_site_verification",
+            "bing_site_verification",
             "pinterest_domain_verify",
             # --- Theme ---
             "primary_color",

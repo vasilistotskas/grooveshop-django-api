@@ -29,7 +29,11 @@ from unfold.datasets import BaseDataset
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
-from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.base import (
+    BaseModelAdmin,
+    BaseTranslatableAdmin,
+    BaseTranslatableTabularInline,
+)
 from admin.bulk import update_each
 from admin.datasets import RelatedDatasetAdmin
 from admin.displays import (
@@ -60,6 +64,7 @@ from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
+from product.models.highlight import ProductHighlight
 from product.models.image import ProductImage
 from product.models.price_spell import ProductPriceSpell
 from product.models.product import (
@@ -344,6 +349,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         "attribute_info",
         "active",
         "is_variant",
+        "schema_property",
         "values_count_display",
         "usage_count_display",
         "sort_order",
@@ -356,6 +362,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
     list_filter = [
         "active",
         "is_variant",
+        "schema_property",
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
@@ -378,7 +385,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         (
             _("Attribute Information"),
             {
-                "fields": ("name", "active", "is_variant"),
+                "fields": ("name", "active", "is_variant", "schema_property"),
                 "classes": ("wide",),
             },
         ),
@@ -643,15 +650,35 @@ class ProductAttributeInline(TabularInline):
         )
 
 
-class ProductImageInline(TabularInline):
-    # Unfold's inline image widget previews the current file itself.
+class ProductImageInline(BaseTranslatableTabularInline):
+    # Unfold's inline image widget previews the current file itself. The
+    # alt text is per language: parler shows the language tab of the
+    # product page.
     model = ProductImage
     extra = 0
-    fields = ("image", "is_main")
+    fields = ("image", "is_main", "alt_text")
 
     tab = True
-    per_page = 20
+    # No ``per_page``: Unfold's paged formset and parler's translated one
+    # cannot be combined (it passes ``request`` to a formset that has no
+    # such argument).
     show_change_link = True
+
+
+class ProductHighlightInline(BaseTranslatableTabularInline):
+    """The product's Google Merchant highlights: short benefits, one row
+    each, written per language (the language tab of the product page) and
+    dragged into the order they are published in."""
+
+    model = ProductHighlight
+    extra = 0
+    fields = ("text", "sort_order")
+    tab = True
+    # Dragging a row sets its ``sort_order``.
+    ordering_field = "sort_order"
+    hide_ordering_field = True
+    # No ``per_page``: Unfold's paged formset and parler's translated one
+    # cannot be combined (see ``ProductImageInline``).
 
 
 class ProductPriceSpellInline(TabularInline):
@@ -901,6 +928,7 @@ class ProductAdmin(
     inlines = [
         ProductAttributeInline,
         ProductImageInline,
+        ProductHighlightInline,
         StockReservationInline,
         ProductPriceSpellInline,
         TaggedItemInline,
@@ -950,8 +978,11 @@ class ProductAdmin(
                     "category",
                     "variant_group",
                     "brand",
+                    "gtin",
+                    "mpn",
                     "active",
                     "name",
+                    "feed_title",
                     "description",
                 ),
                 "classes": ("tab",),
@@ -1757,7 +1788,7 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("name", "description"),
+                "fields": ("name", "description", "footer_text"),
                 "classes": ("wide",),
             },
         ),
@@ -2177,7 +2208,6 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ]
     search_fields = [
         "category__translations__name",
-        "translations__title",
         "translations__alt_text",
     ]
     list_select_related = ["category"]
@@ -2195,7 +2225,7 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title", "alt_text"),
+                "fields": ("alt_text",),
                 "classes": ("wide",),
             },
         ),
@@ -2230,7 +2260,7 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
         return header_two_line(
             obj.category.safe_translation_getter("name", any_language=True)
             or _("Unnamed Category"),
-            obj.safe_translation_getter("title", any_language=True),
+            obj.safe_translation_getter("alt_text", any_language=True),
             image_path=obj.image.url if obj.image else None,
             squared=True,
         )
@@ -2260,7 +2290,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     search_fields = [
         "product__translations__name",
         "product__sku",
-        "translations__title",
+        "translations__alt_text",
     ]
     list_select_related = ["product"]
     autocomplete_fields = ("product",)
@@ -2278,7 +2308,7 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         (
             _("Content"),
             {
-                "fields": ("title",),
+                "fields": ("alt_text",),
                 "classes": ("wide",),
             },
         ),

@@ -82,6 +82,13 @@ cache-invalidated by the rewrite, and `updated_at` keeps its value.
   Conversions API logs, Celery results, and every dj-stripe mirror row except
   the platform's own Stripe account (the API key and webhook endpoint rows are
   wiped, and `manage.py bootstrap_stripe` rebuilds them from a sandbox key).
+- **Switched off**: the settings in `rules.FORCED_OFF_SETTINGS` (today
+  `INDEXNOW_ENABLED`), in every schema. Store settings are restored from
+  production as they are, so a switch that makes the application call out
+  to the public internet would arrive on: staging would announce its own
+  URLs to the public IndexNow endpoint. The row is kept and its value set
+  to off through `_base_manager` (`Setting.get` reads a cache keyed by
+  schema); a second run finds nothing to change.
 - **Kept real**: orders, items, payments, invoices' amounts, products, stock,
   prices, promotions, gift-card balances, loyalty points, translations.
 

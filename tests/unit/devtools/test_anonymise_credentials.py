@@ -29,6 +29,13 @@ _KEPT = {
         "stored hashed (make_password) by allauth, so a copy opens nothing"
     ),
     "tenant.Tenant.cache_generation": "a counter, not a credential",
+    "tenant.Tenant.indexnow_key": (
+        "the IndexNow ownership key, public by design: the storefront "
+        "serves it to anyone at /<key>.txt"
+    ),
+    "tenant.HistoricalTenant.indexnow_key": (
+        "the history copy of Tenant.indexnow_key, public by design"
+    ),
     "emails.EmailSwitch.type_key": (
         "the name of an email type a store switched off, not a credential"
     ),

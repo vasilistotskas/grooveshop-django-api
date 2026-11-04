@@ -55,8 +55,7 @@ def _product(
     ],
 )
 def test_price_basis_selects_its_price_component(basis, expected):
-    with loyalty_settings(LOYALTY_PRICE_BASIS=basis):
-        assert LoyaltyService.get_price_basis_amount(_product()) == expected
+    assert LoyaltyService.get_price_basis_amount(_product(), basis) == expected
 
 
 _cents = st.decimals(
@@ -81,7 +80,9 @@ def test_item_points_floor_the_exact_product_and_add_fixed_points(
     )
     # Settings hold floats; the service must not lose precision on them.
     with loyalty_settings(LOYALTY_POINTS_FACTOR=float(factor)):
-        points = LoyaltyService.calculate_item_points(product, quantity)
+        rates = LoyaltyService.points_rates()
+
+    points = LoyaltyService.calculate_item_points(product, quantity, rates)
 
     earned = points - fixed * quantity
     exact = price * factor * coefficient * quantity

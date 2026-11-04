@@ -141,7 +141,9 @@ def test_it_is_the_services_own_answer():
     with loyalty_settings():
         served = _detail(product)["potentialPoints"]
 
-        assert served == LoyaltyService.calculate_item_points(product, 1)
+        rates = LoyaltyService.points_rates()
+
+        assert served == LoyaltyService.calculate_item_points(product, 1, rates)
 
 
 def test_the_list_does_not_query_once_per_product():

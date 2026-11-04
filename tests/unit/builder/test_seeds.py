@@ -3,31 +3,24 @@
 ``builder/seeds/*.json`` are the storefront's, seeded without validation
 (``builder.seeding``); this is where they are validated, against the
 snapshot of the storefront's block catalogue that is pinned beside them
-(``tests/fixtures/builder/catalogue.json``). Both are refreshed together, so
+(``builder/seed_catalogue.json``). Both are refreshed together, so
 a block that changes under a seed fails here, not on a new store.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
 from builder import seeding
 from builder.models import DocumentKind, kind_of_key
+from builder.seeding import SEED_CATALOGUE
 from builder.storefront import parse_catalogue
 from builder.validation import validate_document
 
 CATALOGUE = parse_catalogue(
-    json.loads(
-        (
-            Path(__file__).resolve().parents[2]
-            / "fixtures"
-            / "builder"
-            / "catalogue.json"
-        ).read_text(encoding="utf-8")
-    )
+    json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
 )
 
 SEEDS = seeding.load_seeds()

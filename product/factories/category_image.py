@@ -17,7 +17,6 @@ available_languages = [
 
 class ProductCategoryImageTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    title = factory.Faker("word")
     alt_text = factory.Faker("sentence")
     master = factory.SubFactory(
         "product.factories.category_image.ProductCategoryImageFactory"

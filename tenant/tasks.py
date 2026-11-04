@@ -11,6 +11,7 @@ from core.retry import (
     MAIL_TRANSIENT_ERRORS,
     TRANSIENT_ERRORS,
     TRANSIENT_HTTP_ERRORS,
+    TRANSIENT_NETWORK_ERRORS,
 )
 from core.tasks import MonitoredTask
 from tenant.celery import TenantTask, run_for_all_tenants
@@ -149,6 +150,16 @@ def fanout_send_checkout_abandonment_emails():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_send_review_request_emails():
+    return run_for_all_tenants("order.tasks.send_review_request_emails")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_submit_indexnow_urls():
+    return run_for_all_tenants("indexnow.tasks.submit_pending_urls")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_check_low_stock_products():
     return run_for_all_tenants("product.tasks.check_low_stock_products")
 
@@ -237,6 +248,11 @@ def fanout_reap_unclaimed_attachments():
     return run_for_all_tenants(
         "contact.tasks.reap_unclaimed_attachments", include_suspended=True
     )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_rescan_pending_contact_attachments():
+    return run_for_all_tenants("contact.tasks.rescan_pending_attachments")
 
 
 @celery_app.task(base=TenantTask)
@@ -590,3 +606,88 @@ def send_staff_password_reset_email(
         )
         sent += 1
     return {"sent": sent}
+
+
+@celery_app.task(base=MonitoredTask)
+def redispatch_deferred_tasks() -> dict[str, int]:
+    """Publish again the tasks whose publish failed after their change
+    committed (``tenant.celery.dispatch_on_commit``).
+
+    Runs in ``public``, where the rows live. A row is deleted once its task is
+    out; one that fails again waits ``base * 2**attempts`` seconds (capped); a
+    row older than the retention is deleted with an ERROR, because the work it
+    stood for was not done. Rows are taken ``SKIP LOCKED``, so two overlapping
+    sweeps never publish one twice.
+    """
+    from datetime import timedelta
+
+    from django.db import transaction
+    from django.utils import timezone
+
+    from tenant.models import DeferredDispatch
+
+    now = timezone.now()
+    done = failed = expired = 0
+    expired_before = now - timedelta(
+        days=settings.DEFERRED_DISPATCH_RETENTION_DAYS
+    )
+    with transaction.atomic():
+        due = list(
+            DeferredDispatch.objects.select_for_update(skip_locked=True)
+            .filter(next_attempt_at__lte=now)
+            .order_by("next_attempt_at", "id")[
+                : settings.DEFERRED_DISPATCH_BATCH
+            ]
+        )
+        for row in due:
+            if row.created_at < expired_before:
+                logger.error(
+                    "Deferred dispatch of %s for %s given up after %s "
+                    "attempts: %s; payload args=%r kwargs=%r",
+                    row.task_name,
+                    row.schema_name or "-",
+                    row.attempts,
+                    row.last_error,
+                    row.args,
+                    row.kwargs,
+                )
+                row.delete()
+                expired += 1
+                continue
+            task = celery_app.tasks.get(row.task_name)
+            try:
+                if task is None:
+                    raise LookupError(f"no task named {row.task_name!r}")
+                task.apply_async(
+                    args=row.args,
+                    kwargs=row.kwargs,
+                    headers=row.headers,
+                    **row.options,
+                )
+            except Exception as exc:
+                broker_down = isinstance(exc, TRANSIENT_NETWORK_ERRORS)
+                row.attempts += 1
+                row.last_error = f"{type(exc).__name__}: {exc}"[:255]
+                row.next_attempt_at = now + timedelta(
+                    seconds=min(
+                        settings.DEFERRED_DISPATCH_BACKOFF_SECONDS
+                        * 2**row.attempts,
+                        settings.DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS,
+                    )
+                )
+                row.save(
+                    update_fields=["attempts", "last_error", "next_attempt_at"]
+                )
+                failed += 1
+                if broker_down:
+                    # Every other row would wait out the same timeout; they
+                    # stay due for the next run.
+                    break
+            else:
+                row.delete()
+                done += 1
+    if failed:
+        logger.error(
+            "%s deferred dispatch(es) could not be published again", failed
+        )
+    return {"published": done, "failed": failed, "expired": expired}

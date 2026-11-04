@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
+from product.enum.attribute import SchemaProperty
 from product.models.product import Product
 from product.serializers.product import (
     EffectivePriceFieldsSerializer,
@@ -76,6 +77,9 @@ class VariantAxisSerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     name = serializers.CharField()
+    schema_property = serializers.ChoiceField(
+        choices=SchemaProperty.choices, allow_blank=True
+    )
     values = VariantAxisValueSerializer(many=True)
 
 

@@ -2,11 +2,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from allauth.headless.constants import Flow
 from allauth.headless.spec.internal.schema import get_schema
 from django.core.management.base import BaseCommand, CommandError
 from django.test import override_settings
 from django.urls import NoReverseMatch, clear_url_caches
+
+from core.allauth_spec_corrections import apply_corrections
 
 
 class Command(BaseCommand):
@@ -27,21 +28,6 @@ class Command(BaseCommand):
             help="Where to write the document (default: %(default)s)",
         )
 
-    @staticmethod
-    def declare_every_flow(document: dict[str, Any]) -> None:
-        """List every flow allauth can answer with in ``Flow.id``.
-
-        The specification's enum is written by hand and lags allauth's own
-        ``Flow``: it omits ``mfa_login_webauthn`` (passkey login),
-        ``mfa_signup_webauthn``, ``mfa_trust`` and
-        ``password_reset_by_code``, which the responses do carry. Read from
-        the constants, so it is a no-op once allauth lists them itself.
-        """
-        schema = document["components"]["schemas"]["Flow"]["properties"]["id"]
-        schema["enum"] = sorted(
-            {*schema["enum"], *(flow.value for flow in Flow)}
-        )
-
     def handle(self, *args: Any, **options: Any) -> None:
         # ``get_schema()`` roots its paths at the URL of its own
         # ``openapi.yaml`` route, which allauth mounts only when
@@ -57,7 +43,7 @@ class Command(BaseCommand):
                     "URLconf was imported before the setting was on."
                 ) from error
         clear_url_caches()
-        self.declare_every_flow(document)
+        apply_corrections(document)
 
         Path(options["file"]).write_text(
             yaml.safe_dump(

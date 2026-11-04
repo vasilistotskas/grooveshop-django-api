@@ -292,6 +292,29 @@ def sanitize_html(html: str) -> str:
     )
 
 
+_HEADING = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1>\s*", re.DOTALL)
+
+
+def drop_empty_headings(html: str) -> str:
+    """Return ``html`` without the headings that show nothing.
+
+    The editor leaves one behind when a heading's text is moved or
+    deleted (``<h2 id="..."></h2>``). A reader sees a gap at most, but a
+    screen reader announces a blank heading and a search engine reads a
+    hole in the page's outline. A heading holding an image shows
+    something and stays (``has_visible_content``).
+
+    Separate from ``sanitize_html`` because ``lost_content`` refuses what
+    that drops, and nothing is lost here.
+    """
+    return _HEADING.sub(
+        lambda heading: (
+            heading.group(0) if has_visible_content(heading.group(2)) else ""
+        ),
+        html,
+    )
+
+
 class _MarkupCounter(HTMLParser):
     """Counts every element and every ``element[attribute]`` in a fragment."""
 

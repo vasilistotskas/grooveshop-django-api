@@ -552,6 +552,7 @@ class TenantAdmin(BaseModelAdmin):
                 "fields": [
                     "seo_author",
                     "google_site_verification",
+                    "bing_site_verification",
                     "pinterest_domain_verify",
                     "meta_pixel_id",
                     "tiktok_pixel_id",
@@ -563,6 +564,7 @@ class TenantAdmin(BaseModelAdmin):
                     "google_ads_add_payment_info_label",
                     "google_ads_page_view_label",
                     "meta_capi_access_token",
+                    "indexnow_key",
                 ],
             },
         ),

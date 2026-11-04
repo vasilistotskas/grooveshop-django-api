@@ -3,6 +3,73 @@
 
 
 
+## v3.225.0 (2026-11-04)
+
+### Bug fixes
+
+* fix(builder): keep the refusal codes plain until the storefront ships
+
+New required properties ship Django first and new enum values ship
+consumer first, so one change holding both could pass the contract
+check in neither order. The conflict and in-use bodies keep their
+shape, with code as a plain string, as ErrorResponse declares it. The
+reschedule 400 goes back to what is live. The enums and that branch
+follow once the storefront generated from them is in production.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`10f3d08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10f3d08c4d346bfe667fe4101abdef1b27a0be34))
+
+* fix(core): work out a pause cutoff in UTC (#485)
+
+Arithmetic between datetimes in one time zone is wall clock, so a cutoff
+that crossed a daylight saving change was an hour out, and points
+expired an hour off for two weeks after each change.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6332b94`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6332b942110e59e40e3e741e94ddff0a68bd8ac1))
+
+### Features
+
+* feat(builder): declare every refusal the builder answers, with its body (#455) ([`10f3d08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10f3d08c4d346bfe667fe4101abdef1b27a0be34))
+
+* feat(builder): declare every refusal the builder answers, with its body
+
+The 409 revision_conflict (currentRevision, updatedBy, updatedAt), the 409
+media_in_use (usedBy), and the plain 404, 428 and 503 were answered but not in
+the schema, so the storefront parsed them with schemas of its own. Each
+operation now declares the statuses it can answer; the revision conflict and
+the media-in-use body are named components. A reschedule (not a cancel)
+declares the invalid_document branch.
+
+Every request of tests/integration/builder is held to its operation: its
+status must be declared and its body must satisfy the declared schema, so a
+refusal added later cannot go undeclared.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`10f3d08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10f3d08c4d346bfe667fe4101abdef1b27a0be34))
+
+* feat(product): serve potentialPoints on the product card and page (#469) ([`0ed9b2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ed9b2c6412e05ce40b3f88b6c1820469974510e))
+
+* feat(product): serve potentialPoints on the product card and page
+
+What one unit earns at the store's base rate, from LoyaltyService.
+calculate_item_points(product, 1): no tier multiplier, 0 when loyalty is off.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0ed9b2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ed9b2c6412e05ce40b3f88b6c1820469974510e))
+
+### Testing
+
+* test(loyalty): type the settings helper as a generator
+
+contextmanager deprecates an Iterator return.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`0ed9b2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ed9b2c6412e05ce40b3f88b6c1820469974510e))
+
 ## v3.224.0 (2026-11-04)
 
 ### Bug fixes

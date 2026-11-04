@@ -3,6 +3,53 @@
 
 
 
+## v3.223.0 (2026-11-04)
+
+### Features
+
+* feat(product): retire the image title and serve the category image alt (#483) ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
+* feat(product): serve the alt text of a category's main image
+
+The merchant's alt text on a category image reached no consumer: the
+category payload carried only mainImagePath. Add the read-only
+mainImageAlt next to it, on the category list and detail serializers:
+the MAIN image's alt text in the request language, an empty string
+when there is no main image or no alt text. No fallback to the
+category name, which the storefront writes beside the photo.
+
+It reads through the existing main_image property; the MAIN image
+prefetch now carries the image's translations, so a list costs the
+same number of queries for one category or many.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
+### Refactoring
+
+* refactor(product): retire the title of product and category images
+
+The title was shown nowhere. On a product image it only served as a
+fallback for the alt text; alt_text is the one text of an image.
+
+Release N of two: the title leaves the models, the serializers, the
+admin, the search fields, the managers (with_titles, without_titles had
+no caller) and the factories. The columns stay in the database, both
+nullable, so the release still serving keeps working; a state-only
+migration takes them out of Django's state. The next release drops
+them.
+
+The response loses the optional translations.<lang>.title key of
+product images and category images. alt_text on a product image is the
+merchant's alt text, else an empty string.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxLAk1mtSnAJttzs6KQ ([`3caa543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3caa5437a8bfd00ce0aab5382f1325a196274aaf))
+
 ## v3.222.0 (2026-11-04)
 
 ### Continuous integration

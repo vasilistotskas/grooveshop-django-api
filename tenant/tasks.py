@@ -150,6 +150,11 @@ def fanout_send_checkout_abandonment_emails():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_submit_indexnow_urls():
+    return run_for_all_tenants("indexnow.tasks.submit_pending_urls")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_check_low_stock_products():
     return run_for_all_tenants("product.tasks.check_low_stock_products")
 

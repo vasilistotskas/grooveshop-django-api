@@ -23,7 +23,9 @@ from core.utils.tenant_urls import (
 )
 from tenant.validators import (
     HOSTNAME_MAX_LENGTH,
+    INDEXNOW_KEY_PATTERN,
     SocialProfileUrlValidator,
+    generate_indexnow_key,
     validate_reserved_schema_name,
     validate_store_hostname,
 )
@@ -320,6 +322,19 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Pinterest domain verification token (the content of the "
             "p:domain_verify meta tag). Empty → not emitted."
+        ),
+    )
+    indexnow_key = models.CharField(
+        _("IndexNow key"),
+        max_length=128,
+        default=generate_indexnow_key,
+        db_default="",
+        validators=[RegexValidator(INDEXNOW_KEY_PATTERN)],
+        help_text=_(
+            "The key the store proves its ownership to search engines "
+            "with when it notifies them through IndexNow. The storefront "
+            "serves it at /<key>.txt while the store's INDEXNOW_ENABLED "
+            "setting is on. Public by design."
         ),
     )
 
@@ -1410,6 +1425,14 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             validate_reserved_schema_name(self.schema_name)
         except ValidationError as exc:
             raise ValidationError({"schema_name": exc.messages}) from exc
+
+    @property
+    def published_indexnow_key(self) -> str:
+        """The IndexNow key the storefront serves at ``/<key>.txt``: empty
+        unless the store switched IndexNow on (``indexnow.service``)."""
+        from indexnow.service import published_key
+
+        return published_key(self)
 
     @property
     def served_locales(self) -> list[str]:

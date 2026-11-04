@@ -307,18 +307,12 @@ class PublishProblemSerializer(serializers.Serializer):
 INVALID_DOCUMENT_CODE_CHOICES = [("invalid_document", "invalid_document")]
 
 
-MEDIA_IN_USE_CODE_CHOICES = [("media_in_use", "media_in_use")]
-
-
 class BuilderMediaInUseSerializer(serializers.Serializer):
     """The 409 of deleting an image a published page uses: which documents."""
 
     detail = serializers.CharField()
-    code = serializers.ChoiceField(choices=MEDIA_IN_USE_CODE_CHOICES)
+    code = serializers.CharField()
     used_by = serializers.ListField(child=serializers.CharField())
-
-
-REVISION_CONFLICT_CODE_CHOICES = [("revision_conflict", "revision_conflict")]
 
 
 class BuilderRevisionConflictSerializer(serializers.Serializer):
@@ -326,7 +320,7 @@ class BuilderRevisionConflictSerializer(serializers.Serializer):
     current one: the revision to reload and who moved it."""
 
     detail = serializers.CharField()
-    code = serializers.ChoiceField(choices=REVISION_CONFLICT_CODE_CHOICES)
+    code = serializers.CharField()
     current_revision = serializers.IntegerField()
     updated_by = StaffSerializer(allow_null=True)
     updated_at = serializers.DateTimeField()

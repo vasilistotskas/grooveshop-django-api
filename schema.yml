@@ -10508,7 +10508,6 @@ paths:
                 anyOf:
                 - $ref: '#/components/schemas/ApiValidationError'
                 - $ref: '#/components/schemas/ApiError'
-                - $ref: '#/components/schemas/BuilderDocumentInvalidError'
           description: ''
         '409':
           content:
@@ -38577,7 +38576,7 @@ components:
         detail:
           type: string
         code:
-          $ref: '#/components/schemas/BuilderMediaInUseCodeEnum'
+          type: string
         usedBy:
           type: array
           items:
@@ -38586,11 +38585,6 @@ components:
       - code
       - detail
       - usedBy
-    BuilderMediaInUseCodeEnum:
-      enum:
-      - media_in_use
-      type: string
-      description: '* `media_in_use` - media_in_use'
     BuilderPageKindEnum:
       enum:
       - page
@@ -38608,7 +38602,7 @@ components:
         detail:
           type: string
         code:
-          $ref: '#/components/schemas/BuilderRevisionConflictCodeEnum'
+          type: string
         currentRevision:
           type: integer
         updatedBy:
@@ -38624,11 +38618,6 @@ components:
       - detail
       - updatedAt
       - updatedBy
-    BuilderRevisionConflictCodeEnum:
-      enum:
-      - revision_conflict
-      type: string
-      description: '* `revision_conflict` - revision_conflict'
     BuilderVersionKindEnum:
       enum:
       - checkpoint

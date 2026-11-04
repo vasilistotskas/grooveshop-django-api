@@ -313,7 +313,7 @@ class TestInvalidDocumentIsTyped:
             in str(operation.get("responses", {}).get("400", ""))
         }
 
-        assert len(named) == 11
+        assert len(named) == 10
 
 
 class TestAFailedScheduleListsTypedProblems:

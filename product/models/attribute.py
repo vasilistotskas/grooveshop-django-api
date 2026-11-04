@@ -5,6 +5,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from product.enum.attribute import SchemaProperty
 from product.managers.attribute import AttributeManager
 
 
@@ -25,6 +26,20 @@ class Attribute(
             "When enabled, this attribute is rendered as a variant selector "
             "(e.g. Colour, Memory) across a product's variant group instead of "
             "as a plain read-only specification."
+        ),
+    )
+
+    schema_property = models.CharField(
+        _("Standard property"),
+        max_length=20,
+        choices=SchemaProperty.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "Which standard product property this attribute is (for "
+            "example Colour or Size). Search engines use it to understand "
+            "and group your products. Leave empty if it is none of these."
         ),
     )
 

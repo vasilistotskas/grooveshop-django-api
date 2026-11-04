@@ -42,6 +42,7 @@ from meili.models import IndexMixin
 from product.managers.image import ORDERED_IMAGES
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
+from product.validators import validate_gtin
 from search.transliteration import (
     greeklish_shadow,
     greeklish_shadow_alt,
@@ -101,6 +102,35 @@ class Product(
     id = models.BigAutoField(primary_key=True)
     sku = models.CharField(
         _("SKU"), unique=True, max_length=100, default=uuid.uuid4
+    )
+    # The manufacturer's identifiers, which Google Merchant Center asks
+    # for. Never derived from ``sku``: that is the store's own code, and a
+    # made-up identifier gets the whole feed disapproved.
+    gtin = models.CharField(
+        _("GTIN"),
+        max_length=14,
+        blank=True,
+        default="",
+        db_default="",
+        validators=[validate_gtin],
+        help_text=_(
+            "The number printed under the product's barcode (EAN, UPC "
+            "or ISBN): 8, 12, 13 or 14 digits. Google Merchant Center "
+            "uses it to recognise the product. Leave empty if the "
+            "product has none."
+        ),
+    )
+    mpn = models.CharField(
+        _("MPN"),
+        max_length=70,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The manufacturer's part number, as the manufacturer prints "
+            "it. Use it for a product without a barcode. This is not your "
+            "SKU. Leave empty if the product has none."
+        ),
     )
     category = TreeForeignKey(
         "product.ProductCategory",
@@ -670,6 +700,17 @@ class ProductTranslation(
     )
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
     description = RichTextField(_("Description"), blank=True, null=True)
+    feed_title = models.CharField(
+        _("Feed title"),
+        max_length=150,
+        blank=True,
+        null=True,
+        help_text=_(
+            "The title shown in Google Merchant Center and the other "
+            "product feeds instead of the product name. Up to 150 "
+            "characters. Empty → the product name is used."
+        ),
+    )
 
     class Meta:
         app_label = "product"

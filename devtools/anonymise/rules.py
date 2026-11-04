@@ -394,6 +394,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     # ── credentials, sessions and logs ──────────────────────────────
     "account.EmailConfirmation": Delete(),
     "knox.AuthToken": Delete(),
+    # Work waiting to be published: its payload may name people and
+    # must not be replayed from a restored copy.
+    "tenant.DeferredDispatch": Delete(),
     "mfa.Authenticator": Delete(),
     "allauth_idp_oidc.Token": Delete(),
     "socialaccount.SocialAccount": Delete(),
@@ -402,6 +405,9 @@ REGISTRY: dict[str, Scrub | Delete] = {
     "sessions.Session": Delete(tenant_only=True),
     "user.UserDataExport": Delete(),
     "meta_capi.MetaCapiEventLog": Delete(),
+    # Changes waiting to be announced to search engines: staging must not
+    # replay production's pages from a restored copy.
+    "indexnow.PendingUrl": Delete(),
     "search.SearchQuery": Delete(),
     "notification.Notification": Delete(),
     "notification.NotificationTranslation": Delete(),
@@ -414,6 +420,16 @@ REGISTRY: dict[str, Scrub | Delete] = {
     # A share-preview link is a bearer credential to unpublished pages.
     "builder.BuilderPreviewLink": Delete(),
 }
+
+#: Boolean store settings forced off in every schema after the restore.
+#: ``extra_settings.Setting`` rows are copied from production as they are
+#: (a store's configuration), so a switch that makes the application
+#: reach OUT to the public internet would arrive on. ``INDEXNOW_ENABLED``
+#: is one: staging would announce its own URLs to the public IndexNow
+#: endpoint, which search engines then crawl and index. A switch with a
+#: visible outside effect belongs here; the row stays, only its value
+#: changes, and a store that has no row keeps the declared default (off).
+FORCED_OFF_SETTINGS: tuple[str, ...] = ("INDEXNOW_ENABLED",)
 
 #: Apps whose every model is deleted except the named ones. A model added
 #: to one of them is wiped by default, which is the safe direction: dj-stripe
@@ -473,6 +489,8 @@ NOT_PERSONAL: dict[str, str] = {
         "product.ProductCategoryImage",
         "product.ProductCategoryImageTranslation",
         "product.ProductCategoryTranslation",
+        "product.ProductHighlight",
+        "product.ProductHighlightTranslation",
         "product.ProductImage",
         "product.ProductImageTranslation",
         "product.ProductPriceSpell",

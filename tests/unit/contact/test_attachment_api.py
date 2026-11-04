@@ -78,6 +78,31 @@ class TestTheGate:
         assert row.contact_id is None
         assert row.claim_deadline > timezone.now()
 
+    def test_a_broker_that_is_down_does_not_fail_the_upload(
+        self, client, private_tree, attachments_on
+    ):
+        """The file and the row are committed before the scan is queued, so
+        an unreachable broker must not turn them into a 500: the dispatch is
+        kept and published again, and the row waits PENDING for its scan."""
+        from kombu.exceptions import OperationalError
+
+        from contact.tasks import scan_contact_attachment
+        from tenant.models import DeferredDispatch
+
+        with mock.patch.object(
+            scan_contact_attachment,
+            "apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ):
+            response = _upload(client, pdf_bytes())
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        row = ContactAttachment.objects.get()
+        assert row.scan_status == ContactAttachment.ScanStatus.PENDING
+        kept = DeferredDispatch.objects.get()
+        assert kept.task_name == scan_contact_attachment.name
+        assert kept.args == [row.pk]
+
     def test_the_bytes_land_in_the_private_tree(
         self, client, private_tree, attachments_on
     ):

@@ -68,6 +68,7 @@ class Report:
     scrubbed: Counter[str] = field(default_factory=Counter)
     deleted: Counter[str] = field(default_factory=Counter)
     cleared: Counter[str] = field(default_factory=Counter)
+    switched_off: Counter[str] = field(default_factory=Counter)
     kept_users: dict[str, int] = field(default_factory=dict)
 
     def lines(self) -> Iterator[str]:
@@ -77,6 +78,8 @@ class Report:
             yield f"cleared  {count:>7}  {label} credentials"
         for label, count in sorted(self.deleted.items()):
             yield f"deleted  {count:>7}  {label}"
+        for schema, count in sorted(self.switched_off.items()):
+            yield f"off      {count:>7}  outbound settings in {schema}"
         for schema, count in sorted(self.kept_users.items()):
             yield f"kept     {count:>7}  accounts in {schema}"
 
@@ -492,6 +495,29 @@ def _delete_all(
         pending = refused
 
 
+def _switch_off_settings(
+    schema: _Schema, public: str, context: _Context
+) -> None:
+    """Turn every ``rules.FORCED_OFF_SETTINGS`` row off in this schema.
+
+    One ``UPDATE`` through ``_base_manager``, like ``_demo_emails``: not
+    ``Setting.get``, whose cache is keyed by schema and on staging holds
+    the previous database's values. Only a row that is on is touched, so
+    a second run changes nothing.
+    """
+    from extra_settings.models import Setting
+
+    if not _in_schema(Setting, schema.name, public):
+        return
+    switched = Setting._base_manager.filter(
+        name__in=rules.FORCED_OFF_SETTINGS,
+        value_type=Setting.TYPE_BOOL,
+        value_bool=True,
+    ).update(value_bool=False)
+    if switched:
+        context.report.switched_off[schema.name] += switched
+
+
 def _tenant_schemas() -> list[str]:
     from tenant.models import Tenant
 
@@ -566,6 +592,7 @@ def anonymise_database() -> Report:
                     ):
                         wipe.append(model)
                 _delete_all(wipe, schema, context)
+                _switch_off_settings(schema, public, context)
                 _assert_credentials_blank(
                     [
                         model

@@ -276,6 +276,8 @@ def register_default_surfaces() -> None:
                 "product.ProductTranslation",
                 "product.ProductImage",
                 "product.ProductImageTranslation",
+                "product.ProductHighlight",
+                "product.ProductHighlightTranslation",
                 "product.Attribute",
                 "product.AttributeTranslation",
                 "product.AttributeValue",

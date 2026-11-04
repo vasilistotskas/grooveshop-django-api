@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from celery import Task
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
+
+from core.retry import TRANSIENT_NETWORK_ERRORS
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +167,6 @@ def dispatch_on_commit(
     kwargs: Mapping[str, Any] | None = None,
     *,
     schema_name: str | None = None,
-    robust: bool = False,
     **options: Any,
 ) -> None:
     """Queue ``task`` for after the current transaction, schema pinned NOW.
@@ -186,9 +189,12 @@ def dispatch_on_commit(
     rather than passed as empty, so the resulting ``apply_async``
     signature is the one the call sites already produce.
 
-    ``robust`` is ``transaction.on_commit``'s: a failing dispatch (the
-    broker unreachable) is logged instead of raised into the caller,
-    for a task that must never fail the change that queued it.
+    A publish that fails because the broker or the network is unreachable
+    never reaches the caller: the change it follows is already committed, so
+    raising could only answer 500 for work that was done. The dispatch is
+    logged at ERROR and kept as a ``DeferredDispatch`` that
+    ``redispatch_deferred_tasks`` publishes again, so it is not lost. Any
+    other exception is a bug and still raises.
 
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
@@ -202,7 +208,66 @@ def dispatch_on_commit(
     if kwargs is not None:
         call["kwargs"] = dict(kwargs)
 
-    transaction.on_commit(
-        lambda: task.apply_async(**call, headers=headers, **options),
-        robust=robust,
+    def publish() -> None:
+        try:
+            task.apply_async(**call, headers=headers, **options)
+        except TRANSIENT_NETWORK_ERRORS as exc:
+            defer_dispatch(task, call, headers, options, exc)
+
+    transaction.on_commit(publish)
+
+
+#: Characters kept of the error a deferred dispatch records.
+_ERROR_LENGTH = 255
+
+
+def defer_dispatch(
+    task: Any,
+    call: Mapping[str, Any],
+    headers: Mapping[str, Any],
+    options: Mapping[str, Any],
+    error: BaseException,
+) -> None:
+    """Keep a dispatch whose publish failed, for ``redispatch_deferred_tasks``.
+
+    If the row cannot be written either, the whole payload is in the log
+    line, so the work can still be recovered by hand.
+    """
+    from django.utils import timezone
+
+    from tenant.models import DeferredDispatch
+
+    name = getattr(task, "name", repr(task))
+    payload = {
+        "args": call.get("args", []),
+        "kwargs": call.get("kwargs", {}),
+        "headers": dict(headers),
+        "options": dict(options),
+    }
+    logger.error(
+        "Publishing %s failed after its change committed (%s: %s); it is "
+        "kept and published again by the sweep",
+        name,
+        type(error).__name__,
+        error,
+        extra={"task": name, "schema": headers.get("_schema_name", "")},
     )
+    try:
+        DeferredDispatch.objects.create(
+            task_name=name,
+            args=payload["args"],
+            kwargs=payload["kwargs"],
+            headers=payload["headers"],
+            options=json.loads(
+                json.dumps(payload["options"], cls=DjangoJSONEncoder)
+            ),
+            schema_name=str(headers.get("_schema_name", ""))[:63],
+            last_error=f"{type(error).__name__}: {error}"[:_ERROR_LENGTH],
+            next_attempt_at=timezone.now(),
+        )
+    except Exception:
+        logger.exception(
+            "A deferred dispatch of %s could not be kept; payload %r",
+            name,
+            payload,
+        )

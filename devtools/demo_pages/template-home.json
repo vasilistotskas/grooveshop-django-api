@@ -167,23 +167,29 @@
           },
           "eyebrow": "Τρέχουσες προσφορές",
           "heading": "Κωδικοί που όντως ισχύουν.",
-          "limit": 3,
-          "surface": "ink"
+          "surface": "ink",
+          "offers": {
+            "limit": 3
+          }
         },
-        "type": "offers_preview@1"
+        "type": "offers_preview@2"
       },
       "6286bb96-460d-4e8b-b3f5-81a883da837d": {
         "settings": {
-          "count": 3,
           "ctaLink": {
             "route": "/blog"
           },
           "ctaText": "Όλα τα άρθρα",
           "heading": "Από το blog",
           "subheading": "Οδηγοί και συμβουλές, χωρίς μάρκετινγκ.",
-          "surface": "default"
+          "surface": "default",
+          "posts": {
+            "mode": "filter",
+            "ordering": "newest",
+            "limit": 3
+          }
         },
-        "type": "blog_posts_grid@1"
+        "type": "blog_posts_grid@2"
       },
       "7ea1f9de-48d6-47da-bcd2-e39c6d901898": {
         "settings": {
@@ -192,13 +198,16 @@
           },
           "ctaText": "Δες όλα",
           "heading": "Νέες αφίξεις",
-          "ordering": "newest",
-          "pageSize": 4,
           "showAddToCart": true,
           "subheading": "Ό,τι μπήκε τελευταίο στο κατάστημα.",
-          "surface": "default"
+          "surface": "default",
+          "products": {
+            "mode": "filter",
+            "ordering": "newest",
+            "limit": 4
+          }
         },
-        "type": "products_grid@1"
+        "type": "products_grid@2"
       },
       "a340a1bb-e05d-4a0c-980f-4508534b8d62": {
         "blockOrder": [
@@ -251,13 +260,16 @@
           },
           "ctaText": "Δες όλα",
           "heading": "Δημοφιλή προϊόντα",
-          "ordering": "popular",
-          "pageSize": 4,
           "showAddToCart": true,
           "subheading": "Αυτά βάζουν όλοι στο καλάθι τους αυτόν τον μήνα.",
-          "surface": "muted"
+          "surface": "muted",
+          "products": {
+            "mode": "filter",
+            "ordering": "mostLiked",
+            "limit": 4
+          }
         },
-        "type": "featured_products@1"
+        "type": "featured_products@2"
       },
       "b24a6d27-62ce-4515-ac96-abd610be79b7": {
         "settings": {
@@ -269,10 +281,13 @@
         "settings": {
           "heading": "Αγόρασε ανά κατηγορία",
           "layout": "tiles",
-          "limit": 6,
-          "surface": "muted"
+          "surface": "muted",
+          "categories": {
+            "mode": "roots",
+            "limit": 6
+          }
         },
-        "type": "product_categories@1"
+        "type": "product_categories@2"
       },
       "dec52c57-5926-4c89-ab72-c131b6657dad": {
         "blockOrder": [
@@ -291,14 +306,14 @@
               "eyebrow": "Φόρτιση",
               "heading": "Φόρτισε γρήγορα, μία φορά την ημέρα",
               "imageUrl": "{{asset:hero-charging}}",
-              "productId": "{{product:demo-powerbank-20k}}",
               "secondaryCtaLink": {
                 "route": "/blog"
               },
               "secondaryCtaText": "Οδηγοί αγοράς",
-              "subheading": "Power banks, φορτιστές GaN και καλώδια που αντέχουν."
+              "subheading": "Power banks, φορτιστές GaN και καλώδια που αντέχουν.",
+              "product": "{{product:demo-powerbank-20k}}"
             },
-            "type": "hero_slide@1"
+            "type": "hero_slide@2"
           },
           "dec52c57-5926-4c89-ab72-c131b6657dad-2": {
             "settings": {
@@ -312,7 +327,7 @@
               "imageUrl": "{{asset:hero-audio}}",
               "subheading": "Ακύρωση θορύβου, αυτονομία και εφαρμογή — με αυτή τη σειρά."
             },
-            "type": "hero_slide@1"
+            "type": "hero_slide@2"
           },
           "dec52c57-5926-4c89-ab72-c131b6657dad-3": {
             "settings": {
@@ -326,7 +341,7 @@
               "imageUrl": "{{asset:hero-protection}}",
               "subheading": "Θήκες και tempered glass για κάθε μοντέλο."
             },
-            "type": "hero_slide@1"
+            "type": "hero_slide@2"
           }
         },
         "settings": {

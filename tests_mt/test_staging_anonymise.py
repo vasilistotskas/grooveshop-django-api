@@ -595,3 +595,51 @@ def test_arming_refuses_a_production_like_host(seeded, staging, domain):
         arm_credentials(
             f'{{"{tenant.schema_name}": {{"stripe_secret_key": "x"}}}}'
         )
+
+
+def _setting_value(tenant, name: str) -> object:
+    from extra_settings.models import Setting
+
+    # Through the table, not ``Setting.get``: its cache is keyed by schema.
+    with tenant_context(tenant):
+        return Setting._base_manager.get(name=name).value_bool
+
+
+def test_a_switch_that_reaches_the_public_internet_is_turned_off(
+    seeded, staging
+):
+    from extra_settings.models import Setting
+
+    tenant, other = seeded
+    for store in (tenant, other):
+        with tenant_context(store):
+            for name in ("INDEXNOW_ENABLED", "DEMO_ACCOUNT_ENABLED"):
+                Setting.objects.update_or_create(
+                    name=name, defaults=_setting_defaults(name, True)
+                )
+
+    call_command("staging_anonymise")
+
+    for store in (tenant, other):
+        assert _setting_value(store, "INDEXNOW_ENABLED") is False
+        # Only the declared switches change: the rest is the store's
+        # configuration, restored as it was.
+        assert _setting_value(store, "DEMO_ACCOUNT_ENABLED") is True
+
+
+def test_turning_the_switch_off_is_idempotent(seeded, staging):
+    from extra_settings.models import Setting
+
+    tenant, _ = seeded
+    with tenant_context(tenant):
+        Setting.objects.update_or_create(
+            name="INDEXNOW_ENABLED",
+            defaults=_setting_defaults("INDEXNOW_ENABLED", True),
+        )
+
+    call_command("staging_anonymise")
+    first = engine.anonymise_database()
+    call_command("staging_anonymise")
+
+    assert _setting_value(tenant, "INDEXNOW_ENABLED") is False
+    assert not first.switched_off

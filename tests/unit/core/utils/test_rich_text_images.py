@@ -8,8 +8,8 @@ from django.db import connection
 from PIL import Image
 
 from blog.factories.post import BlogPostFactory
-from core.management.commands.record_rich_text_image_sizes import (
-    record_current_schema,
+from core.management.commands.normalise_rich_text import (
+    normalise_current_schema,
     rich_text_fields,
 )
 from core.utils.rich_text_images import record_natural_sizes
@@ -190,15 +190,30 @@ def test_backfill_updates_rows_saved_before_and_is_idempotent(media):
     old = f'<p><img src="{media.url}a.png" width="100%"></p>'
     type(translation).objects.filter(pk=translation.pk).update(body=old)
 
-    dry = record_current_schema(rich_text_fields(), dry_run=True)
+    dry = normalise_current_schema(rich_text_fields(), dry_run=True)
     translation.refresh_from_db()
     assert translation.body == old
     assert dry["blog.BlogPostTranslation.body"].changed >= 1
 
-    first = record_current_schema(rich_text_fields())
+    first = normalise_current_schema(rich_text_fields())
     translation.refresh_from_db()
     assert 'data-natural-width="800"' in translation.body
     assert first["blog.BlogPostTranslation.body"].changed >= 1
 
-    second = record_current_schema(rich_text_fields())
+    second = normalise_current_schema(rich_text_fields())
     assert all(tally.changed == 0 for tally in second.values())
+
+
+@pytest.mark.django_db
+def test_a_save_and_the_backfill_both_drop_an_empty_heading():
+    post = BlogPostFactory(
+        slug="empty-heading", body='<h2 id="a"></h2><p>x</p>'
+    )
+    translation = post.translations.first()
+    assert translation.body == "<p>x</p>"
+
+    old = '<h2 id="a"></h2><p>x</p>'
+    type(translation).objects.filter(pk=translation.pk).update(body=old)
+    normalise_current_schema(rich_text_fields())
+    translation.refresh_from_db()
+    assert translation.body == "<p>x</p>"

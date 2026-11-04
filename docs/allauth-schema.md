@@ -42,6 +42,17 @@ deployment**, so the specification is not served on any store's host.
     `mfa_signup_webauthn`, `mfa_trust` and `password_reset_by_code`, which
     responses carry.
 
+Everything else the real endpoints disagree on is a correction in
+`core/allauth_spec_corrections.py`, applied by the command, each naming the
+allauth source it was read from: `Flow.id` lists every flow and `Flow.providers`
+the provider ids of a provider flow, `meta.is_authenticated` is nullable (null
+for an expired session), `OptionalTimestamp` is really nullable (upstream put
+`nullable` beside a `$ref`, where OpenAPI 3.0 ignores it), `mfa.passkey_login_enabled`
+and `account.authentication_method` are declared, `POST .../recovery-codes`
+answers 200, and our own `GET .../totp/svg` (`core.views.ManageTOTPSvgView`) is
+added. The contract test also fails on any key an endpoint serves that the
+document does not declare.
+
 A new correction is a hook on the adapter where allauth offers one, otherwise
-a step in the command, and in both cases a case in the contract test that
+an entry in `CORRECTIONS`, and in both cases a case in the contract test that
 fails without it.

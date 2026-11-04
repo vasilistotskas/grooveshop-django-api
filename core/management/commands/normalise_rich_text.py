@@ -1,18 +1,18 @@
-"""Record the real size of every uploaded image in stored rich text.
+"""Bring stored rich text up to what a save writes today.
 
-``RichTextField`` does this on every save
-(``core.utils.rich_text_images``); this command brings the rows saved
-before that existed up to date. Safe to run again: a row whose images
-already carry the right size is left alone.
+``RichTextField`` normalises on every save (``normalise_rich_text``: no
+empty headings, every uploaded image's real size); this command brings
+the rows saved before each step existed up to date. Safe to run again: a
+row already normalised is left alone.
 
 It writes the column directly rather than saving the row. A save
 re-validates the whole body and would refuse one the policy has since
 tightened over, and it re-indexes and records history for a change that
 touches no text. The search index holds a rich-text field's visible text
-only (``core.utils.html_text``), never its attributes, so the sizes
-cannot change a document and nothing needs reindexing after this run.
-The storefront keeps serving a cached page until it expires, so run
-``purge_edge_cache`` afterwards to have the sizes used at once.
+only (``core.utils.html_text``), so neither step can change a document
+and nothing needs reindexing after this run. The storefront keeps serving
+a cached page until it expires, so run ``purge_edge_cache`` afterwards to
+have the change served at once.
 
 Fields come from the app registry, so a model that gains a rich-text
 column is covered without touching this command.
@@ -25,10 +25,9 @@ from dataclasses import dataclass
 from django.core.management.base import BaseCommand
 from django.db import models
 
-from core.fields.rich_text import RichTextField
+from core.fields.rich_text import RichTextField, normalise_rich_text
 from core.management.commands.media_reference_audit import tenant_models
 from core.management.tenant_mixin import TenantCommandMixin
-from core.utils.rich_text_images import record_natural_sizes
 
 
 @dataclass
@@ -49,7 +48,9 @@ def rich_text_fields() -> list[tuple[type[models.Model], list]]:
     return pairs
 
 
-def record_current_schema(pairs, *, dry_run: bool = False) -> dict[str, Tally]:
+def normalise_current_schema(
+    pairs, *, dry_run: bool = False
+) -> dict[str, Tally]:
     """Update every rich-text column in the connected schema.
 
     ``_base_manager`` rather than the default manager: a soft-deleted
@@ -68,7 +69,7 @@ def record_current_schema(pairs, *, dry_run: bool = False) -> dict[str, Tally]:
                 tally.scanned += 1
                 if not body:
                     continue
-                updated = record_natural_sizes(body)
+                updated = normalise_rich_text(body)
                 if updated == body:
                     continue
                 tally.changed += 1
@@ -80,7 +81,7 @@ def record_current_schema(pairs, *, dry_run: bool = False) -> dict[str, Tally]:
 
 
 class Command(TenantCommandMixin, BaseCommand):
-    help = "Record the real size of uploaded images in stored rich text."
+    help = "Bring stored rich text up to what a save writes today."
     require_tenant_scope = True
 
     def add_arguments(self, parser):
@@ -96,7 +97,7 @@ class Command(TenantCommandMixin, BaseCommand):
         total = 0
         for context in self.iter_tenant_contexts(options):
             with context:
-                tallies = record_current_schema(
+                tallies = normalise_current_schema(
                     pairs, dry_run=options["dry_run"]
                 )
             for label, tally in tallies.items():

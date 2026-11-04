@@ -3,6 +3,38 @@
 
 
 
+## v3.222.0 (2026-11-04)
+
+### Continuous integration
+
+* ci(api-contract): hold Django's own PRs to what is live, and retire the label (#482) ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
+### Features
+
+* feat(api-contract): hold Django's own PRs to what is live, and retire the label
+
+The API contract workflow now calls the shared check with this PR's own
+api-contract/, so a schema.yml or allauth-schema.yml that cannot be live
+together with the storefront and gateway in production and staging fails,
+instead of passing with an api-breaking-change label that had no expiry and
+no knowledge of what is live. CI reads the oasdiff image from
+api-contract/oasdiff-image.txt, the single pin.
+
+Merge only once the cluster records its deployments: until then the check
+has nothing to read and fails closed.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
+### Testing
+
+* test(api-contract): a stopped recorder leaves the last success readable
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`e040783`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e040783be4dfba53f0d2664d8849a1e0c8e8e9ce))
+
 ## v3.221.0 (2026-11-04)
 
 ### Bug fixes

@@ -3,6 +3,20 @@
 
 
 
+## v3.219.1 (2026-11-04)
+
+### Bug fixes
+
+* fix(emails): the Resend guard reads only the columns it needs (#477)
+
+The deploy guard is a database system check, and migration_preflight runs
+it before migrate. It loaded whole Tenant rows, so with EMAIL_TRANSPORT
+on resend the query named every column the release adds to Tenant, and
+the deploy adding one failed in PreSync on a column that did not exist
+yet. Staging, on SMTP, skips the query, so it passed there.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a9df59d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9df59df1463c177fa9c250764ca11942c5e3639))
+
 ## v3.219.0 (2026-11-04)
 
 ### Bug fixes

@@ -133,17 +133,15 @@ def test_the_banner_is_never_null():
     assert _get()["fundingBanner"] == {"enabled": False}
 
 
-def test_a_stored_value_that_is_not_its_shape_does_not_break_the_payload(
-    caplog,
-):
+def test_a_stored_value_that_is_not_its_shape_fails_loudly():
+    """No fallback: the admin refuses such a value and the deploy check
+    refuses a store that holds one, so reaching here is a bug."""
     _store("ANNOUNCEMENT_BAR", {"enabled": "yes"})
-    _store("FUNDING_BANNER", {"nonsense": True})
 
-    body = _get()
+    response = APIClient().get(reverse("api-settings-public"))
 
-    assert body["announcementBar"] is None
-    assert body["fundingBanner"] == {"enabled": False}
-    assert "not its shape" in caplog.text
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.json()["code"] == "settings_unavailable"
 
 
 def test_contact_attachment_types_are_a_list():

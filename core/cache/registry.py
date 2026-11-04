@@ -47,6 +47,11 @@ class CacheSurface:
     django_patterns: tuple[str, ...] = ()
     nuxt_patterns: tuple[str, ...] = ()
     invalidates_gateway_feeds: bool = False
+    # A FOURTH target: the page-builder documents queued by
+    # ``builder.data_purge`` (the pages a changed record appears on).
+    # They are sent to the storefront as ``builderDocuments``, which
+    # maps a document to its own routes; no pattern describes them.
+    purges_builder_documents: bool = False
     # Purging this surface follows a change to data the storefront reads
     # from /tenant/resolve (features, settings), so the storefront must
     # re-resolve the store and re-key its rendered pages. Sent to the

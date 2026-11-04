@@ -519,14 +519,12 @@ class TestTheStaffEmail:
         ):
             _patch(api, review, rate=5)
 
-            [dispatch] = [
-                call.args[0]
-                for call in on_commit.call_args_list
-                if call.kwargs.get("robust")
-            ]
+            # Every dispatch the request registered waits for the commit.
+            dispatches = [call.args[0] for call in on_commit.call_args_list]
             queue.assert_not_called()
 
-            dispatch()
+            for dispatch in dispatches:
+                dispatch()
 
             queue.assert_called_once()
             assert queue.call_args.kwargs["kwargs"] == {"review_id": review.pk}

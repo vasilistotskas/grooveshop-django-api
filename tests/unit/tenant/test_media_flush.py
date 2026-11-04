@@ -129,13 +129,15 @@ class TestSuspendDispatchesFlush:
         dispatch.assert_not_called()
 
     def test_dispatch_failure_does_not_break_suspend(self):
+        from kombu.exceptions import OperationalError
+
         from tenant.lifecycle import suspend_tenant
         from tenant.models import SuspendedReason
 
         tenant = store_tenant("media_flush_broker_down")
         with mock.patch(
             "tenant.tasks.flush_tenant_media_task.apply_async",
-            side_effect=RuntimeError("broker down"),
+            side_effect=OperationalError("broker down"),
         ):
             # Suspension still succeeds despite the dispatch failing.
             assert suspend_tenant(tenant, reason=SuspendedReason.MANUAL) is True

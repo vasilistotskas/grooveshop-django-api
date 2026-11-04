@@ -45,12 +45,23 @@ fallback for a setting it could not fetch.
   `businessHours`; `null`, or `[]` for offices, is nothing configured), and
   produces the value served. It is strict: an unknown key, a wrong type
   (`"true"`, `5` for text) and a snake_case key are refused, and the stored
-  keys are camelCase, as served. A stored value that is not its shape is
-  logged and served as nothing configured, so one broken strip never takes
-  the settings payload down. A new structured setting is a serializer, a
+  keys are camelCase, as served. A stored value that is not its shape fails
+  the request (500 `settings_unavailable`), never served as something else:
+  the admin refuses it at save, a shape change ships with a data migration of
+  the stored values, and `manage.py check_store_settings` (PreSync, after
+  `migrate_schemas`) fails the deploy when any store holds a value its
+  declared validator refuses. A new structured setting is a serializer, a
   registry row, a field on `PublicSettingsSerializer` and an example in
   `tests/integration/core/test_public_settings_typed.py`; the storefront
   generates its parser from `schema.yml` and writes none.
+- Every other public setting is also served typed, in `values` (a key per
+  setting, e.g. `giftCardMinAmount: number`, `returnWindowDays: integer`,
+  `storeGeoLat: number | null`) in the type its entry in
+  `EXTRA_SETTINGS_DEFAULTS` declares: `PublicValuesSerializer` is built from
+  `PUBLIC_SETTING_KEYS` (in `core/store_settings.py`) and `DECLARED_TYPES`, so
+  a new public setting gets its typed field by being declared. A type with no
+  field there raises at import. Only the exceptions are written down
+  (`_FIELD_OVERRIDES`: coordinates, return fees).
 - Adding a feature: a permission class, a `STORE_FEATURES` row, a field on
   `StoreFeaturesSerializer`, a regenerated `schema.yml`, and a row in
   `SERVED_BY` in `tests/integration/tenant/test_store_features.py`.
@@ -99,6 +110,7 @@ consumed by tasks and integrations.
 | `PRODUCT_ASSURANCES_ENABLED` | (b) `product_assurances` | the product page's delivery / payment / returns box; each row hides itself without data |
 | `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
+| `INDEXNOW_ENABLED` | (s) | the batched IndexNow notification (`docs/indexnow.md`); only its key is read by the storefront, from `TenantConfig.indexnowKey`, empty while off |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |
 
 `ACCOUNT_LOGIN_BY_CODE_ENABLED`, `MFA_*_ENABLED`, `DB_POOL_ENABLED` and the

@@ -1,5 +1,5 @@
 [project]
-version = "3.206.0"
+version = "3.224.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -420,6 +420,10 @@ ignore = [
 # no logging config — stdout IS the interface, and the workflow log is
 # where an operator reads what a prune selected before it deletes it.
 ".github/scripts/**" = ["T201"]
+# The API contract tooling (api-contract/) runs on a bare runner, in the
+# deploy gate and from a developer's shell, the same way: its stdout and
+# stderr are the verdict an operator reads.
+"api-contract/**" = ["T201"]
 
 [tool.ruff.lint.pylint]
 max-positional-args = 6

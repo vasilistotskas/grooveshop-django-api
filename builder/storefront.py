@@ -29,7 +29,8 @@ from django.conf import settings
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
 
-from builder import pointers
+from builder import contrast as contrast_module
+from builder import data_sources, pointers
 from builder.models import ReferenceKind
 from core.storefront import StorefrontUnavailable, base_url
 
@@ -53,6 +54,9 @@ class BlockDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    #: ``data``: pointer -> declaration of a setting that is a typed data
+    #: prop (``builder.data_sources``).
+    data: dict[str, dict[str, Any]]
     #: Pointer patterns (``linkRefs``) of the settings that are links: ``{href}``,
     #: ``{route}`` or ``{ref: {kind, id}}``. Only the last one points at
     #: something of ours, and its kind is in the data, not here.
@@ -83,7 +87,14 @@ class RootDefinition:
     translatable: tuple[str, ...]
     rich_text: tuple[str, ...]
     refs: dict[str, str]
+    data: dict[str, dict[str, Any]]
     link_refs: tuple[str, ...]
+    #: The pairs of colours a theme must keep a contrast between
+    #: (``builder.contrast``); empty for every other kind of document.
+    contrast: tuple[contrast_module.Rule, ...]
+    #: ``defaults``: the settings a NEW store of this view's design starts
+    #: with (the theme's), or ``None`` when the catalogue states none.
+    defaults: dict[str, Any] | None
     validator: Validator = field(compare=False, repr=False)
 
 
@@ -99,6 +110,9 @@ class Catalogue:
     #: The page types that are fixed templates (home, about, ...); any
     #: other page is a custom ``page:<key>``. The storefront's routing.
     templates: frozenset[str] = frozenset()
+    #: The caps for typed data props (``dataLimits``); the catalogue states
+    #: them whenever a block declares ``data``.
+    data_limits: data_sources.DataLimits | None = None
     _index: dict[str, BlockDefinition] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -146,6 +160,7 @@ def _parse_block(raw: dict[str, Any]) -> BlockDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=refs,
+        data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
         max_blocks=limits.get("maxBlocks"),
         max_per_template=limits.get("maxPerTemplate"),
@@ -193,6 +208,25 @@ def _parse_link_refs(
     return link_refs
 
 
+def _parse_data(raw: Any) -> dict[str, dict[str, Any]]:
+    """The ``data`` map of a block: ``{pointer: declaration}``. A declaration
+    the catalogue got wrong is a catalogue bug, refused when it is read."""
+    data = {str(k): dict(v) for k, v in (raw or {}).items()}
+    for pointer, declaration in data.items():
+        field_ = declaration.get("field")
+        if field_ == "ref":
+            known = declaration.get("kind") in REFERENCE_KINDS
+        elif field_ == "query":
+            known = declaration.get("source") in data_sources.QUERY_KIND and (
+                isinstance(declaration.get("maxLimit"), int)
+            )
+        else:
+            known = False
+        if not known:
+            raise ValueError(f"unknown data declaration at {pointer}")
+    return data
+
+
 def _parse_refs(raw: Any) -> dict[str, str]:
     refs = {str(k): str(v) for k, v in (raw or {}).items()}
     if not set(refs.values()) <= REFERENCE_KINDS:
@@ -208,7 +242,12 @@ def _parse_root(raw: dict[str, Any]) -> RootDefinition:
         translatable=translatable,
         rich_text=tuple(dict.fromkeys(_rich_text_pointers(schema))),
         refs=_parse_refs(raw.get("refs")),
+        data=_parse_data(raw.get("data")),
         link_refs=_parse_link_refs(raw["linkRefs"], translatable),
+        contrast=contrast_module.parse_rules(raw.get("contrast")),
+        defaults=(
+            dict(raw["defaults"]) if raw.get("defaults") is not None else None
+        ),
         validator=Draft202012Validator(
             schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         ),
@@ -222,11 +261,22 @@ def parse_catalogue(payload: Any) -> Catalogue:
             str(kind): _parse_root(raw)
             for kind, raw in (payload.get("documentKinds") or {}).items()
         }
+        declares_data = any(b.data for b in blocks) or any(
+            r.data for r in roots.values()
+        )
+        raw_limits = payload.get("dataLimits")
+        if declares_data and raw_limits is None:
+            raise ValueError("data is declared without dataLimits")
         return Catalogue(
             hash=str(payload["hash"]),
             blocks=blocks,
             roots=roots,
             templates=frozenset(str(t) for t in payload.get("templates") or ()),
+            data_limits=(
+                data_sources.DataLimits.parse(raw_limits)
+                if raw_limits is not None
+                else None
+            ),
             _index={block.type: block for block in blocks},
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:

@@ -1,6 +1,6 @@
 """The storefront's real catalogue reads as Django expects it, links included.
 
-``tests/fixtures/builder/catalogue.json`` is the pinned copy of the storefront's
+``builder/seed_catalogue.json`` is the pinned copy of the storefront's
 catalogue (``.github/scripts/sync_storefront_sources.py``). Every block and
 document root must state ``linkRefs`` (``parse_catalogue`` refuses one that
 does not), and what it states must be exactly the settings its own schema
@@ -13,24 +13,17 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+from builder.seeding import SEED_CATALOGUE
 from builder.storefront import parse_catalogue
 
 #: The keyword the storefront puts on a link setting's JSON Schema.
 LINK_MARKER = "x-builder-link"
 
-PAYLOAD = json.loads(
-    (
-        Path(__file__).resolve().parents[2]
-        / "fixtures"
-        / "builder"
-        / "catalogue.json"
-    ).read_text(encoding="utf-8")
-)
+PAYLOAD = json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
 CATALOGUE = parse_catalogue(PAYLOAD)
 
 

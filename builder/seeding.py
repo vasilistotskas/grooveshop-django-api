@@ -9,12 +9,11 @@ its translations.
 Provisioning calls :func:`seed_store`, which stores each one as a document
 (its draft equal to its published content), one version, and ONE release
 (number 1) holding them all: what the storefront reads from the first
-request. It makes no call to the storefront and so does not validate: the
-catalogue is not needed to start a store, and a catalogue fetch that fails
-must not leave a store without its homepage. What stands in for validation
-is ``tests/unit/builder/test_seeds.py``, which validates every seed against
-the vendored catalogue snapshot and checks that what is derived here (block
-types, references) is what validation derives.
+request. It makes no call to the storefront: a catalogue fetch that fails
+must not leave a store without its homepage. What a seed derives (block types,
+the dependency rows of its data settings) comes from ``seed_catalogue.json``,
+the storefront's catalogue pinned with the seeds, so the seeds and the blocks
+they are read against are always of one build.
 
 :func:`seed_with_content` releases richer content in the same files' shape
 (the demo store's pages, ``devtools/demo_pages``) on a store that holds
@@ -25,15 +24,15 @@ publish.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass, replace
+from functools import cache
 from pathlib import Path
 from typing import Any
 
 from django.db import transaction
 
-from builder import validation
+from builder import storefront, validation
 from builder.errors import DocumentInvalid, Issue
 from builder.models import (
     BuilderDocument,
@@ -49,11 +48,16 @@ from builder.services import (
     _issues,
     _lock_release_sequence,
     _new_version,
+    published_versions,
 )
 
 SEEDS = Path(__file__).parent / "seeds"
+SEED_CATALOGUE = Path(__file__).parent / "seed_catalogue.json"
 
 NOTE = "Default content"
+#: The release that gives a new store its theme (and an existing one,
+#: ``import_theme_settings``): made by the platform, like the defaults.
+THEME_NOTE = "Theme"
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,30 +82,33 @@ def load_seeds(directory: Path = SEEDS) -> list[Seed]:
     return seeds
 
 
-def _block_types(nodes: dict[str, Any]) -> set[str]:
-    types: set[str] = set()
-    for node in nodes.values():
-        types.add(node["type"])
-        types |= _block_types(node.get("blocks", {}))
-    return types
+@cache
+def seed_catalogue() -> storefront.Catalogue:
+    """The catalogue of the build the seeds came from."""
+    return storefront.parse_catalogue(
+        json.loads(SEED_CATALOGUE.read_text(encoding="utf-8"))
+    )
 
 
 def derive(seed: Seed) -> validation.Validated:
-    """What validation would derive from a seed, without the catalogue.
+    """A seed as validation derives it, against :func:`seed_catalogue`.
 
-    A seed holds no references (a default document cannot name a product
-    or a page a new store does not have), so ``refs`` is empty; the seeds
-    test holds every seed to that.
+    A seed names no record a new store does not have, but its lists are
+    data settings, and their dependency rows are what purges the page when
+    the store's products change. Every feature counts as on: whether a
+    block shows is the storefront's to decide when it renders.
+    ``tests/unit/builder/test_seeds.py`` holds every seed to passing.
     """
-    payload = validation.encode(seed.data, seed.i18n)
-    return validation.Validated(
+    issues, validated = validation.validate_document(
+        key=seed.key,
         data=seed.data,
         i18n=seed.i18n,
-        block_types=sorted(_block_types(seed.data["sections"])),
-        refs={},
-        content_hash=hashlib.sha256(payload).hexdigest(),
-        size_bytes=len(payload),
+        catalogue=seed_catalogue(),
+        feature_on=lambda _feature: True,
     )
+    if validated is None:
+        raise DocumentInvalid(issues)
+    return validated
 
 
 def seed_store() -> BuilderRelease | None:
@@ -146,14 +153,19 @@ def _untouched_defaults() -> dict[str, int] | None:
     :func:`seed_store` leaves, ``{}`` for a store with none at all, and
     ``None`` for any other: a draft saved, a page deleted, a named save, a
     schedule or a release by a person all mean someone has worked here."""
-    releases = list(BuilderRelease.objects.order_by("number")[:2])
+    releases = list(BuilderRelease.objects.order_by("number"))
     documents = BuilderDocument.objects.all_with_deleted()
     if not releases:
         return None if documents.exists() else {}
     if (
-        len(releases) > 1
+        len(releases) > 2
         or releases[0].note != NOTE
-        or releases[0].published_by_staff_id is not None
+        or any(
+            r.published_by_staff_id is not None
+            or r.rolled_back_from_id is not None
+            for r in releases
+        )
+        or any(r.note != THEME_NOTE for r in releases[1:])
         or documents.filter(is_deleted=True).exists()
         or documents.exclude(draft_revision=1).exists()
         or BuilderVersion.objects.exclude(kind=VersionKind.PUBLISH).exists()
@@ -161,7 +173,7 @@ def _untouched_defaults() -> dict[str, int] | None:
         or BuilderScheduledPublish.objects.exists()
     ):
         return None
-    return dict(releases[0].versions)
+    return dict(releases[-1].versions)
 
 
 def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
@@ -231,3 +243,78 @@ def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
                 catalogue_hash=catalogue.hash,
             ).pk
         return _create_release(None, versions, note=note)
+
+
+def installable_problems(key: str, data: Any, i18n: Any) -> list[Issue]:
+    """Every problem that would stop :func:`install_document`: the document
+    against the store's catalogue view, then what stops a release (references,
+    a theme's contrast). Writes nothing."""
+    catalogue = _catalogue()
+    issues, validated = _issues(key, data, i18n, catalogue)
+    if validated is not None:
+        issues = validation.check_before_release(key, validated, catalogue)
+    return [replace(issue, document=key) for issue in issues]
+
+
+def install_document(
+    key: str, data: Any, i18n: Any, *, note: str
+) -> BuilderRelease | None:
+    """Create document *key* with *data* and release it in ONE release that
+    keeps every other document as it was; ``None``, writing nothing, when the
+    store already has that document (it never overwrites what an editor has).
+
+    Validated like a publish, against the store's catalogue view, so one
+    problem is a ``DocumentInvalid`` that writes nothing; no catalogue, no
+    write. For the content a store starts with that was not a default seed:
+    the theme of a store that existed before it had one (``import_theme_settings``).
+    """
+    catalogue = _catalogue()
+    with transaction.atomic():
+        _lock_release_sequence()
+        if BuilderDocument.objects.all_with_deleted().filter(key=key).exists():
+            return None
+        issues, validated = _issues(key, data, i18n, catalogue)
+        if validated is not None:
+            issues = validation.check_before_release(key, validated, catalogue)
+        if issues:
+            raise DocumentInvalid(
+                [replace(issue, document=key) for issue in issues]
+            )
+        assert validated is not None
+        kind = kind_of_key(key)
+        assert kind is not None, key
+        document = BuilderDocument.objects.create(
+            kind=kind,
+            key=key,
+            draft=validated.data,
+            draft_i18n=validated.i18n,
+            draft_catalogue_hash=catalogue.hash,
+            draft_revision=1,
+            published_revision=1,
+        )
+        version = _new_version(
+            None,
+            document,
+            validated,
+            kind=VersionKind.PUBLISH,
+            note=note,
+            catalogue_hash=catalogue.hash,
+        )
+        versions = {**published_versions(), key: version.pk}
+        return _create_release(None, versions, note=note)
+
+
+def install_theme_defaults() -> BuilderRelease | None:
+    """The theme a NEW store of this catalogue view's design starts with
+    (``documentKinds.theme.defaults``), installed as its theme document.
+    ``None`` when the catalogue states no defaults or the store already has
+    a theme document."""
+    root = _catalogue().roots.get("theme")
+    if root is None or root.defaults is None:
+        return None
+    return install_document(
+        "theme",
+        {"sections": {}, "order": [], "settings": root.defaults},
+        {},
+        note=THEME_NOTE,
+    )

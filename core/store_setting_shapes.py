@@ -22,9 +22,8 @@ conversion every request body already goes through.
 
 from __future__ import annotations
 
-import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -35,9 +34,6 @@ from djangorestframework_camel_case.util import camelize, underscoreize
 from rest_framework import serializers
 
 from core.utils.i18n import available_language_codes
-
-logger = logging.getLogger(__name__)
-
 
 # ---------------------------------------------------------------------------
 # Strict building blocks
@@ -487,22 +483,98 @@ def is_valid_structured(name: str, value: object) -> bool:
 def public_structured_values(values: Mapping[str, object]) -> dict[str, Any]:
     """The typed values of ``values``' structured settings.
 
-    A stored value that is not its shape (it was validated when saved, so
-    only a direct database write gets here) is logged and served as
-    nothing configured: one store's broken optional strip must not take
-    the whole settings payload, and so the page, down with it. Nothing
-    configured is the setting's declared value.
+    A stored value is valid because the admin validator refused every
+    other, a shape change ships with a data migration, and
+    ``manage.py check_store_settings`` stops a deploy that would serve an
+    invalid one. So a value that is not its shape here is a bug, and it
+    raises: it fails the request loudly instead of being served as
+    something else.
     """
-    from core.store_settings import declared_default
+    return {
+        name: validated_structured(name, values[name])
+        for name in STRUCTURED_SETTINGS
+    }
 
-    typed: dict[str, Any] = {}
-    for name in STRUCTURED_SETTINGS:
-        try:
-            typed[name] = validated_structured(name, values[name])
-        except serializers.ValidationError as error:
-            logger.error(
-                "Stored store setting is not its shape",
-                extra={"setting": name, "errors": error.detail},
-            )
-            typed[name] = validated_structured(name, declared_default(name))
-    return typed
+
+# ---------------------------------------------------------------------------
+# The other public settings: typed by their declared type
+# ---------------------------------------------------------------------------
+#
+# A public setting without structure is a number, a flag or a short text.
+# It is served as a string in the ``settings`` map (the encoding
+# ``settings/get`` uses) and again typed in ``values``, in the type its
+# declaration in ``settings.EXTRA_SETTINGS_DEFAULTS`` names, so the type is
+# written down once and no client parses a number out of text.
+
+# Who pays to send a return back: the return is free to the customer, or
+# the customer pays its shipping. Empty = the store has not said.
+RETURN_FEES_CHOICES = frozenset({"", "free", "customer"})
+
+# Served as a list in its own key.
+_SERVED_ELSEWHERE = frozenset({"CONTACT_ATTACHMENTS_TYPES"})
+
+_FIELD_FOR_DECLARED_TYPE: dict[str, Callable[[], serializers.Field]] = {
+    "string": lambda: serializers.CharField(allow_blank=True),
+    "int": serializers.IntegerField,
+    "decimal": serializers.FloatField,
+    "bool": serializers.BooleanField,
+}
+
+
+def _degrees(value: object) -> float | None:
+    """Decimal degrees of a ``STORE_GEO_*`` text; empty is no location."""
+    text = str(value or "").strip()
+    return float(text) if text else None
+
+
+# Where the stored text is not the type clients want. The validator on each
+# of these settings already refuses a value that does not convert.
+_STORED_AS_TEXT = {"STORE_GEO_LAT": _degrees, "STORE_GEO_LNG": _degrees}
+_FIELD_OVERRIDES: dict[str, Callable[[], serializers.Field]] = {
+    "STORE_GEO_LAT": lambda: serializers.FloatField(allow_null=True),
+    "STORE_GEO_LNG": lambda: serializers.FloatField(allow_null=True),
+    "RETURN_FEES": lambda: serializers.ChoiceField(
+        choices=sorted(RETURN_FEES_CHOICES - {""}), allow_blank=True
+    ),
+}
+
+
+def _scalar_names() -> tuple[str, ...]:
+    from core.store_settings import PUBLIC_SETTING_KEYS
+
+    return tuple(
+        sorted(
+            PUBLIC_SETTING_KEYS - STRUCTURED_SETTINGS.keys() - _SERVED_ELSEWHERE
+        )
+    )
+
+
+def _scalar_field(name: str) -> serializers.Field:
+    from core.store_settings import DECLARED_TYPES
+
+    if name in _FIELD_OVERRIDES:
+        return _FIELD_OVERRIDES[name]()
+    return _FIELD_FOR_DECLARED_TYPE[DECLARED_TYPES[name]]()
+
+
+SCALAR_PUBLIC_SETTINGS = _scalar_names()
+
+# One field per public scalar setting, named after it (the camelCase
+# renderer turns ``gift_card_min_amount`` into ``giftCardMinAmount``). A
+# public setting of a type with no field here raises at import.
+PublicValuesSerializer = type(
+    "PublicValuesSerializer",
+    (serializers.Serializer,),
+    {name.lower(): _scalar_field(name) for name in SCALAR_PUBLIC_SETTINGS},
+)
+
+
+def public_scalar_values(values: Mapping[str, object]) -> dict[str, Any]:
+    """The typed values of ``values``' scalar public settings, by lower-case
+    setting name."""
+    return {
+        name.lower(): _STORED_AS_TEXT[name](values[name])
+        if name in _STORED_AS_TEXT
+        else values[name]
+        for name in SCALAR_PUBLIC_SETTINGS
+    }

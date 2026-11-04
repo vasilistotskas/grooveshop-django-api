@@ -33,8 +33,8 @@ from product.serializers.price_history import ProductPriceHistorySerializer
 from product.serializers.product import (
     ProductCardSerializer,
     ProductDetailSerializer,
+    ProductFeedSerializer,
     ProductRetrieveSerializer,
-    ProductSerializer,
     ProductWriteSerializer,
 )
 from product.serializers.review import ProductReviewSerializer
@@ -59,7 +59,7 @@ serializers_config: SerializersConfig = {
     # name, which the storefront's product cards never read. Filtered,
     # sorted and paginated exactly like ``list``.
     "feed": ActionConfig(
-        response=ProductSerializer,
+        response=ProductFeedSerializer,
         many=True,
         operation_id="listProductFeed",
         summary=_("Product feed"),
@@ -318,7 +318,7 @@ class ProductViewSet(BaseModelViewSet):
             # A product card: no attributes, no gallery, no offer kind.
             queryset = Product.objects.for_list()
         elif self.action == "feed":
-            queryset = Product.objects.for_full_list().with_offer_kind()
+            queryset = Product.objects.for_feed().with_offer_kind()
         else:
             # ``for_detail()`` deliberately does not filter on ``active``
             # — its docstring says so, because staff must be able to open
@@ -544,6 +544,7 @@ class ProductViewSet(BaseModelViewSet):
                             "name", any_language=True
                         )
                         or "",
+                        "schema_property": attribute.schema_property,
                         "sort_order": attribute.sort_order or 0,
                         "_values": {},
                     },

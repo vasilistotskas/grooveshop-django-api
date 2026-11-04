@@ -16,8 +16,7 @@ from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.api.views import PUBLIC_SETTING_KEYS
-from core.store_settings import declared_default
+from core.store_settings import PUBLIC_SETTING_KEYS, declared_default
 from tenant.features import feature_setting_keys, preference_setting_keys
 
 pytestmark = pytest.mark.django_db
@@ -67,7 +66,14 @@ def test_values_match_the_single_key_endpoint():
 
 
 def test_json_typed_settings_are_json_encoded():
-    hours = {"mon": [["09:00", "17:00"]], "tz": "Europe/Athens"}
+    # A valid value: an invalid one is refused at save and fails the read.
+    hours = {
+        "timezone": "Europe/Athens",
+        "schedule": {
+            "mon": {"opens": "09:00", "closes": "17:00"},
+            **{day: None for day in ("tue", "wed", "thu", "fri", "sat", "sun")},
+        },
+    }
     Setting.objects.update_or_create(
         name="BUSINESS_HOURS",
         defaults={"value_type": Setting.TYPE_JSON, "value_json": hours},

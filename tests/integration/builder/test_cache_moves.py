@@ -75,6 +75,7 @@ def test_the_surface_purges_the_storefront_with_the_tenant_config():
     assert surface.invalidates_tenant_config is True
     assert surface.invalidated_by == ("builder.BuilderRelease",)
     assert "cache:nitro:handlers:builderPage*" in surface.nuxt_patterns
+    assert "cache:nitro:functions:builderPageDocument*" in surface.nuxt_patterns
     assert "cache:nitro:handlers:builderChrome*" in surface.nuxt_patterns
     # A route-family pattern is what queues the Cloudflare edge purge.
     assert "cache:nitro:routes:_:*" in surface.nuxt_patterns
@@ -145,3 +146,26 @@ def test_a_refused_publish_moves_nothing(
 
     assert run_queued_purge() == []
     assert _generation(tenant) == before
+
+
+def test_the_data_loaders_are_purged_with_the_records_they_read():
+    """The storefront's ``builderData*`` functions (60 s) read products,
+    categories, posts and offers; each surface purges the ones it feeds."""
+    from core.cache.registry import get_surface
+
+    expected = {
+        "products": {"builderDataProduct", "builderDataSlug"},
+        "categories": {"builderDataCategory", "builderDataSlug"},
+        "blog": {
+            "builderDataBlogPost",
+            "builderDataBlogCategory",
+            "builderDataSlug",
+        },
+        "promotions": {"builderDataPromotion", "builderDataProduct"},
+        "builder": {"builderPageDocument", "builderDataTargets"},
+        "page_config": {"builderDataTargets"},
+    }
+    for code, names in expected.items():
+        patterns = set(get_surface(code).nuxt_patterns)
+        for name in names:
+            assert f"cache:nitro:functions:{name}*" in patterns, (code, name)

@@ -1,0 +1,148 @@
+# The API contract check, as a reusable workflow.
+#
+# A pull request to the Django API, the storefront or the agent gateway
+# fails when its OpenAPI document cannot be live together with what runs in
+# production and staging NOW:
+#
+#   django      its schema.yml / allauth-schema.yml breaks the storefront or
+#               the gateway that is live (the enum, removal or loosening is
+#               shipped consumer first);
+#   storefront  its openapi/*.yml requires something the Django that is live
+#   gateway     does not provide (shipped Django first).
+#
+# So a change that has no safe deploy order can never merge: it has to be
+# split. The same script (api-contract/api-contract.sh) and the same rules
+# (storefront-levels.txt, ignore.txt) run as the deploy gate in
+# grooveshop-infrastructure; a verdict here is the verdict there.
+#
+# What is live is read from GitHub Deployments, which the cluster reconciler
+# records from the pods that run (api-contract/live_state.py). Nothing here
+# needs a secret, so it runs the same on a fork's pull request: the token it
+# is given is the read-only GITHUB_TOKEN, used for the authenticated rate
+# limit and the list of changed files only.
+#
+# Callers:
+#   django      .github/workflows/api-contract.yml in this repository, with
+#               the PR's own api-contract/ (script, rules, `until` entries);
+#   storefront  uses: vasilistotskas/grooveshop-django-api/.github/workflows/api-contract-check.yml@main
+#   gateway     (a reusable workflow's ref cannot be an expression, so it is
+#               fixed at main and fetches the script and the rules from the
+#               Django release that is live in each environment, exactly the
+#               files the deploy gate runs for a consumer-only sync).
+#
+# A pull request that touches no contract document passes at once
+# (api-contract/watched.txt): the job always reports, so it can be a
+# required status check.
+name: API contract check
+
+on:
+  workflow_call:
+    inputs:
+      kind:
+        description: django, storefront or gateway
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Breaking API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KIND: ${{ inputs.kind }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the pull request
+        uses: actions/checkout@v7
+
+      # A reusable workflow's checkout is the CALLER's repository; the
+      # tooling is read from the workflow's own source.
+      - name: Checkout the contract tooling
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .api-contract-tooling
+          sparse-checkout: api-contract
+
+      - name: Did this pull request touch a contract document?
+        id: scope
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
+          relevant=false
+          while read -r kind prefix; do
+            case $kind in ''|'#'*) continue ;; esac
+            [ "$kind" = "$KIND" ] || continue
+            if awk -v prefix="$prefix" 'index($0, prefix) == 1 { found = 1 } END { exit !found }' <<<"$files"; then
+              relevant=true
+            fi
+          done < .api-contract-tooling/api-contract/watched.txt
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          [ "$relevant" = true ] || echo "::notice::No contract document changed in this pull request."
+
+      - name: What is live
+        if: steps.scope.outputs.relevant == 'true'
+        run: python3 -I .api-contract-tooling/api-contract/live_state.py live.env production staging
+
+      - name: Expire accepted breaks
+        if: steps.scope.outputs.relevant == 'true' && inputs.kind == 'django'
+        run: python3 -I api-contract/check-ignore.py --ignore api-contract/ignore.txt --live live.env
+
+      - name: Pair this pull request with what is live
+        if: steps.scope.outputs.relevant == 'true'
+        run: |
+          set -euo pipefail
+          image=$(cat .api-contract-tooling/api-contract/oasdiff-image.txt)
+          services=.api-contract-tooling/api-contract/services.txt
+          mkdir -p live-dir && cp live.env live-dir/live.env
+
+          verdict() { # RULES_DIR ENVIRONMENT...
+            rules=$1
+            shift
+            docker run --rm --user "$(id -u):$(id -g)" -e LIVE_FILE=/live/live.env \
+              -v "$rules:/contract:ro" -v "$PWD/live-dir:/live:ro" -v "$PWD:/repo:ro" \
+              --entrypoint /bin/sh "$image" /contract/api-contract.sh pr "$KIND" /repo "$@"
+          }
+
+          code=0
+          : > verdict.txt
+          if [ "$KIND" = django ]; then
+            # The PR's own script and rules.
+            verdict "$PWD/api-contract" production staging 2>&1 | tee -a verdict.txt || code=${PIPESTATUS[0]}
+          else
+            # Consumer PRs: the script and the rules of the Django release
+            # live in each environment, the files the deploy gate runs.
+            django_repo=$(sed -n 's/^django //p' "$services")
+            for environment in production staging; do
+              key=$(tr '[:lower:]' '[:upper:]' <<<"${environment}_django")
+              tag=$(sed -n "s/^$key=\"\([^ \"]*\).*/\1/p" live.env)
+              [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "no live Django tag for $environment" >&2; exit 2; }
+              rules="$RUNNER_TEMP/rules-$environment"
+              mkdir -p "$rules"
+              curl -fsSL "https://codeload.github.com/$django_repo/tar.gz/refs/tags/$tag" \
+                | tar -xz --strip-components=2 -C "$rules" --wildcards '*/api-contract/*'
+              [ -f "$rules/api-contract.sh" ] || {
+                echo "Django $tag, live in $environment, predates api-contract/: its rules cannot be run" >&2
+                exit 2
+              }
+              verdict "$rules" "$environment" 2>&1 | tee -a verdict.txt || code=$(( code == 1 ? 1 : PIPESTATUS[0] ))
+            done
+          fi
+
+          {
+            echo '### API contract'
+            echo '```'
+            head -c 60000 verdict.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -eq 1 ]; then
+            echo "::error title=API contract::This pull request cannot be live together with what runs now. See the job summary for the direction, the live release and how to split it."
+          elif [ "$code" -ne 0 ]; then
+            echo "::error title=API contract::The contract could not be checked (exit $code): a merge must not proceed on an unanswered question."
+          fi
+          exit "$code"

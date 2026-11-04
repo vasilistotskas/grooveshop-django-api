@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -8,8 +9,11 @@ from core.filters.core import (
     UUIDFilterMixin,
 )
 from product.attribute_selection import AttributeSelection
+from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.product import Product
+from tag.models.tag import Tag
+from tag.models.tagged_item import TaggedItem
 
 
 class IntegerInFilter(filters.BaseInFilter, filters.Filter):
@@ -111,6 +115,23 @@ class ProductFilter(
         field_name="category__id",
         help_text="Filter by exact category ID",
     )
+    brand = filters.ModelMultipleChoiceFilter(
+        field_name="brand",
+        queryset=Brand.objects.none(),
+        help_text=(
+            "Filter by brand IDs: a product of any of them (repeat the "
+            "parameter)"
+        ),
+    )
+    tags = filters.ModelMultipleChoiceFilter(
+        field_name="tags",
+        queryset=Tag.objects.none(),
+        method="filter_tags",
+        help_text=(
+            "Filter by active tag IDs: a product with any of them (repeat "
+            "the parameter)"
+        ),
+    )
 
     min_view_count = filters.NumberFilter(
         field_name="view_count",
@@ -192,6 +213,26 @@ class ProductFilter(
             "is_deleted": ["exact"],
             "uuid": ["exact"],
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters["brand"].queryset = Brand.objects.all()
+        # Active tags only, as on the blog: an inactive tag is hidden from
+        # the storefront, so an id of one is the same 400 as an unknown id
+        # rather than an oracle for "this tag exists but is hidden".
+        self.filters["tags"].queryset = Tag.objects.filter(active=True)
+
+    def filter_tags(self, queryset, name, value):
+        """Products carrying any of the tags (one subquery, no join: a
+        product with two matching tags is still one row)."""
+        tag_ids = [tag.pk for tag in value]
+        if not tag_ids:
+            return queryset
+        tagged = TaggedItem.objects.filter(
+            content_type=ContentType.objects.get_for_model(Product),
+            tag_id__in=tag_ids,
+        ).values("object_id")
+        return queryset.filter(id__in=tagged)
 
     def filter_attribute_value__in(self, queryset, name, value):
         """Alternatives within one attribute, every attribute narrowing."""

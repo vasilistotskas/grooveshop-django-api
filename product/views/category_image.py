@@ -89,7 +89,7 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
     filterset_fields = ["id", "category", "image_type", "active"]
     ordering_fields = ["created_at", "image_type", "sort_order"]
     ordering = ["sort_order", "-created_at"]
-    search_fields = ["translations__title", "translations__alt_text"]
+    search_fields = ["translations__alt_text"]
 
     def get_permissions(self):
         # ``bulk_update`` is a PATCH, which DjangoModelPermissions maps to

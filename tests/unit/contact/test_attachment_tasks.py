@@ -357,3 +357,26 @@ class TestTheNotificationEmail:
         send_contact_notification_email_task(contact.pk)
 
         assert "attachment" not in mail.outbox[-1].body
+
+
+class TestRescanPending:
+    """A scan whose dispatch was lost leaves the row ``PENDING``; the sweep
+    finds it by state."""
+
+    def test_only_a_stale_pending_attachment_is_queued(self, settings):
+        from contact.tasks import rescan_pending_attachments
+
+        old = timezone.now() - timedelta(
+            minutes=settings.CONTACT_SCAN_PENDING_AFTER_MINUTES + 1
+        )
+        stale = make_attachment(created_at=old)
+        make_attachment()  # recent: a scan may still be on its way
+        make_attachment(
+            created_at=old, scan_status=ContactAttachment.ScanStatus.CLEAN
+        )
+
+        with mock.patch.object(scan_contact_attachment, "apply_async") as queue:
+            queued = rescan_pending_attachments()
+
+        assert queued == 1
+        queue.assert_called_once_with(args=[stale.pk])

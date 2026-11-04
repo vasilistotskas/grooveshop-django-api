@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import uuid
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
@@ -14,7 +15,22 @@ from django.utils.deconstruct import deconstructible
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import get_public_schema_name
 
-from core.store_setting_shapes import is_valid_structured
+from core.store_setting_shapes import RETURN_FEES_CHOICES, is_valid_structured
+
+# ---------------------------------------------------------------------------
+# IndexNow key
+# ---------------------------------------------------------------------------
+
+#: What the IndexNow protocol allows a key to be: 8 to 128 letters, digits
+#: and dashes (https://www.indexnow.org/faq, "How do I generate an IndexNow
+#: API key?").
+INDEXNOW_KEY_PATTERN = r"^[A-Za-z0-9-]{8,128}$"
+
+
+def generate_indexnow_key() -> str:
+    """A new IndexNow key: a UUID's 32 hexadecimal characters."""
+    return uuid.uuid4().hex
+
 
 # ---------------------------------------------------------------------------
 # Structured JSON settings
@@ -69,10 +85,6 @@ def validate_dispatch_cutoff_setting(value: object) -> bool:
 # ---------------------------------------------------------------------------
 # RETURN_WINDOW_DAYS / RETURN_FEES extra_settings
 # ---------------------------------------------------------------------------
-
-# Who pays to send a return back: the return is free to the customer, or
-# the customer pays its shipping. Empty = the store has not said.
-RETURN_FEES_CHOICES = frozenset({"", "free", "customer"})
 
 
 def validate_return_window_days_setting(value: object) -> bool:

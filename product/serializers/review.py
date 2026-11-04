@@ -190,7 +190,6 @@ class ProductReviewWriteSerializer(
             dispatch_on_commit(
                 send_review_pending_alert,
                 kwargs={"review_id": review.pk},
-                robust=True,
             )
         return review
 

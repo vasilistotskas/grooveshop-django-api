@@ -312,3 +312,41 @@ def purge_expired_contact_records() -> dict[str, int]:
             days,
         )
     return counts
+
+
+@celery_app.task(base=MonitoredTask)
+def rescan_pending_attachments() -> int:
+    """Queue the scan of every attachment still ``PENDING`` past
+    ``CONTACT_SCAN_PENDING_AFTER_MINUTES``.
+
+    The upload queues its scan after the row commits
+    (``dispatch_on_commit``). A broker outage is kept and published again by
+    ``redispatch_deferred_tasks``, but a worker killed between the commit and
+    the publish loses the dispatch, and the row would stay ``PENDING`` (and
+    undownloadable) forever. The state is the guarantee: this sweep finds the
+    rows by it. A scan already in flight finishes long before the threshold,
+    and running one twice only records the same verdict twice.
+    """
+    from django.conf import settings
+
+    from contact.models import ContactAttachment
+
+    cutoff = timezone.now() - timedelta(
+        minutes=settings.CONTACT_SCAN_PENDING_AFTER_MINUTES
+    )
+    ids = list(
+        ContactAttachment.objects.filter(
+            scan_status=ContactAttachment.ScanStatus.PENDING,
+            created_at__lte=cutoff,
+        )
+        .exclude(file="")
+        .order_by("id")
+        .values_list("pk", flat=True)[: settings.CONTACT_SCAN_SWEEP_BATCH]
+    )
+    for pk in ids:
+        scan_contact_attachment.apply_async(args=[pk])
+    if ids:
+        logger.warning(
+            "Queued the scan of %s attachment(s) still pending", len(ids)
+        )
+    return len(ids)

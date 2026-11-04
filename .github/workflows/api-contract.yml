@@ -1,33 +1,33 @@
-# Flag a pull request whose schema.yml breaks clients of the API.
+# Hold a pull request to the API contract: its schema.yml and
+# allauth-schema.yml must be able to be live together with the storefront
+# and the agent gateway that production and staging run NOW.
 #
 # The storefront answers 422 to every response its generated schemas
-# reject, so removing or loosening a response field breaks the storefront
-# that is live until one that no longer reads it is deployed. On
-# 2026-10-13 a release that dropped two product fields took add to cart
-# down on webside for ~8 minutes; replaying production's history found ten
-# such windows since 2026-09-01.
+# reject, so removing or loosening a response field, adding an enum value
+# or a success status breaks the storefront that is live until a release
+# that accepts it is deployed (2026-10-13: add to cart down on webside for
+# ~8 minutes). And a storefront that requires a field the live Django does
+# not serve breaks the other way. A change that has no safe deploy order
+# (2026-11-03: a required field plus an enum value, Django #442 / storefront
+# #347) therefore cannot merge: it has to be split.
 #
-# This is the earliest of three layers. It compares the PR's schema.yml
-# with the base branch's (``oasdiff breaking``: what in the PR breaks a
-# client of the base). A break fails the check unless the PR carries the
-# ``api-breaking-change`` label, which records that the break is meant and
-# that the storefront that stops relying on it ships first. The deploy
-# gate in grooveshop-infrastructure (the backend-api-contract PreSync Job)
-# then refuses any deploy whose order is wrong, and a log alert catches
-# what slips through. CI's "OpenAPI schema.yml is up to date" step keeps
-# the committed file honest, which all three rely on.
+# api-contract/ holds the rule: the same script and rules the deploy gate in
+# grooveshop-infrastructure runs (a verdict here is the verdict there), and
+# an accepted break is a dated line in api-contract/ignore.txt, reviewed in
+# the pull request that makes the change. What is live comes from GitHub
+# Deployments, recorded from the running pods
+# (grooveshop-infrastructure/manifests/app-constructs/grooveshop/recorder).
+# See api-contract/README.md and the reusable workflow it calls.
 #
-# Its own workflow, not a job in ci.yml, so that adding or removing the
-# label re-runs this one cheap job instead of the whole test suite.
+# Its own workflow, not a job in ci.yml: it needs no code checkout beyond
+# this one and no database. The job always reports, so it is a required
+# status check; a pull request that touches no contract document passes at
+# once (api-contract/watched.txt).
 name: API contract
 
 on:
   pull_request:
     branches: ['main']
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths:
-      - 'schema.yml'
-      - 'allauth-schema.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
@@ -36,66 +36,9 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # oasdiff, pinned by digest; the same image as ci.yml and as the deploy
-  # gate in grooveshop-infrastructure (prepare-helm values).
-  OASDIFF_IMAGE: tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
-  BREAKING_LABEL: api-breaking-change
-
 jobs:
-  breaking:
-    name: Breaking API changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Compare schema.yml with the base branch
-        env:
-          # The base is read at the exact commit the PR targets. The
-          # repository is public, so no token is needed.
-          BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.base.sha }}
-          ACCEPTED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-change') }}
-        run: |
-          # schema.yml is ours; allauth-schema.yml is allauth's headless
-          # API as this project serves it (``manage.py allauth_schema``),
-          # which the storefront also generates its parsers from. A file
-          # the base does not have yet is new, so there is nothing to
-          # break.
-          worst=0
-          for file in schema.yml allauth-schema.yml; do
-            if [ ! -f "$file" ]; then continue; fi
-            if ! curl -fsS -o "/tmp/base-$file" "$BASE_URL/$file"; then
-              echo "$file is new on this branch; nothing to compare."
-              continue
-            fi
-            oasdiff() {
-              docker run --rm --user "$(id -u):$(id -g)" \
-                -v "$PWD/$file:/s/new.yml:ro" \
-                -v "/tmp/base-$file:/s/base.yml:ro" \
-                "$OASDIFF_IMAGE" breaking --allow-external-refs=false "$@" \
-                -- /s/base.yml /s/new.yml
-            }
-            # Annotations on the PR, then the verdict.
-            oasdiff --format githubactions || true
-            set +e
-            oasdiff --fail-on ERR --format text
-            code=$?
-            set -e
-            if [ "$code" -gt 1 ]; then
-              echo "::error::oasdiff could not compare $file (exit $code)"
-              exit "$code"
-            fi
-            if [ "$code" -eq 1 ]; then worst=1; fi
-          done
-          if [ "$worst" -eq 0 ]; then
-            echo "No breaking changes."
-            exit 0
-          fi
-          if [ "$ACCEPTED" = "true" ]; then
-            echo "::warning::Breaking API changes accepted by the '$BREAKING_LABEL' label. Deploy the storefront that no longer relies on them BEFORE this release; the deploy gate refuses the other order."
-            exit 0
-          fi
-          echo "::error::This PR breaks API clients. If that is intended, add the '$BREAKING_LABEL' label and ship the storefront that stops relying on these fields first (docs/migrations.md has the same expand/contract rule for columns)."
-          exit 1
+  contract:
+    name: API contract
+    uses: ./.github/workflows/api-contract-check.yml
+    with:
+      kind: django

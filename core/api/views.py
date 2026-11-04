@@ -38,6 +38,7 @@ from core.celery import celery_app
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
+from core.store_settings import PUBLIC_SETTING_KEYS
 from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
 from tenant.membership import is_store_staff
@@ -645,90 +646,6 @@ def list_settings(request):
         )
 
 
-# The store VALUES a storefront renders: figures, texts, hours, contact
-# details. A store switch is never here: a feature is served in
-# ``TenantConfig.features`` and a preference in ``TenantConfig.preferences``
-# (``tenant/features.py``), Django's one answer for each, and a switch
-# published here too would be a second answer a client could read instead.
-# ``tests/integration/core/test_settings_public_api.py`` refuses one.
-PUBLIC_SETTING_KEYS = frozenset(
-    {
-        # Shipping price/free-threshold is a per-country ``ShippingRate``
-        # row now (``/api/v1/shipping/options`` and
-        # ``/api/v1/shipping/free-shipping-info``), not a Setting. The
-        # carriers' own settings (e.g. ACS_DYNAMIC_PRICING_ENABLED) are
-        # server-side only and stay admin-gated.
-        # Storefront's "order before HH:MM" line next to a rate's
-        # delivery days.
-        "DISPATCH_CUTOFF",
-        # The return terms the storefront's Organization schema.org node
-        # states (with the countries the store ships to), the same terms
-        # the store's public return-policy page gives.
-        "RETURN_WINDOW_DAYS",
-        "RETURN_FEES",
-        # Purchase-form bounds for the storefront gift-card page.
-        "GIFT_CARD_MIN_AMOUNT",
-        "GIFT_CARD_MAX_AMOUNT",
-        # Drives the storefront's "Valid for N years" line; the server
-        # reads it again when it stamps ``expires_at``.
-        "GIFT_CARD_VALIDITY_DAYS",
-        # The loyalty programme's figures the storefront explains and
-        # estimates with. Whether the programme is on is the ``loyalty``
-        # feature.
-        "LOYALTY_REDEMPTION_RATIO_EUR",
-        "LOYALTY_POINTS_FACTOR",
-        "LOYALTY_TIER_MULTIPLIER_ENABLED",
-        "LOYALTY_POINTS_EXPIRATION_DAYS",
-        "LOYALTY_NEW_CUSTOMER_BONUS_ENABLED",
-        "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
-        "LOYALTY_XP_PER_LEVEL",
-        # Store presence: hours/geo feed the business-hours section,
-        # footer open/closed badge and LocalBusiness schema.org.
-        "BUSINESS_HOURS",
-        "STORE_GEO_LAT",
-        "STORE_GEO_LNG",
-        # Public offices — the footer's contact column and the contact
-        # page. Public by definition: these are the addresses the
-        # merchant publishes for customers to visit, which is why they
-        # are here and the INVOICE_SELLER_* seat is not.
-        "STORE_OFFICES",
-        # The three the storefront needs to render the contact form's
-        # upload control and pre-check a file before spending a request
-        # on it (whether uploads are on is the ``contact_attachments``
-        # feature). The server re-reads them - a client is not a gate -
-        # and the retention window is deliberately NOT here: it is
-        # operator/legal policy, not something a visitor's form needs.
-        "CONTACT_ATTACHMENTS_MAX_COUNT",
-        "CONTACT_ATTACHMENTS_MAX_MB",
-        "CONTACT_ATTACHMENTS_TYPES",
-        # Public contact email for storefront footer/contact page.
-        # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
-        "CONTACT_EMAIL",
-        # The strip above the header. Operator-authored text rendered on
-        # every page, so it is public by construction.
-        "ANNOUNCEMENT_BAR",
-        # The sign-in pages' photo and line. Operator-authored and shown
-        # to every visitor before they authenticate, so public.
-        "AUTH_PANEL",
-        # The EU/ESPA co-funding strip at the very top of every page.
-        # Operator-authored and shown to every visitor, so public.
-        "FUNDING_BANNER",
-        # Demo-store credentials, deliberately public: the login page
-        # shows them so a prospect can see the logged-in storefront.
-        # Empty everywhere by default; the demo seeder writes them only
-        # on a tenant flagged ``is_demo``, and a nightly task resets
-        # that account's data. Whether the card shows is the
-        # ``demo_account`` preference in TenantConfig.preferences. Read
-        # ``settings.EXTRA_SETTINGS_DEFAULTS`` before enabling this on
-        # anything that is not a throwaway store.
-        "DEMO_ACCOUNT_EMAIL",
-        "DEMO_ACCOUNT_PASSWORD",
-        "DEMO_ACCOUNT_B2B_EMAIL",
-        "DEMO_ACCOUNT_B2B_PASSWORD",
-    }
-)
-
-
 @extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get setting by key"),
     description=_("Retrieve a specific setting value by its key name"),
@@ -856,7 +773,10 @@ def get_public_settings(request):
     """
     try:
         from contact.attachments import parse_attachment_types
-        from core.store_setting_shapes import public_structured_values
+        from core.store_setting_shapes import (
+            public_scalar_values,
+            public_structured_values,
+        )
         from core.store_settings import store_settings
 
         raw = store_settings(PUBLIC_SETTING_KEYS)
@@ -872,6 +792,7 @@ def get_public_settings(request):
                 "funding_banner": typed["FUNDING_BANNER"],
                 "store_offices": typed["STORE_OFFICES"] or [],
                 "business_hours": typed["BUSINESS_HOURS"],
+                "values": public_scalar_values(raw),
                 "contact_attachments_types": list(
                     parse_attachment_types(raw["CONTACT_ATTACHMENTS_TYPES"])
                 ),

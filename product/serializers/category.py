@@ -24,6 +24,9 @@ class ProductCategorySerializer(
     # Empty string when the category has no MAIN image, matching the
     # model property.
     main_image_path = serializers.CharField(read_only=True)
+    # The MAIN image's alt text in the request language; empty when the
+    # category has no main image or the merchant wrote none.
+    main_image_alt = serializers.CharField(read_only=True)
     # Active products in the category and all its descendants, annotated
     # by ``for_list()`` (no query per row).
     recursive_product_count = serializers.IntegerField(read_only=True)
@@ -39,6 +42,7 @@ class ProductCategorySerializer(
             "level",
             "tree_id",
             "main_image_path",
+            "main_image_alt",
             "recursive_product_count",
             "created_at",
             "updated_at",
@@ -49,6 +53,7 @@ class ProductCategorySerializer(
             "level",
             "tree_id",
             "main_image_path",
+            "main_image_alt",
             "recursive_product_count",
             "created_at",
             "updated_at",

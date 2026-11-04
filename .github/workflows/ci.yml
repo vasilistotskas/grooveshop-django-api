@@ -36,9 +36,6 @@ env:
   MEILI_MASTER_KEY: ci-throwaway-meilisearch-key
   UV_VERSION: '0.13.6'
   FORCE_COLOR: 1
-  # oasdiff, pinned by digest; the same image as api-contract.yml and as
-  # the deploy gate in grooveshop-infrastructure (prepare-helm values).
-  OASDIFF_IMAGE: tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
 
 jobs:
   tested-in-pr:
@@ -115,7 +112,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -188,7 +185,7 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD/schema.yml:/s/committed.yml:ro" \
             -v /tmp/_schema_check.yml:/s/generated.yml:ro \
-            "$OASDIFF_IMAGE" diff --allow-external-refs=false \
+            "$(cat api-contract/oasdiff-image.txt)" diff --allow-external-refs=false \
             --exclude-elements description,title,summary,examples \
             --fail-on-diff /s/committed.yml /s/generated.yml || {
             echo "::error file=schema.yml::schema.yml does not match the code. Run: uv run python manage.py spectacular --file schema.yml"
@@ -206,7 +203,7 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD/allauth-schema.yml:/s/committed.yml:ro" \
             -v /tmp/_allauth_check.yml:/s/generated.yml:ro \
-            "$OASDIFF_IMAGE" diff --allow-external-refs=false \
+            "$(cat api-contract/oasdiff-image.txt)" diff --allow-external-refs=false \
             --exclude-elements description,title,summary,examples \
             --fail-on-diff /s/committed.yml /s/generated.yml || {
             echo "::error file=allauth-schema.yml::allauth-schema.yml does not match allauth and our settings. Run: uv run python manage.py allauth_schema"
@@ -292,7 +289,7 @@ jobs:
           python-version-file: '.python-version'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -424,7 +421,7 @@ jobs:
           python-version-file: '.python-version'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -604,7 +601,7 @@ jobs:
           python-version-file: '.python-version'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -652,7 +649,7 @@ jobs:
           python-version-file: '.python-version'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -721,7 +718,7 @@ jobs:
           python-version-file: '.python-version'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true

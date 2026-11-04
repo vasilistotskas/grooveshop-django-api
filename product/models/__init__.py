@@ -5,6 +5,7 @@ from .brand import Brand
 from .category import ProductCategory
 from .category_image import ProductCategoryImage
 from .favourite import ProductFavourite
+from .highlight import ProductHighlight
 from .image import ProductImage
 from .price_spell import ProductPriceSpell
 from .product import Product
@@ -24,6 +25,7 @@ __all__ = [
     "ProductCategory",
     "ProductCategoryImage",
     "ProductFavourite",
+    "ProductHighlight",
     "ProductImage",
     "ProductPriceSpell",
     "ProductRelation",

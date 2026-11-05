@@ -228,7 +228,7 @@ class TestHighlightsInAdmin:
     def test_saving_the_inline_stores_the_text_in_that_language(self):
         request = RequestFactory().get("/")
         request.user = UserAccountFactory(is_superuser=True, is_staff=True)
-        product = ProductFactory(num_images=0, num_reviews=0)
+        product = ProductFactory(active=True, num_images=0, num_reviews=0)
         highlight = _highlight(product, el="Ελληνικό")
         inline = ProductHighlightInline(Product, AdminSite())
         formset_class = inline.get_formset(request, product)

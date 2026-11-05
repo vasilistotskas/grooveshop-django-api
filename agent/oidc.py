@@ -9,6 +9,10 @@ SCOPE_ORDERS_READ = "orders:read"
 SCOPE_LOYALTY_READ = "loyalty:read"
 SCOPE_FAVOURITES_READ = "favourites:read"
 
+# Where a store's MCP server lives on its own domain, routed to the agent
+# gateway. The resource a linking client binds its token to (RFC 8707).
+MCP_RESOURCE_PATH = "/mcp"
+
 
 class AgentOIDCAdapter(DefaultOIDCAdapter):
     """Adds the commerce scopes to the consent screen's display copy."""

@@ -6,12 +6,20 @@ from allauth.idp.oidc.contrib.rest_framework.authentication import (
 from allauth.idp.oidc.contrib.rest_framework.permissions import (
     TokenPermission,
 )
+from allauth.idp.oidc.internal.oauthlib.server import get_server
+from allauth.idp.oidc.internal.oauthlib.utils import (
+    extract_params,
+    get_validator_context,
+)
+from allauth.idp.oidc.internal.resources import is_resources_subset
 from drf_spectacular.utils import extend_schema
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from agent.oidc import (
+    MCP_RESOURCE_PATH,
     SCOPE_FAVOURITES_READ,
     SCOPE_LOYALTY_READ,
     SCOPE_ORDERS_READ,
@@ -41,7 +49,29 @@ class AgentTokenAuthentication(TokenAuthentication):
     credentials as 403 instead of 401 — and the agent gateway relies on
     the 401 to distinguish a bad token (re-run OAuth, RFC 9728
     challenge) from a valid token that merely lacks a scope (403).
+
+    A client linking through the store's MCP server binds its token to
+    that server (RFC 8707, which MCP requires), and the gateway forwards
+    the token here, because this API is what ``/mcp`` reads. allauth
+    compares a token's resources with the URL it reached, so it refused
+    every such token as an invalid target. This compares them with the
+    store's MCP server instead, which still refuses a token bound to
+    another store's. The rest is allauth's own ``authenticate``.
     """
+
+    def authenticate(self, request):
+        valid, orequest = get_server().verify_request(
+            *extract_params(request), scopes=[]
+        )
+        if not valid:
+            return None
+        access_token = get_validator_context().access_token
+        if access_token and not is_resources_subset(
+            [request.build_absolute_uri(MCP_RESOURCE_PATH)],
+            access_token.get_resources(),
+        ):
+            raise PermissionDenied("Invalid target resource.")
+        return orequest.user, access_token
 
     def authenticate_header(self, request):
         return 'Bearer realm="agent"'

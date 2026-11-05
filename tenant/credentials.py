@@ -182,28 +182,66 @@ _DEFAULT_EMAIL_THEME = {
 }
 
 
-def _customised(field: str) -> str:
-    """The tenant's value ONLY when it differs from the model default.
+def _branded_primary() -> tuple[str, str] | None:
+    """The 600 and 700 of the store's primary colour scale, when it is
+    the store's own.
 
-    Every ``Tenant`` row carries the field's default — ``accent_hex``
-    defaults to ``#003DFF``, ``success_hex`` to ``#16a34a`` — so "the
-    field has a value" does NOT mean "the merchant chose it". Treating
-    it that way would have repainted every existing store's email
-    (header ``#97b7ff`` -> ``#003DFF``) purely because a default exists.
+    Read from the theme document of the store's CURRENT release, the one
+    source the storefront draws its look from (``/colors/light/primary``),
+    through the cached chrome read the storefront's own requests share
+    (``builder.published.published_index``): no query once the release is
+    warm, and no cache of its own. The default locale is asked because a
+    colour has no translation.
 
-    Comparing against the field default is how the storefront token
-    compiler decides too: ``server/utils/themeTokens.ts`` emits a token
-    only when the tenant's value differs from ``PLATFORM_COLORS``, so a
-    tenant that customised nothing emits nothing. Case-insensitive for
-    the same reason it is there — the hex fields are free text.
+    ``None`` — the platform palette — when the store is not in a store
+    schema (platform mail renders under ``public``, and a Celery task with
+    no tenant has none), has no release or no theme document, or its scale
+    is the platform's own default: every new store starts from that
+    scale, so "the store has a primary scale" does NOT mean "the merchant
+    chose it". Treating it so would repaint every unbranded store's mail
+    grey. The default is the catalogue the storefront pinned with the
+    seeds, which every design shares for the primary scale.
+
+    A document that cannot be read never fails a send: the store gets the
+    platform palette and a warning is logged.
     """
-    from tenant.models import Tenant
+    if not in_tenant_schema():
+        return None
+    from builder import published, seeding
+    from builder.contrast import HEX
 
-    value = (_get_tenant_field(field) or "").strip()
-    if not value:
-        return ""
-    default = str(Tenant._meta.get_field(field).default or "").strip()
-    return "" if value.lower() == default.lower() else value
+    try:
+        theme = published.published_index(
+            settings.PARLER_DEFAULT_LANGUAGE_CODE
+        )["theme"]
+        if theme is None:
+            return None
+        scale = theme["settings"]["colors"]["light"]["primary"]["scale"]
+        # A catalogue with no theme defaults has nothing to compare with.
+        defaults = seeding.seed_catalogue().roots["theme"].defaults or {}
+        default = defaults["colors"]["light"]["primary"]["scale"]
+        primary, dark = scale["600"], scale["700"]
+    except Exception:
+        # A theme that cannot be read must not stop outbound mail, but it
+        # must not be swallowed silently either.
+        logger.warning(
+            "Could not read the published theme for email colours",
+            exc_info=True,
+        )
+        return None
+    # The colours go straight into the email's <style> block.
+    if not all(isinstance(c, str) and HEX.match(c) for c in (primary, dark)):
+        logger.warning(
+            "The published theme's primary scale is not hex: email colours"
+            " fall back to the platform palette"
+        )
+        return None
+    if (primary.lower(), dark.lower()) == (
+        default["600"].lower(),
+        default["700"].lower(),
+    ):
+        return None
+    return primary, dark
 
 
 def tenant_email_theme() -> dict[str, str]:
@@ -218,42 +256,30 @@ def tenant_email_theme() -> dict[str, str]:
     resolved to ``background-color: transparent`` while keeping
     ``color: #ffffff !important`` — white text on a white card.
 
-    Sources, in priority order:
-      1. ``Tenant.theme_metadata["colors"]["primaryScale"]`` — the
-         per-shade map the storefront token compiler already uses.
-      2. ``Tenant.accent_hex`` / ``Tenant.success_hex`` — the validated
-         ``#RRGGBB`` fields on the Tenant row.
-      3. The platform defaults above.
+    A store's brand is its primary colour scale in its published theme
+    document (``_branded_primary``): shade 600 is the button, link and
+    header colour, shade 700 the button's hover. A store that has not
+    changed that scale, or has no theme document yet, gets the platform
+    palette above, which is what its mail wore before it was themable.
 
-    ``Tenant.primary_color`` and ``neutral_color`` are deliberately NOT
-    consulted: they hold Tailwind colour NAMES ("blue", "zinc") for the
-    Nuxt compiler, not hex, so they cannot go into email CSS without a
-    name→hex table this does not need.
+    Only the primary scale is read. The accent and the status colours
+    (``/colors/light/accent``, ``…/success``) are stored as the colour a
+    store paints, and the colour an UNCHANGED store paints depends on its
+    storefront design, which the API does not know: comparing them with a
+    default would repaint the stores of the other design. The secondary
+    button therefore stays the platform's green.
+
+    The scale holds hex, never a Tailwind colour NAME ("blue", "zinc"),
+    so it can go into email CSS without a name→hex table. That was the
+    reason the tenant's ``primary_color`` and ``neutral_color`` names
+    were never consulted, and it holds still.
     """
     theme = dict(_DEFAULT_EMAIL_THEME)
-
-    scale = {}
-    metadata = _get_tenant_field("theme_metadata") or {}
-    if isinstance(metadata, dict):
-        colors = metadata.get("colors")
-        if isinstance(colors, dict):
-            candidate = colors.get("primaryScale")
-            if isinstance(candidate, dict):
-                scale = candidate
-
-    accent = _customised("accent_hex")
-    success = _customised("success_hex")
-
-    primary = scale.get("600") or accent
-    if primary:
+    if (brand := _branded_primary()) is not None:
+        primary, dark = brand
         theme["primary"] = primary
         theme["header"] = primary
-    dark = scale.get("700") or primary
-    if dark:
         theme["primary_dark"] = dark
-    if success:
-        theme["secondary"] = success
-
     return theme
 
 

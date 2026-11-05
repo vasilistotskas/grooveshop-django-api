@@ -3,6 +3,20 @@
 
 
 
+## v3.226.1 (2026-11-05)
+
+### Bug fixes
+
+* fix(auth): declare the creation options a passkey signup answers (#488)
+
+GET auth/webauthn/signup registers a credential, so allauth answers
+creation_options. Its document declares the request options of a
+sign-in, and the storefront parsers built on that refuse the answer, so
+choosing a passkey at signup failed. The new contract test drives the
+real endpoint.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ab6d0ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab6d0acd3693ea44b1aeb4fb57ec0e49e9703db3))
+
 ## v3.226.0 (2026-11-05)
 
 ### Features

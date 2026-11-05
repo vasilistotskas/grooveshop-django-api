@@ -19,10 +19,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from agent.oidc import (
-    MCP_RESOURCE_PATH,
     SCOPE_FAVOURITES_READ,
     SCOPE_LOYALTY_READ,
     SCOPE_ORDERS_READ,
+    store_mcp_resource,
 )
 from agent.serializers import AgentFavouriteSerializer, AgentProfileSerializer
 from loyalty.serializers.loyalty import LoyaltySummarySerializer
@@ -66,9 +66,9 @@ class AgentTokenAuthentication(TokenAuthentication):
         if not valid:
             return None
         access_token = get_validator_context().access_token
-        if access_token and not is_resources_subset(
-            [request.build_absolute_uri(MCP_RESOURCE_PATH)],
-            access_token.get_resources(),
+        resources = access_token.get_resources() if access_token else []
+        if resources and not is_resources_subset(
+            [store_mcp_resource()], resources
         ):
             raise PermissionDenied("Invalid target resource.")
         return orequest.user, access_token

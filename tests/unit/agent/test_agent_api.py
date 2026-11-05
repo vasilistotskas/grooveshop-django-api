@@ -23,7 +23,12 @@ from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
 from product.models.product import Product
-from tenant.models import Tenant, TenantMembershipRole, UserTenantMembership
+from tenant.models import (
+    Tenant,
+    TenantDomain,
+    TenantMembershipRole,
+    UserTenantMembership,
+)
 from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
@@ -72,6 +77,9 @@ class AgentAPITestCase(APITestCase):
         )
         cls.tenant.auto_create_schema = False
         cls.tenant.save()
+        TenantDomain.objects.create(
+            tenant=cls.tenant, domain="agent-test.example", is_primary=True
+        )
         # A store that runs the programme: plan flag above, switch here.
         switch_store_settings(LOYALTY_ENABLED=True)
         UserTenantMembership.objects.create(
@@ -159,7 +167,9 @@ class AgentAPITestCase(APITestCase):
     def test_token_bound_to_the_store_mcp_server_is_accepted(self) -> None:
         # What a real MCP client holds: it must send the server's URL as
         # the RFC 8707 resource, and the gateway forwards the token here.
-        self._bearer(["profile"], resources=["http://testserver/mcp"])
+        # The request arrives on another host and scheme than the token's,
+        # as it can in production, and that must not matter.
+        self._bearer(["profile"], resources=["https://agent-test.example/mcp"])
         response = self.client.get(reverse("agent-me"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.user.id)
@@ -172,7 +182,15 @@ class AgentAPITestCase(APITestCase):
     def test_token_bound_to_another_resource_of_the_store_is_refused(
         self,
     ) -> None:
-        self._bearer(["profile"], resources=["http://testserver/other"])
+        self._bearer(
+            ["profile"], resources=["https://agent-test.example/other"]
+        )
+        response = self.client.get(reverse("agent-me"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_token_bound_to_the_request_host_is_refused(self) -> None:
+        # What the store advertises decides, not what a caller sends.
+        self._bearer(["profile"], resources=["http://testserver/mcp"])
         response = self.client.get(reverse("agent-me"))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 

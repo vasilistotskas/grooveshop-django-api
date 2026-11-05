@@ -10,8 +10,22 @@ SCOPE_LOYALTY_READ = "loyalty:read"
 SCOPE_FAVOURITES_READ = "favourites:read"
 
 # Where a store's MCP server lives on its own domain, routed to the agent
-# gateway. The resource a linking client binds its token to (RFC 8707).
+# gateway.
 MCP_RESOURCE_PATH = "/mcp"
+
+
+def store_mcp_resource() -> str:
+    """The resource a linking client binds its token to (RFC 8707).
+
+    The storefront's protected-resource metadata names this URL, on the
+    store's primary domain and always over https. It is read from the
+    store, not the request: a request reaches this API through other
+    hosts and schemes than the one the token was bound to.
+    """
+    from tenant.membership import get_current_tenant
+
+    domain = get_current_tenant().get_primary_domain().domain
+    return f"https://{domain}{MCP_RESOURCE_PATH}"
 
 
 class AgentOIDCAdapter(DefaultOIDCAdapter):

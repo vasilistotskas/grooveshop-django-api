@@ -34,7 +34,7 @@ from builder import media_services, preview_links
 from builder.errors import BuilderError
 from builder.localization import LOCALE_PARAM, requested_locale
 from builder.models import BuilderReference, MediaAsset, ReferenceKind
-from builder.serializers import StaffSerializer
+from builder.serializers import BuilderMediaInUseSerializer, StaffSerializer
 from builder.services import staff_summary
 from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
@@ -43,10 +43,10 @@ from core.utils.image_paths import image_to_media_path
 
 TAGS = ["Builder media"]
 IDS_PARAM = "ids"
-ERRORS = {
-    400: OpenApiResponse(response=ErrorResponseSerializer),
-    409: OpenApiResponse(response=ErrorResponseSerializer),
-}
+_PLAIN = OpenApiResponse(response=ErrorResponseSerializer)
+ERRORS = {400: _PLAIN, 409: _PLAIN}
+NOT_FOUND = {404: _PLAIN}
+STORE_UNAVAILABLE = {503: _PLAIN}
 
 
 def _held_alt(asset: MediaAsset) -> dict[str, str]:
@@ -324,14 +324,14 @@ class AssetDetailView(RetrieveUpdateDestroyAPIView):
             "used_by": _used_by([int(self.kwargs["pk"])]),
         }
 
-    @extend_schema(tags=TAGS)
+    @extend_schema(tags=TAGS, responses={200: AssetSerializer, **NOT_FOUND})
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         return super().get(request, *args, **kwargs)
 
     @extend_schema(
         tags=TAGS,
         request=AssetUpdateSerializer,
-        responses={200: AssetSerializer, **ERRORS},
+        responses={200: AssetSerializer, **ERRORS, **NOT_FOUND},
         description=(
             "Change the focal point and the alt text of the languages "
             "named; the file never changes. A used asset's change reaches "
@@ -358,7 +358,12 @@ class AssetDetailView(RetrieveUpdateDestroyAPIView):
 
     @extend_schema(
         tags=TAGS,
-        responses={204: None, **ERRORS},
+        responses={
+            204: None,
+            **ERRORS,
+            **NOT_FOUND,
+            409: OpenApiResponse(response=BuilderMediaInUseSerializer),
+        },
         description=(
             "Delete an asset no published page uses; otherwise 409 "
             "`media_in_use` with `usedBy`."
@@ -423,7 +428,7 @@ class AssetImportView(APIView):
     @extend_schema(
         tags=TAGS,
         request=AssetImportSerializer,
-        responses={201: AssetStoredSerializer, **ERRORS},
+        responses={201: AssetStoredSerializer, **ERRORS, **STORE_UNAVAILABLE},
         description=(
             "Import an image of THIS store by path: one the storefront serves "
             "(`/img/...`, fetched from its internal address, no redirect "

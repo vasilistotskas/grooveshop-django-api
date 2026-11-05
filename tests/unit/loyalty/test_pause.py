@@ -7,8 +7,9 @@ points while it is off, so that time must not eat into them.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import call, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.utils import timezone
@@ -49,6 +50,21 @@ class TestActiveCutoff:
         assert LoyaltyPause.active_cutoff(now, timedelta(days=5)) == (
             now - timedelta(days=15)
         )
+
+    def test_a_daylight_saving_change_does_not_move_the_cutoff(self):
+        """Athens left summer time on 2026-10-25, so a pause read back in
+        the store's zone spans a change of offset."""
+        athens = ZoneInfo("Europe/Athens")
+        now = datetime(2026, 11, 4, 20, 0, tzinfo=UTC)
+        LoyaltyPause.objects.create(
+            started_at=(now - timedelta(days=10)).astimezone(athens)
+        )
+
+        cutoff = LoyaltyPause.active_cutoff(
+            now.astimezone(athens), timedelta(days=5)
+        )
+
+        assert cutoff == datetime(2026, 10, 20, 20, 0, tzinfo=UTC)
 
     def test_a_pause_older_than_the_window_changes_nothing(self):
         now = timezone.now()

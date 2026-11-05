@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
-from loyalty.services import LoyaltyService
+from loyalty.services import LoyaltyService, PointsRates
 from order.enum.status import OrderStatus, PaymentStatus
 from tests.utils.loyalty import loyalty_settings
 
@@ -25,6 +25,13 @@ pytestmark = pytest.mark.assert_english
 # ---------------------------------------------------------------------------
 # Helper: build a mock product
 # ---------------------------------------------------------------------------
+
+
+RATES = PointsRates(
+    factor=Decimal("1.0"),
+    price_basis="final_price",
+    tier_multiplier_enabled=False,
+)
 
 
 def _make_mock_product(
@@ -181,17 +188,23 @@ class TestDisabledSystem:
                 user, 100, "EUR", max_discount=Decimal(99999)
             )
 
-    def test_get_product_potential_points_returns_zero(self):
-        """get_product_potential_points returns 0 when disabled."""
-        product = _make_mock_product()
+    def test_no_rates_are_shown_while_loyalty_is_off(self):
+        with loyalty_settings(LOYALTY_ENABLED=False):
+            assert LoyaltyService.active_points_rates() is None
 
-        with patch(
-            "extra_settings.models.Setting.get",
-            side_effect=self._mock_settings_disabled,
+    def test_the_rates_are_shown_while_loyalty_is_on(self):
+        with loyalty_settings(
+            LOYALTY_POINTS_FACTOR=2.5,
+            LOYALTY_PRICE_BASIS="final_price",
+            LOYALTY_TIER_MULTIPLIER_ENABLED=True,
         ):
-            result = LoyaltyService.get_product_potential_points(product)
+            rates = LoyaltyService.active_points_rates()
 
-        assert result == 0
+        assert rates == PointsRates(
+            factor=Decimal("2.5"),
+            price_basis="final_price",
+            tier_multiplier_enabled=True,
+        )
 
 
 # ===========================================================================
@@ -212,20 +225,9 @@ class TestZeroCoefficient:
             bonus_points=25,
         )
 
-        def mock_settings(key, default=None):
-            settings_map = {
-                "LOYALTY_POINTS_FACTOR": 1.0,
-                "LOYALTY_PRICE_BASIS": "final_price",
-                "LOYALTY_TIER_MULTIPLIER_ENABLED": False,
-            }
-            return settings_map.get(key, default)
-
-        with patch(
-            "extra_settings.models.Setting.get", side_effect=mock_settings
-        ):
-            result = LoyaltyService.calculate_item_points(
-                product, quantity=1, tier_multiplier=Decimal("1.0")
-            )
+        result = LoyaltyService.calculate_item_points(
+            product, quantity=1, rates=RATES
+        )
 
         assert result == 25
 
@@ -238,20 +240,9 @@ class TestZeroCoefficient:
             bonus_points=10,
         )
 
-        def mock_settings(key, default=None):
-            settings_map = {
-                "LOYALTY_POINTS_FACTOR": 1.0,
-                "LOYALTY_PRICE_BASIS": "final_price",
-                "LOYALTY_TIER_MULTIPLIER_ENABLED": False,
-            }
-            return settings_map.get(key, default)
-
-        with patch(
-            "extra_settings.models.Setting.get", side_effect=mock_settings
-        ):
-            result = LoyaltyService.calculate_item_points(
-                product, quantity=3, tier_multiplier=Decimal("1.0")
-            )
+        result = LoyaltyService.calculate_item_points(
+            product, quantity=3, rates=RATES
+        )
 
         assert result == 30  # 0 calculated + 10 * 3 fixed
 

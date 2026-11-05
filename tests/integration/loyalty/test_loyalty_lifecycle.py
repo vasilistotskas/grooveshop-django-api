@@ -21,6 +21,7 @@ from loyalty.services import LoyaltyService
 from order.models.item import OrderItem
 from order.models.order import Order
 from product.models.product import Product
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 from vat.models import Vat
 
@@ -224,6 +225,7 @@ class TestOrderCompleteEarnFlow:
         order = _create_order(user)
         _create_order_item(order, product, quantity=1)
 
+        switch_store_settings(LOYALTY_TIER_MULTIPLIER_ENABLED=True)
         mock_settings = _loyalty_settings(
             enabled=True,
             points_factor=1.0,

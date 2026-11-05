@@ -1,7 +1,9 @@
 import logging
 import math
+from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -9,7 +11,11 @@ from django.db.models import F, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.store_settings import DECLARED_DEFAULTS, store_setting
+from core.store_settings import (
+    DECLARED_DEFAULTS,
+    store_setting,
+    store_settings,
+)
 from loyalty.enum import PriceBasis, TransactionType
 from loyalty.models.pause import LoyaltyPause
 from loyalty.models.tier import LoyaltyTier
@@ -19,6 +25,36 @@ logger = logging.getLogger(__name__)
 
 #: ``<prefix><ISO currency>``: points per one unit of that currency.
 REDEMPTION_RATIO_PREFIX = "LOYALTY_REDEMPTION_RATIO_"
+
+
+_RATE_SETTINGS = (
+    "LOYALTY_POINTS_FACTOR",
+    "LOYALTY_PRICE_BASIS",
+    "LOYALTY_TIER_MULTIPLIER_ENABLED",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PointsRates:
+    """The store's rates for earning points, read once and reused.
+
+    A store setting costs a Redis round trip, so a caller that prices
+    several products reads these once, not once per product.
+    """
+
+    factor: Decimal
+    price_basis: str
+    tier_multiplier_enabled: bool
+
+    @classmethod
+    def from_settings(cls, values: dict[str, Any]) -> PointsRates:
+        return cls(
+            factor=Decimal(str(values["LOYALTY_POINTS_FACTOR"])),
+            price_basis=values["LOYALTY_PRICE_BASIS"],
+            tier_multiplier_enabled=bool(
+                values["LOYALTY_TIER_MULTIPLIER_ENABLED"]
+            ),
+        )
 
 
 def _reversal_due(order_id: int) -> bool:
@@ -73,8 +109,32 @@ class LoyaltyService:
         return bool(store_setting("LOYALTY_ENABLED"))
 
     @classmethod
-    def get_price_basis_amount(cls, product) -> Decimal:
-        """Return the price amount based on the configured LOYALTY_PRICE_BASIS.
+    def points_rates(cls) -> PointsRates:
+        """The store's earning rates, in one settings read."""
+        return PointsRates.from_settings(store_settings(_RATE_SETTINGS))
+
+    @classmethod
+    def active_points_rates(cls) -> PointsRates | None:
+        """The rates to show a shopper, or ``None`` while loyalty is off:
+        :meth:`is_enabled` and :meth:`points_rates` in one settings read."""
+        from tenant.membership import tenant_plan_allows
+
+        if not tenant_plan_allows("loyalty_enabled"):
+            return None
+        values = store_settings(("LOYALTY_ENABLED", *_RATE_SETTINGS))
+        if not values["LOYALTY_ENABLED"]:
+            return None
+        return PointsRates.from_settings(values)
+
+    @classmethod
+    def tier_multiplier(cls, user) -> Decimal:
+        """What *user*'s tier multiplies points by; 1 without a tier."""
+        tier = user.loyalty_tier
+        return tier.points_multiplier if tier else Decimal("1.0")
+
+    @classmethod
+    def get_price_basis_amount(cls, product, basis: str) -> Decimal:
+        """Return the price amount for a LOYALTY_PRICE_BASIS value.
 
         Supports four price basis options:
         - price_excl_vat_no_discount: product.price
@@ -82,7 +142,6 @@ class LoyaltyService:
         - price_incl_vat_no_discount: product.price plus VAT on it
         - final_price: product.final_price (price + vat - discount)
         """
-        basis = store_setting("LOYALTY_PRICE_BASIS")
         if basis == PriceBasis.PRICE_EXCL_VAT_NO_DISCOUNT:
             return Decimal(str(product.price.amount))
         elif basis == PriceBasis.PRICE_EXCL_VAT_WITH_DISCOUNT:
@@ -103,6 +162,7 @@ class LoyaltyService:
         cls,
         product,
         quantity: int,
+        rates: PointsRates,
         tier_multiplier: Decimal = Decimal("1.0"),
     ) -> int:
         """Calculate points for a single order item.
@@ -113,17 +173,15 @@ class LoyaltyService:
         The tier multiplier is only applied when LOYALTY_TIER_MULTIPLIER_ENABLED is true
         and the multiplier is greater than 1.0.
         """
-        factor = Decimal(str(store_setting("LOYALTY_POINTS_FACTOR")))
-        price_basis = cls.get_price_basis_amount(product)
+        price_basis = cls.get_price_basis_amount(product, rates.price_basis)
         calculated = (
             price_basis
-            * factor
+            * rates.factor
             * Decimal(str(product.points_coefficient))
             * quantity
         )
 
-        tier_enabled = store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED")
-        if tier_enabled and tier_multiplier > Decimal("1.0"):
+        if rates.tier_multiplier_enabled and tier_multiplier > Decimal("1.0"):
             calculated = calculated * tier_multiplier
 
         return math.floor(calculated) + (product.points * quantity)
@@ -148,15 +206,13 @@ class LoyaltyService:
         previews them, so the number a customer sees before the award
         is the number the award then writes.
         """
-        tier_multiplier = Decimal("1.0")
-        tier = order.user.loyalty_tier
-        if tier:
-            tier_multiplier = tier.points_multiplier
+        tier_multiplier = cls.tier_multiplier(order.user)
+        rates = cls.points_rates()
         return [
             (
                 item,
                 cls.calculate_item_points(
-                    item.product, item.quantity, tier_multiplier
+                    item.product, item.quantity, rates, tier_multiplier
                 ),
             )
             for item in order.items.select_related("product", "product__vat")
@@ -793,23 +849,6 @@ class LoyaltyService:
                     count += 1
 
         return count
-
-    @classmethod
-    def get_product_potential_points(cls, product, user=None) -> int:
-        """Calculate potential points for a single product purchase.
-
-        If a user is provided and has a tier, the tier multiplier is applied.
-        """
-        if not cls.is_enabled():
-            return 0
-
-        tier_multiplier = Decimal("1.0")
-        if user and user.loyalty_tier:
-            tier_multiplier = user.loyalty_tier.points_multiplier
-
-        return cls.calculate_item_points(
-            product, quantity=1, tier_multiplier=tier_multiplier
-        )
 
     @classmethod
     @transaction.atomic

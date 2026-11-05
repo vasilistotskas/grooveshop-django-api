@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.store_settings import store_setting
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -316,17 +315,22 @@ class LoyaltyViewSet(BaseModelViewSet):
 
     def _points_preview(self, products) -> list[dict]:
         """Each product's points for the caller, at their current tier."""
-        user = self.request.user
+        rates = LoyaltyService.active_points_rates()
+        multiplier = LoyaltyService.tier_multiplier(self.request.user)
         tier_multiplier_applied = (
-            bool(user.loyalty_tier)
-            and user.loyalty_tier.points_multiplier > 1
-            and bool(store_setting("LOYALTY_TIER_MULTIPLIER_ENABLED"))
+            rates is not None
+            and rates.tier_multiplier_enabled
+            and multiplier > 1
         )
         return [
             {
                 "product_id": product.id,
-                "potential_points": LoyaltyService.get_product_potential_points(
-                    product, user
+                "potential_points": (
+                    LoyaltyService.calculate_item_points(
+                        product, 1, rates, multiplier
+                    )
+                    if rates is not None
+                    else 0
                 ),
                 "tier_multiplier_applied": tier_multiplier_applied,
             }

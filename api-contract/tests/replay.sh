@@ -24,8 +24,10 @@ STOREFRONT=https://raw.githubusercontent.com/vasilistotskas/grooveshop-storefron
 
 # The rules the PR entry point runs: this directory, with nothing accepted.
 mkdir -p "$work/rules" "$work/live"
-cp "$here"/{api-contract.sh,services.txt,allauth-required.txt,storefront-levels.txt} "$work/rules/"
+cp "$here"/{api-contract.sh,services.txt,storefront-levels.txt} "$work/rules/"
 : > "$work/rules/ignore.txt"
+# These tags predate the storefront's allauth document.
+echo false > "$work/rules/allauth-required.txt"
 
 host_path() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else echo "$1"; fi; }
 

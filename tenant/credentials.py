@@ -199,11 +199,8 @@ def _branded_primary() -> tuple[str, str] | None:
     is the platform's own default: every new store starts from that
     scale, so "the store has a primary scale" does NOT mean "the merchant
     chose it". Treating it so would repaint every unbranded store's mail
-    grey. Comparing against the default is how the storefront's token
-    compiler decides too (``server/utils/themeTokens.ts`` writes only what
-    differs from the platform's). The default is the catalogue the
-    storefront pinned with the seeds, which every design shares for the
-    primary scale.
+    grey. The default is the catalogue the storefront pinned with the
+    seeds, which every design shares for the primary scale.
 
     A document that cannot be read never fails a send: the store gets the
     platform palette and a warning is logged.

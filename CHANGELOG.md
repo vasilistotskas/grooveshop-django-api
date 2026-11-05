@@ -3,6 +3,102 @@
 
 
 
+## v3.226.2 (2026-11-05)
+
+### Bug fixes
+
+* fix(agent): accept a token bound to the store's MCP server (#490) ([`4bf241a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bf241a567eb3c2e3924ca82e591db2ccb1c267b))
+
+* fix(agent): accept a token bound to the store's MCP server
+
+A client linking through the store's MCP server binds its token to that
+server, as MCP requires (RFC 8707), and the gateway forwards the token
+to this API, which is what /mcp reads. allauth compares a token's
+resources with the URL it reached, so it refused every such token as an
+invalid target, and the my_* tools could not work for any real client.
+
+AgentTokenAuthentication now compares them with the store's MCP server
+instead. A token bound to another store's server, or to another resource
+of this store, is still refused.
+
+The tests minted tokens without a resource, which allauth lets through,
+so none of them met this.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxKx2YfKAzsgw9Krp8i ([`4bf241a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bf241a567eb3c2e3924ca82e591db2ccb1c267b))
+
+* fix(agent): read the MCP audience from the store, not the request
+
+The storefront advertises the resource on the primary domain, always over
+https, so a request arriving on another host or scheme was refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RjQxxKx2YfKAzsgw9Krp8i
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4bf241a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bf241a567eb3c2e3924ca82e591db2ccb1c267b))
+
+* fix(email): read the brand colours from the published theme document (#491) ([`d692d9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d692d9ea3cf82d399505de85c5ee3104f494e4f2))
+
+* fix(email): compare both shades and warn on a malformed scale
+
+A scale that changed only its dark shade counted as the default, and a
+malformed one fell back with no warning, though the docs promise one.
+The case test used a shade with no letters, so it now holds one that
+has them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`d692d9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d692d9ea3cf82d399505de85c5ee3104f494e4f2))
+
+### Continuous integration
+
+* ci(api-contract): require the storefront allauth document (#489) ([`058431e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/058431ebb930c5ebeaea5494fa7f1dc85751e99c))
+
+* ci(api-contract): require the storefront allauth document
+
+Storefront v3.323.5 commits it, so a missing document now fails the
+check instead of being reported as not checked.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`058431e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/058431ebb930c5ebeaea5494fa7f1dc85751e99c))
+
+### Documentation
+
+* docs(email): drop the reference to a deleted compiler
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d692d9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d692d9ea3cf82d399505de85c5ee3104f494e4f2))
+
+### Refactoring
+
+* refactor(email): read the brand colours from the published theme document
+
+tenant_email_theme took the email palette from the Tenant theme columns
+(theme_metadata primaryScale, accent_hex, success_hex). The page builder's
+theme document is now the only source of a store's look, so the mail reads
+colors.light.primary.scale shades 600 and 700 of the current release, through
+the cached chrome read the storefront shares.
+
+A store whose primary scale is the platform default, a store with no release
+or theme document, mail rendered outside a store schema, and a document that
+cannot be read keep the platform palette; a read failure is logged and never
+stops a send. The accent and status colours are no longer read: what an
+unchanged store paints depends on its design.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`d692d9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d692d9ea3cf82d399505de85c5ee3104f494e4f2))
+
+### Testing
+
+* test(api-contract): replay old tags without the allauth document
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`058431e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/058431ebb930c5ebeaea5494fa7f1dc85751e99c))
+
 ## v3.226.1 (2026-11-05)
 
 ### Bug fixes

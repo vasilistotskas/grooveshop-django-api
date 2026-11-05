@@ -24,12 +24,33 @@ Django does before the mail ever leaves — zero client dependency.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from django.conf import settings
+from django.core.cache import cache
+from django.db import connection
 from django.template.loader import render_to_string
 
+from builder.factories import (
+    BuilderDocumentFactory,
+    BuilderReleaseFactory,
+    BuilderVersionFactory,
+)
+from builder.models import DocumentKind
+from builder.published import published_index
 from core.utils.email_context import build_email_context
+from tenant.credentials import (
+    _DEFAULT_EMAIL_THEME,
+    in_tenant_schema,
+    tenant_email_theme,
+)
+from tenant.models import Tenant
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
 
 EMAIL_TEMPLATE_ROOT = Path(settings.BASE_DIR) / "core" / "templates" / "emails"
 # django-allauth emails (login code, password reset, email confirmation,
@@ -155,139 +176,250 @@ class TestRenderedOutput:
         assert "email-wrapper" in html, "did not render through the base"
 
 
-class TestThemeResolution:
-    def test_defaults_are_literal_hex(self):
-        from tenant.credentials import tenant_email_theme
+ORIGINAL_PALETTE = {
+    "primary": "#2563eb",
+    "primary_dark": "#1e40af",
+    "secondary": "#10b981",
+    "header": "#97b7ff",
+}
 
+#: The primary scale of ``ekfyseosfyteias``, the one production store that
+#: chose its own (its published theme document, shades 600 and 700).
+FYTEIA_600, FYTEIA_700 = "#7f8a6c", "#676d58"
+
+
+def _default_primary_scale() -> dict[str, str]:
+    """The scale every new store's theme starts with."""
+    from builder import seeding
+
+    defaults = seeding.seed_catalogue().roots["theme"].defaults
+    return dict(defaults["colors"]["light"]["primary"]["scale"])
+
+
+def _release_theme(
+    scale: dict[str, str] | None, *, dark: dict | None = None, **colors
+) -> None:
+    """Release a theme document whose light primary is *scale*."""
+    primary = {"scale": scale} if scale is not None else None
+    light = {**({"primary": primary} if primary else {}), **colors}
+    document = BuilderDocumentFactory(kind=DocumentKind.THEME, key="theme")
+    version = BuilderVersionFactory(
+        document=document,
+        data={
+            "sections": {},
+            "order": [],
+            "settings": {
+                "colors": {"light": light, **({"dark": dark} if dark else {})}
+            },
+        },
+    )
+    BuilderReleaseFactory(versions={"theme": version.pk})
+
+
+@pytest.fixture
+def store():
+    """A store schema is active, with a cold cache."""
+    cache.clear()
+    tenant = store_tenant("email_theme_store")
+    previous = bind_store_tenant(tenant)
+    yield tenant
+    unbind_store_tenant(previous)
+    cache.clear()
+
+
+@pytest.mark.django_db
+class TestThemeResolution:
+    """``tenant_email_theme`` wears the store's published theme document."""
+
+    def test_defaults_are_literal_hex(self):
         theme = tenant_email_theme()
         assert set(theme) == {"primary", "primary_dark", "secondary", "header"}
         for key, value in theme.items():
             assert value.startswith("#"), f"{key} is not hex: {value!r}"
 
-    def test_accent_hex_drives_the_palette(self, monkeypatch):
-        from tenant import credentials
+    def test_platform_defaults_are_the_original_palette(self):
+        """The values of the old ``:root`` block, byte for byte."""
+        assert _DEFAULT_EMAIL_THEME == ORIGINAL_PALETTE
 
-        values = {"accent_hex": "#AA00BB", "success_hex": "#00CC44"}
-        monkeypatch.setattr(
-            credentials,
-            "_get_tenant_field",
-            lambda name, *a, **kw: values.get(name, ""),
+    def test_primary_scale_drives_the_palette(self, store):
+        _release_theme(
+            {**_default_primary_scale(), "600": "#123456", "700": "#0a1b2c"}
         )
 
-        theme = credentials.tenant_email_theme()
-
-        assert theme["primary"] == "#AA00BB"
-        assert theme["header"] == "#AA00BB"
-        assert theme["secondary"] == "#00CC44"
-
-    def test_theme_metadata_scale_wins_over_accent(self, monkeypatch):
-        from tenant import credentials
-
-        values = {
-            "accent_hex": "#AA00BB",
-            "theme_metadata": {
-                "colors": {"primaryScale": {"600": "#123456", "700": "#0A1B2C"}}
-            },
+        assert tenant_email_theme() == {
+            "primary": "#123456",
+            "primary_dark": "#0a1b2c",
+            "secondary": ORIGINAL_PALETTE["secondary"],
+            "header": "#123456",
         }
-        monkeypatch.setattr(
-            credentials,
-            "_get_tenant_field",
-            lambda name, *a, **kw: values.get(name, ""),
+
+    def test_the_store_that_chose_its_scale_keeps_its_colours(self, store):
+        """ekfyseosfyteias: shades 600 and 700 of its sage scale."""
+        _release_theme(
+            {**_default_primary_scale(), "600": FYTEIA_600, "700": FYTEIA_700}
         )
 
-        theme = credentials.tenant_email_theme()
+        assert tenant_email_theme() == {
+            "primary": FYTEIA_600,
+            "primary_dark": FYTEIA_700,
+            "secondary": ORIGINAL_PALETTE["secondary"],
+            "header": FYTEIA_600,
+        }
 
-        assert theme["primary"] == "#123456"
-        assert theme["primary_dark"] == "#0A1B2C"
+    def test_accent_and_status_colours_are_not_read(self, store):
+        """What an unchanged store paints depends on its design, which the
+        API does not know, so only the primary scale is a brand."""
+        _release_theme(
+            _default_primary_scale(), accent="#b3694b", success="#13703a"
+        )
 
-    def test_malformed_theme_metadata_falls_back_cleanly(self, monkeypatch):
-        """Merchant-editable JSON must never break outbound mail."""
-        from tenant import credentials
+        assert tenant_email_theme() == ORIGINAL_PALETTE
 
-        for junk in ("not-a-dict", {"colors": "nope"}, {"colors": {}}, None):
-            monkeypatch.setattr(
-                credentials,
-                "_get_tenant_field",
-                lambda name, *a, _j=junk, **kw: (
-                    _j if name == "theme_metadata" else ""
-                ),
-            )
-            theme = credentials.tenant_email_theme()
-            assert theme["primary"].startswith("#")
+    def test_dark_scheme_is_not_read(self, store):
+        _release_theme(
+            _default_primary_scale(),
+            dark={"primary": {"scale": {"600": "#123456", "700": "#0a1b2c"}}},
+        )
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
 
 
-class TestUncustomisedTenantRendersExactlyAsBefore:
+@pytest.mark.django_db
+class TestUnbrandedStoreRendersExactlyAsBefore:
     """An existing store's mail must not change appearance.
 
-    Every ``Tenant`` row carries the model's field defaults —
-    ``accent_hex`` is ``#003DFF``, ``success_hex`` is ``#16a34a`` —
-    so "the field has a value" does NOT mean the merchant chose it.
-    Treating a default as a customisation repainted every existing
-    store's email (header ``#97b7ff`` -> ``#003DFF``, buttons
-    ``#2563eb`` -> ``#003DFF``) purely because a default exists.
-
-    These are the EXACT values from the old ``:root`` block. Rendering
-    the pre-change template with its variables resolved produced output
-    byte-identical to the current template under this palette.
+    Every store's theme document carries a primary scale: a new store
+    starts with the platform's, and the theme import wrote the two
+    production stores that never chose one (demo, webside) the same.
+    "The document has a scale" is therefore NOT "the merchant chose it".
+    Treating it so repainted their mail grey (``#525252``) purely because
+    a default exists, instead of the palette it has always worn.
     """
 
-    ORIGINAL_PALETTE = {
-        "primary": "#2563eb",
-        "primary_dark": "#1e40af",
-        "secondary": "#10b981",
-        "header": "#97b7ff",
-    }
+    def test_default_scale_gets_the_original_palette(self, store):
+        """demo and webside."""
+        _release_theme(_default_primary_scale())
 
-    def test_platform_defaults_are_the_original_palette(self):
-        from tenant.credentials import _DEFAULT_EMAIL_THEME
+        assert tenant_email_theme() == ORIGINAL_PALETTE
 
-        assert _DEFAULT_EMAIL_THEME == self.ORIGINAL_PALETTE
+    def test_default_comparison_is_case_insensitive(self, store):
+        scale = _default_primary_scale()
+        _release_theme({**scale, "600": scale["600"].upper()})
 
-    def test_tenant_carrying_model_defaults_gets_the_original_palette(
-        self, monkeypatch
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+
+    def test_store_with_no_release_gets_the_original_palette(
+        self, store, caplog
     ):
-        from tenant import credentials
-        from tenant.models import Tenant
+        """A normal state, not a warning."""
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+        assert caplog.text == ""
 
-        defaults = {
-            "accent_hex": Tenant._meta.get_field("accent_hex").default,
-            "success_hex": Tenant._meta.get_field("success_hex").default,
-            "theme_metadata": {},
-        }
-        monkeypatch.setattr(
-            credentials,
-            "_get_tenant_field",
-            lambda name, *a, **kw: defaults.get(name, ""),
+    def test_release_without_a_theme_gets_the_original_palette(
+        self, store, caplog
+    ):
+        BuilderReleaseFactory(versions={})
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+        assert caplog.text == ""
+
+    def test_platform_mail_under_public_gets_the_original_palette(self):
+        """Platform mail renders in ``public``: no store, so no theme, even
+        where a release is on disk (a store-less Celery task, a shell)."""
+        cache.clear()
+        _release_theme({**_default_primary_scale(), "600": "#123456"})
+        assert in_tenant_schema() is False
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+
+    def test_tenant_theme_columns_no_longer_drive_the_palette(self, store):
+        """The old inputs are not read, not even as a fallback."""
+        Tenant.objects.filter(pk=store.pk).update(
+            accent_hex="#AA00BB",
+            success_hex="#00CC44",
+            theme_metadata={
+                "colors": {"primaryScale": {"600": "#123456", "700": "#0A1B2C"}}
+            },
+        )
+        connection.set_tenant(Tenant.objects.get(pk=store.pk))
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+
+
+@pytest.mark.django_db
+class TestAnUnreadableThemeNeverStopsAMail:
+    """Merchant-edited JSON and the infrastructure under it must never
+    break outbound mail."""
+
+    @pytest.mark.parametrize(
+        "scale",
+        [
+            {},
+            {"600": "#123456"},
+            {"700": "#123456"},
+            {"600": "blue", "700": "blue"},
+            {"600": "#12345", "700": "#0a1b2c"},
+            {"600": "#fff;}</style><script>", "700": "#0a1b2c"},
+            {"600": 7, "700": None},
+        ],
+    )
+    def test_malformed_scale_gets_the_original_palette(self, store, scale):
+        _release_theme(scale)
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+
+    def test_document_without_colours_gets_the_original_palette(self, store):
+        _release_theme(None)
+
+        assert tenant_email_theme() == ORIGINAL_PALETTE
+
+    def test_a_failed_read_is_logged_and_gets_the_original_palette(
+        self, store, caplog
+    ):
+        with mock.patch(
+            "builder.published.published_index", side_effect=RuntimeError("db")
+        ):
+            theme = tenant_email_theme()
+
+        assert theme == ORIGINAL_PALETTE
+        assert "Could not read the published theme" in caplog.text
+
+
+@pytest.mark.django_db
+class TestTheReadIsCheap:
+    def test_a_warm_release_costs_no_query(
+        self, store, django_assert_num_queries
+    ):
+        _release_theme({**_default_primary_scale(), "600": "#123456"})
+        assert tenant_email_theme()["primary"] == "#123456"
+
+        with django_assert_num_queries(0):
+            assert tenant_email_theme()["primary"] == "#123456"
+
+    def test_the_read_is_the_storefronts_cached_chrome(self, store):
+        """No cache of its own: the storefront's request for the default
+        locale warms the mail's read."""
+        _release_theme({**_default_primary_scale(), "600": "#123456"})
+        published_index(settings.PARLER_DEFAULT_LANGUAGE_CODE)
+
+        with mock.patch("builder.published._build_index") as build:
+            assert tenant_email_theme()["primary"] == "#123456"
+        build.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestRenderedMailWearsTheStoresColours:
+    def test_button_and_header_follow_the_document(self, store):
+        _release_theme(
+            {**_default_primary_scale(), "600": FYTEIA_600, "700": FYTEIA_700}
         )
 
-        assert credentials.tenant_email_theme() == self.ORIGINAL_PALETTE
-
-    def test_customisation_is_still_honoured(self, monkeypatch):
-        """The feature must still work for a store that DID choose."""
-        from tenant import credentials
-
-        values = {"accent_hex": "#AA00BB", "theme_metadata": {}}
-        monkeypatch.setattr(
-            credentials,
-            "_get_tenant_field",
-            lambda name, *a, **kw: values.get(name, ""),
+        html = render_to_string(
+            "emails/order/order_shipped.html",
+            build_email_context(language="el", order={"id": 1}, items=[]),
         )
 
-        theme = credentials.tenant_email_theme()
-        assert theme["primary"] == "#AA00BB"
-        assert theme["header"] == "#AA00BB"
-
-    def test_default_comparison_is_case_insensitive(self, monkeypatch):
-        """The hex fields are free text; #003dff is not a customisation."""
-        from tenant import credentials
-        from tenant.models import Tenant
-
-        default = str(Tenant._meta.get_field("accent_hex").default)
-        values = {"accent_hex": default.lower(), "theme_metadata": {}}
-        monkeypatch.setattr(
-            credentials,
-            "_get_tenant_field",
-            lambda name, *a, **kw: values.get(name, ""),
-        )
-
-        assert credentials.tenant_email_theme() == self.ORIGINAL_PALETTE
+        assert f"background-color: {FYTEIA_600}" in html
+        assert f"background-color: {FYTEIA_700}" in html
+        assert ORIGINAL_PALETTE["primary"] not in html
+        assert ORIGINAL_PALETTE["header"] not in html

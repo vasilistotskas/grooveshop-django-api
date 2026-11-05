@@ -408,6 +408,40 @@ else its name on the platform's sender). `Reply-To` (`sender.reply_to(email_type
 address for a store type sent to customers, and empty for a platform type
 and for mail to the store's own staff.
 
+### Colours
+
+`core.utils.email_context.build_email_context` puts the store's colours in
+the context as `THEME`, resolved by `tenant.credentials.tenant_email_theme()`
+to literal hex that `email_base.html` writes into its `<style>` block: mail
+clients drop the `:root { --x: ... }` declaration, so CSS custom properties
+cannot carry a colour.
+
+The source is the store's theme document in its CURRENT release, the same
+one the storefront draws its look from, not any `Tenant` column. The mail
+wears `colors.light.primary.scale` shade 600 (buttons, links, the header) and
+shade 700 (a button's hover). Nothing else of the theme is read: the accent
+and the status colours are stored as the colour a store paints, and what an
+unchanged store paints depends on its storefront design, which the API does
+not know.
+
+The platform palette (the one the base template carried before it was
+themable, in `_DEFAULT_EMAIL_THEME`) is used when
+
+- the mail renders outside a store's schema (every `platform.*` type renders
+  under `public`; a task with no tenant has none);
+- the store has no release, or its release has no theme document;
+- the primary scale is the platform's default scale (the one a new store
+  starts with, read from the catalogue pinned with the seeds): a store has a
+  scale whether or not its merchant chose one, so only a scale that differs
+  is a brand;
+- the document cannot be read or shade 600 or 700 is not `#RRGGBB`. This is
+  logged as a warning (not for the first three, which are normal) and never
+  stops the mail.
+
+The read is `builder.published.published_index` for the default language,
+the cached chrome read the storefront's own requests use, so a warm release
+costs no query and mail adds no cache of its own.
+
 ## Gates (`gates.py`)
 
 Each gate has a `label` (the reason a store reads, "Gift cards feature")

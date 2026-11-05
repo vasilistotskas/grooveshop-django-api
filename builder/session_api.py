@@ -28,7 +28,7 @@ class StaffSessionTicketSerializer(serializers.Serializer):
 
 
 class StaffSessionStaffSerializer(StaffSerializer):
-    role = serializers.CharField()
+    role = serializers.ChoiceField(choices=staff_session.ROLES)
 
 
 class StaffSessionResponseSerializer(serializers.Serializer):

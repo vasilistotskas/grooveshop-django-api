@@ -52002,6 +52002,18 @@ components:
       - expiresAt
       - staff
       - token
+    StaffSessionRoleEnum:
+      enum:
+      - staff
+      - admin
+      - owner
+      - superuser
+      type: string
+      description: |-
+        * `staff` - staff
+        * `admin` - admin
+        * `owner` - owner
+        * `superuser` - superuser
     StaffSessionStaff:
       type: object
       properties:
@@ -52010,7 +52022,7 @@ components:
         name:
           type: string
         role:
-          type: string
+          $ref: '#/components/schemas/StaffSessionRoleEnum'
       required:
       - id
       - name

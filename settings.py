@@ -4341,6 +4341,7 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.hooks.preprocess_exclude_path_format",
     ],
     "ENUM_NAME_OVERRIDES": {
+        "StaffSessionRoleEnum": "builder.staff_session.ROLES",
         "OrderStatus": "order.enum.status.OrderStatus",
         # ``PayWay.key`` and ``Order.pay_way_key`` share one vocabulary; the
         # override keeps the established ``PayWayKeyEnum`` name for both

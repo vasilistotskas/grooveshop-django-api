@@ -38,12 +38,19 @@ from builder.services import VIEW_PERMISSION
 from core import tickets
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 from tenant.membership import get_current_tenant, get_membership
-from tenant.models import PlatformStaffToken, StaffTokenScope
+from tenant.models import (
+    PlatformStaffToken,
+    StaffTokenScope,
+    TenantMembershipRole,
+)
 from tenant.staff_actors import resolve_staff, staff_id
 
 #: ``role`` in the session answer for a platform superuser, who holds no
 #: membership.
 SUPERUSER_ROLE = "superuser"
+
+#: Every ``role`` the session answer can carry.
+ROLES = (*TenantMembershipRole.values, SUPERUSER_ROLE)
 
 
 class InvalidTicket(BuilderError):
@@ -77,7 +84,11 @@ def _role_of(user: Any) -> str:
     if user.is_superuser:
         return SUPERUSER_ROLE
     membership = get_membership(user, get_current_tenant())
-    return membership.role if membership is not None else ""
+    # The role backend grants the view permission to a member, so a
+    # person who got this far has a membership.
+    if membership is None:
+        raise InvalidTicket()
+    return membership.role
 
 
 def open_session(ticket: str) -> Session:

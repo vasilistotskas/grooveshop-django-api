@@ -3,6 +3,38 @@
 
 
 
+## v3.226.0 (2026-11-05)
+
+### Features
+
+* feat(builder): declare the refusal codes as enums (#486)
+
+The conflict and in-use bodies name their one code, and a reschedule
+declares the invalid_document branch it can answer. This is the last
+step of the change that declared them: it needs a storefront generated
+from this schema in production first.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`24ab91f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24ab91f2c755e610e99793e19135afbb42d97f9c))
+
+* feat(builder): publish the staff session role as an enum (#454)
+
+StaffSessionStaff.role was a plain string. It is one of the tenant
+membership roles or superuser, so the storefront can derive its editing
+roles from the generated type. A person without a membership no longer
+gets an empty role: the role backend only grants the view permission to a
+member, so that path is an invalid ticket.
+
+Co-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com> ([`6c9b748`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c9b7480407807aa7fc16b1fefa00b485448084f))
+
+### Testing
+
+* test(product): read an active product from the feed (#487)
+
+The factory makes one product in seven inactive, and the feed leaves
+those out, so the test failed at random.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`175c633`](https://github.com/vasilistotskas/grooveshop-django-api/commit/175c633da129a8f64b9eb1cbc384e34160ade6d9))
+
 ## v3.225.0 (2026-11-04)
 
 ### Bug fixes

@@ -4364,6 +4364,8 @@ SPECTACULAR_SETTINGS = {
         "BuilderDocumentKindEnum": "builder.models.DocumentKind",
         "BuilderVersionKindEnum": "builder.models.VersionKind",
         "BuilderDocumentInvalidCodeEnum": "builder.serializers.INVALID_DOCUMENT_CODE_CHOICES",
+        "BuilderRevisionConflictCodeEnum": "builder.serializers.REVISION_CONFLICT_CODE_CHOICES",
+        "BuilderMediaInUseCodeEnum": "builder.serializers.MEDIA_IN_USE_CODE_CHOICES",
         "OrderCreateErrorType": "order.enum.create_error.OrderCreateErrorType",
         "OrderCancelErrorType": "order.enum.cancel_error.OrderCancelErrorType",
         "ReviewStatus": "product.enum.review.ReviewStatus",

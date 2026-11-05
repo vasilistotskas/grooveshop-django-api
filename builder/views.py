@@ -626,7 +626,7 @@ class ScheduleView(StaffView):
         request=RescheduleSerializer,
         responses={
             200: ScheduleSerializer,
-            **ERRORS,
+            **DOCUMENT_INVALID_ERRORS,
             **NOT_FOUND,
         },
         description="Move a pending schedule; 409 `schedule_not_pending` otherwise.",

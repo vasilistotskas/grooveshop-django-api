@@ -397,6 +397,27 @@ def test_the_passkey_login_options_carry_the_session_token(document):
     assert body["meta"]["session_token"]
 
 
+def test_the_passkey_signup_options_are_creation_options(document, settings):
+    """A passkey signup registers a new credential, so the browser needs
+    creation options, whatever the upstream document calls them."""
+    # Verifying the email is the stage before this one.
+    settings.ACCOUNT_EMAIL_VERIFICATION = "none"
+    pending = _call(
+        Client(),
+        "post",
+        "/auth/webauthn/signup",
+        {"email": "passkey@example.com"},
+    )
+    assert pending.status_code == status.HTTP_401_UNAUTHORIZED
+    token = pending.json()["meta"]["session_token"]
+
+    response = _call(Client(), "get", "/auth/webauthn/signup", token=token)
+
+    assert response.status_code == status.HTTP_200_OK
+    body = assert_documented(document, "/auth/webauthn/signup", "get", response)
+    assert body["data"]["creation_options"]["publicKey"]
+
+
 def test_resending_a_login_code_carries_the_session_token(document, user):
     pending = _call(
         Client(), "post", "/auth/code/request", {"email": user.email}

@@ -46,7 +46,8 @@ Everything else the real endpoints disagree on is a correction in
 `core/allauth_spec_corrections.py`, applied by the command, each naming the
 allauth source it was read from: `Flow.id` lists every flow and `Flow.providers`
 the provider ids of a provider flow, `meta.is_authenticated` is nullable (null
-for an expired session), `OptionalTimestamp` is really nullable (upstream put
+for an expired session), the passkey signup answers creation options, not
+request options, `OptionalTimestamp` is really nullable (upstream put
 `nullable` beside a `$ref`, where OpenAPI 3.0 ignores it), `mfa.passkey_login_enabled`
 and `account.authentication_method` are declared, `POST .../recovery-codes`
 answers 200, and our own `GET .../totp/svg` (`core.views.ManageTOTPSvgView`) is

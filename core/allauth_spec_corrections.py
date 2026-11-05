@@ -108,6 +108,23 @@ def declare_recovery_codes_regeneration_answer(document: Document) -> None:
     }
 
 
+def declare_passkey_signup_creation_options(document: Document) -> None:
+    """``GET .../auth/webauthn/signup`` answers creation options: a signup
+    registers a credential (``headless/mfa/views.py``,
+    ``SignupWebAuthnView.get``, returns ``AddWebAuthnResponse``). The
+    document declares the request options of a sign-in."""
+    operation = document["paths"][f"{OUR_PATH_PREFIX}/auth/webauthn/signup"][
+        "get"
+    ]
+    operation["description"] = (
+        "Returns the WebAuthn credential creation options, that can be "
+        "processed using `parseCreationOptionsFromJSON()` on the frontend.\n"
+    )
+    operation["responses"]["200"] = {
+        "$ref": "#/components/responses/WebAuthnCreationOptionsResponse"
+    }
+
+
 def declare_totp_svg(document: Document) -> None:
     """``GET .../totp/svg`` is ours (``core.views.ManageTOTPSvgView``): the
     TOTP status endpoint plus the QR code as an SVG, for a user without an
@@ -272,6 +289,7 @@ CORRECTIONS: tuple[Callable[[Document], None], ...] = (
     declare_passkey_login_enabled,
     declare_authentication_method,
     declare_recovery_codes_regeneration_answer,
+    declare_passkey_signup_creation_options,
     declare_totp_svg,
     name_totp_not_found_response,
     declare_rate_limit_answer,

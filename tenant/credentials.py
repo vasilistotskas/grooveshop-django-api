@@ -231,8 +231,15 @@ def _branded_primary() -> tuple[str, str] | None:
         return None
     # The colours go straight into the email's <style> block.
     if not all(isinstance(c, str) and HEX.match(c) for c in (primary, dark)):
+        logger.warning(
+            "The published theme's primary scale is not hex: email colours"
+            " fall back to the platform palette"
+        )
         return None
-    if primary.lower() == default["600"].lower():
+    if (primary.lower(), dark.lower()) == (
+        default["600"].lower(),
+        default["700"].lower(),
+    ):
         return None
     return primary, dark
 

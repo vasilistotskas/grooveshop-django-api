@@ -24,6 +24,7 @@ Django does before the mail ever leaves — zero client dependency.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -303,10 +304,41 @@ class TestUnbrandedStoreRendersExactlyAsBefore:
         assert tenant_email_theme() == ORIGINAL_PALETTE
 
     def test_default_comparison_is_case_insensitive(self, store):
-        scale = _default_primary_scale()
-        _release_theme({**scale, "600": scale["600"].upper()})
+        """The real default's shades have no letters, so the comparison is
+        held against one that does."""
+        default = {"600": "#ab12ef", "700": "#cd34ef"}
+        catalogue = SimpleNamespace(
+            roots={
+                "theme": SimpleNamespace(
+                    defaults={
+                        "colors": {"light": {"primary": {"scale": default}}}
+                    }
+                )
+            }
+        )
+        _release_theme(
+            {
+                **_default_primary_scale(),
+                "600": default["600"].upper(),
+                "700": default["700"].upper(),
+            }
+        )
 
-        assert tenant_email_theme() == ORIGINAL_PALETTE
+        with mock.patch(
+            "builder.seeding.seed_catalogue", return_value=catalogue
+        ):
+            assert tenant_email_theme() == ORIGINAL_PALETTE
+
+    def test_a_scale_that_changes_only_its_dark_shade_is_the_stores_own(
+        self, store
+    ):
+        scale = _default_primary_scale()
+        _release_theme({**scale, "700": "#0a1b2c"})
+
+        theme = tenant_email_theme()
+
+        assert theme["primary"] == scale["600"]
+        assert theme["primary_dark"] == "#0a1b2c"
 
     def test_store_with_no_release_gets_the_original_palette(
         self, store, caplog
@@ -363,10 +395,13 @@ class TestAnUnreadableThemeNeverStopsAMail:
             {"600": 7, "700": None},
         ],
     )
-    def test_malformed_scale_gets_the_original_palette(self, store, scale):
+    def test_malformed_scale_gets_the_original_palette(
+        self, store, scale, caplog
+    ):
         _release_theme(scale)
 
         assert tenant_email_theme() == ORIGINAL_PALETTE
+        assert "email colours" in caplog.text
 
     def test_document_without_colours_gets_the_original_palette(self, store):
         _release_theme(None)

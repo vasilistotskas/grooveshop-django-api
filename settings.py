@@ -1102,10 +1102,10 @@ CELERY_TASK_TIME_LIMIT = 1800
 # where a result could be evicted before it expired and the whole lot
 # vanished in the 2026-09-09 Redis outage.
 #
-# What IS worth keeping is the failures, durably and queryably: this
-# platform has no metrics or alerting stack, and a silent failure here
-# is an order confirmation nobody receives or a voucher that never
-# mints. ``task_store_errors_even_if_ignored`` is what makes the pair
+# What IS worth keeping is the failures, durably and queryably: a
+# silent failure here is an order confirmation nobody receives or a
+# voucher that never mints. ``task_store_errors_even_if_ignored`` is
+# what makes the pair
 # work — celery/app/trace.py::handle_error_state falls back to it
 # precisely when a task is ignored — so successes write nothing while
 # failures and retries write a full row, with task name and arguments
@@ -3893,9 +3893,8 @@ UNFOLD_PLATFORM = {
             },
             # The Celery beat schedule and the task-result tables live in
             # the PUBLIC schema and drive every store's fan-out tasks —
-            # platform operations, never a store's. (Task Results only
-            # fill up under the ``django-db`` result backend; production
-            # writes results to Redis, so the page is empty there.)
+            # platform operations, never a store's. (Task Results holds
+            # task failures only: ``CELERY_TASK_IGNORE_RESULT``.)
             {
                 "title": _("Background Jobs"),
                 "separator": True,

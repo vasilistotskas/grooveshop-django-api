@@ -68,7 +68,8 @@ class TestPurchaseEventDedup:
         # No browser-minted id → deterministic per-order id, so two server
         # dispatches (e.g. COD + retry) dedup at Meta instead of counting
         # twice (G0198).
-        assert id1 == f"purchase-{order.uuid}"
+        assert id1 == f"purchase-{order.pk}"
+        assert str(order.uuid) not in id1
         assert id1 == id2
 
 

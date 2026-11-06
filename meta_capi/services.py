@@ -365,8 +365,9 @@ def build_purchase_event(order: Order) -> tuple[Event, str]:
     # server dispatches of the same order's Purchase — e.g. a COD order with
     # no browser-minted id, or a retry — collide on Meta's dedup instead of
     # being counted twice (G0198). A browser-minted id still wins when
-    # present, preserving server↔pixel dedup.
-    event_id = _event_id_for(order, "purchase") or f"purchase-{order.uuid}"
+    # present, preserving server↔pixel dedup. The order's number, never its
+    # uuid: a guest's uuid opens the order, and this id goes to Meta.
+    event_id = _event_id_for(order, "purchase") or f"purchase-{order.pk}"
     event = _new_event(
         name=StandardEvent.PURCHASE,
         event_id=event_id,

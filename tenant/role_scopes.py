@@ -258,6 +258,7 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         # Analytics / pixels
         "meta_pixel_id",
         "tiktok_pixel_id",
+        "clarity_project_id",
         "ga_tracking_id",
         "google_ads_conversion_id",
         "google_ads_purchase_label",

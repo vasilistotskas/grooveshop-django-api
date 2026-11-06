@@ -64,8 +64,8 @@ class JSONSchemaValidator:
 
 
 def _message(error: SchemaError) -> str:
-    """``colors.primaryScale.500: 'red' does not match ...`` — the path
-    names the offending entry, so a long value is fixable."""
+    """``[0]: 'fr' is not one of ...`` — the path names the offending
+    entry, so a long value is fixable."""
     path = "".join(
         f"[{part}]" if isinstance(part, int) else f".{part}"
         for part in error.absolute_path

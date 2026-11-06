@@ -71,7 +71,7 @@ PLATFORM_PERMS = (
     "auth.change_permission",
     "country.change_country",
     "region.change_region",
-    "django_celery_beat.change_periodictask",
+    "scheduler.change_periodictask",
     "sites.change_site",
 )
 

@@ -3,6 +3,63 @@
 
 
 
+## v3.228.0 (2026-11-06)
+
+### Features
+
+* feat(scheduler): replace django-celery-beat with our own scheduler (#497)
+
+django-celery-beat caps the Django version it allows, so every Django upgrade waited for its next release. CodeOwnedScheduler is a celery.beat.Scheduler subclass: Celery still decides when an entry is due, CELERY_BEAT_SCHEDULE is the whole schedule, and scheduler.PeriodicTask holds only state. Beat deletes any row the settings do not declare when it starts.
+
+A run is saved as soon as it is sent. A failed publish is retried on its own timer, so an entry that cannot be sent never holds up the others. expires now applies, so it stays only on the polls that run again within 15 minutes and comes off the six daily entries. The platform admin reads the schedule, switches an entry and runs one by hand.
+
+The migration copies the old state and beat takes the old scheduler's final runs on start, so the deploy repeats no slot. The old tables stay for a rollback until the next release drops them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`1f1d7ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f1d7ae0b01018ae5e41e15fec2915a2dd8b4dc9))
+
+## v3.227.3 (2026-11-06)
+
+### Bug fixes
+
+* fix(agent): answer 401 to a token bound to another resource (#495)
+
+A token bound to anything but the store's MCP server got 403, which the
+gateway reads as a valid token short of a scope, so the client was never
+asked to link again. It now gets 401. The authorization endpoints also
+refuse such a resource up front, so the token is never issued.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ce1b09c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce1b09c01d572100dbb18569204c9b17d6095c58))
+
+## v3.227.2 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): drop the Tenant theme columns (#498)
+
+Step two of two after migration 0072: the release that still named them is
+gone and no code reads them, so both tables lose the nine columns.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a8770cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8770ccbdae79cce95ff694d7d58d746ab5e083f))
+
+## v3.227.1 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): retire the Tenant theme fields (#494)
+
+A store's look lives in its published theme document, and nothing reads
+primary_color, neutral_color, the five colour hex fields, theme_preset or
+theme_metadata. They leave the model, the store config, the admin, the role
+scopes and the schema, with ThemePreset, TailwindColor and the metadata JSON
+schema. export_theme_fields and import_theme_settings go too: every store has
+its theme document and the storefront's seed tool is gone.
+
+The columns stay for the release still serving during the rollout, each with
+a database default; the next release drops them.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`922d1d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/922d1d02e848317b36cdc852e713937ba6c02edd))
+
 ## v3.227.0 (2026-11-06)
 
 ### Bug fixes

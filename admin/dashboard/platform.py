@@ -124,7 +124,7 @@ class PlatformEstateCards(DashboardWidget):
         )
         suspended = sum(1 for store in stores if store.suspended_at is not None)
 
-        PeriodicTask = apps.get_model("django_celery_beat", "PeriodicTask")
+        PeriodicTask = apps.get_model("scheduler", "PeriodicTask")
         TaskResult = apps.get_model("django_celery_results", "TaskResult")
         scheduled = PeriodicTask.objects.filter(enabled=True).count()
         # Only failures are stored (CELERY_TASK_IGNORE_RESULT), in one

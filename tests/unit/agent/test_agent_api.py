@@ -13,12 +13,14 @@ from datetime import timedelta
 from decimal import Decimal
 
 from allauth.idp.oidc.models import Client, Token
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from agent.oidc import AgentOIDCAdapter
 from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
@@ -174,10 +176,17 @@ class AgentAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.user.id)
 
+    def test_only_the_stores_mcp_server_is_issued_a_token(self) -> None:
+        adapter = AgentOIDCAdapter()
+        adapter.validate_resource_uris(uris=["https://agent-test.example/mcp"])
+        adapter.validate_resource_uris(uris=[])
+        with self.assertRaises(ValidationError):
+            adapter.validate_resource_uris(uris=["https://other.example/mcp"])
+
     def test_token_bound_to_another_store_is_refused(self) -> None:
         self._bearer(["profile"], resources=["https://other.example/mcp"])
         response = self.client.get(reverse("agent-me"))
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_token_bound_to_another_resource_of_the_store_is_refused(
         self,
@@ -186,13 +195,13 @@ class AgentAPITestCase(APITestCase):
             ["profile"], resources=["https://agent-test.example/other"]
         )
         response = self.client.get(reverse("agent-me"))
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_token_bound_to_the_request_host_is_refused(self) -> None:
         # What the store advertises decides, not what a caller sends.
         self._bearer(["profile"], resources=["http://testserver/mcp"])
         response = self.client.get(reverse("agent-me"))
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_orders_returns_only_own_orders(self) -> None:
         own = OrderFactory(user=self.user)

@@ -6,10 +6,10 @@ from unittest import mock
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django_tenants.utils import get_public_schema_name, schema_context
 
 from emails.gates import CarrierGate, FeatureGate, ScheduleGate, StoreSwitchGate
+from scheduler.models import PeriodicTask
 from shipping.models import ShippingProvider
 
 pytestmark = pytest.mark.django_db
@@ -73,12 +73,7 @@ class TestScheduleGate:
 
         with schema_context(get_public_schema_name()):
             entry = PeriodicTask.objects.create(
-                name="probe-entry",
-                task="probe.task",
-                enabled=False,
-                interval=IntervalSchedule.objects.create(
-                    every=1, period=IntervalSchedule.DAYS
-                ),
+                name="probe-entry", enabled=False
             )
         assert gate.is_open() is False
 

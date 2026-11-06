@@ -70,45 +70,6 @@ class SuspendedReason(models.TextChoices):
     BILLING = "billing", _("Billing")
 
 
-class ThemePreset(models.TextChoices):
-    DEFAULT = "default", _("Default")
-    MINIMAL = "minimal", _("Minimal")
-    BOLD = "bold", _("Bold")
-    CUSTOM = "custom", _("Custom")
-
-
-# Tailwind color name choices for Nuxt UI v4 compatibility
-class TailwindColor(models.TextChoices):
-    SLATE = "slate", "Slate"
-    GRAY = "gray", "Gray"
-    ZINC = "zinc", "Zinc"
-    NEUTRAL = "neutral", "Neutral"
-    STONE = "stone", "Stone"
-    RED = "red", "Red"
-    ORANGE = "orange", "Orange"
-    AMBER = "amber", "Amber"
-    YELLOW = "yellow", "Yellow"
-    LIME = "lime", "Lime"
-    GREEN = "green", "Green"
-    EMERALD = "emerald", "Emerald"
-    TEAL = "teal", "Teal"
-    CYAN = "cyan", "Cyan"
-    SKY = "sky", "Sky"
-    BLUE = "blue", "Blue"
-    INDIGO = "indigo", "Indigo"
-    VIOLET = "violet", "Violet"
-    PURPLE = "purple", "Purple"
-    FUCHSIA = "fuchsia", "Fuchsia"
-    PINK = "pink", "Pink"
-    ROSE = "rose", "Rose"
-
-
-hex_color_validator = RegexValidator(
-    regex=r"^#[0-9a-fA-F]{6}$",
-    message=_("Enter a valid hex color (e.g., #003DFF)."),
-)
-
-
 class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # Redeclares ``TenantMixin.schema_name`` (abstract base — safe to
     # override) to layer ``validate_reserved_schema_name`` on top of
@@ -335,71 +296,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "with when it notifies them through IndexNow. The storefront "
             "serves it at /<key>.txt while the store's INDEXNOW_ENABLED "
             "setting is on. Public by design."
-        ),
-    )
-
-    # Theme (Nuxt UI v4 compatible)
-    primary_color = models.CharField(
-        _("Primary Color"),
-        max_length=20,
-        choices=TailwindColor.choices,
-        default=TailwindColor.NEUTRAL,
-    )
-    neutral_color = models.CharField(
-        _("Neutral Color"),
-        max_length=20,
-        choices=TailwindColor.choices,
-        default=TailwindColor.ZINC,
-    )
-    accent_hex = models.CharField(
-        _("Accent Hex"),
-        max_length=7,
-        default="#003DFF",
-        validators=[hex_color_validator],
-    )
-    success_hex = models.CharField(
-        _("Success Hex"),
-        max_length=7,
-        default="#16a34a",
-        validators=[hex_color_validator],
-    )
-    warning_hex = models.CharField(
-        _("Warning Hex"),
-        max_length=7,
-        default="#ca8a04",
-        validators=[hex_color_validator],
-    )
-    error_hex = models.CharField(
-        _("Error Hex"),
-        max_length=7,
-        default="#dc2626",
-        validators=[hex_color_validator],
-    )
-    info_hex = models.CharField(
-        _("Info Hex"),
-        max_length=7,
-        default="#2563eb",
-        validators=[hex_color_validator],
-    )
-
-    # Theme preset & metadata
-    theme_preset = models.CharField(
-        _("Theme Preset"),
-        max_length=20,
-        choices=ThemePreset.choices,
-        default=ThemePreset.DEFAULT,
-    )
-    theme_metadata = models.JSONField(
-        _("Theme Metadata"),
-        default=dict,
-        blank=True,
-        validators=[JSONSchemaValidator("tenant.json_schemas.theme_metadata")],
-        help_text=_(
-            "Per-token theme overrides on top of the preset. Legal "
-            "keys: radius, fontSans, container, colors.primaryScale / "
-            "colors.neutralScale (shade → #RRGGBB). Anything else is "
-            "rejected — the storefront token compiler ignores invalid "
-            "metadata entirely."
         ),
     )
 

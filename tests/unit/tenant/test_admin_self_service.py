@@ -178,7 +178,6 @@ class TestTenantAdminScoping:
         readonly = set(self._admin().get_readonly_fields(_request(user)))
         for own_field in (
             "store_name",
-            "primary_color",
             "from_email",
             "ga_tracking_id",
             "google_ads_conversion_id",

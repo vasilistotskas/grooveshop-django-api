@@ -270,9 +270,7 @@ def tenant_email_theme() -> dict[str, str]:
     button therefore stays the platform's green.
 
     The scale holds hex, never a Tailwind colour NAME ("blue", "zinc"),
-    so it can go into email CSS without a name→hex table. That was the
-    reason the tenant's ``primary_color`` and ``neutral_color`` names
-    were never consulted, and it holds still.
+    so it can go into email CSS without a name→hex table.
     """
     theme = dict(_DEFAULT_EMAIL_THEME)
     if (brand := _branded_primary()) is not None:

@@ -1157,9 +1157,6 @@ msgstr "Abandoned checkout reminder"
 msgid "Abandonment Notified"
 msgstr "Abandonment Notified"
 
-msgid "Accent Hex"
-msgstr "Accent Hex"
-
 msgid "Accept the terms of use to place your order."
 msgstr "Accept the terms of use to place your order."
 
@@ -2115,9 +2112,6 @@ msgstr "Blog post list/detail, related posts, comments, categories, tags, and au
 
 msgid "Body"
 msgstr "Body"
-
-msgid "Bold"
-msgstr "Bold"
 
 msgid "Bonus"
 msgstr "Bonus"
@@ -3682,9 +3676,6 @@ msgstr "Currently-live, publicly advertisable promotions that touch this product
 msgid "Cursor for pagination"
 msgstr "Cursor for pagination"
 
-msgid "Custom"
-msgstr "Custom"
-
 msgid "Customer"
 msgstr "Customer"
 
@@ -3865,9 +3856,6 @@ msgstr "Decrease quantity by 1"
 
 msgid "Decrement"
 msgstr "Decrement"
-
-msgid "Default"
-msgstr "Default"
 
 msgid "Default Currency"
 msgstr "Default Currency"
@@ -4510,9 +4498,6 @@ msgstr "Enter a valid email address"
 msgid "Enter a valid email address."
 msgstr "Enter a valid email address."
 
-msgid "Enter a valid hex color (e.g., #003DFF)."
-msgstr "Enter a valid hex color (e.g., #003DFF)."
-
 msgid "Enter a valid phone number"
 msgstr "Enter a valid phone number"
 
@@ -4585,9 +4570,6 @@ msgstr[1] "Entries older than %(days)d days are deleted automatically every nigh
 
 msgid "Error"
 msgstr "Error"
-
-msgid "Error Hex"
-msgstr "Error Hex"
 
 msgid "Error Message"
 msgstr "Error Message"
@@ -7304,9 +7286,6 @@ msgstr "Infected"
 msgid "Info"
 msgstr "Info"
 
-msgid "Info Hex"
-msgstr "Info Hex"
-
 msgid "Informational only — the line values are already net of the allocation, so this never enters the total arithmetic."
 msgstr "Informational only — the line values are already net of the allocation, so this never enters the total arithmetic."
 
@@ -8397,9 +8376,6 @@ msgstr "Microsoft Clarity project ID must be alphanumeric (e.g. 'a1b2c3d4e5')."
 msgid "Mid-range (€50-€100)"
 msgstr "Mid-range (€50-€100)"
 
-msgid "Minimal"
-msgstr "Minimal"
-
 msgid "Minimum Quantity"
 msgstr "Minimum Quantity"
 
@@ -8586,9 +8562,6 @@ msgstr "Net turnover last year"
 
 msgid "Net turnover per period"
 msgstr "Net turnover per period"
-
-msgid "Neutral Color"
-msgstr "Neutral Color"
 
 msgid "Never"
 msgstr "Never"
@@ -10232,9 +10205,6 @@ msgstr "Per-promotion breakdown of promotion_discount: one entry per offer that 
 msgid "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). This value is public by design and is safe to expose to unauthenticated callers. Leave blank if Stripe is not configured for this tenant."
 msgstr "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). This value is public by design and is safe to expose to unauthenticated callers. Leave blank if Stripe is not configured for this tenant."
 
-msgid "Per-token theme overrides on top of the preset. Legal keys: radius, fontSans, container, colors.primaryScale / colors.neutralScale (shade → #RRGGBB). Anything else is rejected — the storefront token compiler ignores invalid metadata entirely."
-msgstr "Per-token theme overrides on top of the preset. Legal keys: radius, fontSans, container, colors.primaryScale / colors.neutralScale (shade → #RRGGBB). Anything else is rejected — the storefront token compiler ignores invalid metadata entirely."
-
 msgid "Percent (0-100) for percentage benefits, EUR amount for fixed-amount benefits; ignored for free shipping"
 msgstr "Percent (0-100) for percentage benefits, EUR amount for fixed-amount benefits; ignored for free shipping"
 
@@ -10682,9 +10652,6 @@ msgstr "Pricing Information"
 
 msgid "Pricing tier"
 msgstr "Pricing tier"
-
-msgid "Primary Color"
-msgstr "Primary Color"
 
 msgid "Primary address line"
 msgstr "Primary address line"
@@ -13454,9 +13421,6 @@ msgstr "Subtotal (excl. VAT)"
 msgid "Success"
 msgstr "Success"
 
-msgid "Success Hex"
-msgstr "Success Hex"
-
 msgid "Success message"
 msgstr "Success message"
 
@@ -14431,12 +14395,6 @@ msgstr "The zone of the store's own domain, from the Cloudflare dashboard's doma
 
 msgid "Theme"
 msgstr "Theme"
-
-msgid "Theme Metadata"
-msgstr "Theme Metadata"
-
-msgid "Theme Preset"
-msgstr "Theme Preset"
 
 msgid "There are more ids than a list may name."
 msgstr "There are more ids than a list may name."
@@ -15807,9 +15765,6 @@ msgstr "Warehouse"
 msgid "Warning"
 msgstr "Warning"
 
-msgid "Warning Hex"
-msgstr "Warning Hex"
-
 msgid "We Miss You!"
 msgstr "We Miss You!"
 
@@ -17030,6 +16985,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "About Content"
 #~ msgstr "About Content"
 
+#~ msgid "Accent Hex"
+#~ msgstr "Accent Hex"
+
 #~ msgid "Account security"
 #~ msgstr "Account security"
 
@@ -17074,6 +17032,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Blog Posts Grid"
 #~ msgstr "Blog Posts Grid"
+
+#~ msgid "Bold"
+#~ msgstr "Bold"
 
 #~ msgid "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
@@ -17124,8 +17085,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Currency is required when amount is provided"
 #~ msgstr "Currency is required when amount is provided"
 
+#~ msgid "Custom"
+#~ msgstr "Custom"
+
 #~ msgid "Custom page"
 #~ msgstr "Custom page"
+
+#~ msgid "Default"
+#~ msgstr "Default"
 
 #~ msgid "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
 #~ msgstr "Deprecated mirror of ``settlement == OFFLINE_TRANSFER``. Dropped in the release after settlement lands."
@@ -17148,8 +17115,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Email template"
 #~ msgstr "Email template"
 
+#~ msgid "Enter a valid hex color (e.g., #003DFF)."
+#~ msgstr "Enter a valid hex color (e.g., #003DFF)."
+
 #~ msgid "Entries"
 #~ msgstr "Entries"
+
+#~ msgid "Error Hex"
+#~ msgstr "Error Hex"
 
 #~ msgid "External link"
 #~ msgstr "External link"
@@ -17221,6 +17194,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Inactive user notification"
 #~ msgstr "Inactive user notification"
 
+#~ msgid "Info Hex"
+#~ msgstr "Info Hex"
+
 #~ msgid "Interval Schedules"
 #~ msgstr "Interval Schedules"
 
@@ -17288,6 +17264,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 #~ msgstr "Meta Conversions API dataset (pixel) ID used for server-side event deduplication. No platform fallback — empty disables Meta CAPI."
 
+#~ msgid "Minimal"
+#~ msgstr "Minimal"
+
 #~ msgid "Mobile"
 #~ msgstr "Mobile"
 
@@ -17323,6 +17302,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Navigation Menus"
 #~ msgstr "Navigation Menus"
+
+#~ msgid "Neutral Color"
+#~ msgstr "Neutral Color"
 
 #~ msgid "Newsletter Signup"
 #~ msgstr "Newsletter Signup"
@@ -17403,8 +17385,14 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
 #~ msgstr "Per-row parler translation cache. Purging this forces a re-fetch from Postgres on the next request for every translatable row touched. Use sparingly."
 
+#~ msgid "Per-token theme overrides on top of the preset. Legal keys: radius, fontSans, container, colors.primaryScale / colors.neutralScale (shade → #RRGGBB). Anything else is rejected — the storefront token compiler ignores invalid metadata entirely."
+#~ msgstr "Per-token theme overrides on top of the preset. Legal keys: radius, fontSans, container, colors.primaryScale / colors.neutralScale (shade → #RRGGBB). Anything else is rejected — the storefront token compiler ignores invalid metadata entirely."
+
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
+
+#~ msgid "Primary Color"
+#~ msgstr "Primary Color"
 
 #~ msgid "Products Grid"
 #~ msgstr "Products Grid"
@@ -17530,6 +17518,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Subscription confirmation email"
 #~ msgstr "Subscription confirmation email"
 
+#~ msgid "Success Hex"
+#~ msgstr "Success Hex"
+
 #~ msgid "Successfully unsubscribed"
 #~ msgstr "Successfully unsubscribed"
 
@@ -17551,6 +17542,12 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
+
+#~ msgid "Theme Metadata"
+#~ msgstr "Theme Metadata"
+
+#~ msgid "Theme Preset"
+#~ msgstr "Theme Preset"
 
 #~ msgid "There is a named save (checkpoint)."
 #~ msgstr "There is a named save (checkpoint)."
@@ -17612,6 +17609,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Vision Content"
 #~ msgstr "Vision Content"
+
+#~ msgid "Warning Hex"
+#~ msgstr "Warning Hex"
 
 #, python-format
 #~ msgid "We noticed that your order #%(order_id)s placed on %(order_date)s is still in pending status."

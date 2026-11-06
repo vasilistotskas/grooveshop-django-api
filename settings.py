@@ -4614,6 +4614,9 @@ if IS_KUBERNETES:
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
             },
+            "drop_system_exit": {
+                "()": "core.logging.DropSystemExit",
+            },
         },
         "handlers": {
             "console": {
@@ -4645,6 +4648,12 @@ if IS_KUBERNETES:
             "asyncio": {
                 "level": logging_level,
                 "filters": ["drop_asyncio_cancelled"],
+                "propagate": True,
+            },
+            # Flower's clean shutdown, see DropSystemExit.
+            "tornado.application": {
+                "level": logging_level,
+                "filters": ["drop_system_exit"],
                 "propagate": True,
             },
         },
@@ -4682,6 +4691,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
             },
+            "drop_system_exit": {
+                "()": "core.logging.DropSystemExit",
+            },
         },
         "handlers": {
             "console": {
@@ -4716,6 +4728,12 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "asyncio": {
                 "level": logging_level,
                 "filters": ["drop_asyncio_cancelled"],
+                "propagate": True,
+            },
+            # Flower's clean shutdown, see DropSystemExit.
+            "tornado.application": {
+                "level": logging_level,
+                "filters": ["drop_system_exit"],
                 "propagate": True,
             },
         },

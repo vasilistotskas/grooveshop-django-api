@@ -81,5 +81,4 @@ re-run rather than debugging it.
 - Password hashing uses MD5 (faster than the production Argon2 hasher)
 - Coverage minimum is 70% (`fail_under = 70`, enforced on the combined CI shards)
 - Query counts use Django's `CaptureQueriesContext` (`len(ctx)`) and pytest-django's `django_assert_num_queries` / `django_assert_max_num_queries`
-- Running tests beside another pytest session: give it its own `DB_NAME=…` (or `-n0`), or the two truncate each other's `test_<DB_NAME>_gwN` databases
 - Durations that are exact multiples of ~30 s on Windows mean the Docker Desktop `localhost` IPv6 stall — rerun with `REDIS_HOST=127.0.0.1`

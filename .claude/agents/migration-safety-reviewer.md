@@ -76,8 +76,10 @@ For every entry in `operations = [...]`, assign one of:
 #### Conditional operations
 - `AddIndex` / `AddConstraint` on a hot table (Order, Product, OrderItem,
   Cart, BlogPost) — a long lock blocks writes, and the PreSync Job's
-  `activeDeadlineSeconds=1800` kills the whole hook. Suggest
-  `AddIndexConcurrently` or splitting.
+  `activeDeadlineSeconds=1800` kills the whole hook. Require `atomic = False`
+  and `core.db.migration_operations.AddIndexAdaptively`
+  (`AddUniqueConstraintAdaptively` for a unique constraint); see
+  `docs/migrations.md`.
 - `RunPython` / `RunSQL` — must read the actual code/SQL and apply the same
   classification rules to its effect on data
 - `AddField` NOT NULL with `db_default` — safe for old code, but the
@@ -115,8 +117,9 @@ Specialise per op type:
 For any `AddIndex` / `AddConstraint`, estimate impact:
 - If the table is `Order`, `OrderItem`, `Product`, `ProductTranslation`,
   `Cart`, `CartItem`, `BlogPost`, `BlogComment`, or any table with >100k
-  rows in production, recommend `AddIndexConcurrently` and a manual,
-  non-PreSync-hook migration window.
+  rows in production, recommend `AddIndexAdaptively` with `atomic = False`: it
+  builds `CONCURRENTLY` inside the PreSync job, so no manual window is needed.
+  Never Django's `AddIndexConcurrently`, which `Tenant.save()` cannot replay.
 
 The PreSync Job has `activeDeadlineSeconds=1800` (30 min) for the whole
 hook, every schema included. A `CREATE INDEX` that exceeds it gets killed
@@ -157,7 +160,7 @@ CONDITIONAL
   order/migrations/0089_add_status_index.py:8
     AddIndex(Order, fields=["status"])
     Order has ~5M rows in prod; CREATE INDEX may exceed the PreSync hook's 1800s activeDeadlineSeconds
-    Fix: use AddIndexConcurrently and run as a separate manual migration
+    Fix: use AddIndexAdaptively with atomic = False
 
 SAFE
   product/migrations/0043_add_view_count.py:12

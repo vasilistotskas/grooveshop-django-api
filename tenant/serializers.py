@@ -385,6 +385,7 @@ class TenantConfigSerializer(serializers.Serializer):
     # existing pixel fields are safe only because they are already in
     # the contract on both sides.
     openai_pixel_id = serializers.CharField(required=False)
+    clarity_project_id = serializers.CharField(required=False)
     ga_tracking_id = serializers.CharField(read_only=True)
     google_ads_conversion_id = serializers.CharField(read_only=True)
     google_ads_purchase_label = serializers.CharField(read_only=True)
@@ -538,6 +539,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "meta_pixel_id",
             "tiktok_pixel_id",
             "openai_pixel_id",
+            "clarity_project_id",
             "ga_tracking_id",
             "google_ads_conversion_id",
             "google_ads_purchase_label",

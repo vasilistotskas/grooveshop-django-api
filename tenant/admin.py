@@ -556,6 +556,7 @@ class TenantAdmin(BaseModelAdmin):
                     "pinterest_domain_verify",
                     "meta_pixel_id",
                     "tiktok_pixel_id",
+                    "clarity_project_id",
                     "ga_tracking_id",
                     "google_ads_conversion_id",
                     "google_ads_purchase_label",

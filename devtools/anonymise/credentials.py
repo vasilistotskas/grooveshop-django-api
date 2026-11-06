@@ -40,6 +40,7 @@ INTEGRATION_PREFIXES: tuple[str, ...] = (
     "meta_pixel",
     "tiktok_pixel",
     "openai_pixel",
+    "clarity_project",
     "ga_tracking",
     "google_ads_",
     "cloudflare_",

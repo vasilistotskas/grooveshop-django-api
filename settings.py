@@ -1701,7 +1701,7 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery", "expires": 300},
+            "options": {"queue": "celery"},
         },
         # Poll BoxNow's REST API every 15 min for non-terminal
         # shipments. Defence-in-depth against a missed webhook
@@ -1710,8 +1710,10 @@ def get_celery_beat_schedule():
         # registration), so a single misconfiguration would freeze
         # parcel state at our last observed value. The poll
         # converges state independent of webhook health.
-        # ``expires=300`` keeps a beat-pod restart from re-firing
-        # stale enqueues.
+        # ``expires=300``: a poll still queued after that is overtaken by
+        # the next one, so a backlog does not run them all in a row. Only an
+        # entry that runs again soon may expire; a daily one would lose its
+        # day (tests/integration/scheduler/test_beat.py).
         "poll-boxnow-tracking": {
             # Fanout wrapper, not the task directly: beat fires in the
             # public schema, so calling poll_boxnow_tracking_batch
@@ -1727,16 +1729,13 @@ def get_celery_beat_schedule():
         # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
         # when the AcsStation cache is in use; harmless to schedule now
         # since the task no-ops when ACS provider is inactive).
-        # ``expires=300`` discards stale enqueues so a beat-pod restart
-        # mid-DST-fallback hour (Europe/Athens transitions twice yearly)
-        # can't re-fire the task against a stale ``last_run_at``.
         "sync-acs-stations": {
             # Fanout: AcsStation is per-tenant; beat fires in public.
             "task": "tenant.tasks.fanout_sync_acs_stations",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery", "expires": 300},
+            "options": {"queue": "celery"},
         },
         # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens, the
         # same path as the admin's "Issue ACS pickup list now". ACS
@@ -1750,7 +1749,7 @@ def get_celery_beat_schedule():
             # daily manifest.
             "task": "tenant.tasks.fanout_issue_daily_acs_pickup_list",
             "schedule": crontab(hour="16", minute="30", day_of_week="mon-fri"),
-            "options": {"queue": "celery", "expires": 300},
+            "options": {"queue": "celery"},
         },
         # Poll ACS_Trackingsummary every 15 min for non-terminal
         # shipments. Sub-tasks fan out internally spaced by
@@ -1778,7 +1777,7 @@ def get_celery_beat_schedule():
             # Fanout: AcsShipment is per-tenant; beat fires in public.
             "task": "tenant.tasks.fanout_check_stale_acs_shipments",
             "schedule": crontab(hour="9", minute="0"),
-            "options": {"queue": "celery", "expires": 3600},
+            "options": {"queue": "celery"},
         },
         # Reconcile yesterday's COD payouts daily at 02:30 Athens —
         # safely after midnight so ACS's books for the prior day are
@@ -1794,7 +1793,7 @@ def get_celery_beat_schedule():
             "schedule": crontab(hour="2", minute="30")
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery", "expires": 300},
+            "options": {"queue": "celery"},
         },
         # Half an hour after the reconcile, so a payout that landed
         # overnight is already recorded and cannot be reported overdue.
@@ -1805,7 +1804,7 @@ def get_celery_beat_schedule():
             "schedule": crontab(hour="3", minute="0")
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery", "expires": 300},
+            "options": {"queue": "celery"},
         },
     }
 

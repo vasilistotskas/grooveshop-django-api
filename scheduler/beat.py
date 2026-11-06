@@ -9,7 +9,8 @@ restart and the admin need:
   exactly once and repeats nothing;
 - switching an entry off or on in the admin reaches the running process;
 - a publish that fails is sent again instead of waiting for the next slot, so
-  a broker restart cannot lose a daily job.
+  a broker restart cannot lose a daily job, and it waits on its own: an entry
+  that cannot be sent never holds up the others.
 
 Run one beat at a time: nothing here stops two from sending the same tick, and
 the Deployment is one replica with the ``Recreate`` strategy.
@@ -22,6 +23,7 @@ from datetime import datetime
 from typing import Any, override
 
 from celery.beat import ScheduleEntry, Scheduler, SchedulingError
+from celery.schedules import schedstate
 from django.db import DatabaseError, InterfaceError, close_old_connections
 from django.db import connection as db_connection
 
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 #: least once a minute for the every-minute entries, so a change lands within
 #: about a minute however low this is.
 STATE_REFRESH_SECONDS = 5.0
-#: How long to wait before sending again after a publish failed.
+#: How long an entry waits before it is sent again after its publish failed.
 PUBLISH_RETRY_SECONDS = 30.0
 
 
@@ -43,13 +45,35 @@ class _Run:
     count: int
 
 
+class RetryingEntry(ScheduleEntry):
+    """An entry that is not due again until its failed publish has waited.
+
+    It lives on the entry, and not in the scheduler, because ``populate_heap``
+    asks the entry directly: the entries that are really due sort ahead of it.
+    """
+
+    def __init__(
+        self, *args: Any, retry_at: float = 0.0, **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.retry_at = retry_at
+
+    @override
+    def is_due(self) -> schedstate:
+        if (wait := self.retry_at - time.monotonic()) > 0:
+            return schedstate(False, wait)
+        return super().is_due()
+
+
 class CodeOwnedScheduler(Scheduler):
+    Entry = RetryingEntry
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Set before ``super().__init__``, which calls ``setup_schedule``.
         self._declared: dict[str, ScheduleEntry] = {}
         self._unsaved_runs: dict[str, _Run] = {}
         self._state_read_at = 0.0
-        self._publish_failed = False
+        self._heap_is_stale = False
         super().__init__(*args, **kwargs)
 
     @override
@@ -87,12 +111,10 @@ class CodeOwnedScheduler(Scheduler):
     def tick(self, *args: Any, **kwargs: Any) -> float:
         self._refresh_state()
         interval = super().tick(*args, **kwargs)
-        if self._publish_failed:
-            self._publish_failed = False
-            # The next tick rebuilds the heap from the restored entry, which
-            # is still due.
+        if self._heap_is_stale:
+            # ``tick`` has just pushed the entry for its next slot.
+            self._heap_is_stale = False
             self._heap = None
-            return PUBLISH_RETRY_SECONDS
         return interval
 
     @override
@@ -108,8 +130,9 @@ class CodeOwnedScheduler(Scheduler):
             result = super().apply_async(entry, producer, advance, **kwargs)
         except SchedulingError:
             # ``tick`` already moved this entry on to its next slot.
+            entry.retry_at = time.monotonic() + PUBLISH_RETRY_SECONDS
             self.schedule[entry.name] = entry
-            self._publish_failed = True
+            self._heap_is_stale = True
             raise
         sent = self.schedule[entry.name]
         self._unsaved_runs[entry.name] = _Run(

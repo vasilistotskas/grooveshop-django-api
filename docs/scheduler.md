@@ -28,12 +28,16 @@ not in the settings, because Celery installs it while
   save, if the process dies right there. A task must tolerate that, which
   `CELERY_TASK_ACKS_LATE` requires anyway.
 - **A failed publish is retried** every `PUBLISH_RETRY_SECONDS`, so a broker
-  restart does not cost a daily job its day.
+  restart does not cost a daily job its day. The entry waits on its own, so one
+  that cannot be sent never holds up the others, and logs an error each time.
 - **A database outage does not stop sending.** Beat keeps its last known
   switches and saves the runs when the database is back. At start, though, it
   needs the database, and the container restarts until it has it.
 - **`options` in an entry apply.** `expires` means a message waiting longer than
-  that is discarded, not run. django-celery-beat silently dropped it.
+  that is discarded, not run, and it counts from the send, with the run already
+  recorded. So only an entry that runs again within the hour may set it, which a
+  test enforces: a daily job discarded because a worker was down would lose its
+  day. django-celery-beat silently dropped this option.
 
 ## Time zones
 

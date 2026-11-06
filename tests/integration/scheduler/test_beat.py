@@ -24,6 +24,7 @@ pytestmark = pytest.mark.django_db
 
 ATHENS = ZoneInfo("Europe/Athens")
 BACKEND_CLEANUP = "celery.backend_cleanup"
+MAX_TICKS_WITHOUT_SLEEP = 50
 
 
 class Harness:
@@ -34,6 +35,8 @@ class Harness:
         self.sent: list[tuple[str, datetime]] = []
         self.messages: list[dict] = []
         self.broker_down = False
+        self.unpublishable: set[str] = set()
+        self.attempts: list[str] = []
         self.app = Celery("harness", set_as_current=False)
         self.app.conf.timezone = "Europe/Athens"
         self.app.conf.result_expires = None
@@ -41,15 +44,20 @@ class Harness:
         harness = self
 
         def send_task(_self, name, args=None, kwargs=None, **options):
-            if harness.broker_down:
+            short = name.removeprefix("tasks.")
+            harness.attempts.append(short)
+            if harness.broker_down or short in harness.unpublishable:
                 raise BrokerError("broker unreachable")
-            harness.sent.append((name.removeprefix("tasks."), harness.now))
+            harness.sent.append((short, harness.now))
             harness.messages.append(options)
 
         monkeypatch.setattr(CodeOwnedScheduler, "send_task", send_task)
         # The test's transaction lives on this connection.
         monkeypatch.setattr(beat, "close_old_connections", lambda: None)
         monkeypatch.setattr(beat, "STATE_REFRESH_SECONDS", 0.0)
+        monkeypatch.setattr(
+            beat.time, "monotonic", lambda: harness.now.timestamp()
+        )
 
     def clock(self):
         return self.now.astimezone(ATHENS)
@@ -69,8 +77,11 @@ class Harness:
     def run(self, scheduler, *, until, step=timedelta(seconds=30)):
         """Tick as ``Service.start`` does: again at once while it returns 0."""
         while self.now < until:
-            while scheduler.tick() == 0:
-                pass
+            for _ in range(MAX_TICKS_WITHOUT_SLEEP):
+                if scheduler.tick() != 0:
+                    break
+            else:
+                pytest.fail("beat spun without ever sleeping")
             self.now += step
 
 
@@ -249,16 +260,55 @@ class TestFailures:
         harness.now = datetime(2026, 11, 2, 10, 0, 30, tzinfo=UTC)
         harness.broker_down = True
 
-        assert scheduler.tick() == PUBLISH_RETRY_SECONDS
+        harness.run(scheduler, until=harness.now + timedelta(seconds=30))
         row = PeriodicTask.objects.get(name="job")
         assert row.last_run_at is None
         assert harness.sent == []
 
         harness.broker_down = False
+        harness.now += timedelta(seconds=PUBLISH_RETRY_SECONDS)
         harness.run(scheduler, until=harness.now + timedelta(seconds=30))
 
         assert _names(harness) == ["job"]
         assert PeriodicTask.objects.get(name="job").total_run_count == 1
+
+    def test_an_entry_that_cannot_be_sent_does_not_hold_up_the_others(
+        self, harness
+    ):
+        """Serialising one message can fail for good: the rest must still go."""
+        harness.every("broken", hour="12", minute="0")
+        harness.every("fine", hour="12", minute="0")
+        harness.now = datetime(2026, 11, 2, 9, 59, tzinfo=UTC)
+        scheduler = harness.start()
+        harness.now = datetime(2026, 11, 2, 10, 0, 30, tzinfo=UTC)
+        harness.unpublishable = {"broken"}
+
+        harness.run(scheduler, until=harness.now + timedelta(seconds=30))
+
+        assert _names(harness) == ["fine"]
+        assert PeriodicTask.objects.get(name="fine").total_run_count == 1
+
+    def test_a_failing_entry_is_tried_again_at_its_own_pace(self, harness):
+        harness.every("broken", hour="12", minute="0")
+        harness.every("steady", minute="*/5")
+        harness.now = datetime(2026, 11, 2, 9, 59, tzinfo=UTC)
+        scheduler = harness.start()
+        harness.now = datetime(2026, 11, 2, 10, 0, 30, tzinfo=UTC)
+        harness.unpublishable = {"broken"}
+
+        harness.run(scheduler, until=harness.now + timedelta(minutes=5))
+
+        # Once a retry interval, not once a tick, and it keeps the others going.
+        tries = harness.attempts.count("broken")
+        assert 2 <= tries <= 5 * 60 / PUBLISH_RETRY_SECONDS + 1
+        assert _names(harness).count("steady") >= 1
+
+        harness.unpublishable = set()
+        harness.now += timedelta(seconds=PUBLISH_RETRY_SECONDS)
+        harness.run(scheduler, until=harness.now + timedelta(seconds=30))
+
+        assert _names(harness).count("broken") == 1
+        assert PeriodicTask.objects.get(name="broken").total_run_count == 1
 
     def test_an_unreachable_database_does_not_stop_sending(
         self, harness, monkeypatch
@@ -345,6 +395,21 @@ class TestDaylightSaving:
             1,
             1,
         ]
+
+
+def test_only_an_entry_that_runs_again_within_the_hour_may_expire():
+    """Expiry counts from the send, and the run is already recorded.
+
+    A daily job discarded because a worker was down would lose its whole day.
+    """
+    offenders = [
+        name
+        for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+        if "expires" in entry.get("options", {})
+        and len(entry["schedule"].hour) < 24
+    ]
+
+    assert offenders == []
 
 
 class TestMessages:

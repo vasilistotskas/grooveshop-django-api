@@ -138,16 +138,20 @@ class PeriodicTaskAdmin(BaseModelAdmin):
                     level=messages.ERROR,
                 )
                 continue
+            options = entry.get("options", {})
             celery_app.send_task(
                 entry["task"],
                 args=entry.get("args", ()),
                 kwargs=entry.get("kwargs", {}),
                 ignore_result=celery_app.conf.task_ignore_result,
-                headers={
-                    "periodic_task_name": task.name,
-                    "_schema_name": get_public_schema_name(),
+                **{
+                    **options,
+                    "headers": {
+                        **options.get("headers", {}),
+                        "periodic_task_name": task.name,
+                        "_schema_name": get_public_schema_name(),
+                    },
                 },
-                **entry.get("options", {}),
             )
             self.log_change(request, task, "Ran by hand")
             sent += 1

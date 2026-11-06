@@ -154,17 +154,6 @@ class TenantConfigSerializer(serializers.Serializer):
         required=False, allow_blank=True
     )
 
-    # --- Theme ---
-    primary_color = serializers.CharField(read_only=True)
-    neutral_color = serializers.CharField(read_only=True)
-    accent_hex = serializers.CharField(read_only=True)
-    success_hex = serializers.CharField(read_only=True)
-    warning_hex = serializers.CharField(read_only=True)
-    error_hex = serializers.CharField(read_only=True)
-    info_hex = serializers.CharField(read_only=True)
-    theme_preset = serializers.CharField(read_only=True)
-    theme_metadata = serializers.JSONField(read_only=True)
-
     # --- Localisation ---
     default_locale = serializers.CharField(read_only=True)
     # Locales the storefront may serve for this tenant. Empty = single
@@ -514,16 +503,6 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "google_site_verification",
             "bing_site_verification",
             "pinterest_domain_verify",
-            # --- Theme ---
-            "primary_color",
-            "neutral_color",
-            "accent_hex",
-            "success_hex",
-            "warning_hex",
-            "error_hex",
-            "info_hex",
-            "theme_preset",
-            "theme_metadata",
             # --- Features ---
             "loyalty_enabled",
             "blog_enabled",

@@ -55,8 +55,8 @@ SEEDS = Path(__file__).parent / "seeds"
 SEED_CATALOGUE = Path(__file__).parent / "seed_catalogue.json"
 
 NOTE = "Default content"
-#: The release that gives a new store its theme (and an existing one,
-#: ``import_theme_settings``): made by the platform, like the defaults.
+#: The release that gives a new store its theme: made by the platform, like
+#: the defaults.
 THEME_NOTE = "Theme"
 
 
@@ -245,17 +245,6 @@ def seed_with_content(seeds: list[Seed], *, note: str) -> BuilderRelease | None:
         return _create_release(None, versions, note=note)
 
 
-def installable_problems(key: str, data: Any, i18n: Any) -> list[Issue]:
-    """Every problem that would stop :func:`install_document`: the document
-    against the store's catalogue view, then what stops a release (references,
-    a theme's contrast). Writes nothing."""
-    catalogue = _catalogue()
-    issues, validated = _issues(key, data, i18n, catalogue)
-    if validated is not None:
-        issues = validation.check_before_release(key, validated, catalogue)
-    return [replace(issue, document=key) for issue in issues]
-
-
 def install_document(
     key: str, data: Any, i18n: Any, *, note: str
 ) -> BuilderRelease | None:
@@ -265,8 +254,8 @@ def install_document(
 
     Validated like a publish, against the store's catalogue view, so one
     problem is a ``DocumentInvalid`` that writes nothing; no catalogue, no
-    write. For the content a store starts with that was not a default seed:
-    the theme of a store that existed before it had one (``import_theme_settings``).
+    write. For the content a store starts with that is not a default seed:
+    its design's theme defaults.
     """
     catalogue = _catalogue()
     with transaction.atomic():

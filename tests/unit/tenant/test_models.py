@@ -431,87 +431,6 @@ def test_stripe_secret_key_matching_modes_are_valid():
 
 
 # ---------------------------------------------------------------------------
-# Tenant.theme_metadata validation
-# ---------------------------------------------------------------------------
-
-
-def test_theme_metadata_empty_is_valid():
-    t = _unsaved_tenant(theme_metadata={})
-    t.clean()  # must not raise
-
-
-def test_theme_metadata_known_tokens_are_valid():
-    t = _unsaved_tenant(
-        theme_metadata={
-            "radius": "0.5rem",
-            "fontSans": "poppins",
-            "container": "narrow",
-            "colors": {"primaryScale": {"500": "#123456"}},
-        }
-    )
-    t.clean()  # must not raise
-
-
-def test_theme_metadata_unknown_key_raises():
-    t = _unsaved_tenant(theme_metadata={"customCss": "body{}"})
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_bad_enum_value_raises():
-    t = _unsaved_tenant(theme_metadata={"fontSans": "comic-sans"})
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_bad_scale_hex_raises():
-    t = _unsaved_tenant(
-        theme_metadata={
-            "colors": {"primaryScale": {"500": "red; } * { display:none"}}
-        }
-    )
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_dark_and_secondary_tokens_are_valid():
-    t = _unsaved_tenant(
-        theme_metadata={
-            "colors": {"secondaryScale": {"500": "#5d9d91"}},
-            "darkColors": {
-                "primaryScale": {"500": "#9aa882"},
-                "secondaryScale": {"400": "#7eb8ac"},
-            },
-            "likedHex": "#b3694b",
-            "accentDarkHex": "#d09d75",
-        }
-    )
-    t.clean()  # must not raise
-
-
-def test_theme_metadata_dark_colors_unknown_scale_raises():
-    t = _unsaved_tenant(
-        theme_metadata={"darkColors": {"accentScale": {"500": "#123456"}}}
-    )
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_dark_colors_bad_hex_raises():
-    t = _unsaved_tenant(
-        theme_metadata={"darkColors": {"primaryScale": {"500": "#12345"}}}
-    )
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_bad_liked_hex_raises():
-    t = _unsaved_tenant(theme_metadata={"likedHex": "hotpink"})
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-# ---------------------------------------------------------------------------
 # Tenant.clean() / field validator — reserved schema_name
 # ---------------------------------------------------------------------------
 
@@ -574,35 +493,6 @@ def test_schema_name_public_schema_name_is_valid(value):
     t.clean()  # must not raise
 
 
-def test_theme_metadata_font_display_is_valid():
-    t = _unsaved_tenant(
-        theme_metadata={"fontSans": "manrope", "fontDisplay": "source-serif-4"}
-    )
-    t.clean()  # must not raise
-
-
-def test_theme_metadata_bad_font_display_raises():
-    t = _unsaved_tenant(theme_metadata={"fontDisplay": "comic-sans"})
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-@pytest.mark.parametrize("font", ["geologica", "vollkorn", "commissioner"])
-def test_theme_metadata_accepts_the_newer_fonts(font):
-    t = _unsaved_tenant(theme_metadata={"fontSans": font, "fontDisplay": font})
-    t.clean()  # must not raise
-
-
-def test_theme_metadata_font_mono_is_valid():
-    t = _unsaved_tenant(
-        theme_metadata={
-            "fontSans": "ibm-plex-sans",
-            "fontMono": "jetbrains-mono",
-        }
-    )
-    t.clean()  # must not raise
-
-
 def test_available_locales_empty_is_valid():
     # Empty = single-language on default_locale, the pre-field default.
     t = _unsaved_tenant(available_locales=[])
@@ -636,12 +526,6 @@ def test_available_locales_must_contain_default_locale():
 
 def test_available_locales_rejects_non_list():
     t = _unsaved_tenant(available_locales="el,en")
-    with pytest.raises(ValidationError):
-        t.clean_fields()
-
-
-def test_theme_metadata_bad_font_mono_raises():
-    t = _unsaved_tenant(theme_metadata={"fontMono": "comic-sans"})
     with pytest.raises(ValidationError):
         t.clean_fields()
 

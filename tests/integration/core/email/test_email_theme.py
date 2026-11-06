@@ -30,7 +30,6 @@ from unittest import mock
 import pytest
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connection
 from django.template.loader import render_to_string
 
 from builder.factories import (
@@ -46,7 +45,6 @@ from tenant.credentials import (
     in_tenant_schema,
     tenant_email_theme,
 )
-from tenant.models import Tenant
 from tests.utils.staff import (
     bind_store_tenant,
     store_tenant,
@@ -361,19 +359,6 @@ class TestUnbrandedStoreRendersExactlyAsBefore:
         cache.clear()
         _release_theme({**_default_primary_scale(), "600": "#123456"})
         assert in_tenant_schema() is False
-
-        assert tenant_email_theme() == ORIGINAL_PALETTE
-
-    def test_tenant_theme_columns_no_longer_drive_the_palette(self, store):
-        """The old inputs are not read, not even as a fallback."""
-        Tenant.objects.filter(pk=store.pk).update(
-            accent_hex="#AA00BB",
-            success_hex="#00CC44",
-            theme_metadata={
-                "colors": {"primaryScale": {"600": "#123456", "700": "#0A1B2C"}}
-            },
-        )
-        connection.set_tenant(Tenant.objects.get(pk=store.pk))
 
         assert tenant_email_theme() == ORIGINAL_PALETTE
 

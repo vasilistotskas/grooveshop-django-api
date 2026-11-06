@@ -233,15 +233,7 @@ theme is.
   step, and re-running provisioning finishes it (a store with a theme is left
   alone). The platform's own `Theme` release does not count as work an editor
   made (`seed_with_content` still applies).
-- **A store that existed before the theme document:** three steps, none of
-  which writes without being asked. `manage.py export_theme_fields` writes each
-  store's theme inputs as JSON (read only); the storefront's `pnpm theme:seed`
-  turns them into theme settings; `manage.py import_theme_settings <file>
-  [--dry-run]` validates each store's settings against that store's own
-  catalogue view (schema, references, the contrast `error` rules) and creates
-  and publishes the theme document in a release that keeps every other document
-  as it was. A store that already has a theme document is skipped, never
-  overwritten, and the whole file is judged before any store is touched.
+
 
 ### Typed data props (`builder/data_sources.py`)
 

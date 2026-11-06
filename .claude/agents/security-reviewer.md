@@ -28,7 +28,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - `force_authenticate()` should only appear in test files
 
 ### 3. Stock & Payment Atomicity
-- `StockManager.reserve_stock()` / `release_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
+- `StockManager.reserve_stock()` / `release_reservation()` / `convert_reservation_to_sale()` / `decrement_stock()` must use `select_for_update()` — flag any stock modification without row-level locking
 - `StockReservation` TTL is the store setting `STOCK_RESERVATION_TTL_MINUTES` (default in `EXTRA_SETTINGS_DEFAULTS` in `settings.py`, validated by `order.stock.validate_reservation_ttl_minutes_setting`) — verify expired reservations are cleaned up
 - Stripe webhook handlers (`dj-stripe`): verify signature verification is not bypassed
 - Viva Wallet webhooks (`order/views/viva_webhook.py`, the primary provider): the POST body is unauthenticated (no HMAC; `_check_source_ip` only logs), so the Retrieve Transaction call (`_retrieve_transaction`, `_verify_viva_terminal_transaction`, `_verify_viva_reversal`) inside the owning tenant's `tenant_context` is the authentication. Flag any order, payment or gift-card state change taken from the event body without it. `viva_wallet_webhook_verification_key` is only echoed back on the GET registration handshake; it authenticates nothing
@@ -59,7 +59,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 - Admin-only endpoints use `StoreStaffModelPermissions` (or `tenant.membership.is_store_staff`), or `IsPlatformSuperuser` for platform routes; flag any DRF `IsAdminUser` or `request.user.is_staff` check (`docs/api-staff-identity.md`)
 
 ### 8. Information Disclosure
-- Error responses: verify `DEBUG = False` in production settings (`SYSTEM_ENV != 'dev'`)
+- Error responses: verify the production deploy does not set the `DEBUG` env var to `True` (`settings.py`: `DEBUG = getenv("DEBUG", "False") == "True"`)
 - Serializer fields: verify `private_metadata` is excluded from non-admin serializers
 - User serializers: verify sensitive fields (password hash, tokens, internal IDs) are excluded
 - Health check at `/api/v1/health`: verify it doesn't expose internal service versions or connection strings
@@ -94,7 +94,7 @@ Review code changes for security vulnerabilities specific to this Django REST AP
 6. Rate each finding: CRITICAL / HIGH / MEDIUM with clear exploit scenario
 
 ## What NOT to Flag
-- `DEBUG = True` in dev settings (expected for `SYSTEM_ENV = 'dev'`)
+- `DEBUG=True` in a developer's local `.env`
 - A browsing or read endpoint with no per-scope throttle (the default anon/user throttles already apply)
 - Generic Django security settings already configured in `settings.py`
 - `force_authenticate()` in test files (expected pattern)

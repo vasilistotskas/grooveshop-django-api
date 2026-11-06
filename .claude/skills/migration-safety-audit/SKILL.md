@@ -35,7 +35,7 @@ Read it with the `Read` tool. Look at the `operations = [...]` list.
 | `AddField` (with `db_default=` or `null=True`) | SAFE | Old code ignores the new column |
 | `AddField` (NOT NULL with only `default=`) on an existing table | UNSAFE | Django drops the default right after `ADD COLUMN`; old INSERTs omit the column → IntegrityError |
 | `CreateModel` | SAFE | Old code doesn't reference the table |
-| `AddIndex` / `AddConstraint` | USUALLY SAFE | Watch for long lock on large tables; consider `CONCURRENTLY` |
+| `AddIndex` / a unique `AddConstraint` | USUALLY SAFE | A plain build blocks writes on a large table: use `AddIndexAdaptively` / `AddUniqueConstraintAdaptively` with `atomic = False` (`docs/migrations.md`) |
 | `RemoveField` | UNSAFE | Old pods still SELECT/INSERT the column → 500s |
 | `DeleteModel` | UNSAFE | Old pods still query the table → 500s |
 | `RenameField` | UNSAFE | Both old name (old pods) and new name (new pods) need to exist simultaneously |
@@ -95,7 +95,7 @@ For each UNSAFE op, output:
 grep -l "AddIndex\|AddConstraint" <migration_path>
 ```
 
-If the table is large (`Order`, `Product`, `OrderItem`), warn: the PreSync Job has `activeDeadlineSeconds=1800` for the whole hook, every schema included — a long `CREATE INDEX` may exceed it, and it blocks writes while it runs. Suggest `AddIndexConcurrently` or splitting.
+If the table is large (`Order`, `Product`, `OrderItem`), warn: the PreSync Job has `activeDeadlineSeconds=1800` for the whole hook, every schema included — a long `CREATE INDEX` may exceed it, and it blocks writes while it runs. Require `AddIndexAdaptively` with `atomic = False` (`docs/migrations.md`).
 
 ### 7. Verify no `--fake` is needed
 

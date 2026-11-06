@@ -2,7 +2,8 @@
 name: gen-test
 description: >
   Generate pytest tests for the GrooveShop Django API following all project
-  conventions: CustomDjangoModelFactory usage, APITestCase with setUpTestData,
+  conventions: factory usage (CustomDjangoModelFactory for translatable models),
+  APITestCase with setUpTestData,
   query counting for N+1 detection, proper authentication patterns, and
   assertion conventions. Use this skill whenever the user wants to generate
   tests, write tests, add test coverage, or says things like "test this",

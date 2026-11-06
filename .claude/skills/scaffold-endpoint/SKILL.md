@@ -47,7 +47,7 @@ For detailed patterns for each step, read `references/patterns.md`.
 - **URL routing**: Manual `path()` registration — NOT DRF routers
 - **Managers**: Always define `for_list()` and `for_detail()` on a custom QuerySet
 - **Filters**: Compose from core mixins (`TimeStampFilterMixin`, `UUIDFilterMixin`, etc.)
-- **Admin**: Use django-unfold's `ModelAdmin` and `TabularInline`
+- **Admin**: Subclass `admin.base.BaseModelAdmin` (`BaseTranslatableAdmin` for parler models); inlines come from `unfold.admin`
 - **Translations**: Define local `TranslatedFieldsFieldExtend(TranslatedFieldExtended)` per serializer module (see patterns.md §3)
 - **Files**: Use directories (not single files) when an app has 3+ models/serializers/views
 
@@ -70,7 +70,7 @@ After scaffolding, verify:
 - [ ] `@extend_schema_view(**create_schema_view_config(...))` decorator is on ViewSet
 - [ ] URLs use manual `path()` with `ViewSet.as_view({...})` mapping
 - [ ] FilterSet composes appropriate core mixins
-- [ ] Admin is registered with django-unfold's `ModelAdmin`
-- [ ] Factory extends `CustomDjangoModelFactory` with proper translation handling
+- [ ] Admin subclasses `BaseModelAdmin` / `BaseTranslatableAdmin` (`admin/base.py`)
+- [ ] Factory extends `CustomDjangoModelFactory` for a parler model (or `factory.django.DjangoModelFactory` with a translations post_generation)
 - [ ] App is in `TENANT_APPS` (store data) or `SHARED_APPS` (public schema) in `settings.py`
 - [ ] URLs are included in `core/urls.py` under `api/v1/`

@@ -826,8 +826,9 @@ In `core/urls.py`, new apps are registered under `api/v1/`:
 
 ```python
 from django.contrib import admin
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
 
+from admin.base import BaseModelAdmin
 from your_app.models import YourModel
 
 
@@ -837,12 +838,7 @@ class YourModelInline(TabularInline):
 
 
 @admin.register(YourModel)
-class YourModelAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-
+class YourModelAdmin(BaseModelAdmin):
     list_display = ["id", "name", "created_at"]
     list_filter = ["created_at"]
     search_fields = ["translations__name", "slug"]
@@ -850,7 +846,7 @@ class YourModelAdmin(ModelAdmin):
     inlines = [YourModelInline]
 ```
 
-For translatable models, also inherit `TranslatableAdmin` from `parler.admin`.
+`BaseModelAdmin` already sets the Unfold flags and prefetches translations. For translatable models inherit `admin.base.BaseTranslatableAdmin`.
 
 ---
 
@@ -971,7 +967,7 @@ class YourAppConfig(AppConfig):
 
 ### core/urls.py
 
-Add URL inclusion inside `i18n_patterns(...)`:
+Add the include to `_storefront_i18n_patterns` (per-store data) or `_shared_i18n_patterns` (platform data):
 
 ```python
 (path("api/v1/", include("your_app.urls")),)
@@ -1078,8 +1074,8 @@ from djmoney.contrib.django_rest_framework import (
 from simple_history.models import HistoricalRecords
 
 # Admin
-from unfold.admin import ModelAdmin, TabularInline
-from parler.admin import TranslatableAdmin
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from unfold.admin import TabularInline
 
 # Factory
 import factory

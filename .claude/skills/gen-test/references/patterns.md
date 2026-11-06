@@ -117,10 +117,10 @@ class TestYourModelManager(TestCase):
 
     def test_for_list_includes_translations(self):
         """Verify for_list() prefetches translations."""
-        qs = YourModel.objects.for_list()
-        # Accessing translations should not trigger extra queries
+        # A queryset is lazy: evaluate it first, so only the access is counted.
+        items = list(YourModel.objects.for_list())
         with self.assertNumQueries(0):
-            for item in qs:
+            for item in items:
                 _ = list(item.translations.all())
 
     def test_custom_queryset_method(self):
@@ -275,8 +275,8 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
             "id",
             "translations",
             "slug",
-            "createdAt",
-            "updatedAt",
+            "created_at",
+            "updated_at",
         }
         self.assertTrue(
             expected_fields.issubset(set(first_result.keys())),
@@ -289,8 +289,8 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
 
         self.assertIn("count", response.data)
-        self.assertIn("totalPages", response.data)
-        self.assertIn("pageSize", response.data)
+        self.assertIn("total_pages", response.data)
+        self.assertIn("page_size", response.data)
 
     # --- RETRIEVE tests ---
 
@@ -327,9 +327,8 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
         url = self.get_list_url()
         data = {"slug": "test"}
         response = self.client.post(url, data, format="json")
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        self.assertEqual(
+            response.status_code, status.HTTP_401_UNAUTHORIZED
         )
 
     # --- UPDATE tests ---
@@ -348,17 +347,13 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
         instance = YourModelFactory()
         url = self.get_detail_url(instance.pk)
         response = self.client.delete(url)
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_204_NO_CONTENT, status.HTTP_200_OK],
-        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_unauthenticated_returns_error(self):
         url = self.get_detail_url(self.instance.pk)
         response = self.client.delete(url)
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        self.assertEqual(
+            response.status_code, status.HTTP_401_UNAUTHORIZED
         )
 ```
 
@@ -385,7 +380,7 @@ def test_custom_action_with_request_body(self):
     data = {"itemIds": [self.instance.pk, self.instance2.pk]}
     response = self.client.post(url, data, format="json")
     self.assertEqual(response.status_code, status.HTTP_200_OK)
-    self.assertIn("itemIds", response.data)
+    self.assertIn("item_ids", response.data)
 ```
 
 ### Search & Filter Tests
@@ -583,10 +578,7 @@ def test_create_requires_authentication(self):
     """Write endpoints should require auth."""
     self.client.force_authenticate(user=None)
     response = self.client.post(self.get_list_url(), {}, format="json")
-    self.assertIn(
-        response.status_code,
-        [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
-    )
+    self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 def test_update_own_resource(self):
@@ -681,22 +673,26 @@ Index real documents for it with `tests/utils/meilisearch.py`.
 
 ### Response Structure (List Endpoint)
 
-The API returns a paginated envelope:
+`response.data` holds the paginated envelope before rendering:
 
 ```python
 {
     "links": {"next": ..., "previous": ...},
     "count": 45,
-    "totalPages": 4,  # camelCase in API response
-    "pageSize": 12,
-    "pageTotalResults": 12,
+    "total_pages": 4,
+    "page_size": 12,
+    "page_total_results": 12,
     "page": 1,
     "results": [...],
 }
 ```
 
-Note: the API uses **camelCase** responses (via djangorestframework-camel-case),
-so assert against camelCase keys in response data.
+Note: the JSON on the wire is **camelCase** (`totalPages`, via
+djangorestframework-camel-case), applied by the renderer. So assert snake_case keys
+on `response.data`, and camelCase only on `response.json()`. An unauthenticated
+write answers 401 because the first default authentication class is Knox's; a view
+with its own `authentication_classes` can differ, so read the view and assert the
+exact code.
 
 ### Standard List Assertions
 

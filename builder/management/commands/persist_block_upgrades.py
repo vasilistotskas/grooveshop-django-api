@@ -5,9 +5,16 @@
 
 Each upgraded document, its translations moved with its nodes, goes through
 ``validate_document`` against the store's catalogue, and what that returns is
-what is stored, hash and references included. One document that does not pass stops the store: nothing of it is
-written, and the command fails naming every problem. ``--dry-run`` does all of
-that and writes nothing. A second run finds nothing to do.
+what is stored, hash and references included. One document that does not pass
+stops the store: nothing of it is written, and the command fails naming every
+problem. ``--dry-run`` does all of that and writes nothing. A second run finds
+nothing to do. Every feature counts as on, as for a seed: a store may switch a
+feature off with its block still on a page, which is for its next publish to
+refuse and no reason for that page to stay on an old version.
+
+There is no way back. An older storefront leaves out a node newer than it knows,
+so run this once the release it follows has proved itself, and only with a
+restorable backup of the store.
 
 This is the one place that rewrites a ``BuilderVersion``, which is otherwise
 immutable: a version keeps its number and what it renders, the storefront
@@ -30,7 +37,6 @@ from builder.block_upgrades import NoUpgradePath, upgrade_document
 from builder.models import BuilderDocument, BuilderVersion
 from builder.services import published_versions
 from core.management.tenant_mixin import TenantCommandMixin
-from tenant.features import feature_on
 
 
 class Command(TenantCommandMixin, BaseCommand):
@@ -150,7 +156,7 @@ class Command(TenantCommandMixin, BaseCommand):
             data=upgraded,
             i18n=upgraded_i18n,
             catalogue=catalogue,
-            feature_on=feature_on,
+            feature_on=lambda _feature: True,
         )
         if result is None:
             problems.extend(

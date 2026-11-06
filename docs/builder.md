@@ -146,7 +146,11 @@ dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
 (or `--all-tenants`; `--dry-run` writes nothing) writes the upgrades into every
 stored draft and version, each validated against the store's catalogue, then
 rebuilds the current release's reference index. One document that does not pass
-stops its store with nothing written. It is the only thing that rewrites a
+stops its store with nothing written; a feature switched off does not count
+against a document here, as it does at a publish. There is no way back: an older
+storefront leaves out a node newer than it knows, so run it once the storefront
+release it follows has proved itself, with a restorable backup of the store. It
+is the only thing that rewrites a
 `BuilderVersion`: a version keeps its number and what it renders, and a draft
 keeps its revision, so a store is not told it has unpublished changes.
 `builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held

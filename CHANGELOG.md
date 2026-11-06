@@ -3,6 +3,20 @@
 
 
 
+## v3.228.3 (2026-11-06)
+
+### Bug fixes
+
+* fix(logging): keep a clean Flower shutdown out of the error log (#502)
+
+Flower stops on SIGTERM by calling sys.exit(0) from its signal handler. If
+the signal lands during a request, Tornado logs the exit at ERROR as an
+uncaught exception, which blocks promote.py production until the next
+staging rollout. A filter on tornado.application now drops SystemExit, and
+every other exception still logs.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f9572c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9572c61b944f163365640f1f7299fba2dc3b35b))
+
 ## v3.228.2 (2026-11-06)
 
 ### Bug fixes

@@ -640,6 +640,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         max_length=64,
         blank=True,
         default="",
+        db_default="",
         help_text=_(
             "Microsoft Clarity project ID for the storefront (e.g. "
             "'a1b2c3d4e5'), under Settings > Overview in Clarity. "

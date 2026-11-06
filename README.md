@@ -51,7 +51,7 @@ for how the services fit together. The developer docs are behind basic auth.
   Django Channels for WebSockets
 - PostgreSQL 18 with django-tenants (schema per store)
 - Redis (cache, Channels layer, WebSocket tickets)
-- Celery with a RabbitMQ broker; django-celery-beat for schedules
+- Celery with a RabbitMQ broker; `scheduler/` for schedules
 - Meilisearch
 - drf-spectacular for the OpenAPI schema
 - Django Unfold for the admin
@@ -86,8 +86,7 @@ when you need background jobs:
 ```bash
 uv run uvicorn asgi:application --reload
 uv run celery --app core worker --queues celery,meilisearch --loglevel=info
-uv run celery --app core beat --loglevel=info \
-  --scheduler django_celery_beat.schedulers:DatabaseScheduler
+uv run celery --app core beat --loglevel=info
 ```
 
 `manage.py runserver` is not the dev server: it serves no WebSocket; use

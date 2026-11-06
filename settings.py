@@ -193,7 +193,7 @@ SHARED_APPS = [
     "core",
     "devtools",
     # Celery infrastructure — beat scheduler runs in public schema
-    # (DatabaseScheduler reads PeriodicTask from public).
+    # (the scheduler reads PeriodicTask from public).
     #
     # Task results are PUBLIC-SCHEMA ONLY and deliberately not mirrored
     # into TENANT_APPS. Only failures are ever written (see
@@ -205,7 +205,7 @@ SHARED_APPS = [
     # tables would be written by tenant-context tasks, invisible to the
     # control plane, and never cleaned. tenant/migrations/0039 drops the
     # ones an earlier TENANT_APPS entry created.
-    "django_celery_beat",
+    "scheduler",
     "django_celery_results",
     # Platform-wide Setting table. Also in TENANT_APPS so per-tenant
     # settings can override.
@@ -1102,11 +1102,10 @@ CELERY_TASK_TIME_LIMIT = 1800
 # where a result could be evicted before it expired and the whole lot
 # vanished in the 2026-09-09 Redis outage.
 #
-# What IS worth keeping is the failures, durably and queryably: this
-# platform has no metrics or alerting stack, and a silent failure here
-# is an order confirmation nobody receives or a voucher that never
-# mints. ``task_store_errors_even_if_ignored`` is what makes the pair
-# work — celery/app/trace.py::handle_error_state falls back to it
+# What IS worth keeping is the failures, durably and queryably: a
+# silent failure here is an order confirmation nobody receives or a
+# voucher that never mints. ``task_store_errors_even_if_ignored`` is
+# what makes the pair work — celery/app/trace.py::handle_error_state falls back to it
 # precisely when a task is ignored — so successes write nothing while
 # failures and retries write a full row, with task name and arguments
 # (``result_extended``) for the admin.
@@ -1126,8 +1125,8 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # the app ran on celery's 1-day default. 30 days is affordable now that
 # only failures land here, and it is long enough to still find the row
 # behind a complaint that arrives a fortnight late. Beat's
-# DatabaseScheduler installs ``celery.backend_cleanup`` on its own
-# whenever this is set (django_celery_beat/schedulers.py).
+# Celery's scheduler installs ``celery.backend_cleanup`` on its own
+# whenever this is set (celery/beat.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
 # Retention sweeps (``core.retention``): primary keys deleted per statement.
@@ -1208,7 +1207,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
 
 # Beat scheduler
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULER = "scheduler.beat:CodeOwnedScheduler"
 CELERY_BEAT_MAX_LOOP_INTERVAL = 300
 
 # Development safety
@@ -1257,10 +1256,8 @@ TENANT_BILLING = {
 # The nightly pg_dump (and the pruning of its output) is production's
 # disaster-recovery copy. An environment that is itself a refreshable,
 # anonymised clone of production (staging) sets this to False: it then
-# schedules neither entry, and ``core.beat`` deletes the rows the cloned
-# database brings along, because DatabaseScheduler never removes a row
-# whose entry left CELERY_BEAT_SCHEDULE. On by default: production relies
-# on the dump.
+# schedules neither entry, and beat deletes the rows the cloned database
+# brings along. On by default: production relies on the dump.
 DATABASE_BACKUPS_ENABLED = getenv("DATABASE_BACKUPS_ENABLED", "True") == "True"
 DATABASE_BACKUP_BEAT_ENTRIES = (
     "scheduled-database-backup",
@@ -1832,12 +1829,9 @@ def get_celery_beat_schedule():
     return base_schedule
 
 
+# The whole schedule: ``scheduler.beat`` deletes any other PeriodicTask row
+# when beat starts. To change when a job runs, change it here and deploy.
 CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
-# Entries this environment must NOT run: ``core.beat`` deletes their
-# PeriodicTask rows when beat starts.
-CELERY_BEAT_UNSCHEDULED_ENTRIES = (
-    () if DATABASE_BACKUPS_ENABLED else DATABASE_BACKUP_BEAT_ENTRIES
-)
 
 CHANNEL_LAYERS = {
     "default": {
@@ -3898,9 +3892,8 @@ UNFOLD_PLATFORM = {
             },
             # The Celery beat schedule and the task-result tables live in
             # the PUBLIC schema and drive every store's fan-out tasks —
-            # platform operations, never a store's. (Task Results only
-            # fill up under the ``django-db`` result backend; production
-            # writes results to Redis, so the page is empty there.)
+            # platform operations, never a store's. (Task Results holds
+            # task failures only: ``CELERY_TASK_IGNORE_RESULT``.)
             {
                 "title": _("Background Jobs"),
                 "separator": True,
@@ -3910,39 +3903,7 @@ UNFOLD_PLATFORM = {
                         "title": _("Periodic Tasks"),
                         "icon": "task_alt",
                         "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_periodictask_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Crontab Schedules"),
-                        "icon": "more_time",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_crontabschedule_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Interval Schedules"),
-                        "icon": "update",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_intervalschedule_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Clocked Schedules"),
-                        "icon": "alarm",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_clockedschedule_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Solar Schedules"),
-                        "icon": "wb_sunny",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_beat_solarschedule_changelist",
+                            "platform_admin:scheduler_periodictask_changelist",
                             urlconf=PUBLIC_SCHEMA_URLCONF,
                         ),
                     },

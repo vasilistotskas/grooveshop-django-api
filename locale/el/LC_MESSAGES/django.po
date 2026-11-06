@@ -145,6 +145,24 @@ msgid "%(count)d payment methods were successfully deactivated."
 msgstr "%(count)d μέθοδοι πληρωμής απενεργοποιήθηκαν επιτυχώς."
 
 #, python-format
+msgid "%(count)d periodic task queued."
+msgid_plural "%(count)d periodic tasks queued."
+msgstr[0] "Μπήκε στην ουρά %(count)d περιοδική εργασία."
+msgstr[1] "Μπήκαν στην ουρά %(count)d περιοδικές εργασίες."
+
+#, python-format
+msgid "%(count)d periodic task switched off."
+msgid_plural "%(count)d periodic tasks switched off."
+msgstr[0] "Απενεργοποιήθηκε %(count)d περιοδική εργασία."
+msgstr[1] "Απενεργοποιήθηκαν %(count)d περιοδικές εργασίες."
+
+#, python-format
+msgid "%(count)d periodic task switched on."
+msgid_plural "%(count)d periodic tasks switched on."
+msgstr[0] "Ενεργοποιήθηκε %(count)d περιοδική εργασία."
+msgstr[1] "Ενεργοποιήθηκαν %(count)d περιοδικές εργασίες."
+
+#, python-format
 msgid "%(count)d posts were successfully marked as featured."
 msgstr "%(count)d άρθρα επισημάνθηκαν επιτυχώς ως προτεινόμενα."
 
@@ -414,6 +432,10 @@ msgstr "%(name)s (παρακρατείται)"
 #, python-format
 msgid "%(name)s Admin"
 msgstr "Διαχείριση %(name)s"
+
+#, python-format
+msgid "%(name)s is not declared in the schedule."
+msgstr "Το %(name)s δεν υπάρχει στο πρόγραμμα."
 
 #, python-format
 msgid "%(name)s: invoices retained until %(until)s under the statutory record-keeping obligation; everything else erased."
@@ -3032,9 +3054,6 @@ msgstr "Πατήστε τον παρακάτω σύνδεσμο για να επ
 msgid "Clicked a result"
 msgstr "Πάτησαν σε αποτέλεσμα"
 
-msgid "Clocked Schedules"
-msgstr "Προγραμματισμοί με Ώρα"
-
 #, python-format
 msgid "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activate when ready."
 msgstr "Κλωνοποιήθηκε το προϊόν #%(orig)s → πρόχειρο #%(clone)s. Επεξεργαστείτε το αντίγραφο και επανενεργοποιήστε όταν είναι έτοιμο."
@@ -3629,9 +3648,6 @@ msgstr "Κρίσιμη προτεραιότητα"
 
 msgid "Critical Stock (1-5)"
 msgstr "Κρίσιμο απόθεμα (1-5)"
-
-msgid "Crontab Schedules"
-msgstr "Προγραμματισμοί Crontab"
 
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr "Κρυπτογραφικά τυχαίος, με κεφαλαία· το μυστικό του κατόχου"
@@ -7341,9 +7357,6 @@ msgstr "Εσωτερική σημαία — αποτρέπει διπλές ει
 msgid "Internal grams; converted to kilograms (>= 0.5) at API call time per ACS Weight requirements."
 msgstr "Εσωτερικά γραμμάρια· μετατρέπονται σε κιλά (>= 0,5) κατά την κλήση API σύμφωνα με τις απαιτήσεις βάρους της ACS."
 
-msgid "Interval Schedules"
-msgstr "Προγραμματισμοί Διαστημάτων"
-
 msgid "Invalid"
 msgstr "Μη έγκυρο"
 
@@ -7658,6 +7671,9 @@ msgstr "Τελευταία παραγγελία"
 
 msgid "Last polled at"
 msgstr "Τελευταία ανάκτηση"
+
+msgid "Last run"
+msgstr "Τελευταία εκτέλεση"
 
 #, python-format
 msgid "Last sent %(ago)s ago"
@@ -10251,6 +10267,9 @@ msgstr "Εκτελέστηκε από (προσωπικό)"
 msgid "Period"
 msgstr "Περίοδος"
 
+msgid "Periodic Task"
+msgstr "Περιοδική Εργασία"
+
 msgid "Periodic Tasks"
 msgstr "Περιοδικές Εργασίες"
 
@@ -12014,8 +12033,14 @@ msgstr "Εκτελέστε"
 msgid "Run COD reconciliation now"
 msgstr "Εκτέλεση συμφωνίας αντικαταβολής τώρα"
 
+msgid "Run now"
+msgstr "Εκτέλεση τώρα"
+
 msgid "Running low on stock"
 msgstr "Χαμηλό απόθεμα"
+
+msgid "Runs"
+msgstr "Εκτελέσεις"
 
 msgid "SEO"
 msgstr "SEO"
@@ -12152,6 +12177,9 @@ msgstr "Σάρωση για επαλήθευση"
 
 msgid "Scanned at"
 msgstr "Σαρώθηκε στις"
+
+msgid "Schedule"
+msgstr "Πρόγραμμα"
 
 msgid "Scheduled"
 msgstr "Προγραμματισμένο"
@@ -12933,9 +12961,6 @@ msgstr "Αποσυνδέθηκε κοινωνικός λογαριασμός"
 msgid "Software and subscriptions"
 msgstr "Λογισμικό και συνδρομές"
 
-msgid "Solar Schedules"
-msgstr "Προγραμματισμοί Ηλιακοί"
-
 msgid "Sold"
 msgstr "Τεμάχια"
 
@@ -13508,11 +13533,20 @@ msgstr "Ανεστάλη από το admin της πλατφόρμας"
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Η αναστολή (η ενέργεια στη λίστα Καταστήματα ή η εργασία χρέωσης) σημειώνει το κατάστημα ως ανενεργό και καταγράφει πότε και γιατί: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία. Το storefront σταματά να αποκρίνεται άμεσα (οι επισκέπτες βλέπουν ότι το κατάστημα δεν βρέθηκε), οι συνδέσεις WebSocket απορρίπτονται, οι προγραμματισμένες εργασίες παρακάμπτουν το κατάστημα και το agent gateway δεν το εξυπηρετεί πλέον. Τα δεδομένα μένουν ανέπαφα· η ενέργεια «Ενεργοποίηση επιλεγμένων καταστημάτων» επαναφέρει τα πάντα."
 
+msgid "Switch off"
+msgstr "Απενεργοποίηση"
+
+msgid "Switch on"
+msgstr "Ενεργοποίηση"
+
 msgid "Switch on or off"
 msgstr "Ενεργοποίηση ή απενεργοποίηση"
 
 msgid "Switched off"
 msgstr "Απενεργοποιημένο"
+
+msgid "Switched on at"
+msgstr "Ενεργοποιήθηκε στις"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Συγχρονισμός lockers από BoxNow API"
@@ -17228,6 +17262,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Clear search"
 #~ msgstr "Καθαρισμός αναζήτησης"
 
+#~ msgid "Clocked Schedules"
+#~ msgstr "Προγραμματισμοί με Ώρα"
+
 #~ msgid "Collapse/Expand"
 #~ msgstr "Σύμπτυξη/Επέκταση"
 
@@ -17284,6 +17321,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Country Analytics"
 #~ msgstr "Αναλυτικά ανά χώρα"
+
+#~ msgid "Crontab Schedules"
+#~ msgstr "Προγραμματισμοί Crontab"
 
 #~ msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
 #~ msgstr "Κωδικός νομίσματος (π.χ. USD, EUR). Υποχρεωτικό αν δοθεί ποσό."
@@ -17518,6 +17558,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Increment view count by 100"
 #~ msgstr "Αύξηση προβολών κατά 100"
+
+#~ msgid "Interval Schedules"
+#~ msgstr "Προγραμματισμοί Διαστημάτων"
 
 #~ msgid "Invalid or expired confirmation link."
 #~ msgstr "Μη έγκυρος ή ληγμένος σύνδεσμος επιβεβαίωσης."
@@ -18130,6 +18173,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Social sign-in"
 #~ msgstr "Σύνδεση μέσω τρίτων"
+
+#~ msgid "Solar Schedules"
+#~ msgstr "Προγραμματισμοί Ηλιακοί"
 
 #, python-format
 #~ msgid "Sort order has been reset for %(count)d payment methods."

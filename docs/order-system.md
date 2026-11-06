@@ -1254,9 +1254,7 @@ accepting Cyprus orders at the Greek flat rate.
   `raw["Unprinted_Vouchers"]`, so the task takes the one path above: status,
   order notes, no email. If ANY candidate is locally printed the silence is
   unexplained and stays an ERROR log plus `AcsAPIError`; that case failed
-  the infrastructure's production smoke gate when it was misclassified. The retired `warn-unprinted-acs-vouchers` beat row is deleted by
-  `tenant/migrations/0049`, because `DatabaseScheduler` never removes a
-  row whose entry left `CELERY_BEAT_SCHEDULE`.
+  the infrastructure's production smoke gate when it was misclassified. The `warn-unprinted-acs-vouchers` beat entry is retired.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)
   excludes orders awaiting their online payment — the auto-cancel owns
   those, and listing them invited an "Issue ACS voucher now" for unpaid

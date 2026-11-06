@@ -12,11 +12,9 @@ and nobody is emailed. Every other refusal still fails the task.
 
 from __future__ import annotations
 
-import importlib
 from unittest.mock import patch
 
 import pytest
-from django.apps import apps as django_apps
 
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError, AcsUnprintedVouchersError
@@ -242,51 +240,9 @@ class TestSilentRefusalEndToEnd:
         assert not isinstance(exc_info.value, AcsUnprintedVouchersError)
 
 
-class TestRetiredWarningBeatRow:
-    """The 15:45 warning task is gone, and so must be its beat row.
-
-    ``DatabaseScheduler`` never deletes a row whose entry left
-    ``CELERY_BEAT_SCHEDULE``; without the migration it would keep firing
-    a task that no longer exists.
-    """
-
-    migration = importlib.import_module(
-        "tenant.migrations.0049_remove_warn_unprinted_acs_vouchers_beat"
+def test_no_schedule_entry_names_the_retired_warning_task(settings):
+    assert "warn-unprinted-acs-vouchers" not in settings.CELERY_BEAT_SCHEDULE
+    assert not any(
+        "warn_unprinted" in entry["task"]
+        for entry in settings.CELERY_BEAT_SCHEDULE.values()
     )
-
-    def test_no_schedule_entry_names_the_retired_task(self, settings):
-        assert self.migration.TASK_NAME not in settings.CELERY_BEAT_SCHEDULE
-        assert not any(
-            "warn_unprinted" in entry["task"]
-            for entry in settings.CELERY_BEAT_SCHEDULE.values()
-        )
-
-    def test_migration_deletes_the_row_and_flags_the_change(self):
-        from django.utils import timezone
-        from django_celery_beat.models import (
-            CrontabSchedule,
-            PeriodicTask,
-            PeriodicTasks,
-        )
-
-        crontab = CrontabSchedule.objects.create(
-            minute="45", hour="15", day_of_week="mon-fri"
-        )
-        PeriodicTask.objects.create(
-            name=self.migration.TASK_NAME,
-            task="tenant.tasks.fanout_warn_unprinted_acs_vouchers",
-            crontab=crontab,
-        )
-        kept = PeriodicTask.objects.create(
-            name="issue-acs-pickup-list",
-            task="tenant.tasks.fanout_issue_daily_acs_pickup_list",
-            crontab=crontab,
-        )
-        before = timezone.now()
-
-        self.migration.delete_beat_row(django_apps, None)
-
-        names = set(PeriodicTask.objects.values_list("name", flat=True))
-        assert self.migration.TASK_NAME not in names
-        assert kept.name in names
-        assert PeriodicTasks.objects.get(ident=1).last_update >= before

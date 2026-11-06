@@ -19,7 +19,6 @@ dependencies = [
   "django==6.0.9",
   "django-allauth[idp-oidc]==65.20.0",
   "django-extra-settings==0.15.0",
-  "django-celery-beat==2.9.0",
   "django-celery-results==2.6.0",
   "django-cors-headers==4.9.0",
   "django-simple-history==3.13.0",

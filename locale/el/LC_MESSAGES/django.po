@@ -14592,6 +14592,9 @@ msgstr "Αυτή η παραγγελία δεν είναι διαμορφωμέ�
 msgid "This order is not waiting for a payment."
 msgstr "Αυτή η παραγγελία δεν περιμένει πληρωμή."
 
+msgid "This order link is not valid or has expired."
+msgstr "Αυτός ο σύνδεσμος παραγγελίας δεν είναι έγκυρος ή έχει λήξει."
+
 msgid "This order was not paid through a payment provider, so there is nothing to refund here."
 msgstr "Αυτή η παραγγελία δεν πληρώθηκε μέσω παρόχου πληρωμών, επομένως δεν υπάρχει κάτι να επιστραφεί από εδώ."
 

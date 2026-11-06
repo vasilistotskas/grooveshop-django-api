@@ -612,7 +612,7 @@ class OrderViewSet(BaseModelViewSet):
             )
             if not obj.opens_for_guest(request_uuid):
                 raise PermissionDenied(
-                    _("Guest orders can only be accessed via UUID."),
+                    _("This order link is not valid or has expired."),
                     code="guest_order_requires_uuid",
                 )
             return

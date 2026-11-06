@@ -327,9 +327,7 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
         url = self.get_list_url()
         data = {"slug": "test"}
         response = self.client.post(url, data, format="json")
-        self.assertEqual(
-            response.status_code, status.HTTP_401_UNAUTHORIZED
-        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     # --- UPDATE tests ---
 
@@ -352,9 +350,7 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_delete_unauthenticated_returns_error(self):
         url = self.get_detail_url(self.instance.pk)
         response = self.client.delete(url)
-        self.assertEqual(
-            response.status_code, status.HTTP_401_UNAUTHORIZED
-        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 ```
 
 ### Custom Action Tests

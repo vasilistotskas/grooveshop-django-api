@@ -14589,6 +14589,9 @@ msgstr "This order is not configured for online payments."
 msgid "This order is not waiting for a payment."
 msgstr "This order is not waiting for a payment."
 
+msgid "This order link is not valid or has expired."
+msgstr "This order link is not valid or has expired."
+
 msgid "This order was not paid through a payment provider, so there is nothing to refund here."
 msgstr "This order was not paid through a payment provider, so there is nothing to refund here."
 

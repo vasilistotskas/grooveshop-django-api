@@ -4,7 +4,7 @@ Hi Maria,
 
 Your personal data export is ready to download. The archive contains every record we hold that relates to you: profile, addresses, orders, favourites, reviews, blog comments, loyalty activity, notifications, and subscriptions.
 
-Download your export: https://shop.example/en/account/settings/privacy?export=export-token
+Download your export: https://shop.example/en/account/settings/privacy
 
 File size: 0.0 KB
 The link expires on 03/21/2026 12:30 p.m.. After that you can request a new export from the privacy settings page.

@@ -35,7 +35,7 @@ class TestSuccessUrlForOrder:
         with override_settings(NUXT_BASE_URL="https://webside.gr"):
             url = _success_url_for_order(order)
 
-        assert url == f"https://tenant-b.com/checkout/success/{order.uuid}"
+        assert url == "https://tenant-b.com/checkout/success"
 
     def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):
         order = OrderFactory(num_order_items=0)
@@ -44,7 +44,7 @@ class TestSuccessUrlForOrder:
         with override_settings(NUXT_BASE_URL="https://webside.gr"):
             url = _success_url_for_order(order)
 
-        assert url == f"https://webside.gr/checkout/success/{order.uuid}"
+        assert url == "https://webside.gr/checkout/success"
 
     def test_returns_empty_string_when_no_base_url_configured(
         self, bind_tenant
@@ -69,6 +69,4 @@ class TestSuccessUrlForOrder:
         with override_settings(NUXT_BASE_URL="https://webside.gr"):
             url = _success_url_for_order(order)
 
-        assert url == (
-            f"https://webside.gr{prefix}/checkout/success/{order.uuid}"
-        )
+        assert url == (f"https://webside.gr{prefix}/checkout/success")

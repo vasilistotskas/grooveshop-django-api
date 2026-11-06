@@ -314,7 +314,8 @@ def _success_url_for_order(order: Order) -> str:
     """Build the storefront success URL — Meta uses ``event_source_url``
     as a hint for content-matching and reporting, so we send the
     canonical user-facing URL even though the event was minted
-    server-side.
+    server-side. Never the order's uuid: it opens a guest order, so the
+    page's address does not hold it.
 
     Uses the active tenant's storefront domain (via
     ``get_tenant_frontend_url``) rather than the platform-wide
@@ -326,13 +327,8 @@ def _success_url_for_order(order: Order) -> str:
     base = get_tenant_base_url()
     if not base:
         return ""
-    # Order UUID is the public guest-safe identifier; matches the
-    # Nuxt page route ``/checkout/success/[uuid]``.
-    uuid = getattr(order, "uuid", None)
-    if not uuid:
-        return base
     return get_tenant_frontend_url(
-        f"/checkout/success/{uuid}", language=get_order_language(order)
+        "/checkout/success", language=get_order_language(order)
     )
 
 

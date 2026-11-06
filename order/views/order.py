@@ -610,7 +610,7 @@ class OrderViewSet(BaseModelViewSet):
             request_uuid = self.kwargs.get("uuid") or request.query_params.get(
                 "uuid"
             )
-            if not (request_uuid and str(obj.uuid) == str(request_uuid)):
+            if not obj.opens_for_guest(request_uuid):
                 raise PermissionDenied(
                     _("Guest orders can only be accessed via UUID."),
                     code="guest_order_requires_uuid",

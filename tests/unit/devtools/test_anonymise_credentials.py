@@ -42,9 +42,6 @@ _KEPT = {
     "emails.HistoricalEmailSwitch.type_key": (
         "the history copy of EmailSwitch.type_key, not a credential"
     ),
-    "django_celery_beat.PeriodicTask.routing_key": (
-        "an AMQP routing key (a queue name), not a credential"
-    ),
     "order.Order.pay_way_key": (
         "the slug of the payment method the order used, not a credential"
     ),

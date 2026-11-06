@@ -125,7 +125,7 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             "sites",
             "country",
             "region",
-            "django_celery_beat",
+            "scheduler",
             "django_celery_results",
             "auth",
             "core",

@@ -26,7 +26,6 @@ import pytest
 from django.core import mail
 from django.utils import translation
 from django.utils.translation import gettext
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from djmoney.money import Money
 
 from b2b.enum import BusinessProfileStatus, ViesStatus
@@ -62,6 +61,7 @@ from product.tasks import (
     send_product_alert_price_drop,
     send_product_alert_restock,
 )
+from scheduler.models import PeriodicTask
 from tests.utils.golden import assert_golden, snapshot
 from tests.utils.staff import (
     bind_store_tenant,
@@ -120,13 +120,7 @@ def _store(settings, language):
     switch_store_settings(PRODUCT_ALERTS_ENABLED=True)
     PeriodicTask.objects.update_or_create(
         name=BEAT_ENTRY,
-        defaults={
-            "task": "tenant.tasks.fanout_send_inactive_user_notifications",
-            "enabled": True,
-            "interval": IntervalSchedule.objects.create(
-                every=1, period=IntervalSchedule.DAYS
-            ),
-        },
+        defaults={"enabled": True},
     )
     previous = bind_store_tenant(
         store_tenant(

@@ -78,7 +78,7 @@ class TestSharedOnlyAppLabels(TestCase):
             "core",
             "country",
             "region",
-            "django_celery_beat",
+            "scheduler",
             "django_celery_results",
         ):
             assert label in labels, f"{label} would still be offered"

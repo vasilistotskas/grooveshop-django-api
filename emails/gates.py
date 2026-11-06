@@ -83,7 +83,7 @@ class ScheduleGate(Gate):
     entry: str
 
     def is_open(self) -> bool:
-        from django_celery_beat.models import PeriodicTask
+        from scheduler.models import PeriodicTask
 
         with schema_context(get_public_schema_name()):
             return PeriodicTask.objects.filter(

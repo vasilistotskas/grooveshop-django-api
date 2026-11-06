@@ -58,7 +58,7 @@ PLATFORM_APP_LABELS: frozenset[str] = frozenset(
         # silently changed nothing for any store.
         "country",
         "region",
-        "django_celery_beat",
+        "scheduler",
         "django_celery_results",
         # The platform's own mail: its log and its suppression list live in
         # ``public`` (``send_email`` runs a platform type under it), and the

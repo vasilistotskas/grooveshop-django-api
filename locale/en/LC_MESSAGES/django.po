@@ -140,6 +140,24 @@ msgid "%(count)d payment methods were successfully deactivated."
 msgstr "%(count)d payment methods were successfully deactivated."
 
 #, python-format
+msgid "%(count)d periodic task queued."
+msgid_plural "%(count)d periodic tasks queued."
+msgstr[0] "%(count)d periodic task queued."
+msgstr[1] "%(count)d periodic tasks queued."
+
+#, python-format
+msgid "%(count)d periodic task switched off."
+msgid_plural "%(count)d periodic tasks switched off."
+msgstr[0] "%(count)d periodic task switched off."
+msgstr[1] "%(count)d periodic tasks switched off."
+
+#, python-format
+msgid "%(count)d periodic task switched on."
+msgid_plural "%(count)d periodic tasks switched on."
+msgstr[0] "%(count)d periodic task switched on."
+msgstr[1] "%(count)d periodic tasks switched on."
+
+#, python-format
 msgid "%(count)d posts were successfully marked as featured."
 msgstr "%(count)d posts were successfully marked as featured."
 
@@ -409,6 +427,10 @@ msgstr "%(name)s (withheld)"
 #, python-format
 msgid "%(name)s Admin"
 msgstr "%(name)s Admin"
+
+#, python-format
+msgid "%(name)s is not declared in the schedule."
+msgstr "%(name)s is not declared in the schedule."
 
 #, python-format
 msgid "%(name)s: invoices retained until %(until)s under the statutory record-keeping obligation; everything else erased."
@@ -3019,9 +3041,6 @@ msgstr "Click the link below to retry your payment:"
 msgid "Clicked a result"
 msgstr "Clicked a result"
 
-msgid "Clocked Schedules"
-msgstr "Clocked Schedules"
-
 #, python-format
 msgid "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activate when ready."
 msgstr "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activate when ready."
@@ -3619,9 +3638,6 @@ msgstr "Critical Priority"
 
 msgid "Critical Stock (1-5)"
 msgstr "Critical Stock (1-5)"
-
-msgid "Crontab Schedules"
-msgstr "Crontab Schedules"
 
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr "Crypto-random, uppercased; the bearer secret"
@@ -7313,9 +7329,6 @@ msgstr "Internal flag — prevents duplicate alerts. Automatically cleared when 
 msgid "Internal grams; converted to kilograms (>= 0.5) at API call time per ACS Weight requirements."
 msgstr "Internal grams; converted to kilograms (>= 0.5) at API call time per ACS Weight requirements."
 
-msgid "Interval Schedules"
-msgstr "Interval Schedules"
-
 msgid "Invalid"
 msgstr "Invalid"
 
@@ -7629,6 +7642,9 @@ msgstr "Last order"
 
 msgid "Last polled at"
 msgstr "Last polled at"
+
+msgid "Last run"
+msgstr "Last run"
 
 #, python-format
 msgid "Last sent %(ago)s ago"
@@ -10213,6 +10229,9 @@ msgstr "Performed By (staff)"
 msgid "Period"
 msgstr "Period"
 
+msgid "Periodic Task"
+msgstr "Periodic Task"
+
 msgid "Periodic Tasks"
 msgstr "Periodic Tasks"
 
@@ -11974,8 +11993,14 @@ msgstr "Run"
 msgid "Run COD reconciliation now"
 msgstr "Run COD reconciliation now"
 
+msgid "Run now"
+msgstr "Run now"
+
 msgid "Running low on stock"
 msgstr "Running low on stock"
+
+msgid "Runs"
+msgstr "Runs"
 
 msgid "SEO"
 msgstr "SEO"
@@ -12112,6 +12137,9 @@ msgstr "Scan to verify"
 
 msgid "Scanned at"
 msgstr "Scanned at"
+
+msgid "Schedule"
+msgstr "Schedule"
 
 msgid "Scheduled"
 msgstr "Scheduled"
@@ -12893,9 +12921,6 @@ msgstr "Social account disconnected"
 msgid "Software and subscriptions"
 msgstr "Software and subscriptions"
 
-msgid "Solar Schedules"
-msgstr "Solar Schedules"
-
 msgid "Sold"
 msgstr "Sold"
 
@@ -13469,11 +13494,20 @@ msgstr "Suspended via platform admin"
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 
+msgid "Switch off"
+msgstr "Switch off"
+
+msgid "Switch on"
+msgstr "Switch on"
+
 msgid "Switch on or off"
 msgstr "Switch on or off"
 
 msgid "Switched off"
 msgstr "Switched off"
+
+msgid "Switched on at"
+msgstr "Switched on at"
 
 msgid "Sync lockers from BoxNow API"
 msgstr "Sync lockers from BoxNow API"
@@ -17014,6 +17048,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Call to Action Banner"
 #~ msgstr "Call to Action Banner"
 
+#~ msgid "Clocked Schedules"
+#~ msgstr "Clocked Schedules"
+
 #~ msgid "Column"
 #~ msgstr "Column"
 
@@ -17038,6 +17075,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Contact Panel"
 #~ msgstr "Contact Panel"
+
+#~ msgid "Crontab Schedules"
+#~ msgstr "Crontab Schedules"
 
 #~ msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
 #~ msgstr "Currency code (e.g., USD, EUR). Required if amount is provided."
@@ -17156,6 +17196,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Info Hex"
 #~ msgstr "Info Hex"
+
+#~ msgid "Interval Schedules"
+#~ msgstr "Interval Schedules"
 
 #~ msgid "Invalid or expired unsubscribe link"
 #~ msgstr "Invalid or expired unsubscribe link"
@@ -17447,6 +17490,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Social sign-in"
 #~ msgstr "Social sign-in"
+
+#~ msgid "Solar Schedules"
+#~ msgstr "Solar Schedules"
 
 #~ msgid "Spacer"
 #~ msgstr "Spacer"

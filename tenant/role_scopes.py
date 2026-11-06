@@ -58,7 +58,7 @@ PLATFORM_ONLY_APP_LABELS: frozenset[str] = frozenset(
         "country",
         "region",
         "core",
-        "django_celery_beat",
+        "scheduler",
         "django_celery_results",
         "allauth_idp_oidc",
         "rosetta",

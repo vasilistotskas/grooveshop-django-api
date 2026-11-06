@@ -52,7 +52,7 @@ def shared_only_app_labels() -> list[str]:
     because what they would show is the platform's own rows rather than
     that store's. ``django_site`` holds one row per store domain;
     ``core_cachepurgelog`` every purge across the estate;
-    ``django_celery_beat`` the schedule that drives every tenant.
+    ``scheduler`` the schedule that drives every tenant.
 
     Derived, not enumerated, and that matters here:
     ``role_scopes.PLATFORM_ONLY_APP_LABELS`` looks like the same set but

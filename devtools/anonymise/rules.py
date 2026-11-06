@@ -468,12 +468,7 @@ NOT_PERSONAL: dict[str, str] = {
     ),
     **_exempt(
         "scheduler configuration of the platform, no customer data",
-        "django_celery_beat.ClockedSchedule",
-        "django_celery_beat.CrontabSchedule",
-        "django_celery_beat.IntervalSchedule",
-        "django_celery_beat.PeriodicTask",
-        "django_celery_beat.PeriodicTasks",
-        "django_celery_beat.SolarSchedule",
+        "scheduler.PeriodicTask",
     ),
     **_exempt(
         "catalogue and storefront content the merchant authored",

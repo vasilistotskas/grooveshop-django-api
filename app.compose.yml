@@ -134,7 +134,6 @@ services:
       uv --no-cache run celery
       --app core
       beat
-      --scheduler django_celery_beat.schedulers:DatabaseScheduler
       --loglevel=info
     env_file:
       - ./.env

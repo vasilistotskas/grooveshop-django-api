@@ -9,17 +9,10 @@ the 15 minutes before its cancellation and never a second time.
 from __future__ import annotations
 
 import importlib
-from datetime import timedelta
 
 import pytest
 from django.apps import apps as real_apps
 from django.conf import settings
-from django.utils import timezone
-from django_celery_beat.models import (
-    IntervalSchedule,
-    PeriodicTask,
-    PeriodicTasks,
-)
 from extra_settings.models import Setting
 
 from order.models.order import Order
@@ -27,7 +20,6 @@ from order.models.order import Order
 pytestmark = pytest.mark.django_db
 
 ORDER_MIGRATION = "order.migrations.0084_drop_pending_order_reminders"
-TENANT_MIGRATION = "tenant.migrations.0056_remove_check_pending_orders_beat"
 SETTINGS = (
     "PENDING_ORDER_REMINDER_MAX_COUNT",
     "PENDING_ORDER_REMINDER_INTERVAL_DAYS_1",
@@ -95,31 +87,3 @@ def test_the_migration_gives_the_counter_a_database_default():
 
     assert alter.name == "reminder_count"
     assert alter.field.db_default == 0
-
-
-def test_the_beat_row_is_deleted_and_the_schedule_reloads():
-    daily = IntervalSchedule.objects.create(
-        every=1, period=IntervalSchedule.DAYS
-    )
-    PeriodicTask.objects.create(
-        name="check-pending-orders",
-        task="tenant.tasks.fanout_check_pending_orders",
-        interval=daily,
-    )
-    keep = PeriodicTask.objects.create(
-        name="expire-gift-cards",
-        task="tenant.tasks.fanout_expire_gift_cards",
-        interval=daily,
-    )
-    PeriodicTasks.objects.update_or_create(
-        ident=1, defaults={"last_update": timezone.now() - timedelta(days=1)}
-    )
-    before = PeriodicTasks.objects.get(ident=1).last_update
-
-    importlib.import_module(TENANT_MIGRATION).delete_beat_row(
-        real_apps, _SchemaEditor
-    )
-
-    assert not PeriodicTask.objects.filter(name="check-pending-orders").exists()
-    assert PeriodicTask.objects.filter(pk=keep.pk).exists()
-    assert PeriodicTasks.objects.get(ident=1).last_update > before

@@ -27,10 +27,9 @@ skip the check. Production's value is `production`.
 Staging is a refreshable clone, so its own `pg_dump` has nothing to protect.
 `DATABASE_BACKUPS_ENABLED=False` (default `True`, which is production's
 behaviour) removes both `scheduled-database-backup` and `cleanup-old-backups`
-from `CELERY_BEAT_SCHEDULE`. `DatabaseScheduler` never deletes a row whose
-entry left the schedule, and the restored production database carries those
-rows, so `core/beat.py` deletes them every time beat starts
-(`beat_init` in `core/celery.py`, named by `CELERY_BEAT_UNSCHEDULED_ENTRIES`).
+from `CELERY_BEAT_SCHEDULE`. The restored production database carries those
+rows, and beat deletes every row the schedule does not declare when it starts
+(`scheduler/beat.py`).
 A refresh that swaps in a database while beat keeps running leaves the rows
 until the next beat restart. Nothing else reads the dump directory: the health
 monitor checks the database, Redis and Celery, never the existence or age of a

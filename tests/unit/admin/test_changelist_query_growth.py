@@ -313,34 +313,15 @@ BUILDERS: dict[str, Callable[[], object]] = {
         value_type="string",
         value_string="x",
     ),
-    "django_celery_beat.IntervalSchedule": lambda: __import__(
-        "django_celery_beat.models", fromlist=["IntervalSchedule"]
-    ).IntervalSchedule.objects.create(every=next(_sequence) + 1, period="days"),
-    "django_celery_beat.CrontabSchedule": lambda: __import__(
-        "django_celery_beat.models", fromlist=["CrontabSchedule"]
-    ).CrontabSchedule.objects.create(minute=str(next(_sequence) % 60)),
-    "django_celery_beat.ClockedSchedule": lambda: __import__(
-        "django_celery_beat.models", fromlist=["ClockedSchedule"]
-    ).ClockedSchedule.objects.create(clocked_time=timezone.now()),
-    "django_celery_beat.PeriodicTask": lambda: __import__(
-        "django_celery_beat.models",
-        fromlist=["PeriodicTask", "IntervalSchedule"],
-    ).PeriodicTask.objects.create(
-        name=f"growth-{_uid()}",
-        task="core.tasks.clear_expired_sessions_task",
-        interval=__import__(
-            "django_celery_beat.models", fromlist=["IntervalSchedule"]
-        ).IntervalSchedule.objects.create(
-            every=next(_sequence) + 1, period="days"
-        ),
-    ),
+    "scheduler.PeriodicTask": lambda: __import__(
+        "scheduler.models", fromlist=["PeriodicTask"]
+    ).PeriodicTask.objects.create(name=f"growth-{_uid()}"),
 }
 
 EXEMPT: dict[str, str] = {
     "order.InvoiceCounter": "one row per numbering series",
     "order.CreditCounter": "one row per numbering series",
     "recommendation.RecommendationSlot": "one row per surface, seeded",
-    "django_celery_beat.SolarSchedule": "one row per solar event and place",
     "emails.EmailSwitch": "a page of the registry's types, not a list of rows",
 }
 

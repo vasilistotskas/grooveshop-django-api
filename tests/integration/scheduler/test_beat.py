@@ -193,6 +193,27 @@ class TestRunsAcrossRestarts:
         assert row.total_run_count == 1
         assert row.last_run_at == harness.sent[0][1]
 
+    def test_a_row_in_utc_is_read_in_the_schedules_time_zone(self, harness):
+        """Whatever zone the database hands back, which differs per machine.
+
+        Built by hand because ``DATABASES["TIME_ZONE"]`` follows ``.env``: a
+        database row can come back in Athens time and hide this.
+        """
+        harness.every("pickup", hour="16", minute="30")
+        scheduler = harness.start()
+        entry = scheduler._resumed(
+            PeriodicTask(
+                name="pickup",
+                last_run_at=datetime(2026, 11, 1, 14, 30, tzinfo=UTC),
+            )
+        )
+
+        harness.now = datetime(2026, 11, 2, 14, 29, tzinfo=UTC)
+        assert entry.is_due().is_due is False
+
+        harness.now = datetime(2026, 11, 2, 14, 31, tzinfo=UTC)
+        assert entry.is_due().is_due is True
+
     def test_a_slot_is_read_in_the_schedules_time_zone(self, harness):
         """16:30 Athens is 14:30Z: the row's UTC hour must not decide."""
         harness.every("pickup", hour="16", minute="30")

@@ -206,10 +206,15 @@ class CodeOwnedScheduler(Scheduler):
                 self.schedule[row.name] = self._resumed(row)
 
     def _resumed(self, row: PeriodicTask) -> ScheduleEntry:
+        # Celery's crontab reads the hour off this value and leaves an aware
+        # datetime in its own zone, so it must not be in the database's.
+        counted_from = row.counted_from
         return self.Entry(
             **dict(
                 self._declared[row.name],
-                last_run_at=row.counted_from,
+                last_run_at=counted_from.astimezone(self.app.timezone)
+                if counted_from
+                else None,
                 total_run_count=row.total_run_count,
             )
         )

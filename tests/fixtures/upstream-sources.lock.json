@@ -1,20 +1,20 @@
 {
   "commits": {
-    "vasilistotskas/grooveshop-media-stream": "977f2cc70391ca3de8d391f8ee2b73984eb9ae48",
-    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "6b5286ec96ff94a5181caecff6938f3c072e29b9"
+    "vasilistotskas/grooveshop-media-stream": "f187f76e25fbd9d0d9fc4b38875cce8600d781c0",
+    "vasilistotskas/grooveshop-storefront-ui-node-nuxt": "0f40360760915556c7885cf6184d0345a23562e6"
   },
   "sources": {
     "catalogue": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
       "path": "test/fixtures/builder/catalogue.json",
       "kind": "blob",
-      "sha": "f2c7cf1da0401ec09cb2f40c101a557be827285c"
+      "sha": "69a94147c724c628606aa0571384a3f4e91d5bda"
     },
     "seeds": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
       "path": "test/fixtures/builder/seeds",
       "kind": "tree",
-      "sha": "4aba41bb702f0a9948fc358f1f4d8fdb96a0be66"
+      "sha": "94d6623a06e57ab4f270465fb412e483996124de"
     },
     "placement": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
@@ -32,7 +32,7 @@
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",
       "path": "test/fixtures/builder/upgrade-cases.json",
       "kind": "blob",
-      "sha": "80a5b03ebe480c9f14719b979cdb068d3d44e8ec"
+      "sha": "4cceaaf8a0ccddfe9d5bc3510cbe7722e560834c"
     },
     "contrast-cases": {
       "repository": "vasilistotskas/grooveshop-storefront-ui-node-nuxt",

@@ -635,6 +635,17 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → TikTok pixel is disabled for this tenant."
         ),
     )
+    clarity_project_id = models.CharField(
+        _("Microsoft Clarity project ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Microsoft Clarity project ID for the storefront (e.g. "
+            "'a1b2c3d4e5'), under Settings > Overview in Clarity. "
+            "Alphanumeric only. Empty → Clarity is disabled for this tenant."
+        ),
+    )
     openai_pixel_id = models.CharField(
         _("ChatGPT Ads Pixel ID"),
         max_length=64,
@@ -1381,6 +1392,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
         self._validate_openai_pixel_id()
+        self._validate_clarity_project_id()
         self._validate_ga_tracking_id()
         self._validate_google_ads()
         self._validate_social_urls()
@@ -1633,6 +1645,27 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     "openai_pixel_id": _(
                         "ChatGPT Ads Pixel ID must be alphanumeric "
                         "(e.g. '8MktrqpXN1MRdD2NUfkXmU')."
+                    )
+                }
+            )
+
+    def _validate_clarity_project_id(self) -> None:
+        """Clarity project IDs are alphanumeric strings only.
+
+        Clarity hands out an install snippet, not a field to copy, so what
+        arrives is whatever someone lifted out of it. The storefront puts
+        the value in the script's URL, and a malformed one records nothing
+        without saying so.
+        """
+        value = self.clarity_project_id
+        if not value:
+            return
+        if not re.fullmatch(r"[A-Za-z0-9]+", value):
+            raise ValidationError(
+                {
+                    "clarity_project_id": _(
+                        "Microsoft Clarity project ID must be alphanumeric "
+                        "(e.g. 'a1b2c3d4e5')."
                     )
                 }
             )

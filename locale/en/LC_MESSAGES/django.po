@@ -8369,6 +8369,15 @@ msgstr "Method"
 msgid "Method not allowed."
 msgstr "Method not allowed."
 
+msgid "Microsoft Clarity project ID"
+msgstr "Microsoft Clarity project ID"
+
+msgid "Microsoft Clarity project ID for the storefront (e.g. 'a1b2c3d4e5'), under Settings > Overview in Clarity. Alphanumeric only. Empty → Clarity is disabled for this tenant."
+msgstr "Microsoft Clarity project ID for the storefront (e.g. 'a1b2c3d4e5'), under Settings > Overview in Clarity. Alphanumeric only. Empty → Clarity is disabled for this tenant."
+
+msgid "Microsoft Clarity project ID must be alphanumeric (e.g. 'a1b2c3d4e5')."
+msgstr "Microsoft Clarity project ID must be alphanumeric (e.g. 'a1b2c3d4e5')."
+
 msgid "Mid-range (€50-€100)"
 msgstr "Mid-range (€50-€100)"
 

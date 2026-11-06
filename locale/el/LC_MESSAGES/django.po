@@ -8377,6 +8377,15 @@ msgstr "Τρόπος"
 msgid "Method not allowed."
 msgstr "Η μέθοδος δεν επιτρέπεται."
 
+msgid "Microsoft Clarity project ID"
+msgstr "Αναγνωριστικό έργου Microsoft Clarity"
+
+msgid "Microsoft Clarity project ID for the storefront (e.g. 'a1b2c3d4e5'), under Settings > Overview in Clarity. Alphanumeric only. Empty → Clarity is disabled for this tenant."
+msgstr "Αναγνωριστικό έργου Microsoft Clarity για το storefront (π.χ. 'a1b2c3d4e5'), στις Ρυθμίσεις > Επισκόπηση του Clarity. Μόνο αλφαριθμητικοί χαρακτήρες. Κενό → το Clarity είναι ανενεργό για αυτόν τον tenant."
+
+msgid "Microsoft Clarity project ID must be alphanumeric (e.g. 'a1b2c3d4e5')."
+msgstr "Το αναγνωριστικό έργου Microsoft Clarity πρέπει να είναι αλφαριθμητικό (π.χ. 'a1b2c3d4e5')."
+
 msgid "Mid-range (€50-€100)"
 msgstr "Μεσαία κατηγορία (€50-€100)"
 

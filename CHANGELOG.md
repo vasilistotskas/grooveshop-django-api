@@ -3,6 +3,41 @@
 
 
 
+## v3.227.0 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): the Clarity column keeps a database default
+
+The release still serving does not name the new column when it writes a
+tenant, and a plain default is dropped right after ADD COLUMN.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`9053ee3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9053ee360b2c903186a9e8fef33a8a2b75da2bac))
+
+* fix(deps): oauthlib 4.0.1 for CVE-2026-49272
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`9053ee3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9053ee360b2c903186a9e8fef33a8a2b75da2bac))
+
+### Features
+
+* feat(tenant): a store can name its Microsoft Clarity project (#492) ([`9053ee3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9053ee360b2c903186a9e8fef33a8a2b75da2bac))
+
+* feat(tenant): a store can name its Microsoft Clarity project
+
+A store's own Clarity project id, like its Meta and TikTok pixel ids: per
+tenant, no platform fallback, editable by the store owner, blanked on a
+staging copy. Alphanumeric, since it goes into the script's URL. Optional
+in the API contract, so a storefront that predates it keeps working.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`9053ee3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9053ee360b2c903186a9e8fef33a8a2b75da2bac))
+
 ## v3.226.2 (2026-11-05)
 
 ### Bug fixes

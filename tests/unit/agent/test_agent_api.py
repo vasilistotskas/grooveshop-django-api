@@ -20,7 +20,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from agent.oidc import AgentOIDCAdapter
+from agent.oidc import LINKING_SCOPES, AgentOIDCAdapter
 from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
@@ -175,6 +175,42 @@ class AgentAPITestCase(APITestCase):
         response = self.client.get(reverse("agent-me"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.user.id)
+
+    def test_a_client_naming_no_scopes_can_ask_for_the_linking_scopes(
+        self,
+    ) -> None:
+        response = self.client.post(
+            "/identity/o/api/clients",
+            {
+                "client_name": "No scope",
+                "redirect_uris": ["http://127.0.0.1:1/callback"],
+                "token_endpoint_auth_method": "none",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["scope"], " ".join(LINKING_SCOPES))
+
+    def test_a_client_naming_its_scopes_keeps_them(self) -> None:
+        response = self.client.post(
+            "/identity/o/api/clients",
+            {
+                "client_name": "Narrow",
+                "redirect_uris": ["http://127.0.0.1:1/callback"],
+                "token_endpoint_auth_method": "none",
+                "scope": "profile orders:read",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["scope"], "profile orders:read")
+
+    def test_server_metadata_names_the_linking_scopes(self) -> None:
+        response = self.client.get("/.well-known/oauth-authorization-server")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json()["scopes_supported"], list(LINKING_SCOPES)
+        )
 
     def test_only_the_stores_mcp_server_is_issued_a_token(self) -> None:
         adapter = AgentOIDCAdapter()

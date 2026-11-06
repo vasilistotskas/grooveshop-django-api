@@ -3,6 +3,34 @@
 
 
 
+## v3.228.3 (2026-11-06)
+
+### Bug fixes
+
+* fix(logging): keep a clean Flower shutdown out of the error log (#502)
+
+Flower stops on SIGTERM by calling sys.exit(0) from its signal handler. If
+the signal lands during a request, Tornado logs the exit at ERROR as an
+uncaught exception, which blocks promote.py production until the next
+staging rollout. A filter on tornado.application now drops SystemExit, and
+every other exception still logs.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f9572c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9572c61b944f163365640f1f7299fba2dc3b35b))
+
+## v3.228.2 (2026-11-06)
+
+### Bug fixes
+
+* fix(agent): let a client that names no scopes link an account (#500)
+
+Registration may omit scope, and allauth then stores openid alone, so the
+client's request for the commerce scopes fails with invalid_scope. Such a
+client is now registered for what linking offers, and the server metadata
+names those scopes too. What the token holds is still what the shopper
+grants on the consent screen.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6c21a4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c21a4b02a7aac99b79642709a6cb65766d462df))
+
 ## v3.228.1 (2026-11-06)
 
 ### Bug fixes

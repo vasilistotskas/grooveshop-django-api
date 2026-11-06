@@ -175,6 +175,54 @@ def test_a_published_page_gets_the_dependency_rows_of_its_data(published, run):
     ).exists()
 
 
+def test_a_translation_moves_with_its_setting(
+    admin, catalogue, upgraded_catalogue, features_on, run
+):
+    """The draft and the version both, and a language reads what it read:
+    a setting renamed by an upgrade keeps its translation."""
+    draft = document(
+        ("a", section("offers_preview@1", {"title": "Προσφορές", "limit": 4}))
+    )
+    services.save_draft(
+        admin,
+        key=HOME,
+        draft=draft,
+        i18n={"en": {"a": {"/title": "Offers"}}},
+        expected_revision=0,
+    )
+    services.publish(admin, keys=[HOME])
+    upgraded_catalogue()
+    current = offers(2)
+    catalogue.blocks = [
+        block for block in catalogue.blocks if block["type"] != "offers_preview"
+    ] + [
+        {
+            **current,
+            "version": 3,
+            "accepts": [3],
+            "translatable": ["/heading"],
+            "schema": _schema(
+                heading=dict(TEXT),
+                offers=current["schema"]["properties"]["offers"],
+            ),
+        }
+    ]
+    catalogue.hash = "catalogue-hash-3"
+    clear_catalogue_cache()
+
+    run()
+
+    stored = BuilderDocument.objects.get(key=HOME)
+    version = stored.versions.get()
+    moved = {"en": {"a": {"/heading": "Offers"}}}
+    assert stored.draft_i18n == moved
+    assert version.i18n == moved
+    assert version.data["sections"]["a"]["settings"]["heading"] == "Προσφορές"
+    assert services.check_publish(admin, keys=[HOME]).problems[0].code == (
+        "nothing_to_publish"
+    )
+
+
 def test_the_upgraded_draft_is_the_upgraded_release(admin, published, run):
     run()
 

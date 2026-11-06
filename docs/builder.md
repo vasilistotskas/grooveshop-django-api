@@ -152,6 +152,10 @@ keeps its revision, so a store is not told it has unpublished changes.
 `builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
 to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
 adds its step there too, or the command stops at it with `no upgrade from`.
+The overlay moves with the node: each language's settings are upgraded too, and
+what differs from the draft's upgraded text stays as that language's translation
+(`upgrade_translations`), so an upgrade can rename, merge or drop a translated
+setting and every language reads what it read.
 
 Limits come from settings, never from code paths:
 `BUILDER_MAX_SECTIONS_PER_DOCUMENT`, `BUILDER_MAX_BLOCKS_PER_NODE`,

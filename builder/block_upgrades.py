@@ -5,7 +5,9 @@ it loads one (``shared/builder/*Upgrades.ts``), but Django accepts only the
 current version of a block, so a draft nobody opened since a block moved
 cannot be published, and a release written before a block took data settings
 records no dependency rows for them. This module is the same upgrades, for
-writing into what is stored: ``manage.py persist_block_upgrades``.
+writing into what is stored: ``manage.py persist_block_upgrades``. A
+translation is kept apart from its node, by setting pointer, so it moves with
+it: :func:`upgrade_translations`.
 
 They are written twice on purpose. Django cannot run the storefront's
 TypeScript, and the catalogue states a block's current version, not how to
@@ -22,7 +24,9 @@ from collections import Counter
 from collections.abc import Callable, Iterator
 from typing import Any
 
-from builder.storefront import Catalogue
+from builder import pointers
+from builder.published import localised
+from builder.storefront import BlockDefinition, Catalogue
 from builder.validation import VERSIONED_TYPE
 
 Settings = dict[str, Any]
@@ -133,19 +137,47 @@ def _hero_slide(settings: Settings) -> Settings:
     return kept
 
 
+def _title_into_heading(settings: Settings) -> Settings:
+    """A band's heading was two settings, and every component drew ``heading``
+    first: the one it drew stays, under the one name."""
+    kept = dict(settings)
+    title = kept.pop("title", None)
+    heading = kept.pop("heading", None)
+    text = heading or title
+    return {**kept, "heading": text} if text else kept
+
+
 #: ``{block type: {version: the upgrade to the next one}}``, with the arguments
 #: of each block's ``upgrade`` in the storefront's ``app/blocks/*.block.ts``.
 UPGRADES: dict[str, dict[int, Upgrade]] = {
-    "featured_products": {1: _product_rail("featured", 8, 24)},
-    "products_grid": {1: _product_rail("featured", 8, 24)},
-    "products_slider": {1: _product_rail("newest", 8, 24)},
+    "featured_products": {
+        1: _product_rail("featured", 8, 24),
+        2: _title_into_heading,
+    },
+    "products_grid": {
+        1: _product_rail("featured", 8, 24),
+        2: _title_into_heading,
+    },
+    "products_slider": {
+        1: _product_rail("newest", 8, 24),
+        2: _title_into_heading,
+    },
     "blog_posts_grid": {1: _blog_rail(3, 24)},
     "blog_posts_list": {1: _blog_rail(3, 24)},
     "blog_posts_carousel": {1: _blog_rail(6, 12)},
     "blog_categories": {1: _blog_categories(10)},
     "product_categories": {1: _product_categories(8)},
-    "offers_preview": {1: _offers(3)},
+    "offers_preview": {1: _offers(3), 2: _title_into_heading},
     "hero_slide": {1: _hero_slide},
+    "contact_panel": {1: _title_into_heading},
+    "cta_banner": {1: _title_into_heading},
+    "hero_banner": {1: _title_into_heading},
+    "media_text": {1: _title_into_heading},
+    "newsletter_signup": {1: _title_into_heading},
+    "recently_viewed": {1: _title_into_heading},
+    "story_timeline": {1: _title_into_heading},
+    "testimonials": {1: _title_into_heading},
+    "trust_badges": {1: _title_into_heading},
 }
 
 
@@ -168,6 +200,40 @@ def upgrade_node(node: dict[str, Any], current: int) -> dict[str, Any]:
     return {**node, "type": f"{name}@{current}", "settings": settings}
 
 
+def upgrade_translations(
+    node: dict[str, Any],
+    definition: BlockDefinition,
+    translations: dict[str, Any],
+) -> dict[str, Any]:
+    """One language's *translations* of *node*, once it is at its block's
+    current version. What a language reads is the upgrade of its own settings,
+    so a translation follows whatever an upgrade does to its setting (a rename,
+    a merge, the setting taken out) and no upgrade has to state it. An entry is
+    kept where the language reads something other than the draft's upgraded
+    text, or where it already translated that setting; a new entry that only
+    repeats the draft's text is left out, since the setting falls back to that
+    text anyway. The storefront's ``upgradeNodeTranslations``, held to the same
+    cases."""
+    upgraded = upgrade_node(node, definition.version)
+    if upgraded is node:
+        return translations
+    translated = upgrade_node(
+        {**node, "settings": localised(node["settings"], translations)},
+        definition.version,
+    )
+    moved: dict[str, Any] = {}
+    for declared in definition.translatable:
+        pattern = pointers.parse(declared)
+        draft = dict(pointers.walk(upgraded["settings"], pattern))
+        for path, value in pointers.walk(translated["settings"], pattern):
+            pointer = pointers.format_path(path)
+            if value not in ("", []) and (
+                pointer in translations or value != draft.get(path)
+            ):
+                moved[pointer] = value
+    return moved
+
+
 def _nodes(holder: dict[str, Any], key: str) -> Iterator[tuple[dict, str]]:
     for node_id, node in (holder.get(key) or {}).items():
         yield holder[key], node_id
@@ -176,13 +242,15 @@ def _nodes(holder: dict[str, Any], key: str) -> Iterator[tuple[dict, str]]:
 
 
 def upgrade_document(
-    data: dict[str, Any], catalogue: Catalogue
-) -> tuple[dict[str, Any], Counter[str]]:
-    """A copy of document *data* with every node at its block's current
-    version, and how many nodes of each older ``type@version`` moved. A node
-    of a block the catalogue does not list stays as it is: that is for the
-    validation to refuse, not for an upgrade to guess at."""
+    data: dict[str, Any], i18n: dict[str, Any], catalogue: Catalogue
+) -> tuple[dict[str, Any], dict[str, Any], Counter[str]]:
+    """Copies of document *data* with every node at its block's current version
+    and of its overlay *i18n* moved with them, and how many nodes of each older
+    ``type@version`` moved. A node of a block the catalogue does not list stays
+    as it is: that is for the validation to refuse, not for an upgrade to guess
+    at."""
     upgraded = copy.deepcopy(data)
+    before: dict[str, tuple[dict[str, Any], BlockDefinition]] = {}
     moved: Counter[str] = Counter()
     for parent, node_id in list(_nodes(upgraded, "sections")):
         node = parent[node_id]
@@ -193,6 +261,30 @@ def upgrade_document(
         definition = catalogue.get(match.group(1)) if match else None
         if definition is None or int(match.group(2)) >= definition.version:
             continue
+        before[node_id] = (node, definition)
         parent[node_id] = upgrade_node(node, definition.version)
         moved[versioned] += 1
-    return upgraded, moved
+    return upgraded, _upgraded_overlay(i18n, before), moved
+
+
+def _upgraded_overlay(
+    i18n: dict[str, Any],
+    before: dict[str, tuple[dict[str, Any], BlockDefinition]],
+) -> dict[str, Any]:
+    """A copy of overlay *i18n* with the nodes in *before* moved; a node or a
+    language left with no translation goes. What is not a moved node (a node
+    already current, the document's own settings) stays as it is."""
+    upgraded: dict[str, Any] = {}
+    for locale, per_node in i18n.items():
+        kept: dict[str, Any] = {}
+        for node_id, translations in per_node.items():
+            entries = (
+                upgrade_translations(*before[node_id], translations)
+                if node_id in before
+                else copy.deepcopy(translations)
+            )
+            if entries:
+                kept[node_id] = entries
+        if kept:
+            upgraded[locale] = kept
+    return upgraded

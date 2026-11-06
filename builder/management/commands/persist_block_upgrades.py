@@ -3,9 +3,9 @@
     uv run python manage.py persist_block_upgrades --tenant webside --dry-run
     uv run python manage.py persist_block_upgrades --all-tenants
 
-Each upgraded document goes through ``validate_document`` against the store's
-catalogue, and what that returns is what is stored, hash and references
-included. One document that does not pass stops the store: nothing of it is
+Each upgraded document, its translations moved with its nodes, goes through
+``validate_document`` against the store's catalogue, and what that returns is
+what is stored, hash and references included. One document that does not pass stops the store: nothing of it is
 written, and the command fails naming every problem. ``--dry-run`` does all of
 that and writes nothing. A second run finds nothing to do.
 
@@ -136,7 +136,9 @@ class Command(TenantCommandMixin, BaseCommand):
         """The document to store, or ``None`` with nothing to do or with the
         reason it cannot be upgraded added to *problems*."""
         try:
-            upgraded, found = upgrade_document(data, catalogue)
+            upgraded, upgraded_i18n, found = upgrade_document(
+                data, i18n, catalogue
+            )
         except NoUpgradePath as exc:
             problems.append(f"{label}: {exc}")
             return None
@@ -146,7 +148,7 @@ class Command(TenantCommandMixin, BaseCommand):
         issues, result = validation.validate_document(
             key=key,
             data=upgraded,
-            i18n=i18n,
+            i18n=upgraded_i18n,
             catalogue=catalogue,
             feature_on=feature_on,
         )

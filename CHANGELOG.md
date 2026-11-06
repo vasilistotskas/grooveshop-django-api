@@ -3,6 +3,30 @@
 
 
 
+## v3.227.3 (2026-11-06)
+
+### Bug fixes
+
+* fix(agent): answer 401 to a token bound to another resource (#495)
+
+A token bound to anything but the store's MCP server got 403, which the
+gateway reads as a valid token short of a scope, so the client was never
+asked to link again. It now gets 401. The authorization endpoints also
+refuse such a resource up front, so the token is never issued.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ce1b09c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce1b09c01d572100dbb18569204c9b17d6095c58))
+
+## v3.227.2 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): drop the Tenant theme columns (#498)
+
+Step two of two after migration 0072: the release that still named them is
+gone and no code reads them, so both tables lose the nine columns.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a8770cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8770ccbdae79cce95ff694d7d58d746ab5e083f))
+
 ## v3.227.1 (2026-11-06)
 
 ### Bug fixes

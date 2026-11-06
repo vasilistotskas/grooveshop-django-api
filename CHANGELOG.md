@@ -3,6 +3,83 @@
 
 
 
+## v3.228.1 (2026-11-06)
+
+### Bug fixes
+
+* fix(order): a guest order's uuid opens it for a limited time (#501) ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(order): a guest order's uuid opens it for a limited time
+
+The uuid reads the customer's details without a login and it never expired, so
+it outlived every place it had been seen, trackers included. It now works for
+GUEST_ORDER_ACCESS_DAYS after the order. Meta's server events and the data
+export email stop carrying a key in their addresses.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(order): an expired guest link says so
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(meta_capi): the purchase event id no longer holds the order uuid
+
+A guest's uuid opens the order, and this id goes to Meta when no browser id
+was stored. The order number is as stable and opens nothing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+### Chores
+
+* chore(claude): correct agents and skills, move the domain guides to a rule (#496) ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): correct agents and skills, split CLAUDE.md below the size limit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): format the gen-test samples with ruff
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): auto-lint never syncs and has its own timeouts
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): drop a conflicting test timeout and a duplicate note
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): name the real stock release method
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+### Documentation
+
+* docs(order): name the limit on a guest order's uuid
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* docs(core): use a live schema in the validator message example (#499)
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c1f3ba9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1f3ba98d2758a721674660a0a4aebbff427e823))
+
 ## v3.228.0 (2026-11-06)
 
 ### Features

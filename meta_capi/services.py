@@ -314,7 +314,8 @@ def _success_url_for_order(order: Order) -> str:
     """Build the storefront success URL — Meta uses ``event_source_url``
     as a hint for content-matching and reporting, so we send the
     canonical user-facing URL even though the event was minted
-    server-side.
+    server-side. Never the order's uuid: it opens a guest order, so the
+    page's address does not hold it.
 
     Uses the active tenant's storefront domain (via
     ``get_tenant_frontend_url``) rather than the platform-wide
@@ -326,13 +327,8 @@ def _success_url_for_order(order: Order) -> str:
     base = get_tenant_base_url()
     if not base:
         return ""
-    # Order UUID is the public guest-safe identifier; matches the
-    # Nuxt page route ``/checkout/success/[uuid]``.
-    uuid = getattr(order, "uuid", None)
-    if not uuid:
-        return base
     return get_tenant_frontend_url(
-        f"/checkout/success/{uuid}", language=get_order_language(order)
+        "/checkout/success", language=get_order_language(order)
     )
 
 
@@ -369,8 +365,9 @@ def build_purchase_event(order: Order) -> tuple[Event, str]:
     # server dispatches of the same order's Purchase — e.g. a COD order with
     # no browser-minted id, or a retry — collide on Meta's dedup instead of
     # being counted twice (G0198). A browser-minted id still wins when
-    # present, preserving server↔pixel dedup.
-    event_id = _event_id_for(order, "purchase") or f"purchase-{order.uuid}"
+    # present, preserving server↔pixel dedup. The order's number, never its
+    # uuid: a guest's uuid opens the order, and this id goes to Meta.
+    event_id = _event_id_for(order, "purchase") or f"purchase-{order.pk}"
     event = _new_event(
         name=StandardEvent.PURCHASE,
         event_id=event_id,

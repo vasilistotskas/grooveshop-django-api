@@ -976,6 +976,10 @@ CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
 # daily: an order delivered up to this many days earlier than its due day
 # is still reminded, so a run that did not happen costs nothing.
 REVIEW_REQUEST_CATCH_UP_DAYS = int(getenv("REVIEW_REQUEST_CATCH_UP_DAYS", "3"))
+# How long a guest order's uuid opens it (``Order.opens_for_guest``): long
+# enough to pay, see the confirmation and follow a delivery. Store staff and a
+# signed-in owner are not limited by it.
+GUEST_ORDER_ACCESS_DAYS = int(getenv("GUEST_ORDER_ACCESS_DAYS", "14"))
 # IndexNow (``indexnow/``): the endpoint the batched notification is posted
 # to (the protocol's shared endpoint, which hands the URLs to every
 # participating search engine) and how long one POST may take.

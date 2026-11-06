@@ -48,7 +48,7 @@ def _data_export(export: UserDataExport, env: RenderEnv) -> dict[str, Any]:
     return {
         "user": export.user,
         "download_url": get_tenant_frontend_url(
-            f"/account/settings/privacy?export={export.token}",
+            "/account/settings/privacy",
             language=env.language,
         ),
         "expires_at": export.expires_at,

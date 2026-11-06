@@ -445,7 +445,7 @@ class TestAccountEmails:
 
         _assert_links(
             _body(mail.outbox[-1]),
-            f"{BASE}{prefix}/account/settings/privacy?export=exp-tok",
+            f"{BASE}{prefix}/account/settings/privacy",
             language,
         )
 

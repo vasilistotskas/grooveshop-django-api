@@ -3,6 +3,24 @@
 
 
 
+## v3.227.1 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): retire the Tenant theme fields (#494)
+
+A store's look lives in its published theme document, and nothing reads
+primary_color, neutral_color, the five colour hex fields, theme_preset or
+theme_metadata. They leave the model, the store config, the admin, the role
+scopes and the schema, with ThemePreset, TailwindColor and the metadata JSON
+schema. export_theme_fields and import_theme_settings go too: every store has
+its theme document and the storefront's seed tool is gone.
+
+The columns stay for the release still serving during the rollout, each with
+a database default; the next release drops them.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`922d1d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/922d1d02e848317b36cdc852e713937ba6c02edd))
+
 ## v3.227.0 (2026-11-06)
 
 ### Bug fixes

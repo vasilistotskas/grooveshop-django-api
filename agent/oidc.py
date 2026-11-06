@@ -1,4 +1,8 @@
+from typing import Any
+
 from allauth.idp.oidc.adapter import DefaultOIDCAdapter
+from allauth.idp.oidc.internal.resources import is_resources_subset
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 # Scopes AI agents may request when linking a shopper's account. The
@@ -37,3 +41,12 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
         SCOPE_LOYALTY_READ: _("View your loyalty points and tier"),
         SCOPE_FAVOURITES_READ: _("View your favourite products"),
     }
+
+    def validate_resource_uris(self, *, uris: list[str], **kwargs: Any) -> None:
+        """Refuse at issue a token the agent API would refuse in use."""
+        store_resource = store_mcp_resource()
+        for uri in uris:
+            if not is_resources_subset([store_resource], [uri]):
+                raise ValidationError(
+                    "Resource is not this store's MCP server."
+                )

@@ -13,7 +13,7 @@ from allauth.idp.oidc.internal.oauthlib.utils import (
 )
 from allauth.idp.oidc.internal.resources import is_resources_subset
 from drf_spectacular.utils import extend_schema
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -56,7 +56,9 @@ class AgentTokenAuthentication(TokenAuthentication):
     compares a token's resources with the URL it reached, so it refused
     every such token as an invalid target. This compares them with the
     store's MCP server instead, which still refuses a token bound to
-    another store's. The rest is allauth's own ``authenticate``.
+    another store's. Such a token is invalid here, not short of a scope,
+    so it answers 401 and the client links again. The rest is allauth's
+    own ``authenticate``.
     """
 
     def authenticate(self, request):
@@ -70,7 +72,7 @@ class AgentTokenAuthentication(TokenAuthentication):
         if resources and not is_resources_subset(
             [store_mcp_resource()], resources
         ):
-            raise PermissionDenied("Invalid target resource.")
+            raise AuthenticationFailed("Invalid target resource.")
         return orequest.user, access_token
 
     def authenticate_header(self, request):

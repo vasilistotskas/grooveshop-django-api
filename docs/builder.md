@@ -147,7 +147,8 @@ dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
 stored draft and version, each validated against the store's catalogue, then
 rebuilds the current release's reference index. One document that does not pass
 stops its store with nothing written; a feature switched off does not count
-against a document here, as it does at a publish. There is no way back: an older
+against a document here, as it does at a publish, but one the platform does not
+know does. There is no way back: an older
 storefront leaves out a node newer than it knows, so run it once the storefront
 release it follows has proved itself, with a restorable backup of the store. It
 is the only thing that rewrites a

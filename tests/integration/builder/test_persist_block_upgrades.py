@@ -280,6 +280,22 @@ def test_a_feature_switched_off_does_not_stop_the_store(
     assert version.data["sections"]["a"]["type"] == "offers_preview@2"
 
 
+def test_a_feature_the_platform_does_not_know_stops_the_store(
+    published, catalogue, run
+):
+    """A publish would refuse it, so the upgrade must not store it."""
+    version = published.versions.get()
+    gated = next(b for b in catalogue.blocks if b["type"] == "offers_preview")
+    gated["feature"] = "no_such_feature"
+    clear_catalogue_cache()
+
+    with pytest.raises(CommandError, match="unknown_feature"):
+        run()
+
+    after = BuilderVersion.objects.get(pk=version.pk)
+    assert after.data["sections"]["a"]["type"] == "offers_preview@1"
+
+
 def test_one_document_that_fails_stops_the_store(published, run):
     """The version still upgrades cleanly; the draft does not, so neither is
     written."""

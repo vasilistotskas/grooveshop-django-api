@@ -3,6 +3,21 @@
 
 
 
+## v3.228.0 (2026-11-06)
+
+### Features
+
+* feat(scheduler): replace django-celery-beat with our own scheduler (#497)
+
+django-celery-beat caps the Django version it allows, so every Django upgrade waited for its next release. CodeOwnedScheduler is a celery.beat.Scheduler subclass: Celery still decides when an entry is due, CELERY_BEAT_SCHEDULE is the whole schedule, and scheduler.PeriodicTask holds only state. Beat deletes any row the settings do not declare when it starts.
+
+A run is saved as soon as it is sent. A failed publish is retried on its own timer, so an entry that cannot be sent never holds up the others. expires now applies, so it stays only on the polls that run again within 15 minutes and comes off the six daily entries. The platform admin reads the schedule, switches an entry and runs one by hand.
+
+The migration copies the old state and beat takes the old scheduler's final runs on start, so the deploy repeats no slot. The old tables stay for a rollback until the next release drops them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`1f1d7ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f1d7ae0b01018ae5e41e15fec2915a2dd8b4dc9))
+
 ## v3.227.3 (2026-11-06)
 
 ### Bug fixes

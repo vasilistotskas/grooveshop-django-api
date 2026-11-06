@@ -68,4 +68,4 @@ Validate that Django migrations are consistent with model definitions.
 - Review the generated migration file to ensure it matches expectations
 - Verify no data loss operations (field removal, type changes) without explicit confirmation
 - A new NOT NULL column on an existing table needs `db_default`, not just `default` — the old release's INSERTs do not name it
-- Run `uv run pytest tests/unit/ -x --timeout=60` to ensure migrations don't break tests
+- Run `uv run pytest tests/unit/ -x` to ensure migrations don't break tests

@@ -3,6 +3,17 @@
 
 
 
+## v3.227.2 (2026-11-06)
+
+### Bug fixes
+
+* fix(tenant): drop the Tenant theme columns (#498)
+
+Step two of two after migration 0072: the release that still named them is
+gone and no code reads them, so both tables lose the nine columns.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`a8770cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8770ccbdae79cce95ff694d7d58d746ab5e083f))
+
 ## v3.227.1 (2026-11-06)
 
 ### Bug fixes

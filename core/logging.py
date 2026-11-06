@@ -61,6 +61,22 @@ class DropAsyncioCancelledError(logging.Filter):
         return not isinstance(exc, asyncio.CancelledError)
 
 
+class DropSystemExit(logging.Filter):
+    """Drop ``tornado.application`` records whose exc_info is ``SystemExit``.
+
+    Flower stops on SIGTERM by calling ``sys.exit(0)`` from its signal
+    handler (``flower/command.py``). When the signal lands while Tornado is
+    handling a request, the exit is raised inside that request and Tornado
+    logs it at ERROR as "Uncaught exception". It is a clean shutdown, and an
+    ERROR there blocks ``promote.py production``. Any other exception still
+    passes through.
+    """
+
+    def filter(self, record):
+        exc = record.exc_info[1] if record.exc_info else None
+        return not isinstance(exc, SystemExit)
+
+
 class JsonFormatter(logging.Formatter):
     """Render each record as exactly ONE line of valid JSON.
 

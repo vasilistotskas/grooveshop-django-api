@@ -8,6 +8,7 @@ after its task was deleted, filling the queue with messages no worker knew.
 from __future__ import annotations
 
 import pytest
+from celery.beat import Service
 from celery.signals import beat_init
 from django.test import Client
 from django.urls import reverse
@@ -17,6 +18,7 @@ from django_celery_beat.models import (
     PeriodicTask,
     PeriodicTasks,
 )
+from django_celery_beat.schedulers import DatabaseScheduler
 
 from core.beat import BACKEND_CLEANUP_ENTRY, delete_undeclared_periodic_tasks
 from core.celery import celery_app
@@ -77,6 +79,28 @@ def test_beat_start_runs_it():
     beat_init.send(sender=celery_app)
 
     assert not PeriodicTask.objects.filter(name=REMOVED).exists()
+
+
+def test_a_starting_scheduler_drops_the_deleted_row_before_its_first_tick(
+    monkeypatch,
+):
+    """The scheduler has read every row by the time ``beat_init`` fires.
+
+    Only the change the delete records makes it read them again, so this
+    needs the real scheduler. It would close the test's connection, which
+    holds the open transaction.
+    """
+    monkeypatch.setattr(
+        "django_celery_beat.schedulers.close_old_connections", lambda: None
+    )
+    _row(REMOVED, task="order.tasks.update_order_statuses_from_shipping")
+    service = Service(app=celery_app, scheduler_cls=DatabaseScheduler)
+    assert REMOVED in service.scheduler.schedule
+
+    beat_init.send(sender=service)
+
+    assert REMOVED not in service.scheduler.schedule
+    assert DECLARED in service.scheduler.schedule
 
 
 @pytest.fixture

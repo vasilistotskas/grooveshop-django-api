@@ -133,16 +133,16 @@ def create_celery_app():
         )
 
     @beat_init.connect(weak=False)
-    def delete_unscheduled_entries(**kwargs):
-        """Drop the beat rows this environment's settings no longer schedule.
+    def delete_undeclared_entries(**kwargs):
+        """Drop the beat rows this environment's settings do not declare.
 
         ``beat_init`` fires for any scheduler and however beat is launched
         (the manifests pass ``--scheduler`` on the command line, which a
         scheduler subclass set in settings would lose to).
         """
-        from core.beat import delete_unscheduled_periodic_tasks
+        from core.beat import delete_undeclared_periodic_tasks
 
-        delete_unscheduled_periodic_tasks()
+        delete_undeclared_periodic_tasks()
 
     @worker_process_shutdown.connect(weak=False)
     def shutdown_worker_process(**kwargs):

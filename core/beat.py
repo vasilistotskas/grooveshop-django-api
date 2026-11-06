@@ -1,11 +1,12 @@
-"""Make the database the beat scheduler reads agree with the settings.
+"""Code owns the beat schedule; the database only follows it.
 
-``DatabaseScheduler.setup_schedule`` only inserts and updates the rows of
-``CELERY_BEAT_SCHEDULE``; it never removes one whose entry is gone. A
-database cloned from production (staging) therefore brings production's
-rows along, and they would keep firing. ``settings.CELERY_BEAT_UNSCHEDULED_ENTRIES``
-names the entries this environment must not run, and beat deletes their rows
-on every start, so the clone converges whenever the scheduler restarts.
+``CELERY_BEAT_SCHEDULE`` is the whole schedule. ``DatabaseScheduler`` writes
+each of its entries to a row when it starts, but never removes a row whose
+entry is gone, so a removed entry keeps firing at a task that may no longer
+exist, and a database cloned from production brings production's entries
+along. Beat therefore deletes every row the settings do not declare on each
+start. The row stays what the admin's Enabled switch, ``ScheduleGate`` and
+"did it run" (``last_run_at``) read.
 """
 
 import logging
@@ -15,19 +16,25 @@ from django_celery_beat.models import PeriodicTask
 
 logger = logging.getLogger(__name__)
 
+#: ``DatabaseScheduler`` installs this one itself, because
+#: ``CELERY_RESULT_EXPIRES`` is set; it is never in the settings' dict.
+BACKEND_CLEANUP_ENTRY = "celery.backend_cleanup"
 
-def delete_unscheduled_periodic_tasks() -> int:
-    """Delete the rows of every entry this environment does not schedule.
+
+def delete_undeclared_periodic_tasks() -> int:
+    """Delete every row this environment's schedule does not declare.
 
     Deleting through the ORM fires django-celery-beat's own signals, which
-    bump ``PeriodicTasks.last_update`` so the running scheduler reloads.
+    bump ``PeriodicTasks.last_update`` so a running scheduler reloads.
     """
-    deleted, _ = PeriodicTask.objects.filter(
-        name__in=settings.CELERY_BEAT_UNSCHEDULED_ENTRIES
-    ).delete()
-    if deleted:
+    undeclared = PeriodicTask.objects.exclude(
+        name__in=[*settings.CELERY_BEAT_SCHEDULE, BACKEND_CLEANUP_ENTRY]
+    )
+    names = list(undeclared.values_list("name", flat=True))
+    deleted, _ = undeclared.delete()
+    if names:
         logger.info(
-            "Deleted periodic tasks this environment does not schedule",
-            extra={"names": list(settings.CELERY_BEAT_UNSCHEDULED_ENTRIES)},
+            "Deleted periodic tasks the schedule does not declare",
+            extra={"names": names},
         )
     return deleted

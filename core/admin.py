@@ -1,7 +1,7 @@
 import logging
 
 from django.contrib import admin
-from django.utils.functional import cached_property
+from django.forms import ModelForm
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from django_celery_beat.admin import (
@@ -11,11 +11,6 @@ from django_celery_beat.admin import (
     CrontabScheduleAdmin as BaseCrontabScheduleAdmin,
 )
 from django_celery_beat.admin import PeriodicTaskAdmin as BasePeriodicTaskAdmin
-from django_celery_beat.admin import (
-    PeriodicTaskForm,
-    TaskChoiceField,
-    TaskSelectWidget,
-)
 from django_celery_beat.models import (
     ClockedSchedule,
     CrontabSchedule,
@@ -33,7 +28,6 @@ from extra_settings.models import Setting
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import DropdownFilter
 from unfold.decorators import display
-from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 from admin.base import BaseModelAdmin
 from admin.mixins import (
@@ -127,38 +121,6 @@ def override_third_party_admins():
 
         admin.site.register(model, new_admin_class)
         _resync_platform_site(model, new_admin_class)
-
-
-class UnfoldTaskSelectWidget(UnfoldAdminSelectWidget, TaskSelectWidget):
-    @cached_property
-    def _modules(self):
-        """Import every app's ``tasks`` module, so the list is complete.
-
-        Directly, not through ``loader.import_default_modules()`` as the
-        base widget does: that sends Celery's ``import_modules`` signal,
-        on which the Django fixup runs every Django system check, on
-        each render of this form. On the platform host dj-stripe's check
-        queries ``djstripe_webhookendpoint``, a store-only table, swallows
-        the DatabaseError and leaves the admin's transaction aborted, so
-        the periodic-task form answered 500 there.
-        """
-        self.celery_app.autodiscover_tasks(force=True)
-
-
-class UnfoldPeriodicTaskForm(PeriodicTaskForm):
-    # Declared here rather than swapped in ``__init__``: the form's
-    # field copy in ``BaseForm.__init__`` already builds the widget's
-    # choices, and the base widget would import the task modules its
-    # own way before the swap.
-    regtask = TaskChoiceField(
-        label=PeriodicTaskForm.base_fields["regtask"].label,
-        required=False,
-        widget=UnfoldTaskSelectWidget(),
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["task"].widget = UnfoldAdminTextInputWidget()
 
 
 # Ordered prefix → category map for the ~80 flat extra_settings rows.
@@ -381,8 +343,59 @@ class SettingAdmin(BaseModelAdmin):
         return desc[:60] + "…" if len(desc) > 60 else desc
 
 
-class PeriodicTaskAdmin(BasePeriodicTaskAdmin, BaseModelAdmin):
-    form = UnfoldPeriodicTaskForm
+class CodeOwnedScheduleAdmin:
+    """No adding or deleting: ``CELERY_BEAT_SCHEDULE`` is the whole schedule.
+
+    Beat rewrites each declared row when it starts and deletes the others
+    (``core.beat``), so a row added here would vanish and a deleted one
+    would come back, both silently, at the next deploy.
+    """
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class PeriodicTaskAdmin(
+    CodeOwnedScheduleAdmin, BasePeriodicTaskAdmin, BaseModelAdmin
+):
+    """Read the schedule, switch an entry off or on, run one by hand.
+
+    ``enabled`` is the one field beat does not rewrite, so it is the one
+    field here. Without an editable task there is no task picker, and the
+    upstream form and its template go with it.
+    """
+
+    form = ModelForm
+    change_form_template = None
+    fieldsets = None
+    fields = (
+        "name",
+        "task",
+        "enabled",
+        "crontab",
+        "crontab_translation",
+        "last_run_at",
+        "total_run_count",
+        "args",
+        "kwargs",
+        "queue",
+        "expire_seconds",
+    )
+    readonly_fields = (
+        "name",
+        "task",
+        "crontab",
+        "crontab_translation",
+        "last_run_at",
+        "total_run_count",
+        "args",
+        "kwargs",
+        "queue",
+        "expire_seconds",
+    )
 
 
 class TaskResultStoreFilter(DropdownFilter):
@@ -467,19 +480,34 @@ class GroupResultAdmin(BaseGroupResultAdmin, BaseModelAdmin):
     pass
 
 
-class IntervalScheduleAdmin(BaseModelAdmin):
+class ReadOnlyScheduleAdmin(CodeOwnedScheduleAdmin):
+    """A schedule row is what beat derived from the declaration.
+
+    Beat points an entry back at the row matching its declaration when it
+    starts, so an edit here would last only until the next deploy.
+    """
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class IntervalScheduleAdmin(ReadOnlyScheduleAdmin, BaseModelAdmin):
     pass
 
 
-class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, BaseModelAdmin):
+class CrontabScheduleAdmin(
+    ReadOnlyScheduleAdmin, BaseCrontabScheduleAdmin, BaseModelAdmin
+):
     pass
 
 
-class SolarScheduleAdmin(BaseModelAdmin):
+class SolarScheduleAdmin(ReadOnlyScheduleAdmin, BaseModelAdmin):
     pass
 
 
-class ClockedScheduleAdmin(BaseClockedScheduleAdmin, BaseModelAdmin):
+class ClockedScheduleAdmin(
+    ReadOnlyScheduleAdmin, BaseClockedScheduleAdmin, BaseModelAdmin
+):
     pass
 
 

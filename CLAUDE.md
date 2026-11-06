@@ -209,12 +209,15 @@ Tasks are split by domain:
 
 **Data retention.** Every sweep deletes through `core.retention.delete_in_batches` (batch size `RETENTION_PURGE_BATCH_SIZE`) and per-store tables fan out through `tenant.tasks.fanout_purge_*` with `include_suspended=True`. A model whose `HistoricalRecords` sets `excluded_fields` and is saved by a bookkeeping task uses `core.history.ChangeOnlyHistoricalRecords`, or every poll tick writes a history row. The full table (what, how long, which setting) is `grooveshop-docs/src/dev/operations/data-retention.md`.
 
+**The schedule is code.** `CELERY_BEAT_SCHEDULE` is the whole schedule: on every
+beat start `core/beat.py` deletes each `PeriodicTask` row it does not declare
+(`celery.backend_cleanup` excepted), so removing an entry needs no migration, and
+the platform admin offers only the Enabled switch and the run action. Change a
+schedule in `get_celery_beat_schedule()` and deploy.
+
 **Nightly dump switch.** `DATABASE_BACKUPS_ENABLED` (env, default `True`) keeps
 `scheduled-database-backup` and `cleanup-old-backups` in the beat schedule;
-staging sets it `False`. `DatabaseScheduler` never deletes a row whose entry
-left `CELERY_BEAT_SCHEDULE`, so `core/beat.py` deletes the rows named by
-`CELERY_BEAT_UNSCHEDULED_ENTRIES` on every beat start. See
-`docs/staging-anonymise.md`.
+staging sets it `False`. See `docs/staging-anonymise.md`.
 
 **Only task FAILURES are stored** (`CELERY_TASK_IGNORE_RESULT`), in the public schema's `django_celery_results`, tagged with the store by `core.result_backend.TenantDatabaseBackend`. A `chord()`/`group()` needs `ignore_result=False` on that task; "did it run?" is `PeriodicTask.last_run_at`, never that table. Detail: [`docs/celery-results.md`](docs/celery-results.md).
 

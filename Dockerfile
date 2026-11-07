@@ -84,9 +84,9 @@ RUN apk add --no-cache \
     && chown app:app ${APP_PATH}
 
 # Write stdout as it is printed. Off a terminal Python buffers it in blocks,
-# so what is printed rather than logged (celery beat's and worker's start
-# banner, a management command's output) reached the logs only when the
-# process exited, and never if it was killed. Logging flushes every record.
+# so what is printed rather than logged (celery beat's start banner, a
+# management command's output) reached the logs only when the process exited,
+# and never if it was killed. Logging flushes every record.
 ENV PYTHONUNBUFFERED=1
 
 USER app

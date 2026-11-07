@@ -12,9 +12,10 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
     """Tracks async generation of a user's GDPR data-export bundle.
 
     The actual payload (a single JSON file) is written to private media
-    storage by ``export_user_data_task``. The ``token`` column backs a
-    one-off download link that the email sends the user; it is not the
-    same as the user's auth token and carries no API access.
+    storage by ``export_user_data_task`` and reaches only its owner, signed
+    in (``UserAccountViewSet.download_data_export``). Nothing reads ``token``
+    any more: it is still written because a release that does may have to
+    come back, and it goes once that can no longer happen.
     """
 
     class Status(models.TextChoices):

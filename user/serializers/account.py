@@ -350,22 +350,9 @@ class UserDataExportSerializer(serializers.Serializer):
 
     id = serializers.IntegerField(read_only=True)
     status = serializers.CharField(read_only=True)
-    token = serializers.CharField(read_only=True)
     file_size = serializers.IntegerField(read_only=True, allow_null=True)
     expires_at = serializers.DateTimeField(read_only=True, allow_null=True)
     created_at = serializers.DateTimeField(read_only=True)
-    download_url = serializers.SerializerMethodField()
-
-    def get_download_url(self, obj) -> str | None:
-        from user.models.data_export import UserDataExport
-
-        if obj.status != UserDataExport.Status.READY:
-            return None
-        request = self.context.get("request")
-        path = f"/api/v1/user/data_export/{obj.token}/download"
-        if request is not None:
-            return request.build_absolute_uri(path)
-        return path
 
 
 class DeleteAccountRequestSerializer(serializers.Serializer):

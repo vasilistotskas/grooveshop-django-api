@@ -31898,8 +31898,8 @@ paths:
   /api/v1/user/account/{id}/data_exports:
     get:
       operationId: listUserAccountDataExports
-      description: Λίστα πρόσφατων αιτημάτων εξαγωγής δεδομένων για αυτόν τον χρήστη,
-        ώστε η διεπαφή να εμφανίζει την πρόοδο και τον τελευταίο σύνδεσμο λήψης.
+      description: Παραθέτει τα πρόσφατα αιτήματα εξαγωγής δεδομένων αυτού του χρήστη,
+        ώστε η διεπαφή να δείχνει την πρόοδό τους.
       summary: Λίστα εξαγωγών δεδομένων GDPR
       parameters:
       - in: query
@@ -32011,9 +32011,10 @@ paths:
   /api/v1/user/account/{id}/data_exports/{export_id}/download:
     get:
       operationId: downloadUserAccountDataExport
-      description: 'Streams the JSON bundle of one of this user''s data exports. Only
-        the account''s owner can read it, signed in: the address holds no credential.'
-      summary: Download a GDPR data export
+      description: 'Επιστρέφει το αρχείο JSON μιας εξαγωγής δεδομένων αυτού του χρήστη.
+        Μόνο ο κάτοχος του λογαριασμού μπορεί να το διαβάσει, συνδεδεμένος: η διεύθυνση
+        δεν περιέχει διαπιστευτήριο.'
+      summary: Λήψη εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
         name: exportId
@@ -32061,7 +32062,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No such export, or it is not ready
+          description: Δεν υπάρχει τέτοια εξαγωγή ή δεν είναι έτοιμη
         '500':
           content:
             application/json:
@@ -32080,7 +32081,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The export has expired
+          description: Η εξαγωγή έχει λήξει
   /api/v1/user/account/{id}/delete_account:
     post:
       operationId: deleteUserAccountGdpr
@@ -32746,9 +32747,9 @@ paths:
   /api/v1/user/account/{id}/request_data_export:
     post:
       operationId: requestUserAccountDataExport
-      description: Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη
-        και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή
-        UserDataExport.
+      description: Βάζει σε ουρά μια εργασία που συγκεντρώνει τα προσωπικά δεδομένα
+        του χρήστη και τον ενημερώνει με email όταν είναι έτοιμα. Επιστρέφει τη νέα
+        εγγραφή UserDataExport.
       summary: Αίτημα εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
@@ -33539,30 +33540,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddressDetail'
           description: ''
-  /api/v1/user/data_export/{token}/download:
-    get:
-      operationId: downloadUserDataExport
-      description: Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token
-        έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και
-        λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής.
-      summary: Λήψη πακέτου εξαγωγής δεδομένων GDPR
-      parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-        required: true
-      tags:
-      - User Accounts
-      security:
-      - {}
-      responses:
-        '200':
-          description: No response body
-        '404':
-          description: No response body
-        '410':
-          description: No response body
   /api/v1/user/email-preferences:
     get:
       operationId: getEmailPreferences
@@ -53605,9 +53582,6 @@ components:
         status:
           type: string
           readOnly: true
-        token:
-          type: string
-          readOnly: true
         fileSize:
           type: integer
           readOnly: true
@@ -53621,18 +53595,12 @@ components:
           type: string
           format: date-time
           readOnly: true
-        downloadUrl:
-          type: string
-          nullable: true
-          readOnly: true
       required:
       - createdAt
-      - downloadUrl
       - expiresAt
       - fileSize
       - id
       - status
-      - token
     UserDetails:
       type: object
       properties:

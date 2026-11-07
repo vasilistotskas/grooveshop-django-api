@@ -3,6 +3,44 @@
 
 
 
+## v3.231.3 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): remove the public data-export download (#507) ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): remove the public data-export download
+
+A token in a URL was all anyone needed to read a person's whole data
+bundle for 7 days. The storefront now downloads through the owner's
+route, so the public route goes, with token and download_url from the
+API.
+
+The column stays and keeps being written, because a rollback target still
+reads it, so this release has no migration. New files are named by the
+row's uuid.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): keep the export ledger read-only without the token
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): let a rerun of an export keep the file it named
+
+A bundle written before this release is named by its token. A rerun wrote a
+second, uuid-named file and pointed the row at it, leaving the first where
+neither the expiry sweep nor an erasure finds it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
 ## v3.231.2 (2026-11-07)
 
 ### Bug fixes

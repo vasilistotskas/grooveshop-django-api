@@ -45984,7 +45984,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         stock:
           type: integer
           maximum: 2147483647
@@ -46994,7 +46993,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         viewCount:
           type: integer
           readOnly: true
@@ -47157,6 +47155,7 @@ components:
       - uuid
       - variantGroup
       - variantGroupTitle
+      - vat
       - vatPercent
       - vatValue
       - viewCount
@@ -47982,7 +47981,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         viewCount:
           type: integer
           readOnly: true
@@ -48154,6 +48152,7 @@ components:
       - uuid
       - variantGroup
       - variantGroupTitle
+      - vat
       - vatPercent
       - vatValue
       - viewCount
@@ -48244,7 +48243,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         viewCount:
           type: integer
           readOnly: true
@@ -48416,6 +48414,7 @@ components:
       - uuid
       - variantGroup
       - variantGroupTitle
+      - vat
       - vatPercent
       - vatValue
       - viewCount
@@ -48632,7 +48631,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         viewCount:
           type: integer
           readOnly: true
@@ -48801,6 +48799,7 @@ components:
       - uuid
       - variantGroup
       - variantGroupTitle
+      - vat
       - vatPercent
       - vatValue
       - viewCount
@@ -49500,7 +49499,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         viewCount:
           type: integer
           readOnly: true
@@ -49678,6 +49676,7 @@ components:
       - uuid
       - variantGroup
       - variantGroupTitle
+      - vat
       - vatPercent
       - vatValue
       - viewCount
@@ -50078,7 +50077,6 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-          nullable: true
         stock:
           type: integer
           maximum: 2147483647
@@ -50110,6 +50108,7 @@ components:
       - price
       - slug
       - translations
+      - vat
     PromotionCategoryRef:
       type: object
       description: Enough to link a promotion at its category listing page.

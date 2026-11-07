@@ -399,22 +399,6 @@ class TestVatChange:
         assert fresh.prior_price == Decimal("124.00")
         assert fresh.effective_price == Decimal("101.70")
 
-    def test_deleting_a_rate_re_prices_its_products_without_vat(
-        self, clock, vat, category
-    ):
-        product = make_product(vat, category)
-        clock.advance(days=2)
-
-        vat.delete()
-
-        fresh = reload(product)
-        assert fresh.vat_id is None
-        assert fresh.effective_price == Decimal("100.00")
-        assert [s.price.amount for s in spells_of(product)] == [
-            Decimal("124.00"),
-            Decimal("100.00"),
-        ]
-
 
 @pytest.mark.django_db
 class TestPromotions:

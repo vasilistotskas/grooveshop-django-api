@@ -247,12 +247,14 @@ class Product(
             "is not reduced."
         ),
     )
+    # Required on every write path and protected from deletion: a product
+    # without a rate is priced, snapshotted and invoiced at 0%. ``null=True``
+    # stays only until no tenant holds a NULL (see ``vat_percent``).
     vat = models.ForeignKey(
         "vat.Vat",
         related_name="products",
-        blank=True,
         null=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         verbose_name=_("VAT"),
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
@@ -588,6 +590,11 @@ class Product(
 
     @property
     def vat_percent(self) -> Decimal:
+        # The ONE place a missing rate reads as 0%, and only because the
+        # column is still nullable: rows written before the rate became
+        # required may hold NULL until the data migration reaches every
+        # tenant. The release that makes the column NOT NULL deletes this
+        # branch (and the SQL twin in ``with_vat_value_annotation``).
         if self.vat:
             return self.vat.value
         return Decimal(0)
@@ -602,11 +609,9 @@ class Product(
         takes 10% off what the shopper pays. ``discount_value`` stays the
         markdown on the net price.
         """
-        if self.vat:
-            net = self.price.amount - self.discount_value.amount
-            value = (net * self.vat.value) / 100
-            return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
-        return Money(0, settings.DEFAULT_CURRENCY)
+        net = self.price.amount - self.discount_value.amount
+        value = (net * self.vat_percent) / 100
+        return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
     @property
     def final_price(self) -> Money:

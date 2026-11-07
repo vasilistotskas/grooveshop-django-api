@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
@@ -17,7 +18,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from cart.models import Cart
-from core import celery_app
+from core import celery_app, db_cost
 from core.cache import edge as edge_cache
 from core.cache import invalidation as cache_invalidation
 from core.cache.edge import EdgePurgeError
@@ -118,9 +119,31 @@ class MonitoredTask(TenantTask):
             raise exc
         return super().retry(*args, **options)
 
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Run the task and keep what it cost the database on its request.
+
+        ``on_success`` and ``on_failure`` run after ``__call__`` returns,
+        on the same request context, so the figures are stored there.
+        """
+        started = time.perf_counter()
+        with db_cost.measure() as cost:
+            try:
+                return super().__call__(*args, **kwargs)
+            finally:
+                self.request.cost_fields = {
+                    "duration_ms": round(
+                        (time.perf_counter() - started) * 1000, 1
+                    ),
+                    **cost.as_fields(),
+                }
+
+    def _cost_fields(self) -> dict[str, Any]:
+        return getattr(self.request, "cost_fields", {})
+
     def on_success(self, retval, task_id, args, kwargs):
         logger.info(
-            f"Task {self.name} completed successfully. Task ID: {task_id}"
+            f"Task {self.name} completed successfully. Task ID: {task_id}",
+            extra={"fields": self._cost_fields()},
         )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
@@ -139,6 +162,7 @@ class MonitoredTask(TenantTask):
             safe_args,
             safe_kwargs,
             exc_info=exc,
+            extra={"fields": self._cost_fields()},
         )
 
 

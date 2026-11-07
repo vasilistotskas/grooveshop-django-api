@@ -20,6 +20,7 @@ import pytest
 from django.contrib import admin
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.models import ProtectedError
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from djmoney.money import Money
@@ -323,13 +324,16 @@ class TestIssuedDocumentsIgnoreTheCatalogue:
 
         self._assert_still_24_percent(order)
 
-    def test_deleting_the_vat_row_changes_neither_document(self):
-        """``Product.vat`` is SET_NULL: the line used to fall into 0%."""
+    def test_deleting_the_vat_row_is_refused_and_changes_neither_document(
+        self,
+    ):
+        """``Product.vat`` was SET_NULL: the line used to fall into 0%."""
         order, product = self._order()
 
-        product.vat.delete()
+        with pytest.raises(ProtectedError):
+            product.vat.delete()
         product.refresh_from_db()
-        assert product.vat is None
+        assert product.vat is not None
 
         self._assert_still_24_percent(order)
 

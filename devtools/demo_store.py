@@ -1048,12 +1048,18 @@ def seed_products() -> dict[str, int]:
         ProductImage,
         ProductVariantGroup,
     )
+    from vat.constants import STANDARD_VAT_RATE
     from vat.models import Vat
 
     report: dict[str, int] = {}
-    vat = Vat.objects.filter(value=Decimal("24.0")).first()
+    # Refuses rather than seeding products without a rate: the store's
+    # migrations seed the standard row. ``Vat.value`` is not unique, so a
+    # store holding two standard rows takes the oldest instead of failing.
+    vat = Vat.objects.filter(value=STANDARD_VAT_RATE).order_by("pk").first()
     if vat is None:
-        logger.warning("No 24%% VAT row; demo products will carry no VAT")
+        raise Vat.DoesNotExist(
+            f"No {STANDARD_VAT_RATE}% VAT rate in this store to seed with."
+        )
 
     categories = {c.slug: c for c in ProductCategory.objects.all()}
     brands = {b.name: b for b in Brand.objects.all()}

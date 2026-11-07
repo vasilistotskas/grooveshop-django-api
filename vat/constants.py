@@ -40,3 +40,10 @@ MYDATA_SUPPORTED_VAT_RATES: frozenset[Decimal] = frozenset(
         Decimal(0),
     }
 )
+
+# The rate a product is priced at when nobody chose one: Greek standard
+# VAT, ``order/mydata/builder.py``'s ``VAT_CATEGORY_24`` (AADE category 1).
+# A ``Vat`` row carries only its ``value``, so the value IS what identifies
+# the standard row; there is no flag to read. Must stay a supported rate.
+STANDARD_VAT_RATE: Decimal = Decimal(24)
+assert STANDARD_VAT_RATE in MYDATA_SUPPORTED_VAT_RATES

@@ -215,10 +215,31 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   `StockManager` that follow re-lock rows already held and cannot block.
   `cancel_order` (a restore takes one lock per product), the bulk discount
   admin actions and the guest→user cart merge follow the same rule;
-  `reserve_stock` is not affected, each call being its own transaction.
+  `reserve_cart_stock` takes the same locks itself, through the same helper.
   Not covered: an admin edit that changes the quantity of several
   `OrderItem` rows in one request (`handle_order_item_post_save` →
   `StockManager.adjust_stock`) locks their products in form order.
+- **A cart's stock holds are replaced as a whole, never stacked**
+  (`POST cart/reserve-stock` -> `StockManager.reserve_cart_stock`). A cart
+  (session = the cart UUID) owns one set of `StockReservation` rows. One call
+  locks the products of the old and the new set (`lock_products`, pk order),
+  releases every unconsumed hold of the session (expired ones too) through
+  `release_reservation` (`consumed=True`, a `StockLog` RELEASE line each, no
+  order), then reserves the new quantities, all in one transaction. The call first locks the `Cart` row, the lock checkout takes first, so the order is cart, then products, the same as checkout; `reserve_cart_stock`, a checkout of that cart and the login merge that rehomes its holds (`CartService.merge_carts` locks both cart rows, lowest pk first) run one at a time. A checkout therefore never reads a hold set a re-reserve is half way through replacing. A reload,
+  a retry, an agent completing twice, a changed quantity or a removed line
+  therefore never leave the cart blocked by its own earlier holds
+  (`stock == quantity` used to answer 409 on the second attempt and keep the
+  units held for the TTL) and never leave a hold on a product the cart no
+  longer has. Other sessions' holds still count, so two carts still exclude
+  each other for the last unit. If any line is short the whole call rolls
+  back (`CartStockUnavailableError`, one entry per short line, answered as 409
+  `insufficient_stock` with `failed_items`) and the cart keeps the holds it
+  had. `StockManager.reserve_stock` stays the per-product primitive and counts
+  every active hold, so only reserve through `reserve_cart_stock`. Order
+  creation looks reservations up by SESSION, not by id
+  (`session_id=cart.uuid, consumed=False`), so the ids an older response
+  returned are irrelevant: they are already consumed, and
+  `release-reservations` treats a consumed id as a no-op.
 
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
@@ -435,9 +456,10 @@ catalogue can no longer change.
   item admin and API, scripts); `bulk_create` skips `save()`, so
   `devtools/demo_orders.py` passes it itself. The column has
   `db_default=0` only so the release still serving during a rollout can
-  keep inserting; a product with no `Vat` row is sold at 0. The item
-  admin cannot add a line (§3.7) and keeps the rate editable, so staff
-  can correct a wrong snapshot, until the order's invoice carries a
+  keep inserting; a legacy product with no `Vat` row (NULL until the
+  column is made NOT NULL, see `docs/product-pricing.md`) is sold at 0.
+  The item admin cannot add a line (§3.7) and keeps the rate editable, so
+  staff can correct a wrong snapshot, until the order's invoice carries a
   myDATA MARK; from then on it is read-only, because the registered
   document can no longer change. A correction rewrites the order's
   `OrderVatLine` rows (`write_vat_lines`), which the turnover report
@@ -445,8 +467,7 @@ catalogue can no longer change.
 - **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
   and `order/mydata/builder.py` get their lines from
   `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
-  a `Vat` row, moving the product to another, or deleting the row (the
-  FK is `SET_NULL`) changes neither the PDF nor the myDATA payload of an
+  a `Vat` row, or moving the product to another, changes neither the PDF nor the myDATA payload of an
   existing order. Regenerating a not-yet-registered invoice therefore
   keeps the original rates too. Lines that predate the column were
   backfilled (`0065`) from their product's VAT at deploy time, which is

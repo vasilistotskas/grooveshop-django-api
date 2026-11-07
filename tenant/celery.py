@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from celery import Task
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
 
@@ -157,6 +159,19 @@ def run_for_all_tenants(
     return results
 
 
+class BrokerKnownDown(Exception):
+    """A publish that was not tried, because one failed moments ago."""
+
+    def __str__(self) -> str:
+        return "not tried: a publish in this process failed moments ago"
+
+
+#: When this process may try the broker again (``time.monotonic``). One failed
+#: publish holds its caller for the whole of Celery's connection retries, and
+#: an order makes six: an outage must not make a shopper wait for each.
+_broker_down_until = 0.0
+
+
 def dispatch_on_commit(
     # Annotated `Any`, not `Task`: Celery's `@shared_task` returns a Task
     # at RUNTIME, but a type checker sees the undecorated function, so a
@@ -194,7 +209,10 @@ def dispatch_on_commit(
     raising could only answer 500 for work that was done. The dispatch is
     logged at ERROR and kept as a ``DeferredDispatch`` that
     ``redispatch_deferred_tasks`` publishes again, so it is not lost. Any
-    other exception is a bug and still raises.
+    other exception is a bug and still raises. After one such failure this
+    process keeps the next ones without trying, for
+    ``DEFERRED_DISPATCH_BROKER_DOWN_SECONDS``, so one request does not wait
+    out the failure once per task.
 
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
@@ -209,9 +227,17 @@ def dispatch_on_commit(
         call["kwargs"] = dict(kwargs)
 
     def publish() -> None:
+        global _broker_down_until
+        if time.monotonic() < _broker_down_until:
+            defer_dispatch(task, call, headers, options, BrokerKnownDown())
+            return
         try:
             task.apply_async(**call, headers=headers, **options)
         except TRANSIENT_NETWORK_ERRORS as exc:
+            _broker_down_until = (
+                time.monotonic()
+                + settings.DEFERRED_DISPATCH_BROKER_DOWN_SECONDS
+            )
             defer_dispatch(task, call, headers, options, exc)
 
     transaction.on_commit(publish)

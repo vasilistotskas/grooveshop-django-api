@@ -62,9 +62,12 @@ def test_a_broker_failure_after_the_order_commits_keeps_the_order_flow():
     ):
         order_created.send(sender=Order, order=order)
 
-    assert _task_names() == {
+    # Both are kept, and so is what the order's later receivers publish: after
+    # one failure nothing else waits for the broker.
+    assert _task_names() >= {
         send_order_confirmation_email.name,
         send_admin_new_order_email.name,
+        "notify_order_created_live",
     }
     # The hooks after the publishes still ran.
     assert OrderHistory.objects.filter(

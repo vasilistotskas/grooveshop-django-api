@@ -9,6 +9,7 @@ that was done. The dispatch is kept (``DeferredDispatch``) and
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 from unittest import mock
 
@@ -69,6 +70,55 @@ class TestAFailedPublish:
             dispatch_on_commit(task, [42])
 
         assert any("payload" in r.getMessage() for r in caplog.records)
+
+
+class TestAfterAFailedPublish:
+    def test_the_next_one_is_kept_without_trying_the_broker(self):
+        dispatch_on_commit(broker_down_task("first.task"), [1])
+        second = broker_down_task("second.task")
+
+        dispatch_on_commit(second, [2])
+
+        second.apply_async.assert_not_called()
+        kept = DeferredDispatch.objects.get(task_name="second.task")
+        assert kept.args == [2]
+        assert kept.last_error.startswith("BrokerKnownDown")
+
+    def test_the_broker_is_tried_again_once_the_window_has_passed(
+        self, settings
+    ):
+        dispatch_on_commit(broker_down_task(), [1])
+        later = mock.Mock(name="later.task")
+
+        with mock.patch(
+            "tenant.celery.time.monotonic",
+            return_value=time.monotonic()
+            + settings.DEFERRED_DISPATCH_BROKER_DOWN_SECONDS
+            + 1,
+        ):
+            dispatch_on_commit(later, [2])
+
+        later.apply_async.assert_called_once()
+
+    def test_a_bug_says_nothing_about_the_broker(self):
+        broken = mock.Mock(name="broken.task")
+        broken.apply_async.side_effect = TypeError("a bug")
+        with pytest.raises(TypeError):
+            dispatch_on_commit(broken, [1])
+        healthy = mock.Mock(name="healthy.task")
+
+        dispatch_on_commit(healthy, [2])
+
+        healthy.apply_async.assert_called_once()
+
+    def test_a_publish_that_works_leaves_the_next_to_try(self):
+        first = mock.Mock(name="first.task")
+        second = mock.Mock(name="second.task")
+
+        dispatch_on_commit(first, [1])
+        dispatch_on_commit(second, [2])
+
+        second.apply_async.assert_called_once()
 
 
 def deferred(name="demo.task", *, age_days=0, due_in=timedelta(0), **fields):

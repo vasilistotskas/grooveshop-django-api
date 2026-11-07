@@ -26,6 +26,13 @@ never reaches the caller:
    row older than `DEFERRED_DISPATCH_RETENTION_DAYS` is deleted with an `ERROR`
    (the work was not done) and its payload in the log.
 
+A failed publish holds its caller for all of Celery's connection retries, and an
+order makes six of them, so one failure tells this process to keep the next ones
+without trying for `DEFERRED_DISPATCH_BROKER_DOWN_SECONDS`. Measured on a local
+stack with the broker's port closed, on Windows where a refused connection is
+slow: one order held its request 52.7 s without this, about 8.8 s for each
+publish. The rows it keeps go out through the same sweep.
+
 Any other exception is a bug and still raises. There is no metrics stack on this
 platform: the number of `DeferredDispatch` rows is the count of publishes
 waiting, and each failure is an `ERROR` log line.

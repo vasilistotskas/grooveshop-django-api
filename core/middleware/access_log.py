@@ -34,6 +34,9 @@ A 5xx line is a WARNING, everything else INFO; ``django.request`` still
 logs the 5xx at ERROR, with the traceback when there is one, so the
 traceback is never repeated here.
 
+``db_queries`` and ``db_ms`` say where a slow request spent its time
+(``duration_ms`` minus ``db_ms`` is Python, Redis and outbound calls).
+
 Never logged: the raw path (it carries ids), the query string, headers,
 cookies, bodies, error messages. The route is the URL PATTERN the request
 resolved to; the code is a fixed identifier, never text a client sent.
@@ -47,6 +50,7 @@ import time
 from django.urls import Resolver404, resolve
 from rest_framework import status
 
+from core import db_cost
 from core.api.exception_handler import CODE_KEY
 
 logger = logging.getLogger(__name__)
@@ -97,6 +101,10 @@ def _code_of(response) -> str | None:
 class AccessLogMiddleware:
     """Log ``method route status duration_ms [code]`` once per request.
 
+    The line also carries ``db_queries`` and ``db_ms`` (``core.db_cost``):
+    how many queries the request ran, on any database alias, and the time
+    spent in them. They are fields, not part of the message text.
+
     Sync-only like every other middleware here; Django adapts it for the
     ASGI stack and both sync and async views. The duration runs until
     the response object comes back, so the time to stream a
@@ -110,7 +118,8 @@ class AccessLogMiddleware:
 
     def __call__(self, request):
         started = time.perf_counter()
-        response = self.get_response(request)
+        with db_cost.measure() as cost:
+            response = self.get_response(request)
         duration_ms = round((time.perf_counter() - started) * 1000, 1)
 
         route = _route_of(request)
@@ -119,6 +128,7 @@ class AccessLogMiddleware:
             "route": route,
             "status": response.status_code,
             "duration_ms": duration_ms,
+            **cost.as_fields(),
         }
         code = _code_of(response)
         if code is not None:

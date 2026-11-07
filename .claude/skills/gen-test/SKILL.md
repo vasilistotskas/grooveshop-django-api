@@ -74,6 +74,10 @@ Every generated test follows these conventions:
 8. **Query counting**: `django_assert_max_num_queries` / `assertNumQueries`,
    or two `CaptureQueriesContext` measurements compared for a cost that must
    not grow with the data
+9. **No real network**: the suite runs with sockets blocked except the local
+   services (`docs/testing.md`, "Network access"). Mock an external client
+   (payment provider, carrier, Resend, Cloudflare, Meta) at its boundary,
+   the way the neighbouring tests do; never allow a third-party host
 
 ## Output Checklist
 
@@ -86,3 +90,4 @@ After generating tests, verify:
 - [ ] Permissions are tested (authenticated, unauthenticated, wrong user, admin)
 - [ ] Both success and error paths are covered
 - [ ] No hardcoded IDs, URLs, or magic numbers
+- [ ] No test reaches a real third party (a `SocketConnectBlockedError` means the client is not mocked)

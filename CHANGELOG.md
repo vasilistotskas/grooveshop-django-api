@@ -3,6 +3,16 @@
 
 
 
+## v3.234.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(order): freeze placed order lines and flag a double payment (#521) ([`f92c81c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f92c81c226630d241508eef2dac1fc711c2c909e))
+
+### Features
+
+* feat(search): find products by code, brand and category name (#522) ([`a24dbf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a24dbf232188355cabfae4dae3821eb5a3b3e2fa))
+
 ## v3.233.0 (2026-11-07)
 
 ### Bug fixes

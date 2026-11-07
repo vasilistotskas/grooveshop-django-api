@@ -609,10 +609,11 @@ class CartViewSet(BaseModelViewSet):
                 quantities.get(item.product_id, 0) + item.quantity
             )
         try:
-            reservations = StockManager.reserve_cart_stock(
-                quantities,
-                session_id=str(cart.uuid),
-                user_id=cart.user.id if cart.user else None,
+            reservations = StockManager.reserve_cart_stock(cart, quantities)
+        except Cart.DoesNotExist:
+            return Response(
+                {"detail": "Cart not found", "code": "cart_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
         except CartStockUnavailableError as exc:
             # Log it, or the resulting 409 is unanswerable from server logs.

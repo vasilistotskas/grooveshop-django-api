@@ -1,7 +1,8 @@
 from collections.abc import Iterable, Mapping
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
@@ -14,6 +15,9 @@ from order.exceptions import (
 from order.models import StockLog, StockReservation
 from product.models import Product
 from tenant.staff_actors import staff_id
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 
 def validate_reservation_ttl_minutes_setting(value: object) -> bool:
@@ -226,10 +230,8 @@ class StockManager:
     @transaction.atomic
     def reserve_cart_stock(
         cls,
+        cart: Cart,
         quantities: Mapping[int, int],
-        *,
-        session_id: str,
-        user_id: int | None = None,
     ) -> list[StockReservation]:
         """
         Make the cart's holds exactly ``quantities``, replacing its old ones.
@@ -244,22 +246,28 @@ class StockManager:
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
 
-        Calls for the same session are serialised first (a transaction-scoped
-        advisory lock), so the holds read below cannot change under it.
+        The first statement locks the ``Cart`` row (``select_for_update``),
+        the lock checkout takes first, so the order is cart, then products,
+        the same as checkout. This call, a checkout of the cart and the
+        login merge that rehomes its holds therefore run one at a time: the
+        holds read below cannot change under it, and a checkout never reads
+        a hold set this call is half way through replacing. Cart rows are
+        locked only here, in checkout and in the merge.
 
         Order creation consumes the session's unconsumed holds
         (``OrderService._consume_stock_for_order``), so after this call
         those are exactly the ones returned.
 
         Args:
+            cart: The cart whose holds are replaced (its UUID is the
+                session id of the holds, its user their owner)
             quantities: product id -> units wanted, every one positive
-            session_id: Cart UUID
-            user_id: Owner of the cart, None for a guest
 
         Returns:
             The new reservations, in ascending product id order.
 
         Raises:
+            Cart.DoesNotExist: The cart was deleted meanwhile
             ValueError: A quantity is not positive
             ProductNotFoundError: A product does not exist
             CartStockUnavailableError: One or more lines are short. Every
@@ -269,17 +277,11 @@ class StockManager:
         if any(quantity <= 0 for quantity in quantities.values()):
             raise ValueError("Quantity must be positive")
 
-        # One request per cart at a time. Without this, a concurrent
-        # request of the same cart could add a hold on a product outside
-        # the set locked below, and releasing it would lock that product
-        # out of pk order. Advisory locks are per DATABASE and every store
-        # shares one, hence the schema in the key. Nothing else takes this
-        # lock, so it adds no cycle with checkout's product locks.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                [f"stock_cart_session:{connection.schema_name}:{session_id}"],
-            )
+        from cart.models import Cart
+
+        locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        session_id = str(locked_cart.uuid)
+        user_id = locked_cart.user_id
 
         held_products = StockReservation.objects.filter(
             session_id=session_id, consumed=False

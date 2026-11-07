@@ -8,11 +8,13 @@ and the first attempt's units stayed held for the TTL. The call now
 replaces the cart's holds, whatever products they were on.
 """
 
+import threading
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
 import pytest
-from django.db import connection
+from django.db import OperationalError, connection, transaction
+from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -20,6 +22,8 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from cart.factories import CartFactory, CartItemFactory
+from cart.models import Cart
+from cart.services import CartService
 from country.factories import CountryFactory
 from order.enum.status import PaymentStatus
 from order.exceptions import CartStockUnavailableError
@@ -273,74 +277,138 @@ class TestOrderCreationAfterReReserve:
 
 
 class TestReserveCartStock:
-    def test_replaces_session_holds_across_products(self, user):
+    def test_replaces_session_holds_across_products(self, user, cart):
         kept = ProductFactory(stock=5)
         dropped = ProductFactory(stock=5)
-        session = "cart-session"
-        StockManager.reserve_cart_stock(
-            {kept.id: 2, dropped.id: 3}, session_id=session, user_id=user.id
-        )
+        StockManager.reserve_cart_stock(cart, {kept.id: 2, dropped.id: 3})
 
-        holds = StockManager.reserve_cart_stock(
-            {kept.id: 5}, session_id=session, user_id=user.id
-        )
+        holds = StockManager.reserve_cart_stock(cart, {kept.id: 5})
 
         assert [(h.product_id, h.quantity) for h in holds] == [(kept.id, 5)]
-        live = StockReservation.objects.filter(
-            session_id=session, consumed=False
-        )
-        assert [r.product_id for r in live] == [kept.id]
+        assert [r.product_id for r in _active(cart)] == [kept.id]
         assert StockManager.get_available_stock(dropped.id) == 5
 
-    def test_reports_every_short_line_and_changes_nothing(self, user):
+    def test_reports_every_short_line_and_changes_nothing(self, user, cart):
         first = ProductFactory(stock=1)
         second = ProductFactory(stock=1)
         ok = ProductFactory(stock=9)
-        session = "cart-session"
-        StockManager.reserve_cart_stock(
-            {ok.id: 1}, session_id=session, user_id=user.id
-        )
+        StockManager.reserve_cart_stock(cart, {ok.id: 1})
 
         with pytest.raises(CartStockUnavailableError) as raised:
             StockManager.reserve_cart_stock(
-                {first.id: 2, second.id: 2, ok.id: 3},
-                session_id=session,
-                user_id=user.id,
+                cart, {first.id: 2, second.id: 2, ok.id: 3}
             )
 
         assert {e.product_id for e in raised.value.shortfalls} == {
             first.id,
             second.id,
         }
-        live = StockReservation.objects.filter(
-            session_id=session, consumed=False
-        )
-        assert [(r.product_id, r.quantity) for r in live] == [(ok.id, 1)]
+        assert [(r.product_id, r.quantity) for r in _active(cart)] == [
+            (ok.id, 1)
+        ]
 
-    def test_rejects_a_non_positive_quantity(self, user):
+    def test_rejects_a_non_positive_quantity(self, user, cart):
         product = ProductFactory(stock=5)
         with pytest.raises(ValueError, match="positive"):
-            StockManager.reserve_cart_stock(
-                {product.id: 0}, session_id="s", user_id=user.id
-            )
+            StockManager.reserve_cart_stock(cart, {product.id: 0})
 
-    def test_session_lock_is_taken_before_any_product_lock(self, user):
+    def test_a_deleted_cart_is_reported(self, user, cart):
+        product = ProductFactory(stock=5)
+        stale = Cart.objects.get(pk=cart.pk)
+        cart.delete()
+
+        with pytest.raises(Cart.DoesNotExist):
+            StockManager.reserve_cart_stock(stale, {product.id: 1})
+
+    def test_cart_row_is_locked_before_any_product_lock(self, user, cart):
         product = ProductFactory(stock=5)
 
         with CaptureQueriesContext(connection) as queries:
-            StockManager.reserve_cart_stock(
-                {product.id: 1}, session_id="cart-session", user_id=user.id
-            )
+            StockManager.reserve_cart_stock(cart, {product.id: 1})
 
         statements = [q["sql"] for q in queries]
-        lock_at = next(
+        cart_lock_at = next(
             i
             for i, sql in enumerate(statements)
-            if "pg_advisory_xact_lock" in sql
+            if 'FROM "cart_cart"' in sql and "FOR UPDATE" in sql
         )
         product_lock_at = next(
             i
             for i, sql in enumerate(statements)
             if 'FROM "product_product"' in sql and "FOR UPDATE" in sql
         )
-        assert lock_at < product_lock_at
+        assert cart_lock_at < product_lock_at
+
+
+@pytest.fixture
+def cart_lock_held_elsewhere():
+    """Hold a cart's row lock on another connection until released."""
+    release = threading.Event()
+    started = []
+
+    def hold(cart_pk: int, held: threading.Event) -> None:
+        try:
+            with transaction.atomic():
+                Cart.objects.select_for_update().get(pk=cart_pk)
+                held.set()
+                release.wait(20)
+        finally:
+            connection.close()
+
+    def start(cart_pk: int) -> None:
+        held = threading.Event()
+        thread = threading.Thread(target=hold, args=(cart_pk, held))
+        thread.start()
+        started.append(thread)
+        assert held.wait(20)
+
+    yield start
+    release.set()
+    for thread in started:
+        thread.join()
+
+
+def _lock_timeout_300ms() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL lock_timeout = '300ms'")
+
+
+@pytest.mark.django_db(transaction=True)
+class TestCartRowLockSerialises:
+    """A checkout holds the cart row; these wait for it, as checkout does."""
+
+    def test_reserve_waits_for_a_checkout_holding_the_cart(
+        self, user, cart, cart_lock_held_elsewhere
+    ):
+        product = ProductFactory(stock=5)
+        cart_lock_held_elsewhere(cart.pk)
+
+        with pytest.raises(OperationalError):
+            with transaction.atomic():
+                _lock_timeout_300ms()
+                StockManager.reserve_cart_stock(cart, {product.id: 1})
+
+        assert not _active(cart).exists()
+
+    def test_reserve_runs_once_the_cart_is_free(self, user, cart):
+        product = ProductFactory(stock=5)
+
+        StockManager.reserve_cart_stock(cart, {product.id: 1})
+
+        assert _active(cart).count() == 1
+
+    def test_login_merge_takes_the_target_cart_lock(
+        self, user, cart, cart_lock_held_elsewhere
+    ):
+        guest_cart = CartFactory(user=None, num_cart_items=0)
+        request = RequestFactory().get("/")
+        request.user = user
+        request.META["HTTP_X_CART_ID"] = str(cart.uuid)
+        cart_lock_held_elsewhere(cart.pk)
+
+        with pytest.raises(OperationalError):
+            with transaction.atomic():
+                _lock_timeout_300ms()
+                CartService(request=request).merge_carts(guest_cart, cart)
+
+        assert Cart.objects.filter(pk=guest_cart.pk).exists()

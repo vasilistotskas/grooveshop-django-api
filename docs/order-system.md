@@ -225,7 +225,7 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   locks the products of the old and the new set (`lock_products`, pk order),
   releases every unconsumed hold of the session (expired ones too) through
   `release_reservation` (`consumed=True`, a `StockLog` RELEASE line each, no
-  order), then reserves the new quantities, all in one transaction. Calls for the same cart are serialised first by a transaction-scoped advisory lock (`pg_advisory_xact_lock`, keyed on schema and session id; nothing else takes it), so the holds read before the product locks cannot change under the call. A reload,
+  order), then reserves the new quantities, all in one transaction. The call first locks the `Cart` row, the lock checkout takes first, so the order is cart, then products, the same as checkout; `reserve_cart_stock`, a checkout of that cart and the login merge that rehomes its holds (`CartService.merge_carts` locks both cart rows, lowest pk first) run one at a time. A checkout therefore never reads a hold set a re-reserve is half way through replacing. A reload,
   a retry, an agent completing twice, a changed quantity or a removed line
   therefore never leave the cart blocked by its own earlier holds
   (`stock == quantity` used to answer 409 on the second attempt and keep the

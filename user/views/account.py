@@ -545,14 +545,18 @@ class UserAccountViewSet(BaseModelViewSet):
     def download_data_export(self, request, pk=None, export_id=None):
         """Stream one of this user's export bundles.
 
-        The most complete copy of a person's data the system makes, so it
-        takes the viewset's owner check and nothing in its address is a
-        credential.
+        The most complete copy of a person's data the system makes, so
+        nobody but its owner reads it: the viewset's check also lets store
+        staff through. Nothing in the address is a credential.
         """
         from user.models.data_export import UserDataExport
 
         user = self.get_object()
-        export = UserDataExport.objects.filter(user=user, pk=export_id).first()
+        export = (
+            UserDataExport.objects.filter(user=user, pk=export_id).first()
+            if user.pk == request.user.pk
+            else None
+        )
         if export is None:
             raise NotFound(_("Export not found."), code="export_not_found")
         return export_file_response(export)

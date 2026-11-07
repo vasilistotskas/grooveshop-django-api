@@ -84,6 +84,18 @@ def test_another_customer_is_refused(export_dir):
     assert not getattr(response, "streaming", False)
 
 
+def test_store_staff_and_superusers_are_refused(export_dir):
+    owner = UserAccountFactory()
+    export = make_export(owner, export_dir)
+    superuser = UserAccountFactory(is_staff=True, is_superuser=True)
+
+    response = client_of(superuser).get(download_url(owner, export))
+
+    assert response.status_code == 404
+    assert response.data["code"] == "export_not_found"
+    assert not getattr(response, "streaming", False)
+
+
 def test_owner_cannot_reach_another_accounts_export_through_their_own(
     export_dir,
 ):

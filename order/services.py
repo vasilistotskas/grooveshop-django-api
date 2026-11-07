@@ -21,6 +21,7 @@ from order.attribution import (
     classify,
 )
 from order.discounts import add_line_discounts, spread_by_remaining_value
+from order.enum.attribution import OrderSourceType
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -421,6 +422,13 @@ class OrderService:
     def get_order_by_uuid(cls, uuid: str) -> Order:
         """Get order by UUID with optimized queryset."""
         return Order.objects.for_detail().get(uuid=uuid)
+
+    @classmethod
+    def get_agent_order_by_uuid(cls, uuid: str) -> Order:
+        """Get an order an AI agent placed, by UUID."""
+        return Order.objects.for_detail().get(
+            uuid=uuid, attribution__source_type=OrderSourceType.AGENT
+        )
 
     @classmethod
     def _consume_stock_for_order(cls, *, order, cart, cart_items, reservations):

@@ -91,8 +91,9 @@ class AgentInternalOrderView(APIView):
     A uuid that a client hands the gateway never comes here: those go to
     the guest route and keep its limit.
 
-    A caller without the secret gets the 404 an unknown order gets, so the
-    route does not advertise itself.
+    Other services hold the same secret, so only an order an agent placed
+    is served. A caller without the secret, and any other order, gets the
+    404 an unknown order gets, so the route does not advertise itself.
     """
 
     authentication_classes = []
@@ -105,7 +106,8 @@ class AgentInternalOrderView(APIView):
         summary="Read an order (agent gateway only)",
         description=(
             "An order the agent gateway placed. Requires the gateway's "
-            "shared secret in `X-Internal-Token`; any other caller gets 404."
+            "shared secret in `X-Internal-Token`; any other caller or "
+            "order gets 404."
         ),
         tags=["Agent"],
         auth=[],
@@ -114,7 +116,7 @@ class AgentInternalOrderView(APIView):
         if not is_internal_caller(request.headers.get("X-Internal-Token", "")):
             raise NotFound
         try:
-            order = OrderService.get_order_by_uuid(uuid)
+            order = OrderService.get_agent_order_by_uuid(uuid)
         except Order.DoesNotExist as e:
             raise NotFound from e
         return Response(OrderDetailSerializer(order).data)

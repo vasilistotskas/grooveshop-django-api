@@ -13,7 +13,7 @@ from allauth.idp.oidc.internal.oauthlib.utils import (
 )
 from allauth.idp.oidc.internal.resources import is_resources_subset
 from drf_spectacular.utils import extend_schema
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, NotFound
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,9 +27,11 @@ from agent.oidc import (
 from agent.serializers import AgentFavouriteSerializer, AgentProfileSerializer
 from loyalty.serializers.loyalty import LoyaltySummarySerializer
 from loyalty.services import LoyaltyService
-from order.serializers.order import OrderSerializer
+from order.models.order import Order
+from order.serializers.order import OrderDetailSerializer, OrderSerializer
 from order.services import OrderService
 from product.models.favourite import ProductFavourite
+from tenant.internal import is_internal_caller
 from tenant.permissions import (
     IsCatalogueEnabled,
     IsFavouritesEnabled,
@@ -77,6 +79,45 @@ class AgentTokenAuthentication(TokenAuthentication):
 
     def authenticate_header(self, request):
         return 'Bearer realm="agent"'
+
+
+class AgentInternalOrderView(APIView):
+    """An order as the agent gateway reads it for its own work.
+
+    The gateway tells a platform about an order for as long as the order
+    moves, which outlives what a guest's uuid opens
+    (``Order.opens_for_guest``). So its own reads, of a uuid it holds
+    because it placed the order, prove the gateway with its shared secret.
+    A uuid that a client hands the gateway never comes here: those go to
+    the guest route and keep its limit.
+
+    A caller without the secret gets the 404 an unknown order gets, so the
+    route does not advertise itself.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = []
+
+    @extend_schema(
+        operation_id="getAgentInternalOrder",
+        responses=OrderDetailSerializer,
+        summary="Read an order (agent gateway only)",
+        description=(
+            "An order the agent gateway placed. Requires the gateway's "
+            "shared secret in `X-Internal-Token`; any other caller gets 404."
+        ),
+        tags=["Agent"],
+        auth=[],
+    )
+    def get(self, request: Request, uuid) -> Response:
+        if not is_internal_caller(request.headers.get("X-Internal-Token", "")):
+            raise NotFound
+        try:
+            order = OrderService.get_order_by_uuid(uuid)
+        except Order.DoesNotExist as e:
+            raise NotFound from e
+        return Response(OrderDetailSerializer(order).data)
 
 
 class AgentAPIView(APIView):

@@ -3,6 +3,59 @@
 
 
 
+## v3.232.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(accounts): show who is signed in, and mark destructive buttons
+
+allauth's default layout listed Sign Out on every page, and the new frame
+dropped it outside the account-management pages. On the OAuth consent a
+shopper on a shared device could then only grant an AI app the account
+already signed in. The frame now names the signed-in email with a Sign Out
+link, or offers Sign In to a signed-out visitor.
+
+Buttons allauth tags "danger" (remove an address, deactivate a factor) were
+drawn as the primary action; they get their own style. The consent and social
+sign-up pages reuse the frame's brand instead of reading it a second time, and
+both sentences take allauth's own Greek. The tests now show a store's own
+colour reaching the page instead of passing on the default palette.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+* fix(accounts): sign out from the consent and come back to it
+
+The Sign Out link carries the page as next, so a shopper who switches account
+on the OAuth consent returns to it. The tests now check the store name inside
+the consent and social sign-up sentences, where a missing brand would show,
+and that a signed-out page offers Sign In while the sign-in page does not.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+### Features
+
+* feat(accounts): sign-in and consent pages wear the store (#514) ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+* feat(accounts): sign-in and consent pages wear the store
+
+An AI agent sends a shopper to /accounts/login/ and then to the OAuth
+consent on the store's API host. Every page allauth renders there used its
+bare default layout: no stylesheet and a "Menu:" list. They now share one
+frame with the store's name, logo, favicon and primary colour, read with the
+helpers email and the admin already use, in light and dark colour schemes.
+Buttons take their role from allauth's tags.
+
+The consent and social sign-up pages named the django.contrib.sites site of
+SITE_ID, one row for every store, so a demo-store shopper read that Claude
+wanted to access a Webside account. Both now name the store, and the consent
+sentence has its Greek translation.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
 ## v3.231.6 (2026-11-07)
 
 ### Bug fixes

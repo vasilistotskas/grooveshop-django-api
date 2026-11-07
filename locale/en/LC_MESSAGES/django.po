@@ -62,6 +62,10 @@ msgid "%(chars)d chars, %(words)d words, %(lines)d lines"
 msgstr "%(chars)d chars, %(words)d words, %(lines)d lines"
 
 #, python-format
+msgid "%(client_name)s wants to access your %(site_name)s account."
+msgstr "%(client_name)s wants to access your %(site_name)s account."
+
+#, python-format
 msgid "%(code)s on cart %(cart)s"
 msgstr "%(code)s on cart %(cart)s"
 
@@ -1184,6 +1188,9 @@ msgstr "Accessory for"
 msgid "Account"
 msgstr "Account"
 
+msgid "Account Connections"
+msgstr "Account Connections"
+
 msgid "Account Transaction Created"
 msgstr "Account Transaction Created"
 
@@ -1784,6 +1791,9 @@ msgstr "Authenticator set up."
 msgid "Author"
 msgstr "Author"
 
+msgid "Authorize"
+msgstr "Authorize"
+
 msgid "Authors"
 msgstr "Authors"
 
@@ -1874,6 +1884,10 @@ msgstr "Back in stock (%(refunded)s/%(qty)s)"
 
 msgid "Back in stock (favourited product)"
 msgstr "Back in stock (favourited product)"
+
+#, python-format
+msgid "Back to %(store)s"
+msgstr "Back to %(store)s"
 
 msgid "Back to log in"
 msgstr "Back to log in"
@@ -2818,6 +2832,12 @@ msgstr "Change"
 
 msgid "Change (%)"
 msgstr "Change (%)"
+
+msgid "Change Email"
+msgstr "Change Email"
+
+msgid "Change Password"
+msgstr "Change Password"
 
 msgid "Change Type"
 msgstr "Change Type"
@@ -12569,6 +12589,9 @@ msgstr "Session Key"
 msgid "Session key"
 msgstr "Session key"
 
+msgid "Sessions"
+msgstr "Sessions"
+
 msgid "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 msgstr "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 
@@ -12782,6 +12805,12 @@ msgstr "Show nothing rather than fewer than this many suggestions."
 
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
+
+msgid "Sign Out"
+msgstr "Sign Out"
+
+msgid "Sign Up"
+msgstr "Sign Up"
 
 msgid "Sign-in code"
 msgstr "Sign-in code"
@@ -15027,6 +15056,9 @@ msgstr "Twitter/X profile URL. Must use https://. Empty → link hidden in store
 msgid "Two"
 msgstr "Two"
 
+msgid "Two-Factor Authentication"
+msgstr "Two-Factor Authentication"
+
 msgid "Two-step verification"
 msgstr "Two-step verification"
 
@@ -16196,6 +16228,14 @@ msgstr "You already have an active alert of this kind for this product."
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
+
+#, python-format
+msgid ""
+"You are about to use your %(provider_name)s account to login to\n"
+"%(site_name)s. As a final step, please complete the following form:"
+msgstr ""
+"You are about to use your %(provider_name)s account to login to\n"
+"%(site_name)s. As a final step, please complete the following form:"
 
 msgid "You are already subscribed to the newsletter."
 msgstr "You are already subscribed to the newsletter."
@@ -17600,9 +17640,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Trust Badges"
-
-#~ msgid "Two-factor authentication"
-#~ msgstr "Two-factor authentication"
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Unsubscribe from a topic via email link (GET)"

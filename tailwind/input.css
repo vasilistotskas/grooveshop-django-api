@@ -109,3 +109,171 @@
 }
 
 /* Custom styles for Unfold admin */
+
+/* allauth's pages and the OAuth consent on a store's API host
+   (core/templates/allauth/). The store's colour arrives as --brand and
+   --brand-dark on <html>; the page follows the visitor's colour scheme. */
+@layer components {
+  .account-page {
+    @apply min-h-screen bg-base-50 px-4 py-10 font-sans text-base-900 antialiased;
+  }
+  .account-header {
+    @apply mx-auto mb-6 flex max-w-md justify-center;
+  }
+  .account-brand {
+    @apply text-xl font-semibold tracking-tight text-base-900 no-underline;
+  }
+  .account-logo {
+    @apply h-10 w-auto;
+  }
+  .account-nav ul {
+    @apply mx-auto mb-4 flex max-w-md flex-wrap justify-center gap-x-4 gap-y-1 text-sm;
+  }
+  .account-nav a,
+  .account-footer a {
+    @apply text-base-600 underline-offset-2 hover:underline;
+  }
+  .account-card {
+    @apply mx-auto w-full max-w-md rounded-2xl border border-base-200 bg-white p-6 shadow-sm sm:p-8;
+  }
+  .account-card h1 {
+    @apply mb-3 text-2xl font-semibold tracking-tight;
+  }
+  .account-card h2 {
+    @apply mt-6 mb-2 text-lg font-semibold;
+  }
+  .account-card p,
+  .account-card li {
+    @apply mb-4 text-sm leading-6 text-base-600;
+  }
+  .account-card a:not(.account-btn) {
+    color: var(--brand);
+    @apply font-medium underline-offset-2 hover:underline;
+  }
+  .account-card hr {
+    @apply my-6 border-base-200;
+  }
+  .account-card form p {
+    @apply flex flex-col gap-1.5 text-base-900;
+  }
+  .account-card form p:has(> input[type="checkbox"]),
+  .account-card form p:has(> input[type="radio"]) {
+    @apply flex-row flex-wrap items-center gap-2;
+  }
+  .account-card label {
+    @apply text-sm font-medium text-base-800;
+  }
+  .account-card input:not([type="checkbox"], [type="radio"], [type="hidden"]),
+  .account-card select,
+  .account-card textarea {
+    @apply w-full rounded-lg border border-base-300 bg-white px-3 py-2.5 text-base text-base-900 outline-none;
+  }
+  .account-card input:focus,
+  .account-card select:focus,
+  .account-card textarea:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent);
+  }
+  .account-card input[type="checkbox"],
+  .account-card input[type="radio"] {
+    accent-color: var(--brand);
+    @apply size-4;
+  }
+  .account-card .helptext,
+  .account-card form p > span {
+    @apply text-xs text-base-500;
+  }
+  .account-card ul.errorlist {
+    @apply mb-1 list-none p-0;
+  }
+  .account-card ul.errorlist li {
+    @apply mb-0 text-sm text-red-600;
+  }
+  .account-card ul:not(.errorlist) {
+    @apply list-none p-0;
+  }
+  .account-actions {
+    @apply mt-6 flex flex-col gap-3;
+  }
+  .account-card ul.account-providers {
+    @apply flex flex-col gap-3;
+  }
+  .account-providers li {
+    @apply mb-0;
+  }
+  .account-btn {
+    @apply inline-flex w-full cursor-pointer items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold no-underline transition-colors;
+  }
+  .account-btn + .account-btn {
+    @apply mt-3;
+  }
+  .account-actions .account-btn + .account-btn {
+    @apply mt-0;
+  }
+  .account-btn-primary {
+    background-color: var(--brand);
+    @apply border border-transparent text-white;
+  }
+  .account-btn-primary:hover {
+    background-color: var(--brand-dark);
+  }
+  .account-btn-outline {
+    @apply border border-base-300 bg-white text-base-800 hover:bg-base-50;
+  }
+  .account-btn-link {
+    color: var(--brand);
+    @apply w-auto border-0 bg-transparent p-0 font-medium underline-offset-2 hover:underline;
+  }
+  .account-alert {
+    @apply mb-4 rounded-lg border border-base-200 bg-base-50 px-3 py-2 text-sm text-base-800;
+  }
+  .account-footer {
+    @apply mx-auto mt-6 max-w-md text-center text-sm;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .account-page {
+      @apply bg-base-950 text-base-100;
+    }
+    .account-brand {
+      @apply text-base-100;
+    }
+    .account-card {
+      @apply border-base-800 bg-base-900;
+    }
+    .account-card hr {
+      @apply border-base-800;
+    }
+    .account-card h1,
+    .account-card h2,
+    .account-card label,
+    .account-card form p {
+      @apply text-base-100;
+    }
+    .account-card p,
+    .account-card li,
+    .account-nav a,
+    .account-footer a {
+      @apply text-base-300;
+    }
+    .account-card input:not([type="checkbox"], [type="radio"], [type="hidden"]),
+    .account-card select,
+    .account-card textarea {
+      @apply border-base-700 bg-base-950 text-base-100;
+    }
+    .account-btn-outline {
+      @apply border-base-700 bg-base-900 text-base-100 hover:bg-base-800;
+    }
+    .account-alert {
+      @apply border-base-700 bg-base-800 text-base-100;
+    }
+    .account-card ul.errorlist li {
+      @apply text-red-400;
+    }
+    /* A brand colour picked for a light page can be too dark to read on this one. */
+    .account-card a:not(.account-btn),
+    .account-btn-link {
+      color: color-mix(in srgb, var(--brand) 55%, white);
+    }
+  }
+}

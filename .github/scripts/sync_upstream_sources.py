@@ -3,15 +3,18 @@
 Two services own things this repository must agree with, and a copy of what
 they own can drift silently.
 
-The storefront owns the page builder's blocks, so three things it produces
-are COPIED here:
+The storefront owns the page builder's blocks, so what it produces about them
+is COPIED here:
 
 * ``catalogue``: ``test/fixtures/builder/catalogue.json`` -> ``builder/
   seed_catalogue.json``, a snapshot of its block catalogue for the default
   schema: what a new store's seeds are read against, without a storefront;
+* ``legacy-image-fields``: ``test/fixtures/builder/legacy-image-fields.json``
+  -> ``builder/legacy_image_fields.json``, each block's old image settings, for
+  ``manage.py migrate_builder_media``. Application data, like the seeds;
 * ``seeds``: ``test/fixtures/builder/seeds/`` -> ``builder/seeds/``, the
   default documents a new store starts with (``builder.seeding``). Unlike the
-  others this one is application data, not a test input.
+  rest this and the one above are application data, not test inputs.
 * ``data-cases``: ``test/fixtures/builder/data-cases.json`` -> ``tests/
   fixtures/builder/data-cases.json``, the cases both repositories run for the
   typed data props (``builder.data_sources``): a declaration, a value, whether
@@ -99,6 +102,13 @@ SOURCES: tuple[Source, ...] = (
         STOREFRONT,
         "test/fixtures/builder/catalogue.json",
         "builder/seed_catalogue.json",
+        "blob",
+    ),
+    Source(
+        "legacy-image-fields",
+        STOREFRONT,
+        "test/fixtures/builder/legacy-image-fields.json",
+        "builder/legacy_image_fields.json",
         "blob",
     ),
     Source(

@@ -657,6 +657,16 @@ def release_documents(
     return answer
 
 
+def release_again(note: str) -> BuilderRelease | None:
+    """A new release of the versions the current one holds, for a command that
+    rewrote them in place: the public read is cached per release, so this is
+    what brings the rewrite to visitors, through the store's cache generation
+    like any release. ``None`` where nothing has been released."""
+    _lock_release_sequence()
+    versions = published_versions()
+    return _create_release(None, versions, note=note) if versions else None
+
+
 def publish(user: Any, *, keys: Iterable[str], note: str = "") -> PublishResult:
     """Release the drafts of *keys* together, or none of them.
 

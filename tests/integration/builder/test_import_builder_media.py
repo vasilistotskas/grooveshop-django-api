@@ -169,6 +169,8 @@ class TestScan:
             ("/img/x.JPG", "static"),
             ("/uploads/x.webp", "store"),
             ("/media/s/uploads/x.png", "store"),
+            ("media/s/uploads/x.png", "store"),
+            ("media/other/uploads/x.png", "external"),
             ("/media/other/uploads/x.png", "external"),
             ("https://example.org/x.png", "external"),
             ("//example.org/x.png", "external"),

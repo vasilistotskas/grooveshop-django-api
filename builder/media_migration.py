@@ -11,26 +11,41 @@ photo and the de-duplication by content are the ones of an upload. The result
 is a map of each URL to the ``MediaAsset`` it became.
 
 A string is an image path of this store when it starts with ``/img/`` (the
-storefront's own files), ``/uploads/`` or ``/media/<this store>/uploads/``
-and ends in an image extension. An absolute ``http(s)`` address with an image
-extension is EXTERNAL: it is listed and never fetched. Nothing is rewritten
-here: what to put in a document in place of the URL is the block's decision.
+storefront's own files), ``/uploads/`` or ``/media/<this store>/uploads/``, the
+last also as Django itself writes it, with no leading slash, and ends in an
+image extension. An absolute ``http(s)`` address with an image extension is
+EXTERNAL: it is listed and never fetched.
+
+:func:`migrate_document` is what puts the asset in a document in place of the
+URL, for the settings the storefront's blocks declare as old ones
+(``legacy_image_fields.json``): ``manage.py migrate_builder_media``.
 """
 
 from __future__ import annotations
 
+import copy
+import json
 import re
-from collections import defaultdict
-from collections.abc import Iterator
+from collections import Counter, defaultdict
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
 from typing import Any
 
+from django.conf import settings
 from django.db import connection
 
 from builder import media_services, pointers
+from builder.block_upgrades import nodes_of
 from builder.errors import BuilderError
 from builder.models import BuilderDocument, BuilderVersion, MediaAsset
 from builder.services import published_versions
+from builder.validation import VERSIONED_TYPE
+
+#: The storefront's declaration of each block's old image settings, vendored and
+#: pinned like the catalogue (``sync_upstream_sources.py``).
+LEGACY_FIELDS_FILE = Path(__file__).with_name("legacy_image_fields.json")
 
 IMAGE_EXTENSIONS = (
     ".jpg",
@@ -95,9 +110,15 @@ def _has_image_extension(path: str) -> bool:
     return path.lower().split("?", 1)[0].endswith(IMAGE_EXTENSIONS)
 
 
+def _rooted(text: str) -> str:
+    """*text*, the leading slash added to a path as Django writes it
+    (``media/<store>/uploads/x.png``)."""
+    return f"/{text}" if text.startswith("media/") else text
+
+
 def classify(value: str, schema: str) -> str | None:
     """``static``, ``store``, ``external`` or ``None`` (not an image path)."""
-    text = value.strip()
+    text = _rooted(value.strip())
     if not text or len(text) > 1000 or not _has_image_extension(text):
         return None
     if _ABSOLUTE.match(text):
@@ -119,7 +140,7 @@ def classify(value: str, schema: str) -> str | None:
 def import_url_of(value: str) -> str:
     """The path ``media_services`` reads: ``/uploads/x`` is
     ``/media/<store>/uploads/x``."""
-    text = value.strip()
+    text = _rooted(value.strip())
     if text.startswith("/uploads/"):
         return f"/media/{connection.schema_name}{text}"
     return text
@@ -208,3 +229,262 @@ def mapping(plan: Plan, outcomes: dict[str, Outcome]) -> dict[str, int]:
             for item in items:
                 result[item.url] = outcome.asset_id
     return dict(sorted(result.items()))
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyField:
+    """One old image setting of a block, by the storefront's ``legacyImages``."""
+
+    source: str
+    target: str
+    alt: str | None
+    is_list: bool
+
+
+def _setting_of(pointer: str) -> str:
+    return pointer.removeprefix("/").removesuffix("/*")
+
+
+@cache
+def legacy_fields() -> dict[str, tuple[LegacyField, ...]]:
+    """``{block type: its old image settings}``."""
+    grouped: dict[str, list[LegacyField]] = defaultdict(list)
+    for row in json.loads(LEGACY_FIELDS_FILE.read_text(encoding="utf-8")):
+        alt = row.get("alt")
+        grouped[row["block"]].append(
+            LegacyField(
+                source=_setting_of(row["from"]),
+                target=_setting_of(row["to"]),
+                alt=_setting_of(alt) if alt else None,
+                is_list=row["list"],
+            )
+        )
+    return {block: tuple(fields) for block, fields in grouped.items()}
+
+
+def _fields_of(node: Any) -> tuple[LegacyField, ...]:
+    versioned = node.get("type") if isinstance(node, dict) else None
+    match = (
+        VERSIONED_TYPE.match(versioned) if isinstance(versioned, str) else None
+    )
+    return legacy_fields().get(match.group(1), ()) if match else ()
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyUse:
+    """One image a document still names by URL, with the alt it gives it."""
+
+    document: str
+    #: ``draft`` or ``version <number>``.
+    source: str
+    path: str
+    url: str
+    #: ``{language: text}``, what this use says in each language it says it.
+    alt: Mapping[str, str]
+
+    @property
+    def where(self) -> str:
+        return f"{self.document} {self.source}"
+
+
+def _alt_of(
+    node_id: str, node_settings: dict, name: str | None, i18n: dict
+) -> dict[str, str]:
+    """A use's alt per language: the setting is the default language's, and the
+    overlay holds the rest."""
+    if name is None:
+        return {}
+    texts = {settings.PARLER_DEFAULT_LANGUAGE_CODE: node_settings.get(name)}
+    for locale, per_node in (i18n or {}).items():
+        if locale != settings.PARLER_DEFAULT_LANGUAGE_CODE:
+            texts[locale] = ((per_node or {}).get(node_id) or {}).get(
+                f"/{name}"
+            )
+    return {
+        locale: text.strip()
+        for locale, text in texts.items()
+        if isinstance(text, str) and text.strip()
+    }
+
+
+def legacy_uses(
+    document: str, source: str, data: Any, i18n: Any
+) -> Iterator[LegacyUse]:
+    """Every old image setting that still names an image, in *data*. A node
+    whose new setting is already chosen has none: its old one is left over."""
+    for parent, node_id in nodes_of(data or {}, "sections"):
+        node = parent[node_id]
+        for legacy in _fields_of(node):
+            node_settings = node.get("settings") or {}
+            if node_settings.get(legacy.target):
+                continue
+            value = node_settings.get(legacy.source)
+            values = value if isinstance(value, list) else [value]
+            alt = _alt_of(node_id, node_settings, legacy.alt, i18n)
+            for position, url in enumerate(values):
+                if isinstance(url, str) and url.strip():
+                    tail = f"/{position}" if legacy.is_list else ""
+                    yield LegacyUse(
+                        document,
+                        source,
+                        f"/sections/{node_id}/settings/{legacy.source}{tail}",
+                        url.strip(),
+                        alt,
+                    )
+
+
+def stored_uses() -> tuple[list[LegacyUse], list[LegacyUse]]:
+    """Every old image setting of this store: ``(what the drafts and the current
+    release hold, what only older versions hold)``. Only the first decide an
+    image's alt: an older version's text is what the store has since replaced."""
+    current: list[LegacyUse] = []
+    older: list[LegacyUse] = []
+    for document in BuilderDocument.objects.order_by("key"):
+        current.extend(
+            legacy_uses(
+                document.key, "draft", document.draft, document.draft_i18n
+            )
+        )
+    live = set(published_versions().values())
+    for version in BuilderVersion.objects.select_related("document").order_by(
+        "document__key", "number"
+    ):
+        (current if version.pk in live else older).extend(
+            legacy_uses(
+                version.document.key,
+                f"version {version.number}",
+                version.data,
+                version.i18n,
+            )
+        )
+    return current, older
+
+
+def plan_of(uses: list[LegacyUse]) -> tuple[Plan, list[str]]:
+    """*uses* as an import plan, and what cannot be one: a value that is no
+    image of this store has no asset to become."""
+    schema = connection.schema_name
+    plan = Plan()
+    problems: list[str] = []
+    for use in uses:
+        kind = classify(use.url, schema)
+        if kind in {None, EXTERNAL}:
+            problems.append(
+                f"{use.where} {use.path}: {use.url!r} is no image of this store"
+            )
+        else:
+            plan.found.append(
+                Found(use.document, use.source, use.path, use.url, kind)
+            )
+    return plan, problems
+
+
+@dataclass(slots=True)
+class AltDecisions:
+    """What a migration does to the library's alt text."""
+
+    #: ``{asset id: {language: text}}``, to write.
+    fill: dict[int, dict[str, str]] = field(default_factory=dict)
+    #: A use that says something else than the asset already does, which wins.
+    gives_way: list[str] = field(default_factory=list)
+    #: Uses that disagree, of an asset with nothing written to decide by.
+    conflicts: list[str] = field(default_factory=list)
+
+
+def decide_alts(
+    uses: list[LegacyUse], assets: Mapping[str, int]
+) -> AltDecisions:
+    """Alt text belongs to the image, so one image says one thing in a language.
+    What the asset already says wins; a use's text fills a language it has
+    none in; and uses that disagree stop the store for someone to choose, by
+    writing it on the image. Nothing here guesses between them."""
+    said: dict[tuple[int, str], dict[str, list[LegacyUse]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for use in uses:
+        for locale, text in use.alt.items():
+            said[assets[use.url], locale][text].append(use)
+    held = {
+        (asset, locale): text
+        for asset, locale, text in MediaAsset.translations.field.model.objects.filter(
+            master__in=set(assets.values())
+        ).values_list("master", "language_code", "alt")
+        if text
+    }
+    decisions = AltDecisions()
+    for (asset, locale), texts in sorted(said.items()):
+        if (kept := held.get((asset, locale))) is not None:
+            decisions.gives_way.extend(
+                f"image {asset} [{locale}] keeps {kept!r}; {uses_[0].where} said {text!r}"
+                for text, uses_ in texts.items()
+                if text != kept
+            )
+        elif len(texts) > 1:
+            versions = "; ".join(
+                f"{text!r} ({uses_[0].where})" for text, uses_ in texts.items()
+            )
+            decisions.conflicts.append(
+                f"image {asset} [{locale}]: its uses disagree and it has no alt "
+                f"of its own, so write one on the image: {versions}"
+            )
+        else:
+            decisions.fill.setdefault(asset, {})[locale] = next(iter(texts))
+    return decisions
+
+
+def migrate_document(
+    data: Any, i18n: Any, assets: Mapping[str, int]
+) -> tuple[Any, Any, Counter[str]]:
+    """Copies of document *data* and its overlay *i18n* with every old image
+    setting replaced by the asset it names and its alt taken out of both, and
+    how many settings of each block moved. A chosen new setting stays, and the
+    old one left beside it goes. An empty entry of a list goes, since a list of
+    references has no empty slot."""
+    migrated = copy.deepcopy(data)
+    overlay = copy.deepcopy(i18n or {})
+    moved: Counter[str] = Counter()
+    for parent, node_id in list(nodes_of(migrated, "sections")):
+        node = parent[node_id]
+        node_settings = (
+            (node.get("settings") or {}) if isinstance(node, dict) else {}
+        )
+        for legacy in _fields_of(node):
+            present = legacy.source in node_settings
+            value = node_settings.pop(legacy.source, None)
+            alt_present = (
+                legacy.alt is not None
+                and node_settings.pop(legacy.alt, None) is not None
+            )
+            for per_node in overlay.values():
+                translations = (per_node or {}).get(node_id)
+                if legacy.alt and translations:
+                    alt_present = (
+                        translations.pop(f"/{legacy.alt}", None) is not None
+                        or alt_present
+                    )
+            if not (present or alt_present):
+                continue
+            moved[str(node["type"])] += 1
+            if node_settings.get(legacy.target):
+                continue
+            if legacy.is_list:
+                ids = [
+                    assets[url.strip()]
+                    for url in value or []
+                    if isinstance(url, str) and url.strip()
+                ]
+                if ids:
+                    node_settings[legacy.target] = ids
+            elif isinstance(value, str) and value.strip():
+                node_settings[legacy.target] = assets[value.strip()]
+    return migrated, _without_empties(overlay), moved
+
+
+def _without_empties(overlay: dict[str, Any]) -> dict[str, Any]:
+    """*overlay* with a node or a language left with no translation gone."""
+    kept: dict[str, Any] = {}
+    for locale, per_node in overlay.items():
+        nodes = {node: text for node, text in (per_node or {}).items() if text}
+        if nodes:
+            kept[locale] = nodes
+    return kept

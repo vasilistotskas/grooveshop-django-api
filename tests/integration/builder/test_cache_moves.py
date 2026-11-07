@@ -162,7 +162,11 @@ def test_the_data_loaders_are_purged_with_the_records_they_read():
             "builderDataSlug",
         },
         "promotions": {"builderDataPromotion", "builderDataProduct"},
-        "builder": {"builderPageDocument", "builderDataTargets"},
+        "builder": {
+            "builderPageDocument",
+            "builderDataTargets",
+            "builderDataMedia",
+        },
         "page_config": {"builderDataTargets"},
     }
     for code, names in expected.items():

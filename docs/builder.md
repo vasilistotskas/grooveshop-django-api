@@ -652,8 +652,9 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
 - It reads every string of the drafts and of the published versions
   (`--all-versions` for every stored version), by value, never by field name:
   the catalogue does not mark those fields. An image path of the store is
-  `/img/...`, `/uploads/...` or `/media/<store>/uploads/...` ending in an image
-  extension; `/uploads/x` is read as `/media/<store>/uploads/x`.
+  `/img/...`, `/uploads/...` or `/media/<store>/uploads/...`, the last also as
+  Django writes it with no leading slash, ending in an image extension;
+  `/uploads/x` is read as `/media/<store>/uploads/x`.
 - Each distinct path goes through the same import as `media/import`
   (`media_services.store_import`: the upload checks, the shrinking of an
   oversize photo, de-duplication by content), so running it again finds the
@@ -664,8 +665,30 @@ Before the media picker a block held an image as a string (`/img/x.jpg`,
   and never fetched. An SVG is refused by the library (a raster only) and a
   file that cannot be read is reported `FAILED (<code>)`; the rest carry on.
 - `--dry-run` reads the same files and writes nothing: no asset, no file.
-- It never rewrites a document. What replaces the URL is the block's
-  decision (its version upgrade), which the storefront owns.
+- It never rewrites a document.
+
+`manage.py migrate_builder_media --tenant <schema>` does, once the storefront
+serves the blocks' new settings and the images are imported. The storefront
+declares each block's old image settings (`legacyImages`, vendored as
+`builder/legacy_image_fields.json`). Every draft and stored version gets the
+asset in place of the URL and loses the URL and its alt, in the settings and in
+the overlay, through `builder/document_rewrite.py`: each document is validated
+against the store's catalogue, a version keeps its number and a draft its
+revision. It ends with a new release of the same versions, because the public
+read is cached per release: that is what brings the rewrite to visitors.
+
+- **Alt text belongs to the image.** A use's alt goes onto the asset, per
+  language, only where the asset has none. Only the drafts and the current
+  release decide it; what an older version says is text the store has replaced.
+  Uses that disagree stop the store until someone writes the alt on the image,
+  which then wins, and each use that gives way to it is printed to read.
+- **It imports nothing.** A value that is no image of the store (it names the
+  place), an image not in the library yet, and a document that does not validate
+  each stop the store with nothing written. Run `import_builder_media
+  --all-versions` first.
+- A new setting already chosen stays and the URL beside it goes. An empty entry
+  of a list goes, since a list of references has no empty slot.
+- `--dry-run` does all of that and writes nothing. A second run finds nothing.
 
 ## Signing in to the editor
 

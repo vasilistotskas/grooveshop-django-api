@@ -11,7 +11,6 @@ the difference.
 from __future__ import annotations
 
 import pytest
-from django.conf import settings
 from django.core.cache import cache
 from django_tenants.utils import get_public_schema_name, schema_context
 
@@ -44,8 +43,12 @@ def _staff():
 
 
 def test_wrong_passwords_on_every_host_share_one_allowance(
-    mt_tenant, mt_tenant_b
+    mt_tenant, mt_tenant_b, settings
 ):
+    settings.STAFF_LOGIN_LIMITS = {
+        **settings.STAFF_LOGIN_LIMITS,
+        "MAX_FAILURES_PER_ACCOUNT": 4,
+    }
     user = _staff()
     backend = PlatformStaffBackend()
     hosts = [
@@ -68,7 +71,8 @@ def test_wrong_codes_on_every_host_share_one_lockout(mt_tenant, mt_tenant_b):
     hosts = [mt_tenant.schema_name, mt_tenant_b.schema_name]
     for attempt in range(staff_mfa.MAX_FAILURES):
         with schema_context(hosts[attempt % len(hosts)]):
-            staff_mfa.record_failure(user)
+            with pytest.raises(staff_mfa.SecondFactorWrong):
+                staff_mfa.verify_second_factor(user, "000000")
 
     for host in (get_public_schema_name(), *hosts):
         with schema_context(host):

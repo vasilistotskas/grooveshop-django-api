@@ -306,11 +306,13 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   sign-in, with no second login. The code that enrolled is spent. The
   recovery codes sit in the pending sign-in until confirmed, so a reload
   does not lose them.
-- **Guessing is bounded:** five wrong codes per user lock further tries for
-  fifteen minutes (cache), even a right one. The count is shared by the admin
-  login and the token endpoint, and is kept under a `global:strict:` key, so
-  every host (the platform's and each store's) draws on one allowance and a
-  cache that cannot count stops the sign-in instead of lifting the lock.
+- **Guessing is bounded:** five code attempts per user in fifteen minutes
+  (cache), then even a right one is refused. The attempt is counted BEFORE the
+  code is checked (`staff_mfa.register_attempt`), so parallel requests cannot
+  each get a guess; a right code clears the count. The count is shared by the
+  admin login and the token endpoint, and is kept under a `global:strict:`
+  key, so every host (the platform's and each store's) draws on one allowance
+  and a cache that cannot count stops the sign-in instead of lifting the lock.
 - **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa <email>`
   (run with cluster access) removes the authenticators and any
   lockout; the next login enrols a new one.
@@ -325,33 +327,51 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   `429 mfa_locked`. A token already issued keeps working; WebAuthn/passkeys
   are not offered for the admin login yet.
 
-## Wrong passwords (admin login and token endpoint)
+## Sign-in attempts (admin login and token endpoint)
 
-allauth's limiter covers `/_allauth/` only, so wrong passwords at the Django
-admin login and at the token endpoint are counted by
+allauth's limiter covers `/_allauth/` only, so attempts at the Django admin
+login and at the token endpoint are counted by
 `tenant/staff_login_limits.py`. Both reach the password check through
 `PlatformStaffBackend.authenticate_staff`, which does the counting, so there is
 no second copy.
 
-- **Per account**: the submitted identifier, lower-cased and hashed whether or
-  not it names an account, so a locked unknown address answers like a locked
-  known one. `STAFF_LOGIN_LIMITS["MAX_FAILURES_PER_ACCOUNT"]` (5) inside
-  `WINDOW_SECONDS` (15 minutes). A success clears it; so do a password reset
-  (`StaffSetPasswordForm.save`) and `reset_staff_mfa`.
-- **Per client address**, only when `trusted_client_ip` proves one (the request
-  carried our edge's `X-Origin-Verify`): `MAX_FAILURES_PER_IP` (20) across any
+- **Counted first.** `register_attempt` increments (`add` with the window,
+  then `incr`, using the value it returns) before the password is looked at,
+  and raises `StaffLoginLocked` when the result is over a budget, without
+  checking the password. Parallel requests each get their own number, so the
+  budget is not "the limit plus the requests in flight".
+- **Account + proven address** (`MAX_FAILURES_PER_ACCOUNT_ADDRESS`, 5): the
+  strict budget. A lock here refuses only that address, so someone who knows a
+  staff email cannot lock the owner out from the owner's own address. A
+  success clears it; so do a password reset (`StaffSetPasswordForm.save`, which
+  clears BEFORE it saves, so a cache that cannot be written fails the reset
+  before anything changes) and `reset_staff_mfa`.
+- **Account-wide ceiling** (`MAX_FAILURES_PER_ACCOUNT`, 50): bounds a guessing
+  run spread over many addresses. Past it the account is locked for everyone
+  until the window ends. That is the remaining denial-of-service bound: a
+  caller who knows a staff email can lock it for everyone, but needs 50
+  attempts spread over addresses in the window to do so (a single address is
+  stopped after 5), and the owner is unlocked by a password reset or
+  `reset_staff_mfa`. It is the only account limit for a request without a
+  proven address.
+- **Per proven address** (`MAX_FAILURES_PER_IP`, 20): a run of guesses across
   accounts. A success does not clear it, or one valid login of the attacker's
-  own would reset a guessing run. Without the proof (a domain outside our
-  Cloudflare zones, a missing or rotated secret, a direct call to a node) the
-  only address known is the proxy peer, a Cloudflare edge node or SNAT gateway
-  shared by everyone behind it, so it is not counted: 20 wrong passwords from
-  one place would lock every staff member out. Such a request is bounded by the
-  per-account limit alone.
-- **A lock refuses even the right password** (`StaffLoginLocked`): the admin form
-  shows "Too many failed sign-in attempts. Try again later." and the endpoint
-  answers `429 login_locked`. Refused attempts add nothing, so they cannot
-  extend it; it ends when the window that began with the first failure does.
+  own would reset a guessing run. An address is `trusted_client_ip` (the
+  request carried our edge's `X-Origin-Verify`); IPv6 counts on its /64, IPv4
+  on the full address. Without the proof (a domain outside our Cloudflare
+  zones, a missing or rotated secret, a direct call to a node) the only
+  address known is the proxy peer, a Cloudflare edge node or SNAT gateway
+  shared by everyone behind it, so no address counter applies: 20 wrong
+  passwords from one place would lock every staff member out.
+- **Existence-neutral.** The account key is the submitted identifier,
+  lower-cased and hashed whether or not it names an account, so a locked
+  unknown address answers like a locked known one.
+- **A lock refuses even the right password**: the admin form shows "Too many
+  failed sign-in attempts. Try again later." and the endpoint answers `429
+  login_locked`. Refused attempts do not extend it; it ends when the window
+  that began with the first attempt does.
 - **Keys** are `global:strict:` (see above), env-tunable as
+  `STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT_ADDRESS`,
   `STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT`, `STAFF_LOGIN_MAX_FAILURES_PER_IP`,
   `STAFF_LOGIN_WINDOW_SECONDS`. The endpoint's `staff_login` throttle (10 an
   hour) still sits in front.

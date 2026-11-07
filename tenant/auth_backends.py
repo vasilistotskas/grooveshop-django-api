@@ -65,21 +65,21 @@ class PlatformStaffBackend(ModelBackend):
         ``is_staff`` — ordinary tenant customers (even if somehow
         matched by username/password) are never returned here.
 
-        Every wrong password is counted per account and per client address
-        (``tenant.staff_login_limits``), and once either count is spent
-        ``StaffLoginLocked`` is raised even for the right password. This is
-        the one place the admin login and the token endpoint both go
-        through, so the count is made here and nowhere else.
+        Every attempt is counted BEFORE the password is looked at, per
+        account and per proven client address (``tenant.staff_login_limits``),
+        and ``StaffLoginLocked`` is raised, without checking the password,
+        once an attempt is over a budget: even the right password is then
+        refused. This is the one place the admin login and the token
+        endpoint both go through, so the count is made here and nowhere else.
         """
-        staff_login_limits.ensure_not_locked(request, username)
+        staff_login_limits.register_attempt(request, username)
         with schema_context(get_public_schema_name()):
             user = super().authenticate(
                 request, username=username, password=password
             )
         if user is None or not (user.is_active and user.is_staff):
-            staff_login_limits.record_failure(request, username)
             return None
-        staff_login_limits.clear_account(username)
+        staff_login_limits.clear_after_success(request, username)
         setattr(user, PLATFORM_IDENTITY_ATTR, True)
         return user
 

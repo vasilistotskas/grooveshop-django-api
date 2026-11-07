@@ -141,14 +141,15 @@ class StaffSetPasswordForm(SetPasswordForm):
     def save(self, commit=True):
         from tenant.models import PlatformStaffToken
 
+        if commit:
+            # Whoever proves the mailbox may sign in again at once: attempts
+            # against the old password no longer count. First, so a cache
+            # that cannot be written fails the reset before anything changes.
+            staff_login_limits.clear_account(self.user.email)
         with schema_context(get_public_schema_name()):
             user = super().save(commit)
             if commit:
                 PlatformStaffToken.objects.filter(user=user).delete()
-        if commit:
-            # Whoever proves the mailbox may sign in again at once: wrong
-            # passwords against the old one no longer count.
-            staff_login_limits.clear_account(user.email)
         return user
 
 

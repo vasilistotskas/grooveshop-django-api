@@ -234,7 +234,11 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
                 staff_mfa.verify_second_factor(user, code)
                 self._finish(user)
                 return
-            staff_mfa.ensure_not_locked(user)
+            staff_mfa.register_attempt(user)
+            codes = staff_mfa.complete_enrolment(self.request, user, code)
+            if codes is None:
+                raise staff_mfa.SecondFactorWrong
+            staff_mfa.clear_failures(user)
         except staff_mfa.SecondFactorLocked:
             raise forms.ValidationError(
                 _("Too many wrong codes. Try again in a few minutes."),
@@ -244,21 +248,12 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
             raise forms.ValidationError(
                 _("That code is not correct."), code="mfa_wrong_code"
             ) from None
-        codes = staff_mfa.complete_enrolment(self.request, user, code)
-        if codes is None:
-            self._wrong_code(user)
         # Both factors are proven, but the recovery codes are shown once
         # before the sign-in completes.
         self.pending = staff_mfa.advance_pending(
             self.request, self.pending, Step.RECOVERY, codes
         )
         self.step = Step.RECOVERY
-
-    def _wrong_code(self, user) -> None:
-        staff_mfa.record_failure(user)
-        raise forms.ValidationError(
-            _("That code is not correct."), code="mfa_wrong_code"
-        )
 
     def _finish(self, user) -> None:
         staff_mfa.clear_pending(self.request)

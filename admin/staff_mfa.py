@@ -48,6 +48,8 @@ from django.core.cache import cache
 from django.db import transaction
 from django_tenants.utils import get_public_schema_name, schema_context
 
+from tenant import staff_login_limits
+
 logger = logging.getLogger(__name__)
 
 #: The session key holding the secret of an enrolment in progress, with the
@@ -105,17 +107,17 @@ def _failures_key(user) -> str:
 
 
 def is_locked(user) -> bool:
+    """Whether the next attempt is refused."""
     return cache.get(_failures_key(user), 0) >= MAX_FAILURES
 
 
-def record_failure(user) -> None:
-    key = _failures_key(user)
-    cache.add(key, 0, timeout=LOCKOUT_SECONDS)
-    try:
-        cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, timeout=LOCKOUT_SECONDS)
-    logger.warning("Wrong staff MFA code", extra={"user_id": user.pk})
+def register_attempt(user) -> None:
+    """Count one attempt and raise ``SecondFactorLocked`` when it is over
+    ``MAX_FAILURES``, before the code is looked at (counting afterwards would
+    let every request in flight read a count below the limit)."""
+    attempt = staff_login_limits.count(_failures_key(user), LOCKOUT_SECONDS)
+    if attempt > MAX_FAILURES:
+        raise SecondFactorLocked
 
 
 def clear_failures(user) -> None:
@@ -132,25 +134,6 @@ class SecondFactorLocked(SecondFactorRefused):
 
 class SecondFactorWrong(SecondFactorRefused):
     """The code is not a current authenticator or unused recovery code."""
-
-
-def ensure_not_locked(user) -> None:
-    if is_locked(user):
-        raise SecondFactorLocked
-
-
-def verify_second_factor(user, code: str) -> None:
-    """Accept *code* for *user* or raise ``SecondFactorRefused``.
-
-    The one check behind both ways in (the admin login's ``code`` step and
-    the staff token endpoint): the lockout, the code, the failure count,
-    and clearing the count on success.
-    """
-    ensure_not_locked(user)
-    if not verify_code(user, code):
-        record_failure(user)
-        raise SecondFactorWrong
-    clear_failures(user)
 
 
 def verify_code(user, code: str) -> bool:
@@ -171,6 +154,20 @@ def verify_code(user, code: str) -> bool:
                 authenticator.record_usage()
                 return True
     return False
+
+
+def verify_second_factor(user, code: str) -> None:
+    """Accept *code* for *user* or raise ``SecondFactorRefused``.
+
+    The one check behind both ways in (the admin login's ``code`` step and
+    the staff token endpoint): the attempt is counted first, then the code
+    is checked, and a right one clears the count.
+    """
+    register_attempt(user)
+    if not verify_code(user, code):
+        logger.warning("Wrong staff MFA code", extra={"user_id": user.pk})
+        raise SecondFactorWrong
+    clear_failures(user)
 
 
 @dataclass(frozen=True)

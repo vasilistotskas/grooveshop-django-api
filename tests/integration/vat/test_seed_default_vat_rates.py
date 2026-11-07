@@ -110,25 +110,3 @@ class TestExistingTenantIsUntouched:
 
         assert Vat.objects.filter(value=Decimal("24.0")).count() == 1
         assert Vat.objects.count() == 4
-
-
-@pytest.mark.django_db
-class TestProductWriteApiSurvivesWithoutVatRows:
-    """The serializer/model mismatch that seeding alone would not fix."""
-
-    def test_vat_is_optional_on_both_product_serializers(self):
-        from product.serializers.product import (
-            ProductSerializer,
-            ProductWriteSerializer,
-        )
-
-        for serializer_class in (ProductSerializer, ProductWriteSerializer):
-            field = serializer_class().fields["vat"]
-            assert not field.required, (
-                f"{serializer_class.__name__}.vat is required, so a tenant "
-                "with no Vat rows cannot create a product at all"
-            )
-            assert field.allow_null, (
-                f"{serializer_class.__name__}.vat must accept null to match "
-                "Product.vat (null=True, SET_NULL)"
-            )

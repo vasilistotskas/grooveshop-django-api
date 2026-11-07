@@ -11,19 +11,36 @@ dispatch). Same wall the admin login uses, applied to the API.
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from admin import staff_mfa
+from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import StaffLoginThrottle
 from tenant.api_tokens import PlatformStaffTokenAuthentication
+from tenant.staff_login_limits import StaffLoginLocked, StaffLoginUnavailable
 
 
 class StaffLoginRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(trim_whitespace=False)
+    code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text=_(
+            "An authenticator or unused recovery code. Required for a "
+            "platform superuser, who must have set up an authenticator in "
+            "the admin first."
+        ),
+    )
 
 
 class PlatformStaffLoginView(APIView):
@@ -37,6 +54,11 @@ class PlatformStaffLoginView(APIView):
     membership. A bare ``is_staff`` with no role gets a token that
     grants nothing, so refusing it here is a courtesy and a smaller
     attack surface, not a security boundary.
+
+    A user ``admin.staff_mfa.requires_mfa`` covers (a superuser, who is
+    store staff in every store) must also present a ``code``, checked by
+    the helper the admin login uses, with the same lockout. Wrong
+    passwords are counted by the backend (``tenant.staff_login_limits``).
     """
 
     authentication_classes = []
@@ -54,6 +76,27 @@ class PlatformStaffLoginView(APIView):
                     "token": serializers.CharField(),
                     "expiry": serializers.DateTimeField(allow_null=True),
                 },
+            ),
+            401: OpenApiResponse(
+                ErrorResponseSerializer,
+                description="`invalid_credentials`, `mfa_code_required` "
+                "or `mfa_wrong_code`.",
+            ),
+            403: OpenApiResponse(
+                ErrorResponseSerializer,
+                description="`no_operable_store`, or "
+                "`mfa_enrolment_required`: a superuser must set up an "
+                "authenticator by signing in to the admin once.",
+            ),
+            503: OpenApiResponse(
+                ErrorResponseSerializer,
+                description="`staff_login_unavailable`: the attempt "
+                "counters cannot be reached, so sign-in is refused.",
+            ),
+            429: OpenApiResponse(
+                ErrorResponseSerializer,
+                description="`login_locked` (too many wrong passwords) or "
+                "`mfa_locked` (too many wrong codes).",
             ),
         },
         tags=["Platform"],
@@ -74,11 +117,24 @@ class PlatformStaffLoginView(APIView):
         serializer = StaffLoginRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = PlatformStaffBackend().authenticate_staff(
-            request,
-            serializer.validated_data["email"],
-            serializer.validated_data["password"],
-        )
+        try:
+            user = PlatformStaffBackend().authenticate_staff(
+                request,
+                serializer.validated_data["email"],
+                serializer.validated_data["password"],
+            )
+        except StaffLoginLocked:
+            return Response(
+                {
+                    "detail": _(
+                        "Too many failed sign-in attempts. Try again later."
+                    ),
+                    "code": "login_locked",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        except StaffLoginUnavailable:
+            return self._unavailable()
         if user is None:
             return Response(
                 {
@@ -87,6 +143,15 @@ class PlatformStaffLoginView(APIView):
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        try:
+            refusal = self._second_factor_refusal(
+                user, serializer.validated_data["code"]
+            )
+        except StaffLoginUnavailable:
+            return self._unavailable()
+        if refusal is not None:
+            return refusal
 
         with schema_context(get_public_schema_name()):
             operates_something = user.is_superuser or any(
@@ -122,6 +187,67 @@ class PlatformStaffLoginView(APIView):
             instance, token = PlatformStaffToken.objects.create(user)
 
         return Response({"token": token, "expiry": instance.expiry})
+
+    @staticmethod
+    def _unavailable() -> Response:
+        return Response(
+            {
+                "detail": _(
+                    "Sign-in is temporarily unavailable, try again shortly."
+                ),
+                "code": "staff_login_unavailable",
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    @staticmethod
+    def _second_factor_refusal(user, code: str) -> Response | None:
+        """The refusal for a user who must present a second factor and has
+        not, the same rule and the same helpers as the admin login."""
+        if not staff_mfa.requires_mfa(user):
+            return None
+        if not staff_mfa.is_enrolled(user):
+            return Response(
+                {
+                    "detail": _(
+                        "Set up an authenticator by signing in to the admin "
+                        "once, then try again."
+                    ),
+                    "code": "mfa_enrolment_required",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not code:
+            return Response(
+                {
+                    "detail": _(
+                        "An authenticator or recovery code is required."
+                    ),
+                    "code": "mfa_code_required",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        try:
+            staff_mfa.verify_second_factor(user, code)
+        except staff_mfa.SecondFactorLocked:
+            return Response(
+                {
+                    "detail": _(
+                        "Too many wrong codes. Try again in a few minutes."
+                    ),
+                    "code": "mfa_locked",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        except staff_mfa.SecondFactorWrong:
+            return Response(
+                {
+                    "detail": _("That code is not correct."),
+                    "code": "mfa_wrong_code",
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        return None
 
 
 class PlatformStaffLogoutView(APIView):

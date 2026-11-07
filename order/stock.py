@@ -1,11 +1,13 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
 from order.exceptions import (
+    CartStockUnavailableError,
     InsufficientStockError,
     ProductNotFoundError,
     StockReservationError,
@@ -13,6 +15,9 @@ from order.exceptions import (
 from order.models import StockLog, StockReservation
 from product.models import Product
 from tenant.staff_actors import staff_id
+
+if TYPE_CHECKING:
+    from cart.models import Cart
 
 
 def validate_reservation_ttl_minutes_setting(value: object) -> bool:
@@ -114,7 +119,10 @@ class StockManager:
         user_id: int | None = None,
     ) -> StockReservation:
         """
-        Reserve stock for checkout process.
+        Reserve stock for one product.
+
+        Counts EVERY active hold, the caller's own included. A cart reserves
+        through ``reserve_cart_stock``, which replaces its holds first.
 
         Creates a temporary stock reservation with a configurable TTL (default 15 minutes).
         Uses SELECT FOR UPDATE to prevent race conditions when multiple customers
@@ -217,6 +225,97 @@ class StockManager:
         )
 
         return reservation
+
+    @classmethod
+    @transaction.atomic
+    def reserve_cart_stock(
+        cls,
+        cart: Cart,
+        quantities: Mapping[int, int],
+    ) -> list[StockReservation]:
+        """
+        Make the cart's holds exactly ``quantities``, replacing its old ones.
+
+        A session (cart) owns one set of holds. In a single transaction this
+        locks every product the old or the new set touches (``lock_products``,
+        pk order), releases ALL of the session's unconsumed holds, expired
+        ones included, through ``release_reservation`` (so each leaves its
+        ``StockLog`` line), then reserves the new quantities. The cart's own
+        previous holds therefore never count against it, a retry is
+        idempotent, and a line that changed or left the cart is freed in the
+        same step. Holds of other sessions count as before, so two carts
+        still exclude each other for the last unit.
+
+        The first statement locks the ``Cart`` row (``select_for_update``),
+        the lock checkout takes first, so the order is cart, then products,
+        the same as checkout. This call, a checkout of the cart and the
+        login merge that rehomes its holds therefore run one at a time: the
+        holds read below cannot change under it, and a checkout never reads
+        a hold set this call is half way through replacing. Cart rows are
+        locked only here, in checkout and in the merge.
+
+        Order creation consumes the session's unconsumed holds
+        (``OrderService._consume_stock_for_order``), so after this call
+        those are exactly the ones returned.
+
+        Args:
+            cart: The cart whose holds are replaced (its UUID is the
+                session id of the holds, its user their owner)
+            quantities: product id -> units wanted, every one positive
+
+        Returns:
+            The new reservations, in ascending product id order.
+
+        Raises:
+            Cart.DoesNotExist: The cart was deleted meanwhile
+            ValueError: A quantity is not positive
+            ProductNotFoundError: A product does not exist
+            CartStockUnavailableError: One or more lines are short. Every
+                short line is reported and the transaction is rolled back,
+                so the cart keeps the holds it had.
+        """
+        if any(quantity <= 0 for quantity in quantities.values()):
+            raise ValueError("Quantity must be positive")
+
+        from cart.models import Cart
+
+        locked_cart = Cart.objects.select_for_update().get(pk=cart.pk)
+        session_id = str(locked_cart.uuid)
+        user_id = locked_cart.user_id
+
+        held_products = StockReservation.objects.filter(
+            session_id=session_id, consumed=False
+        ).values_list("product_id", flat=True)
+        cls.lock_products({*quantities, *held_products})
+
+        # Read again under the locks: a concurrent request of the same cart
+        # either finished before them (its holds are visible) or waits.
+        for reservation_id in list(
+            StockReservation.objects.filter(
+                session_id=session_id, consumed=False
+            )
+            .order_by("id")
+            .values_list("id", flat=True)
+        ):
+            cls.release_reservation(reservation_id)
+
+        reservations: list[StockReservation] = []
+        shortfalls: list[InsufficientStockError] = []
+        for product_id, quantity in sorted(quantities.items()):
+            try:
+                reservations.append(
+                    cls.reserve_stock(
+                        product_id=product_id,
+                        quantity=quantity,
+                        session_id=session_id,
+                        user_id=user_id,
+                    )
+                )
+            except InsufficientStockError as exc:
+                shortfalls.append(exc)
+        if shortfalls:
+            raise CartStockUnavailableError(shortfalls)
+        return reservations
 
     @classmethod
     @transaction.atomic

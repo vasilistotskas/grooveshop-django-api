@@ -469,39 +469,6 @@ def sync_prices_on_vat_change(sender, instance, created, raw=False, **kwargs):
         )
 
 
-@receiver(
-    pre_delete,
-    sender=Vat,
-    dispatch_uid="product.remember_vat_products_on_delete",
-)
-def remember_vat_products_on_delete(sender, instance, **kwargs):
-    """Take the rate's product ids while the rows still point at it.
-
-    Deleting a rate leaves its products without VAT (``SET_NULL``), a
-    bulk update that saves no Product and leaves no way to find them
-    afterwards.
-    """
-    instance._repriced_product_ids = list(
-        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
-    )
-
-
-@receiver(
-    post_delete,
-    sender=Vat,
-    dispatch_uid="product.sync_prices_on_vat_delete",
-)
-def sync_prices_on_vat_delete(sender, instance, **kwargs):
-    """Re-price the products the deleted rate left without VAT."""
-    from product.tasks import sync_price_records
-
-    product_ids = getattr(instance, "_repriced_product_ids", [])
-    if product_ids:
-        dispatch_on_commit(
-            sync_price_records, kwargs={"product_ids": product_ids}
-        )
-
-
 def _watch_search_text(
     sender, source: SearchTextSource, field: str, *, translated: bool
 ) -> None:

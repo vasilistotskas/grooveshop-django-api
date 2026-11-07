@@ -15,6 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from cart.models import Cart
+from core.celery import celery_app
 from core.exceptions import HealthCheckFailed
 from core.tasks import (
     MonitoredTask,
@@ -44,22 +45,29 @@ from user.factories.account import UserAccountFactory
 SMTP_RECEIPT = Receipt(provider=EmailProvider.SMTP)
 
 
+# Registered on the app, so it has the request stack Celery gives every
+# real task (a bare ``MonitoredTask()`` has none, and ``on_success`` reads
+# the request for its database cost).
+@celery_app.task(base=MonitoredTask, name="test_task")
+def _monitored_task():
+    return None
+
+
 class TestMonitoredTask:
     @patch("core.tasks.logger")
     def test_on_success_logs_completion(self, mock_logger):
-        task = MonitoredTask()
-        task.name = "test_task"
+        task = _monitored_task
 
         task.on_success(retval="success", task_id="12345", args=(), kwargs={})
 
         mock_logger.info.assert_called_once_with(
-            "Task test_task completed successfully. Task ID: 12345"
+            "Task test_task completed successfully. Task ID: 12345",
+            extra={"fields": {}},
         )
 
     @patch("core.tasks.logger")
     def test_on_failure_logs_error(self, mock_logger):
-        task = MonitoredTask()
-        task.name = "test_task"
+        task = _monitored_task
 
         exception = Exception("Test error")
         task.on_failure(
@@ -76,6 +84,7 @@ class TestMonitoredTask:
             [],
             {},
             exc_info=exception,
+            extra={"fields": {}},
         )
 
 

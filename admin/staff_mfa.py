@@ -21,8 +21,11 @@ step (not enrolled yet). A correct enrolment code activates the
 authenticator and shows the recovery codes ONCE; confirming them completes
 the same sign-in, because both factors were proven in this session.
 
-Not covered: platform staff API tokens (``PlatformStaffToken``) are issued
-after a login and are a separate surface.
+The staff token endpoint (``tenant.staff_api``) asks the same factor of the
+same users, through ``verify_second_factor``, with the same failure count;
+it does not enrol (the QR step belongs to the admin login), so a superuser
+with no authenticator is refused there until they have signed in to the
+admin once.
 """
 
 from __future__ import annotations
@@ -44,6 +47,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django_tenants.utils import get_public_schema_name, schema_context
+
+from tenant import staff_login_limits
 
 logger = logging.getLogger(__name__)
 
@@ -95,25 +100,42 @@ def is_enrolled(user) -> bool:
 
 
 def _failures_key(user) -> str:
-    return f"staff_mfa.failures:{user.pk}"
+    # ``global:`` (staff are public identities, so a store host must not get
+    # an allowance of its own) and ``strict:`` (a cache that cannot count
+    # must stop the sign-in, not lift the lockout).
+    return f"global:strict:staff_mfa.failures:{user.pk}"
 
 
 def is_locked(user) -> bool:
+    """Whether the next attempt is refused."""
     return cache.get(_failures_key(user), 0) >= MAX_FAILURES
 
 
-def record_failure(user) -> None:
-    key = _failures_key(user)
-    cache.add(key, 0, timeout=LOCKOUT_SECONDS)
-    try:
-        cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, timeout=LOCKOUT_SECONDS)
-    logger.warning("Wrong staff MFA code", extra={"user_id": user.pk})
+def register_attempt(user) -> None:
+    """Count one attempt and raise ``SecondFactorLocked`` when it is over
+    ``MAX_FAILURES``, before the code is looked at (counting afterwards would
+    let every request in flight read a count below the limit)."""
+    with staff_login_limits.refuse_when_cache_is_down():
+        attempt = staff_login_limits.count(_failures_key(user), LOCKOUT_SECONDS)
+    if attempt > MAX_FAILURES:
+        raise SecondFactorLocked
 
 
 def clear_failures(user) -> None:
-    cache.delete(_failures_key(user))
+    with staff_login_limits.refuse_when_cache_is_down():
+        cache.delete(_failures_key(user))
+
+
+class SecondFactorRefused(Exception):
+    """The second factor was not accepted; the subclass says why."""
+
+
+class SecondFactorLocked(SecondFactorRefused):
+    """Too many wrong codes: even a right one is refused for a while."""
+
+
+class SecondFactorWrong(SecondFactorRefused):
+    """The code is not a current authenticator or unused recovery code."""
 
 
 def verify_code(user, code: str) -> bool:
@@ -134,6 +156,20 @@ def verify_code(user, code: str) -> bool:
                 authenticator.record_usage()
                 return True
     return False
+
+
+def verify_second_factor(user, code: str) -> None:
+    """Accept *code* for *user* or raise ``SecondFactorRefused``.
+
+    The one check behind both ways in (the admin login's ``code`` step and
+    the staff token endpoint): the attempt is counted first, then the code
+    is checked, and a right one clears the count.
+    """
+    register_attempt(user)
+    if not verify_code(user, code):
+        logger.warning("Wrong staff MFA code", extra={"user_id": user.pk})
+        raise SecondFactorWrong
+    clear_failures(user)
 
 
 @dataclass(frozen=True)

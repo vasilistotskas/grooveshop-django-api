@@ -39,6 +39,12 @@ advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
 The lock ends with the session if the worker dies; the next sweep then sends again
 at most the one row that was going out.
 
+A healthy sweep takes seconds and beat sends one a minute, so a sweep that finds
+the lock held logs a WARNING with how many rows are due and the oldest. The
+connection pool resets nothing on a returned connection, so an unlock that
+releases nothing is an ERROR: a lock left held would stop every sweep until the
+pool retires that connection (an hour by default).
+
 A failed publish holds its caller for all of Celery's connection retries, and an
 order makes six of them, so one failure tells this process to keep the next ones
 without trying for `DEFERRED_DISPATCH_BROKER_DOWN_SECONDS`. Measured on a local

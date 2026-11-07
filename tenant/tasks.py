@@ -632,8 +632,17 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     session-level advisory lock and a sweep that finds it held does nothing.
     The lock goes with the session if the worker dies, and the next sweep
     sends again at most the one row that was going out.
+
+    A healthy sweep takes seconds and beat sends one a minute, so a sweep
+    that finds the lock held is a sign of trouble and says so at WARNING,
+    with what is waiting. The connection pool resets nothing on a returned
+    connection, so a lock left held would stop every sweep until the pool
+    retires that connection: an unlock that releases nothing is an ERROR.
     """
     from django.db import connection
+    from django.utils import timezone
+
+    from tenant.models import DeferredDispatch
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -642,7 +651,20 @@ def redispatch_deferred_tasks() -> dict[str, int]:
         )
         (held,) = cursor.fetchone()
     if not held:
-        logger.info("A sweep of deferred dispatches is already running")
+        waiting = DeferredDispatch.objects.filter(
+            next_attempt_at__lte=timezone.now()
+        )
+        oldest = (
+            waiting.order_by("created_at")
+            .values_list("created_at", flat=True)
+            .first()
+        )
+        logger.warning(
+            "A sweep of deferred dispatches is still running, so this one did "
+            "nothing; %s due, the oldest kept at %s",
+            waiting.count(),
+            oldest or "-",
+        )
         return {"published": 0, "failed": 0, "expired": 0}
     try:
         return _redispatch_due()
@@ -651,6 +673,13 @@ def redispatch_deferred_tasks() -> dict[str, int]:
             cursor.execute(
                 "SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
                 [_SWEEP_LOCK],
+            )
+            (released,) = cursor.fetchone()
+        if not released:
+            logger.error(
+                "The deferred dispatch sweep ended without holding its lock; "
+                "if another session holds it, no sweep runs until that "
+                "connection is closed"
             )
 
 

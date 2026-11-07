@@ -434,7 +434,9 @@ class TestAgainstARealCommit:
 
         assert in_transaction == [False]
 
-    def test_a_sweep_started_while_another_is_publishing_takes_nothing(self):
+    def test_a_sweep_started_while_another_is_publishing_takes_nothing(
+        self, caplog
+    ):
         # However long the first one's publish takes: it holds the lock until
         # it ends, so nothing it read can go out a second time.
         deferred()
@@ -448,12 +450,45 @@ class TestAgainstARealCommit:
 
         task.apply_async.side_effect = publish
 
-        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
+        with (
+            mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task),
+            caplog.at_level(logging.WARNING, logger="tenant.tasks"),
+        ):
             first = redispatch_deferred_tasks()
 
         assert other == [{"published": 0, "failed": 0, "expired": 0}]
         assert first["published"] == 2
         assert task.apply_async.call_count == 2
+        skipped = [r for r in caplog.records if "still running" in r.message]
+        assert [r.levelno for r in skipped] == [logging.WARNING]
+        assert "2 due" in skipped[0].message
+
+    def test_a_lock_the_session_no_longer_held_at_the_end_is_an_error(
+        self, caplog
+    ):
+        deferred()
+        task = mock.Mock()
+
+        def publish(**_):
+            # Whatever took it, the sweep no longer holds its lock here.
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_unlock_all()",
+                )
+
+        task.apply_async.side_effect = publish
+
+        with (
+            mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task),
+            caplog.at_level(logging.ERROR, logger="tenant.tasks"),
+        ):
+            redispatch_deferred_tasks()
+
+        assert any(
+            r.levelno == logging.ERROR
+            and "without holding its lock" in r.message
+            for r in caplog.records
+        )
 
     def test_a_sweep_that_dies_half_way_leaves_the_rest_and_the_lock(self):
         class Killed(BaseException):

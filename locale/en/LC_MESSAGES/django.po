@@ -12821,6 +12821,9 @@ msgstr "Sign Up"
 msgid "Sign-in code"
 msgstr "Sign-in code"
 
+msgid "Sign-in is temporarily unavailable, try again shortly."
+msgstr "Sign-in is temporarily unavailable, try again shortly."
+
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"
 

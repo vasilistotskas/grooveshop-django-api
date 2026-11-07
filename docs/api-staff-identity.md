@@ -376,6 +376,24 @@ no second copy.
   `STAFF_LOGIN_WINDOW_SECONDS`. The endpoint's `staff_login` throttle (10 an
   hour) still sits in front.
 
+### If the cache is down
+
+Staff sign-in is refused on purpose while the attempt counters cannot be read
+or written (`StaffLoginUnavailable`, raised for the cache's own
+`REDIS_UNAVAILABLE` errors on the `strict:` keys): the admin form shows "Sign-in
+is temporarily unavailable, try again shortly." and the token endpoint answers
+`503 staff_login_unavailable`, with one ERROR log line per attempt (no
+username) and the password never checked. Otherwise an attacker could lift the
+limits by overloading Redis. Customer sign-in behaves the same, because
+allauth's limiter keys are strict too.
+
+The way in during a Redis incident is the cluster, not the admin: run
+`manage.py` with `kubectl --context grooveshop exec` in a backend pod.
+`manage.py changepassword <email>` sets a staff password (it runs in the public
+schema, where staff identities live, and needs no cache). `manage.py
+reset_staff_mfa <email>` also clears the account's attempt counters, so it needs
+the cache; with Redis down, restore Redis first.
+
 ## Forgotten password (admin login)
 
 The admin login offers **"Forgotten your password or username?"** on the

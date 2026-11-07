@@ -12828,6 +12828,9 @@ msgstr "Εγγραφή"
 msgid "Sign-in code"
 msgstr "Κωδικός σύνδεσης"
 
+msgid "Sign-in is temporarily unavailable, try again shortly."
+msgstr "Η σύνδεση δεν είναι προσωρινά διαθέσιμη, δοκιμάστε ξανά σε λίγο."
+
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
 

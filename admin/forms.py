@@ -18,7 +18,7 @@ from tenant.auth_backends import (
     PLATFORM_STAFF_BACKEND_PATH,
     PlatformStaffBackend,
 )
-from tenant.staff_login_limits import StaffLoginLocked
+from tenant.staff_login_limits import StaffLoginLocked, StaffLoginUnavailable
 
 
 class PlatformAdminAuthenticationForm(AuthenticationForm):
@@ -213,6 +213,8 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
                 _("Too many failed sign-in attempts. Try again later."),
                 code="login_locked",
             ) from None
+        except StaffLoginUnavailable:
+            raise self._unavailable() from None
         if user is None:
             raise self.get_invalid_login_error()
         # Bind the session to PlatformStaffBackend explicitly —
@@ -239,6 +241,8 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
             if codes is None:
                 raise staff_mfa.SecondFactorWrong
             staff_mfa.clear_failures(user)
+        except StaffLoginUnavailable:
+            raise self._unavailable() from None
         except staff_mfa.SecondFactorLocked:
             raise forms.ValidationError(
                 _("Too many wrong codes. Try again in a few minutes."),
@@ -254,6 +258,13 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
             self.request, self.pending, Step.RECOVERY, codes
         )
         self.step = Step.RECOVERY
+
+    @staticmethod
+    def _unavailable() -> forms.ValidationError:
+        return forms.ValidationError(
+            _("Sign-in is temporarily unavailable, try again shortly."),
+            code="login_unavailable",
+        )
 
     def _finish(self, user) -> None:
         staff_mfa.clear_pending(self.request)

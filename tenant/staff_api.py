@@ -25,7 +25,7 @@ from admin import staff_mfa
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import StaffLoginThrottle
 from tenant.api_tokens import PlatformStaffTokenAuthentication
-from tenant.staff_login_limits import StaffLoginLocked
+from tenant.staff_login_limits import StaffLoginLocked, StaffLoginUnavailable
 
 
 class StaffLoginRequestSerializer(serializers.Serializer):
@@ -88,6 +88,11 @@ class PlatformStaffLoginView(APIView):
                 "`mfa_enrolment_required`: a superuser must set up an "
                 "authenticator by signing in to the admin once.",
             ),
+            503: OpenApiResponse(
+                ErrorResponseSerializer,
+                description="`staff_login_unavailable`: the attempt "
+                "counters cannot be reached, so sign-in is refused.",
+            ),
             429: OpenApiResponse(
                 ErrorResponseSerializer,
                 description="`login_locked` (too many wrong passwords) or "
@@ -128,6 +133,8 @@ class PlatformStaffLoginView(APIView):
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
+        except StaffLoginUnavailable:
+            return self._unavailable()
         if user is None:
             return Response(
                 {
@@ -137,9 +144,12 @@ class PlatformStaffLoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        refusal = self._second_factor_refusal(
-            user, serializer.validated_data["code"]
-        )
+        try:
+            refusal = self._second_factor_refusal(
+                user, serializer.validated_data["code"]
+            )
+        except StaffLoginUnavailable:
+            return self._unavailable()
         if refusal is not None:
             return refusal
 
@@ -177,6 +187,18 @@ class PlatformStaffLoginView(APIView):
             instance, token = PlatformStaffToken.objects.create(user)
 
         return Response({"token": token, "expiry": instance.expiry})
+
+    @staticmethod
+    def _unavailable() -> Response:
+        return Response(
+            {
+                "detail": _(
+                    "Sign-in is temporarily unavailable, try again shortly."
+                ),
+                "code": "staff_login_unavailable",
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
     @staticmethod
     def _second_factor_refusal(user, code: str) -> Response | None:

@@ -115,13 +115,15 @@ def register_attempt(user) -> None:
     """Count one attempt and raise ``SecondFactorLocked`` when it is over
     ``MAX_FAILURES``, before the code is looked at (counting afterwards would
     let every request in flight read a count below the limit)."""
-    attempt = staff_login_limits.count(_failures_key(user), LOCKOUT_SECONDS)
+    with staff_login_limits.refuse_when_cache_is_down():
+        attempt = staff_login_limits.count(_failures_key(user), LOCKOUT_SECONDS)
     if attempt > MAX_FAILURES:
         raise SecondFactorLocked
 
 
 def clear_failures(user) -> None:
-    cache.delete(_failures_key(user))
+    with staff_login_limits.refuse_when_cache_is_down():
+        cache.delete(_failures_key(user))
 
 
 class SecondFactorRefused(Exception):

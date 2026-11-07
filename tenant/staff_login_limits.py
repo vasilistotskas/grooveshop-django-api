@@ -50,12 +50,13 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import logging
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpRequest
 
-from core.caches import STRICT_NAMESPACE
+from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE
 from core.client_ip import trusted_client_ip
 from tenant.cache import GLOBAL_CACHE_PREFIX
 
@@ -69,6 +70,26 @@ _IPV6_PREFIX = 64
 
 class StaffLoginLocked(Exception):
     """Too many attempts for this account, address or pair."""
+
+
+class StaffLoginUnavailable(Exception):
+    """The counters cannot be read or written (the cache is down). The
+    sign-in is refused: an attacker who can overload Redis must not be
+    able to lift the limits."""
+
+
+@contextmanager
+def refuse_when_cache_is_down():
+    """Turn the strict keys' "cache unavailable" error into
+    ``StaffLoginUnavailable``, logged once per attempt (no username)."""
+    try:
+        yield
+    except REDIS_UNAVAILABLE as exc:
+        logger.error(
+            "Staff sign-in refused: the attempt counters are unavailable",
+            exc_info=exc,
+        )
+        raise StaffLoginUnavailable from None
 
 
 def _digest(value: str) -> str:
@@ -136,7 +157,13 @@ def _address_key(network: str) -> str:
 
 def register_attempt(request: HttpRequest | None, username: str) -> None:
     """Count this attempt and raise ``StaffLoginLocked`` when it is over any
-    budget. Call before the password is checked."""
+    budget, ``StaffLoginUnavailable`` when the cache cannot count. Call
+    before the password is checked."""
+    with refuse_when_cache_is_down():
+        _register_attempt(request, username)
+
+
+def _register_attempt(request: HttpRequest | None, username: str) -> None:
     limits = settings.STAFF_LOGIN_LIMITS
     window = limits["WINDOW_SECONDS"]
     network = _proven_network(request)
@@ -160,10 +187,11 @@ def register_attempt(request: HttpRequest | None, username: str) -> None:
 def clear_after_success(request: HttpRequest | None, username: str) -> None:
     """A right password ends the account's counts for the address that
     proved it. The address counter stays."""
-    cache.delete(_ceiling_key(username))
-    network = _proven_network(request)
-    if network is not None:
-        cache.delete(_pair_key(username, network))
+    with refuse_when_cache_is_down():
+        cache.delete(_ceiling_key(username))
+        network = _proven_network(request)
+        if network is not None:
+            cache.delete(_pair_key(username, network))
 
 
 def clear_account(username: str) -> None:
@@ -172,9 +200,10 @@ def clear_account(username: str) -> None:
 
     The pair counters are named by a generation that moves here, so they
     need not be found."""
-    cache.delete(_ceiling_key(username))
-    cache.set(
-        _generation_key(username),
-        _generation(username) + 1,
-        timeout=settings.STAFF_LOGIN_LIMITS["WINDOW_SECONDS"],
-    )
+    with refuse_when_cache_is_down():
+        cache.delete(_ceiling_key(username))
+        cache.set(
+            _generation_key(username),
+            _generation(username) + 1,
+            timeout=settings.STAFF_LOGIN_LIMITS["WINDOW_SECONDS"],
+        )

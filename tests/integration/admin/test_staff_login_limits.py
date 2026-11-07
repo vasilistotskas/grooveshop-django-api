@@ -352,3 +352,93 @@ class TestUnlocking:
         call_command("reset_staff_mfa", user.email, stdout=StringIO())
 
         assert _admin_signed_in(_admin_login(user.email, PASSWORD))
+
+
+class TestCacheDown:
+    """Fail closed, and say so: an outage must not lift the limits."""
+
+    @pytest.fixture
+    def cache_down(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        with patch(
+            "tenant.staff_login_limits.cache.incr",
+            side_effect=RedisConnectionError("down"),
+        ):
+            yield
+
+    def test_the_admin_form_shows_an_unavailable_error(self, cache_down):
+        user = _staff()
+
+        response = _admin_login(user.email, PASSWORD)
+
+        assert not _admin_signed_in(response)
+        assert "temporarily unavailable" in str(response.context["form"].errors)
+
+    def test_the_token_endpoint_answers_503(self, cache_down):
+        user = _staff()
+
+        response = _token_login(user.email, PASSWORD)
+
+        assert response.status_code == 503
+        assert response.data["code"] == "staff_login_unavailable"
+
+    def test_the_password_is_not_checked_and_one_error_is_logged(
+        self, cache_down, caplog
+    ):
+        user = _staff()
+
+        with patch.object(ModelBackend, "authenticate") as check:
+            _token_login(user.email, PASSWORD)
+
+        check.assert_not_called()
+        errors = [
+            r
+            for r in caplog.records
+            if r.levelname == "ERROR" and r.name == "tenant.staff_login_limits"
+        ]
+        assert len(errors) == 1
+        assert user.email not in errors[0].getMessage()
+
+    def test_the_token_second_factor_step_answers_503_too(self):
+        from allauth.mfa.totp.internal.auth import (
+            TOTP,
+            generate_totp_secret,
+        )
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        user = _staff(is_superuser=True)
+        with schema_context("public"):
+            TOTP.activate(user, generate_totp_secret())
+        real_incr = __import__(
+            "django.core.cache", fromlist=["cache"]
+        ).cache.incr
+
+        def incr(key, *args, **kwargs):
+            if "staff_mfa" in key:
+                raise RedisConnectionError("down")
+            return real_incr(key, *args, **kwargs)
+
+        with patch("tenant.staff_login_limits.cache.incr", side_effect=incr):
+            response = APIClient(**_edge("10.0.0.1")).post(
+                TOKEN_LOGIN,
+                {"email": user.email, "password": PASSWORD, "code": "123456"},
+            )
+
+        assert response.status_code == 503
+        assert response.data["code"] == "staff_login_unavailable"
+
+    def test_changepassword_runs_in_the_public_schema(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        user = _staff()
+        with patch(
+            "django.contrib.auth.management.commands.changepassword.getpass.getpass",
+            return_value="Brand-new-passw0rd!",
+        ):
+            call_command("changepassword", user.email, stdout=StringIO())
+
+        user.refresh_from_db()
+        assert user.check_password("Brand-new-passw0rd!")

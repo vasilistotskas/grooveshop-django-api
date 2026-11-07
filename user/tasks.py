@@ -288,7 +288,10 @@ def export_user_data_task(self, export_id: int) -> dict:
         location = get_export_location()
         storage = FileSystemStorage(location=location)
 
-        rel_path = f"{user.id}/{export.uuid}.json"
+        # A rerun keeps the file it already named (a bundle written before
+        # this release is named by its token): writing a second one would
+        # leave the first where neither the expiry sweep nor an erasure finds it.
+        rel_path = export.file_path or f"{user.id}/{export.uuid}.json"
         abs_path = os.path.join(location, rel_path)
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         with open(abs_path, "wb") as fh:

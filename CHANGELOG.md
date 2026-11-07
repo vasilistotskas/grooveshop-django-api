@@ -3,6 +3,30 @@
 
 
 
+## v3.231.6 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): take the data-export token out of the code (#511) ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
+* fix(user): take the data-export token out of the code
+
+Nothing reads it since the public download went, and the scheduler's
+contract release ended the rollback that still wrote it. The column becomes
+nullable and leaves Django's state; the next release drops it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
+* fix(user): build the export email's sample without a token
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
 ## v3.231.5 (2026-11-07)
 
 ### Bug fixes

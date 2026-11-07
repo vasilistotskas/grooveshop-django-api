@@ -140,7 +140,6 @@ def _sample_data_export(env: RenderEnv) -> UserDataExport:
 
     return UserDataExport(
         user=_sample_user(env),
-        token="sample-token",
         file_size=2048,
         expires_at=timezone.now() + timedelta(days=7),
     )

@@ -4208,9 +4208,6 @@ msgstr "Λήψη BoxNow voucher (PDF)"
 msgid "Download PDF"
 msgstr "Λήψη PDF"
 
-msgid "Download Token"
-msgstr "Token Λήψης"
-
 msgid "Download a GDPR data export"
 msgstr "Λήψη εξαγωγής δεδομένων GDPR"
 
@@ -11129,9 +11126,6 @@ msgstr "RabbitMQ"
 msgid "Random part length"
 msgstr "Μήκος τυχαίου τμήματος"
 
-msgid "Random token carried by the download URL."
-msgstr "Τυχαίο token που φέρει το URL λήψης."
-
 msgid "Rarely Used (1-2 products)"
 msgstr "Σπάνια σε χρήση (1-2 προϊόντα)"
 
@@ -15950,8 +15944,8 @@ msgstr "Πότε ενημερώθηκε ο πελάτης ότι το δέμα �
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "Πότε η απόφαση πήρε τελευταία την τρέχουσα τιμή. Μια απόδειξη που εκδίδεται μετά μειώνεται κατά το chargeback· μια που εκδόθηκε πριν πιστώνεται."
 
-msgid "When the download link stops working."
-msgstr "Πότε σταματά να λειτουργεί ο σύνδεσμος λήψης."
+msgid "When the export can no longer be downloaded."
+msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία από το κατάστημα. Η πώληση μετράει στον μήνα αυτής της στιγμής (αναφορά τζίρου)· μια παραγγελία που δεν στάλθηκε ποτέ δεν έχει τιμή."
@@ -17334,6 +17328,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Divider"
 #~ msgstr "Διαχωριστικό"
 
+#~ msgid "Download Token"
+#~ msgstr "Token Λήψης"
+
 #~ msgid "Download a GDPR data export bundle"
 #~ msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
 
@@ -18030,6 +18027,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "RFC 8058 one-click unsubscribe from all topics"
 #~ msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
 
+#~ msgid "Random token carried by the download URL."
+#~ msgstr "Τυχαίο token που φέρει το URL λήψης."
+
 #~ msgid "Ready Status"
 #~ msgstr "Κατάσταση Ετοιμότητας"
 
@@ -18443,6 +18443,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "What Is Microlearning"
 #~ msgstr "Τι είναι η μικρομάθηση"
+
+#~ msgid "When the download link stops working."
+#~ msgstr "Πότε σταματά να λειτουργεί ο σύνδεσμος λήψης."
 
 #~ msgid "Whether new users are automatically subscribed to this topic"
 #~ msgstr "Αν οι νέοι χρήστες εγγράφονται αυτόματα σε αυτό το θέμα"

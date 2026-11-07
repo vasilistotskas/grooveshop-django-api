@@ -226,7 +226,7 @@ BUILDERS: dict[str, Callable[[], object]] = {
     ).Group.objects.create(name=f"group-{_uid()}"),
     "user.UserDataExport": lambda: __import__(
         "user.models", fromlist=["UserDataExport"]
-    ).UserDataExport.objects.create(user=_user(), token=_uid()),
+    ).UserDataExport.objects.create(user=_user()),
     "recommendation.RecommendationCandidate": lambda: __import__(
         "recommendation.models", fromlist=["RecommendationCandidate"]
     ).RecommendationCandidate.objects.create(

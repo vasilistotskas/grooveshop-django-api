@@ -3,6 +3,14 @@
 
 
 
+## v3.234.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(shipping): answer 404 from the ACS station routes for a store without ACS credentials (#525)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0cc7922`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0cc7922d1a45cf627a640ed537282b5e85dd99cf))
+
 ## v3.234.0 (2026-11-07)
 
 ### Bug fixes

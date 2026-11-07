@@ -1278,6 +1278,9 @@ class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         ("expires_at", RangeDateTimeFilter),
     )
     search_fields = ("user__email", "user__username")
+    # Read by nothing since the public download went; kept off the form so
+    # the ledger stays read-only until the column is dropped.
+    exclude = ("token",)
     readonly_fields = (
         "user",
         "status",

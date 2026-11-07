@@ -94,6 +94,7 @@ class CartStockUnavailableError(StockError):
     """
 
     def __init__(self, shortfalls: list[InsufficientStockError]):
+        """Keep the per-line shortfalls and name the products in the message."""
         self.shortfalls = shortfalls
         super().__init__(
             "Insufficient stock for products: "

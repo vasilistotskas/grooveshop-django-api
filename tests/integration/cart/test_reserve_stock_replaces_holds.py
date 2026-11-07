@@ -12,6 +12,8 @@ from datetime import timedelta
 from unittest.mock import Mock, patch
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -321,3 +323,24 @@ class TestReserveCartStock:
             StockManager.reserve_cart_stock(
                 {product.id: 0}, session_id="s", user_id=user.id
             )
+
+    def test_session_lock_is_taken_before_any_product_lock(self, user):
+        product = ProductFactory(stock=5)
+
+        with CaptureQueriesContext(connection) as queries:
+            StockManager.reserve_cart_stock(
+                {product.id: 1}, session_id="cart-session", user_id=user.id
+            )
+
+        statements = [q["sql"] for q in queries]
+        lock_at = next(
+            i
+            for i, sql in enumerate(statements)
+            if "pg_advisory_xact_lock" in sql
+        )
+        product_lock_at = next(
+            i
+            for i, sql in enumerate(statements)
+            if 'FROM "product_product"' in sql and "FOR UPDATE" in sql
+        )
+        assert lock_at < product_lock_at

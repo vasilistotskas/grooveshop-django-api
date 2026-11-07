@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
@@ -244,6 +244,9 @@ class StockManager:
         same step. Holds of other sessions count as before, so two carts
         still exclude each other for the last unit.
 
+        Calls for the same session are serialised first (a transaction-scoped
+        advisory lock), so the holds read below cannot change under it.
+
         Order creation consumes the session's unconsumed holds
         (``OrderService._consume_stock_for_order``), so after this call
         those are exactly the ones returned.
@@ -265,6 +268,18 @@ class StockManager:
         """
         if any(quantity <= 0 for quantity in quantities.values()):
             raise ValueError("Quantity must be positive")
+
+        # One request per cart at a time. Without this, a concurrent
+        # request of the same cart could add a hold on a product outside
+        # the set locked below, and releasing it would lock that product
+        # out of pk order. Advisory locks are per DATABASE and every store
+        # shares one, hence the schema in the key. Nothing else takes this
+        # lock, so it adds no cycle with checkout's product locks.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                [f"stock_cart_session:{connection.schema_name}:{session_id}"],
+            )
 
         held_products = StockReservation.objects.filter(
             session_id=session_id, consumed=False

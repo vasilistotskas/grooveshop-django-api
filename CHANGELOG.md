@@ -3,6 +3,20 @@
 
 
 
+## v3.232.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): drop the data-export token column (#515)
+
+The contract half of 0035: nothing has written or read the column since
+that release.
+
+
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6e83e4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e83e4b7af1b51b10d8de54757104eaf3b7b4bf5))
+
 ## v3.232.0 (2026-11-07)
 
 ### Bug fixes

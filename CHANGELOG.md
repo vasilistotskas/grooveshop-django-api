@@ -3,6 +3,59 @@
 
 
 
+## v3.229.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(builder): a feature switched off does not stop persist_block_upgrades
+
+A store may switch a feature off with its block still on a page. That is for
+its next publish to refuse, but it stopped the whole store's upgrade, leaving
+every page on the old versions. Every feature now counts as on, as for a
+seed. The test fixture mocked the feature check, which hid this.
+
+The command's docstring and docs/builder.md state that it has no way back.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+* fix(builder): persist_block_upgrades still refuses a feature the platform does not know
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+### Features
+
+* feat(builder): persist_block_upgrades moves translations, and a band has one heading (#503) ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+* feat(builder): write a block's upgrade into its translations too
+
+persist_block_upgrades moved a node to its block's current version and left
+its translations under the old setting pointers, which validation refuses
+(untranslatable_setting), so an upgrade could not rename a translated setting.
+
+Each language's settings are now upgraded as well, and what differs from the
+draft's upgraded text stays as that language's translation, the storefront's
+rule and held to the same cases, so every language reads what it read.
+
+With it, the port of title into heading on the 13 blocks that had both, the
+demo pages at those versions, and the storefront's fixtures at the commit that
+ships them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+### Testing
+
+* test(builder): pin the upstream fixtures to storefront main
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
 ## v3.228.3 (2026-11-06)
 
 ### Bug fixes

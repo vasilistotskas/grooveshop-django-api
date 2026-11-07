@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.admin import site as admin_site
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.test import RequestFactory
 
 from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
@@ -60,7 +60,9 @@ class TestAdminSitePermission:
         assert admin_site.has_permission(_request_for(superuser)) is True
 
     def test_staff_passes_on_public_schema(self, db, monkeypatch):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         staff = UserAccountFactory(is_staff=True)
         assert admin_site.has_permission(_request_for(staff)) is True
 
@@ -183,7 +185,9 @@ class TestAdminSiteBranding:
     def test_no_bound_store_keeps_the_deployment_identity(
         self, db, monkeypatch, settings
     ):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         superuser = UserAccountFactory(is_staff=True, is_superuser=True)
         context = admin_site.each_context(_request_for(superuser))
         assert context["site_header"] == settings.UNFOLD["SITE_HEADER"]

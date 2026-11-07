@@ -187,9 +187,11 @@ class TestMetadataCannotCrossTenants:
 
     @staticmethod
     def _on_tenant_host(monkeypatch, schema="tenant_b"):
-        from django.db import connection
+        from django.db import DEFAULT_DB_ALIAS, connections
 
-        monkeypatch.setattr(connection, "schema_name", schema, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "schema_name", schema, raising=False
+        )
 
     @pytest.mark.django_db
     def test_mismatched_claim_is_refused(self, monkeypatch, caplog):

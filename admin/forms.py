@@ -18,6 +18,7 @@ from tenant.auth_backends import (
     PLATFORM_STAFF_BACKEND_PATH,
     PlatformStaffBackend,
 )
+from tenant.staff_login_limits import StaffLoginLocked
 
 
 class PlatformAdminAuthenticationForm(AuthenticationForm):
@@ -203,9 +204,15 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
         password = self.cleaned_data.get("password")
         if username is None or not password:
             return
-        user = PlatformStaffBackend().authenticate_staff(
-            self.request, username=username, password=password
-        )
+        try:
+            user = PlatformStaffBackend().authenticate_staff(
+                self.request, username=username, password=password
+            )
+        except StaffLoginLocked:
+            raise forms.ValidationError(
+                _("Too many failed sign-in attempts. Try again later."),
+                code="login_locked",
+            ) from None
         if user is None:
             raise self.get_invalid_login_error()
         # Bind the session to PlatformStaffBackend explicitly —
@@ -222,17 +229,21 @@ class PlatformAdminAuthenticationForm(AuthenticationForm):
 
     def _code_step(self, user) -> None:
         code = self.cleaned_data["otp_code"]
-        if staff_mfa.is_locked(user):
+        try:
+            if self.step is Step.CODE:
+                staff_mfa.verify_second_factor(user, code)
+                self._finish(user)
+                return
+            staff_mfa.ensure_not_locked(user)
+        except staff_mfa.SecondFactorLocked:
             raise forms.ValidationError(
                 _("Too many wrong codes. Try again in a few minutes."),
                 code="mfa_locked",
-            )
-        if self.step is Step.CODE:
-            if not staff_mfa.verify_code(user, code):
-                self._wrong_code(user)
-            staff_mfa.clear_failures(user)
-            self._finish(user)
-            return
+            ) from None
+        except staff_mfa.SecondFactorWrong:
+            raise forms.ValidationError(
+                _("That code is not correct."), code="mfa_wrong_code"
+            ) from None
         codes = staff_mfa.complete_enrolment(self.request, user, code)
         if codes is None:
             self._wrong_code(user)

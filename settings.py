@@ -497,6 +497,18 @@ STAFF_PASSWORD_RESET = {
     ),
 }
 
+# Wrong passwords at a platform-staff sign-in (the Django admin login and the
+# staff token endpoint, ``tenant.staff_login_limits``): allowed per account and
+# per client address inside ``WINDOW_SECONDS`` before even the right password
+# is refused. allauth's limiter covers neither.
+STAFF_LOGIN_LIMITS = {
+    "MAX_FAILURES_PER_ACCOUNT": int(
+        getenv("STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT", "5")
+    ),
+    "MAX_FAILURES_PER_IP": int(getenv("STAFF_LOGIN_MAX_FAILURES_PER_IP", "20")),
+    "WINDOW_SECONDS": int(getenv("STAFF_LOGIN_WINDOW_SECONDS", "900")),
+}
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",

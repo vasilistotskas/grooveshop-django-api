@@ -37,6 +37,10 @@ STRICT_NAMESPACE = "strict:"
 #: not "slower", it is a security control switched off:
 #:
 #: - ``strict:`` — our own opt-in namespace (above).
+#: - ``global:strict:`` — the same, for a key that must also be shared by
+#:   every schema (``tenant.cache.GLOBAL_CACHE_PREFIX`` is what the key
+#:   function reads, so it has to lead): the platform staff's sign-in
+#:   counters, whose identities are public.
 #: - ``allauth:rl:`` — allauth's rate limits: login, signup, password
 #:   reset, email confirmation and MFA attempts
 #:   (``allauth/core/internal/ratelimit.py`` ``get_cache_key``). Failing
@@ -59,6 +63,7 @@ STRICT_NAMESPACE = "strict:"
 #: on the key, in this one place.
 STRICT_KEY_PREFIXES: tuple[str, ...] = (
     STRICT_NAMESPACE,
+    f"global:{STRICT_NAMESPACE}",
     "allauth:rl:",
     "allauth.mfa.totp.used?",
     "allauth.idp.oidc.authorization_code[",

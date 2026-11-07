@@ -35,6 +35,8 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth.backends import BaseBackend, ModelBackend
 from django_tenants.utils import get_public_schema_name, schema_context
 
+from tenant import staff_login_limits
+
 PLATFORM_STAFF_BACKEND_PATH = "tenant.auth_backends.PlatformStaffBackend"
 
 # Marks a user object as having been loaded from the PUBLIC schema by
@@ -62,15 +64,22 @@ class PlatformStaffBackend(ModelBackend):
         Returns the ``UserAccount`` only when it is ``is_active`` AND
         ``is_staff`` — ordinary tenant customers (even if somehow
         matched by username/password) are never returned here.
+
+        Every wrong password is counted per account and per client address
+        (``tenant.staff_login_limits``), and once either count is spent
+        ``StaffLoginLocked`` is raised even for the right password. This is
+        the one place the admin login and the token endpoint both go
+        through, so the count is made here and nowhere else.
         """
+        staff_login_limits.ensure_not_locked(request, username)
         with schema_context(get_public_schema_name()):
             user = super().authenticate(
                 request, username=username, password=password
             )
-        if user is None:
+        if user is None or not (user.is_active and user.is_staff):
+            staff_login_limits.record_failure(request, username)
             return None
-        if not (user.is_active and user.is_staff):
-            return None
+        staff_login_limits.clear_account(username)
         setattr(user, PLATFORM_IDENTITY_ATTR, True)
         return user
 

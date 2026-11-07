@@ -21,8 +21,11 @@ step (not enrolled yet). A correct enrolment code activates the
 authenticator and shows the recovery codes ONCE; confirming them completes
 the same sign-in, because both factors were proven in this session.
 
-Not covered: platform staff API tokens (``PlatformStaffToken``) are issued
-after a login and are a separate surface.
+The staff token endpoint (``tenant.staff_api``) asks the same factor of the
+same users, through ``verify_second_factor``, with the same failure count;
+it does not enrol (the QR step belongs to the admin login), so a superuser
+with no authenticator is refused there until they have signed in to the
+admin once.
 """
 
 from __future__ import annotations
@@ -95,7 +98,10 @@ def is_enrolled(user) -> bool:
 
 
 def _failures_key(user) -> str:
-    return f"staff_mfa.failures:{user.pk}"
+    # ``global:`` (staff are public identities, so a store host must not get
+    # an allowance of its own) and ``strict:`` (a cache that cannot count
+    # must stop the sign-in, not lift the lockout).
+    return f"global:strict:staff_mfa.failures:{user.pk}"
 
 
 def is_locked(user) -> bool:
@@ -114,6 +120,37 @@ def record_failure(user) -> None:
 
 def clear_failures(user) -> None:
     cache.delete(_failures_key(user))
+
+
+class SecondFactorRefused(Exception):
+    """The second factor was not accepted; the subclass says why."""
+
+
+class SecondFactorLocked(SecondFactorRefused):
+    """Too many wrong codes: even a right one is refused for a while."""
+
+
+class SecondFactorWrong(SecondFactorRefused):
+    """The code is not a current authenticator or unused recovery code."""
+
+
+def ensure_not_locked(user) -> None:
+    if is_locked(user):
+        raise SecondFactorLocked
+
+
+def verify_second_factor(user, code: str) -> None:
+    """Accept *code* for *user* or raise ``SecondFactorRefused``.
+
+    The one check behind both ways in (the admin login's ``code`` step and
+    the staff token endpoint): the lockout, the code, the failure count,
+    and clearing the count on success.
+    """
+    ensure_not_locked(user)
+    if not verify_code(user, code):
+        record_failure(user)
+        raise SecondFactorWrong
+    clear_failures(user)
 
 
 def verify_code(user, code: str) -> bool:

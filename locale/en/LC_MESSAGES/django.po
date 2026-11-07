@@ -1547,6 +1547,12 @@ msgstr "An IP address is not a store domain; use a host name."
 msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
 msgstr "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
 
+msgid "An authenticator or recovery code is required."
+msgstr "An authenticator or recovery code is required."
+
+msgid "An authenticator or unused recovery code. Required for a platform superuser, who must have set up an authenticator in the admin first."
+msgstr "An authenticator or unused recovery code. Required for a platform superuser, who must have set up an authenticator in the admin first."
+
 msgid "An email address is required for guest alerts."
 msgstr "An email address is required for guest alerts."
 
@@ -12620,6 +12626,9 @@ msgstr "Set the VAT percentage rate (0.0% - 100.0%)"
 msgid "Set this address as the user's main address."
 msgstr "Set this address as the user's main address."
 
+msgid "Set up an authenticator by signing in to the admin once, then try again."
+msgstr "Set up an authenticator by signing in to the admin once, then try again."
+
 msgid "Set up your authenticator app"
 msgstr "Set up your authenticator app"
 
@@ -14889,6 +14898,9 @@ msgstr "Token has exceeded its maximum lifetime. Please log in again."
 
 msgid "Token hash"
 msgstr "Token hash"
+
+msgid "Too many failed sign-in attempts. Try again later."
+msgstr "Too many failed sign-in attempts. Try again later."
 
 #, python-brace-format
 msgid "Too many ids — request at most {max} per call."

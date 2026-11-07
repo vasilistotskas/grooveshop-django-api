@@ -307,13 +307,48 @@ when `user.is_superuser`**. Store admins and staff stay password-only.
   recovery codes sit in the pending sign-in until confirmed, so a reload
   does not lose them.
 - **Guessing is bounded:** five wrong codes per user lock further tries for
-  fifteen minutes (cache), even a right one.
+  fifteen minutes (cache), even a right one. The count is shared by the admin
+  login and the token endpoint, and is kept under a `global:strict:` key, so
+  every host (the platform's and each store's) draws on one allowance and a
+  cache that cannot count stops the sign-in instead of lifting the lock.
 - **Lost authenticator, no recovery codes:** `manage.py reset_staff_mfa <email>`
   (run with cluster access) removes the authenticators and any
   lockout; the next login enrols a new one.
-- **Not covered:** platform staff API tokens (`PlatformStaffToken`) are issued
-  after a login and are a separate surface; a token already issued keeps
-  working. WebAuthn/passkeys are not offered for the admin login yet.
+- **The token endpoint asks the same factor.** `POST /api/v1/platform/auth/login`
+  takes `email`, `password` and, for every user `staff_mfa.requires_mfa` covers
+  (a superuser), a `code` (authenticator or recovery code), checked by
+  `staff_mfa.verify_second_factor`, the helper the admin form's `code` step
+  uses, with the same lockout and failure count. A superuser who has not set up
+  an authenticator gets `403 mfa_enrolment_required`: enrolment needs the QR
+  step, which stays in the admin login, so sign in there once first. Other
+  answers: `401 mfa_code_required` (none sent), `401 mfa_wrong_code`,
+  `429 mfa_locked`. A token already issued keeps working; WebAuthn/passkeys
+  are not offered for the admin login yet.
+
+## Wrong passwords (admin login and token endpoint)
+
+allauth's limiter covers `/_allauth/` only, so wrong passwords at the Django
+admin login and at the token endpoint are counted by
+`tenant/staff_login_limits.py`. Both reach the password check through
+`PlatformStaffBackend.authenticate_staff`, which does the counting, so there is
+no second copy.
+
+- **Per account**: the submitted identifier, lower-cased and hashed whether or
+  not it names an account, so a locked unknown address answers like a locked
+  known one. `STAFF_LOGIN_LIMITS["MAX_FAILURES_PER_ACCOUNT"]` (5) inside
+  `WINDOW_SECONDS` (15 minutes). A success clears it; so do a password reset
+  (`StaffSetPasswordForm.save`) and `reset_staff_mfa`.
+- **Per client address** (`client_ip_or_peer`): `MAX_FAILURES_PER_IP` (20) across
+  any accounts. A success does not clear it, or one valid login of the
+  attacker's own would reset a guessing run.
+- **A lock refuses even the right password** (`StaffLoginLocked`): the admin form
+  shows "Too many failed sign-in attempts. Try again later." and the endpoint
+  answers `429 login_locked`. Refused attempts add nothing, so they cannot
+  extend it; it ends when the window that began with the first failure does.
+- **Keys** are `global:strict:` (see above), env-tunable as
+  `STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT`, `STAFF_LOGIN_MAX_FAILURES_PER_IP`,
+  `STAFF_LOGIN_WINDOW_SECONDS`. The endpoint's `staff_login` throttle (10 an
+  hour) still sits in front.
 
 ## Forgotten password (admin login)
 

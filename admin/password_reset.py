@@ -57,6 +57,7 @@ from unfold.widgets import (
 )
 
 from core.client_ip import client_ip_or_peer
+from tenant import staff_login_limits
 from tenant.celery import dispatch_on_commit
 from tenant.membership import get_current_tenant, get_membership
 
@@ -144,6 +145,10 @@ class StaffSetPasswordForm(SetPasswordForm):
             user = super().save(commit)
             if commit:
                 PlatformStaffToken.objects.filter(user=user).delete()
+        if commit:
+            # Whoever proves the mailbox may sign in again at once: wrong
+            # passwords against the old one no longer count.
+            staff_login_limits.clear_account(user.email)
         return user
 
 

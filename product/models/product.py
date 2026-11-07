@@ -732,9 +732,10 @@ class ProductTranslation(
 
         return (
             cls.objects.select_related(
-                "master", "master__category", "master__vat"
+                "master", "master__category", "master__vat", "master__brand"
             )
             .prefetch_related(
+                "master__category__translations",
                 "master__product_attributes__attribute_value__attribute__translations",
                 "master__product_attributes__attribute_value__translations",
             )
@@ -819,15 +820,26 @@ class ProductTranslation(
         # built.
         facet_search = False
         # ``*_greeklish_variants`` bags exist only for the SHORT fields
-        # (name/attributes) — expanding every description word would
+        # (name/brand/category/attributes) — expanding every description word would
         # bloat the index and pollute ranking for no realistic recall
         # gain.
         searchable_fields = (
             "master_id",
+            "sku",
+            "gtin",
+            "mpn",
             "name",
             "name_greeklish",
             "name_greeklish_alt",
             "name_greeklish_variants",
+            "brand_name",
+            "brand_name_greeklish",
+            "brand_name_greeklish_alt",
+            "brand_name_greeklish_variants",
+            "category_name",
+            "category_name_greeklish",
+            "category_name_greeklish_alt",
+            "category_name_greeklish_variants",
             "description",
             "description_greeklish",
             "description_greeklish_alt",
@@ -908,7 +920,9 @@ class ProductTranslation(
             "enabled": True,
             "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 8},
             "disableOnWords": [],
-            "disableOnAttributes": [],
+            # A code matches exactly or not at all: with typos allowed a
+            # barcode one digit off finds a different product.
+            "disableOnAttributes": ["sku", "gtin", "mpn"],
         }
         # ``attribute_values`` is one facet holding every attribute's
         # value ids, returned in lexicographic order and cut at this cap:
@@ -966,12 +980,28 @@ class ProductTranslation(
             ),
             "category": lambda obj: obj.master.category_id,
             "brand": lambda obj: obj.master.brand_id,
-            "category_name": lambda obj: (
-                obj.master.category.safe_translation_getter(
-                    "name", language_code=obj.language_code, any_language=True
-                )
-                if obj.master.category
-                else None
+            "sku": lambda obj: obj.master.sku,
+            "gtin": lambda obj: obj.master.gtin,
+            "mpn": lambda obj: obj.master.mpn,
+            "brand_name": lambda obj: cls._brand_name(obj),
+            "brand_name_greeklish": lambda obj: greeklish_shadow(
+                cls._brand_name(obj)
+            ),
+            "brand_name_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                cls._brand_name(obj)
+            ),
+            "brand_name_greeklish_variants": lambda obj: greeklish_variants(
+                cls._brand_name(obj)
+            ),
+            "category_name": lambda obj: cls._category_name(obj),
+            "category_name_greeklish": lambda obj: greeklish_shadow(
+                cls._category_name(obj)
+            ),
+            "category_name_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                cls._category_name(obj)
+            ),
+            "category_name_greeklish_variants": lambda obj: greeklish_variants(
+                cls._category_name(obj)
             ),
             "stock": lambda obj: obj.master.stock,
             "in_stock": lambda obj: obj.master.stock > 0,
@@ -990,6 +1020,20 @@ class ProductTranslation(
             ),
             **cls._attribute_meili_fields(),
         }
+
+    @staticmethod
+    def _brand_name(obj) -> str | None:
+        brand = obj.master.brand
+        return brand.name if brand else None
+
+    @staticmethod
+    def _category_name(obj) -> str | None:
+        category = obj.master.category
+        if not category:
+            return None
+        return category.safe_translation_getter(
+            "name", language_code=obj.language_code, any_language=True
+        )
 
     def indexed_offer_kind(self) -> str | None:
         """``offer_kind`` from the bulk queryset's annotation, else resolved.

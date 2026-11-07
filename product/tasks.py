@@ -538,6 +538,35 @@ def sync_price_records(product_ids: list[int]) -> dict[str, int]:
     retry_backoff=True,
     retry_jitter=True,
 )
+def reindex_products_for_search_text(source: str, pk: int) -> dict[str, int]:
+    """Reindex the products whose search text includes the named row.
+
+    A brand, category, attribute or attribute value renamed in the admin
+    leaves its products' documents with the old text. A category can hold
+    thousands of products, so finding them and queueing a document each
+    happens here, never in the request that saved the rename.
+    """
+    from product.enum.search_text import SearchTextSource
+    from product.models.product import Product
+    from product.signals import reindex_products_by_pk
+
+    lookup = SearchTextSource(source).product_lookup
+    product_ids = list(
+        Product.objects.filter(**{lookup: pk})
+        .values_list("pk", flat=True)
+        .distinct()
+    )
+    documents = reindex_products_by_pk(product_ids)
+    return {"products": len(product_ids), "documents": documents}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=SEARCH_TRANSIENT_ERRORS,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def reevaluate_price_episodes() -> dict[str, int]:
     """Reconcile every product's price records with its live price.
 

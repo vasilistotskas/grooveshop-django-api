@@ -48,6 +48,36 @@ engine until the field is added to `filterable_fields`.
 `range_fields` must be a subset of `filterable_fields`;
 `filterable_attributes_payload` raises otherwise.
 
+## Searchable attributes and typo tolerance
+
+The product index searches, in this order (the `attribute` ranking rule
+prefers a match in an earlier field): `sku`, `gtin`, `mpn`, `name`, `brand_name`,
+`category_name`, `description`, the attribute names, then the attribute values.
+Each text field except the codes carries its Greeklish shadows
+(`docs/search/greeklish.md`); `description` has the `_greeklish` and `_alt`
+shadows but no `_variants` bag, which exists only for short fields. A code sits first because a shopper who
+types one means that product; `brand_name` and `category_name` sit above the
+description because a name in the title of a department is a stronger signal
+than the same word in prose.
+
+`typoTolerance.disableOnAttributes` is `sku`, `gtin`, `mpn`: a code matches
+exactly or not at all, so a barcode one digit off finds nothing instead of a
+different product. `disableOnNumbers` stays off: it would also stop typo
+matching of the numbers inside names and attribute values, which are not codes.
+
+The brand name is not translated (`Brand.name`); the category name is read in
+the document's language. Renaming a brand, category, attribute or attribute
+value reindexes its products: `product.signals._watch_search_text` queues
+`product.tasks.reindex_products_for_search_text`, which finds the products and
+queues one document each. Only a changed name or value queues it; deleting a translation, a brand or a
+category (with its child categories) queues the affected products too.
+
+After a deploy that changes these settings, `meilisearch_apply_settings
+--all-tenants` runs as part of the release and adds the new fields to every
+store's index; the documents of existing products gain `sku`, `gtin`, `mpn`,
+`brand_name` and `category_name` on the next reindex (the nightly full sync, or
+`meilisearch_sync_index product.ProductTranslation` at once).
+
 ## Facet search
 
 `MeiliMeta.facet_search = False` on both indexes. It is sent twice: as the

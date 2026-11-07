@@ -17,6 +17,7 @@ import pytest
 from allauth.account.models import EmailAddress
 from django.template.loader import render_to_string
 from django.test import RequestFactory
+from django.utils import translation
 
 from tenant.credentials import _DEFAULT_EMAIL_THEME
 from user.factories.account import UserAccountFactory
@@ -63,6 +64,17 @@ class TestSignInPage:
         # allauth's default layout listed its links under "Menu:".
         assert "Menu:" not in html
         assert "Μενού:" not in html
+        # Signed out on the sign-in page itself: no "Sign In" link to it.
+        assert "account-session" not in html
+
+    @UNBRANDED
+    def test_signed_out_pages_offer_sign_in(
+        self, _primary, client, bind_tenant
+    ):
+        bind_tenant(_store())
+        html = client.get("/accounts/password/reset/").content.decode()
+        assert "account-session" in html
+        assert "/accounts/login/" in html
 
     @mock.patch(
         "tenant.credentials._branded_primary",
@@ -92,23 +104,29 @@ class TestConsentNamesTheStore:
         self, _primary, bind_tenant
     ):
         bind_tenant(_store())
-        html = render_to_string(
-            "idp/oidc/authorization_form.html",
-            {
-                "client": SimpleNamespace(name="Claude"),
-                "form": "",
-                "site": SimpleNamespace(name="Another Store"),
-            },
-            request=_request(),
+        with translation.override("en"):
+            html = render_to_string(
+                "idp/oidc/authorization_form.html",
+                {
+                    "client": SimpleNamespace(name="Claude"),
+                    "form": "",
+                    "site": SimpleNamespace(name="Another Store"),
+                },
+                request=_request(),
+            )
+        # The sentence itself: the name is in the header and footer anyway.
+        assert (
+            "Claude wants to access your Account Pages Store account." in html
         )
-        assert "Account Pages Store" in html
         assert "Another Store" not in html
         # allauth tags the grant "primary" and the cancel "outline".
         assert "account-btn-primary" in html
         assert "account-btn-outline" in html
         # The shopper sees which account the app gets, and can switch.
         assert "shopper@example.com" in html
-        assert "/accounts/logout/" in html
+        # Signing out comes back here, so the shopper can switch account
+        # and carry on with the consent.
+        assert "/accounts/logout/?next=/identity/o/authorize" in html
 
 
 class TestSocialSignupNamesTheStore:
@@ -118,16 +136,18 @@ class TestSocialSignupNamesTheStore:
     ):
         bind_tenant(_store())
         provider = SimpleNamespace(name="Google")
-        html = render_to_string(
-            "socialaccount/signup.html",
-            {
-                "account": SimpleNamespace(get_provider=lambda: provider),
-                "form": None,
-                "site": SimpleNamespace(name="Another Store"),
-            },
-            request=_request(),
-        )
-        assert "Account Pages Store" in html
+        with translation.override("en"):
+            html = render_to_string(
+                "socialaccount/signup.html",
+                {
+                    "account": SimpleNamespace(get_provider=lambda: provider),
+                    "form": None,
+                    "site": SimpleNamespace(name="Another Store"),
+                },
+                request=_request(),
+            )
+        # The sentence itself: the name is in the header and footer anyway.
+        assert "login to\nAccount Pages Store. As a final step" in html
         assert "Another Store" not in html
 
 

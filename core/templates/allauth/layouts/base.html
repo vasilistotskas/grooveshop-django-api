@@ -34,7 +34,8 @@ the styles are the account-* components in tailwind/input.css.
             {% if user.is_authenticated %}
                 <p class="account-session">
                     {% blocktranslate with email=user.email %}Signed in as {{ email }}{% endblocktranslate %}
-                    · <a href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
+                    {% comment %}Back to this page after signing out, so a shopper who switches account on the consent carries on with it.{% endcomment %}
+                    · <a href="{% url 'account_logout' %}?next={{ request.get_full_path|urlencode }}">{% translate "Sign Out" %}</a>
                 </p>
             {% elif request.resolver_match.url_name != "account_login" %}
                 <p class="account-session"><a href="{% url 'account_login' %}">{% translate "Sign In" %}</a></p>

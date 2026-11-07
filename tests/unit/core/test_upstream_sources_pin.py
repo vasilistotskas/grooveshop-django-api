@@ -110,8 +110,9 @@ class TestGitHashes:
 
 class FakeGitHub:
     """The GitHub API reads the script makes, over two in-memory
-    repositories: the storefront's, holding two files (``catalogue``,
-    ``placement``) and one directory (``seeds``), and the media service's,
+    repositories: the storefront's, holding its files (``catalogue``,
+    ``legacy-image-fields``, the cases) and one directory (``seeds``), and
+    the media service's,
     holding the ``image-limits`` file, all at the sources' upstream paths."""
 
     def __init__(
@@ -119,6 +120,7 @@ class FakeGitHub:
         *,
         seeds: dict[str, bytes],
         catalogue: bytes = b'{"hash": "h"}\n',
+        legacy_image_fields: bytes = b"{}\n",
         placement: bytes = b"[]\n",
         data_cases: bytes = b"[]\n",
         upgrade_cases: bytes = b"[]\n",
@@ -127,6 +129,7 @@ class FakeGitHub:
     ) -> None:
         self.directories = {"seeds": seeds}
         self.catalogue = catalogue
+        self.legacy_image_fields = legacy_image_fields
         self.placement = placement
         self.data_cases = data_cases
         self.upgrade_cases = upgrade_cases
@@ -166,6 +169,11 @@ class FakeGitHub:
                     "path": "catalogue.json",
                     "type": "blob",
                     "sha": self._blob(self.catalogue),
+                },
+                {
+                    "path": "legacy-image-fields.json",
+                    "type": "blob",
+                    "sha": self._blob(self.legacy_image_fields),
                 },
                 {
                     "path": "placement-cases.json",

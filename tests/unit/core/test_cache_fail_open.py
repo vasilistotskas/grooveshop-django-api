@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -189,8 +190,13 @@ class TestOneWarningPerBurst:
         self, stopped, caplog
     ):
         clock = iter([1000.0, 1001.0, 1002.0, 1100.0])
+        # Replace only the module's ``time`` name: ``core.caches.time`` is
+        # the global module, and patching its ``monotonic`` also feeds this
+        # clock to redis-py's own timing, which then exhausts it.
         with (
-            patch("core.caches.time.monotonic", lambda: next(clock)),
+            patch.object(
+                caches, "time", SimpleNamespace(monotonic=lambda: next(clock))
+            ),
             caplog.at_level(logging.WARNING, logger="core.caches"),
         ):
             for _ in range(4):

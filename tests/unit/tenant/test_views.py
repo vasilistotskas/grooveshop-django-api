@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.test.client import Client
 from rest_framework.test import APIClient
 
@@ -311,7 +311,10 @@ class TestTenantResolveOnPublicSchema:
 
         sentinel_tenant = SimpleNamespace(schema_name="public")
         monkeypatch.setattr(
-            connection, "tenant", sentinel_tenant, raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "tenant",
+            sentinel_tenant,
+            raising=False,
         )
 
         response = resolve_client.get(

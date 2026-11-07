@@ -3,6 +3,59 @@
 
 
 
+## v3.232.2 (2026-11-07)
+
+### Bug fixes
+
+* fix(deps): Celery 5.7, redis-py 8, allauth 65.21.1 and Python 3.14.9 (#523) ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
+* fix(deps): Celery 5.7, redis-py 8, allauth 65.21.1 and Python 3.14.9
+
+Runtime
+- Python 3.14.7 -> 3.14.9, Alpine 3.23 -> 3.24, uv 0.13.6 -> 0.13.7
+  (Dockerfile, .python-version, CI, required-version)
+- Node 26.13.0 for the Tailwind stage (node:25 is end of life);
+  tailwindcss 4.3.5
+- Celery and kombu 5.7.0; redis-py 6.4 -> 8.1 (Celery no longer caps it)
+- django-allauth 65.21.1 (passkey user verification, rate-limit window
+  security fixes), django-phonenumber-field 9, django-mptt 0.21.1,
+  pypdf 7, psycopg 3.3.8, django-tenants 4.0.1, unfold 0.110.1, knox
+  5.1.1 and the rest of the lock, all at least a day old
+- Django stays on 6.0.9: Django 6.1 ships as its own release
+
+redis-py 8 gives every connection a 5 s socket timeout, the same length
+as channels-redis's BZPOPMIN wait, so an idle websocket receive raised
+TimeoutError (django/channels_redis#422). The channel layer now sets
+socket_timeout to twice brpop_timeout.
+
+Tests
+- pytest 9.2 restores a monkeypatched attribute only if it was in the
+  target's own __dict__ (pytest #10644). django.db.connection is a proxy,
+  so undoing a patch on it deleted schema_name/tenant from the real
+  DatabaseWrapper. Patches now target connections[DEFAULT_DB_ALIAS].
+- test_cache_fail_open patched the global time.monotonic, which redis-py
+  8 also reads while connecting; it now replaces only core.caches.time.
+
+allauth-schema.yml regenerated: description text only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGY6NJCtpdz6kzMGtMC ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
+* fix(deps): drop settings Celery 5.7 makes default, name the npm package
+
+- CELERY_CONTROL_QUEUE_EXCLUSIVE and CELERY_EVENT_QUEUE_EXCLUSIVE:
+  Celery 5.7 defaults both to True (5.6.3 had False), so the settings
+  and the comment about kombu 5.6 go
+- pypdf floor >=7.0.0, the major the lock now holds
+- package.json names itself django-deps, so package-lock.json no longer
+  takes the name of whatever folder npm ran in
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
 ## v3.232.1 (2026-11-07)
 
 ### Bug fixes

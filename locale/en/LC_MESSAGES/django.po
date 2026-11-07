@@ -4209,9 +4209,6 @@ msgstr "Download Token"
 msgid "Download a GDPR data export"
 msgstr "Download a GDPR data export"
 
-msgid "Download a GDPR data export bundle"
-msgstr "Download a GDPR data export bundle"
-
 msgid "Download shipping voucher (PDF)"
 msgstr "Download shipping voucher (PDF)"
 
@@ -7840,8 +7837,8 @@ msgstr "List of topic IDs to subscribe/unsubscribe"
 msgid "List public offers"
 msgstr "List public offers"
 
-msgid "List recent data-export requests for this user so the UI can show progress and the last download link."
-msgstr "List recent data-export requests for this user so the UI can show progress and the last download link."
+msgid "List recent data-export requests for this user so the UI can show their progress."
+msgstr "List recent data-export requests for this user so the UI can show their progress."
 
 msgid "List the coupons available for this cart"
 msgstr "List the coupons available for this cart"
@@ -11094,8 +11091,8 @@ msgstr "Questions or already renewed? Reply to this email or contact us at %(ema
 msgid "Questions?"
 msgstr "Questions?"
 
-msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
-msgstr "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
+msgid "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
+msgstr "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
 
 msgid "Queued"
 msgstr "Queued"
@@ -11913,9 +11910,6 @@ msgstr "Returns"
 
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Returns a list of the authenticated user's orders"
-
-msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
-msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 
 msgid "Returns the notifications for a list of ids."
 msgstr "Returns the notifications for a list of ids."
@@ -14495,9 +14489,6 @@ msgstr "This credit receipt is your proof of the refund — please keep it for y
 msgid "This document has no such block."
 msgstr "This document has no such block."
 
-msgid "This download link has expired."
-msgstr "This download link has expired."
-
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 
@@ -14506,6 +14497,9 @@ msgstr "This email is required and cannot be switched off."
 
 msgid "This email type does not exist."
 msgstr "This email type does not exist."
+
+msgid "This export has expired."
+msgstr "This export has expired."
 
 msgid "This field is required"
 msgstr "This field is required"
@@ -17121,6 +17115,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Divider"
 #~ msgstr "Divider"
 
+#~ msgid "Download a GDPR data export bundle"
+#~ msgstr "Download a GDPR data export bundle"
+
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"
 
@@ -17462,6 +17459,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "Required compartment size: 1=Small, 2=Medium, 3=Large"
 
+#~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
+#~ msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
+
 #, python-format
 #~ msgid "Review #%(id)s: %(comment)s"
 #~ msgstr "Review #%(id)s: %(comment)s"
@@ -17569,6 +17569,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "There is a release after the first: someone published."
 #~ msgstr "There is a release after the first: someone published."
+
+#~ msgid "This download link has expired."
+#~ msgstr "This download link has expired."
 
 #~ msgid "This store already has page builder data."
 #~ msgstr "This store already has page builder data."

@@ -16,6 +16,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -58,6 +59,21 @@ class AcsStationViewSet(
         "last_synced_at",
     ]
     ordering = ["postal_code", "external_id"]
+
+    def initial(self, request: Request, *args, **kwargs) -> None:
+        """A store without ACS credentials has no ACS stations to serve.
+
+        Its table is never filled (the nightly sync skips it) and its
+        checkout never offers ACS (``AcsCarrier.is_kind_enabled``), so
+        every route here answers a plain 404, like a switched-off
+        feature, instead of an empty list a client would read as "the
+        catalogue is not synced yet". Checked before the cached
+        ``list``/``retrieve`` run, so no answer of either kind is cached
+        across a credential change.
+        """
+        super().initial(request, *args, **kwargs)
+        if not acs_config.is_configured():
+            raise NotFound()
 
     def get_serializer_class(self):
         if self.action == "retrieve":

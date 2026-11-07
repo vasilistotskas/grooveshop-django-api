@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from django.conf import settings as django_settings
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.http import HttpResponse
 from django.test import RequestFactory
 
@@ -45,7 +45,9 @@ def test_rewrites_session_and_csrf_domains(
     middleware, monkeypatch, db, host, expected
 ):
     tenant = store_tenant(f"cookie_{host.replace('.', '_')}")
-    monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+    )
 
     request = RequestFactory().get("/", HTTP_HOST=host)
     response = middleware(_tenant_response())(request)
@@ -74,10 +76,14 @@ def test_scope_follows_the_host_whatever_the_connection_holds(
     and the cookie kept the settings default on a foreign apex.
     """
     if tenant_state is None:
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
     else:
         obj = type("_T", (), {"schema_name": tenant_state})()
-        monkeypatch.setattr(connection, "tenant", obj, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", obj, raising=False
+        )
 
     request = RequestFactory().get(
         "/admin/login/", HTTP_HOST="platform.grooveshop.space"
@@ -104,7 +110,9 @@ def test_public_schema_derives_from_its_own_host(middleware, monkeypatch):
     admin login returned 403 on every POST — observed live on
     platform-staging.grooveshop.space.
     """
-    monkeypatch.setattr(connection, "tenant", _PublicTenant(), raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", _PublicTenant(), raising=False
+    )
 
     request = RequestFactory().get(
         "/admin/login/", HTTP_HOST="platform-staging.grooveshop.space"
@@ -125,7 +133,9 @@ def test_internal_service_host_keeps_configured_domains(
     middleware, monkeypatch
 ):
     """``backend-service`` has no registrable domain to scope to."""
-    monkeypatch.setattr(connection, "tenant", _PublicTenant(), raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", _PublicTenant(), raising=False
+    )
 
     request = RequestFactory().get("/", HTTP_HOST="backend-service")
     response = middleware(_tenant_response())(request)

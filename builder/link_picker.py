@@ -38,17 +38,24 @@ from django.db.models.functions import Coalesce, NullIf, StrIndex, Substr
 from builder import references
 from builder.models import BuilderDocument, DocumentKind, ReferenceKind
 
-#: The kinds a picker offers, in the order a search without ``kinds``
-#: answers them, and the translated field each one is named by. A page
-#: has no parler translation (its label is in the document), a content
-#: page is named by its slug in the store and its title for the person.
-PICKER_KINDS: tuple[ReferenceKind, ...] = (
+#: What a link may point at, in the order a search without ``kinds`` answers
+#: them. A page has no parler translation (its label is in the document), a
+#: content page is named by its slug in the store and its title for the person.
+LINK_KINDS: tuple[ReferenceKind, ...] = (
     ReferenceKind.PRODUCT,
     ReferenceKind.CATEGORY,
     ReferenceKind.BLOG_POST,
     ReferenceKind.BLOG_CATEGORY,
     ReferenceKind.PAGE,
     ReferenceKind.CONTENT_PAGE,
+)
+
+#: What a picker finds when asked: what a link may point at, and what only a
+#: setting of that kind names, which has no page of its own to link to.
+PICKER_KINDS: tuple[ReferenceKind, ...] = (
+    *LINK_KINDS,
+    ReferenceKind.PROMOTION,
+    ReferenceKind.TOPIC,
 )
 
 #: As choices, for the schema (``ENUM_NAME_OVERRIDES`` names them).
@@ -65,6 +72,8 @@ _LABEL_FIELD = {
     ReferenceKind.BLOG_POST: "title",
     ReferenceKind.BLOG_CATEGORY: "name",
     ReferenceKind.CONTENT_PAGE: "title",
+    ReferenceKind.PROMOTION: "name",
+    ReferenceKind.TOPIC: "name",
 }
 
 #: Kinds named by a number; the others (``page``, ``contentPage``) by text.
@@ -74,6 +83,8 @@ NUMERIC_KINDS = frozenset(
         ReferenceKind.CATEGORY,
         ReferenceKind.BLOG_POST,
         ReferenceKind.BLOG_CATEGORY,
+        ReferenceKind.PROMOTION,
+        ReferenceKind.TOPIC,
     }
 )
 
@@ -86,11 +97,29 @@ def _text(expression: Any) -> NullIf:
     return NullIf(expression, Value(""), output_field=CharField())
 
 
+def _first_code() -> Subquery:
+    """The code the offers list shows for a promotion: its first it may
+    publish, as ``PublicPromotionSerializer`` reads it."""
+    from promotion.managers.promotion import publishable_code_q
+    from promotion.models import PromotionCode
+
+    return Subquery(
+        PromotionCode.objects.filter(
+            publishable_code_q(), promotion=OuterRef("pk")
+        )
+        .order_by("created_at")
+        .values("code")[:1]
+    )
+
+
 def _labelled(
     queryset: QuerySet[Any], kind: ReferenceKind, locale: str
 ) -> QuerySet[Any]:
     """``queryset`` with ``label``: the name in ``locale``, else in the
-    default language, else the slug."""
+    default language, else the slug. An offer has no slug: what the person
+    tells it by is its code."""
+    if kind == ReferenceKind.PROMOTION:
+        queryset = queryset.annotate(slug=_first_code())
     translation = queryset.model._parler_meta.root_model
     field = _LABEL_FIELD[kind]
 

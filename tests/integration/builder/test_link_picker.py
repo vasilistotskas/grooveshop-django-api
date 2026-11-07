@@ -3,8 +3,11 @@ pickers. Both answer by the rule a publish checks references with."""
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -15,7 +18,10 @@ from builder.models import DocumentKind
 from page_config.models import ContentPage
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
+from promotion.factories.promotion import PromotionCodeFactory, PromotionFactory
+from promotion.models.promotion import PromotionTrigger
 from tests.integration.builder.conftest import api_as
+from user.models.subscription import SubscriptionTopic
 
 pytestmark = pytest.mark.django_db
 
@@ -394,3 +400,93 @@ class TestLabelling:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.json()["param"] == "page"
+
+
+class TestAnOffer:
+    def offer(self, code="SUMMER10", **fields):
+        promotion = PromotionFactory(**fields)
+        PromotionCodeFactory(promotion=promotion, code=code)
+        return named(promotion, el="Καλοκαίρι", en="Summer")
+
+    def test_it_is_found_by_its_name_and_told_apart_by_its_code(
+        self, admin, tenant
+    ):
+        promotion = self.offer()
+
+        response = search(admin, q="καλοκ", kinds="promotion", locale="el")
+
+        assert response.json()["results"] == [
+            {
+                "kind": "promotion",
+                "id": promotion.pk,
+                "label": "Καλοκαίρι",
+                "slug": "SUMMER10",
+                "active": True,
+            }
+        ]
+
+    def test_it_is_found_by_its_code(self, admin, tenant):
+        promotion = self.offer()
+
+        response = search(admin, q="summer10", kinds="promotion", locale="el")
+
+        assert found(response) == [("promotion", promotion.pk, "Καλοκαίρι")]
+
+    def test_one_with_no_code_to_copy_is_not_offered(self, admin, tenant):
+        named(
+            PromotionFactory(trigger=PromotionTrigger.AUTOMATIC),
+            el="Καλοκαίρι",
+            en="Summer",
+        )
+
+        response = search(admin, q="καλοκ", kinds="promotion", locale="el")
+
+        assert found(response) == []
+
+    def test_a_search_for_a_link_never_offers_one(self, admin, tenant):
+        self.offer()
+
+        response = search(admin, q="καλοκ", locale="el")
+
+        assert found(response) == []
+
+    def test_its_label_says_when_it_can_no_longer_be_used(self, admin, tenant):
+        ended = self.offer(ends_at=timezone.now() - timedelta(days=1))
+
+        response = labels(admin, promotion=str(ended.pk), locale="el")
+
+        assert response.json() == {
+            "promotion": {
+                str(ended.pk): {"label": "Καλοκαίρι", "active": False}
+            }
+        }
+
+
+class TestATopic:
+    def topic(self, slug="weekly", **fields):
+        defaults = {
+            "name": "Εβδομαδιαίο",
+            "category": SubscriptionTopic.TopicCategory.NEWSLETTER,
+        }
+        return SubscriptionTopic.objects.create(
+            slug=slug, **{**defaults, **fields}
+        )
+
+    def test_a_newsletter_is_found(self, admin, tenant):
+        topic = self.topic()
+
+        response = search(admin, q="εβδομ", kinds="topic", locale="el")
+
+        assert found(response) == [("topic", topic.pk, "Εβδομαδιαίο")]
+
+    def test_a_topic_the_form_may_not_subscribe_to_is_not_offered(
+        self, admin, tenant
+    ):
+        self.topic(
+            slug="account", category=SubscriptionTopic.TopicCategory.ACCOUNT
+        )
+        self.topic(slug="old", is_active=False)
+
+        response = search(admin, q="εβδομ", kinds="topic", locale="el")
+
+        assert found(response) == []

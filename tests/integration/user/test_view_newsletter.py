@@ -616,11 +616,10 @@ class TestRequestPathIsAddressIndependent:
         assert row.consented_at is not None
         assert before <= row.consented_at <= timezone.now()
 
-    def test_task_skips_a_topic_that_stopped_being_the_default(self, topic):
+    def _run_task_for(self, topic):
         from user.tasks import subscribe_to_newsletter_task
 
-        SubscriptionTopic.objects.filter(pk=topic.pk).update(is_default=False)
-        result = subscribe_to_newsletter_task.apply(
+        return subscribe_to_newsletter_task.apply(
             kwargs={
                 "topic_id": topic.pk,
                 "email": "late@example.com",
@@ -631,8 +630,22 @@ class TestRequestPathIsAddressIndependent:
                 "consented_at": timezone.now().isoformat(),
             }
         ).result
+
+    def test_task_skips_a_topic_no_longer_on_offer(self, topic):
+        SubscriptionTopic.objects.filter(pk=topic.pk).update(is_active=False)
+
+        result = self._run_task_for(topic)
+
         assert result == {"status": "skipped", "reason": "topic_unavailable"}
         assert not UserSubscription.objects.exists()
+
+    def test_task_keeps_to_the_newsletter_the_visitor_agreed_to(self, topic):
+        # Another topic became the default between the request and the run:
+        # this one is still on offer, and it is what they asked for.
+        SubscriptionTopic.objects.filter(pk=topic.pk).update(is_default=False)
+
+        assert self._run_task_for(topic)["status"] == "armed"
+        assert UserSubscription.objects.filter(topic=topic).count() == 1
 
 
 def _verified_user(email="owner@example.com"):
@@ -762,3 +775,86 @@ class TestAnswerStatus:
         row = UserSubscription.objects.get(user=user, topic=topic)
         assert row.status == Status.PENDING
         assert len(mail.outbox) == 1
+
+
+@pytest.fixture
+def weekly():
+    return SubscriptionTopic.objects.create(
+        slug="weekly",
+        name="Weekly",
+        category=SubscriptionTopic.TopicCategory.NEWSLETTER,
+        is_active=True,
+    )
+
+
+class TestAFormThatNamesATopic:
+    def test_it_subscribes_to_that_topic_and_not_the_default(
+        self, client, topic, weekly, django_capture_on_commit_callbacks
+    ):
+        with django_capture_on_commit_callbacks(execute=True):
+            response = _post(client, topic=weekly.pk)
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert UserSubscription.objects.filter(topic=weekly).count() == 1
+        assert UserSubscription.objects.filter(topic=topic).count() == 0
+
+    def test_it_is_still_double_opt_in(
+        self, client, weekly, django_capture_on_commit_callbacks
+    ):
+        with django_capture_on_commit_callbacks(execute=True):
+            _post(client, topic=weekly.pk)
+
+        row = UserSubscription.objects.get(topic=weekly)
+        assert row.status == Status.PENDING
+        assert row.confirmation_token in mail.outbox[0].body
+
+    def test_a_store_with_no_default_can_still_offer_one(self, client, weekly):
+        assert client.get(URL).json() == {"available": False}
+        assert client.get(URL, {"topic": weekly.pk}).json() == {
+            "available": True
+        }
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"is_active": False},
+            {"category": SubscriptionTopic.TopicCategory.ACCOUNT},
+            {"category": SubscriptionTopic.TopicCategory.SYSTEM},
+            {"category": SubscriptionTopic.TopicCategory.PROMOTIONAL},
+        ],
+        ids=["inactive", "account", "system", "promotional"],
+    )
+    def test_one_it_may_not_subscribe_to_is_like_no_newsletter_at_all(
+        self, client, topic, fields
+    ):
+        other = SubscriptionTopic.objects.create(
+            slug="other",
+            name="Other",
+            **{
+                "category": SubscriptionTopic.TopicCategory.NEWSLETTER,
+                **fields,
+            },
+        )
+
+        response = _post(client, topic=other.pk)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json()["code"] == "newsletter_unavailable"
+        assert client.get(URL, {"topic": other.pk}).json() == {
+            "available": False
+        }
+        assert UserSubscription.objects.count() == 0
+
+    def test_an_unknown_one_is_like_no_newsletter_at_all(self, client, topic):
+        response = _post(client, topic=987654)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert client.get(URL, {"topic": "987654"}).json() == {
+            "available": False
+        }
+
+    def test_a_topic_that_is_no_number_is_refused(self, client, topic):
+        assert _post(client, topic="weekly").status_code == 400
+        assert client.get(URL, {"topic": "weekly"}).json() == {
+            "available": False
+        }

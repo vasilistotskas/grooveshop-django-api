@@ -50,6 +50,8 @@ def accepts_value(kind: str, value: Any) -> bool:
         ReferenceKind.BLOG_CATEGORY,
         ReferenceKind.BLOG_POST,
         ReferenceKind.MEDIA,
+        ReferenceKind.PROMOTION,
+        ReferenceKind.TOPIC,
     }:
         return (
             isinstance(value, int)
@@ -92,6 +94,26 @@ def _content_pages() -> QuerySet[Any]:
     return ContentPage.objects.all()
 
 
+def _promotions() -> QuerySet[Any]:
+    """An offer a page may hand out the code of: live, one the store may
+    advertise (``publicly_listable``, the rule of every discovery surface), and
+    holding a code it may show, which an automatic offer does not."""
+    from promotion.models import Promotion
+
+    return (
+        Promotion.objects.live()
+        .publicly_listable()
+        .filter(publishable_code_count__gt=0)
+    )
+
+
+def _topics() -> QuerySet[Any]:
+    """A topic the newsletter form may subscribe a visitor to."""
+    from user.models.subscription import SubscriptionTopic
+
+    return SubscriptionTopic.objects.newsletters()
+
+
 def _pages() -> QuerySet[Any]:
     """A page is named by its key: the store's ``page:<key>`` document or
     the ``template:<key>`` of a fixed page type (home, about, ...), draft
@@ -111,6 +133,8 @@ VISIBLE: dict[str, Callable[[], QuerySet[Any]]] = {
     ReferenceKind.BLOG_POST: _blog_posts,
     ReferenceKind.CONTENT_PAGE: _content_pages,
     ReferenceKind.PAGE: _pages,
+    ReferenceKind.PROMOTION: _promotions,
+    ReferenceKind.TOPIC: _topics,
 }
 
 #: The field a kind of reference is named by in the store (everything else

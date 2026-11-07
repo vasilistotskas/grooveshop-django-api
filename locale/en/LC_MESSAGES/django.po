@@ -775,6 +775,9 @@ msgstr "A new security key has been added."
 msgid "A new set of Two-Factor Authentication recovery codes has been generated."
 msgstr "A new set of Two-Factor Authentication recovery codes has been generated."
 
+msgid "A newsletter topic to ask about, instead of the store's default."
+msgstr "A newsletter topic to ask about, instead of the store's default."
+
 msgid "A note is required."
 msgstr "A note is required."
 
@@ -14092,6 +14095,9 @@ msgstr "The marketing emails this store sends, each with whether your account's 
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
+
+msgid "The newsletter topic to subscribe to. The store's default when left out."
+msgstr "The newsletter topic to subscribe to. The store's default when left out."
 
 msgid "The number of the version this one restores (kind restore)."
 msgstr "The number of the version this one restores (kind restore)."

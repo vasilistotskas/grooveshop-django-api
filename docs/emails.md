@@ -148,6 +148,13 @@ Declared in `user/emails.py` and `cart/emails.py`:
 
 ### The newsletter form's answer
 
+A form subscribes to the store's default newsletter topic, or to the one it
+names (`topic`, set on the page builder's `newsletter_signup`). Only an active
+topic of the `NEWSLETTER` category can be named: what the visitor ticks says
+"newsletter" and is stored as the proof of their consent, so it must be true of
+the topic. Anything else answers `404 newsletter_unavailable`, like a store with
+no default topic, an answer about the store and never about the address.
+
 `POST /api/v1/user/subscription/newsletter` answers every visitor the same
 `202` and does every address-dependent step in `subscribe_to_newsletter_task`,
 so neither the body nor the cost tells a known address from a new one. What the

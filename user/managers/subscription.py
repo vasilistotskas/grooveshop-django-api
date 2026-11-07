@@ -42,6 +42,12 @@ class SubscriptionTopicQuerySet(TranslatableOptimizedQuerySet):
             is_default=True, is_active=True, category="NEWSLETTER"
         )
 
+    def newsletters(self) -> Self:
+        """The topics the newsletter form may subscribe a visitor to. Only
+        newsletters: what the visitor ticks says so, and it is stored as the
+        proof of their consent, so it must be true of the topic."""
+        return self.filter(is_active=True, category="NEWSLETTER")
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.

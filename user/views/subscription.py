@@ -4,7 +4,11 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -479,6 +483,10 @@ class NewsletterSubscribeView(APIView):
     A confirmed address that skipped the save and the broker publish
     answered measurably faster than a new one; now nothing differs.
 
+    A form on a page may name another newsletter topic of the store
+    (``SubscriptionTopic.objects.newsletters``). One that is unknown,
+    inactive or no newsletter answers like a store with no default topic.
+
     The consent snapshot is taken HERE, because it describes this
     request: the exact sentence the visitor agreed to (supplied by the
     storefront server, which renders it), the visitor's IP as far as it
@@ -525,14 +533,38 @@ class NewsletterSubscribeView(APIView):
             "when a newsletter form submission can be honoured."
         ),
         tags=["User Subscriptions"],
+        parameters=[
+            OpenApiParameter(
+                name="topic",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description=_(
+                    "A newsletter topic to ask about, instead of the store's "
+                    "default."
+                ),
+            ),
+        ],
         responses={
             200: NewsletterAvailabilitySerializer,
             404: ErrorResponseSerializer,
         },
     )
     def get(self, request):
-        available = SubscriptionTopic.objects.default_newsletter().exists()
-        return Response({"available": available})
+        raw = request.query_params.get("topic")
+        if raw is not None and not (raw.isascii() and raw.isdigit()):
+            return Response({"available": False})
+        topic = self._topic(None if raw is None else int(raw))
+        return Response({"available": topic is not None})
+
+    @staticmethod
+    def _topic(topic_id: int | None) -> SubscriptionTopic | None:
+        """The topic a form subscribes to: the one it names, or the store's
+        default. An answer about the store, never about the address."""
+        topics = SubscriptionTopic.objects
+        if topic_id is None:
+            return topics.default_newsletter().first()
+        return topics.newsletters().filter(pk=topic_id).first()
 
     @extend_schema(
         operation_id="subscribeToNewsletter",
@@ -562,7 +594,7 @@ class NewsletterSubscribeView(APIView):
         serializer = NewsletterSubscribeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        topic = SubscriptionTopic.objects.default_newsletter().first()
+        topic = self._topic(serializer.validated_data.get("topic"))
         if topic is None:
             return Response(
                 {

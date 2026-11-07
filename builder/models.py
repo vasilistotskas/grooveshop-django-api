@@ -424,6 +424,8 @@ class ReferenceKind(models.TextChoices):
     BLOG_CATEGORY = "blogCategory", _("Blog category")
     CONTENT_PAGE = "contentPage", _("Content page")
     BLOG_POST = "blogPost", _("Blog post")
+    PROMOTION = "promotion", _("Promotion")
+    TOPIC = "topic", _("Subscription Topic")
     #: Not records: the lists a document asks for (``builder.data_sources``).
     #: ``target`` is a facet (``*``, ``category:<id>``, ``parent:<id>``).
     QUERY_PRODUCT = "queryProduct", _("Product list")

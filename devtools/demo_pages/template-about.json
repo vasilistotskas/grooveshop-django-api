@@ -198,8 +198,11 @@
       "f21b42d9-8e2d-4a32-8b46-d58e8c5f9cb9": {
         "settings": {
           "body": "Το 2019 ψάχναμε ένα καλώδιο που να αντέχει. Δεν το βρήκαμε, οπότε αρχίσαμε να διαλέγουμε μόνοι μας τι αξίζει να μπει στο συρτάρι.",
-          "ctaLink": {
-            "route": "/products"
+          "ctaAction": {
+            "kind": "link",
+            "to": {
+              "route": "/products"
+            }
           },
           "ctaText": "Δες τη γκάμα",
           "decor": "orbs",
@@ -207,7 +210,7 @@
           "imageUrl": "/img/main-banner.png",
           "heading": "Ξεκινήσαμε από ένα συρτάρι με καλώδια"
         },
-        "type": "media_text@2"
+        "type": "media_text@3"
       },
       "ff8b5710-dfe2-4a69-b935-374dbc4067b6": {
         "settings": {

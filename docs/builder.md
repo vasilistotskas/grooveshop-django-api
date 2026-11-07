@@ -204,6 +204,17 @@ and "where is it used" then treat it like any other reference. A link is not
 translatable: it resolves to the path of the viewer's language, so an overlay
 value on it is `untranslatable_setting`.
 
+**A button's action.** `cta_banner`, `hero_banner` and `media_text` hold what
+their main button does as one object, `{kind, to | product | promotion}`: a
+closed set of kinds, each naming one target (`builderField.action` in the
+storefront). Nothing here knows the word: the catalogue's `oneOf` is the rule,
+its `to` is a `linkRefs` pointer and its `product` and `promotion` are `data`
+references, so they are checked, indexed and purged like any other.
+`tests/fixtures/builder/action-cases.json` holds the rule equal to the
+storefront's parse. A `promotion` is an offer a page may hand out the code of
+(`references._promotions`: live, publicly listable, with a code it may show); a
+`topic`, named by `newsletter_signup`, is a newsletter the form may subscribe to.
+
 
 ### A theme keeps its contrast (`builder/contrast.py`)
 
@@ -272,8 +283,8 @@ sources (`tests/unit/builder/test_data_sources.py` runs every case).
 A valid value yields two kinds of index row, both in `BuilderVersion.refs` and,
 for the current release, `BuilderReference`:
 
-- the records it names (`product`, `category`, `blogCategory`, `blogPost`):
-  existence-checked at publish and listed by "used on N pages";
+- the records it names (`product`, `category`, `blogCategory`, `blogPost`,
+  `promotion`): existence-checked at publish and listed by "used on N pages";
 - the lists it asks for, as a query kind (`queryProduct`, `queryBlogPost`,
   `queryCategory`, `queryBlogCategory`, `queryPromotion`) whose `target` is a
   facet: `*` when no filter bounds the list, `category:<id>` or `parent:<id>`
@@ -451,8 +462,10 @@ it. No route is built here: the storefront composes the path from the slug.
 
 - `GET link-search?q=&kinds=&locale=` answers `{results: [{kind, id, label,
   slug, active}]}` over `product`, `category`, `blogPost`, `blogCategory`,
-  `page` and `contentPage` (`kinds` a comma-separated list, all when omitted,
-  an unknown one `400 invalid_link_search`). Grouped by kind in the order of
+  `page` and `contentPage`, and when asked for by name `promotion` and `topic`,
+  which have no page to link to (`kinds` a comma-separated list, what a link may
+  point at when omitted, an unknown one `400 invalid_link_search`). A
+  `promotion`'s `slug` is its code. Grouped by kind in the order of
   `kinds`, each group by label, at most `BUILDER_LINK_SEARCH_LIMIT` of a kind.
   `q` matches the label (in `locale`, else the default language, else the
   slug) or the slug, and a product's id. A `q` shorter than
@@ -462,7 +475,7 @@ it. No route is built here: the storefront composes the path from the slug.
   `contentPage`; a `page` result also has `source` (`page` for a store page,
   `template` for a fixed page type). A page is labelled with its SEO title in
   `locale`, else its default one, else its key; a template with its key.
-- `GET link-labels?product=1,2&category=&blogPost=&blogCategory=&page=&contentPage=&locale=`
+- `GET link-labels?product=1,2&category=&blogPost=&blogCategory=&page=&contentPage=&promotion=&topic=&locale=`
   answers `{kind: {id: {label, active}}}` for the ids asked about, so a stored
   reference shows its name: `active` is the same rule, an inactive or
   unpublished record keeps its `label` with `active: false`, and an id that
@@ -798,6 +811,7 @@ files (the media service's image limits are copied the same way, see
 |---|---|---|
 | `test/fixtures/builder/catalogue.json` | `builder/seed_catalogue.json` | the seeds and real-catalogue tests: a snapshot of the block catalogue |
 | `test/fixtures/builder/seeds/` | `builder/seeds/` | `builder.seeding`: application data |
+| `test/fixtures/builder/action-cases.json` | `tests/fixtures/builder/action-cases.json` | `tests/unit/builder/test_action_cases.py`: what a button's action may hold |
 
 `tests/fixtures/upstream-sources.lock.json` names each owner's commit and
 the git id of each source (the tree id of a directory, the blob id of a file).

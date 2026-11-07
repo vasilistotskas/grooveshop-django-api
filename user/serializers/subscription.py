@@ -320,6 +320,14 @@ class NewsletterSubscribeSerializer(serializers.Serializer):
         trim_whitespace=True,
         help_text=_("The exact consent sentence shown to the visitor."),
     )
+    topic = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        help_text=_(
+            "The newsletter topic to subscribe to. The store's default when "
+            "left out."
+        ),
+    )
 
     def validate_consent(self, value: bool) -> bool:
         if value is not True:

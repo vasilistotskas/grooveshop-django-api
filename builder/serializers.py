@@ -513,6 +513,10 @@ class LinkLabelsResponseSerializer(serializers.Serializer):
     content_page = serializers.DictField(
         child=LinkLabelSerializer(), required=False
     )
+    promotion = serializers.DictField(
+        child=LinkLabelSerializer(), required=False
+    )
+    topic = serializers.DictField(child=LinkLabelSerializer(), required=False)
 
 
 class LinkTargetsResponseSerializer(serializers.Serializer):

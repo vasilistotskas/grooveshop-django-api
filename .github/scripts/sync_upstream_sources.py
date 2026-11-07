@@ -140,6 +140,13 @@ SOURCES: tuple[Source, ...] = (
         "blob",
     ),
     Source(
+        "action-cases",
+        STOREFRONT,
+        "test/fixtures/builder/action-cases.json",
+        "tests/fixtures/builder/action-cases.json",
+        "blob",
+    ),
+    Source(
         "contrast-cases",
         STOREFRONT,
         "test/fixtures/builder/contrast-cases.json",

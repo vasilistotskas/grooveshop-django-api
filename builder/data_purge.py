@@ -201,10 +201,15 @@ def _blog_category_documents(category_id: int) -> set[str]:
 
 def _promotion_documents() -> set[str]:
     """A promotion changes the discount badge and price of any card: every
-    page that shows a product, as well as the pages that list offers."""
+    page that shows a product, as well as the pages that list offers and those
+    with a button that hands out a code."""
     return documents_for(
         lists=[(ReferenceKind.QUERY_PROMOTION, {ANY})],
-        any_record_of=[ReferenceKind.PRODUCT, ReferenceKind.QUERY_PRODUCT],
+        any_record_of=[
+            ReferenceKind.PRODUCT,
+            ReferenceKind.QUERY_PRODUCT,
+            ReferenceKind.PROMOTION,
+        ],
     )
 
 

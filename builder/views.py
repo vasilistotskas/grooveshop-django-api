@@ -862,7 +862,9 @@ class LinkSearchView(StaffView):
                     "Comma-separated kinds to search, in the order of the "
                     "answer: "
                     + ", ".join(k.value for k in link_picker.PICKER_KINDS)
-                    + ". All when omitted."
+                    + ". When omitted, what a link may point at: "
+                    + ", ".join(k.value for k in link_picker.LINK_KINDS)
+                    + "."
                 ),
             ),
             LOCALE_OPENAPI_PARAMETER,
@@ -874,13 +876,14 @@ class LinkSearchView(StaffView):
         description=(
             "`{results: [{kind, id, label, slug, active}]}`, grouped by "
             "kind and ordered by label, at most `BUILDER_LINK_SEARCH_LIMIT` "
-            "of each kind. Only what a link may point at (the rule a "
+            "of each kind. Only what a setting may point at (the rule a "
             "publish checks references with), so `active` is always true. "
-            "`id` is a number for products, categories, posts and blog "
-            "categories and the key or slug for pages and content pages; "
-            "a page result also has `source` (`page` or `template`). The "
-            "label is in `locale`, else the default language, else the "
-            "slug. The storefront builds the path from the slug."
+            "`id` is a number for products, categories, posts, blog "
+            "categories, promotions and topics, and the key or slug for "
+            "pages and content pages; a page result also has `source` "
+            "(`page` or `template`). The label is in `locale`, else the "
+            "default language, else the slug. The storefront builds the "
+            "path from the slug. A promotion's `slug` is its code."
         ),
     )
     def get(self, request: Request) -> Response:
@@ -898,7 +901,7 @@ class LinkSearchView(StaffView):
     def _kinds(request: Request) -> list[ReferenceKind]:
         raw = request.query_params.get("kinds")
         if not raw:
-            return list(link_picker.PICKER_KINDS)
+            return list(link_picker.LINK_KINDS)
         kinds: list[ReferenceKind] = []
         for part in raw.split(","):
             if part not in link_picker.PICKER_KINDS:

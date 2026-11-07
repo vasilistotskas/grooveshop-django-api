@@ -144,16 +144,12 @@ def subscribe_to_newsletter_task(
         subscribe_email_to_newsletter,
     )
 
-    topic = (
-        SubscriptionTopic.objects.default_newsletter()
-        .filter(pk=topic_id)
-        .first()
-    )
+    topic = SubscriptionTopic.objects.newsletters().filter(pk=topic_id).first()
     if topic is None:
-        # The topic stopped being the default between request and run.
+        # The topic stopped being a newsletter on offer between request and run.
         logger.info(
-            "subscribe_to_newsletter_task: topic %s is no longer the "
-            "default newsletter topic",
+            "subscribe_to_newsletter_task: topic %s is no longer a "
+            "newsletter on offer",
             topic_id,
         )
         return {"status": "skipped", "reason": "topic_unavailable"}

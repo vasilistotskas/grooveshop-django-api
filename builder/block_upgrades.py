@@ -148,6 +148,20 @@ def _title_into_heading(settings: Settings) -> Settings:
     return {**kept, "heading": text} if text else kept
 
 
+def _link_into_action(link: str, action: str) -> Upgrade:
+    """A button that could only link can now do more: its link becomes an
+    action that links, under the setting that replaces it. Its label keeps its
+    name, so no translation moves."""
+
+    def upgrade(settings: Settings) -> Settings:
+        kept = dict(settings)
+        if link in kept:
+            kept[action] = {"kind": "link", "to": kept.pop(link)}
+        return kept
+
+    return upgrade
+
+
 #: ``{block type: {version: the upgrade to the next one}}``, with the arguments
 #: of each block's ``upgrade`` in the storefront's ``app/blocks/*.block.ts``.
 UPGRADES: dict[str, dict[int, Upgrade]] = {
@@ -171,9 +185,18 @@ UPGRADES: dict[str, dict[int, Upgrade]] = {
     "offers_preview": {1: _offers(3), 2: _title_into_heading},
     "hero_slide": {1: _hero_slide},
     "contact_panel": {1: _title_into_heading},
-    "cta_banner": {1: _title_into_heading},
-    "hero_banner": {1: _title_into_heading},
-    "media_text": {1: _title_into_heading},
+    "cta_banner": {
+        1: _title_into_heading,
+        2: _link_into_action("buttonLink", "buttonAction"),
+    },
+    "hero_banner": {
+        1: _title_into_heading,
+        2: _link_into_action("ctaLink", "ctaAction"),
+    },
+    "media_text": {
+        1: _title_into_heading,
+        2: _link_into_action("ctaLink", "ctaAction"),
+    },
     "newsletter_signup": {1: _title_into_heading},
     "recently_viewed": {1: _title_into_heading},
     "story_timeline": {1: _title_into_heading},

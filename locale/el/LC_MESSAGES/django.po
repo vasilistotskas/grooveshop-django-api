@@ -780,6 +780,9 @@ msgstr "Προστέθηκε νέο κλειδί ασφαλείας."
 msgid "A new set of Two-Factor Authentication recovery codes has been generated."
 msgstr "Δημιουργήθηκε νέο σετ κωδικών ανάκτησης για την ταυτοποίηση δύο παραγόντων."
 
+msgid "A newsletter topic to ask about, instead of the store's default."
+msgstr "Ένα θέμα ενημερωτικού δελτίου για το οποίο γίνεται η ερώτηση, αντί για το προεπιλεγμένο του καταστήματος."
+
 msgid "A note is required."
 msgstr "Η σημείωση είναι υποχρεωτική."
 
@@ -14095,6 +14098,9 @@ msgstr "Τα προωθητικά email που στέλνει αυτό το κα
 
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
+
+msgid "The newsletter topic to subscribe to. The store's default when left out."
+msgstr "Το θέμα ενημερωτικού δελτίου στο οποίο γίνεται η εγγραφή. Αν λείπει, το προεπιλεγμένο του καταστήματος."
 
 msgid "The number of the version this one restores (kind restore)."
 msgstr "Ο αριθμός της έκδοσης που επαναφέρει αυτή (είδος επαναφορά)."

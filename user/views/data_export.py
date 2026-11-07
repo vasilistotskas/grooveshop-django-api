@@ -37,10 +37,9 @@ def export_file_response(export: UserDataExport) -> FileResponse:
     if not export.is_ready:
         raise NotFound(_("Export not ready."), code="export_not_ready")
 
+    # Only ``cleanup_expired_data_exports`` marks a row expired: it skips the
+    # rows that are, so marking one here would leave its file on disk for good.
     if export.expires_at and export.expires_at < timezone.now():
-        UserDataExport.objects.filter(pk=export.pk).update(
-            status=UserDataExport.Status.EXPIRED
-        )
         raise ExportExpired
 
     abs_path = os.path.join(get_export_location(), export.file_path)

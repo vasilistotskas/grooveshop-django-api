@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -12,6 +13,7 @@ from rest_framework.test import APIClient
 
 from user.factories.account import UserAccountFactory
 from user.models.data_export import UserDataExport
+from user.tasks import cleanup_expired_data_exports
 
 pytestmark = pytest.mark.django_db
 
@@ -121,16 +123,26 @@ def test_export_not_ready_is_not_found(export_dir):
     assert response.data["code"] == "export_not_ready"
 
 
-def test_expired_export_is_gone_and_recorded(export_dir):
+def test_expired_export_is_gone_and_its_file_still_reaches_the_cleanup(
+    export_dir,
+):
     owner = UserAccountFactory()
     export = make_export(
         owner, export_dir, expires_at=timezone.now() - timedelta(minutes=1)
     )
+    bundle = export_dir / export.file_path
 
     response = client_of(owner).get(download_url(owner, export))
 
     assert response.status_code == 410
     assert response.data["code"] == "download_expired"
+
+    with patch(
+        "user.services.gdpr.get_export_location", return_value=str(export_dir)
+    ):
+        cleanup_expired_data_exports()
+
+    assert not bundle.exists()
     export.refresh_from_db()
     assert export.status == UserDataExport.Status.EXPIRED
 

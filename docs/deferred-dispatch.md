@@ -27,12 +27,23 @@ never reaches the caller:
    row older than `DEFERRED_DISPATCH_RETENTION_DAYS` is deleted with an `ERROR`
    (the work was not done) and its masked payload in the log.
 
-The sweep publishes outside any transaction, because a broker that stops
-answering can hold a publish for longer than
-`idle_in_transaction_session_timeout`, and losing the transaction would send every
-row already published a second time. It claims its rows first, moving
-`next_attempt_at` on by `DEFERRED_DISPATCH_LEASE_SECONDS`, so two overlapping runs
-never take the same row and a run killed half way sends at most one row twice.
+One sweep runs at a time, and it publishes outside any transaction. A publish
+can wait without end: while RabbitMQ blocks publishers (a memory or disk alarm)
+the producer waits for its confirm, and closing the channel after a failed publish
+waits too, which a publish timeout does not cover. Measured on a local broker with
+its memory alarm on: still waiting after 75 s, with a 3 s publish timeout or
+without. A transaction held across that would be ended by
+`idle_in_transaction_session_timeout` and send every row already published a
+second time, and any lease could be outlived. So a sweep holds a session-level
+advisory lock (`pg_try_advisory_lock`), and one that finds it held does nothing.
+The lock ends with the session if the worker dies; the next sweep then sends again
+at most the one row that was going out.
+
+A healthy sweep takes seconds and beat sends one a minute, so a sweep that finds
+the lock held logs a WARNING with how many rows are due and the oldest. The
+connection pool resets nothing on a returned connection, so an unlock that
+releases nothing is an ERROR: a lock left held would stop every sweep until the
+pool retires that connection (an hour by default).
 
 A failed publish holds its caller for all of Celery's connection retries, and an
 order makes six of them, so one failure tells this process to keep the next ones

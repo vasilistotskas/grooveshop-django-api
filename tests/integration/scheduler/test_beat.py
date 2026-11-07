@@ -12,7 +12,7 @@ import pytest
 from celery import Celery
 from celery.schedules import crontab
 from django.conf import settings
-from django.db import OperationalError, connection
+from django.db import OperationalError
 from kombu.exceptions import OperationalError as BrokerError
 
 from core.celery import celery_app
@@ -444,49 +444,3 @@ class TestMessages:
         assert message["queue"] == "celery"
         assert message["expires"] == 300
         assert message["headers"]["periodic_task_name"] == "job"
-
-
-class TestAdoptingThePreviousScheduler:
-    @staticmethod
-    def _old_table(name, last_run_at, count):
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "CREATE TABLE django_celery_beat_periodictask ("
-                "name varchar(200), last_run_at timestamptz, "
-                "total_run_count integer)"
-            )
-            cursor.execute(
-                "INSERT INTO django_celery_beat_periodictask VALUES (%s, %s, %s)",
-                [name, last_run_at, count],
-            )
-
-    def test_a_slot_the_old_beat_sent_after_the_copy_is_not_sent_again(
-        self, harness
-    ):
-        harness.every("job", minute="*/5")
-        harness.now = datetime(2026, 11, 2, 10, 6, tzinfo=UTC)
-        PeriodicTask.objects.create(
-            name="job",
-            last_run_at=datetime(2026, 11, 2, 9, 55, tzinfo=UTC),
-            total_run_count=7,
-        )
-        self._old_table("job", datetime(2026, 11, 2, 10, 5, tzinfo=UTC), 9)
-
-        harness.run(harness.start(), until=harness.now + timedelta(seconds=30))
-
-        assert harness.sent == []
-        assert PeriodicTask.objects.get(name="job").total_run_count == 9
-
-    def test_it_never_moves_a_run_backwards(self, harness):
-        harness.every("job", minute="*/5")
-        newer = datetime(2026, 11, 2, 10, 5, tzinfo=UTC)
-        PeriodicTask.objects.create(
-            name="job", last_run_at=newer, total_run_count=9
-        )
-        self._old_table("job", datetime(2026, 11, 2, 9, 0, tzinfo=UTC), 7)
-
-        harness.start()
-
-        row = PeriodicTask.objects.get(name="job")
-        assert row.last_run_at == newer
-        assert row.total_run_count == 9

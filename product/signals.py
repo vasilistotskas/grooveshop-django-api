@@ -2,11 +2,21 @@ import logging
 
 import django.dispatch
 from django.conf import settings
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import (
+    post_delete,
+    post_save,
+    pre_delete,
+    pre_save,
+)
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
 from order.enum.stock_log_reason import StockLogReason
+from product.enum.search_text import SearchTextSource
+from product.models.attribute import Attribute
+from product.models.attribute_value import AttributeValue
+from product.models.brand import Brand
+from product.models.category import ProductCategory
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 from tenant.celery import dispatch_on_commit
@@ -490,3 +500,57 @@ def sync_prices_on_vat_delete(sender, instance, **kwargs):
         dispatch_on_commit(
             sync_price_records, kwargs={"product_ids": product_ids}
         )
+
+
+def _watch_search_text(sender, source: SearchTextSource, field: str) -> None:
+    """Reindex a row's products when its ``field`` changes.
+
+    The product document carries this text, but the row is saved on its
+    own, so ``Product``'s receivers never run. Only a changed value
+    queues work: a category edited for its description would otherwise
+    reindex every product in it. A translation added to a row that has
+    products changes the text of that language's documents; a brand
+    created just now has none.
+    """
+    uid = f"product.search_text.{sender._meta.label_lower}"
+
+    @receiver(pre_save, sender=sender, dispatch_uid=f"{uid}.before")
+    def remember_text(sender, instance, **kwargs):
+        instance._search_text_before = (
+            sender._base_manager.filter(pk=instance.pk)
+            .values_list(field, flat=True)
+            .first()
+            if instance.pk
+            else None
+        )
+
+    @receiver(post_save, sender=sender, dispatch_uid=f"{uid}.saved")
+    def reindex_after_save(sender, instance, created, **kwargs):
+        owner_id = getattr(instance, "master_id", None)
+        if created and owner_id is None:
+            return
+        if instance._search_text_before == getattr(instance, field):
+            return
+        if settings.MEILISEARCH.get("OFFLINE", False):
+            return
+
+        from product.tasks import reindex_products_for_search_text
+
+        dispatch_on_commit(
+            reindex_products_for_search_text,
+            kwargs={"source": source.value, "pk": owner_id or instance.pk},
+        )
+
+
+_watch_search_text(Brand, SearchTextSource.BRAND, "name")
+_watch_search_text(
+    ProductCategory._parler_meta.root_model, SearchTextSource.CATEGORY, "name"
+)
+_watch_search_text(
+    Attribute._parler_meta.root_model, SearchTextSource.ATTRIBUTE, "name"
+)
+_watch_search_text(
+    AttributeValue._parler_meta.root_model,
+    SearchTextSource.ATTRIBUTE_VALUE,
+    "value",
+)

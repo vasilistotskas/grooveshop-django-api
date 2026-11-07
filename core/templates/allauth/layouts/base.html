@@ -1,0 +1,58 @@
+{% load i18n static store_brand %}{% store_brand as brand %}{% get_current_language as LANGUAGE_CODE %}<!DOCTYPE html>
+{% comment %}
+The frame of every page allauth renders on a store's API host: sign-in,
+sign-up, codes, passwords, MFA, account management, and the OAuth
+consent and device pages an AI agent sends a shopper to. It wears the
+store's name, logo, favicon and colour (core/templatetags/store_brand.py);
+the styles are the account-* components in tailwind/input.css.
+{% endcomment %}
+<html lang="{{ LANGUAGE_CODE }}" style="--brand: {{ brand.primary }}; --brand-dark: {{ brand.primary_dark }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex">
+        <title>{% block head_title %}{% endblock head_title %} · {{ brand.name }}</title>
+        {% if brand.favicon %}<link rel="icon" href="{{ brand.favicon }}">{% endif %}
+        <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+        {% block extra_head %}{% endblock extra_head %}
+    </head>
+    <body class="account-page">
+        {% block body %}
+            <header class="account-header">
+                <a href="{{ brand.home_url }}" class="account-brand">
+                    {% if brand.logo %}
+                        <picture>
+                            <source srcset="{{ brand.logo.dark }}" media="(prefers-color-scheme: dark)">
+                            <img src="{{ brand.logo.light }}" alt="{{ brand.name }}" class="account-logo">
+                        </picture>
+                    {% else %}
+                        {{ brand.name }}
+                    {% endif %}
+                </a>
+            </header>
+            {% comment %}Who is signed in, and the way out: on the OAuth consent a shopper must see which account an AI app gets, and be able to switch.{% endcomment %}
+            {% if user.is_authenticated %}
+                <p class="account-session">
+                    {% blocktranslate with email=user.email %}Signed in as {{ email }}{% endblocktranslate %}
+                    {% comment %}Back to this page after signing out, so a shopper who switches account on the consent carries on with it.{% endcomment %}
+                    · <a href="{% url 'account_logout' %}?next={{ request.get_full_path|urlencode }}">{% translate "Sign Out" %}</a>
+                </p>
+            {% elif request.resolver_match.url_name != "account_login" %}
+                <p class="account-session"><a href="{% url 'account_login' %}">{% translate "Sign In" %}</a></p>
+            {% endif %}
+            {% block nav %}{% endblock nav %}
+            <main class="account-card">
+                {% if messages %}
+                    {% for message in messages %}
+                        <p class="account-alert" role="status">{{ message }}</p>
+                    {% endfor %}
+                {% endif %}
+                {% block content %}{% endblock content %}
+            </main>
+            <footer class="account-footer">
+                <a href="{{ brand.home_url }}">{% blocktranslate with store=brand.name %}Back to {{ store }}{% endblocktranslate %}</a>
+            </footer>
+        {% endblock body %}
+        {% block extra_body %}{% endblock extra_body %}
+    </body>
+</html>

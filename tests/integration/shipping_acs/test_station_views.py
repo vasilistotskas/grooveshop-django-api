@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -10,7 +12,12 @@ from rest_framework.test import APIClient
 from shipping_acs.enum.shop_kind import AcsShopKind
 from shipping_acs.factories import AcsStationFactory
 
-pytestmark = pytest.mark.django_db
+# The routes serve only a store with ACS credentials; the last test
+# covers one without.
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("acs_configured_tenant"),
+]
 
 
 def test_list_defaults_to_locker_kinds_only():
@@ -151,3 +158,34 @@ def test_retrieve_by_uuid_disambiguates_shared_station_codes():
         body = response.json()
         assert body["uuid"] == str(station.uuid)
         assert body["branchCode"] == station.branch_code
+
+
+@pytest.mark.parametrize(
+    ("route", "query"),
+    [
+        ("shipping-acs-station-list", {}),
+        ("shipping-acs-station-nearest", {"postalCode": "10557"}),
+    ],
+)
+def test_a_store_without_acs_credentials_has_no_stations(
+    bind_tenant, route, query
+):
+    """No credentials: the nightly sync skips the store and its checkout
+    never offers ACS, so its station routes answer 404 rather than an
+    empty list a client reads as a catalogue not synced yet."""
+    station = AcsStationFactory(
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER, postal_code="10557"
+    )
+    bind_tenant(SimpleNamespace(schema_name="test-no-acs"))
+
+    client = APIClient()
+    response = client.get(reverse(route), query)
+    detail = client.get(
+        reverse(
+            "shipping-acs-station-detail", kwargs={"uuid": str(station.uuid)}
+        )
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["code"] == "not_found"
+    assert detail.status_code == status.HTTP_404_NOT_FOUND

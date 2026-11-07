@@ -134,7 +134,8 @@ line sees both, once each. In production it is one JSON object (the
  "schema": "webside", "correlation_id": "…",
  "message": "POST api/v1/order/<int:pk>/create_payment_intent 400 812.4ms payment_intent_failed",
  "method": "POST", "route": "api/v1/order/<int:pk>/create_payment_intent",
- "status": 400, "duration_ms": 812.4, "code": "payment_intent_failed"}
+ "status": 400, "duration_ms": 812.4, "db_queries": 14, "db_ms": 233.1,
+ "code": "payment_intent_failed"}
 ```
 
 - `route` is the URL pattern, never the path; `schema` is the store. No
@@ -147,6 +148,13 @@ line sees both, once each. In production it is one JSON object (the
   character, personal data included; the JSON formatter escapes it, so it
   cannot add a field or a line, and it must be treated as untrusted when
   read back (never as a key, a path or a template).
+- `db_queries` and `db_ms` are what the request cost the database: the number of
+  queries it ran on any configured alias and the time spent in them, measured
+  by `core/db_cost.py` (a `connection.execute_wrapper` per alias, about 1
+  microsecond per query). `duration_ms` minus `db_ms` is Python, Redis and
+  outbound calls. A `MonitoredTask` completion or failure line carries the same
+  two fields and its own `duration_ms`. Queries a view hands to a thread other
+  than the request thread are not counted.
 - `level` is `WARNING` for a 5xx and `INFO` otherwise. `django.request`
   still logs every 5xx at `ERROR` (with the traceback when an exception
   caused it); the access line never repeats the traceback.

@@ -11,7 +11,7 @@ import logging
 from unittest.mock import patch
 
 import pytest
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -33,7 +33,9 @@ def _refusals(caplog):
 
 def test_a_plan_gate_refusal_is_logged(caplog, monkeypatch):
     tenant = store_tenant("gate_log_blog_off", blog_enabled=False)
-    monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+    )
 
     with caplog.at_level(logging.INFO, logger="tenant.permissions"):
         response = APIClient().get(reverse("blog-post-list"))
@@ -68,7 +70,9 @@ def test_a_store_setting_refusal_is_logged(caplog):
 
 def test_an_open_gate_logs_nothing(caplog, monkeypatch):
     tenant = store_tenant("gate_log_blog_on", blog_enabled=True)
-    monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+    )
 
     with caplog.at_level(logging.INFO, logger="tenant.permissions"):
         response = APIClient().get(reverse("blog-post-list"))

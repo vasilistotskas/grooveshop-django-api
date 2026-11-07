@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 
 from core.logging import TenantContextFilter
 
@@ -51,7 +51,9 @@ class TestTenantContextFilter:
     def test_falls_back_to_sentinel_when_tenant_attribute_missing(
         self, monkeypatch
     ):
-        monkeypatch.delattr(connection, "tenant", raising=False)
+        monkeypatch.delattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", raising=False
+        )
         record = _record()
         assert TenantContextFilter().filter(record) is True
         assert record.schema_name == "-"

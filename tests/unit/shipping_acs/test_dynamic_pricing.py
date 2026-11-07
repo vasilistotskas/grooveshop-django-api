@@ -449,13 +449,13 @@ def test_station_origin_parses_from_billing_code(monkeypatch):
     """
     from types import SimpleNamespace
 
-    from django.db import connection
+    from django.db import DEFAULT_DB_ALIAS, connections
 
     from shipping_acs import config as acs_config
 
     def _bind(billing_code: str) -> None:
         monkeypatch.setattr(
-            connection,
+            connections[DEFAULT_DB_ALIAS],
             "tenant",
             SimpleNamespace(acs_billing_code=billing_code),
             raising=False,

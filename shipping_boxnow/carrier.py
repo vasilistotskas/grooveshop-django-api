@@ -321,12 +321,15 @@ class BoxNowCarrier(ShippingCarrierInterface):
             extra={"order_id": order.id, "carrier": "boxnow"},
         )
         # Stamp the caller-captured tenant schema — see the base
-        # method's contract.
-        from django.db import connection
+        # method's contract. A broker failure is kept as a
+        # ``DeferredDispatch`` instead of leaving a paid order with no
+        # shipment.
+        from tenant.celery import dispatch_on_commit
 
-        create_boxnow_shipment_for_order.apply_async(
-            args=[order.id],
-            headers={"_schema_name": schema_name or connection.schema_name},
+        dispatch_on_commit(
+            create_boxnow_shipment_for_order,
+            [order.id],
+            schema_name=schema_name,
         )
 
     # Pricing is a ``ShippingRate`` row now (boxnow/CY/pickup_point,

@@ -29,6 +29,7 @@ from core.api.permissions import IsStoreStaff
 from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
+from core.retry import TRANSIENT_NETWORK_ERRORS
 from core.store_settings import store_setting
 from product.attribute_selection import (
     ATTRIBUTE_VALUES_FIELD,
@@ -827,12 +828,19 @@ def search_click(request):
 
     from search.tasks import save_search_click
 
-    save_search_click.delay(
-        query_uuid=str(data["query_id"]),
-        result_id=str(data["result_id"]),
-        result_type=data["result_type"],
-        position=data["position"],
-    )
+    # An analytics beacon: when the broker is down the click is dropped
+    # and logged, like `SearchAnalyticsMiddleware` drops a query. It is
+    # not a `DeferredDispatch` row on purpose: this endpoint is open to
+    # anonymous traffic, and every beacon in an outage would be a row.
+    try:
+        save_search_click.delay(
+            query_uuid=str(data["query_id"]),
+            result_id=str(data["result_id"]),
+            result_type=data["result_type"],
+            position=data["position"],
+        )
+    except TRANSIENT_NETWORK_ERRORS:
+        logger.exception("Search click dropped: the broker is unreachable")
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 

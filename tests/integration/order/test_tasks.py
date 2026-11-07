@@ -22,6 +22,7 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
+from tests.utils.dispatch import assert_published_once
 from tests.utils.mydata import issuable, mydata_enabled
 
 
@@ -663,7 +664,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    @patch("order.tasks.send_invoice_to_mydata.delay")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     def test_generate_order_invoice_success(self, mock_render_pdf, mock_submit):
         _ship_a_receipt_order(self.order)
@@ -678,7 +679,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertTrue(hasattr(self.order, "invoice"))
         # The submission to AADE is chained once the PDF is ready; the
         # customer's email follows the MARK, not the PDF.
-        mock_submit.assert_called_once_with(self.order.id)
+        assert_published_once(mock_submit, [self.order.id])
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     def test_generate_order_invoice_gives_up_on_an_order_with_no_goods(
@@ -846,7 +847,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         original_status = self.order.status
         _sell_something(self.order)
 
-        with patch("order.tasks.send_invoice_to_mydata.delay"):
+        with patch("order.tasks.send_invoice_to_mydata.apply_async"):
             with mydata_enabled():
                 result = generate_order_invoice(self.order.id)
         self.assertTrue(result)

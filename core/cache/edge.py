@@ -47,6 +47,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 
+from tenant.celery import dispatch_on_commit
 from tenant.membership import bound_tenant
 
 logger = logging.getLogger(__name__)
@@ -340,7 +341,7 @@ def schedule_purge() -> bool:
         return False
     from core.tasks import purge_edge_cache_task
 
-    purge_edge_cache_task.apply_async(countdown=PURGE_DELAY_SECONDS)
+    dispatch_on_commit(purge_edge_cache_task, countdown=PURGE_DELAY_SECONDS)
     return True
 
 

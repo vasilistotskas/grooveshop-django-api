@@ -24,6 +24,7 @@ from unittest.mock import patch
 
 import pytest
 from django.db import connection
+from kombu.exceptions import OperationalError
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -32,6 +33,8 @@ from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models.shipment import AcsShipment
 from shipping_acs.services import AcsService
+from shipping_acs.tasks import acs_send_arrival_notification
+from tenant.models import DeferredDispatch
 
 pytestmark = pytest.mark.django_db
 
@@ -140,49 +143,66 @@ def test_the_marker_is_not_written_when_nothing_was_sent(shipment):
     assert AcsShipment.objects.get(pk=shipment.pk).arrival_notified_at is None
 
 
-def test_a_failed_broker_handoff_leaves_the_notification_retryable(
+def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
     shipment, monkeypatch
 ):
-    """The mark must not outlive a publish that never happened.
+    """A publish the broker refuses is kept, so the mark may be written.
 
-    A DB write and a broker publish cannot be made atomic without an
-    outbox. Marking first risks a permanent silent miss —
-    `task_publish_retry` is on but spends only ~0.6s, so an outage
-    longer than that loses the message while the committed marker stops
-    every later poll from trying again. Marking second risks at most one
-    duplicate, which `acs_send_arrival_notification` documents as
-    acceptable.
+    `dispatch_on_commit` turns a `kombu` `OperationalError` into a
+    `DeferredDispatch` row that the sweep publishes again, so the
+    notification is owed and will go out. The mark is the second hook: it
+    stops the next depot cycle from queueing a second notification while
+    the first waits in the table. (A bare `OSError`, which the helper does
+    not catch, would be a bug and still reaches the poller.)
     """
     monkeypatch.setattr(
         services, "AcsClient", _client_returning(["4", "3", "4"])
     )
 
-    def _broker_down(*args, **kwargs):
-        raise OSError("broker unreachable")
-
-    # The hook is registered non-robust, so the outage reaches the
-    # poller (whose task then retries) — and the marker stays unset.
-    with (
-        patch(
-            "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
-            side_effect=_broker_down,
-        ),
-        pytest.raises(OSError, match="broker unreachable"),
-    ):
+    with patch(
+        "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
+        side_effect=OperationalError("broker unreachable"),
+    ) as notify:
         AcsService.poll_shipment_tracking(shipment)
 
+    notify.assert_called_once()
+    row = DeferredDispatch.objects.get()
+    assert row.task_name == acs_send_arrival_notification.name
+    assert row.args == [shipment.id]
+    assert row.headers == {"_schema_name": SCHEMA}
+
     shipment.refresh_from_db()
-    assert shipment.arrival_notified_at is None, (
-        "the customer was never told, so nothing may claim they were"
+    assert shipment.arrival_notified_at is not None, (
+        "the notification is owed through the kept row, so the next poll "
+        "must not queue another"
     )
 
-    # The next depot cycle back out for delivery still notifies.
+    # The next depot cycle back out for delivery sends no second one.
     with patch(
         "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:
         for _ in range(2):
             AcsService.poll_shipment_tracking(shipment)
 
-    notify.assert_called_once_with(
-        args=[shipment.id], headers={"_schema_name": SCHEMA}
-    )
+    notify.assert_not_called()
+    assert DeferredDispatch.objects.count() == 1
+
+
+def test_a_publish_bug_still_reaches_the_poller_and_marks_nothing(
+    shipment, monkeypatch
+):
+    """Only a network failure is absorbed: anything else is a bug."""
+    monkeypatch.setattr(services, "AcsClient", _client_returning(["4"]))
+
+    with (
+        patch(
+            "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
+            side_effect=TypeError("bad arguments"),
+        ),
+        pytest.raises(TypeError),
+    ):
+        AcsService.poll_shipment_tracking(shipment)
+
+    shipment.refresh_from_db()
+    assert shipment.arrival_notified_at is None
+    assert not DeferredDispatch.objects.exists()

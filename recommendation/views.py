@@ -17,6 +17,7 @@ the viewer's session, so a shared correlation id is harmless.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from django.utils.translation import gettext_lazy as _
@@ -33,6 +34,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import RecommendationEventThrottle
+from core.retry import TRANSIENT_NETWORK_ERRORS
 from core.sessions import persisted_session_key
 from recommendation.engine import SuggestionContext, suggest
 from recommendation.hydrate import hydrate_pairs
@@ -47,6 +49,8 @@ from tenant.permissions import (
     IsRecommendationsEnabled,
     IsRecommendationsRuntimeEnabled,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _user_id(request) -> int | None:
@@ -156,21 +160,30 @@ def recommendation_event(request):
     # The cart is the identity an ``attach`` is later matched on: the
     # storefront proxy forwards the same X-Cart-Id the basket uses.
     cart_uuid = cart_uuid_from_request(request)
-    record_recommendation_event.delay(
-        kind=data["kind"],
-        surface=data["surface"],
-        impression_id=str(data["impression_id"]),
-        items=[
-            {
-                "product_id": item["product_id"],
-                "strategy": item["strategy"],
-                "position": item.get("position"),
-            }
-            for item in data["items"]
-        ],
-        seed_id=data.get("seed_id"),
-        session_key=persisted_session_key(request),
-        user_id=_user_id(request),
-        cart_uuid=str(cart_uuid) if cart_uuid else None,
-    )
+    # An analytics beacon: when the broker is down the event is dropped
+    # and logged. It is not a `DeferredDispatch` row on purpose: this
+    # endpoint is open to anonymous traffic, and every beacon in an outage
+    # would be a row.
+    try:
+        record_recommendation_event.delay(
+            kind=data["kind"],
+            surface=data["surface"],
+            impression_id=str(data["impression_id"]),
+            items=[
+                {
+                    "product_id": item["product_id"],
+                    "strategy": item["strategy"],
+                    "position": item.get("position"),
+                }
+                for item in data["items"]
+            ],
+            seed_id=data.get("seed_id"),
+            session_key=persisted_session_key(request),
+            user_id=_user_id(request),
+            cart_uuid=str(cart_uuid) if cart_uuid else None,
+        )
+    except TRANSIENT_NETWORK_ERRORS:
+        logger.exception(
+            "Recommendation event dropped: the broker is unreachable"
+        )
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)

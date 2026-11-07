@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connection, transaction
+from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext
@@ -44,6 +44,7 @@ from shipping_acs.models import (
     AcsTrackingEvent,
 )
 from shipping_acs.models.pickup_list_run import AcsPickupListRunOutcome
+from tenant.celery import dispatch_on_commit
 from tenant.credentials import tenant_site_name
 from tenant.staff_actors import staff_id
 
@@ -2796,22 +2797,25 @@ class AcsService:
         OUT_FOR_DELIVERY → AT_DESTINATION → OUT_FOR_DELIVERY and
         notified twice. Reproduced with exactly that sequence.
 
-        The mark is written AFTER the publish succeeds, not before it.
-        A DB write and a broker publish cannot be made atomic without an
-        outbox, so one of two failures has to be chosen. Marking first
-        risks a permanent SILENT MISS: `task_publish_retry` is on but
-        spends only ~0.6s, so a broker outage longer than that loses the
-        message while the committed marker stops every later poll from
-        ever trying again. Marking second risks at most ONE duplicate,
-        if the publish lands and the mark then fails — and
+        Two `on_commit` hooks, in this order: the publish
+        (`dispatch_on_commit`), then the mark. A rolled-back poll neither
+        sends nor marks. The mark is written once the publish has been
+        HANDED OVER, and a handed-over publish cannot be lost: when the
+        broker is unreachable `dispatch_on_commit` keeps it as a
+        `DeferredDispatch` that `redispatch_deferred_tasks` publishes
+        again, so the notification is owed and will be sent, and the mark
+        stops the next poll from queueing a second one. Marking BEFORE
+        the publish would be the permanent silent miss, because the mark
+        would outlive a message that never left. The remaining window is
+        a process killed between the two hooks, which risks at most ONE
+        duplicate (publish landed, mark did not), and
         `acs_send_arrival_notification` says outright that "both calls
         are idempotent enough for duplicate delivery to be acceptable".
         The bug being fixed here was SYSTEMATIC duplication on every
         depot cycle, which is a different thing from tolerating one.
 
-        Both run in `on_commit`, so a rolled-back poll neither marks nor
-        sends. The `arrival_notified_at__isnull=True` predicate on the
-        update keeps it idempotent.
+        The `arrival_notified_at__isnull=True` predicate on the update
+        keeps the mark idempotent.
         """
         if (
             new_state != AcsShipmentState.OUT_FOR_DELIVERY
@@ -2823,24 +2827,17 @@ class AcsService:
         from shipping_acs.tasks import acs_send_arrival_notification
 
         shipment_pk = shipment.pk
-        # The schema is pinned HERE, at registration, not read inside the
-        # callback: this runs under the per-tenant poll fanout, and an
-        # `on_commit` hook fires after the request's schema context can
-        # unwind (see `tenant.celery.dispatch_on_commit`, which every
-        # other dispatch in this file now goes through). It cannot BE
-        # `dispatch_on_commit`, because the mark has to run in the same
-        # callback, immediately after the publish — see above.
-        schema = connection.schema_name
+        # `dispatch_on_commit` pins the schema HERE, at registration: this
+        # runs under the per-tenant poll fanout, and an `on_commit` hook
+        # fires after the request's schema context can unwind.
+        dispatch_on_commit(acs_send_arrival_notification, [shipment_pk])
 
-        def _dispatch_then_mark() -> None:
-            acs_send_arrival_notification.apply_async(
-                args=[shipment_pk], headers={"_schema_name": schema}
-            )
+        def _mark_notified() -> None:
             AcsShipment.objects.filter(
                 pk=shipment_pk, arrival_notified_at__isnull=True
             ).update(arrival_notified_at=timezone.now())
 
-        transaction.on_commit(_dispatch_then_mark)
+        transaction.on_commit(_mark_notified)
 
 
 # The ACS_COD_Beneficiary_Info columns that tell one payout row from

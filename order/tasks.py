@@ -43,6 +43,7 @@ from order.payment import get_payment_provider_class
 from order.review_request import awaiting_review_request, delivery_window
 from order.services import OrderService
 from recommendation.order_email import record_impression
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -1038,7 +1039,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
     if invoice.mydata_mark:
         return True
 
-    send_invoice_to_mydata.delay(order_id)
+    dispatch_on_commit(send_invoice_to_mydata, [order_id])
     return True
 
 
@@ -1330,8 +1331,8 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         note=f"Receipt {invoice.invoice_number} registered with myDATA "
         f"(MARK={response.invoice_mark})",
     )
-    send_invoice_email.delay(order_id)
-    issue_pending_credits.delay(order_id)
+    dispatch_on_commit(send_invoice_email, [order_id])
+    dispatch_on_commit(issue_pending_credits, [order_id])
     return True
 
 
@@ -1361,7 +1362,7 @@ def issue_pending_credits(self, order_id: int) -> list[int]:
         .values_list("pk", flat=True)
     )
     for credit_id in pending:
-        send_credit_to_mydata.delay(credit_id)
+        dispatch_on_commit(send_credit_to_mydata, [credit_id])
     return pending
 
 
@@ -1410,7 +1411,7 @@ def send_credit_to_mydata(self, credit_id: int) -> bool:
         f"myDATA (MARK={response.invoice_mark}, credits receipt "
         f"{credit.invoice.invoice_number})",
     )
-    send_credit_email.delay(credit_id)
+    dispatch_on_commit(send_credit_email, [credit_id])
     return True
 
 

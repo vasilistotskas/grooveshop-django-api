@@ -32,6 +32,50 @@ waiting, and each failure is an `ERROR` log line.
 
 `robust=` is gone from `dispatch_on_commit`: every caller has this behaviour.
 
+## Which publishes go through it
+
+A publish that follows a committed change goes through the helper, whether it
+is called from a request, a signal, a task or the admin: the order's emails,
+the carrier voucher and shipment tasks (`ShippingCarrierInterface.
+dispatch_create_shipment_task` implementations publish with it and pass the
+`schema_name` the caller captured), the myDATA chain in `order/tasks.py`, the
+data export and account erasure, comment-liked notifications, search
+reindexing, the cache and edge-cache purges, the offer refresh, the
+recommendation impression, the carrier arrival notification and the admin's
+voucher / shipment reissue. A hook that runs inside another `on_commit` hook
+(the loyalty tier receivers, `_flush` in `core/cache/invalidation.py`) is
+handed the schema registered with the change and passes it as `schema_name=`,
+because the connection no longer says which store it was.
+
+Two things stay a bare publish on purpose:
+
+- **Analytics beacons** (`search_click`, `recommendation_event`; the search
+  middleware drops a query the same way). They are open to anonymous traffic,
+  so a row per beacon in an outage would turn that traffic into database
+  rows. A broker failure is caught (`TRANSIENT_NETWORK_ERRORS`), logged and
+  answered as accepted; the event is dropped.
+- **Publishes that are their own repair or have nothing to keep**: a webhook
+  whose redelivery is the repair (BoxNow, Resend), a staff click that
+  committed nothing (an error answers the click, and a destructive action
+  must not run days later), a sweep or poll task that runs again on its own
+  schedule, a Celery `chain` (it cannot be a row), the beat fan-out that
+  resets the demo stores, and `redispatch_deferred_tasks` itself, whose
+  republish is the repair.
+
+A task that is published through the helper and that publishes the next link
+of a chain (`send_invoice_to_mydata` then `send_invoice_email`) keeps its own
+short-circuits (the MARK check, the reserved-email flag): a row replayed by the
+sweep runs the task again, so the task must be safe to run twice. A row older
+than `DEFERRED_DISPATCH_RETENTION_DAYS` is dropped with an `ERROR`, which for a
+myDATA document is a filing that did not happen: that log line is what to act
+on.
+
+A hook that must run only after a publish was handed over registers the
+publish through the helper first and its own `transaction.on_commit` second
+(`shipping_acs.services.AcsService._maybe_notify_arrival`: the publish, then
+the `arrival_notified_at` mark). The mark then never outlives a message that
+was neither sent nor kept.
+
 ## What the table cannot see
 
 A worker killed between the commit and the publish loses the dispatch without

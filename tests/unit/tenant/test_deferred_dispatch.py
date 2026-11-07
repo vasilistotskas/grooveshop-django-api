@@ -14,7 +14,7 @@ from datetime import timedelta
 from unittest import mock
 
 import pytest
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 from kombu.exceptions import OperationalError
 
@@ -28,6 +28,7 @@ pytestmark = pytest.mark.django_db
 def broker_down_task(name: str = "demo.task"):
     task = mock.Mock()
     task.name = name
+    task.sensitive_kwargs = frozenset()
     task.apply_async.side_effect = OperationalError("broker unreachable")
     return task
 
@@ -70,6 +71,32 @@ class TestAFailedPublish:
             dispatch_on_commit(task, [42])
 
         assert any("payload" in r.getMessage() for r in caplog.records)
+        assert "42" in caplog.text
+
+    def test_when_the_row_cannot_be_kept_a_secret_stays_out_of_the_log(
+        self, caplog
+    ):
+        task = broker_down_task()
+        task.sensitive_kwargs = frozenset({"context"})
+
+        with (
+            mock.patch.object(
+                DeferredDispatch.objects, "create", side_effect=RuntimeError
+            ),
+            caplog.at_level(logging.ERROR, logger="tenant.celery"),
+        ):
+            dispatch_on_commit(
+                task,
+                kwargs={
+                    "context": {"reset_url": "https://shop/reset/secret-link"},
+                    "token": "secret-token",
+                    "address": "shown@example.com",
+                },
+            )
+
+        assert "secret-link" not in caplog.text
+        assert "secret-token" not in caplog.text
+        assert "shown@example.com" in caplog.text
 
 
 class TestAfterAFailedPublish:
@@ -287,6 +314,23 @@ class TestTheSweep:
         assert first.next_attempt_at > timezone.now()
         assert "OperationalError" in first.last_error
         assert second.attempts == 0
+        assert second.next_attempt_at <= timezone.now(), (
+            "a row the run never reached is due again, not held by the lease"
+        )
+
+    def test_a_second_sweep_during_a_run_takes_nothing(self):
+        deferred()
+        task = mock.Mock()
+        inner = []
+        task.apply_async.side_effect = lambda **_: inner.append(
+            redispatch_deferred_tasks()
+        )
+
+        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
+            outer = redispatch_deferred_tasks()
+
+        assert outer["published"] == 1
+        assert inner == [{"published": 0, "failed": 0, "expired": 0}]
 
     def test_a_task_nobody_knows_is_kept_with_the_reason(self):
         row = deferred("nobody.knows")
@@ -311,7 +355,7 @@ class TestTheSweep:
         self, caplog, settings
     ):
         deferred(age_days=settings.DEFERRED_DISPATCH_RETENTION_DAYS + 1)
-        task = mock.Mock()
+        task = mock.Mock(sensitive_kwargs=frozenset())
 
         with (
             mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task),
@@ -323,3 +367,86 @@ class TestTheSweep:
         task.apply_async.assert_not_called()
         assert not DeferredDispatch.objects.exists()
         assert any("given up" in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.parametrize(
+        "task",
+        [mock.Mock(sensitive_kwargs=frozenset({"context"})), None],
+        ids=["a sensitive kwarg", "a task nobody knows"],
+    )
+    def test_a_row_given_up_keeps_its_secrets_out_of_the_log(
+        self, caplog, settings, task
+    ):
+        row = deferred(age_days=settings.DEFERRED_DISPATCH_RETENTION_DAYS + 1)
+        DeferredDispatch.objects.filter(pk=row.pk).update(
+            kwargs={"context": {"reset_url": "https://shop/secret-link"}}
+        )
+
+        with (
+            mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task),
+            caplog.at_level(logging.ERROR, logger="tenant.tasks"),
+        ):
+            redispatch_deferred_tasks()
+
+        assert "given up" in caplog.text
+        assert "secret-link" not in caplog.text
+
+
+@pytest.mark.django_db(transaction=True)
+class TestAgainstARealCommit:
+    def test_a_rolled_back_change_publishes_nothing_and_runs_nothing(self):
+        task = mock.Mock()
+        then = mock.Mock()
+
+        with pytest.raises(RuntimeError), transaction.atomic():
+            dispatch_on_commit(task, [1], then=then)
+            raise RuntimeError
+
+        task.apply_async.assert_not_called()
+        then.assert_not_called()
+
+    def test_the_publish_waits_for_the_commit_and_then_follows_it(self):
+        calls = mock.Mock()
+
+        with transaction.atomic():
+            dispatch_on_commit(calls.task, [1], then=calls.then)
+            assert calls.mock_calls == []
+
+        assert [call[0] for call in calls.mock_calls] == [
+            "task.apply_async",
+            "then",
+        ]
+
+    def test_the_sweep_publishes_outside_any_transaction(self):
+        deferred()
+        in_transaction = []
+        task = mock.Mock()
+        task.apply_async.side_effect = lambda **_: in_transaction.append(
+            connection.in_atomic_block
+        )
+
+        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
+            redispatch_deferred_tasks()
+
+        assert in_transaction == [False]
+
+    def test_a_sweep_killed_half_way_sends_at_most_one_row_twice(self):
+        class Killed(BaseException):
+            pass
+
+        first, second, third = deferred(), deferred(), deferred()
+        task = mock.Mock()
+        task.apply_async.side_effect = [None, Killed()]
+
+        with (
+            mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task),
+            pytest.raises(Killed),
+        ):
+            redispatch_deferred_tasks()
+
+        assert not DeferredDispatch.objects.filter(pk=first.pk).exists(), (
+            "a row that went out stays gone, whatever happens to the run"
+        )
+        second.refresh_from_db()
+        third.refresh_from_db()
+        assert second.next_attempt_at > timezone.now()
+        assert third.next_attempt_at > timezone.now()

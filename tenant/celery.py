@@ -220,15 +220,20 @@ def dispatch_on_commit(
     never reaches the caller: the change it follows is already committed, so
     raising could only answer 500 for work that was done. The dispatch is
     logged at ERROR and kept as a ``DeferredDispatch`` that
-    ``redispatch_deferred_tasks`` publishes again, so it is not lost. Any
-    other exception is a bug and still raises. After one such failure this
+    ``redispatch_deferred_tasks`` publishes again, so it is not lost. Celery
+    raises ``OperationalError`` for every connection error of the transport,
+    which for RabbitMQ includes any ``OSError``, a TLS failure and a nacked
+    message, so those are kept too. Anything else, such as a ``TypeError``
+    from bad arguments, is a bug and still raises. After one such failure this
     process keeps the next ones without trying, for
     ``DEFERRED_DISPATCH_BROKER_DOWN_SECONDS``, so one request does not wait
     out the failure once per task.
 
-    ``then`` runs once the task is published or kept. It does not run when
-    the row could not be written either, so what it records never outlives
-    a message that was neither sent nor kept.
+    ``then`` runs once the task is published or kept, in the pinned schema.
+    It does not run when the row could not be written either, so what it
+    records never outlives a message that was neither sent nor kept. What it
+    raises reaches the caller and drops the commit's later hooks, like any
+    hook that raises, so it should do no more than record.
 
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
@@ -256,7 +261,10 @@ def dispatch_on_commit(
 
     def publish() -> None:
         if handed_over() and then is not None:
-            then()
+            from django_tenants.utils import schema_context
+
+            with schema_context(schema):
+                then()
 
     transaction.on_commit(publish)
 
@@ -275,8 +283,8 @@ def defer_dispatch(
     """Keep a dispatch whose publish failed, for ``redispatch_deferred_tasks``.
 
     Returns whether it was kept. If the row cannot be written either, the
-    whole payload is in the log line, so the work can still be recovered by
-    hand.
+    log line says what the work was, so it can still be recovered by hand,
+    with its secrets masked: the row may hold a reset link, a log may not.
     """
     from django.utils import timezone
 
@@ -311,10 +319,19 @@ def defer_dispatch(
             next_attempt_at=timezone.now(),
         )
     except Exception:
+        from core.tasks import safe_task_arguments
+
+        safe_args, safe_kwargs = safe_task_arguments(
+            task, payload["args"], payload["kwargs"]
+        )
         logger.exception(
-            "A deferred dispatch of %s could not be kept; payload %r",
+            "A deferred dispatch of %s could not be kept; payload args=%s "
+            "kwargs=%s headers=%r options=%r",
             name,
-            payload,
+            safe_args,
+            safe_kwargs,
+            payload["headers"],
+            payload["options"],
         )
         return False
     return True

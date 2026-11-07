@@ -31,7 +31,6 @@ from order.factories.order import OrderFactory
 from shipping_acs import services
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
-from shipping_acs.models.shipment import AcsShipment
 from shipping_acs.services import AcsService
 from shipping_acs.tasks import acs_send_arrival_notification
 from tenant.models import DeferredDispatch
@@ -138,11 +137,6 @@ def test_the_state_still_follows_acs_backwards(shipment, monkeypatch):
     assert shipment.shipment_state == AcsShipmentState.AT_DESTINATION
 
 
-def test_the_marker_is_not_written_when_nothing_was_sent(shipment):
-    """A poll that never reaches OUT_FOR_DELIVERY must leave it null."""
-    assert AcsShipment.objects.get(pk=shipment.pk).arrival_notified_at is None
-
-
 def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
     shipment, monkeypatch
 ):
@@ -152,8 +146,7 @@ def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
     `DeferredDispatch` row that the sweep publishes again, so the
     notification is owed and will go out. The mark stops the next depot
     cycle from queueing a second notification while the first waits in the
-    table. (A bare `OSError`, which the helper does not catch, would be a
-    bug and still reaches the poller.)
+    table.
     """
     monkeypatch.setattr(
         services, "AcsClient", _client_returning(["4", "3", "4"])
@@ -177,7 +170,9 @@ def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
         "must not queue another"
     )
 
-    # The next depot cycle back out for delivery sends no second one.
+    # The next depot cycle back out for delivery sends no second one, with
+    # the broker back: inside the window it would not have been tried anyway.
+    monkeypatch.setattr("tenant.celery._broker_down_until", 0.0)
     with patch(
         "shipping_acs.tasks.acs_send_arrival_notification.apply_async"
     ) as notify:

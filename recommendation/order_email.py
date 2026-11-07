@@ -26,6 +26,7 @@ from core.utils.tenant_urls import get_tenant_frontend_url
 from recommendation.context import recommendations_active
 from recommendation.engine import Suggestion, SuggestionContext, suggest
 from recommendation.enum import EventKind, Surface
+from tenant.celery import dispatch_on_commit
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -91,18 +92,21 @@ def record_impression(order: Order, strip: EmailStrip) -> None:
     from recommendation.tasks import record_recommendation_event
 
     snapshot = (order.metadata or {}).get("cart_snapshot") or {}
-    record_recommendation_event.delay(
-        kind=EventKind.IMPRESSION,
-        surface=Surface.ORDER_EMAIL,
-        impression_id=str(strip.impression_id),
-        items=[
-            {
-                "product_id": suggestion.product_id,
-                "strategy": suggestion.strategy,
-                "position": position,
-            }
-            for position, suggestion in enumerate(strip.suggestions)
-        ],
-        user_id=order.user_id,
-        cart_uuid=snapshot.get("cart_uuid"),
+    dispatch_on_commit(
+        record_recommendation_event,
+        kwargs={
+            "kind": EventKind.IMPRESSION,
+            "surface": Surface.ORDER_EMAIL,
+            "impression_id": str(strip.impression_id),
+            "items": [
+                {
+                    "product_id": suggestion.product_id,
+                    "strategy": suggestion.strategy,
+                    "position": position,
+                }
+                for position, suggestion in enumerate(strip.suggestions)
+            ],
+            "user_id": order.user_id,
+            "cart_uuid": snapshot.get("cart_uuid"),
+        },
     )

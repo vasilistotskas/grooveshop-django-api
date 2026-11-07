@@ -39,6 +39,7 @@ from product.filters.favourite import ProductFavouriteFilter
 from product.filters.review import ProductReviewFilter
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
+from tenant.celery import dispatch_on_commit
 from tenant.membership import is_store_staff
 from tenant.permissions import (
     IsAccountReviewsEnabled,
@@ -534,7 +535,7 @@ class UserAccountViewSet(BaseModelViewSet):
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
         export = create_export_request(user)
-        export_user_data_task.delay(export.id)
+        dispatch_on_commit(export_user_data_task, [export.id])
 
         serializer = UserDataExportSerializer(
             export, context={"request": request}
@@ -616,7 +617,7 @@ class UserAccountViewSet(BaseModelViewSet):
         _revoke_knox_tokens(user)
         _broadcast_force_logout(user)
 
-        delete_user_account_task.delay(user.id)
+        dispatch_on_commit(delete_user_account_task, [user.id])
 
         return Response(
             {

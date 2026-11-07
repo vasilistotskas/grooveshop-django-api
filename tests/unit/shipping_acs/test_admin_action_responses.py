@@ -25,11 +25,15 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.http.response import HttpResponseBase
 from django.test import RequestFactory
+from kombu.exceptions import OperationalError
 
 from shipping_acs.admin import AcsCodPayoutAdmin, AcsShipmentAdmin
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
 from shipping_acs.models import AcsCodPayout, AcsShipment
+from shipping_acs.tasks import create_acs_voucher_for_order
+from tenant.models import DeferredDispatch
+from tests.utils.dispatch import assert_published_once
 from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
@@ -71,14 +75,36 @@ class TestRowActionsReturnAResponse:
 
         with (
             patch(
-                "shipping_acs.tasks.create_acs_voucher_for_order.delay"
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
             ) as task,
             patch("django.contrib.messages.info"),
         ):
             response = admin.issue_voucher_now(_request(), shipment.id)
 
-        task.assert_called_once_with(shipment.order_id)
+        assert_published_once(task, [shipment.order_id])
         assert response.status_code == 302
+
+    def test_issue_voucher_now_keeps_the_request_when_the_broker_is_down(self):
+        admin = AcsShipmentAdmin(AcsShipment, AdminSite())
+        shipment = AcsShipmentFactory(
+            order=courier_cash_order(),
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+        )
+
+        with (
+            patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async",
+                side_effect=OperationalError("broker unreachable"),
+            ),
+            patch("django.contrib.messages.info"),
+        ):
+            response = admin.issue_voucher_now(_request(), shipment.id)
+
+        assert response.status_code == 302
+        row = DeferredDispatch.objects.get()
+        assert row.task_name == create_acs_voucher_for_order.name
+        assert row.args == [shipment.order_id]
 
     def test_issue_voucher_now_when_the_shipment_is_gone(self):
         # The early-exit branch returned a bare ``return`` — the same

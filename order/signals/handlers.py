@@ -304,8 +304,8 @@ def handle_order_created(
         and order.payment_status != PaymentStatus.COMPLETED
     )
     if not is_online_pending:
-        send_order_confirmation_email.delay(order.id)
-    send_admin_new_order_email.delay(order.id)
+        dispatch_on_commit(send_order_confirmation_email, [order.id])
+    dispatch_on_commit(send_admin_new_order_email, [order.id])
     OrderHistory.log_note(order=order, note="Order created")
 
     # Live in-app notification for authenticated shoppers. The task

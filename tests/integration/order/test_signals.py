@@ -21,6 +21,7 @@ from order.signals import (
 )
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils.dispatch import assert_published_once
 
 
 class OrderSignalsTestCase(TestCase):
@@ -40,8 +41,8 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
-    @patch("order.signals.handlers.send_admin_new_order_email.delay")
-    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    @patch("order.signals.handlers.send_admin_new_order_email.apply_async")
+    @patch("order.signals.handlers.send_order_confirmation_email.apply_async")
     def test_order_created_offline_payment_sends_email(
         self, mock_email_task, mock_admin_task
     ):
@@ -53,8 +54,8 @@ class OrderSignalsTestCase(TestCase):
 
         order_created.send(sender=Order, order=self.order)
 
-        mock_email_task.assert_called_once_with(self.order.id)
-        mock_admin_task.assert_called_once_with(self.order.id)
+        assert_published_once(mock_email_task, [self.order.id])
+        assert_published_once(mock_admin_task, [self.order.id])
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -64,8 +65,8 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-    @patch("order.signals.handlers.send_admin_new_order_email.delay")
-    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    @patch("order.signals.handlers.send_admin_new_order_email.apply_async")
+    @patch("order.signals.handlers.send_order_confirmation_email.apply_async")
     def test_order_created_online_payment_defers_email(
         self, mock_email_task, mock_admin_task
     ):
@@ -82,7 +83,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_not_called()
-        mock_admin_task.assert_called_once_with(self.order.id)
+        assert_published_once(mock_admin_task, [self.order.id])
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -92,8 +93,8 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-    @patch("order.signals.handlers.send_admin_new_order_email.delay")
-    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    @patch("order.signals.handlers.send_admin_new_order_email.apply_async")
+    @patch("order.signals.handlers.send_order_confirmation_email.apply_async")
     def test_order_created_online_payment_already_paid_sends_email(
         self, mock_email_task, mock_admin_task
     ):
@@ -107,8 +108,8 @@ class OrderSignalsTestCase(TestCase):
 
         order_created.send(sender=Order, order=self.order)
 
-        mock_email_task.assert_called_once_with(self.order.id)
-        mock_admin_task.assert_called_once_with(self.order.id)
+        assert_published_once(mock_email_task, [self.order.id])
+        assert_published_once(mock_admin_task, [self.order.id])
 
     @patch("order.tasks.send_order_status_update_email.apply_async")
     def test_order_status_changed_signal(self, mock_email_task):

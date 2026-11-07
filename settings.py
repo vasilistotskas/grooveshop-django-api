@@ -976,6 +976,10 @@ CONTACT_SCAN_SWEEP_BATCH = int(getenv("CONTACT_SCAN_SWEEP_BATCH", "200"))
 # daily: an order delivered up to this many days earlier than its due day
 # is still reminded, so a run that did not happen costs nothing.
 REVIEW_REQUEST_CATCH_UP_DAYS = int(getenv("REVIEW_REQUEST_CATCH_UP_DAYS", "3"))
+# How long a guest order's uuid opens it (``Order.opens_for_guest``): long
+# enough to pay, see the confirmation and follow a delivery. Store staff and a
+# signed-in owner are not limited by it.
+GUEST_ORDER_ACCESS_DAYS = int(getenv("GUEST_ORDER_ACCESS_DAYS", "14"))
 # IndexNow (``indexnow/``): the endpoint the batched notification is posted
 # to (the protocol's shared endpoint, which hands the URLs to every
 # participating search engine) and how long one POST may take.
@@ -992,6 +996,9 @@ DEFERRED_DISPATCH_BACKOFF_SECONDS = int(
 )
 DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS = int(
     getenv("DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS", "3600")
+)
+DEFERRED_DISPATCH_BROKER_DOWN_SECONDS = int(
+    getenv("DEFERRED_DISPATCH_BROKER_DOWN_SECONDS", "30")
 )
 DEFERRED_DISPATCH_RETENTION_DAYS = int(
     getenv("DEFERRED_DISPATCH_RETENTION_DAYS", "7")
@@ -4610,6 +4617,9 @@ if IS_KUBERNETES:
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
             },
+            "drop_system_exit": {
+                "()": "core.logging.DropSystemExit",
+            },
         },
         "handlers": {
             "console": {
@@ -4641,6 +4651,12 @@ if IS_KUBERNETES:
             "asyncio": {
                 "level": logging_level,
                 "filters": ["drop_asyncio_cancelled"],
+                "propagate": True,
+            },
+            # Flower's clean shutdown, see DropSystemExit.
+            "tornado.application": {
+                "level": logging_level,
+                "filters": ["drop_system_exit"],
                 "propagate": True,
             },
         },
@@ -4678,6 +4694,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
             },
+            "drop_system_exit": {
+                "()": "core.logging.DropSystemExit",
+            },
         },
         "handlers": {
             "console": {
@@ -4712,6 +4731,12 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "asyncio": {
                 "level": logging_level,
                 "filters": ["drop_asyncio_cancelled"],
+                "propagate": True,
+            },
+            # Flower's clean shutdown, see DropSystemExit.
+            "tornado.application": {
+                "level": logging_level,
+                "filters": ["drop_system_exit"],
                 "propagate": True,
             },
         },

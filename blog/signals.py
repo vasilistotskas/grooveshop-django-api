@@ -81,9 +81,12 @@ def notify_comment_liked_receiver(
         f"{post.storefront_path}#blog-post-comments"
     )
 
-    notify_comment_liked_task.delay(
-        comment_id=instance.id,
-        liker_user_ids=list(pk_set),
-        blog_post_url=blog_post_url,
-        comment_owner_id=user.id,
+    dispatch_on_commit(
+        notify_comment_liked_task,
+        kwargs={
+            "comment_id": instance.id,
+            "liker_user_ids": list(pk_set),
+            "blog_post_url": blog_post_url,
+            "comment_owner_id": user.id,
+        },
     )

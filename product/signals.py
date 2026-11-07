@@ -2,7 +2,6 @@ import logging
 
 import django.dispatch
 from django.conf import settings
-from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
@@ -164,16 +163,17 @@ def reindex_products_by_pk(product_ids) -> int:
         return 0
 
     # Same dispatch shape as ``reindex_product_translations`` below —
-    # on commit, by pk, with the task re-loading each row.
-    def _dispatch_reindex(pks=translation_pks):
-        for pk in pks:
-            index_document_task.delay(
-                app_label="product",
-                model_name="producttranslation",
-                pk=pk,
-            )
-
-    transaction.on_commit(_dispatch_reindex)
+    # on commit, by pk, with the task re-loading each row. The schema is
+    # pinned here, at registration, not read when the hooks fire.
+    for pk in translation_pks:
+        dispatch_on_commit(
+            index_document_task,
+            kwargs={
+                "app_label": "product",
+                "model_name": "producttranslation",
+                "pk": pk,
+            },
+        )
     return len(translation_pks)
 
 
@@ -372,15 +372,15 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
 
-        def _dispatch_attr_reindex(pks=translation_pks):
-            for pk in pks:
-                index_document_task.delay(
-                    app_label="product",
-                    model_name="producttranslation",
-                    pk=pk,
-                )
-
-        transaction.on_commit(_dispatch_attr_reindex)
+        for pk in translation_pks:
+            dispatch_on_commit(
+                index_document_task,
+                kwargs={
+                    "app_label": "product",
+                    "model_name": "producttranslation",
+                    "pk": pk,
+                },
+            )
     else:
         # Sync path (DEBUG) serializes inline → needs the optimized queryset.
         translations = ProductTranslation.get_meilisearch_queryset().filter(

@@ -3,6 +3,263 @@
 
 
 
+## v3.231.2 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): run one deferred dispatch sweep at a time (#508)
+
+redispatch_deferred_tasks runs one sweep at a time, held by a session-level advisory lock outside any transaction, instead of claiming rows with a lease. While RabbitMQ blocks publishers a publish waits without end (measured: still waiting at 75 s, with or without a publish timeout, since closing the channel waits too), so any lease could be outlived and two sweeps would send the same rows. A sweep that finds the lock held does nothing and logs a WARNING with what is due; an unlock that releases nothing is an ERROR, since the connection pool resets nothing. The lock ends with the session if the worker dies. DEFERRED_DISPATCH_LEASE_SECONDS is removed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`775b5fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/775b5fedd38dc954890b04f85c14ca3b1a158583))
+
+## v3.231.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): publish tasks after a commit through dispatch_on_commit (#506)
+
+Every task that follows a committed change now goes through dispatch_on_commit, so a broker outage no longer answers 500 for work that was done, or loses that work.
+
+After one failed publish a process keeps the next ones without trying for DEFERRED_DISPATCH_BROKER_DOWN_SECONDS; on a closed port one order held its request 52.7 s without this. Analytics beacons go through publish_or_drop and share that window.
+
+redispatch_deferred_tasks publishes outside a transaction, claiming rows with a lease (DEFERRED_DISPATCH_LEASE_SECONDS). Holding one transaction across the batch lost it to idle_in_transaction_session_timeout on real Postgres, which sent published rows a second time.
+
+Logs of a kept or given-up dispatch use the mask a failed task's log uses, since a password reset's payload holds the live link.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`8b02a0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b02a0f8027e758cf38662e0be5ef3eb9d8eecbd))
+
+## v3.231.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): keep a data export from store staff
+
+The viewset's check lets store staff through, and walking ids would hand
+them every customer's whole bundle. Only the owner reads it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* fix(user): leave an expired export for the cleanup to remove
+
+Opening an expired export marked its row expired, and the cleanup skips
+rows that are, so the bundle stayed on disk for good. Only the cleanup
+marks a row now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+### Features
+
+* feat(user): let the account's owner download a data export (#505) ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* feat(user): let the account's owner download a data export
+
+The bundle is the most complete copy of a person's data the system makes,
+and its only route is public: whoever holds the token can read it for 7
+days. Add a route under the account's owner check, whose address holds no
+credential, for the storefront to move to. The public route goes once it
+has.
+
+Both routes answer through one function, with a stable code for each
+refusal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+## v3.230.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(agent): serve only agent orders on the gateway's read
+
+Other services hold the same secret, and the route's purpose is an order the
+gateway placed, so an order an agent did not place now answers 404.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+### Features
+
+* feat(agent): let the gateway read an order it placed (#504) ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+* feat(agent): let the gateway read an order it placed
+
+A guest's uuid opens an order for a limited time, but the gateway tells a
+platform about an order for as long as the order moves, so past that limit it
+could no longer build the webhook. It now reads through its own route, with its
+shared secret. A uuid a client hands the gateway stays on the guest route.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+## v3.229.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(builder): a feature switched off does not stop persist_block_upgrades
+
+A store may switch a feature off with its block still on a page. That is for
+its next publish to refuse, but it stopped the whole store's upgrade, leaving
+every page on the old versions. Every feature now counts as on, as for a
+seed. The test fixture mocked the feature check, which hid this.
+
+The command's docstring and docs/builder.md state that it has no way back.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+* fix(builder): persist_block_upgrades still refuses a feature the platform does not know
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+### Features
+
+* feat(builder): persist_block_upgrades moves translations, and a band has one heading (#503) ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+* feat(builder): write a block's upgrade into its translations too
+
+persist_block_upgrades moved a node to its block's current version and left
+its translations under the old setting pointers, which validation refuses
+(untranslatable_setting), so an upgrade could not rename a translated setting.
+
+Each language's settings are now upgraded as well, and what differs from the
+draft's upgraded text stays as that language's translation, the storefront's
+rule and held to the same cases, so every language reads what it read.
+
+With it, the port of title into heading on the 13 blocks that had both, the
+demo pages at those versions, and the storefront's fixtures at the commit that
+ships them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+### Testing
+
+* test(builder): pin the upstream fixtures to storefront main
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`3dcfe86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dcfe8684994d4a7d05fc38fac520dac029cfae1))
+
+## v3.228.3 (2026-11-06)
+
+### Bug fixes
+
+* fix(logging): keep a clean Flower shutdown out of the error log (#502)
+
+Flower stops on SIGTERM by calling sys.exit(0) from its signal handler. If
+the signal lands during a request, Tornado logs the exit at ERROR as an
+uncaught exception, which blocks promote.py production until the next
+staging rollout. A filter on tornado.application now drops SystemExit, and
+every other exception still logs.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`f9572c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9572c61b944f163365640f1f7299fba2dc3b35b))
+
+## v3.228.2 (2026-11-06)
+
+### Bug fixes
+
+* fix(agent): let a client that names no scopes link an account (#500)
+
+Registration may omit scope, and allauth then stores openid alone, so the
+client's request for the commerce scopes fails with invalid_scope. Such a
+client is now registered for what linking offers, and the server metadata
+names those scopes too. What the token holds is still what the shopper
+grants on the consent screen.
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6c21a4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c21a4b02a7aac99b79642709a6cb65766d462df))
+
+## v3.228.1 (2026-11-06)
+
+### Bug fixes
+
+* fix(order): a guest order's uuid opens it for a limited time (#501) ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(order): a guest order's uuid opens it for a limited time
+
+The uuid reads the customer's details without a login and it never expired, so
+it outlived every place it had been seen, trackers included. It now works for
+GUEST_ORDER_ACCESS_DAYS after the order. Meta's server events and the data
+export email stop carrying a key in their addresses.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(order): an expired guest link says so
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* fix(meta_capi): the purchase event id no longer holds the order uuid
+
+A guest's uuid opens the order, and this id goes to Meta when no browser id
+was stored. The order number is as stable and opens nothing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+### Chores
+
+* chore(claude): correct agents and skills, move the domain guides to a rule (#496) ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): correct agents and skills, split CLAUDE.md below the size limit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): format the gen-test samples with ruff
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): auto-lint never syncs and has its own timeouts
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): drop a conflicting test timeout and a duplicate note
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+* chore(claude): name the real stock release method
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGYpRdJFPHoBZ2AbfZo
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`ee7363a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee7363ac03f5aa2057f5481aa7e223ddfdc15f4b))
+
+### Documentation
+
+* docs(order): name the limit on a guest order's uuid
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`4a7fab3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a7fab3c86cec4ffcf0201ebdeafde94cbdae843))
+
+* docs(core): use a live schema in the validator message example (#499)
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`c1f3ba9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1f3ba98d2758a721674660a0a4aebbff427e823))
+
 ## v3.228.0 (2026-11-06)
 
 ### Features

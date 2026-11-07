@@ -95,7 +95,7 @@ def _overlay_for(i18n: dict[str, Any], locale: str) -> dict[str, Any]:
     return i18n.get(locale) or {}
 
 
-def _localised(
+def localised(
     node_settings: dict[str, Any], overrides: dict[str, Any]
 ) -> dict[str, Any]:
     """A copy of *node_settings* with each overlay pointer's value set."""
@@ -114,7 +114,7 @@ def _resolve_node(
         return None
     resolved: dict[str, Any] = {
         "type": node["type"],
-        "settings": _localised(node["settings"], overlay.get(node_id) or {}),
+        "settings": localised(node["settings"], overlay.get(node_id) or {}),
     }
     if "blocks" in node:
         blocks = {
@@ -151,7 +151,7 @@ def resolve_document(key: str, source: Source, locale: str) -> dict[str, Any]:
         "order": list(sections),
     }
     if "settings" in source.data:
-        resolved["settings"] = _localised(
+        resolved["settings"] = localised(
             source.data["settings"], overlay.get(DOCUMENT_NODE) or {}
         )
     return resolved

@@ -40,6 +40,7 @@ from order.models.invoice import MyDataStatus
 from order.mydata.exceptions import MyDataTransportError
 from order.tasks import send_invoice_to_mydata
 from product.factories.product import ProductFactory
+from tests.utils.dispatch import assert_published_once
 from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
 
@@ -141,7 +142,7 @@ class MarkRecoveryTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_success_confirms_invoice(
         self, mock_email, mock_send, _mock_render
     ):
@@ -186,7 +187,7 @@ class MarkRecoveryTestCase(TestCase):
         self.assertEqual(invoice.mydata_mark, _RECOVERED_MARK)
 
         # The receipt is registered, so the customer gets it.
-        mock_email.assert_called_once_with(order.id)
+        assert_published_once(mock_email, [order.id])
 
         # RequestTransmittedDocs was called exactly once (single page).
         query_mock.assert_called_once()
@@ -201,7 +202,7 @@ class MarkRecoveryTestCase(TestCase):
         return_value=_TRANSMITTED_EMPTY,
     )
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_zero_matches_stays_rejected(
         self, mock_email, mock_send, _mock_query, _mock_render
     ):
@@ -230,7 +231,7 @@ class MarkRecoveryTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_multiple_matches_safety_guard(
         self, mock_email, mock_send, _mock_render
     ):
@@ -284,7 +285,7 @@ class MarkRecoveryTestCase(TestCase):
         side_effect=MyDataTransportError("network timeout"),
     )
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_transport_error_no_crash(
         self, mock_email, mock_send, mock_query, _mock_render
     ):
@@ -318,7 +319,7 @@ class MarkRecoveryTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_228_recovery_follows_continuation_token_pagination(
         self, mock_email, mock_send, _mock_render
     ):
@@ -379,4 +380,4 @@ class MarkRecoveryTestCase(TestCase):
         second_call_kwargs = query_mock.call_args_list[1].kwargs
         self.assertEqual(second_call_kwargs.get("next_partition_key"), "PK1")
         self.assertEqual(second_call_kwargs.get("next_row_key"), "RK1")
-        mock_email.assert_called_once_with(order.id)
+        assert_published_once(mock_email, [order.id])

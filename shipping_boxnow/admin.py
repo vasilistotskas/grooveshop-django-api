@@ -591,6 +591,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         from order.enum.status import OrderStatus
         from shipping_boxnow.services import BoxNowService
         from shipping_boxnow.tasks import create_boxnow_shipment_for_order
+        from tenant.celery import dispatch_on_commit
 
         change_url = reverse(
             "admin:shipping_boxnow_boxnowshipment_change", args=[object_id]
@@ -655,7 +656,9 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 _("Cancelled parcel reset — creating a new one."),
             )
 
-        create_boxnow_shipment_for_order.delay(shipment.order_id)
+        dispatch_on_commit(
+            create_boxnow_shipment_for_order, [shipment.order_id]
+        )
         messages.info(request, _("Parcel creation task dispatched."))
         return redirect(change_url)
 

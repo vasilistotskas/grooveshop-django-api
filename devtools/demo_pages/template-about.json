@@ -60,15 +60,15 @@
         "settings": {
           "heading": "Η πορεία μας"
         },
-        "type": "story_timeline@1"
+        "type": "story_timeline@2"
       },
       "7f54c44e-e1cc-4c5f-9cd0-35443a9bff96": {
         "settings": {
           "description": "Νέα προϊόντα και προσφορές, μία φορά τον μήνα.",
-          "heading": "Μείνε ενημερωμένος",
-          "placeholder": "Το email σου"
+          "placeholder": "Το email σου",
+          "heading": "Μείνε ενημερωμένος"
         },
-        "type": "newsletter_signup@1"
+        "type": "newsletter_signup@2"
       },
       "9fafa287-0070-4cf2-83bf-3e99249befcb": {
         "settings": {
@@ -203,11 +203,11 @@
           },
           "ctaText": "Δες τη γκάμα",
           "decor": "orbs",
-          "heading": "Ξεκινήσαμε από ένα συρτάρι με καλώδια",
           "imagePosition": "left",
-          "imageUrl": "/img/main-banner.png"
+          "imageUrl": "/img/main-banner.png",
+          "heading": "Ξεκινήσαμε από ένα συρτάρι με καλώδια"
         },
-        "type": "media_text@1"
+        "type": "media_text@2"
       },
       "ff8b5710-dfe2-4a69-b935-374dbc4067b6": {
         "settings": {
@@ -243,8 +243,8 @@
         "/title": "Wholesale"
       },
       "7f54c44e-e1cc-4c5f-9cd0-35443a9bff96": {
-        "/description": "New products and offers, once a month.",
         "/heading": "Stay in the loop",
+        "/description": "New products and offers, once a month.",
         "/placeholder": "Your email"
       },
       "9fe93702-6924-489e-9be2-de20dcd21994": {
@@ -294,9 +294,9 @@
         "/caption": "We test what we sell"
       },
       "f21b42d9-8e2d-4a32-8b46-d58e8c5f9cb9": {
+        "/heading": "It started with a drawer full of cables",
         "/body": "In 2019 we went looking for a cable that would last. We could not find one, so we started picking for ourselves what deserved a place in the drawer.",
-        "/ctaText": "See the range",
-        "/heading": "It started with a drawer full of cables"
+        "/ctaText": "See the range"
       },
       "ff8b5710-dfe2-4a69-b935-374dbc4067b6": {
         "/content": "<h2>Get in touch</h2><p>Send us a message through the contact form for anything you need.</p>"

@@ -4211,6 +4211,9 @@ msgstr "Λήψη PDF"
 msgid "Download Token"
 msgstr "Token Λήψης"
 
+msgid "Download a GDPR data export"
+msgstr "Λήψη εξαγωγής δεδομένων GDPR"
+
 msgid "Download a GDPR data export bundle"
 msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
 
@@ -8864,6 +8867,9 @@ msgstr "Δεν υπάρχουν καταστήματα ακόμα"
 msgid "No stores yet."
 msgstr "Δεν υπάρχουν καταστήματα ακόμα."
 
+msgid "No such export, or it is not ready"
+msgstr "Δεν υπάρχει τέτοια εξαγωγή ή δεν είναι έτοιμη"
+
 msgid "No term recorded"
 msgstr "Χωρίς καταχωρημένη περίοδο"
 
@@ -13257,6 +13263,9 @@ msgstr "Μεταδίδει το PDF ετικέτας ACS μέσω ταυτοπο
 msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 msgstr "Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία ή δεν έχει ακόμα ανατεθεί ID δέματος."
 
+msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
+msgstr "Επιστρέφει το αρχείο JSON μιας εξαγωγής δεδομένων αυτού του χρήστη. Μόνο ο κάτοχος του λογαριασμού μπορεί να το διαβάσει, συνδεδεμένος: η διεύθυνση δεν περιέχει διαπιστευτήριο."
+
 msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
 msgstr "Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος πρόσβασης όπως και το endpoint μεταδεδομένων."
 
@@ -13983,6 +13992,9 @@ msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο
 msgid "The exact email address of the person's existing platform account."
 msgstr "Η ακριβής διεύθυνση email του υπάρχοντος λογαριασμού πλατφόρμας του ατόμου."
 
+msgid "The export has expired"
+msgstr "Η εξαγωγή έχει λήξει"
+
 msgid "The failure's class and code; never the address."
 msgstr "Η κλάση και ο κωδικός του σφάλματος· ποτέ η διεύθυνση."
 
@@ -14591,6 +14603,9 @@ msgstr "Αυτή η παραγγελία δεν είναι διαμορφωμέ�
 
 msgid "This order is not waiting for a payment."
 msgstr "Αυτή η παραγγελία δεν περιμένει πληρωμή."
+
+msgid "This order link is not valid or has expired."
+msgstr "Αυτός ο σύνδεσμος παραγγελίας δεν είναι έγκυρος ή έχει λήξει."
 
 msgid "This order was not paid through a payment provider, so there is nothing to refund here."
 msgstr "Αυτή η παραγγελία δεν πληρώθηκε μέσω παρόχου πληρωμών, επομένως δεν υπάρχει κάτι να επιστραφεί από εδώ."

@@ -38,6 +38,7 @@ from django_tenants.utils import schema_context
 from core.cache.invalidation import mark_surface_stale
 from promotion.models import Promotion
 from promotion.offers import scope_product_ids
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,10 @@ def _enqueue(
             _add_marks(promotions, products)
             # One task per window: the flag is cleared when it starts.
             if cache.add(_SCHEDULED_KEY, True, timeout=_SCHEDULED_TIMEOUT):
-                reindex_offer_products_task.apply_async(
+                dispatch_on_commit(
+                    reindex_offer_products_task,
                     countdown=REINDEX_DELAY_SECONDS,
-                    headers={"_schema_name": schema_name},
+                    schema_name=schema_name,
                 )
     except Exception:
         # Runs in an on_commit hook: an exception has no caller, and the

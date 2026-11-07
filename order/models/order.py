@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any, cast
 
@@ -903,6 +904,21 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     @property
     def customer_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
+
+    def opens_for_guest(self, request_uuid: object) -> bool:
+        """Whether *request_uuid* opens this guest order.
+
+        The uuid reads the customer's details without a login, so it is a key,
+        and a key that lasts for ever outlives every place it has been seen. It
+        works for ``settings.GUEST_ORDER_ACCESS_DAYS`` after the order. Nothing
+        sends a guest back to an order after that: no email links to it, and the
+        store can read it for them.
+        """
+        if not request_uuid or str(self.uuid) != str(request_uuid):
+            return False
+        return timezone.now() < self.created_at + timedelta(
+            days=settings.GUEST_ORDER_ACCESS_DAYS
+        )
 
     @property
     def is_paid(self) -> bool:

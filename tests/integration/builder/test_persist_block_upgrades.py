@@ -104,15 +104,9 @@ def published(admin, catalogue, upgraded_catalogue, features_on):
 def run(tenant):
     def go(*args):
         out = StringIO()
-        with (
-            mock.patch(
-                "django_tenants.utils.tenant_context",
-                lambda _tenant: contextlib.nullcontext(),
-            ),
-            mock.patch(
-                "builder.management.commands.persist_block_upgrades.feature_on",
-                return_value=True,
-            ),
+        with mock.patch(
+            "django_tenants.utils.tenant_context",
+            lambda _tenant: contextlib.nullcontext(),
         ):
             call_command(
                 "persist_block_upgrades",
@@ -175,6 +169,54 @@ def test_a_published_page_gets_the_dependency_rows_of_its_data(published, run):
     ).exists()
 
 
+def test_a_translation_moves_with_its_setting(
+    admin, catalogue, upgraded_catalogue, features_on, run
+):
+    """The draft and the version both, and a language reads what it read:
+    a setting renamed by an upgrade keeps its translation."""
+    draft = document(
+        ("a", section("offers_preview@1", {"title": "Προσφορές", "limit": 4}))
+    )
+    services.save_draft(
+        admin,
+        key=HOME,
+        draft=draft,
+        i18n={"en": {"a": {"/title": "Offers"}}},
+        expected_revision=0,
+    )
+    services.publish(admin, keys=[HOME])
+    upgraded_catalogue()
+    current = offers(2)
+    catalogue.blocks = [
+        block for block in catalogue.blocks if block["type"] != "offers_preview"
+    ] + [
+        {
+            **current,
+            "version": 3,
+            "accepts": [3],
+            "translatable": ["/heading"],
+            "schema": _schema(
+                heading=dict(TEXT),
+                offers=current["schema"]["properties"]["offers"],
+            ),
+        }
+    ]
+    catalogue.hash = "catalogue-hash-3"
+    clear_catalogue_cache()
+
+    run()
+
+    stored = BuilderDocument.objects.get(key=HOME)
+    version = stored.versions.get()
+    moved = {"en": {"a": {"/heading": "Offers"}}}
+    assert stored.draft_i18n == moved
+    assert version.i18n == moved
+    assert version.data["sections"]["a"]["settings"]["heading"] == "Προσφορές"
+    assert services.check_publish(admin, keys=[HOME]).problems[0].code == (
+        "nothing_to_publish"
+    )
+
+
 def test_the_upgraded_draft_is_the_upgraded_release(admin, published, run):
     run()
 
@@ -220,6 +262,38 @@ def test_a_second_run_finds_nothing(published, run):
     assert "upgraded 0 draft(s), 0 version(s): {}" in report
     after = BuilderVersion.objects.get(pk=version.pk)
     assert after.content_hash == version.content_hash
+
+
+def test_a_feature_switched_off_does_not_stop_the_store(
+    published, catalogue, run
+):
+    """Its block may still be on a page: the next publish refuses that, and
+    the page must not stay on an old version until then."""
+    gated = next(b for b in catalogue.blocks if b["type"] == "offers_preview")
+    gated["feature"] = "newsletter"
+    clear_catalogue_cache()
+
+    with mock.patch("core.store_settings.store_setting", return_value=False):
+        run()
+
+    version = published.versions.get()
+    assert version.data["sections"]["a"]["type"] == "offers_preview@2"
+
+
+def test_a_feature_the_platform_does_not_know_stops_the_store(
+    published, catalogue, run
+):
+    """A publish would refuse it, so the upgrade must not store it."""
+    version = published.versions.get()
+    gated = next(b for b in catalogue.blocks if b["type"] == "offers_preview")
+    gated["feature"] = "no_such_feature"
+    clear_catalogue_cache()
+
+    with pytest.raises(CommandError, match="unknown_feature"):
+        run()
+
+    after = BuilderVersion.objects.get(pk=version.pk)
+    assert after.data["sections"]["a"]["type"] == "offers_preview@1"
 
 
 def test_one_document_that_fails_stops_the_store(published, run):

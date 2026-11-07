@@ -189,7 +189,7 @@ class IsOwnerOrAdminOrGuest(IsOwnerMixin, BasePermission):
                 request_uuid = request.query_params.get(
                     "uuid"
                 ) or request.parser_context.get("kwargs", {}).get("uuid")
-                return bool(request_uuid and str(obj.uuid) == str(request_uuid))
+                return obj.opens_for_guest(request_uuid)
 
             if request.user and request.user.is_authenticated:
                 return obj.user == request.user

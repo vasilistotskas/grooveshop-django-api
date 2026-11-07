@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from celery import Task
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
 
@@ -157,6 +159,30 @@ def run_for_all_tenants(
     return results
 
 
+class BrokerKnownDown(Exception):
+    """A publish that was not tried, because one failed moments ago."""
+
+    def __str__(self) -> str:
+        return "not tried: a publish in this process failed moments ago"
+
+
+#: When this process may try the broker again (``time.monotonic``). One failed
+#: publish holds its caller for the whole of Celery's connection retries, and
+#: an order makes six: an outage must not make a shopper wait for each.
+_broker_down_until = 0.0
+
+
+def _broker_known_down() -> bool:
+    return time.monotonic() < _broker_down_until
+
+
+def _note_broker_down() -> None:
+    global _broker_down_until
+    _broker_down_until = (
+        time.monotonic() + settings.DEFERRED_DISPATCH_BROKER_DOWN_SECONDS
+    )
+
+
 def dispatch_on_commit(
     # Annotated `Any`, not `Task`: Celery's `@shared_task` returns a Task
     # at RUNTIME, but a type checker sees the undecorated function, so a
@@ -167,6 +193,7 @@ def dispatch_on_commit(
     kwargs: Mapping[str, Any] | None = None,
     *,
     schema_name: str | None = None,
+    then: Callable[[], None] | None = None,
     **options: Any,
 ) -> None:
     """Queue ``task`` for after the current transaction, schema pinned NOW.
@@ -193,8 +220,20 @@ def dispatch_on_commit(
     never reaches the caller: the change it follows is already committed, so
     raising could only answer 500 for work that was done. The dispatch is
     logged at ERROR and kept as a ``DeferredDispatch`` that
-    ``redispatch_deferred_tasks`` publishes again, so it is not lost. Any
-    other exception is a bug and still raises.
+    ``redispatch_deferred_tasks`` publishes again, so it is not lost. Celery
+    raises ``OperationalError`` for every connection error of the transport,
+    which for RabbitMQ includes any ``OSError``, a TLS failure and a nacked
+    message, so those are kept too. Anything else, such as a ``TypeError``
+    from bad arguments, is a bug and still raises. After one such failure this
+    process keeps the next ones without trying, for
+    ``DEFERRED_DISPATCH_BROKER_DOWN_SECONDS``, so one request does not wait
+    out the failure once per task.
+
+    ``then`` runs once the task is published or kept, in the pinned schema.
+    It does not run when the row could not be written either, so what it
+    records never outlives a message that was neither sent nor kept. What it
+    raises reaches the caller and drops the commit's later hooks, like any
+    hook that raises, so it should do no more than record.
 
     ``transaction.on_commit`` is reached through the module, not bound at
     import: the test suite monkeypatches it.
@@ -208,11 +247,24 @@ def dispatch_on_commit(
     if kwargs is not None:
         call["kwargs"] = dict(kwargs)
 
-    def publish() -> None:
+    def handed_over() -> bool:
+        if _broker_known_down():
+            return defer_dispatch(
+                task, call, headers, options, BrokerKnownDown()
+            )
         try:
             task.apply_async(**call, headers=headers, **options)
         except TRANSIENT_NETWORK_ERRORS as exc:
-            defer_dispatch(task, call, headers, options, exc)
+            _note_broker_down()
+            return defer_dispatch(task, call, headers, options, exc)
+        return True
+
+    def publish() -> None:
+        if handed_over() and then is not None:
+            from django_tenants.utils import schema_context
+
+            with schema_context(schema):
+                then()
 
     transaction.on_commit(publish)
 
@@ -227,11 +279,12 @@ def defer_dispatch(
     headers: Mapping[str, Any],
     options: Mapping[str, Any],
     error: BaseException,
-) -> None:
+) -> bool:
     """Keep a dispatch whose publish failed, for ``redispatch_deferred_tasks``.
 
-    If the row cannot be written either, the whole payload is in the log
-    line, so the work can still be recovered by hand.
+    Returns whether it was kept. If the row cannot be written either, the
+    log line says what the work was, so it can still be recovered by hand,
+    with its secrets masked: the row may hold a reset link, a log may not.
     """
     from django.utils import timezone
 
@@ -266,8 +319,43 @@ def defer_dispatch(
             next_attempt_at=timezone.now(),
         )
     except Exception:
+        from core.tasks import safe_task_arguments
+
+        safe_args, safe_kwargs = safe_task_arguments(
+            task, payload["args"], payload["kwargs"]
+        )
         logger.exception(
-            "A deferred dispatch of %s could not be kept; payload %r",
+            "A deferred dispatch of %s could not be kept; payload args=%s "
+            "kwargs=%s headers=%r options=%r",
             name,
-            payload,
+            safe_args,
+            safe_kwargs,
+            payload["headers"],
+            payload["options"],
+        )
+        return False
+    return True
+
+
+def publish_or_drop(task: Any, /, **kwargs: Any) -> None:
+    """Publish what an outage may lose, now: an analytics beacon.
+
+    For an endpoint open to anonymous traffic, where a ``DeferredDispatch``
+    row per request in an outage would turn that traffic into database rows.
+    It shares ``dispatch_on_commit``'s window: a broker known to be down is
+    not tried, so a visitor's request does not wait for it, and one failure
+    here spares the next order the wait too. Only the failure that opens the
+    window is logged, so an outage does not log every beacon it drops.
+    """
+    if _broker_known_down():
+        return
+    try:
+        task.delay(**kwargs)
+    except TRANSIENT_NETWORK_ERRORS:
+        _note_broker_down()
+        logger.exception(
+            "Dropped %s: the broker is unreachable, and this process drops "
+            "its beacons for the next %s s",
+            getattr(task, "name", repr(task)),
+            settings.DEFERRED_DISPATCH_BROKER_DOWN_SECONDS,
         )

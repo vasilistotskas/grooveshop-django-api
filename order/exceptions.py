@@ -81,6 +81,26 @@ class InsufficientStockError(StockError):
         )
 
 
+class CartStockUnavailableError(StockError):
+    """
+    Raised when a cart cannot hold stock for every one of its lines.
+
+    Carries one ``InsufficientStockError`` per short line, so the caller can
+    report all of them at once. Nothing was changed when it is raised: the
+    cart keeps the holds it had.
+
+    Attributes:
+        shortfalls (list[InsufficientStockError]): One entry per short line
+    """
+
+    def __init__(self, shortfalls: list[InsufficientStockError]):
+        self.shortfalls = shortfalls
+        super().__init__(
+            "Insufficient stock for products: "
+            + ", ".join(str(e.product_id) for e in shortfalls)
+        )
+
+
 class StockReservationError(StockError):
     """
     Raised when stock reservation fails.

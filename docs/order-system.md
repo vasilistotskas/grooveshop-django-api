@@ -215,10 +215,31 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   `StockManager` that follow re-lock rows already held and cannot block.
   `cancel_order` (a restore takes one lock per product), the bulk discount
   admin actions and the guest→user cart merge follow the same rule;
-  `reserve_stock` is not affected, each call being its own transaction.
+  `reserve_cart_stock` takes the same locks itself, through the same helper.
   Not covered: an admin edit that changes the quantity of several
   `OrderItem` rows in one request (`handle_order_item_post_save` →
   `StockManager.adjust_stock`) locks their products in form order.
+- **A cart's stock holds are replaced as a whole, never stacked**
+  (`POST cart/reserve-stock` -> `StockManager.reserve_cart_stock`). A cart
+  (session = the cart UUID) owns one set of `StockReservation` rows. One call
+  locks the products of the old and the new set (`lock_products`, pk order),
+  releases every unconsumed hold of the session (expired ones too) through
+  `release_reservation` (`consumed=True`, a `StockLog` RELEASE line each, no
+  order), then reserves the new quantities, all in one transaction. A reload,
+  a retry, an agent completing twice, a changed quantity or a removed line
+  therefore never leave the cart blocked by its own earlier holds
+  (`stock == quantity` used to answer 409 on the second attempt and keep the
+  units held for the TTL) and never leave a hold on a product the cart no
+  longer has. Other sessions' holds still count, so two carts still exclude
+  each other for the last unit. If any line is short the whole call rolls
+  back (`CartStockUnavailableError`, one entry per short line, answered as 409
+  `insufficient_stock` with `failed_items`) and the cart keeps the holds it
+  had. `StockManager.reserve_stock` stays the per-product primitive and counts
+  every active hold, so only reserve through `reserve_cart_stock`. Order
+  creation looks reservations up by SESSION, not by id
+  (`session_id=cart.uuid, consumed=False`), so the ids an older response
+  returned are irrelevant: they are already consumed, and
+  `release-reservations` treats a consumed id as a no-op.
 
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the

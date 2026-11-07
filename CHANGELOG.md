@@ -3,6 +3,52 @@
 
 
 
+## v3.231.5 (2026-11-07)
+
+### Bug fixes
+
+* fix(docker): write stdout as it is printed in the production image (#513) ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
+* fix(docker): write stdout as it is printed in the production image
+
+Off a terminal Python buffers stdout in blocks, and the production image
+did not set PYTHONUNBUFFERED (the dev image does). What is printed
+rather than logged, celery beat's and worker's start banner and a
+management command's output, reached the logs only when the process
+exited, and never if it was killed: production's beat banner showed the
+previous pod's start time when the pod stopped, which read as a clock
+error. Logging flushes every record, so log lines were never late.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
+### Continuous integration
+
+* ci(coderabbit): review each pull request once, and again only when asked (#512)
+
+CodeRabbit reviews this repository on its free open-source tier: 1 to 10
+reviews an hour by stars, per author and per repository, and every push
+counts. Last week 67 of its 214 reviews across our repositories were
+re-reviews after a push. A pull request is now reviewed when it is opened
+or marked ready, and again only on `@coderabbitai review`. `drafts: false`
+is stated because the draft-first rule depends on it, and
+`inheritance: true` lets settings made in the CodeRabbit app fill in;
+`@coderabbitai configuration` showed none are set today.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`5a6e0bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a6e0bfd6b7638b108d97a7c5477cc031addc053))
+
+### Documentation
+
+* docs(docker): only beat's banner was late, not the worker's
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
 ## v3.231.4 (2026-11-07)
 
 ### Bug fixes

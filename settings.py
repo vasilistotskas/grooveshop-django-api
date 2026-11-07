@@ -6,6 +6,7 @@ from pathlib import Path
 import django_stubs_ext
 import dotenv
 from celery.schedules import crontab
+from channels_redis.core import RedisChannelLayer
 from corsheaders.defaults import (
     default_headers,
 )
@@ -1839,11 +1840,23 @@ def get_celery_beat_schedule():
 # when beat starts. To change when a job runs, change it here and deploy.
 CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 
+# channels-redis waits for a message with BZPOPMIN for ``brpop_timeout``
+# seconds, and redis-py 8 gives every connection a socket timeout of the
+# same 5 seconds, so an idle receive raised TimeoutError and closed the
+# consumer (django/channels_redis#422). The read timeout must outlast the
+# blocking wait; twice that still notices a dead connection.
+CHANNEL_LAYER_SOCKET_TIMEOUT = RedisChannelLayer.brpop_timeout * 2
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL],
+            "hosts": [
+                {
+                    "address": REDIS_URL,
+                    "socket_timeout": CHANNEL_LAYER_SOCKET_TIMEOUT,
+                }
+            ],
             "capacity": 1500,
             "expiry": 300,
         },

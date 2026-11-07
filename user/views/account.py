@@ -4,9 +4,14 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema_view,
+)
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
@@ -56,6 +61,7 @@ from user.serializers.account import (
     UserWriteSerializer,
 )
 from user.serializers.address import UserAddressSerializer
+from user.views.data_export import export_file_response
 
 User = get_user_model()
 
@@ -161,6 +167,27 @@ serializers_config: SerializersConfig = {
         description=_(
             "List recent data-export requests for this user so the UI can "
             "show progress and the last download link."
+        ),
+        tags=["User Accounts"],
+    ),
+    "download_data_export": ActionConfig(
+        responses={
+            (200, "application/json"): OpenApiTypes.BINARY,
+            404: OpenApiResponse(
+                response=ErrorResponseSerializer,
+                description=_("No such export, or it is not ready"),
+            ),
+            410: OpenApiResponse(
+                response=ErrorResponseSerializer,
+                description=_("The export has expired"),
+            ),
+        },
+        operation_id="downloadUserAccountDataExport",
+        summary=_("Download a GDPR data export"),
+        description=_(
+            "Streams the JSON bundle of one of this user's data exports. "
+            "Only the account's owner can read it, signed in: the address "
+            "holds no credential."
         ),
         tags=["User Accounts"],
     ),
@@ -514,6 +541,26 @@ class UserAccountViewSet(BaseModelViewSet):
             export, context={"request": request}
         )
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["GET"])
+    def download_data_export(self, request, pk=None, export_id=None):
+        """Stream one of this user's export bundles.
+
+        The most complete copy of a person's data the system makes, so
+        nobody but its owner reads it: the viewset's check also lets store
+        staff through. Nothing in the address is a credential.
+        """
+        from user.models.data_export import UserDataExport
+
+        user = self.get_object()
+        export = (
+            UserDataExport.objects.filter(user=user, pk=export_id).first()
+            if user.pk == request.user.pk
+            else None
+        )
+        if export is None:
+            raise NotFound(_("Export not found."), code="export_not_found")
+        return export_file_response(export)
 
     @action(detail=True, methods=["POST"])
     def delete_account(self, request, pk=None):

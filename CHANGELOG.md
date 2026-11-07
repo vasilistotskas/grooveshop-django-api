@@ -3,6 +3,49 @@
 
 
 
+## v3.231.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): keep a data export from store staff
+
+The viewset's check lets store staff through, and walking ids would hand
+them every customer's whole bundle. Only the owner reads it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* fix(user): leave an expired export for the cleanup to remove
+
+Opening an expired export marked its row expired, and the cleanup skips
+rows that are, so the bundle stayed on disk for good. Only the cleanup
+marks a row now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+### Features
+
+* feat(user): let the account's owner download a data export (#505) ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* feat(user): let the account's owner download a data export
+
+The bundle is the most complete copy of a person's data the system makes,
+and its only route is public: whoever holds the token can read it for 7
+days. Add a route under the account's owner check, whose address holds no
+credential, for the storefront to move to. The public route goes once it
+has.
+
+Both routes answer through one function, with a stable code for each
+refusal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
 ## v3.230.0 (2026-11-07)
 
 ### Bug fixes

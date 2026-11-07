@@ -51,7 +51,7 @@ from core.utils.serializers import (
 )
 from order.enum.create_error import OrderCreateErrorType
 from order.exceptions import (
-    InsufficientStockError,
+    CartStockUnavailableError,
     InvalidOrderDataError,
     StockReservationError,
 )
@@ -601,62 +601,46 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Reserve stock for each cart item
-        reservation_ids = []
-        failed_items = []
-
+        # The cart's holds are replaced as a whole: its own earlier holds
+        # never count against it, and a product it no longer wants is freed.
+        quantities: dict[int, int] = {}
         for item in cart_items:
-            try:
-                # Reserve stock using StockManager
-                # session_id is the cart's UUID for tracking
-                # user_id is None for guest users
-                reservation = StockManager.reserve_stock(
-                    product_id=item.product.id,
-                    quantity=item.quantity,
-                    session_id=str(cart.uuid),
-                    user_id=cart.user.id if cart.user else None,
+            quantities[item.product_id] = (
+                quantities.get(item.product_id, 0) + item.quantity
+            )
+        try:
+            reservations = StockManager.reserve_cart_stock(cart, quantities)
+        except Cart.DoesNotExist:
+            return Response(
+                {"detail": "Cart not found", "code": "cart_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except CartStockUnavailableError as exc:
+            # Log it, or the resulting 409 is unanswerable from server logs.
+            names = {
+                item.product_id: item.product.safe_translation_getter(
+                    "name", any_language=True
                 )
-                reservation_ids.append(reservation.id)
-            except InsufficientStockError as e:
-                # Track which items failed to reserve — and log it, or the
-                # resulting 409 is unanswerable from server logs alone.
+                for item in cart_items
+            }
+            failed_items = []
+            for shortfall in exc.shortfalls:
                 logger.info(
                     "Stock reservation rejected: cart=%s product=%s "
                     "available=%s requested=%s",
                     cart.uuid,
-                    e.product_id,
-                    e.available,
-                    e.requested,
+                    shortfall.product_id,
+                    shortfall.available,
+                    shortfall.requested,
                 )
                 failed_items.append(
                     {
-                        "product_id": e.product_id,
-                        "product_name": item.product.safe_translation_getter(
-                            "name", any_language=True
-                        ),
-                        "available": e.available,
-                        "requested": e.requested,
+                        "product_id": shortfall.product_id,
+                        "product_name": names.get(shortfall.product_id),
+                        "available": shortfall.available,
+                        "requested": shortfall.requested,
                     }
                 )
-
-        # If any items failed to reserve, release all successful reservations
-        # and return error
-        if failed_items:
-            # Release all successfully created reservations
-            for reservation_id in reservation_ids:
-                try:
-                    StockManager.release_reservation(reservation_id)
-                except StockReservationError as release_error:
-                    # Don't fail the rollback, but leave a trace — a stuck
-                    # reservation holds stock until its TTL expiry.
-                    logger.warning(
-                        "Failed to release reservation %s during "
-                        "reserve_stock rollback for cart %s: %s",
-                        reservation_id,
-                        cart.uuid,
-                        release_error,
-                    )
-
             return Response(
                 {
                     "detail": "Insufficient stock for one or more items",
@@ -665,6 +649,7 @@ class CartViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+        reservation_ids = [reservation.id for reservation in reservations]
 
         # Return success with reservation IDs
         return Response(

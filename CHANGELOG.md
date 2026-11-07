@@ -3,6 +3,20 @@
 
 
 
+## v3.233.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(product): require a VAT rate on every product and protect it (#520) ([`fad37d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fad37d22abdc0d6987f6424322e02b7986514887))
+
+* fix(tenant): require a second factor and count wrong staff passwords (#519) ([`1146308`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1146308a6fc03cc841c851f8638ecbd3298bc805))
+
+* fix(cart): replace a cart's stock holds instead of stacking them (#517) ([`3eacc4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3eacc4b13019ba5d30896d1363b25f9906ce501f))
+
+### Features
+
+* feat(logging): add db_queries and db_ms to access and task log lines (#518) ([`c2e5d26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2e5d26af16773ba7890f6d771a42c2ef045f0f4))
+
 ## v3.232.2 (2026-11-07)
 
 ### Bug fixes

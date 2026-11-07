@@ -23,6 +23,7 @@ from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework.response import Response
 
+from core import db_cost
 from core.logging import (
     CorrelationIdFilter,
     JsonFormatter,
@@ -340,12 +341,25 @@ class TestDatabaseCost:
         assert payload["db_ms"] > 0
 
     @pytest.mark.django_db
-    def test_a_query_that_fails_is_still_counted(self, access_lines):
-        def view(request):
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1/0")
+    def test_a_query_that_fails_is_still_counted(self):
+        with CaptureQueriesContext(connection) as django_count:
+            with db_cost.measure() as cost:
+                with (
+                    pytest.raises(Exception, match="division by zero"),
+                    connection.cursor() as cursor,
+                ):
+                    cursor.execute("SELECT 1/0")
 
-        with pytest.raises(Exception, match="division by zero"):
+        assert cost.queries == len(django_count) >= 1
+        assert cost.seconds > 0
+        assert connection.execute_wrappers == []
+
+    @pytest.mark.django_db
+    def test_an_exception_leaves_no_wrapper_installed(self):
+        def view(request):
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
             AccessLogMiddleware(view)(RequestFactory().get("/anything"))
 
         assert connection.execute_wrappers == []

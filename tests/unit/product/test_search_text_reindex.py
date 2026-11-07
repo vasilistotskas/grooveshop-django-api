@@ -204,3 +204,28 @@ def test_the_task_reindexes_exactly_the_products_that_use_the_row():
     assert reindexed("category", category.pk) == {branded.pk}
     assert reindexed("attribute_value", value.pk) == {attributed.pk}
     assert reindexed("attribute", value.attribute_id) == {attributed.pk}
+
+
+@pytest.mark.django_db
+def test_deleting_a_brand_reindexes_its_products_without_it(
+    django_capture_on_commit_callbacks,
+):
+    brand = BrandFactory()
+    branded = ProductFactory(brand=brand)
+    ProductFactory()
+
+    with (
+        online(),
+        patch("meili.tasks.index_document_task.apply_async") as index,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        brand.delete()
+
+    dispatched_pks = {
+        call.kwargs["kwargs"]["pk"] for call in index.call_args_list
+    }
+    assert dispatched_pks == set(
+        branded.translations.values_list("pk", flat=True)
+    )
+    branded.refresh_from_db()
+    assert branded.brand_id is None

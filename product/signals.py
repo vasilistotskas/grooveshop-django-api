@@ -554,3 +554,22 @@ _watch_search_text(
     SearchTextSource.ATTRIBUTE_VALUE,
     "value",
 )
+
+
+@receiver(
+    pre_delete,
+    sender=Brand,
+    dispatch_uid="product.search_text.reindex_products_of_deleted_brand",
+)
+def reindex_products_of_deleted_brand(sender, instance, **kwargs):
+    """Reindex a brand's products when the brand is deleted.
+
+    ``Product.brand`` is ``SET_NULL``: the collector nulls it with one
+    UPDATE and no signal, so the documents would keep the brand's name
+    and id. The products are collected here, before the delete: after it
+    nothing points at the brand any more. The documents are re-read on
+    commit, by then without the brand.
+    """
+    reindex_products_by_pk(
+        Product.objects.filter(brand=instance).values_list("pk", flat=True)
+    )

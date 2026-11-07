@@ -540,6 +540,7 @@ def _sample_order(
         lines.append(
             OrderItem(
                 product=product,
+                product_name=name,
                 price=Money(price, "EUR"),
                 quantity=quantity,
             )
@@ -1030,6 +1031,17 @@ class PaymentMismatch:
 
 
 @dataclass(frozen=True, slots=True)
+class Overcharged:
+    """A customer who paid an order more than once: the ledger holds more
+    than the order is for."""
+
+    order_id: int
+    payment_id: str
+    provider: str
+    excess: object
+
+
+@dataclass(frozen=True, slots=True)
 class RefundFailed:
     """A refund the provider accepted and later failed."""
 
@@ -1059,6 +1071,16 @@ def _payment_mismatch(alert: PaymentMismatch, env: RenderEnv) -> dict[str, Any]:
         "provider": alert.provider,
         "observed": alert.observed,
         "expected": alert.expected,
+    }
+
+
+def _overcharged(alert: Overcharged, env: RenderEnv) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "order_id": alert.order_id,
+        "payment_id": alert.payment_id,
+        "provider": alert.provider,
+        "excess": alert.excess,
     }
 
 
@@ -1109,6 +1131,24 @@ staff_email(
         provider="Stripe",
         observed=Money(Decimal("40.00"), "EUR"),
         expected=Money(Decimal("45.50"), "EUR"),
+    ),
+)
+staff_email(
+    "ops.overcharged",
+    area="ops",
+    title=_("Customer charged more than the order is for"),
+    description=_(
+        "Tells the store's staff that an order was paid more than once, so "
+        "the extra payment must be refunded."
+    ),
+    templates=f"{OPS_TEMPLATE_DIR}/overcharged",
+    subject=gettext_noop("[{site}] Order {order_id} was paid more than once"),
+    build_context=_overcharged,
+    sample=lambda env: Overcharged(
+        order_id=1234,
+        payment_id="pi_3QxExample",
+        provider="stripe",
+        excess=Money(Decimal("45.50"), "EUR"),
     ),
 )
 staff_email(

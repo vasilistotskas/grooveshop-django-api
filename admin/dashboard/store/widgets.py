@@ -335,6 +335,16 @@ class StoreAttention(DashboardWidget):
             ),
             (
                 True,
+                "overcharged_orders",
+                "money_off",
+                "danger",
+                _("Orders paid twice"),
+                _("The customer paid more than the order is for: refund it"),
+                "order.Order",
+                urlencode({"overcharged": "yes"}),
+            ),
+            (
+                True,
                 "chargebacks_to_settle",
                 "gavel",
                 "danger",

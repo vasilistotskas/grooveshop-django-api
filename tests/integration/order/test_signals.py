@@ -8,7 +8,7 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import RefundTransactionFactory
 from order.factories.order import OrderFactory
-from order.models.history import OrderHistory, OrderItemHistory
+from order.models.history import OrderHistory
 from order.models.order import Order
 from order.signals import (
     order_canceled,
@@ -262,69 +262,6 @@ class OrderSignalsTestCase(TestCase):
             self.order.save()
 
             mock_signal.assert_called_once()
-
-    def test_handle_order_item_pre_save(self):
-        original_quantity = self.order_item.quantity
-        new_quantity = original_quantity + 2
-
-        self.order_item.quantity = new_quantity
-        self.order_item.save()
-
-        self.assertEqual(self.order_item._original_quantity, original_quantity)
-
-    def test_handle_order_item_saved_quantity_changed(self):
-        original_quantity = self.order_item.quantity
-        new_quantity = original_quantity + 2
-        self.order_item._original_quantity = original_quantity
-
-        self.order_item.quantity = new_quantity
-
-        self.order_item.save()
-
-        self.product.refresh_from_db()
-
-        self.assertEqual(self.product.stock, self.initial_stock - 2)
-
-        self.assertTrue(
-            OrderItemHistory.objects.filter(
-                order_item=self.order_item,
-                change_type="QUANTITY",
-                previous_value={"quantity": original_quantity},
-                new_value={"quantity": new_quantity},
-            ).exists()
-        )
-
-        self.assertTrue(
-            OrderHistory.objects.filter(
-                order=self.order,
-                change_type="NOTE",
-                new_value__note__endswith=(
-                    f"quantity updated from {original_quantity} "
-                    f"to {new_quantity}"
-                ),
-            ).exists()
-        )
-
-    def test_handle_order_item_saved_price_changed(self):
-        original_price = self.order_item.price
-        new_price = Money(
-            amount=Decimal("60.00"), currency=settings.DEFAULT_CURRENCY
-        )
-        self.order_item._original_price = original_price
-
-        self.order_item.price = new_price
-
-        self.order_item.save()
-
-        history = OrderItemHistory.objects.filter(
-            order_item=self.order_item, change_type="PRICE"
-        ).first()
-
-        self.assertIsNotNone(history)
-        self.assertEqual(
-            history.previous_value["price"], float(original_price.amount)
-        )
-        self.assertEqual(history.new_value["price"], float(new_price.amount))
 
     def test_handle_order_shipped(self):
         self.order.tracking_number = "TRACK123"

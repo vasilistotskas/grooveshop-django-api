@@ -96,6 +96,7 @@ from order.payment_ledger import (
 )
 from order.services import OrderService
 from order.taxation import breakdown_by_rate, order_vat_lines
+from order.vat_snapshot import write_vat_lines
 from pay_way.enum.settlement import PaySettlement
 from user.models import UserAccount
 
@@ -229,6 +230,23 @@ class RefundOwedFilter(DropdownFilter):
     def queryset(self, request, queryset):
         if self.value() == "yes":
             return queryset.refund_owed()
+        return queryset
+
+
+class OverchargedFilter(DropdownFilter):
+    """Orders the customer paid more than the order is for, until refunds
+    bring the ledger back (``OrderQuerySet.overcharged``, the rule behind
+    the dashboard counter)."""
+
+    title = _("Overcharge")
+    parameter_name = "overcharged"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("Paid more than the order is for"))]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.overcharged()
         return queryset
 
 
@@ -462,17 +480,14 @@ class RestockReturnedForm(BaseDialogForm):
         super().__init__(request, object_id, *args, **kwargs)
         self.items = [
             item
-            for item in OrderItem.objects.filter(order_id=object_id)
-            .select_related("product")
-            .order_by("sort_order", "pk")
+            for item in OrderItem.objects.filter(order_id=object_id).order_by(
+                "sort_order", "pk"
+            )
             if item.net_quantity > 0
         ]
         for item in self.items:
-            name = item.product.safe_translation_getter(
-                "name", any_language=True
-            ) or _("Unnamed Product")
             self.fields[self.field_name(item)] = forms.IntegerField(
-                label=name,
+                label=item.product_name or _("Unnamed Product"),
                 min_value=0,
                 max_value=item.net_quantity,
                 initial=0,
@@ -533,35 +548,46 @@ class ChargebackDecisionForm(BaseDialogForm):
 
 
 class OrderItemInline(TabularInline):
+    """The lines of a placed order, as the record they are.
+
+    A line's product, quantity and price decide ``amount_due``, the VAT
+    lines the turnover report reads and the stock taken, none of which an
+    edit here could follow. Checkout creates the lines; a restock
+    (``OrderItem.refund``) is the one change made to them afterwards.
+    """
+
     model = OrderItem
     extra = 0
+    max_num = 0
+    can_delete = False
     per_page = 15
     collapsible = True
     fields = (
         "product_display",
+        "sku",
         "quantity",
         "price_display",
         "total_display",
         "refund_status",
     )
-    readonly_fields = (
-        "product_display",
-        "price_display",
-        "total_display",
-        "refund_status",
-    )
+    readonly_fields = fields
 
     tab = True
     show_change_link = True
 
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        if not obj.product:
+        if not obj.product_id:
             return "-"
-        name = obj.product.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Product")
-        return f"{name} (ID: {obj.product.id})"
+        return (
+            f"{obj.product_name or _('Unnamed Product')} (ID: {obj.product_id})"
+        )
 
     @admin.display(description=_("Unit Price"))
     def price_display(self, obj):
@@ -917,6 +943,7 @@ class OrderAdmin(BaseModelAdmin):
         "document_type",
         WholesaleOrderFilter,
         RefundOwedFilter,
+        OverchargedFilter,
         ChargebackDecisionFilter,
         FollowUpFilter,
         RecentOrdersFilter,
@@ -975,6 +1002,17 @@ class OrderAdmin(BaseModelAdmin):
         # behind it.
         "payment_status",
         "payment_id",
+        # Kept by the payment ledger (``PaymentLedger.sync_overcharge``).
+        "overcharged_at",
+        # What the customer owes is a record once the order is placed:
+        # every payment path charges and compares a capture with the total
+        # these amounts make (``calculate_order_total_amount``), and
+        # nothing recomputes ``amount_due`` or the VAT lines when one
+        # changes. The lines (``OrderItemInline``) and the discounts above
+        # are read-only for the same reason; ``payment_method_fee`` is not
+        # on the form at all.
+        "shipping_price",
+        "amount_due",
         # Set by the provider's reply when a payment link is opened.
         "payment_hold_expires_at",
         "follow_up_note",
@@ -1090,6 +1128,7 @@ class OrderAdmin(BaseModelAdmin):
                     "payment_status",
                     "payment_method",
                     "payment_id",
+                    "overcharged_at",
                     "payment_hold_expires_at",
                     "amount_due",
                     "discount_amount",
@@ -1198,6 +1237,12 @@ class OrderAdmin(BaseModelAdmin):
         "pay_way",
         "attribution",
     ]
+
+    def has_add_permission(self, request):
+        # An order is placed by checkout (``OrderService``), which prices
+        # it, takes the stock, reserves the discounts and writes the VAT
+        # lines. A row typed into a form has none of that behind it.
+        return False
 
     def get_inlines(self, request, obj=None):
         # Show the carrier-specific shipment inline only when the order
@@ -2583,13 +2628,27 @@ class OrderItemAdmin(BaseModelAdmin):
         "id",
         "order__id",
         "order__email",
-        "product__translations__name",
+        "product_name",
+        "sku",
         "product__id",
         "notes",
     ]
-    autocomplete_fields = ("order", "product")
+    # A line is the record of a sale: checkout creates it and a restock is
+    # the only change made to its quantities, so everything that decides
+    # what was owed, billed and taken from stock is read-only. What staff
+    # can still do here is annotate it and, until the invoice is registered
+    # with AADE, correct its VAT rate.
     readonly_fields = [
         "id",
+        "order",
+        "product",
+        "product_name",
+        "sku",
+        "quantity",
+        "price",
+        "is_refunded",
+        "refunded_quantity",
+        "original_quantity",
         "created_at",
         "updated_at",
         "total_price",
@@ -2599,13 +2658,21 @@ class OrderItemAdmin(BaseModelAdmin):
         "refunded_amount",
         "net_price",
     ]
-    list_select_related = ["order", "order__user", "product"]
+    list_select_related = ["order", "order__user"]
 
     fieldsets = (
         (
             _("Order Item Information"),
             {
-                "fields": ("order", "product", "quantity", "price", "vat_rate"),
+                "fields": (
+                    "order",
+                    "product",
+                    "product_name",
+                    "sku",
+                    "quantity",
+                    "price",
+                    "vat_rate",
+                ),
                 "classes": ("wide",),
             },
         ),
@@ -2648,26 +2715,18 @@ class OrderItemAdmin(BaseModelAdmin):
         ),
     )
 
-    def get_fieldsets(self, request, obj=None):
-        fieldsets = super().get_fieldsets(request, obj)
-        if obj is not None:
-            return fieldsets
-        # A new line is not asked for a rate: ``OrderItem.save`` snapshots
-        # its product's current one. It cannot be shown read-only either,
-        # since an unsaved instance holds a ``DatabaseDefault`` that the
-        # admin has no way to format.
-        return [
-            (
-                title,
-                {
-                    **options,
-                    "fields": tuple(
-                        name for name in options["fields"] if name != "vat_rate"
-                    ),
-                },
-            )
-            for title, options in fieldsets
-        ]
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if "vat_rate" in form.changed_data:
+            # The turnover report reads the VAT lines written at checkout,
+            # not the line's rate: bring them in line with the receipt.
+            write_vat_lines(obj.order)
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
@@ -2684,16 +2743,6 @@ class OrderItemAdmin(BaseModelAdmin):
         ):
             return (*readonly_fields, "vat_rate")
         return readonly_fields
-
-    def get_queryset(self, request):
-        # ``product_display`` calls ``safe_translation_getter``, which
-        # fires one ``ProductTranslation`` query per row without
-        # prefetch.
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related("product__translations")
-        )
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
@@ -2714,10 +2763,8 @@ class OrderItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        name = obj.product.safe_translation_getter(
-            "name", any_language=True
-        ) or _("Unnamed Product")
-        return f"{name} (ID: {obj.product.id})"
+        name = obj.product_name or _("Unnamed Product")
+        return f"{name} (ID: {obj.product_id})"
 
     @admin.display(description=_("Quantity"))
     def quantity_display(self, obj):

@@ -701,6 +701,10 @@ msgstr "MARK σειράς 9 που επιστρέφεται από επιτυχ�
 msgid "A %(provider)s payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically."
 msgstr "Μια πληρωμή %(provider)s εισέπραξε διαφορετικό ποσό από αυτό της παραγγελίας. Η παραγγελία δεν σημειώθηκε ως πληρωμένη και δεν θα ακυρωθεί αυτόματα."
 
+#, python-format
+msgid "A %(provider)s payment means the customer has paid more than the order is for. The order keeps its first payment and nothing was refunded automatically."
+msgstr "Μια πληρωμή %(provider)s σημαίνει ότι ο πελάτης έχει πληρώσει περισσότερα από όσα αξίζει η παραγγελία. Η παραγγελία κρατά την πρώτη της πληρωμή και τίποτα δεν επιστράφηκε αυτόματα."
+
 msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "Το αναγνωριστικό ζώνης Cloudflare αποτελείται από 32 πεζούς δεκαεξαδικούς χαρακτήρες."
 
@@ -3729,6 +3733,9 @@ msgstr "Σημειώσεις Πελάτη"
 
 msgid "Customer accounts"
 msgstr "Λογαριασμοί πελατών"
+
+msgid "Customer charged more than the order is for"
+msgstr "Ο πελάτης χρεώθηκε περισσότερα από όσα αξίζει η παραγγελία"
 
 msgid "Customer details associated with the parcel"
 msgstr "Στοιχεία πελάτη που σχετίζονται με το δέμα"
@@ -9376,6 +9383,10 @@ msgid "Order #%(order_id)s has no specimen receipt."
 msgstr "Η παραγγελία #%(order_id)s δεν έχει δείγμα απόδειξης."
 
 #, python-format
+msgid "Order #%(order_id)s was paid more than once"
+msgstr "Η παραγγελία #%(order_id)s πληρώθηκε περισσότερες από μία φορές"
+
+#, python-format
 msgid "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
 msgstr "Η παραγγελία #%(order_id)s επιστράφηκε πλήρως πριν εκδοθεί η απόδειξή της, άρα δεν υπάρχει πώληση που να τεκμηριωθεί."
 
@@ -9682,6 +9693,9 @@ msgstr "Παραγγελίες & Ολοκλήρωση αγοράς"
 msgid "Orders and revenue are read from each store every 30 minutes."
 msgstr "Οι παραγγελίες και τα έσοδα διαβάζονται από κάθε κατάστημα ανά 30 λεπτά."
 
+msgid "Orders paid twice"
+msgstr "Παραγγελίες που πληρώθηκαν δύο φορές"
+
 msgid "Orders placed"
 msgstr "Παραγγελίες που καταχωρήθηκαν"
 
@@ -9733,6 +9747,12 @@ msgstr "Εξαντλημένο"
 
 msgid "Outcome"
 msgstr "Έκβαση"
+
+msgid "Overcharge"
+msgstr "Υπερχρέωση"
+
+msgid "Overcharged at"
+msgstr "Υπερχρεώθηκε στις"
 
 msgid "Override the slot's limit, capped at 12."
 msgstr "Παράκαμψη του ορίου της θέσης, με μέγιστο το 12."
@@ -9808,11 +9828,17 @@ msgstr "Το «Πληρωμένο έως» είναι ημερομηνία, συ
 msgid "Paid amount of every order whose payment completed."
 msgstr "Καταβληθέν ποσό κάθε παραγγελίας της οποίας η πληρωμή ολοκληρώθηκε."
 
+msgid "Paid more than the order is for"
+msgstr "Πληρώθηκε περισσότερο από την αξία της παραγγελίας"
+
 msgid "Paid online at checkout"
 msgstr "Πληρωμή online κατά την ολοκλήρωση αγοράς"
 
 msgid "Paid to the carrier before pickup"
 msgstr "Πληρωμή στον μεταφορέα πριν από την παραλαβή"
+
+msgid "Paid too much"
+msgstr "Επιπλέον ποσό που πληρώθηκε"
 
 msgid "Paid until"
 msgstr "Πληρωμένο έως"
@@ -10847,6 +10873,9 @@ msgstr "Λίστα/λεπτομέρειες προϊόντων, εικόνες, 
 msgid "Product markdown"
 msgstr "Έκπτωση προϊόντος"
 
+msgid "Product name"
+msgstr "Όνομα προϊόντος"
+
 msgid "Product not found."
 msgstr "Το προϊόν δεν βρέθηκε."
 
@@ -11484,6 +11513,9 @@ msgstr "Αντιστροφή επιστροφής"
 #, python-format
 msgid "Refund the customer in the %(provider)s dashboard; the provider's refund webhook records it on the order."
 msgstr "Επιστρέψτε τα χρήματα στον πελάτη από τον πίνακα του %(provider)s· το webhook επιστροφής του παρόχου την καταγράφει στην παραγγελία."
+
+msgid "Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for."
+msgstr "Επιστρέψτε το επιπλέον ποσό από τη σελίδα της παραγγελίας. Η ειδοποίηση σβήνει όταν οι επιστροφές φέρουν το σύνολο πίσω στην αξία της παραγγελίας."
 
 msgid "Refund this order's payment first."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας."
@@ -12642,6 +12674,9 @@ msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Ορίζεται όταν ο πελάτης απεγγράφηκε από κάθε διαφημιστικό email (με τον σύνδεσμο ενός κλικ σε διαφημιστικό email). Όσο ισχύει, καμία αποστολή marketing δεν στέλνεται στον λογαριασμό."
 
+msgid "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
+msgstr "Ορίζεται όσο το βιβλίο πληρωμών κρατά περισσότερα χρήματα για την παραγγελία από την αξία της (ο πελάτης πλήρωσε δύο φορές). Σβήνει όταν οι επιστροφές το επαναφέρουν. Τίποτα δεν επιστρέφεται αυτόματα."
+
 msgid "Setting Information"
 msgstr "Πληροφορίες Ρύθμισης"
 
@@ -13705,6 +13740,9 @@ msgstr "Ενημερώνει το προσωπικό του καταστήματ
 msgid "Tells the store's staff that an application awaits review."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια αίτηση περιμένει έλεγχο."
 
+msgid "Tells the store's staff that an order was paid more than once, so the extra payment must be refunded."
+msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι μια παραγγελία πληρώθηκε περισσότερες από μία φορές, οπότε η επιπλέον πληρωμή πρέπει να επιστραφεί."
+
 msgid "Tells the store's staff that an order was placed."
 msgstr "Ενημερώνει το προσωπικό του καταστήματος ότι έγινε μια παραγγελία."
 
@@ -13979,6 +14017,9 @@ msgstr "Ο πελάτης δεν είναι επιλέξιμος για αυτή
 msgid "The customer kept the product"
 msgstr "Ο πελάτης κράτησε το προϊόν"
 
+msgid "The customer paid more than the order is for: refund it"
+msgstr "Ο πελάτης πλήρωσε περισσότερα από την αξία της παραγγελίας: επιστρέψτε τα"
+
 msgid "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay."
 msgstr "Ο πελάτης ενημερώθηκε ότι έγινε επιστροφή: επιστρέψτε του τα χρήματα με άλλον τρόπο ή επαναλάβετε την επιστροφή όταν αρθεί η αιτία. Η πίστωση δωροκάρτας και οι πόντοι που αποδεσμεύτηκαν γι' αυτήν παραμένουν."
 
@@ -14222,6 +14263,12 @@ msgstr "Το προϊόν που βλέπει ο αγοραστής."
 
 msgid "The product was returned or not delivered"
 msgstr "Το προϊόν επιστράφηκε / δεν παραδόθηκε"
+
+msgid "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
+msgstr "Ο κωδικός SKU του προϊόντος όταν δημιουργήθηκε η γραμμή. Τα παραστατικά χρησιμοποιούν αυτόν, ποτέ τον τρέχοντα SKU του προϊόντος."
+
+msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
+msgstr "Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ το τρέχον όνομα του προϊόντος."
 
 msgid "The promotion has ended"
 msgstr "Η προσφορά έχει λήξει"
@@ -16675,6 +16722,10 @@ msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Ειδοποίηση χαμηλού αποθέματος — {n} προϊόν(τα)"
 
 #, python-brace-format
+msgid "[{site}] Order {order_id} was paid more than once"
+msgstr "[{site}] Η παραγγελία {order_id} πληρώθηκε περισσότερες από μία φορές"
+
+#, python-brace-format
 msgid "[{site}] Payment does not match order {order_id}"
 msgstr "[{site}] Η πληρωμή δεν ταιριάζει με την παραγγελία {order_id}"
 
@@ -17274,9 +17325,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Call to Action Banner"
 #~ msgstr "Banner παρότρυνσης για δράση"
-
-#~ msgid "Cannot refund more than the ordered quantity. "
-#~ msgstr "Δεν είναι δυνατή η επιστροφή περισσότερων από την παραγγελθείσα ποσότητα. "
 
 #, python-brace-format
 #~ msgid "Cart validation failed: {errors}"

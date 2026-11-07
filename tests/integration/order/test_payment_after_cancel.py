@@ -19,6 +19,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
+from djmoney.money import Money
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
@@ -27,6 +28,7 @@ from order.models.history import OrderHistory
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_checkout_completed
 from order.views.viva_webhook import _handle_payment_created
+from product.factories.product import ProductFactory
 from tests.utils.payments import CAPTURED
 from tests.utils.viva import verified_payment
 
@@ -40,6 +42,25 @@ def _canceled_order(**extra):
         num_order_items=0,
         **extra,
     )
+
+
+def _priced_for_the_capture(order):
+    """An order whose total is what the provider captures (``CAPTURED``): a
+    capture above the total is an overcharge, a separate alert."""
+    order.items.create(
+        product=ProductFactory(stock=5, num_images=0, num_reviews=0),
+        price=CAPTURED,
+        quantity=1,
+    )
+    type(order).objects.filter(pk=order.pk).update(
+        shipping_price=Money(0, "EUR"),
+        payment_method_fee=Money(0, "EUR"),
+        discount_amount=Money(0, "EUR"),
+        loyalty_discount=Money(0, "EUR"),
+        gift_card_amount=Money(0, "EUR"),
+    )
+    order.refresh_from_db()
+    return order
 
 
 def _notes(order):
@@ -132,7 +153,9 @@ class TestVivaChargeOnACanceledOrder:
 
 class TestStripeChargeOnACanceledOrder:
     def test_payment_intent_success_is_booked_and_alerted(self):
-        order = _canceled_order(payment_id="pi_after_cancel")
+        order = _priced_for_the_capture(
+            _canceled_order(payment_id="pi_after_cancel")
+        )
 
         with (
             patch("emails.send.send_email") as alert,
@@ -154,7 +177,7 @@ class TestStripeChargeOnACanceledOrder:
         dispatch.assert_not_called()
 
     def test_checkout_session_is_booked_and_alerted(self):
-        order = _canceled_order(metadata={})
+        order = _priced_for_the_capture(_canceled_order(metadata={}))
         event = Mock(spec=Event)
         event.id = f"evt_cs_{order.id}"
         event.type = "checkout.session.completed"

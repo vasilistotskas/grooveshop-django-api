@@ -17153,75 +17153,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedOrderItemList'
           description: ''
-    post:
-      operationId: createOrderItem
-      description: Δημιουργία νέου Είδος Παραγγελίας. Απαιτεί ταυτοποίηση.
-      summary: Δημιουργία Είδος Παραγγελίας
-      parameters:
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en)
-      tags:
-      - Order Items
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderItemDetail'
-          description: ''
   /api/v1/order-items/{id}:
     get:
       operationId: retrieveOrderItem
@@ -17279,197 +17210,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderItemDetail'
-          description: ''
-    put:
-      operationId: updateOrderItem
-      description: Ενημέρωση πληροφοριών Είδος Παραγγελίας. Απαιτεί ταυτοποίηση.
-      summary: Ενημέρωση Είδος Παραγγελίας
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en)
-      tags:
-      - Order Items
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderItemWriteRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderItemDetail'
-          description: ''
-    patch:
-      operationId: partialUpdateOrderItem
-      description: Μερική ενημέρωση πληροφοριών Είδος Παραγγελίας. Απαιτεί ταυτοποίηση.
-      summary: Μερική ενημέρωση Είδος Παραγγελίας
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en)
-      tags:
-      - Order Items
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedOrderItemWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedOrderItemWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedOrderItemWriteRequest'
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                anyOf:
-                - $ref: '#/components/schemas/ApiValidationError'
-                - $ref: '#/components/schemas/ApiError'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderItemDetail'
-          description: ''
-    delete:
-      operationId: destroyOrderItem
-      description: Διαγραφή Είδος Παραγγελίας. Απαιτεί ταυτοποίηση.
-      summary: Διαγραφή Είδος Παραγγελίας
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      tags:
-      - Order Items
-      security:
-      - cookieAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/order-items/{id}/restock:
     post:
@@ -43641,6 +43381,18 @@ components:
         product:
           type: integer
           title: Προϊόν
+        productName:
+          type: string
+          readOnly: true
+          title: Όνομα προϊόντος
+          description: Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα
+            της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ
+            το τρέχον όνομα του προϊόντος.
+        sku:
+          type: string
+          readOnly: true
+          description: Ο κωδικός SKU του προϊόντος όταν δημιουργήθηκε η γραμμή. Τα
+            παραστατικά χρησιμοποιούν αυτόν, ποτέ τον τρέχοντα SKU του προϊόντος.
         price:
           type: number
           format: double
@@ -43691,7 +43443,9 @@ components:
       - order
       - price
       - product
+      - productName
       - refundedQuantity
+      - sku
       - totalPrice
       - updatedAt
       - uuid
@@ -43728,6 +43482,18 @@ components:
           allOf:
           - $ref: '#/components/schemas/Product'
           readOnly: true
+        productName:
+          type: string
+          readOnly: true
+          title: Όνομα προϊόντος
+          description: Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα
+            της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ
+            το τρέχον όνομα του προϊόντος.
+        sku:
+          type: string
+          readOnly: true
+          description: Ο κωδικός SKU του προϊόντος όταν δημιουργήθηκε η γραμμή. Τα
+            παραστατικά χρησιμοποιούν αυτόν, ποτέ τον τρέχοντα SKU του προϊόντος.
         price:
           type: number
           format: double
@@ -43809,8 +43575,10 @@ components:
       - originalQuantity
       - price
       - product
+      - productName
       - refundedAmount
       - refundedQuantity
+      - sku
       - sortOrder
       - totalPrice
       - updatedAt
@@ -43837,26 +43605,6 @@ components:
       required:
       - detail
       - item
-    OrderItemWriteRequest:
-      type: object
-      properties:
-        order:
-          type: integer
-          title: Παραγγελία
-        product:
-          type: integer
-          title: Προϊόν
-        quantity:
-          type: integer
-          maximum: 2147483647
-          minimum: -2147483648
-          title: Ποσότητα
-        notes:
-          type: string
-          title: Σημειώσεις
-      required:
-      - order
-      - product
     OrderSourceType:
       enum:
       - direct
@@ -45875,23 +45623,6 @@ components:
         seen:
           type: boolean
           title: Αναγνωσμένη
-    PatchedOrderItemWriteRequest:
-      type: object
-      properties:
-        order:
-          type: integer
-          title: Παραγγελία
-        product:
-          type: integer
-          title: Προϊόν
-        quantity:
-          type: integer
-          maximum: 2147483647
-          minimum: -2147483648
-          title: Ποσότητα
-        notes:
-          type: string
-          title: Σημειώσεις
     PatchedOrderWriteRequest:
       type: object
       properties:

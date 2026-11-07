@@ -65,6 +65,7 @@ OPS_KEYS = {
     "ops.review_pending",
     "ops.gift_card_reversal",
     "ops.payment_mismatch",
+    "ops.overcharged",
     "ops.builder_schedule_failed",
 }
 

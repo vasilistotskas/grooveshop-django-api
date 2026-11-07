@@ -23,7 +23,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.invoicing import receipt_issuable
-from order.models.history import OrderHistory, OrderItemHistory
+from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
@@ -40,8 +40,8 @@ from order.payment_fees import (
     record_stripe_charge_fee,
     record_stripe_fee_for_intent,
 )
-from order.payment_ledger import PaymentLedger
-from order.services import PAYMENT_AMOUNT_TOLERANCE, OrderService
+from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.services import OrderService
 from order.signals import (
     order_canceled,
     order_completed,
@@ -434,24 +434,22 @@ def email_shipment_dispatched(
 def handle_order_item_pre_save(
     sender: Any, instance: Any, **kwargs: Any
 ) -> None:
-    """Store previous order item values before save."""
-    if instance.pk:
-        try:
-            original = sender.objects.get(pk=instance.pk)
+    """Remember whether the line was restocked before this save.
 
-            instance._original_quantity = original.quantity
-            instance._original_price = original.price
-            instance._original_is_refunded = original.is_refunded
-            instance._original_refunded_quantity = original.refunded_quantity
-
-        except sender.DoesNotExist:
-            instance._original_quantity = 0
-            instance._original_price = None
-        except Exception:
-            logger.exception("Error in handle_order_item_pre_save")
-    else:
-        instance._original_quantity = 0
-        instance._original_price = None
+    Nothing else about a placed line changes after checkout (its product,
+    quantity and price are a record, and no admin or API route edits them),
+    so the restock flag is all the post-save handler compares.
+    """
+    if not instance.pk:
+        return
+    try:
+        instance._original_is_refunded = sender.objects.values_list(
+            "is_refunded", flat=True
+        ).get(pk=instance.pk)
+    except sender.DoesNotExist:
+        return
+    except Exception:
+        logger.exception("Error in handle_order_item_pre_save")
 
 
 @receiver(
@@ -462,7 +460,7 @@ def handle_order_item_pre_save(
 def handle_order_item_post_save(
     sender: type[OrderItem], instance: OrderItem, created: bool, **kwargs: Any
 ) -> None:
-    """Handle order item changes and log history."""
+    """Log a line added to an order, and a line marked restocked."""
     if created:
         # Stock is managed by StockManager (either via convert_reservation_to_sale
         # or decrement_stock in OrderService.create_order_from_cart).
@@ -474,58 +472,13 @@ def handle_order_item_post_save(
 
             OrderHistory.log_note(
                 order=order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} added to order",
+                note=f"Item {instance.product_name or 'Unknown'} added to order",
             )
             logger.debug(
                 "Order item %s created for order %s", instance.id, order.id
             )
         except Exception:
             logger.exception("Error handling order item creation")
-    elif (
-        hasattr(instance, "_original_quantity")
-        and instance._original_quantity != instance.quantity
-    ):
-        from order.stock import StockManager
-
-        product = instance.product
-        stock_difference = instance._original_quantity - instance.quantity
-        StockManager.adjust_stock(
-            product=product,
-            delta=stock_difference,
-            reason="admin order item edit",
-            performed_by=None,
-            order_id=instance.order_id,
-        )
-
-        OrderItemHistory.log_quantity_change(
-            order_item=instance,
-            previous_quantity=instance._original_quantity,
-            new_quantity=instance.quantity,
-        )
-
-        try:
-            OrderHistory.log_note(
-                order=instance.order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
-            )
-        except Exception:
-            logger.exception(
-                "Error logging order history for quantity change",
-            )
-
-    # ``is not None`` rather than truthiness: ``Money(0, "EUR")`` is
-    # falsy, so correcting a line priced at zero — a free-gift line, or a
-    # data-entry fix — produced no history entry at all.
-    if (
-        hasattr(instance, "_original_price")
-        and instance._original_price is not None
-        and instance._original_price != instance.price
-    ):
-        OrderItemHistory.log_price_update(
-            order_item=instance,
-            previous_price=instance._original_price,
-            new_price=instance.price,
-        )
 
     if (
         hasattr(instance, "_original_is_refunded")
@@ -535,7 +488,7 @@ def handle_order_item_post_save(
             OrderHistory.log_note(
                 order=instance.order,
                 note=(
-                    f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} "
+                    f"Item {instance.product_name or 'Unknown'} "
                     f"marked as {'refunded' if instance.is_refunded else 'not refunded'}"
                 ),
             )
@@ -910,7 +863,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     # propagate so dj-stripe's outer atomic rolls back the mark + Event
     # row and Stripe redelivers (G0231).
     outcome = OrderService.handle_payment_succeeded(
-        payment_intent_id, captured=captured
+        payment_intent_id,
+        captured=captured,
+        metadata=payment_intent.get("metadata"),
     )
 
     announce_stripe_payment_applied(outcome, payment_intent_id)
@@ -1140,6 +1095,32 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
         )
 
 
+def _locked_order_for_stripe_intent(payment_intent_id: str) -> Order | None:
+    """The order a Stripe PaymentIntent was paid for, locked.
+
+    The ledger's CHARGE row (provider Stripe, reference the intent) names
+    its order whichever intent ``Order.payment_id`` points at: an order
+    paid twice keeps its FIRST intent there, so a refund, a failed refund or
+    a dispute on the second would find nothing by ``payment_id``. An order
+    whose capture the ledger never recorded (paid while the previous release
+    served) has no row, and is found by ``payment_id``. Call inside
+    ``transaction.atomic``.
+    """
+    order_id = (
+        PaymentTransaction.objects.filter(
+            kind=PaymentTransactionKind.CHARGE,
+            provider=StripePaymentProvider.code,
+            provider_reference=payment_intent_id,
+        )
+        .values_list("order_id", flat=True)
+        .first()
+    )
+    orders = Order.objects.select_for_update()
+    if order_id is not None:
+        return orders.filter(pk=order_id).first()
+    return orders.filter(payment_id=payment_intent_id).first()
+
+
 def _gift_card_purchase_for_intent(payment_intent_id: str):
     """The gift-card purchase paid by this PaymentIntent (locked), or
     ``None``. A purchase is not an order: a refund or dispute of its payment
@@ -1226,11 +1207,7 @@ def handle_stripe_charge_refunded(sender, **kwargs):
                     GiftCardService.handle_purchase_reversal(purchase)
                 return
 
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
                     "No order found for refunded payment_intent %s "
@@ -1346,11 +1323,7 @@ def handle_stripe_refund_failed(sender, **kwargs):
         reason = refund.get("failure_reason") or "unknown"
 
         with transaction.atomic():
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             charge = (
                 PaymentTransaction.objects.filter(
                     order=order,
@@ -1484,11 +1457,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
                 GiftCardService.alert_purchase_disputed(purchase, dispute_id)
                 return
 
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
                     "No order found for disputed payment_intent %s "
@@ -1605,11 +1574,7 @@ def handle_stripe_dispute_closed(sender, **kwargs):
                     GiftCardService.handle_purchase_reversal(purchase)
                 return
 
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
+            order = _locked_order_for_stripe_intent(payment_intent_id)
             if order is None:
                 logger.warning(
                     "No order found for closed dispute payment_intent %s "
@@ -1808,6 +1773,26 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                     payment_method="stripe",
                 )
                 publish_payment_status(order)
+                return
+
+            # A second payment on an order another PaymentIntent already
+            # paid: booked above, and ``PaymentLedger.sync_overcharge``
+            # told staff when it took the order past what it is for. The
+            # order keeps its first ``payment_id``.
+            if (
+                order.payment_status == PaymentStatus.COMPLETED
+                and order.payment_id
+                and order.payment_id != payment_intent_id
+            ):
+                logger.error(
+                    "PaymentIntent %s is a second payment on order %s, "
+                    "already paid by %s: recorded in the ledger, order "
+                    "left as it is",
+                    payment_intent_id,
+                    order.id,
+                    order.payment_id,
+                )
+                order.save(update_fields=["metadata"])
                 return
 
             # Settled-state guard: Stripe does not guarantee event

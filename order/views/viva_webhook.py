@@ -1471,6 +1471,25 @@ def _handle_payment_created(order, event_data, transaction_id):
         publish_payment_status(order)
         return None
 
+    # A second payment on an order another transaction already paid: the
+    # ledger booked it above and, when it takes the order past what it is
+    # for, ``PaymentLedger.sync_overcharge`` told staff. The order keeps
+    # its first ``payment_id``; confirming it again would overwrite that
+    # id and mail the customer a second confirmation.
+    if (
+        order.payment_status == PaymentStatus.COMPLETED
+        and order.payment_id
+        and order.payment_id != transaction_id
+    ):
+        logger.error(
+            "Viva transaction %s is a second payment on order %s, already "
+            "paid by %s: recorded in the ledger, order left as it is",
+            transaction_id,
+            order.id,
+            order.payment_id,
+        )
+        return None
+
     # Guard: a stale or out-of-order Viva webhook must not un-refund or
     # un-cancel an order that is already in a settled financial state.
     # Viva does NOT guarantee delivery order.  COMPLETED is allowed

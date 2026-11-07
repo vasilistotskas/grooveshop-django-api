@@ -1277,13 +1277,12 @@ class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         ("created_at", RangeDateTimeFilter),
         ("expires_at", RangeDateTimeFilter),
     )
-    search_fields = ("user__email", "user__username", "token")
+    search_fields = ("user__email", "user__username")
     readonly_fields = (
         "user",
         "status",
         "file_path",
         "file_size",
-        "token",
         "expires_at",
         "error_message",
         "created_at",

@@ -467,7 +467,7 @@ def compile_user_data(user) -> dict[str, Any]:
 
 
 def create_export_request(user) -> Any:
-    """Create a ``UserDataExport`` row in ``PENDING`` with a fresh token."""
+    """Create a ``UserDataExport`` row in ``PENDING``."""
     from user.models.data_export import UserDataExport
 
     return UserDataExport.objects.create(

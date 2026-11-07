@@ -154,7 +154,7 @@ serializers_config: SerializersConfig = {
         summary=_("Request GDPR data export"),
         description=_(
             "Queue a job that compiles the user's personal data and emails "
-            "a one-off download link. Returns the new UserDataExport record."
+            "them when it is ready. Returns the new UserDataExport record."
         ),
         tags=["User Accounts"],
     ),
@@ -165,7 +165,7 @@ serializers_config: SerializersConfig = {
         summary=_("List GDPR data exports"),
         description=_(
             "List recent data-export requests for this user so the UI can "
-            "show progress and the last download link."
+            "show their progress."
         ),
         tags=["User Accounts"],
     ),

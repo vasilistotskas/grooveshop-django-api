@@ -55,6 +55,32 @@ def client_of(user=None) -> APIClient:
     return client
 
 
+def test_the_public_token_route_is_gone(export_dir):
+    owner = UserAccountFactory()
+    export = make_export(owner, export_dir)
+
+    response = client_of().get(
+        f"/api/v1/user/data_export/{export.token}/download"
+    )
+
+    assert response.status_code == 404
+
+
+def test_the_export_list_names_no_token_and_no_address(export_dir):
+    owner = UserAccountFactory()
+    make_export(owner, export_dir)
+
+    response = client_of(owner).get(
+        reverse("user-account-data-exports", kwargs={"pk": owner.pk})
+    )
+
+    assert response.status_code == 200
+    row = response.data["results"][0]
+    assert "token" not in row
+    assert "download_url" not in row
+    assert "downloadUrl" not in row
+
+
 def test_owner_downloads_their_bundle(export_dir):
     owner = UserAccountFactory()
     export = make_export(owner, export_dir)

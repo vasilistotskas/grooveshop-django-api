@@ -4214,9 +4214,6 @@ msgstr "Token Λήψης"
 msgid "Download a GDPR data export"
 msgstr "Λήψη εξαγωγής δεδομένων GDPR"
 
-msgid "Download a GDPR data export bundle"
-msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
-
 msgid "Download shipping voucher (PDF)"
 msgstr "Λήψη voucher αποστολής (PDF)"
 
@@ -7848,8 +7845,8 @@ msgstr "Λίστα ID θεμάτων για εγγραφή/απεγγραφή"
 msgid "List public offers"
 msgstr "Λίστα δημόσιων προσφορών"
 
-msgid "List recent data-export requests for this user so the UI can show progress and the last download link."
-msgstr "Λίστα πρόσφατων αιτημάτων εξαγωγής δεδομένων για αυτόν τον χρήστη, ώστε η διεπαφή να εμφανίζει την πρόοδο και τον τελευταίο σύνδεσμο λήψης."
+msgid "List recent data-export requests for this user so the UI can show their progress."
+msgstr "Παραθέτει τα πρόσφατα αιτήματα εξαγωγής δεδομένων αυτού του χρήστη, ώστε η διεπαφή να δείχνει την πρόοδό τους."
 
 msgid "List the coupons available for this cart"
 msgstr "Λίστα των διαθέσιμων κουπονιών για αυτό το καλάθι"
@@ -11102,8 +11099,8 @@ msgstr "Απορίες ή έχετε ήδη ανανεώσει; Απαντήστ
 msgid "Questions?"
 msgstr "Ερωτήσεις;"
 
-msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
-msgstr "Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή UserDataExport."
+msgid "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
+msgstr "Βάζει σε ουρά μια εργασία που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και τον ενημερώνει με email όταν είναι έτοιμα. Επιστρέφει τη νέα εγγραφή UserDataExport."
 
 msgid "Queued"
 msgstr "Σε αναμονή"
@@ -11920,9 +11917,6 @@ msgstr "Επιστροφές"
 
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Επιστρέφει λίστα με τις παραγγελίες του συνδεδεμένου χρήστη"
-
-msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
-msgstr "Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής."
 
 msgid "Returns the notifications for a list of ids."
 msgstr "Επιστρέφει τις ειδοποιήσεις για μια λίστα αναγνωριστικών."
@@ -14498,9 +14492,6 @@ msgstr "Αυτή η πιστωτική απόδειξη αποδεικνύει �
 msgid "This document has no such block."
 msgstr "Αυτό το έγγραφο δεν έχει τέτοιο μπλοκ."
 
-msgid "This download link has expired."
-msgstr "Ο σύνδεσμος λήψης έχει λήξει."
-
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "Αυτό διαγράφει οριστικά το schema της PostgreSQL και κάθε εγγραφή μέσα σε αυτό. Η ενέργεια δεν μπορεί να αναιρεθεί."
 
@@ -14509,6 +14500,9 @@ msgstr "Αυτό το email είναι υποχρεωτικό και δεν μπ
 
 msgid "This email type does not exist."
 msgstr "Αυτός ο τύπος email δεν υπάρχει."
+
+msgid "This export has expired."
+msgstr "Η εξαγωγή έχει λήξει."
 
 msgid "This field is required"
 msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
@@ -17340,6 +17334,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Divider"
 #~ msgstr "Διαχωριστικό"
 
+#~ msgid "Download a GDPR data export bundle"
+#~ msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
+
 #, python-format
 #~ msgid "Each CSP source must start with 'https://', 'http://localhost', or 'wss://'. Invalid entries: %(bad)s"
 #~ msgstr "Κάθε πηγή CSP πρέπει να ξεκινά με 'https://', 'http://localhost' ή 'wss://'. Μη έγκυρες καταχωρήσεις: %(bad)s"
@@ -18082,6 +18079,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"
 
+#~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
+#~ msgstr "Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής."
+
 #~ msgid "Revenue (€)"
 #~ msgstr "Έσοδα (€)"
 
@@ -18298,6 +18298,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #, python-format
 #~ msgid "This Week's Highlights: %(start)s to %(end)s"
 #~ msgstr "Τα σημαντικότερα της εβδομάδας: %(start)s έως %(end)s"
+
+#~ msgid "This download link has expired."
+#~ msgstr "Ο σύνδεσμος λήψης έχει λήξει."
 
 #~ msgid "This store already has page builder data."
 #~ msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."

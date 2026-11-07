@@ -242,10 +242,10 @@ def send_newsletter_already_subscribed_email_task(
     retry_jitter=True,
 )
 def export_user_data_task(self, export_id: int) -> dict:
-    """Compile the user's data, write JSON to private media, email a link.
+    """Compile the user's data, write JSON to private media, email them.
 
     Idempotent: on retry it re-writes the file under the same path and
-    re-emails the link (the token column keeps the URL stable).
+    emails them again.
     """
     import json
     import os
@@ -283,12 +283,12 @@ def export_user_data_task(self, export_id: int) -> dict:
         # ``MEDIA_ROOT`` is a read-only container-local dir on the
         # worker, so writing there raises PermissionError. These files
         # are never served by the Django media view directly: the only
-        # way to reach them is through the signed-token download
-        # endpoint in ``user/views/data_export.py``.
+        # way to reach them is the owner's download,
+        # ``UserAccountViewSet.download_data_export``.
         location = get_export_location()
         storage = FileSystemStorage(location=location)
 
-        rel_path = f"{user.id}/{export.token}.json"
+        rel_path = f"{user.id}/{export.uuid}.json"
         abs_path = os.path.join(location, rel_path)
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         with open(abs_path, "wb") as fh:

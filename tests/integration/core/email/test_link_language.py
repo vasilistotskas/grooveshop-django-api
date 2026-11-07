@@ -439,7 +439,7 @@ class TestAccountEmails:
     ):
         settings.PRIVATE_MEDIA_ROOT = str(tmp_path)
         user = UserAccountFactory(num_addresses=0, language_code=language)
-        export = UserDataExport.objects.create(user=user, token="exp-tok")
+        export = UserDataExport.objects.create(user=user)
 
         export_user_data_task(export.id)
 

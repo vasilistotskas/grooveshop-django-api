@@ -13,9 +13,7 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
 
     The actual payload (a single JSON file) is written to private media
     storage by ``export_user_data_task`` and reaches only its owner, signed
-    in (``UserAccountViewSet.download_data_export``). Nothing reads ``token``
-    any more: it is still written because a release that does may have to
-    come back, and it goes once that can no longer happen.
+    in (``UserAccountViewSet.download_data_export``).
     """
 
     class Status(models.TextChoices):
@@ -49,18 +47,11 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
         null=True,
         blank=True,
     )
-    token = models.CharField(
-        _("Download Token"),
-        max_length=64,
-        unique=True,
-        db_index=True,
-        help_text=_("Random token carried by the download URL."),
-    )
     expires_at = models.DateTimeField(
         _("Expires At"),
         null=True,
         blank=True,
-        help_text=_("When the download link stops working."),
+        help_text=_("When the export can no longer be downloaded."),
     )
     error_message = models.TextField(
         _("Error Message"),

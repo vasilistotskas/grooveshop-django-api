@@ -289,7 +289,7 @@ def export_user_data_task(self, export_id: int) -> dict:
         storage = FileSystemStorage(location=location)
 
         # A rerun keeps the file it already named (a bundle written before
-        # this release is named by its token): writing a second one would
+        # v3.231.3 is named by its old token): writing a second one would
         # leave the first where neither the expiry sweep nor an erasure finds it.
         rel_path = export.file_path or f"{user.id}/{export.uuid}.json"
         abs_path = os.path.join(location, rel_path)

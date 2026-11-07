@@ -26,7 +26,7 @@ def bundles() -> list[Path]:
 
 def test_a_new_export_is_named_by_its_uuid(private_root):
     user = UserAccountFactory(num_addresses=0)
-    export = UserDataExport.objects.create(user=user, token="a-token")
+    export = UserDataExport.objects.create(user=user)
 
     export_user_data_task(export.id)
 
@@ -38,9 +38,7 @@ def test_a_new_export_is_named_by_its_uuid(private_root):
 def test_a_rerun_writes_the_file_the_row_already_names(private_root):
     user = UserAccountFactory(num_addresses=0)
     named_by_token = f"{user.pk}/a-token.json"
-    export = UserDataExport.objects.create(
-        user=user, token="a-token", file_path=named_by_token
-    )
+    export = UserDataExport.objects.create(user=user, file_path=named_by_token)
 
     export_user_data_task(export.id)
 

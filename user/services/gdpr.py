@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import logging
 import os
-import secrets
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -473,7 +472,6 @@ def create_export_request(user) -> Any:
     return UserDataExport.objects.create(
         user=user,
         status=UserDataExport.Status.PENDING,
-        token=secrets.token_urlsafe(48),
     )
 
 

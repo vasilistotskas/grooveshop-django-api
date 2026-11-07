@@ -4203,9 +4203,6 @@ msgstr "Download BoxNow voucher (PDF)"
 msgid "Download PDF"
 msgstr "Download PDF"
 
-msgid "Download Token"
-msgstr "Download Token"
-
 msgid "Download a GDPR data export"
 msgstr "Download a GDPR data export"
 
@@ -11121,9 +11118,6 @@ msgstr "RabbitMQ"
 msgid "Random part length"
 msgstr "Random part length"
 
-msgid "Random token carried by the download URL."
-msgstr "Random token carried by the download URL."
-
 msgid "Rarely Used (1-2 products)"
 msgstr "Rarely Used (1-2 products)"
 
@@ -15947,8 +15941,8 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
-msgid "When the download link stops working."
-msgstr "When the download link stops working."
+msgid "When the export can no longer be downloaded."
+msgstr "When the export can no longer be downloaded."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
@@ -17115,6 +17109,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Divider"
 #~ msgstr "Divider"
 
+#~ msgid "Download Token"
+#~ msgstr "Download Token"
+
 #~ msgid "Download a GDPR data export bundle"
 #~ msgstr "Download a GDPR data export bundle"
 
@@ -17427,6 +17424,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "RFC 8058 one-click unsubscribe from all topics"
 #~ msgstr "RFC 8058 one-click unsubscribe from all topics"
 
+#~ msgid "Random token carried by the download URL."
+#~ msgstr "Random token carried by the download URL."
+
 #~ msgid "Reason for the refund"
 #~ msgstr "Reason for the refund"
 
@@ -17637,6 +17637,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "What Is Microlearning"
 #~ msgstr "What Is Microlearning"
+
+#~ msgid "When the download link stops working."
+#~ msgstr "When the download link stops working."
 
 #~ msgid "Why Microlearning"
 #~ msgstr "Why Microlearning"

@@ -33,7 +33,6 @@ def make_export(owner, export_dir, **overrides) -> UserDataExport:
     fields = {
         "user": owner,
         "status": UserDataExport.Status.READY,
-        "token": f"token-{owner.pk}",
         "file_path": path,
         "file_size": 21,
         "expires_at": timezone.now() + timedelta(days=7),
@@ -56,12 +55,9 @@ def client_of(user=None) -> APIClient:
 
 
 def test_the_public_token_route_is_gone(export_dir):
-    owner = UserAccountFactory()
-    export = make_export(owner, export_dir)
+    make_export(UserAccountFactory(), export_dir)
 
-    response = client_of().get(
-        f"/api/v1/user/data_export/{export.token}/download"
-    )
+    response = client_of().get("/api/v1/user/data_export/any-token/download")
 
     assert response.status_code == 404
 

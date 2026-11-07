@@ -401,7 +401,7 @@ class TestAccountEmails:
     def test_data_export_ready(self, language, settings, tmp_path):
         settings.PRIVATE_MEDIA_ROOT = str(tmp_path)
         user = customer(language)
-        export = UserDataExport.objects.create(user=user, token="export-token")
+        export = UserDataExport.objects.create(user=user)
         mail.outbox.clear()
 
         # The archive's size is printed; a fixed payload fixes it.

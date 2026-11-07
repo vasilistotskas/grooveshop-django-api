@@ -416,6 +416,32 @@ class TestRicherCatalogueSeed:
             count = product.product_attributes.count()
             assert 5 <= count <= 6, f"{product.slug}: {count}"
 
+    def test_every_product_carries_the_standard_vat_rate(self, seeded):
+        from product.models import Product
+        from vat.constants import STANDARD_VAT_RATE
+
+        rates = set(
+            Product.objects.filter(slug__startswith="demo-").values_list(
+                "vat__value", flat=True
+            )
+        )
+        assert rates == {STANDARD_VAT_RATE}
+
+    def test_a_store_without_the_standard_row_is_not_seeded(
+        self, demo_tenant, monkeypatch
+    ):
+        from product.models import Product
+        from vat.models import Vat
+
+        monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
+        Product.objects.filter(slug__startswith="demo-").delete()
+        Vat.objects.filter(value=24).delete()
+
+        with pytest.raises(Vat.DoesNotExist):
+            demo_store.seed_products()
+
+        assert not Product.objects.filter(slug__startswith="demo-").exists()
+
     def test_the_power_bank_family_is_one_variant_group(self, seeded):
         from product.models import Product
 

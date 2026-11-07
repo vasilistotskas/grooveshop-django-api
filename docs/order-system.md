@@ -456,7 +456,8 @@ catalogue can no longer change.
   item admin and API, scripts); `bulk_create` skips `save()`, so
   `devtools/demo_orders.py` passes it itself. The column has
   `db_default=0` only so the release still serving during a rollout can
-  keep inserting; a product with no `Vat` row is sold at 0. The item
+  keep inserting; a legacy product with no `Vat` row (NULL until the
+  column is made NOT NULL, see `docs/product-pricing.md`) is sold at 0. The item
   admin hides the rate on the add page (`save()` snapshots it) and keeps
   it editable afterwards, so staff can correct a wrong snapshot, until
   the order's invoice carries a myDATA MARK; from then on it is
@@ -467,8 +468,7 @@ catalogue can no longer change.
 - **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
   and `order/mydata/builder.py` get their lines from
   `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
-  a `Vat` row, moving the product to another, or deleting the row (the
-  FK is `SET_NULL`) changes neither the PDF nor the myDATA payload of an
+  a `Vat` row, or moving the product to another, changes neither the PDF nor the myDATA payload of an
   existing order. Regenerating a not-yet-registered invoice therefore
   keeps the original rates too. Lines that predate the column were
   backfilled (`0065`) from their product's VAT at deploy time, which is

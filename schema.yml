@@ -4,6 +4,28 @@ info:
   version: 1.0.0
   description: GrooveShop API
 paths:
+  /api/v1/agent/internal/order/{uuid}:
+    get:
+      operationId: getAgentInternalOrder
+      description: An order the agent gateway placed. Requires the gateway's shared
+        secret in `X-Internal-Token`; any other caller or order gets 404.
+      summary: Read an order (agent gateway only)
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Agent
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: ''
   /api/v1/agent/me:
     get:
       operationId: getAgentProfile

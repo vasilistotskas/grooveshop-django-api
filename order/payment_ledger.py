@@ -36,6 +36,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from djmoney.money import Money
 
 from order.enum.payment_transaction import (
@@ -58,6 +59,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _ZERO = Decimal(0)
+
+#: What a provider may differ from the order's total by (rounding on its
+#: side) before a confirmed charge is treated as not matching the order, and
+#: before the money held for an order is more than it is for.
+PAYMENT_AMOUNT_TOLERANCE = Decimal("0.01")
 _AMOUNT = DecimalField(max_digits=11, decimal_places=2)
 
 #: The rows that put money into the ledger and can be paid back out of it.
@@ -586,7 +592,84 @@ class PaymentLedger:
             )
         if created:
             PaymentLedger._apply_pending_fee(row)
+            PaymentLedger.sync_overcharge(order, row)
         return row, created
+
+    @classmethod
+    def held(cls, order: Order) -> Decimal:
+        """What the ledger holds for *order* now: received, less what was
+        paid back by refunds and what a lost dispute took."""
+        return (
+            cls.captured(order) - cls.refunded(order) - cls.charged_back(order)
+        )
+
+    @classmethod
+    def sync_overcharge(cls, order: Order, trigger: PaymentTransaction) -> None:
+        """Keep ``Order.overcharged_at`` equal to the ledger: set while
+        :meth:`held` exceeds what the order is for (``amount_due``; the
+        order's total when none was fixed yet) by more than the rounding
+        tolerance, cleared when refunds or a chargeback bring it back.
+
+        Called from :meth:`_record` for every new row, under the caller's
+        order lock, so the sums and the stamp are one step. The ops email
+        goes out once, on the change from clear to set: a row the provider
+        redelivers is not new and never reaches here, and a figure that is
+        still over after another row changes nothing. Nothing is refunded
+        here: which payment to give back is a person's call. *trigger* is
+        the row that made the change, named in the alert.
+        """
+        owed = order.amount_due or order.calculate_order_total_amount()
+        excess = cls.held(order) - owed.amount
+        over = excess > PAYMENT_AMOUNT_TOLERANCE
+        if over == (order.overcharged_at is not None):
+            return
+        order.overcharged_at = timezone.now() if over else None
+        order.save(update_fields=["overcharged_at"])
+        if over:
+            cls._alert_overcharge(order, trigger, Money(excess, owed.currency))
+
+    @staticmethod
+    def _alert_overcharge(
+        order: Order, trigger: PaymentTransaction, excess: Money
+    ) -> None:
+        """Tell staff the customer paid more than the order is for: an
+        ERROR log (the monitored channel), a note on the order, and the ops
+        email."""
+        from emails.send import send_email
+        from order.emails import Overcharged
+        from order.models.history import OrderHistory
+
+        logger.error(
+            "Order %s is overcharged by %s: payment %s (%s) brought what "
+            "the ledger holds above what the order is for — refund the "
+            "excess; nothing was refunded automatically",
+            order.pk,
+            excess,
+            trigger.provider_reference,
+            trigger.provider,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"Payment {trigger.provider_reference} ({trigger.provider}) "
+                f"means the customer paid {excess} more than the order is "
+                "for. Refund the excess."
+            ),
+        )
+        try:
+            send_email(
+                "ops.overcharged",
+                Overcharged(
+                    order_id=order.pk,
+                    payment_id=trigger.provider_reference,
+                    provider=trigger.provider,
+                    excess=excess,
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Could not send the overcharge alert for order %s", order.pk
+            )
 
     @staticmethod
     def _apply_pending_fee(row: PaymentTransaction) -> None:

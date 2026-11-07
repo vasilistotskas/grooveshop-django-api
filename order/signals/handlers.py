@@ -40,8 +40,8 @@ from order.payment_fees import (
     record_stripe_charge_fee,
     record_stripe_fee_for_intent,
 )
-from order.payment_ledger import PaymentLedger
-from order.services import PAYMENT_AMOUNT_TOLERANCE, OrderService
+from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.services import OrderService
 from order.signals import (
     order_canceled,
     order_completed,
@@ -474,7 +474,7 @@ def handle_order_item_post_save(
 
             OrderHistory.log_note(
                 order=order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} added to order",
+                note=f"Item {instance.product_name or 'Unknown'} added to order",
             )
             logger.debug(
                 "Order item %s created for order %s", instance.id, order.id
@@ -506,7 +506,7 @@ def handle_order_item_post_save(
         try:
             OrderHistory.log_note(
                 order=instance.order,
-                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
+                note=f"Item {instance.product_name or 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
             )
         except Exception:
             logger.exception(
@@ -535,7 +535,7 @@ def handle_order_item_post_save(
             OrderHistory.log_note(
                 order=instance.order,
                 note=(
-                    f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} "
+                    f"Item {instance.product_name or 'Unknown'} "
                     f"marked as {'refunded' if instance.is_refunded else 'not refunded'}"
                 ),
             )
@@ -1808,6 +1808,26 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                     payment_method="stripe",
                 )
                 publish_payment_status(order)
+                return
+
+            # A second payment on an order another PaymentIntent already
+            # paid: booked above, and ``PaymentLedger.sync_overcharge``
+            # told staff when it took the order past what it is for. The
+            # order keeps its first ``payment_id``.
+            if (
+                order.payment_status == PaymentStatus.COMPLETED
+                and order.payment_id
+                and order.payment_id != payment_intent_id
+            ):
+                logger.error(
+                    "PaymentIntent %s is a second payment on order %s, "
+                    "already paid by %s: recorded in the ledger, order "
+                    "left as it is",
+                    payment_intent_id,
+                    order.id,
+                    order.payment_id,
+                )
+                order.save(update_fields=["metadata"])
                 return
 
             # Settled-state guard: Stripe does not guarantee event

@@ -20,7 +20,7 @@ SHIPPING ADDRESS
   {{ order.country }}
 
 ITEMS
-{% for item in items %}  {{ item.product.name }} — {{ item.quantity }} x {{ item.price }} = {{ item.total_price }}
+{% for item in items %}  {{ item.product_name }} — {{ item.quantity }} x {{ item.price }} = {{ item.total_price }}
 {% endfor %}
   Subtotal: {{ order.total_price_items }}
   Shipping: {{ order.shipping_price }}

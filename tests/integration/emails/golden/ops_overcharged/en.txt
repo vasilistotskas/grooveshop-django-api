@@ -1,0 +1,14 @@
+Order #1234 was paid more than once
+
+A stripe payment means the customer has paid more than the order is for. The order keeps its first payment and nothing was refunded automatically.
+
+Order: #1234
+Payment method: stripe
+Payment reference: pi_3QxExample
+Paid too much: €45.50
+
+Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

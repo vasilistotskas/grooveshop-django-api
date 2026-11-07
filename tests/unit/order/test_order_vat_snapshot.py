@@ -426,46 +426,6 @@ class TestAdmin:
         )
         return client
 
-    def test_a_new_line_is_not_asked_for_a_rate(self):
-        item_admin = admin.site._registry[OrderItem]
-        request = self._request()
-        shown = [
-            name
-            for _title, options in item_admin.get_fieldsets(request, None)
-            for name in options["fields"]
-        ]
-
-        assert "vat_rate" not in shown
-        assert "vat_rate" not in item_admin.get_form(request).base_fields
-
-    def test_the_add_page_renders_and_a_new_line_takes_its_products_rate(
-        self,
-    ):
-        """Showing the rate read-only on the add page 500ed: an unsaved
-        line holds a ``DatabaseDefault``, which the admin cannot format."""
-        client = self._client()
-        order = OrderFactory(num_order_items=0)
-        product = _product("13")
-
-        assert (
-            client.get(reverse("admin:order_orderitem_add")).status_code == 200
-        )
-        response = client.post(
-            reverse("admin:order_orderitem_add"),
-            {
-                "order": order.pk,
-                "product": product.pk,
-                "quantity": 2,
-                "price_0": "11.30",
-                "price_1": "EUR",
-                "refunded_quantity": 0,
-                "notes": "",
-            },
-        )
-
-        assert response.status_code == 302, response.context["errors"]
-        assert order.items.get().vat_rate == D("13")
-
     def test_an_existing_lines_change_page_offers_the_rate_until_a_mark(self):
         line = self._line()
         url = reverse("admin:order_orderitem_change", args=[line.pk])

@@ -51,7 +51,11 @@ def order_item(order, product):
 
 class TestOrderItemModel:
     def test_str_representation(self, order_item, order):
-        assert str(order_item) == f"Order {order.id} - Test Product × 5"
+        # The line's own snapshot of the name, in the order's language.
+        assert order_item.product_name
+        assert str(order_item) == (
+            f"Order {order.id} - {order_item.product_name} × 5"
+        )
 
     def test_save_records_the_original_quantity(self, order, product):
         item = OrderItem(

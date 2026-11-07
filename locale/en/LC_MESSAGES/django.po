@@ -696,6 +696,10 @@ msgstr "9-series MARK returned by a successful ``CancelInvoice`` call — proves
 msgid "A %(provider)s payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically."
 msgstr "A %(provider)s payment collected a different amount than the order is for. The order was not marked paid and will not be canceled automatically."
 
+#, python-format
+msgid "A %(provider)s payment means the customer has paid more than the order is for. The order keeps its first payment and nothing was refunded automatically."
+msgstr "A %(provider)s payment means the customer has paid more than the order is for. The order keeps its first payment and nothing was refunded automatically."
+
 msgid "A Cloudflare zone ID is 32 lowercase hex characters."
 msgstr "A Cloudflare zone ID is 32 lowercase hex characters."
 
@@ -3719,6 +3723,9 @@ msgstr "Customer Notes"
 
 msgid "Customer accounts"
 msgstr "Customer accounts"
+
+msgid "Customer charged more than the order is for"
+msgstr "Customer charged more than the order is for"
 
 msgid "Customer details associated with the parcel"
 msgstr "Customer details associated with the parcel"
@@ -9362,6 +9369,10 @@ msgid "Order #%(order_id)s has no specimen receipt."
 msgstr "Order #%(order_id)s has no specimen receipt."
 
 #, python-format
+msgid "Order #%(order_id)s was paid more than once"
+msgstr "Order #%(order_id)s was paid more than once"
+
+#, python-format
 msgid "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
 msgstr "Order #%(order_id)s was refunded in full before its receipt was issued, so there is no sale to document."
 
@@ -9668,6 +9679,9 @@ msgstr "Orders & Checkout"
 msgid "Orders and revenue are read from each store every 30 minutes."
 msgstr "Orders and revenue are read from each store every 30 minutes."
 
+msgid "Orders paid twice"
+msgstr "Orders paid twice"
+
 msgid "Orders placed"
 msgstr "Orders placed"
 
@@ -9719,6 +9733,12 @@ msgstr "Out of stock"
 
 msgid "Outcome"
 msgstr "Outcome"
+
+msgid "Overcharge"
+msgstr "Overcharge"
+
+msgid "Overcharged at"
+msgstr "Overcharged at"
 
 msgid "Override the slot's limit, capped at 12."
 msgstr "Override the slot's limit, capped at 12."
@@ -9794,11 +9814,17 @@ msgstr "Paid Until is a date, read as inclusive: the term covers that day and la
 msgid "Paid amount of every order whose payment completed."
 msgstr "Paid amount of every order whose payment completed."
 
+msgid "Paid more than the order is for"
+msgstr "Paid more than the order is for"
+
 msgid "Paid online at checkout"
 msgstr "Paid online at checkout"
 
 msgid "Paid to the carrier before pickup"
 msgstr "Paid to the carrier before pickup"
+
+msgid "Paid too much"
+msgstr "Paid too much"
 
 msgid "Paid until"
 msgstr "Paid until"
@@ -10833,6 +10859,9 @@ msgstr "Product list/detail, images, attributes, related products, and the searc
 msgid "Product markdown"
 msgstr "Product markdown"
 
+msgid "Product name"
+msgstr "Product name"
+
 msgid "Product not found."
 msgstr "Product not found."
 
@@ -11470,6 +11499,9 @@ msgstr "Refund reversal"
 #, python-format
 msgid "Refund the customer in the %(provider)s dashboard; the provider's refund webhook records it on the order."
 msgstr "Refund the customer in the %(provider)s dashboard; the provider's refund webhook records it on the order."
+
+msgid "Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for."
+msgstr "Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for."
 
 msgid "Refund this order's payment first."
 msgstr "Refund this order's payment first."
@@ -12626,6 +12658,9 @@ msgstr "Set up your authenticator app"
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 
+msgid "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
+msgstr "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
+
 msgid "Setting Information"
 msgstr "Setting Information"
 
@@ -13690,6 +13725,9 @@ msgstr "Tells the store's staff that a verified carrier webhook could not be app
 msgid "Tells the store's staff that an application awaits review."
 msgstr "Tells the store's staff that an application awaits review."
 
+msgid "Tells the store's staff that an order was paid more than once, so the extra payment must be refunded."
+msgstr "Tells the store's staff that an order was paid more than once, so the extra payment must be refunded."
+
 msgid "Tells the store's staff that an order was placed."
 msgstr "Tells the store's staff that an order was placed."
 
@@ -13964,6 +14002,9 @@ msgstr "The customer is not eligible for this promotion"
 msgid "The customer kept the product"
 msgstr "The customer kept the product"
 
+msgid "The customer paid more than the order is for: refund it"
+msgstr "The customer paid more than the order is for: refund it"
+
 msgid "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay."
 msgstr "The customer was told it was refunded: pay them back another way, or refund again once the cause is cleared. Gift-card credit and points released for it stay."
 
@@ -14207,6 +14248,12 @@ msgstr "The product the shopper is looking at."
 
 msgid "The product was returned or not delivered"
 msgstr "The product was returned or not delivered"
+
+msgid "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
+msgstr "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
+
+msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
+msgstr "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 
 msgid "The promotion has ended"
 msgstr "The promotion has ended"
@@ -16655,6 +16702,10 @@ msgstr "[{site}] Confirm your alert for {name}"
 #, python-brace-format
 msgid "[{site}] Low stock alert — {n} product(s)"
 msgstr "[{site}] Low stock alert — {n} product(s)"
+
+#, python-brace-format
+msgid "[{site}] Order {order_id} was paid more than once"
+msgstr "[{site}] Order {order_id} was paid more than once"
 
 #, python-brace-format
 msgid "[{site}] Payment does not match order {order_id}"

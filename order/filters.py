@@ -418,12 +418,12 @@ class OrderItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     )
 
     product__name = filters.CharFilter(
-        field_name="product__translations__name",
+        field_name="product_name",
         lookup_expr="icontains",
         help_text=_("Filter by product name (case-insensitive)"),
     )
     product__sku = filters.CharFilter(
-        field_name="product__sku",
+        field_name="sku",
         lookup_expr="icontains",
         help_text=_("Filter by product SKU"),
     )

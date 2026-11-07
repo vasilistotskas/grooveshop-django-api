@@ -196,6 +196,7 @@ the order note, whatever the switch says.
 | `ops.unattributable_cod_payouts` | an `UnattributablePayouts` (counts, payment date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.payment_after_cancel` | a `PaymentAfterCancel` | `order/emails.py` | |
 | `ops.payment_mismatch` | a `PaymentMismatch` | `order/emails.py` | |
+| `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `order/emails.py` | |
 | `ops.refund_failed` | a `RefundFailed` | `order/emails.py` | |
 | `ops.builder_schedule_failed` | a `ScheduleFailed` (a failed scheduled page publish) | `builder/emails.py` | |
 | `ops.gift_card_reversal` | a `GiftCardReversal` (the purchase, and what was already spent, or none when only disputed) | `giftcard/emails.py` | none |
@@ -211,7 +212,7 @@ A task treats a skip by what it protects. The stale digest claims its rows
 (`stale_alert_sent`), sends, and releases the claim when nothing was sent
 (switched off, nobody to write to, ACS off): the parcels are in the first
 digest after the store turns it back on. The order-bound alerts
-(`payment_after_cancel`, `payment_mismatch`, `refund_failed`,
+(`payment_after_cancel`, `payment_mismatch`, `overcharged`, `refund_failed`,
 `shipment_rejected`) write their `OrderHistory` note first, whatever the
 switch. Every sender is best-effort: a mail failure never fails the task or
 masks the error it reports.

@@ -357,26 +357,17 @@ def _vat_breakdown_for_render(
 def _render_items(order: Order) -> list[dict[str, Any]]:
     """Flatten order items into a render-friendly structure.
 
-    Django templates can't pass keyword arguments to methods, so the
-    product name (via parler's ``safe_translation_getter``) has to be
-    resolved here. Each row carries the exact numbers and labels the
-    template needs — no more fragile ``|default`` chains against bound
-    methods.
+    Each row carries the exact numbers and labels the template needs. The
+    name and SKU are the line's own snapshot (``OrderItem.product_name``,
+    ``OrderItem.sku``), so renaming a product never rewrites a receipt
+    already issued.
     """
     rows: list[dict[str, Any]] = []
-    for item in order.items.select_related("product").all():
-        product = item.product
-        name = ""
-        sku = ""
-        if product is not None:
-            name = (
-                product.safe_translation_getter("name", any_language=True) or ""
-            )
-            sku = getattr(product, "sku", "") or ""
+    for item in order.items.all():
         rows.append(
             {
-                "name": name,
-                "sku": sku,
+                "name": item.product_name,
+                "sku": item.sku,
                 "quantity": item.quantity,
                 "unit_gross": Decimal(item.price.amount),
                 "vat_rate": item.vat_rate,

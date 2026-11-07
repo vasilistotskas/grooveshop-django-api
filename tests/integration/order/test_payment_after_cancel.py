@@ -132,7 +132,9 @@ class TestVivaChargeOnACanceledOrder:
 
 class TestStripeChargeOnACanceledOrder:
     def test_payment_intent_success_is_booked_and_alerted(self):
-        order = _canceled_order(payment_id="pi_after_cancel")
+        order = _canceled_order(
+            payment_id="pi_after_cancel", amount_due=CAPTURED
+        )
 
         with (
             patch("emails.send.send_email") as alert,
@@ -154,7 +156,7 @@ class TestStripeChargeOnACanceledOrder:
         dispatch.assert_not_called()
 
     def test_checkout_session_is_booked_and_alerted(self):
-        order = _canceled_order(metadata={})
+        order = _canceled_order(metadata={}, amount_due=CAPTURED)
         event = Mock(spec=Event)
         event.id = f"evt_cs_{order.id}"
         event.type = "checkout.session.completed"

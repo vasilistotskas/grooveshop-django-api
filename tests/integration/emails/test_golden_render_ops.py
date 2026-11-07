@@ -28,7 +28,7 @@ from giftcard.emails import GiftCardReversal
 from giftcard.enum import GiftCardPurchaseStatus
 from giftcard.factories import GiftCardPurchaseFactory
 from giftcard.services import GiftCardService
-from order.emails import RefundFailed
+from order.emails import Overcharged, RefundFailed
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.services import OrderService
@@ -221,6 +221,21 @@ class TestPaymentAlerts:
         )
 
         assert_sent("ops_payment_mismatch", language)
+
+    def test_overcharged(self, language):
+        # ``PaymentLedger.sync_overcharge`` raises it; its own tests cover
+        # when (``test_overcharge.py``).
+        send_email(
+            "ops.overcharged",
+            Overcharged(
+                order_id=1234,
+                payment_id="pi_3QxExample",
+                provider="stripe",
+                excess=Money(Decimal("45.50"), "EUR"),
+            ),
+        )
+
+        assert_sent("ops_overcharged", language)
 
     def test_refund_failed(self, language):
         # The handler that raises it (``handle_stripe_refund_failed``) needs

@@ -69,6 +69,7 @@ from order.payment import (
 from order.payment_binding import PaymentPurpose, binding_mismatch
 from order.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
+    PAYMENT_AMOUNT_TOLERANCE,
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
@@ -92,10 +93,6 @@ if TYPE_CHECKING:
     from promotion.services import CartDiscountResult
 
 logger = logging.getLogger(__name__)
-
-# What a provider may differ from the order's total by (rounding on its side)
-# before a confirmed charge is treated as not matching the order.
-PAYMENT_AMOUNT_TOLERANCE = Decimal("0.01")
 
 # Payment statuses that represent a financially settled (terminal) state.
 # A stale or out-of-order webhook event MUST NOT overwrite any of these.

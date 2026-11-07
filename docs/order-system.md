@@ -436,10 +436,12 @@ catalogue can no longer change.
   `devtools/demo_orders.py` passes it itself. The column has
   `db_default=0` only so the release still serving during a rollout can
   keep inserting; a product with no `Vat` row is sold at 0. The item
-  admin hides the rate on the add page (`save()` snapshots it) and keeps
-  it editable afterwards, so staff can correct a wrong snapshot, until
-  the order's invoice carries a myDATA MARK; from then on it is
-  read-only, because the registered document can no longer change. A
+  admin cannot add a line (§3.7) and keeps the rate editable, so staff
+  can correct a wrong snapshot, until the order's invoice carries a
+  myDATA MARK; from then on it is read-only, because the registered
+  document can no longer change. A correction rewrites the order's
+  `OrderVatLine` rows (`write_vat_lines`), which the turnover report
+  reads. A
   line staff add through the API is priced like a checkout line: the
   product's VAT-inclusive `final_price`, or the price of the customer
   group that priced a wholesale order (`metadata["b2b_pricing"]`).
@@ -567,6 +569,47 @@ the attribution, inside the creation transaction: one
   paths take the resolved `LegalAcceptance` as a required argument, so
   no order is created without both rows. Orders placed before the field
   existed (`0092_legal_acceptance`, no backfill) have none.
+
+### 3.7 A placed order's lines are a record (`OrderItem.product_name`, `OrderItem.sku`)
+
+A line's product, quantity and price decide `amount_due`, the VAT lines the
+turnover report reads (`OrderVatLine`, written once at checkout by
+`order.vat_snapshot`), the invoice and the stock taken. Nothing recomputes
+those when a line is edited, so no admin surface edits one:
+
+- **The admin.** `OrderItemInline` is read-only, with no add and no delete
+  (`max_num = 0`, `can_delete = False`). `OrderItemAdmin` shows the product,
+  quantity, price and the restock counters read-only, and offers neither add
+  nor delete; staff can still annotate a line and correct its VAT rate (§3.5).
+  The admin has no "Add order" (`OrderAdmin.has_add_permission`): an order is
+  placed by checkout, which prices it, takes the stock, reserves the
+  discounts and writes the VAT lines. The one change made to a line after
+  checkout is a restock (`OrderItem.refund`, the order's "Restock returned
+  items" action).
+- **The snapshot.** `OrderItem.product_name` (the product's name in the
+  ORDER's language, `Order.language_code`, else any language it has one in)
+  and `OrderItem.sku` are written when the line is created, like `vat_rate`
+  and `unit_cost` (`OrderItem.save()` fills them for every writer that does
+  not state them; `bulk_create` skips `save()`, so it passes them itself).
+  The invoice (`order.invoicing._render_items`), the order emails
+  (`{{ item.product_name }}`), the admin, the order-item API
+  (`productName`, `sku`) and its `product__name` / `product__sku` filters
+  read the snapshot, never the product, so renaming or re-coding a product
+  cannot rewrite a receipt, an email or a history already issued. The
+  nested `product` object of the order API is still the live product (the
+  storefront links to it); a consumer that prints the name of a placed
+  line reads `productName`.
+- **The columns.** NOT NULL with `db_default=''` from the start
+  (`order` 0100), so nothing is tightened in a second release. Migration
+  0101 copies the current product into every existing line;
+  `manage.py backfill_line_snapshots --all-tenants` (the same idempotent SQL,
+  `order/line_snapshot.py`) covers the lines the previous release creates
+  while it still serves the rollout, whose INSERTs leave the columns at `''`.
+  Run it once after the rollout.
+- **Not closed here.** The staff API (`POST/PUT/PATCH/DELETE order-items`)
+  can still change a line, and its quantity change still moves stock through
+  `handle_order_item_post_save`. Removing those routes is an API removal and
+  ships storefront first (`api-contract/README.md`).
 
 ## 4. Payment paths
 
@@ -1402,6 +1445,7 @@ is the whole list:
 | `ops.shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
 | `ops.webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
 | `ops.payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
+| `ops.overcharged` | `PaymentLedger.sync_overcharge` | "Orders paid twice" (`OrderQuerySet.overcharged`), until refunds bring the ledger back; plus the order note |
 | `ops.refund_failed` | `handle_stripe_refund_failed` | A NOTE on the order and a `REFUND_REVERSAL` row on its ledger |
 | `ops.review_pending` | `product.tasks.send_review_pending_alert`, queued after commit by `ProductReviewWriteSerializer.save` | Dashboard "Reviews to approve" and the sidebar badge (`pending_reviews`) |
 
@@ -1873,6 +1917,8 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 
 Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant, less REFUND_REVERSAL), `charged_back` (CHARGEBACK), `fully_returned` (refunded plus charged back covers captured, what the loyalty reversal asks), `refundable` (per payment, collected cash included, less what a chargeback took and what live refund attempts hold), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded plus charged back ≥ captured; chargebacks count, so a chargeback before the last refund no longer leaves the order PARTIALLY_REFUNDED with nothing refundable and the gift card unreleased; and COMPLETED again when every refund was reversed). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
 
+**An order paid twice is flagged, never silently booked** (`PaymentLedger.sync_overcharge`, called by `_record` for every new row, under the order lock). `Order.overcharged_at` is set while `held` (captured, less refunded, less charged back) exceeds `amount_due` (the order's total when none was fixed) by more than `PAYMENT_AMOUNT_TOLERANCE`, and cleared when a refund, a reversal or a chargeback changes the sums so it no longer does. On the change from clear to set it logs ERROR, notes the order and sends `ops.overcharged` once; a row the provider redelivers is not new and never reaches it, and a figure that stays over changes nothing. Both CHARGE rows stay (the money moved), the order keeps its FIRST `payment_id` (Viva `_handle_payment_created` and Stripe `checkout.session.completed` stop after booking a second payment on an order another one already paid, so there is no second confirmation email either), and nothing is refunded automatically: which payment to give back is a person's call. A partial refund of a normal order never flags; a charge on a canceled order is `ops.payment_after_cancel`'s case (it equals the amount due). Staff see it as the "Orders paid twice" dashboard row, the order list filter `?overcharged=yes` and the read-only `Overcharged at` field. A second PaymentIntent that Stripe confirms through `payment_intent.succeeded` alone is looked up by `payment_id` and so is not found; only the checkout-session event names the order.
+
 **What the customer owes is not what was collected.** `Order.amount_due` (`amountDue` in the API) is what the order costs the customer: `calculate_order_total_amount()` (lines and extras, less promotion, loyalty and gift card), written at creation and again where a deduction changes (the standalone loyalty redemption). It says nothing about money collected, which is the ledger's CHARGE and COD_COLLECTION rows.
 
 What is still to be paid is **`Order.remaining_amount`** (`pricingBreakdown.remainingAmount`): `amount_due` while the payment is not settled, and 0 once `payment_status` is in `SETTLED_PAYMENT_STATUSES`. It is read from the status and never from the ledger, because a settled order can hold no ledger row: a payment staff recorded by hand, cash collected under a `payment_method` the 0067 backfill does not key on, and the demo tenant's seeded orders would all read as unpaid on a ledger sum. So a PENDING / PROCESSING / FAILED online order owes its whole `amount_due` (the storefront's "pay €X" state), a COD order owes it until the courier collects (it is also the amount the courier is told to collect: `AcsShipment.cod_amount`, `BoxNowShipment.amount_to_be_collected`), and a COMPLETED order owes 0. A refund never creates an amount owed (PARTIALLY_REFUNDED and REFUNDED stay at 0), and a CANCELED order owes 0 (it closed unpaid, so no payment will be collected: `PAYMENT_CLOSING_STATUSES`).
@@ -1938,6 +1984,8 @@ the linked memory note or the originating PR's commit message.
 | `ShippingService.dispatch_create_shipment_task` wraps in `transaction.on_commit` | `project_shipping_dispatch_on_commit.md` |
 | No carrier mint while `Order.awaits_online_payment` (`ShipmentAwaitingPaymentError`) | §5 above |
 | A payment-success handler checks `is_payment_after_cancel` BEFORE its settled-state guard | §2.2 above |
+| A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | §7.3 |
+| A placed order's lines (product, quantity, price) are read-only in every admin surface; the name and SKU on an invoice, email or API line are the line's own snapshot | §3.7 |
 | Order `status` changes only through admin actions / `OrderService`, never the change form | §7.1 above |
 | Operational mail to a store's operators is an `ops.*` email type sent through `send_email` only (the store's `EmailSwitch` is the one gate); an alert a store may switch off has a dashboard counter by the same rule as its email | §5.4 above |
 | "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment` | §2.3 above |

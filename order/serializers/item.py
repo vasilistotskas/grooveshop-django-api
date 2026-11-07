@@ -17,6 +17,8 @@ class OrderItemSerializer(serializers.ModelSerializer[OrderItem]):
             "uuid",
             "order",
             "product",
+            "product_name",
+            "sku",
             "price",
             "quantity",
             "is_refunded",
@@ -29,6 +31,8 @@ class OrderItemSerializer(serializers.ModelSerializer[OrderItem]):
         read_only_fields = (
             "id",
             "uuid",
+            "product_name",
+            "sku",
             "created_at",
             "updated_at",
             "total_price",

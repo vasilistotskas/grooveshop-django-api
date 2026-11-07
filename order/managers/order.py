@@ -73,6 +73,12 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             ),
         )
 
+    def overcharged(self) -> Self:
+        """Orders the customer paid more than once (``overcharged_at``,
+        kept by ``PaymentLedger.sync_overcharge``): the worklist for
+        refunding the excess, and the filter behind it."""
+        return self.filter(overcharged_at__isnull=False)
+
     def awaiting_chargeback_decision(self) -> Self:
         """Orders with a lost dispute whose goods staff have not yet said
         came back or stayed (``ChargebackDecision``): the worklist the

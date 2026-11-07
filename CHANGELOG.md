@@ -3,6 +3,34 @@
 
 
 
+## v3.230.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(agent): serve only agent orders on the gateway's read
+
+Other services hold the same secret, and the route's purpose is an order the
+gateway placed, so an order an agent did not place now answers 404.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+### Features
+
+* feat(agent): let the gateway read an order it placed (#504) ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+* feat(agent): let the gateway read an order it placed
+
+A guest's uuid opens an order for a limited time, but the gateway tells a
+platform about an order for as long as the order moves, so past that limit it
+could no longer build the webhook. It now reads through its own route, with its
+shared secret. A uuid a client hands the gateway stays on the guest route.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
 ## v3.229.0 (2026-11-07)
 
 ### Bug fixes

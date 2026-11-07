@@ -498,6 +498,24 @@ STAFF_PASSWORD_RESET = {
     ),
 }
 
+# Attempts at a platform-staff sign-in (the Django admin login and the staff
+# token endpoint, ``tenant.staff_login_limits``): counted per account and
+# proven address, per account, and per proven address inside
+# ``WINDOW_SECONDS``; past a budget even the right password is refused. allauth's limiter covers neither.
+STAFF_LOGIN_LIMITS = {
+    # One account from one proven address: the strict budget.
+    "MAX_FAILURES_PER_ACCOUNT_ADDRESS": int(
+        getenv("STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT_ADDRESS", "5")
+    ),
+    # One account from anywhere: the ceiling for a run spread over many
+    # addresses, and the only account limit without a proven address.
+    "MAX_FAILURES_PER_ACCOUNT": int(
+        getenv("STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT", "50")
+    ),
+    "MAX_FAILURES_PER_IP": int(getenv("STAFF_LOGIN_MAX_FAILURES_PER_IP", "20")),
+    "WINDOW_SECONDS": int(getenv("STAFF_LOGIN_WINDOW_SECONDS", "900")),
+}
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",

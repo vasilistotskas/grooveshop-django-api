@@ -1552,6 +1552,12 @@ msgstr "Μια διεύθυνση IP δεν είναι domain καταστήμα
 msgid "An animated image cannot be resized or have its location removed. Upload a smaller or a still image."
 msgstr "Μια κινούμενη εικόνα δεν μπορεί να αλλάξει μέγεθος ούτε να χάσει την τοποθεσία της. Ανεβάστε μια μικρότερη ή μια στατική εικόνα."
 
+msgid "An authenticator or recovery code is required."
+msgstr "Απαιτείται κωδικός εφαρμογής ταυτοποίησης ή κωδικός ανάκτησης."
+
+msgid "An authenticator or unused recovery code. Required for a platform superuser, who must have set up an authenticator in the admin first."
+msgstr "Κωδικός εφαρμογής ταυτοποίησης ή αχρησιμοποίητος κωδικός ανάκτησης. Απαιτείται για τον υπερδιαχειριστή της πλατφόρμας, ο οποίος πρέπει πρώτα να έχει ρυθμίσει εφαρμογή ταυτοποίησης στη διαχείριση."
+
 msgid "An email address is required for guest alerts."
 msgstr "Απαιτείται διεύθυνση email για ειδοποιήσεις επισκεπτών."
 
@@ -12627,6 +12633,9 @@ msgstr "Ορίστε το ποσοστό ΦΠΑ (0.0% - 100.0%)"
 msgid "Set this address as the user's main address."
 msgstr "Ορισμός αυτής της διεύθυνσης ως κύριας διεύθυνσης του χρήστη."
 
+msgid "Set up an authenticator by signing in to the admin once, then try again."
+msgstr "Ρυθμίστε εφαρμογή ταυτοποίησης συνδεόμενοι μία φορά στη διαχείριση και δοκιμάστε ξανά."
+
 msgid "Set up your authenticator app"
 msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
 
@@ -12818,6 +12827,9 @@ msgstr "Εγγραφή"
 
 msgid "Sign-in code"
 msgstr "Κωδικός σύνδεσης"
+
+msgid "Sign-in is temporarily unavailable, try again shortly."
+msgstr "Η σύνδεση δεν είναι προσωρινά διαθέσιμη, δοκιμάστε ξανά σε λίγο."
 
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
@@ -14892,6 +14904,9 @@ msgstr "Το token έχει υπερβεί τη μέγιστη διάρκεια 
 
 msgid "Token hash"
 msgstr "Αποτύπωμα κωδικού"
+
+msgid "Too many failed sign-in attempts. Try again later."
+msgstr "Πάρα πολλές αποτυχημένες προσπάθειες σύνδεσης. Δοκιμάστε ξανά αργότερα."
 
 #, python-brace-format
 msgid "Too many ids — request at most {max} per call."

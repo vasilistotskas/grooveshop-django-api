@@ -101,6 +101,7 @@ dev = [
     # Uvicorn's `--reload` (local dev server) uses it, and only with it
     # do `.*` directories such as `.venv` stay out of the watch set.
     "watchfiles==1.3.0",
+    "pytest-socket==0.8.1",
 ]
 
 # ─────────────────────────────────────────────────────────
@@ -258,7 +259,16 @@ timeout_func_only = true
 # variable above the ini key, and every container started with
 # ``env_file: .env`` exports ``DJANGO_SETTINGS_MODULE=settings``. That
 # module pins what must be right before ``django.setup()``; see its docstring.
-addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db"
+#
+# ``--disable-socket`` with ``--allow-hosts`` (pytest-socket): a test may
+# connect only to the local services the suite runs against, by address
+# or by the compose service name (``db``, ``redis``, ``rabbitmq``,
+# ``meilisearch``). Any other ``connect()`` raises ``SocketConnectBlockedError``,
+# so a test that reaches a real third party (a payment provider, Resend,
+# Cloudflare) fails instead of passing or flaking on the network: mock the
+# client at its boundary. xdist workers read the same ``addopts``.
+# See docs/testing.md before allowing another host.
+addopts = "--ds=tests.settings --tb=short --maxfail=0 -n auto --dist loadfile --reuse-db --disable-socket --allow-hosts=127.0.0.1,localhost,::1,db,redis,rabbitmq,meilisearch"
 markers = [
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
 ]

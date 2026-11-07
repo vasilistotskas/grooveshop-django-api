@@ -466,7 +466,7 @@ class B2BPricingService:
                 * (ONE_HUNDRED - group.discount_percent)
                 / ONE_HUNDRED
             )
-        rate = product.vat_percent or Decimal(0)
+        rate = product.vat_percent
         vat_factor = (ONE_HUNDRED + rate) / ONE_HUNDRED
         final_amount = _quantize_cents(net_amount * vat_factor)
 

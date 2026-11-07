@@ -910,7 +910,9 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     # propagate so dj-stripe's outer atomic rolls back the mark + Event
     # row and Stripe redelivers (G0231).
     outcome = OrderService.handle_payment_succeeded(
-        payment_intent_id, captured=captured
+        payment_intent_id,
+        captured=captured,
+        metadata=payment_intent.get("metadata"),
     )
 
     announce_stripe_payment_applied(outcome, payment_intent_id)

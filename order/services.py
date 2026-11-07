@@ -3,6 +3,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -66,7 +67,11 @@ from order.payment import (
     provider_supports,
     registered_provider_codes,
 )
-from order.payment_binding import PaymentPurpose, binding_mismatch
+from order.payment_binding import (
+    SUBJECT_KEY,
+    PaymentPurpose,
+    binding_mismatch,
+)
 from order.payment_ledger import (
     OFFLINE_TRANSFER_PROVIDER,
     PAYMENT_AMOUNT_TOLERANCE,
@@ -4597,10 +4602,32 @@ class OrderService:
                 order.id,
             )
 
+    @staticmethod
+    def _bound_order_uuid(metadata: Mapping[str, str] | None) -> UUID | None:
+        """The order an intent was created for, when its own metadata (set
+        by the server, ``order.payment_binding``) binds it to an existing
+        order of this store; ``None`` for any other intent."""
+        subject = (metadata or {}).get(SUBJECT_KEY)
+        if not subject:
+            return None
+        try:
+            bound = UUID(subject)
+        except ValueError:
+            return None
+        if binding_mismatch(
+            metadata, purpose=PaymentPurpose.ORDER, subject=bound
+        ):
+            return None
+        return bound
+
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(
-        cls, payment_intent_id: str, *, captured: Money
+        cls,
+        payment_intent_id: str,
+        *,
+        captured: Money,
+        metadata: Mapping[str, str] | None = None,
     ) -> PaymentEventOutcome | None:
         """Book a succeeded Stripe PaymentIntent.
 
@@ -4608,6 +4635,14 @@ class OrderService:
         into the payment ledger whatever state the order is in, because
         the money has moved either way; the order's own status then
         follows the guards below.
+
+        The order is the one whose ``payment_id`` is the intent. An intent
+        the order no longer points at (the shopper paid in an older tab
+        after a retry opened a newer intent) is found by what the server
+        wrote on it, *metadata*: it must bind the intent to an existing
+        order (``PaymentPurpose.ORDER``) of this store, checked by
+        ``binding_mismatch``. A payment-first intent is bound to a cart,
+        its order may not exist yet, and "not found" stays the answer.
         """
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
@@ -4625,7 +4660,7 @@ class OrderService:
         # several of the FKs on Order are nullable (user, pay_way,
         # country, region, shipping_provider) and ``select_related``
         # joins them with LEFT OUTER JOIN.
-        order = (
+        orders = (
             Order.objects.select_for_update(of=("self",))
             .select_related(
                 "user",
@@ -4649,9 +4684,11 @@ class OrderService:
                 "acs_shipment__station_destination",
                 "invoice",
             )
-            .filter(payment_id=payment_intent_id)
-            .first()
         )
+        found = orders.filter(payment_id=payment_intent_id).first()
+        if found is None and (bound := cls._bound_order_uuid(metadata)):
+            found = orders.filter(uuid=bound).first()
+        order = found
         if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
@@ -4671,6 +4708,24 @@ class OrderService:
                 order, payment_id=payment_intent_id, payment_method="stripe"
             )
             publish_payment_status(order)
+            return PaymentEventOutcome(order, previous, applied=False)
+
+        # A second payment on an order another intent already paid: booked
+        # above (and flagged by ``PaymentLedger.sync_overcharge`` when it
+        # takes the order past what it is for). The order keeps its first
+        # ``payment_id`` and is not confirmed again.
+        if (
+            order.payment_status == PaymentStatus.COMPLETED
+            and order.payment_id
+            and order.payment_id != payment_intent_id
+        ):
+            logger.error(
+                "PaymentIntent %s is a second payment on order %s, already "
+                "paid by %s: recorded in the ledger, order left as it is",
+                payment_intent_id,
+                order.id,
+                order.payment_id,
+            )
             return PaymentEventOutcome(order, previous, applied=False)
 
         # Guard: a stale or out-of-order "payment succeeded" event must not

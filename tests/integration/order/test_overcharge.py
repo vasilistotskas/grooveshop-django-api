@@ -16,20 +16,25 @@ first ``payment_id`` is kept. Nothing is refunded automatically.
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.utils import timezone
 from djmoney.money import Money
+from djstripe.models import Event
 
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.payment_binding import PaymentPurpose, binding_metadata
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
-from order.signals.handlers import handle_stripe_checkout_completed
+from order.signals.handlers import (
+    handle_stripe_checkout_completed,
+    handle_stripe_payment_succeeded,
+)
 from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
 from tests.utils.viva import verified_payment
@@ -55,7 +60,8 @@ def _order(**extra) -> Order:
         quantity=1,
     )
     Order.objects.filter(pk=order.pk).update(
-        amount_due=Money(OWED, "EUR"), payment_id=""
+        amount_due=Money(OWED, "EUR"),
+        payment_id=extra.get("payment_id", ""),
     )
     order.refresh_from_db()
     assert order.calculate_order_total_amount().amount == OWED
@@ -105,6 +111,30 @@ def _stripe_checkout(order, payment_intent_id, session_id):
     ):
         handle_stripe_checkout_completed(sender=None, event=event)
     order.refresh_from_db()
+
+
+def _intent_succeeded(payment_intent_id, metadata):
+    """Deliver ``payment_intent.succeeded`` alone (no checkout-session
+    event), for an intent carrying *metadata*."""
+    event = Mock(spec=Event)
+    event.id = f"evt_{payment_intent_id}"
+    event.type = "payment_intent.succeeded"
+    event.data = {
+        "object": {
+            "id": payment_intent_id,
+            "amount": int(OWED * 100),
+            "amount_received": int(OWED * 100),
+            "currency": "eur",
+            "metadata": metadata,
+        }
+    }
+    with (
+        patch(
+            "shipping.services.ShippingService.dispatch_create_shipment_task"
+        ),
+        patch("order.signals.handlers.record_stripe_fee_for_intent"),
+    ):
+        handle_stripe_payment_succeeded(sender=None, event=event)
 
 
 def _alerts(send_email):
@@ -183,6 +213,94 @@ class TestTwoStripePaymentsOnOneOrder:
         assert order.payment_id == "pi_first"
         assert order.overcharged_at is not None
         assert len(_alerts(send_email)) == 1
+
+
+class TestAnIntentTheOrderNoLongerNames:
+    """``payment_intent.succeeded`` finds the order by ``payment_id``; an
+    intent created for the order but no longer named on it is found by what
+    the server wrote on it, and only then."""
+
+    def test_a_second_bound_intent_is_booked_and_flagged(self, send_email):
+        order = _order(payment_id="pi_first")
+        _intent_succeeded(
+            "pi_first", binding_metadata(PaymentPurpose.ORDER, order.uuid)
+        )
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+
+        _intent_succeeded(
+            "pi_second", binding_metadata(PaymentPurpose.ORDER, order.uuid)
+        )
+
+        order.refresh_from_db()
+        assert order.payment_id == "pi_first"
+        assert order.overcharged_at is not None
+        assert PaymentLedger.captured(order) == OWED * 2
+        assert len(_alerts(send_email)) == 1
+
+    def test_a_redelivery_of_the_second_intent_alerts_once(self, send_email):
+        order = _order(payment_id="pi_first")
+        bound = binding_metadata(PaymentPurpose.ORDER, order.uuid)
+        _intent_succeeded("pi_first", bound)
+        _intent_succeeded("pi_second", bound)
+
+        _intent_succeeded("pi_second", bound)
+
+        assert len(_alerts(send_email)) == 1
+        assert order.payment_transactions.count() == 2
+
+    def test_an_older_intent_paid_after_a_retry_settles_the_order(
+        self, send_email
+    ):
+        order = _order(payment_id="pi_newer")
+
+        _intent_succeeded(
+            "pi_older", binding_metadata(PaymentPurpose.ORDER, order.uuid)
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert order.payment_id == "pi_older"
+        assert order.overcharged_at is None
+        assert _alerts(send_email) == []
+
+    @pytest.mark.parametrize(
+        "forge",
+        [
+            {"purpose": PaymentPurpose.CART.value},
+            {"purpose": PaymentPurpose.GIFT_CARD.value},
+            {"tenant_schema": "another_store"},
+            {"subject": "not-a-uuid"},
+            {"subject": "00000000-0000-4000-8000-000000000000"},
+        ],
+    )
+    def test_metadata_that_does_not_bind_the_order_books_nothing(
+        self, send_email, forge
+    ):
+        order = _order(payment_id="pi_first")
+        metadata = {
+            **binding_metadata(PaymentPurpose.ORDER, order.uuid),
+            **forge,
+        }
+
+        _intent_succeeded("pi_other", metadata)
+
+        order.refresh_from_db()
+        assert order.payment_transactions.count() == 0
+        assert order.payment_status == PaymentStatus.PENDING
+        assert _alerts(send_email) == []
+
+    def test_a_payment_first_intent_with_no_order_yet_stays_as_today(
+        self, send_email
+    ):
+        cart_uuid = "5b1c1f06-6d6c-4a63-9c36-1e0a3f0b8a11"
+
+        _intent_succeeded(
+            "pi_early", binding_metadata(PaymentPurpose.CART, cart_uuid)
+        )
+
+        assert PaymentLedger.captured(_order()) == 0
+        assert _alerts(send_email) == []
 
 
 class TestTheFlagFollowsTheLedger:

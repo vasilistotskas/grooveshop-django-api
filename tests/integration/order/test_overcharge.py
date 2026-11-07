@@ -19,6 +19,7 @@ from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
+from django.test import RequestFactory
 from django.utils import timezone
 from djmoney.money import Money
 from djstripe.models import Event
@@ -32,12 +33,16 @@ from order.payment_binding import PaymentPurpose, binding_metadata
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals.handlers import (
+    handle_stripe_charge_refunded,
     handle_stripe_checkout_completed,
+    handle_stripe_dispute_closed,
     handle_stripe_payment_succeeded,
+    handle_stripe_refund_failed,
 )
 from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
 from tests.utils.viva import verified_payment
+from user.factories import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -301,6 +306,169 @@ class TestAnIntentTheOrderNoLongerNames:
 
         assert PaymentLedger.captured(_order()) == 0
         assert _alerts(send_email) == []
+
+
+class TestEventsOnTheSecondIntent:
+    """An order paid twice keeps its FIRST intent as ``payment_id``, so a
+    refund, a failed refund or a dispute on the second is found through the
+    ledger's CHARGE row, and corrects the flag."""
+
+    @pytest.fixture
+    def twice(self, send_email):
+        order = _order(payment_id="pi_first")
+        bound = binding_metadata(PaymentPurpose.ORDER, order.uuid)
+        _intent_succeeded("pi_first", bound)
+        _intent_succeeded("pi_second", bound)
+        order.refresh_from_db()
+        assert order.overcharged_at is not None
+        return order
+
+    @staticmethod
+    def _event(event_id, event_type, obj):
+        event = Mock(spec=Event)
+        event.id = event_id
+        event.type = event_type
+        event.data = {"object": obj}
+        return event
+
+    def _refunded(self, event_id, cents, intent="pi_second"):
+        event = self._event(
+            event_id,
+            "charge.refunded",
+            {
+                "id": "ch_second",
+                "payment_intent": intent,
+                "amount": int(OWED * 100),
+                "amount_refunded": cents,
+                "currency": "eur",
+            },
+        )
+        with patch("order.signals.handlers.dispatch_on_commit"):
+            handle_stripe_charge_refunded(sender=None, event=event)
+
+    def test_a_refund_of_the_second_reaches_the_ledger_and_clears_the_flag(
+        self, twice
+    ):
+        self._refunded("evt_refund_second", int(OWED * 100))
+
+        twice.refresh_from_db()
+        second = twice.payment_transactions.get(provider_reference="pi_second")
+        assert PaymentLedger.refunded_on(second) == OWED
+        assert PaymentLedger.refunded_on(
+            twice.payment_transactions.get(provider_reference="pi_first")
+        ) == Decimal(0)
+        assert twice.overcharged_at is None
+
+    def test_a_failed_refund_of_the_second_reverses_it_and_flags_again(
+        self, twice
+    ):
+        self._refunded("evt_refund_second", int(OWED * 100))
+        failed = self._event(
+            "evt_refund_failed",
+            "refund.failed",
+            {
+                "id": "re_second",
+                "object": "refund",
+                "status": "failed",
+                "amount": int(OWED * 100),
+                "currency": "eur",
+                "payment_intent": "pi_second",
+                "failure_reason": "expired_or_canceled_card",
+            },
+        )
+
+        with patch("order.signals.handlers.send_email"):
+            handle_stripe_refund_failed(sender=None, event=failed)
+
+        twice.refresh_from_db()
+        assert twice.payment_transactions.filter(
+            kind=PaymentTransactionKind.REFUND_REVERSAL
+        ).exists()
+        assert twice.overcharged_at is not None
+
+    def test_a_lost_dispute_on_the_second_reaches_the_ledger_and_clears(
+        self, twice
+    ):
+        closed = self._event(
+            "evt_dispute_closed",
+            "charge.dispute.closed",
+            {
+                "id": "dp_second",
+                "charge": "ch_second",
+                "payment_intent": "pi_second",
+                "reason": "fraudulent",
+                "status": "lost",
+                "amount": int(OWED * 100),
+                "currency": "eur",
+            },
+        )
+
+        with patch("order.signals.handlers.send_email"):
+            handle_stripe_dispute_closed(sender=None, event=closed)
+
+        twice.refresh_from_db()
+        assert twice.payment_transactions.filter(
+            kind=PaymentTransactionKind.CHARGEBACK,
+            charge=twice.payment_transactions.get(
+                provider_reference="pi_second"
+            ),
+        ).exists()
+        assert twice.overcharged_at is None
+
+    def test_an_order_with_no_ledger_row_is_still_found_by_payment_id(self):
+        order = _order(payment_id="pi_unrecorded")
+
+        self._refunded("evt_unrecorded", 1000, "pi_unrecorded")
+
+        order.refresh_from_db()
+        assert order.payment_transactions.filter(
+            kind=PaymentTransactionKind.REFUND
+        ).exists()
+
+
+class TestACorrectPaymentIsNeverFlagged:
+    """What the order is for is the total every payment path charges, so a
+    single correct payment cannot look like an overcharge, whatever the
+    order's deductions."""
+
+    def test_a_gift_card_and_loyalty_order_paid_once_is_not_flagged(
+        self, send_email
+    ):
+        order = _order()
+        Order.objects.filter(pk=order.pk).update(
+            gift_card_amount=Money(Decimal("5.00"), "EUR"),
+            loyalty_discount=Money(Decimal("3.00"), "EUR"),
+            amount_due=Money(0, "EUR"),
+        )
+        order.refresh_from_db()
+        paid = order.calculate_order_total_amount()
+        assert paid.amount == OWED - 8
+
+        PaymentLedger.record_charge(
+            order, amount=paid, provider="viva_wallet", reference="viva_ok"
+        )
+
+        order.refresh_from_db()
+        assert order.overcharged_at is None
+        assert _alerts(send_email) == []
+
+    def test_the_admin_no_longer_offers_the_amounts_to_edit(self):
+        from django.contrib.admin.sites import AdminSite
+
+        from order.admin import OrderAdmin
+
+        order = _order()
+        order_admin = OrderAdmin(Order, AdminSite())
+        request = RequestFactory().get("/")
+        request.user = UserAccountFactory.create(admin=True)
+
+        readonly = order_admin.get_readonly_fields(request, order)
+        form_fields = order_admin.get_form(request, order).base_fields
+
+        for name in ("shipping_price", "amount_due", "payment_method_fee"):
+            assert name in readonly or name not in form_fields
+        assert "shipping_price" not in form_fields
+        assert "amount_due" not in form_fields
 
 
 class TestTheFlagFollowsTheLedger:

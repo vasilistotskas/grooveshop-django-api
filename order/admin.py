@@ -1004,6 +1004,15 @@ class OrderAdmin(BaseModelAdmin):
         "payment_id",
         # Kept by the payment ledger (``PaymentLedger.sync_overcharge``).
         "overcharged_at",
+        # What the customer owes is a record once the order is placed:
+        # every payment path charges and compares a capture with the total
+        # these amounts make (``calculate_order_total_amount``), and
+        # nothing recomputes ``amount_due`` or the VAT lines when one
+        # changes. The lines (``OrderItemInline``) and the discounts above
+        # are read-only for the same reason; ``payment_method_fee`` is not
+        # on the form at all.
+        "shipping_price",
+        "amount_due",
         # Set by the provider's reply when a payment link is opened.
         "payment_hold_expires_at",
         "follow_up_note",

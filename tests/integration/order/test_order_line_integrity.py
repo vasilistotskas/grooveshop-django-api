@@ -21,14 +21,17 @@ from decimal import Decimal
 import pytest
 from django.contrib import admin
 from django.contrib.admin.sites import AdminSite
-from django.test import RequestFactory
+from django.db import connection
+from django.test import Client, RequestFactory
+from django.urls import reverse
 from djmoney.money import Money
 
 from order.admin import OrderAdmin, OrderItemAdmin, OrderItemInline
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.invoicing import _render_items
-from order.models.item import OrderItem
+from order.line_snapshot import backfill_line_snapshots
+from order.models.item import OrderItem, product_name_for
 from order.models.order import Order
 from order.models.vat_line import OrderVatLine
 from order.vat_snapshot import write_vat_lines
@@ -154,3 +157,138 @@ def test_the_vat_lines_belong_to_the_checkout_that_wrote_them():
 
     assert OrderVatLine.objects.filter(order=order).exists()
     assert admin.site.is_registered(OrderItem)
+
+
+class TestAVatRateCorrectionRewritesTheVatLines:
+    """The change form of a line is the one admin edit left: a wrong rate
+    may be corrected until the invoice is registered with AADE, and the
+    turnover report reads ``OrderVatLine``, not the line."""
+
+    def test_posting_a_new_rate_rewrites_the_order_vat_lines(self):
+        order, item = _paid_order()
+        OrderItem.objects.filter(pk=item.pk).update(vat_rate=Decimal(24))
+        write_vat_lines(order)
+        before = {
+            row.vat_rate for row in OrderVatLine.objects.filter(order=order)
+        }
+        assert Decimal(24) in before
+        client = Client()
+        client.force_login(
+            UserAccountFactory.create(admin=True),
+            backend="tenant.auth_backends.PlatformStaffBackend",
+        )
+
+        response = client.post(
+            reverse("admin:order_orderitem_change", args=[item.pk]),
+            {"vat_rate": "13", "notes": "", "_save": "Save"},
+        )
+
+        assert response.status_code == 302, response.context["errors"]
+        item.refresh_from_db()
+        assert item.vat_rate == Decimal(13)
+        rates = {
+            row.vat_rate
+            for row in OrderVatLine.objects.filter(order=order, item=item)
+        }
+        assert rates == {Decimal(13)}
+
+    def test_a_form_save_that_leaves_the_rate_alone_keeps_the_vat_lines(self):
+        order, item = _paid_order()
+        keep = list(
+            OrderVatLine.objects.filter(order=order).values_list(
+                "pk", flat=True
+            )
+        )
+        client = Client()
+        client.force_login(
+            UserAccountFactory.create(admin=True),
+            backend="tenant.auth_backends.PlatformStaffBackend",
+        )
+
+        client.post(
+            reverse("admin:order_orderitem_change", args=[item.pk]),
+            {
+                "vat_rate": str(item.vat_rate),
+                "notes": "gift wrap",
+                "_save": "Save",
+            },
+        )
+
+        assert (
+            list(
+                OrderVatLine.objects.filter(order=order).values_list(
+                    "pk", flat=True
+                )
+            )
+            == keep
+        )
+
+
+class TestBackfillLineSnapshots:
+    """``backfill_line_snapshots`` picks the name the way a new line does."""
+
+    @staticmethod
+    def _product(**names):
+        product = ProductFactory.create(num_images=0, num_reviews=0)
+        product.translations.all().delete()
+        for language, name in names.items():
+            product.set_current_language(language)
+            product.name = name
+            product.save()
+        return Product.objects.get(pk=product.pk)
+
+    @staticmethod
+    def _unsnapshotted_line(product, language):
+        order = OrderFactory.create(num_order_items=0, language_code=language)
+        item = order.items.create(
+            product=product, price=Money(Decimal("5.00"), "EUR"), quantity=1
+        )
+        OrderItem.objects.filter(pk=item.pk).update(product_name="", sku="")
+        item.refresh_from_db()
+        return item
+
+    @pytest.mark.parametrize(
+        ("names", "language"),
+        [
+            ({"el": "Ποδήλατο", "en": "Bike"}, "en"),
+            ({"el": "Ποδήλατο", "en": "Bike"}, "el"),
+            ({"en": "Bike"}, "el"),
+            ({"el": "Ποδήλατο"}, "en"),
+        ],
+    )
+    def test_the_name_is_the_one_a_new_line_would_get(self, names, language):
+        product = self._product(**names)
+        item = self._unsnapshotted_line(product, language)
+
+        written = backfill_line_snapshots(connection)
+
+        item.refresh_from_db()
+        assert written == 1
+        assert item.sku == product.sku
+        assert item.product_name
+        assert item.product_name == product_name_for(product, language)
+        assert item.product_name == (
+            names[language] if language in names else next(iter(names.values()))
+        )
+
+    def test_a_second_run_changes_nothing(self):
+        item = self._unsnapshotted_line(
+            self._product(el="Ποδήλατο", en="Bike"), "en"
+        )
+        assert backfill_line_snapshots(connection) == 1
+        item.refresh_from_db()
+        snapshot = (item.product_name, item.sku)
+
+        assert backfill_line_snapshots(connection) == 0
+
+        item.refresh_from_db()
+        assert (item.product_name, item.sku) == snapshot
+
+    def test_a_line_that_already_has_its_snapshot_is_not_touched(self):
+        _order, item = _paid_order()
+        OrderItem.objects.filter(pk=item.pk).update(product_name="Kept")
+
+        backfill_line_snapshots(connection)
+
+        item.refresh_from_db()
+        assert item.product_name == "Kept"

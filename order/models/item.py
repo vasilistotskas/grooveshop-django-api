@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from parler.utils import get_active_language_choices
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from order.enum.status import RETURN_HANDLING_STATUSES
@@ -22,14 +23,21 @@ RESTOCK_REASON_MAX_LENGTH = 150
 
 def product_name_for(product, language_code: str) -> str:
     """The name a line of an order placed in *language_code* is sold under:
-    the product's name in that language, else in any language it has one in,
-    else empty (never a made-up label)."""
-    return (
-        product.safe_translation_getter(
-            "name", language_code=language_code, any_language=True
+    the product's name in that language, else in the next language of its
+    parler fallback chain, else in any language it has one in, else empty
+    (never a made-up label). ``order.line_snapshot`` chooses the same way
+    for the lines that predate the snapshot."""
+    names = {
+        translation.language_code: translation.name
+        for translation in sorted(
+            product.translations.all(), key=lambda row: row.pk
         )
-        or ""
-    )
+        if translation.name
+    }
+    for language in get_active_language_choices(language_code):
+        if language in names:
+            return names[language]
+    return next(iter(names.values()), "")
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):

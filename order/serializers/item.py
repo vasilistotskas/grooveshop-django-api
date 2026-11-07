@@ -67,43 +67,6 @@ class OrderItemDetailSerializer(OrderItemSerializer):
         )
 
 
-class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
-    class Meta:
-        model = OrderItem
-        fields = (
-            "order",
-            "product",
-            "quantity",
-            "notes",
-        )
-
-    def validate_quantity(self, value: int) -> int:
-        if value <= 0:
-            raise serializers.ValidationError(
-                _("Quantity must be a positive number."),
-                code="quantity_not_positive",
-            )
-        return value
-
-    def validate(self, attrs: dict) -> dict:
-        product = attrs.get("product")
-        quantity = attrs.get("quantity")
-
-        if product and product.stock < quantity:
-            raise serializers.ValidationError(
-                {
-                    "quantity": _(
-                        "Not enough stock available. Only {product_stock} remaining."
-                    ).format(
-                        product_stock=product.stock,
-                    )
-                },
-                code="insufficient_stock",
-            )
-
-        return attrs
-
-
 class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
     class Meta:
         model = OrderItem

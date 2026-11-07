@@ -66,18 +66,6 @@ class TestOrderItemModel:
         item.refresh_from_db()
         assert item.original_quantity == 2
 
-    def test_raising_quantity_takes_the_difference_from_stock(
-        self, order_item, product
-    ):
-        product.refresh_from_db()
-        initial_stock = product.stock
-
-        order_item.quantity = 7
-        order_item.save()
-
-        product.refresh_from_db()
-        assert product.stock == initial_stock - 2
-
     def test_money_properties(self, order_item):
         order_item.refunded_quantity = 2
 

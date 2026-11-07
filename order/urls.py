@@ -130,19 +130,12 @@ urlpatterns = [
     ),
     path(
         "order-items",
-        OrderItemViewSet.as_view({"get": "list", "post": "create"}),
+        OrderItemViewSet.as_view({"get": "list"}),
         name="order-item-list",
     ),
     path(
         "order-items/<int:pk>",
-        OrderItemViewSet.as_view(
-            {
-                "get": "retrieve",
-                "put": "update",
-                "patch": "partial_update",
-                "delete": "destroy",
-            }
-        ),
+        OrderItemViewSet.as_view({"get": "retrieve"}),
         name="order-item-detail",
     ),
     path(

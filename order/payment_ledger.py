@@ -606,9 +606,15 @@ class PaymentLedger:
     @classmethod
     def sync_overcharge(cls, order: Order, trigger: PaymentTransaction) -> None:
         """Keep ``Order.overcharged_at`` equal to the ledger: set while
-        :meth:`held` exceeds what the order is for (``amount_due``; the
-        order's total when none was fixed yet) by more than the rounding
+        :meth:`held` exceeds what the order is for by more than the rounding
         tolerance, cleared when refunds or a chargeback bring it back.
+        What the order is for is ``calculate_order_total_amount()``, the one
+        figure every payment path charges and compares a capture with (lines
+        and extras, less promotion, loyalty and gift card). It is not
+        ``amount_due``: that column is a copy written at creation, and an
+        order from the previous release can carry its default 0. The
+        figure cannot move after placement: the admin and the API have no
+        way to edit the lines or the amounts that feed it.
 
         Called from :meth:`_record` for every new row, under the caller's
         order lock, so the sums and the stamp are one step. The ops email
@@ -618,7 +624,7 @@ class PaymentLedger:
         here: which payment to give back is a person's call. *trigger* is
         the row that made the change, named in the alert.
         """
-        owed = order.amount_due or order.calculate_order_total_amount()
+        owed = order.calculate_order_total_amount()
         excess = cls.held(order) - owed.amount
         over = excess > PAYMENT_AMOUNT_TOLERANCE
         if over == (order.overcharged_at is not None):

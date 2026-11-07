@@ -441,10 +441,7 @@ catalogue can no longer change.
   myDATA MARK; from then on it is read-only, because the registered
   document can no longer change. A correction rewrites the order's
   `OrderVatLine` rows (`write_vat_lines`), which the turnover report
-  reads. A
-  line staff add through the API is priced like a checkout line: the
-  product's VAT-inclusive `final_price`, or the price of the customer
-  group that priced a wholesale order (`metadata["b2b_pricing"]`).
+  reads.
 - **Nothing reads `product.vat` for an order again.** `order/invoicing.py`
   and `order/mydata/builder.py` get their lines from
   `order.taxation.order_vat_lines`, which reads `item.vat_rate`. Editing
@@ -581,11 +578,21 @@ those when a line is edited, so no admin surface edits one:
   (`max_num = 0`, `can_delete = False`). `OrderItemAdmin` shows the product,
   quantity, price and the restock counters read-only, and offers neither add
   nor delete; staff can still annotate a line and correct its VAT rate (§3.5).
-  The admin has no "Add order" (`OrderAdmin.has_add_permission`): an order is
-  placed by checkout, which prices it, takes the stock, reserves the
-  discounts and writes the VAT lines. The one change made to a line after
-  checkout is a restock (`OrderItem.refund`, the order's "Restock returned
-  items" action).
+  The admin has no "Add order" (`OrderAdmin.has_add_permission`), and an
+  order's amounts are read-only on its form (`shipping_price`, `amount_due`,
+  like the discounts and the gift-card amount; `payment_method_fee` is not on
+  the form): an order is placed by checkout, which prices it, takes the
+  stock, reserves the discounts and writes the VAT lines, and nothing
+  recomputes any of that when one number is edited. The one change made to a
+  line after checkout is a restock (`OrderItem.refund`, the order's "Restock
+  returned items" action, or `POST order-items/<id>/restock`).
+- **The API.** `order-items` is read-only: `GET` list and detail and the
+  staff restock remain; `POST`, `PUT`, `PATCH` and `DELETE` are gone (they
+  could swap a line's product or change its quantity, leaving the snapshot,
+  `amount_due`, the VAT lines and the stock apart). Nothing called them (the
+  storefront, the gateway, the admin and the infrastructure scripts were
+  searched); the removal is accepted in `api-contract/ignore.txt` until the
+  storefront regenerates its types.
 - **The snapshot.** `OrderItem.product_name` (the product's name in the
   ORDER's language, `Order.language_code`, else any language it has one in)
   and `OrderItem.sku` are written when the line is created, like `vat_rate`
@@ -605,11 +612,14 @@ those when a line is edited, so no admin surface edits one:
   `manage.py backfill_line_snapshots --all-tenants` (the same idempotent SQL,
   `order/line_snapshot.py`) covers the lines the previous release creates
   while it still serves the rollout, whose INSERTs leave the columns at `''`.
-  Run it once after the rollout.
-- **Not closed here.** The staff API (`POST/PUT/PATCH/DELETE order-items`)
-  can still change a line, and its quantity change still moves stock through
-  `handle_order_item_post_save`. Removing those routes is an API removal and
-  ships storefront first (`api-contract/README.md`).
+  Run it **immediately after the rollout**, once per deploy that ships the
+  columns: until it has run, a confirmation, payment or shipping email for
+  a line the previous release wrote (an order placed in the rollout window)
+  prints a blank product name, and its invoice a blank name and SKU. There
+  is no fallback to the live product: the gap is closed by the command,
+  never by reading the product again. The name is chosen as a new line
+  chooses it (`product_name_for`): the order's language, then the next
+  language of its parler fallback chain, then any language the product has.
 
 ## 4. Payment paths
 
@@ -1917,7 +1927,7 @@ Every path ends in `PaymentLedger.record_refund` (§7.3), so there is one rule f
 
 Everything else is read from the sums: `PaymentLedger.captured` (money received: CHARGE and COD_COLLECTION), `refunded` (REFUND, by a provider or by the merchant, less REFUND_REVERSAL), `charged_back` (CHARGEBACK), `fully_returned` (refunded plus charged back covers captured, what the loyalty reversal asks), `refundable` (per payment, collected cash included, less what a chargeback took and what live refund attempts hold), and **`refund_status(order)`, the one function that decides REFUNDED versus PARTIALLY_REFUNDED** (refunded plus charged back ≥ captured; chargebacks count, so a chargeback before the last refund no longer leaves the order PARTIALLY_REFUNDED with nothing refundable and the gift card unreleased; and COMPLETED again when every refund was reversed). `record_refund` writes the derived status onto the order in the same step as the row, so no path decides it for itself and it cannot go backwards. `payment_status` stays a column (every filter, serializer and guard reads it); the ledger is what it is derived from after a refund.
 
-**An order paid twice is flagged, never silently booked** (`PaymentLedger.sync_overcharge`, called by `_record` for every new row, under the order lock). `Order.overcharged_at` is set while `held` (captured, less refunded, less charged back) exceeds `amount_due` (the order's total when none was fixed) by more than `PAYMENT_AMOUNT_TOLERANCE`, and cleared when a refund, a reversal or a chargeback changes the sums so it no longer does. On the change from clear to set it logs ERROR, notes the order and sends `ops.overcharged` once; a row the provider redelivers is not new and never reaches it, and a figure that stays over changes nothing. Both CHARGE rows stay (the money moved), the order keeps its FIRST `payment_id` (Viva `_handle_payment_created` and Stripe `checkout.session.completed` stop after booking a second payment on an order another one already paid, so there is no second confirmation email either), and nothing is refunded automatically: which payment to give back is a person's call. A partial refund of a normal order never flags; a charge on a canceled order is `ops.payment_after_cancel`'s case (it equals the amount due). Staff see it as the "Orders paid twice" dashboard row, the order list filter `?overcharged=yes` and the read-only `Overcharged at` field. `payment_intent.succeeded` finds the order by `payment_id`; an intent the order no longer names (a second tab, or an older one paid after a retry opened a newer intent) is found by the binding metadata the server wrote on it (`OrderService._bound_order_uuid`: purpose `order`, this order's uuid, this tenant, checked by `binding_mismatch`), so it is booked and flagged like any second payment, and the first `payment_id` is kept. A payment-first intent is bound to a cart (its order may not exist yet) and "not found" stays the answer for it.
+**An order paid twice is flagged, never silently booked** (`PaymentLedger.sync_overcharge`, called by `_record` for every new row, under the order lock). `Order.overcharged_at` is set while `held` (captured, less refunded, less charged back) exceeds what the order is for (`calculate_order_total_amount()`, the one figure every payment path charges and compares a capture with; not the `amount_due` copy, which an order from the previous release can carry as 0) by more than `PAYMENT_AMOUNT_TOLERANCE`, and cleared when a refund, a reversal or a chargeback changes the sums so it no longer does. On the change from clear to set it logs ERROR, notes the order and sends `ops.overcharged` once; a row the provider redelivers is not new and never reaches it, and a figure that stays over changes nothing. Both CHARGE rows stay (the money moved), the order keeps its FIRST `payment_id` (Viva `_handle_payment_created` and Stripe `checkout.session.completed` stop after booking a second payment on an order another one already paid, so there is no second confirmation email either), and nothing is refunded automatically: which payment to give back is a person's call. A partial refund of a normal order never flags; a charge on a canceled order is `ops.payment_after_cancel`'s case (it equals the amount due). Staff see it as the "Orders paid twice" dashboard row, the order list filter `?overcharged=yes` and the read-only `Overcharged at` field. `payment_intent.succeeded` finds the order by `payment_id`; an intent the order no longer names (a second tab, or an older one paid after a retry opened a newer intent) is found by the binding metadata the server wrote on it (`OrderService._bound_order_uuid`: purpose `order`, this order's uuid, this tenant, checked by `binding_mismatch`), so it is booked and flagged like any second payment, and the first `payment_id` is kept. A payment-first intent is bound to a cart (its order may not exist yet) and "not found" stays the answer for it. The refund, failed-refund and dispute events (`charge.refunded`, `refund.failed`, `charge.dispute.created`, `charge.dispute.closed`) find the order through the ledger's Stripe CHARGE row for the intent (`_locked_order_for_stripe_intent`), not `payment_id`, so an event on the second intent reaches the ledger and moves the flag; an order whose capture the ledger never recorded (paid while the previous release served) has no row and is found by `payment_id`.
 
 **What the customer owes is not what was collected.** `Order.amount_due` (`amountDue` in the API) is what the order costs the customer: `calculate_order_total_amount()` (lines and extras, less promotion, loyalty and gift card), written at creation and again where a deduction changes (the standalone loyalty redemption). It says nothing about money collected, which is the ledger's CHARGE and COD_COLLECTION rows.
 

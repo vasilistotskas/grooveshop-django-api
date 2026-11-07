@@ -1,4 +1,3 @@
-from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -8,16 +7,12 @@ from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from b2b.factories import CustomerGroupFactory
-from b2b.services import B2BPricingService
 from order.enum.status import (
     RETURN_HANDLING_STATUSES,
     OrderStatus,
     PaymentStatus,
 )
 from order.factories.order import OrderFactory
-from order.models.item import OrderItem
-from order.models.order import Order
 from order.models.stock_log import StockLog
 from order.serializers.item import (
     OrderItemDetailSerializer,
@@ -139,28 +134,6 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_create_valid(self):
-        self.client.force_authenticate(user=self.staff)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.other_product.id,
-            "quantity": 3,
-            "notes": "Test item creation",
-        }
-
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        item = OrderItem.objects.get(pk=response.data["id"])
-        self.assertEqual(item.order_id, self.order.id)
-        # VAT-inclusive, like every checkout line.
-        self.assertEqual(item.price, self.other_product.final_price)
-        # The line is sold at the VAT its product carries right now.
-        self.assertEqual(item.vat_rate, self.other_product.vat_percent)
-
     def _wholesale_order(self, group_id: int):
         order = OrderFactory(
             num_order_items=0, user=self.user, pay_way=self.pay_way
@@ -171,352 +144,6 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         }
         order.save(update_fields=["metadata"])
         return order
-
-    def test_create_on_a_wholesale_order_uses_the_group_that_priced_it(self):
-        group = CustomerGroupFactory(discount_percent=Decimal("10.00"))
-        order = self._wholesale_order(group.pk)
-        # No retail discount: the group price is capped at the retail
-        # final price, so a discounted product could price both the same.
-        product = ProductFactory(
-            active=True,
-            num_images=0,
-            num_reviews=0,
-            stock=5,
-            discount_percent=Decimal(0),
-        )
-        self.client.force_authenticate(user=self.staff)
-
-        response = self.client.post(
-            self.get_order_item_list_url(),
-            {"order": order.id, "product": product.id, "quantity": 1},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        item = OrderItem.objects.get(pk=response.data["id"])
-        expected = B2BPricingService.resolve_single(product, group).final
-        self.assertEqual(item.price, expected)
-        self.assertLess(item.price, product.final_price)
-
-    def test_create_on_a_wholesale_order_whose_group_is_gone_is_refused(self):
-        group = CustomerGroupFactory()
-        order = self._wholesale_order(group.pk)
-        group.delete()
-        self.client.force_authenticate(user=self.staff)
-
-        response = self.client.post(
-            self.get_order_item_list_url(),
-            {
-                "order": order.id,
-                "product": self.other_product.id,
-                "quantity": 1,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("order", response.data)
-        self.assertFalse(OrderItem.objects.filter(order=order).exists())
-
-    def test_create_forbidden_for_owner(self):
-        # Order lines are written by store staff, not by the order's owner.
-        self.client.force_authenticate(user=self.user)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.other_product.id,
-            "quantity": 3,
-            "notes": "Owner attempt",
-        }
-
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self.order.items.count(), 1)
-
-    def test_create_uses_correct_serializer(self):
-        self.client.force_authenticate(user=self.staff)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 1,
-            "notes": "Test serializer validation",
-        }
-
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_create_forbidden_on_foreign_order(self):
-        # A customer must not be able to attach items to another's order.
-        self.client.force_authenticate(user=self.other_user)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 1,
-        }
-
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertFalse(
-            OrderItem.objects.filter(
-                order=self.order, product=self.product, quantity=1
-            ).exists()
-        )
-
-    def test_update_cannot_reassign_to_foreign_order(self):
-        # The item's owner must not be able to move it into another user's
-        # order via update, `order` being a writable FK.
-        self.client.force_authenticate(user=self.user)
-
-        payload = {
-            "order": self.other_order.id,
-            "product": self.product.id,
-            "quantity": 1,
-        }
-        response = self.client.put(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.order_id, self.order.id)
-
-    def test_update_valid_for_store_staff(self):
-        self.client.force_authenticate(user=self.staff)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 4,
-            "notes": "Updated notes",
-        }
-
-        response = self.client.put(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.quantity, 4)
-        self.assertEqual(self.order_item.notes, "Updated notes")
-
-    def test_update_forbidden_for_owner(self):
-        # self.user owns self.order_item and may read it, not rewrite it.
-        self.client.force_authenticate(user=self.user)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 4,
-            "notes": "Updated notes",
-        }
-
-        response = self.client.put(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.quantity, 2)
-        self.assertNotEqual(self.order_item.notes, "Updated notes")
-
-    def test_update_forbidden_for_non_owner(self):
-        # other_user does not own self.order_item — expect 403/404
-        self.client.force_authenticate(user=self.other_user)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 4,
-            "notes": "Should not update",
-        }
-
-        response = self.client.put(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
-        )
-
-    def test_partial_update_valid_for_store_staff(self):
-        self.client.force_authenticate(user=self.staff)
-
-        payload = {"notes": "Partially updated notes"}
-
-        response = self.client.patch(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.notes, "Partially updated notes")
-
-    def test_partial_update_forbidden_for_owner(self):
-        self.client.force_authenticate(user=self.user)
-
-        payload = {"quantity": 1}
-
-        response = self.client.patch(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.quantity, 2)
-
-    def test_partial_update_forbidden_for_non_owner(self):
-        # other_user does not own self.order_item — expect 403/404
-        self.client.force_authenticate(user=self.other_user)
-
-        payload = {"notes": "Should not update"}
-
-        response = self.client.patch(
-            self.get_order_item_detail_url(self.order_item.id),
-            payload,
-            format="json",
-        )
-
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
-        )
-
-    def test_delete_valid(self):
-        # An ADMIN-role store operator can delete any order item
-        self.client.force_authenticate(user=self.admin_user)
-
-        response = self.client.delete(
-            self.get_order_item_detail_url(self.other_order_item.id)
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            OrderItem.objects.filter(pk=self.other_order_item.pk).exists()
-        )
-
-    def test_delete_forbidden_for_owner(self):
-        self.client.force_authenticate(user=self.user)
-
-        response = self.client.delete(
-            self.get_order_item_detail_url(self.order_item.id)
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertTrue(
-            OrderItem.objects.filter(pk=self.order_item.pk).exists()
-        )
-
-    def test_delete_forbidden_for_staff_role(self):
-        # DELETE maps to ``delete_orderitem``, which STAFF deliberately
-        # does not hold ("delete is the irreversible action",
-        # tenant.role_scopes); ADMIN and OWNER do.
-        self.client.force_authenticate(user=self.staff)
-
-        response = self.client.delete(
-            self.get_order_item_detail_url(self.order_item.id)
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertTrue(
-            OrderItem.objects.filter(pk=self.order_item.pk).exists()
-        )
-
-    def test_writes_refused_for_is_staff_residue(self):
-        """``is_staff`` on a tenant-schema customer row is not a grant."""
-        residue = UserAccountFactory(is_staff=True)
-        self.client.force_authenticate(user=residue)
-
-        response = self.client.post(
-            self.get_order_item_list_url(),
-            {
-                "order": self.order.id,
-                "product": self.other_product.id,
-                "quantity": 1,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_owner_writes_refused_at_every_order_status(self):
-        # Nothing about an order's status turns its owner into someone who
-        # may rewrite its lines, while reading them keeps working.
-        self.client.force_authenticate(user=self.user)
-        detail_url = self.get_order_item_detail_url(self.order_item.id)
-
-        for order_status in OrderStatus:
-            with self.subTest(order_status=order_status.value):
-                Order.objects.filter(pk=self.order.pk).update(
-                    status=order_status.value
-                )
-
-                self.assertEqual(
-                    self.client.get(detail_url).status_code,
-                    status.HTTP_200_OK,
-                )
-                self.assertEqual(
-                    self.client.post(
-                        self.get_order_item_list_url(),
-                        {
-                            "order": self.order.id,
-                            "product": self.other_product.id,
-                            "quantity": 1,
-                        },
-                        format="json",
-                    ).status_code,
-                    status.HTTP_403_FORBIDDEN,
-                )
-                self.assertEqual(
-                    self.client.patch(
-                        detail_url, {"quantity": 1}, format="json"
-                    ).status_code,
-                    status.HTTP_403_FORBIDDEN,
-                )
-                self.assertEqual(
-                    self.client.delete(detail_url).status_code,
-                    status.HTTP_403_FORBIDDEN,
-                )
-
-        self.order_item.refresh_from_db()
-        self.assertEqual(self.order_item.quantity, 2)
-        self.assertEqual(self.order.items.count(), 1)
-
-    def test_unauthenticated_write_denied(self):
-        response = self.client.post(
-            self.get_order_item_list_url(),
-            {
-                "order": self.order.id,
-                "product": self.product.id,
-                "quantity": 1,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_user_can_only_access_own_order_items(self):
         self.client.force_authenticate(user=self.user)
@@ -612,35 +239,24 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
 
-    def test_validation_errors(self):
-        self.client.force_authenticate(user=self.admin_user)
+    def test_the_write_routes_are_gone(self):
+        """A line is a record of what was sold: nothing edits it through the
+        API (a restock is the one change, ``order-items/<id>/restock``)."""
+        self.client.force_authenticate(user=self.staff)
+        detail = self.get_order_item_detail_url(self.order_item.pk)
+        listing = self.get_order_item_list_url()
 
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": -1,
-        }
+        for method, url in (
+            ("post", listing),
+            ("put", detail),
+            ("patch", detail),
+            ("delete", detail),
+        ):
+            response = getattr(self.client, method)(url, {}, format="json")
+            assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_stock_validation(self):
-        self.client.force_authenticate(user=self.admin_user)
-
-        payload = {
-            "order": self.order.id,
-            "product": self.product.id,
-            "quantity": 1000,
-        }
-
-        response = self.client.post(
-            self.get_order_item_list_url(), payload, format="json"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.order_item.refresh_from_db()
+        assert self.order_item.quantity == 2
 
 
 @pytest.mark.assert_english

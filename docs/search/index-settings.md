@@ -53,8 +53,9 @@ engine until the field is added to `filterable_fields`.
 The product index searches, in this order (the `attribute` ranking rule
 prefers a match in an earlier field): `sku`, `gtin`, `mpn`, `name`, `brand_name`,
 `category_name`, `description`, the attribute names, then the attribute values.
-Each text field except `description` and the codes carries its Greeklish
-shadows (`docs/search/greeklish.md`). A code sits first because a shopper who
+Each text field except the codes carries its Greeklish shadows
+(`docs/search/greeklish.md`); `description` has the `_greeklish` and `_alt`
+shadows but no `_variants` bag, which exists only for short fields. A code sits first because a shopper who
 types one means that product; `brand_name` and `category_name` sit above the
 description because a name in the title of a department is a stronger signal
 than the same word in prose.
@@ -68,7 +69,8 @@ The brand name is not translated (`Brand.name`); the category name is read in
 the document's language. Renaming a brand, category, attribute or attribute
 value reindexes its products: `product.signals._watch_search_text` queues
 `product.tasks.reindex_products_for_search_text`, which finds the products and
-queues one document each. Only a changed name or value queues it.
+queues one document each. Only a changed name or value queues it; deleting a translation, a brand or a
+category (with its child categories) queues the affected products too.
 
 After a deploy that changes these settings, `meilisearch_apply_settings
 --all-tenants` runs as part of the release and adds the new fields to every

@@ -8,17 +8,23 @@ old name until the nightly full sync.
 
 from __future__ import annotations
 
+import gc
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from django.conf import settings
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.test import override_settings
 
+from product.enum.search_text import SearchTextSource
 from product.factories.attribute import AttributeFactory
 from product.factories.attribute_value import AttributeValueFactory
 from product.factories.brand import BrandFactory
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
+from product.models.product import ProductTranslation
+from product.signals import _watch_search_text
 
 TASK = "product.tasks.reindex_products_for_search_text.apply_async"
 
@@ -229,3 +235,91 @@ def test_deleting_a_brand_reindexes_its_products_without_it(
     )
     branded.refresh_from_db()
     assert branded.brand_id is None
+
+
+def live_receiver_names(signal, model):
+    sync, asynchronous = signal._live_receivers(model)
+    return {receiver.__name__ for receiver in [*sync, *asynchronous]}
+
+
+@override_settings(DEBUG=False)
+def test_the_receivers_outlive_garbage_collection():
+    # They are closures: connected weakly they are collected as soon as
+    # the function that made them returns. Django keeps a strong reference
+    # to every receiver it connects while DEBUG is on (its signature
+    # cache), and DEBUG is on when the real receivers are connected under
+    # test, so this connects a fresh set the way production does.
+    sender = type(
+        "Watched", (), {"_meta": SimpleNamespace(label_lower="test.watched")}
+    )
+
+    _watch_search_text(sender, SearchTextSource.BRAND, "name", translated=True)
+    gc.collect()
+    try:
+        assert "remember_text" in live_receiver_names(pre_save, sender)
+        assert "reindex_after_save" in live_receiver_names(post_save, sender)
+        assert "reindex_after_delete" in live_receiver_names(
+            post_delete, sender
+        )
+    finally:
+        for signal, suffix in (
+            (pre_save, "before"),
+            (post_save, "saved"),
+            (post_delete, "deleted"),
+        ):
+            signal.disconnect(
+                sender=sender,
+                dispatch_uid=f"product.search_text.test.watched.{suffix}",
+            )
+
+
+@pytest.mark.django_db
+def test_deleting_a_category_reindexes_the_products_of_its_children(
+    django_capture_on_commit_callbacks,
+):
+    parent = ProductCategoryFactory()
+    child = ProductCategoryFactory(parent=parent)
+    in_parent = ProductFactory(category=parent)
+    in_child = ProductFactory(category=child)
+    ProductFactory(category=ProductCategoryFactory())
+
+    with (
+        online(),
+        patch("meili.tasks.index_document_task.apply_async") as index,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        parent.delete()
+
+    dispatched_pks = {
+        call.kwargs["kwargs"]["pk"] for call in index.call_args_list
+    }
+    assert dispatched_pks == set(
+        ProductTranslation.objects.filter(
+            master__in=[in_parent, in_child]
+        ).values_list("pk", flat=True)
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("factory", "source"),
+    [
+        (ProductCategoryFactory, "category"),
+        (AttributeFactory, "attribute"),
+        (AttributeValueFactory, "attribute_value"),
+    ],
+)
+def test_deleting_a_translation_reindexes_the_products(
+    factory, source, django_capture_on_commit_callbacks
+):
+    row = factory()
+    translation = row.translations.first()
+
+    with (
+        online(),
+        patch(TASK) as task,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        translation.delete()
+
+    assert dispatched(task) == [{"source": source, "pk": row.pk}]

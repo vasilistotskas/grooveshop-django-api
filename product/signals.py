@@ -502,19 +502,25 @@ def sync_prices_on_vat_delete(sender, instance, **kwargs):
         )
 
 
-def _watch_search_text(sender, source: SearchTextSource, field: str) -> None:
+def _watch_search_text(
+    sender, source: SearchTextSource, field: str, *, translated: bool
+) -> None:
     """Reindex a row's products when its ``field`` changes.
 
     The product document carries this text, but the row is saved on its
     own, so ``Product``'s receivers never run. Only a changed value
     queues work: a category edited for its description would otherwise
-    reindex every product in it. A translation added to a row that has
-    products changes the text of that language's documents; a brand
-    created just now has none.
+    reindex every product in it. A translation added to or removed from a
+    row that has products changes the text of that language's documents;
+    a brand created just now has none.
+
+    The receivers are closures, so they are connected with ``weak=False``:
+    a weak reference to a function that goes out of scope when this
+    returns is collected, and the signal silently loses it (``DEBUG``
+    keeps them alive through a cache, which hides it in development).
     """
     uid = f"product.search_text.{sender._meta.label_lower}"
 
-    @receiver(pre_save, sender=sender, dispatch_uid=f"{uid}.before")
     def remember_text(sender, instance, **kwargs):
         instance._search_text_before = (
             sender._base_manager.filter(pk=instance.pk)
@@ -524,13 +530,7 @@ def _watch_search_text(sender, source: SearchTextSource, field: str) -> None:
             else None
         )
 
-    @receiver(post_save, sender=sender, dispatch_uid=f"{uid}.saved")
-    def reindex_after_save(sender, instance, created, **kwargs):
-        owner_id = getattr(instance, "master_id", None)
-        if created and owner_id is None:
-            return
-        if instance._search_text_before == getattr(instance, field):
-            return
+    def queue(instance) -> None:
         if settings.MEILISEARCH.get("OFFLINE", False):
             return
 
@@ -538,21 +538,61 @@ def _watch_search_text(sender, source: SearchTextSource, field: str) -> None:
 
         dispatch_on_commit(
             reindex_products_for_search_text,
-            kwargs={"source": source.value, "pk": owner_id or instance.pk},
+            kwargs={
+                "source": source.value,
+                "pk": getattr(instance, "master_id", None) or instance.pk,
+            },
+        )
+
+    def reindex_after_save(sender, instance, created, **kwargs):
+        if created and not translated:
+            return
+        if instance._search_text_before == getattr(instance, field):
+            return
+        queue(instance)
+
+    def reindex_after_delete(sender, instance, **kwargs):
+        queue(instance)
+
+    pre_save.connect(
+        remember_text,
+        sender=sender,
+        dispatch_uid=f"{uid}.before",
+        weak=False,
+    )
+    post_save.connect(
+        reindex_after_save,
+        sender=sender,
+        dispatch_uid=f"{uid}.saved",
+        weak=False,
+    )
+    if translated:
+        post_delete.connect(
+            reindex_after_delete,
+            sender=sender,
+            dispatch_uid=f"{uid}.deleted",
+            weak=False,
         )
 
 
-_watch_search_text(Brand, SearchTextSource.BRAND, "name")
+_watch_search_text(Brand, SearchTextSource.BRAND, "name", translated=False)
 _watch_search_text(
-    ProductCategory._parler_meta.root_model, SearchTextSource.CATEGORY, "name"
+    ProductCategory._parler_meta.root_model,
+    SearchTextSource.CATEGORY,
+    "name",
+    translated=True,
 )
 _watch_search_text(
-    Attribute._parler_meta.root_model, SearchTextSource.ATTRIBUTE, "name"
+    Attribute._parler_meta.root_model,
+    SearchTextSource.ATTRIBUTE,
+    "name",
+    translated=True,
 )
 _watch_search_text(
     AttributeValue._parler_meta.root_model,
     SearchTextSource.ATTRIBUTE_VALUE,
     "value",
+    translated=True,
 )
 
 
@@ -572,4 +612,24 @@ def reindex_products_of_deleted_brand(sender, instance, **kwargs):
     """
     reindex_products_by_pk(
         Product.objects.filter(brand=instance).values_list("pk", flat=True)
+    )
+
+
+@receiver(
+    pre_delete,
+    sender=ProductCategory,
+    dispatch_uid="product.search_text.reindex_products_of_deleted_category",
+)
+def reindex_products_of_deleted_category(sender, instance, **kwargs):
+    """Reindex the products of a deleted category and all its children.
+
+    ``Product.category`` is ``SET_NULL`` (one UPDATE, no signal) and the
+    child categories CASCADE, so every product in the subtree loses its
+    category. They are collected before the delete, while the subtree
+    exists.
+    """
+    reindex_products_by_pk(
+        Product.objects.filter(
+            category__in=instance.get_descendants(include_self=True)
+        ).values_list("pk", flat=True)
     )

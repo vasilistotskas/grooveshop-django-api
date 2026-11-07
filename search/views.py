@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -29,7 +28,6 @@ from core.api.permissions import IsStoreStaff
 from core.api.query_params import parse_int_csv
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
-from core.retry import TRANSIENT_NETWORK_ERRORS
 from core.store_settings import store_setting
 from product.attribute_selection import (
     ATTRIBUTE_VALUES_FIELD,
@@ -48,13 +46,12 @@ from search.serializers import (
     SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
+from tenant.celery import publish_or_drop
 from tenant.features import feature_on
 from tenant.permissions import IsBlogEnabled, IsCatalogueEnabled
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
-
-logger = logging.getLogger(__name__)
 
 _VALID_LANGUAGE_CODES = frozenset(
     code for code, _name in django_settings.LANGUAGES
@@ -828,19 +825,13 @@ def search_click(request):
 
     from search.tasks import save_search_click
 
-    # An analytics beacon: when the broker is down the click is dropped
-    # and logged, like `SearchAnalyticsMiddleware` drops a query. It is
-    # not a `DeferredDispatch` row on purpose: this endpoint is open to
-    # anonymous traffic, and every beacon in an outage would be a row.
-    try:
-        save_search_click.delay(
-            query_uuid=str(data["query_id"]),
-            result_id=str(data["result_id"]),
-            result_type=data["result_type"],
-            position=data["position"],
-        )
-    except TRANSIENT_NETWORK_ERRORS:
-        logger.exception("Search click dropped: the broker is unreachable")
+    publish_or_drop(
+        save_search_click,
+        query_uuid=str(data["query_id"]),
+        result_id=str(data["result_id"]),
+        result_type=data["result_type"],
+        position=data["position"],
+    )
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 

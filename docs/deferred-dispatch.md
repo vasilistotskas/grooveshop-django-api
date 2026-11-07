@@ -54,13 +54,15 @@ voucher / shipment reissue. A hook that runs inside another `on_commit` hook
 handed the schema registered with the change and passes it as `schema_name=`,
 because the connection no longer says which store it was.
 
-Two things stay a bare publish on purpose:
+Two things keep no row, on purpose:
 
-- **Analytics beacons** (`search_click`, `recommendation_event`; the search
-  middleware drops a query the same way). They are open to anonymous traffic,
-  so a row per beacon in an outage would turn that traffic into database
-  rows. A broker failure is caught (`TRANSIENT_NETWORK_ERRORS`), logged and
-  answered as accepted; the event is dropped.
+- **Analytics beacons** (`search_click`, `recommendation_event`, and the query
+  `SearchAnalyticsMiddleware` records) go through
+  `tenant.celery.publish_or_drop`. They are open to anonymous traffic, so a row
+  per beacon in an outage would turn that traffic into database rows. The
+  request is answered as usual and the event is dropped. They share the window
+  above, so a visitor does not wait for a broker known to be down, and only the
+  failure that opens it is logged.
 - **Publishes that are their own repair or have nothing to keep**: a webhook
   whose redelivery is the repair (BoxNow, Resend), a staff click that
   committed nothing (an error answers the click, and a destructive action
@@ -77,11 +79,11 @@ than `DEFERRED_DISPATCH_RETENTION_DAYS` is dropped with an `ERROR`, which for a
 myDATA document is a filing that did not happen: that log line is what to act
 on.
 
-A hook that must run only after a publish was handed over registers the
-publish through the helper first and its own `transaction.on_commit` second
-(`shipping_acs.services.AcsService._maybe_notify_arrival`: the publish, then
-the `arrival_notified_at` mark). The mark then never outlives a message that
-was neither sent nor kept.
+A step that must run only after a publish was handed over is the helper's
+`then` (`shipping_acs.services.AcsService._maybe_notify_arrival` passes the
+`arrival_notified_at` mark). It runs once the task is published or its row is
+written, and not when the row could not be written either, so the mark never
+outlives a message that was neither sent nor kept.
 
 ## What the table cannot see
 

@@ -150,10 +150,10 @@ def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
 
     `dispatch_on_commit` turns a `kombu` `OperationalError` into a
     `DeferredDispatch` row that the sweep publishes again, so the
-    notification is owed and will go out. The mark is the second hook: it
-    stops the next depot cycle from queueing a second notification while
-    the first waits in the table. (A bare `OSError`, which the helper does
-    not catch, would be a bug and still reaches the poller.)
+    notification is owed and will go out. The mark stops the next depot
+    cycle from queueing a second notification while the first waits in the
+    table. (A bare `OSError`, which the helper does not catch, would be a
+    bug and still reaches the poller.)
     """
     monkeypatch.setattr(
         services, "AcsClient", _client_returning(["4", "3", "4"])
@@ -186,6 +186,27 @@ def test_a_failed_broker_handoff_is_kept_and_marked_not_sent_twice(
 
     notify.assert_not_called()
     assert DeferredDispatch.objects.count() == 1
+
+
+def test_a_notification_neither_sent_nor_kept_is_not_marked(
+    shipment, monkeypatch
+):
+    """The mark says it is owed: nothing owes it when no row was written."""
+    monkeypatch.setattr(services, "AcsClient", _client_returning(["4"]))
+
+    with (
+        patch(
+            "shipping_acs.tasks.acs_send_arrival_notification.apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ),
+        patch.object(
+            DeferredDispatch.objects, "create", side_effect=RuntimeError
+        ),
+    ):
+        AcsService.poll_shipment_tracking(shipment)
+
+    shipment.refresh_from_db()
+    assert shipment.arrival_notified_at is None
 
 
 def test_a_publish_bug_still_reaches_the_poller_and_marks_nothing(

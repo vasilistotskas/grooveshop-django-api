@@ -243,9 +243,25 @@ class TestEvents:
         assert not DeferredDispatch.objects.exists()
         assert not RecommendationEvent.objects.exists()
         assert any(
-            "Recommendation event dropped" in r.getMessage()
+            f"Dropped {record_recommendation_event.name}" in r.getMessage()
             for r in caplog.records
         )
+
+    def test_in_an_outage_the_next_event_does_not_wait_for_the_broker(
+        self, client
+    ):
+        with patch.object(
+            record_recommendation_event,
+            "apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ) as publish:
+            for _ in range(2):
+                response = client.post(
+                    self.url, self._payload(_product()), format="json"
+                )
+                assert response.status_code == status.HTTP_202_ACCEPTED
+
+        publish.assert_called_once()
 
     def test_a_bug_in_the_publish_is_not_swallowed(self, client):
         with (

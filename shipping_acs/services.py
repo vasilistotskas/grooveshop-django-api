@@ -2797,18 +2797,19 @@ class AcsService:
         OUT_FOR_DELIVERY → AT_DESTINATION → OUT_FOR_DELIVERY and
         notified twice. Reproduced with exactly that sequence.
 
-        Two `on_commit` hooks, in this order: the publish
-        (`dispatch_on_commit`), then the mark. A rolled-back poll neither
-        sends nor marks. The mark is written once the publish has been
-        HANDED OVER, and a handed-over publish cannot be lost: when the
-        broker is unreachable `dispatch_on_commit` keeps it as a
+        The publish, then the mark, in one `on_commit` hook:
+        `dispatch_on_commit` runs the mark as its `then`, once the publish
+        has been HANDED OVER. A rolled-back poll neither sends nor marks.
+        When the broker is unreachable the publish is kept as a
         `DeferredDispatch` that `redispatch_deferred_tasks` publishes
         again, so the notification is owed and will be sent, and the mark
-        stops the next poll from queueing a second one. Marking BEFORE
-        the publish would be the permanent silent miss, because the mark
-        would outlive a message that never left. The remaining window is
-        a process killed between the two hooks, which risks at most ONE
-        duplicate (publish landed, mark did not), and
+        stops the next poll from queueing a second one. If the row cannot
+        be written either there is no mark: the payload is in the log line
+        and the parcel's next return to OUT_FOR_DELIVERY notifies. Marking
+        BEFORE the publish would be the permanent silent miss, because the
+        mark would outlive a message that never left. The remaining window
+        is a process killed between the publish and the mark, which risks
+        at most ONE duplicate (publish landed, mark did not), and
         `acs_send_arrival_notification` says outright that "both calls
         are idempotent enough for duplicate delivery to be acceptable".
         The bug being fixed here was SYSTEMATIC duplication on every
@@ -2827,17 +2828,18 @@ class AcsService:
         from shipping_acs.tasks import acs_send_arrival_notification
 
         shipment_pk = shipment.pk
-        # `dispatch_on_commit` pins the schema HERE, at registration: this
-        # runs under the per-tenant poll fanout, and an `on_commit` hook
-        # fires after the request's schema context can unwind.
-        dispatch_on_commit(acs_send_arrival_notification, [shipment_pk])
 
         def _mark_notified() -> None:
             AcsShipment.objects.filter(
                 pk=shipment_pk, arrival_notified_at__isnull=True
             ).update(arrival_notified_at=timezone.now())
 
-        transaction.on_commit(_mark_notified)
+        # `dispatch_on_commit` pins the schema HERE, at registration: this
+        # runs under the per-tenant poll fanout, and an `on_commit` hook
+        # fires after the request's schema context can unwind.
+        dispatch_on_commit(
+            acs_send_arrival_notification, [shipment_pk], then=_mark_notified
+        )
 
 
 # The ACS_COD_Beneficiary_Info columns that tell one payout row from

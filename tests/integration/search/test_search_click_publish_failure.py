@@ -2,8 +2,7 @@
 
 `search_click` is open to anonymous traffic, so it is NOT routed through
 `dispatch_on_commit`: every beacon in an outage would be a `DeferredDispatch`
-row. The broker failure is logged and the click is dropped, as
-`SearchAnalyticsMiddleware` drops a query.
+row. It goes through `publish_or_drop`, which drops it.
 """
 
 from __future__ import annotations
@@ -42,7 +41,25 @@ def test_a_broker_failure_drops_the_click_and_still_accepts(caplog):
 
     assert response.status_code == status.HTTP_202_ACCEPTED
     assert not DeferredDispatch.objects.exists()
-    assert any("Search click dropped" in r.getMessage() for r in caplog.records)
+    assert any(
+        f"Dropped {save_search_click.name}" in r.getMessage()
+        for r in caplog.records
+    )
+
+
+def test_in_an_outage_the_next_click_does_not_wait_for_the_broker():
+    with patch.object(
+        save_search_click,
+        "apply_async",
+        side_effect=OperationalError("broker unreachable"),
+    ) as publish:
+        for _ in range(2):
+            response = APIClient().post(
+                reverse("search-click"), PAYLOAD, format="json"
+            )
+            assert response.status_code == status.HTTP_202_ACCEPTED
+
+    publish.assert_called_once()
 
 
 def test_a_bug_in_the_publish_is_not_swallowed():

@@ -68,7 +68,7 @@ msgstr "%(chars)d χαρακτήρες, %(words)d λέξεις, %(lines)d γρα
 
 #, python-format
 msgid "%(client_name)s wants to access your %(site_name)s account."
-msgstr "Το %(client_name)s ζητά πρόσβαση στον λογαριασμό σας στο %(site_name)s."
+msgstr "Η εφαρμογή %(client_name)s θέλει πρόσβαση στο λογαριασμό σας %(site_name)s."
 
 #, python-format
 msgid "%(code)s on cart %(cart)s"
@@ -12813,6 +12813,9 @@ msgstr "Να μην εμφανίζεται τίποτα αντί για λιγό
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
 
+msgid "Sign In"
+msgstr "Είσοδος"
+
 msgid "Sign Out"
 msgstr "Αποσύνδεση"
 
@@ -12824,6 +12827,10 @@ msgstr "Κωδικός σύνδεσης"
 
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
+
+#, python-format
+msgid "Signed in as %(email)s"
+msgstr "Έχετε συνδεθεί ως %(email)s"
 
 msgid "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"
 msgstr "Προσημασμένο: θετικό προσθέτει υπόλοιπο (έκδοση/πίστωση επιστροφής), αρνητικό αφαιρεί (εξαργύρωση/λήξη)"
@@ -16237,8 +16244,8 @@ msgid ""
 "You are about to use your %(provider_name)s account to login to\n"
 "%(site_name)s. As a final step, please complete the following form:"
 msgstr ""
-"Πρόκειται να συνδεθείτε στο %(site_name)s με τον λογαριασμό σας στο\n"
-"%(provider_name)s. Ως τελευταίο βήμα, συμπληρώστε την παρακάτω φόρμα:"
+"Πρόκειται να χρησιμοποιήσετε τον %(provider_name)s λογαριασμό σας για να συνδεθείτε στην σελίδα\n"
+"%(site_name)s. Ως τελικό βήμα, παρακαλούμε συμπληρώστε την παρακάτω φόρμα:"
 
 msgid "You are already subscribed to the newsletter."
 msgstr "Είστε ήδη εγγεγραμμένος/η στο newsletter."

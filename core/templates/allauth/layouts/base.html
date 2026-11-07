@@ -30,6 +30,15 @@ the styles are the account-* components in tailwind/input.css.
                     {% endif %}
                 </a>
             </header>
+            {% comment %}Who is signed in, and the way out: on the OAuth consent a shopper must see which account an AI app gets, and be able to switch.{% endcomment %}
+            {% if user.is_authenticated %}
+                <p class="account-session">
+                    {% blocktranslate with email=user.email %}Signed in as {{ email }}{% endblocktranslate %}
+                    · <a href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
+                </p>
+            {% elif request.resolver_match.url_name != "account_login" %}
+                <p class="account-session"><a href="{% url 'account_login' %}">{% translate "Sign In" %}</a></p>
+            {% endif %}
             {% block nav %}{% endblock nav %}
             <main class="account-card">
                 {% if messages %}

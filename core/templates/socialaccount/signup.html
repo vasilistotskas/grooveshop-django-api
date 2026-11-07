@@ -1,13 +1,11 @@
 {% extends "socialaccount/base_entrance.html" %}
 {% load i18n %}
 {% load allauth %}
-{% load store_brand %}
-{% comment %}allauth's own page, naming the store instead of django.contrib.sites' SITE_ID site, which is one store for every store. The sentence is allauth's msgid, kept as is so its translations apply.{% endcomment %}
+{% comment %}allauth's own page, naming the store instead of django.contrib.sites' SITE_ID site, which is one store for every store. The sentence is allauth's msgid, kept as is so its translations apply. `brand` comes from the frame, allauth/layouts/base.html.{% endcomment %}
 {% block head_title %}
     {% trans "Signup" %}
 {% endblock head_title %}
 {% block content %}
-    {% store_brand as brand %}
     {% element h1 %}
         {% trans "Sign Up" %}
     {% endelement %}

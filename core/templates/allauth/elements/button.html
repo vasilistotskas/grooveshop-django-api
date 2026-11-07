@@ -1,13 +1,13 @@
 {% load allauth %}
 {% comment %} djlint:off {% endcomment %}
-{% comment %}allauth marks a button's role in its tags: "link" is a text link, "outline" or "secondary" a secondary button, anything else the store's primary button.{% endcomment %}
+{% comment %}allauth marks a button's role in its tags: "link" is a text link, "danger" a destructive action (remove, deactivate), "outline" or "secondary" a secondary button, anything else the store's primary button.{% endcomment %}
 <{% if attrs.href %}a href="{{ attrs.href }}"{% else %}button{% endif %}
 {% if attrs.form %}form="{{ attrs.form }}"{% endif %}
 {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
 {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
 {% if attrs.value %}value="{{ attrs.value }}"{% endif %}
 {% if attrs.type %}type="{{ attrs.type }}"{% endif %}
-class="account-btn {% if 'link' in attrs.tags %}account-btn-link{% elif 'outline' in attrs.tags or 'secondary' in attrs.tags %}account-btn-outline{% else %}account-btn-primary{% endif %}"
+class="account-btn {% if 'link' in attrs.tags %}account-btn-link{% elif 'danger' in attrs.tags %}account-btn-danger{% elif 'outline' in attrs.tags or 'secondary' in attrs.tags %}account-btn-outline{% else %}account-btn-primary{% endif %}"
 >
 {% slot %}
 {% endslot %}

@@ -220,6 +220,16 @@
   .account-btn-outline {
     @apply border border-base-300 bg-white text-base-800 hover:bg-base-50;
   }
+  .account-btn-danger {
+    @apply border border-red-300 bg-white text-red-700 hover:bg-red-50;
+  }
+  .account-session {
+    @apply mx-auto mb-4 max-w-md text-center text-sm text-base-600;
+  }
+  .account-session a {
+    color: var(--brand);
+    @apply font-medium underline-offset-2 hover:underline;
+  }
   .account-btn-link {
     color: var(--brand);
     @apply w-auto border-0 bg-transparent p-0 font-medium underline-offset-2 hover:underline;
@@ -267,12 +277,19 @@
     .account-alert {
       @apply border-base-700 bg-base-800 text-base-100;
     }
+    .account-btn-danger {
+      @apply border-red-800 bg-base-900 text-red-400 hover:bg-base-800;
+    }
+    .account-session {
+      @apply text-base-300;
+    }
     .account-card ul.errorlist li {
       @apply text-red-400;
     }
     /* A brand colour picked for a light page can be too dark to read on this one. */
     .account-card a:not(.account-btn),
-    .account-btn-link {
+    .account-btn-link,
+    .account-session a {
       color: color-mix(in srgb, var(--brand) 55%, white);
     }
   }

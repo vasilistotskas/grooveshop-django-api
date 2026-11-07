@@ -12806,6 +12806,9 @@ msgstr "Show nothing rather than fewer than this many suggestions."
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 
+msgid "Sign In"
+msgstr "Sign In"
+
 msgid "Sign Out"
 msgstr "Sign Out"
 
@@ -12817,6 +12820,10 @@ msgstr "Sign-in code"
 
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"
+
+#, python-format
+msgid "Signed in as %(email)s"
+msgstr "Signed in as %(email)s"
 
 msgid "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"
 msgstr "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"

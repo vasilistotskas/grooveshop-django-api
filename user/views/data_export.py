@@ -11,18 +11,53 @@ from __future__ import annotations
 import logging
 import os
 
-from django.http import FileResponse, Http404
+from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from user.models.data_export import UserDataExport
 from user.services.gdpr import get_export_location
 
 logger = logging.getLogger(__name__)
+
+
+class ExportExpired(APIException):
+    status_code = status.HTTP_410_GONE
+    default_detail = _("This download link has expired.")
+    default_code = "download_expired"
+
+
+def export_file_response(export: UserDataExport) -> FileResponse:
+    """The bundle of *export*, or the error that says why there is none."""
+    if not export.is_ready:
+        raise NotFound(_("Export not ready."), code="export_not_ready")
+
+    if export.expires_at and export.expires_at < timezone.now():
+        UserDataExport.objects.filter(pk=export.pk).update(
+            status=UserDataExport.Status.EXPIRED
+        )
+        raise ExportExpired
+
+    abs_path = os.path.join(get_export_location(), export.file_path)
+    if not os.path.exists(abs_path):
+        logger.error(
+            "Export %s is READY but file missing at %s",
+            export.pk,
+            abs_path,
+        )
+        raise NotFound(_("Export file missing."), code="export_file_missing")
+
+    return FileResponse(
+        open(abs_path, "rb"),
+        content_type="application/json",
+        as_attachment=True,
+        filename=f"data-export-{export.user_id}.json",
+    )
 
 
 class UserDataExportDownloadView(APIView):
@@ -48,37 +83,7 @@ class UserDataExportDownloadView(APIView):
                 token=token
             )
         except UserDataExport.DoesNotExist as e:
-            raise Http404(_("Export not found.")) from e
-
-        if not export.is_ready:
-            raise Http404(_("Export not ready."))
-
-        if export.expires_at and export.expires_at < timezone.now():
-            if export.status != UserDataExport.Status.EXPIRED:
-                UserDataExport.objects.filter(pk=export.pk).update(
-                    status=UserDataExport.Status.EXPIRED
-                )
-            return Response(
-                {
-                    "detail": _("This download link has expired."),
-                    "code": "download_expired",
-                },
-                status=410,
-            )
-
-        abs_path = os.path.join(get_export_location(), export.file_path)
-        if not os.path.exists(abs_path):
-            logger.error(
-                "Export %s is READY but file missing at %s",
-                export.pk,
-                abs_path,
-            )
-            raise Http404(_("Export file missing."))
-
-        response = FileResponse(
-            open(abs_path, "rb"),  # noqa: SIM115 — FileResponse owns the fh
-            content_type="application/json",
-            as_attachment=True,
-            filename=f"grooveshop-data-export-{export.user_id}.json",
-        )
-        return response
+            raise NotFound(
+                _("Export not found."), code="export_not_found"
+            ) from e
+        return export_file_response(export)

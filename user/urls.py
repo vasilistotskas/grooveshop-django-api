@@ -84,6 +84,11 @@ urlpatterns = [
         name="user-account-data-exports",
     ),
     path(
+        "user/account/<int:pk>/data_exports/<int:export_id>/download",
+        UserAccountViewSet.as_view({"get": "download_data_export"}),
+        name="user-account-download-data-export",
+    ),
+    path(
         "user/account/<int:pk>/request_data_export",
         UserAccountViewSet.as_view({"post": "request_data_export"}),
         name="user-account-request-data-export",

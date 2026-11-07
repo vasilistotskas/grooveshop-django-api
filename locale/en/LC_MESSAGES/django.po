@@ -4206,6 +4206,9 @@ msgstr "Download PDF"
 msgid "Download Token"
 msgstr "Download Token"
 
+msgid "Download a GDPR data export"
+msgstr "Download a GDPR data export"
+
 msgid "Download a GDPR data export bundle"
 msgstr "Download a GDPR data export bundle"
 
@@ -8857,6 +8860,9 @@ msgstr "No stores yet"
 msgid "No stores yet."
 msgstr "No stores yet."
 
+msgid "No such export, or it is not ready"
+msgstr "No such export, or it is not ready"
+
 msgid "No term recorded"
 msgstr "No term recorded"
 
@@ -13252,6 +13258,9 @@ msgstr "Streams the ACS label PDF through Django auth. Accessible by the order o
 msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 
+msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
+msgstr "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
+
 msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
 msgstr "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
 
@@ -13979,6 +13988,9 @@ msgstr "The exact consent sentence shown to the visitor."
 
 msgid "The exact email address of the person's existing platform account."
 msgstr "The exact email address of the person's existing platform account."
+
+msgid "The export has expired"
+msgstr "The export has expired"
 
 msgid "The failure's class and code; never the address."
 msgstr "The failure's class and code; never the address."

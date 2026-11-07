@@ -3,6 +3,53 @@
 
 
 
+## v3.231.4 (2026-11-07)
+
+### Bug fixes
+
+* fix(scheduler): drop django-celery-beat's tables and rows (#510) ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+### Refactoring
+
+* refactor(scheduler): drop django-celery-beat's tables and rows
+
+scheduler 0002 is the contract step of 0001 (contract_of): it drops the
+six django_celery_beat tables in public, and in every schema deletes the
+app's django_migrations rows, content types and permissions, with what
+points at them as Django's on_delete would (group and user permissions
+and tagged items deleted, admin log entries keep their text with no
+content type). The scheduler no longer adopts the old beat's last runs
+on start: nothing writes those tables any more.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+### Testing
+
+* test(scheduler): run the whole schedule through five simulated weeks
+
+A soak of a day or two never reaches the weekly and monthly entries. Run every
+entry production declares through the real scheduler, across a month boundary
+and the autumn clock change, and check each fired exactly when an independent
+reading of its crontab says, exactly once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+* test(scheduler): cover a store schema and pin the production schedule
+
+The cleanup of django-celery-beat's rows is now checked in a second
+schema as well as public, one without the permission link tables. The
+five-week simulation pins backups on and a Kubernetes pod, so it checks
+the entries production declares wherever it runs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
 ## v3.231.3 (2026-11-07)
 
 ### Bug fixes

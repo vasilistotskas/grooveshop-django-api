@@ -25,7 +25,6 @@ from typing import Any, override
 from celery.beat import ScheduleEntry, Scheduler, SchedulingError
 from celery.schedules import schedstate
 from django.db import DatabaseError, InterfaceError, close_old_connections
-from django.db import connection as db_connection
 
 from scheduler.models import PeriodicTask
 
@@ -104,7 +103,6 @@ class CodeOwnedScheduler(Scheduler):
             [PeriodicTask(name=name) for name in self._declared],
             ignore_conflicts=True,
         )
-        adopt_previous_scheduler_runs()
         self._apply_state()
 
     @override
@@ -217,30 +215,4 @@ class CodeOwnedScheduler(Scheduler):
                 else None,
                 total_run_count=row.total_run_count,
             )
-        )
-
-
-def adopt_previous_scheduler_runs() -> None:
-    """Take the last runs django-celery-beat saved up to its final moment.
-
-    The migration copied them while the old beat was still sending, and it has
-    only now stopped (``Recreate``), so a slot it sent since then would be sent
-    twice. Goes away with the old tables, in the release that drops them.
-    """
-    with db_connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT to_regclass('django_celery_beat_periodictask') IS NOT NULL"
-        )
-        if not cursor.fetchone()[0]:
-            return
-        cursor.execute(
-            """
-            UPDATE scheduler_periodictask AS new
-            SET last_run_at = GREATEST(new.last_run_at, old.last_run_at),
-                total_run_count = GREATEST(
-                    new.total_run_count, old.total_run_count
-                )
-            FROM django_celery_beat_periodictask AS old
-            WHERE old.name = new.name
-            """
         )

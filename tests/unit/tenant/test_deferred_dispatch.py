@@ -9,6 +9,7 @@ that was done. The dispatch is kept (``DeferredDispatch``) and
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from datetime import timedelta
 from unittest import mock
@@ -315,22 +316,8 @@ class TestTheSweep:
         assert "OperationalError" in first.last_error
         assert second.attempts == 0
         assert second.next_attempt_at <= timezone.now(), (
-            "a row the run never reached is due again, not held by the lease"
+            "a row the run never reached stays due for the next one"
         )
-
-    def test_a_second_sweep_during_a_run_takes_nothing(self):
-        deferred()
-        task = mock.Mock()
-        inner = []
-        task.apply_async.side_effect = lambda **_: inner.append(
-            redispatch_deferred_tasks()
-        )
-
-        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
-            outer = redispatch_deferred_tasks()
-
-        assert outer["published"] == 1
-        assert inner == [{"published": 0, "failed": 0, "expired": 0}]
 
     def test_a_task_nobody_knows_is_kept_with_the_reason(self):
         row = deferred("nobody.knows")
@@ -391,6 +378,24 @@ class TestTheSweep:
         assert "secret-link" not in caplog.text
 
 
+def in_another_session(work):
+    """Run *work* on a database connection of its own, as another worker
+    would: an advisory lock belongs to a session, and one session may take
+    its own lock again."""
+    done = []
+
+    def run():
+        try:
+            done.append(work())
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    thread.join()
+    return done[0]
+
+
 @pytest.mark.django_db(transaction=True)
 class TestAgainstARealCommit:
     def test_a_rolled_back_change_publishes_nothing_and_runs_nothing(self):
@@ -429,7 +434,28 @@ class TestAgainstARealCommit:
 
         assert in_transaction == [False]
 
-    def test_a_sweep_killed_half_way_sends_at_most_one_row_twice(self):
+    def test_a_sweep_started_while_another_is_publishing_takes_nothing(self):
+        # However long the first one's publish takes: it holds the lock until
+        # it ends, so nothing it read can go out a second time.
+        deferred()
+        deferred()
+        other = []
+        task = mock.Mock()
+
+        def publish(**_):
+            if not other:
+                other.append(in_another_session(redispatch_deferred_tasks))
+
+        task.apply_async.side_effect = publish
+
+        with mock.patch("tenant.tasks.celery_app.tasks.get", return_value=task):
+            first = redispatch_deferred_tasks()
+
+        assert other == [{"published": 0, "failed": 0, "expired": 0}]
+        assert first["published"] == 2
+        assert task.apply_async.call_count == 2
+
+    def test_a_sweep_that_dies_half_way_leaves_the_rest_and_the_lock(self):
         class Killed(BaseException):
             pass
 
@@ -446,7 +472,13 @@ class TestAgainstARealCommit:
         assert not DeferredDispatch.objects.filter(pk=first.pk).exists(), (
             "a row that went out stays gone, whatever happens to the run"
         )
-        second.refresh_from_db()
-        third.refresh_from_db()
-        assert second.next_attempt_at > timezone.now()
-        assert third.next_attempt_at > timezone.now()
+        healthy = mock.Mock()
+        with mock.patch(
+            "tenant.tasks.celery_app.tasks.get", return_value=healthy
+        ):
+            after = in_another_session(redispatch_deferred_tasks)
+
+        assert after["published"] == 2, "the lock went with the run"
+        assert not DeferredDispatch.objects.filter(
+            pk__in=[second.pk, third.pk]
+        ).exists()

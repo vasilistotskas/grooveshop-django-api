@@ -608,6 +608,10 @@ def send_staff_password_reset_email(
     return {"sent": sent}
 
 
+#: The advisory lock one sweep of deferred dispatches holds while it runs.
+_SWEEP_LOCK = "tenant.redispatch_deferred_tasks"
+
+
 @celery_app.task(base=MonitoredTask)
 def redispatch_deferred_tasks() -> dict[str, int]:
     """Publish again the tasks whose publish failed after their change
@@ -618,18 +622,41 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     row older than the retention is deleted with an ERROR, because the work it
     stood for was not done.
 
-    The publishes run outside any transaction. A broker that stops answering
-    can hold one for longer than ``idle_in_transaction_session_timeout``, and
-    losing the transaction would bring back every row already published, to
-    go out twice. So the rows are claimed first, in a short transaction that
-    moves ``next_attempt_at`` on by ``DEFERRED_DISPATCH_LEASE_SECONDS``: two
-    overlapping sweeps never publish one twice, and a sweep killed half way
-    publishes at most one row twice (out, not yet deleted). The rows it did
-    not reach come back when the lease ends.
+    One sweep runs at a time, and the publishes run outside any transaction.
+    A publish can wait without end: while RabbitMQ blocks publishers (a memory
+    or disk alarm) the producer waits for its confirm, and closing the channel
+    after a failed publish waits too. Measured against a broker with its
+    memory alarm on: still waiting after 75 s, with a publish timeout or
+    without. No lease is long enough for that, and a transaction would be
+    ended by ``idle_in_transaction_session_timeout``, so a sweep holds a
+    session-level advisory lock and a sweep that finds it held does nothing.
+    The lock goes with the session if the worker dies, and the next sweep
+    sends again at most the one row that was going out.
     """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_try_advisory_lock(hashtextextended(%s, 0))",
+            [_SWEEP_LOCK],
+        )
+        (held,) = cursor.fetchone()
+    if not held:
+        logger.info("A sweep of deferred dispatches is already running")
+        return {"published": 0, "failed": 0, "expired": 0}
+    try:
+        return _redispatch_due()
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
+                [_SWEEP_LOCK],
+            )
+
+
+def _redispatch_due() -> dict[str, int]:
     from datetime import timedelta
 
-    from django.db import transaction
     from django.utils import timezone
 
     from tenant.models import DeferredDispatch
@@ -639,19 +666,12 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     expired_before = now - timedelta(
         days=settings.DEFERRED_DISPATCH_RETENTION_DAYS
     )
-    with transaction.atomic():
-        due = list(
-            DeferredDispatch.objects.select_for_update(skip_locked=True)
-            .filter(next_attempt_at__lte=now)
-            .order_by("next_attempt_at", "id")[
-                : settings.DEFERRED_DISPATCH_BATCH
-            ]
-        )
-        DeferredDispatch.objects.filter(pk__in=[row.pk for row in due]).update(
-            next_attempt_at=now
-            + timedelta(seconds=settings.DEFERRED_DISPATCH_LEASE_SECONDS)
-        )
-    for position, row in enumerate(due):
+    due = list(
+        DeferredDispatch.objects.filter(next_attempt_at__lte=now).order_by(
+            "next_attempt_at", "id"
+        )[: settings.DEFERRED_DISPATCH_BATCH]
+    )
+    for row in due:
         task = celery_app.tasks.get(row.task_name)
         if row.created_at < expired_before:
             safe_args, safe_kwargs = safe_task_arguments(
@@ -695,11 +715,8 @@ def redispatch_deferred_tasks() -> dict[str, int]:
             )
             failed += 1
             if broker_down:
-                # Every other row would wait out the same timeout; they are
-                # due again for the next run.
-                DeferredDispatch.objects.filter(
-                    pk__in=[later.pk for later in due[position + 1 :]]
-                ).update(next_attempt_at=now)
+                # Every other row would wait out the same timeout; they stay
+                # due for the next run.
                 break
         else:
             row.delete()

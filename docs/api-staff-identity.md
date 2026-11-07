@@ -338,9 +338,15 @@ no second copy.
   known one. `STAFF_LOGIN_LIMITS["MAX_FAILURES_PER_ACCOUNT"]` (5) inside
   `WINDOW_SECONDS` (15 minutes). A success clears it; so do a password reset
   (`StaffSetPasswordForm.save`) and `reset_staff_mfa`.
-- **Per client address** (`client_ip_or_peer`): `MAX_FAILURES_PER_IP` (20) across
-  any accounts. A success does not clear it, or one valid login of the
-  attacker's own would reset a guessing run.
+- **Per client address**, only when `trusted_client_ip` proves one (the request
+  carried our edge's `X-Origin-Verify`): `MAX_FAILURES_PER_IP` (20) across any
+  accounts. A success does not clear it, or one valid login of the attacker's
+  own would reset a guessing run. Without the proof (a domain outside our
+  Cloudflare zones, a missing or rotated secret, a direct call to a node) the
+  only address known is the proxy peer, a Cloudflare edge node or SNAT gateway
+  shared by everyone behind it, so it is not counted: 20 wrong passwords from
+  one place would lock every staff member out. Such a request is bounded by the
+  per-account limit alone.
 - **A lock refuses even the right password** (`StaffLoginLocked`): the admin form
   shows "Too many failed sign-in attempts. Try again later." and the endpoint
   answers `429 login_locked`. Refused attempts add nothing, so they cannot

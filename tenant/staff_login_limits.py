@@ -12,9 +12,15 @@ count is made in one place and the two share it.
   or not it names an account, so a locked unknown address answers exactly
   like a locked known one and the lock reveals nothing about who exists.
   A success clears it, and so does a password reset.
-- **Per address** (``client_ip_or_peer``): a run of guesses across many
-  accounts. A success does NOT clear it: one valid login of the attacker's
-  own would otherwise reset the run.
+- **Per address**, only for an address ``trusted_client_ip`` proves (the
+  request carried our edge's ``X-Origin-Verify``): a run of guesses across
+  many accounts. A success does NOT clear it: one valid login of the
+  attacker's own would otherwise reset the run. Without the proof (a domain
+  outside our Cloudflare zones, a missing or rotated secret, a direct call
+  to a node) the only address known is the proxy peer, which is a Cloudflare
+  edge node or a SNAT gateway shared by everyone behind it, so counting it
+  would let 20 wrong passwords from one place lock every staff member out.
+  Such a request is bounded by the per-account limit alone.
 
 A lock refuses even the correct password and lasts until the window that
 began with the first failure ends; refused attempts add nothing, so they
@@ -34,7 +40,7 @@ from django.core.cache import cache
 from django.http import HttpRequest
 
 from core.caches import STRICT_NAMESPACE
-from core.client_ip import client_ip_or_peer
+from core.client_ip import trusted_client_ip
 from tenant.cache import GLOBAL_CACHE_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -57,7 +63,10 @@ def _account_key(username: str) -> str:
 def _address_key(request: HttpRequest | None) -> str | None:
     if request is None:
         return None
-    return f"{_KEY}address:{_digest(client_ip_or_peer(request))}"
+    address = trusted_client_ip(request)
+    if address is None:
+        return None
+    return f"{_KEY}address:{_digest(address)}"
 
 
 def ensure_not_locked(request: HttpRequest | None, username: str) -> None:

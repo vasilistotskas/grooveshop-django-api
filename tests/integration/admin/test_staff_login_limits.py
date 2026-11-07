@@ -33,9 +33,18 @@ pytestmark = [
 ]
 
 
+SECRET = "edge-proof-secret"
+
+
 @pytest.fixture(autouse=True)
 def _limits(settings):
     settings.STAFF_LOGIN_LIMITS = LIMITS
+    settings.ORIGIN_VERIFY_SECRET = SECRET
+
+
+def _edge(ip):
+    """Headers of a request that came through our Cloudflare zone."""
+    return {"HTTP_X_ORIGIN_VERIFY": SECRET, "HTTP_CF_CONNECTING_IP": ip}
 
 
 def _staff(**kwargs):
@@ -45,15 +54,17 @@ def _staff(**kwargs):
     return user
 
 
-def _admin_login(email, password, ip="10.0.0.1"):
-    return Client(REMOTE_ADDR=ip).post(
+def _admin_login(email, password, ip="10.0.0.1", proof=True):
+    headers = _edge(ip) if proof else {}
+    return Client(REMOTE_ADDR=ip, **headers).post(
         reverse("admin:login"),
         {"step": "password", "username": email, "password": password},
     )
 
 
-def _token_login(email, password, ip="10.0.0.1"):
-    return APIClient(REMOTE_ADDR=ip).post(
+def _token_login(email, password, ip="10.0.0.1", proof=True):
+    headers = _edge(ip) if proof else {}
+    return APIClient(REMOTE_ADDR=ip, **headers).post(
         TOKEN_LOGIN, {"email": email, "password": password}
     )
 
@@ -130,6 +141,28 @@ class TestAddressLimit:
         response = _admin_login(fresh.email, PASSWORD, ip="10.9.9.9")
 
         assert not _admin_signed_in(response)
+
+    def test_without_edge_proof_no_address_is_counted(self):
+        """The peer is a Cloudflare node or SNAT gateway shared by everyone
+        behind it: counting it would lock every staff member out."""
+        for index in range(LIMITS["MAX_FAILURES_PER_IP"] * 5):
+            _admin_login(
+                f"ghost{index}@example.com", "wrong", ip="10.5.5.5", proof=False
+            )
+        fresh = _staff()
+
+        assert _admin_signed_in(
+            _admin_login(fresh.email, PASSWORD, ip="10.5.5.5", proof=False)
+        )
+
+    def test_without_edge_proof_the_account_limit_still_applies(self):
+        user = _staff()
+        for _attempt in range(LIMITS["MAX_FAILURES_PER_ACCOUNT"]):
+            _admin_login(user.email, "wrong", proof=False)
+
+        assert not _admin_signed_in(
+            _admin_login(user.email, PASSWORD, proof=False)
+        )
 
     def test_another_address_is_not_affected_by_it(self):
         for user in [_staff() for _ in range(LIMITS["MAX_FAILURES_PER_IP"])]:

@@ -3,11 +3,18 @@
     uv run python manage.py persist_block_upgrades --tenant webside --dry-run
     uv run python manage.py persist_block_upgrades --all-tenants
 
-Each upgraded document goes through ``validate_document`` against the store's
-catalogue, and what that returns is what is stored, hash and references
-included. One document that does not pass stops the store: nothing of it is
-written, and the command fails naming every problem. ``--dry-run`` does all of
-that and writes nothing. A second run finds nothing to do.
+Each upgraded document, its translations moved with its nodes, goes through
+``validate_document`` against the store's catalogue, and what that returns is
+what is stored, hash and references included. One document that does not pass
+stops the store: nothing of it is written, and the command fails naming every
+problem. ``--dry-run`` does all of that and writes nothing. A second run finds
+nothing to do. A feature switched off does not stop a store: its block may still
+be on a page, which is for its next publish to refuse and no reason for that
+page to stay on an old version. A feature the platform has never heard of does.
+
+There is no way back. An older storefront leaves out a node newer than it knows,
+so run this once the release it follows has proved itself, and only with a
+restorable backup of the store.
 
 This is the one place that rewrites a ``BuilderVersion``, which is otherwise
 immutable: a version keeps its number and what it renders, the storefront
@@ -30,7 +37,14 @@ from builder.block_upgrades import NoUpgradePath, upgrade_document
 from builder.models import BuilderDocument, BuilderVersion
 from builder.services import published_versions
 from core.management.tenant_mixin import TenantCommandMixin
-from tenant.features import feature_on
+from tenant.features import STORE_FEATURES
+
+
+def _known_feature_on(name: str) -> bool:
+    """What the validation asks of a feature here: on, whatever the store set,
+    with a ``KeyError`` for a name the platform does not have, which it reports
+    as ``unknown_feature``."""
+    return STORE_FEATURES[name] is not None
 
 
 class Command(TenantCommandMixin, BaseCommand):
@@ -136,7 +150,9 @@ class Command(TenantCommandMixin, BaseCommand):
         """The document to store, or ``None`` with nothing to do or with the
         reason it cannot be upgraded added to *problems*."""
         try:
-            upgraded, found = upgrade_document(data, catalogue)
+            upgraded, upgraded_i18n, found = upgrade_document(
+                data, i18n, catalogue
+            )
         except NoUpgradePath as exc:
             problems.append(f"{label}: {exc}")
             return None
@@ -146,9 +162,9 @@ class Command(TenantCommandMixin, BaseCommand):
         issues, result = validation.validate_document(
             key=key,
             data=upgraded,
-            i18n=i18n,
+            i18n=upgraded_i18n,
             catalogue=catalogue,
-            feature_on=feature_on,
+            feature_on=_known_feature_on,
         )
         if result is None:
             problems.extend(

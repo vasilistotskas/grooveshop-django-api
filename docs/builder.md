@@ -146,12 +146,21 @@ dependency rows for them. `manage.py persist_block_upgrades --tenant <schema>`
 (or `--all-tenants`; `--dry-run` writes nothing) writes the upgrades into every
 stored draft and version, each validated against the store's catalogue, then
 rebuilds the current release's reference index. One document that does not pass
-stops its store with nothing written. It is the only thing that rewrites a
+stops its store with nothing written; a feature switched off does not count
+against a document here, as it does at a publish, but one the platform does not
+know does. There is no way back: an older
+storefront leaves out a node newer than it knows, so run it once the storefront
+release it follows has proved itself, with a restorable backup of the store. It
+is the only thing that rewrites a
 `BuilderVersion`: a version keeps its number and what it renders, and a draft
 keeps its revision, so a store is not told it has unpublished changes.
 `builder/block_upgrades.py` is a port of the storefront's `*Upgrades.ts`, held
 to `tests/fixtures/builder/upgrade-cases.json`. A block that gains a version
 adds its step there too, or the command stops at it with `no upgrade from`.
+The overlay moves with the node: each language's settings are upgraded too, and
+what differs from the draft's upgraded text stays as that language's translation
+(`upgrade_translations`), so an upgrade can rename, merge or drop a translated
+setting and every language reads what it read.
 
 Limits come from settings, never from code paths:
 `BUILDER_MAX_SECTIONS_PER_DOCUMENT`, `BUILDER_MAX_BLOCKS_PER_NODE`,

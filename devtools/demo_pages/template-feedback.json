@@ -35,16 +35,16 @@
           }
         },
         "settings": {
-          "title": "Τι λένε οι πελάτες μας"
+          "heading": "Τι λένε οι πελάτες μας"
         },
-        "type": "testimonials@1"
+        "type": "testimonials@2"
       }
     }
   },
   "i18n": {
     "en": {
       "da78692f-97cf-49ef-abbf-840d2bbca88c": {
-        "/title": "What our customers say"
+        "/heading": "What our customers say"
       },
       "da78692f-97cf-49ef-abbf-840d2bbca88c-1": {
         "/name": "George P.",

@@ -13,6 +13,7 @@ import logging
 
 import pytest
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from core.celery import celery_app
 from core.logging import JsonFormatter
@@ -48,13 +49,15 @@ def _only_record(caplog) -> dict:
 
 
 def test_the_completion_line_counts_the_task_queries(caplog):
-    with caplog.at_level(logging.INFO, logger="core.tasks"):
+    with (
+        caplog.at_level(logging.INFO, logger="core.tasks"),
+        CaptureQueriesContext(connection) as django_count,
+    ):
         _runs_queries.apply()
 
     payload = _only_record(caplog)
     assert "completed successfully" in payload["message"]
-    # The tenant lookup the base task makes is part of the task's cost.
-    assert payload["db_queries"] >= QUERIES
+    assert payload["db_queries"] == len(django_count) >= QUERIES
     assert 0 < payload["db_ms"] <= payload["duration_ms"]
 
 

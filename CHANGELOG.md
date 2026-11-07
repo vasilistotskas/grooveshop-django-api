@@ -3,6 +3,23 @@
 
 
 
+## v3.231.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): publish tasks after a commit through dispatch_on_commit (#506)
+
+Every task that follows a committed change now goes through dispatch_on_commit, so a broker outage no longer answers 500 for work that was done, or loses that work.
+
+After one failed publish a process keeps the next ones without trying for DEFERRED_DISPATCH_BROKER_DOWN_SECONDS; on a closed port one order held its request 52.7 s without this. Analytics beacons go through publish_or_drop and share that window.
+
+redispatch_deferred_tasks publishes outside a transaction, claiming rows with a lease (DEFERRED_DISPATCH_LEASE_SECONDS). Holding one transaction across the batch lost it to idle_in_transaction_session_timeout on real Postgres, which sent published rows a second time.
+
+Logs of a kept or given-up dispatch use the mask a failed task's log uses, since a password reset's payload holds the live link.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`8b02a0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b02a0f8027e758cf38662e0be5ef3eb9d8eecbd))
+
 ## v3.231.0 (2026-11-07)
 
 ### Bug fixes

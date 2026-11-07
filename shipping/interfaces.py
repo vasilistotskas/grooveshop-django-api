@@ -220,10 +220,14 @@ class ShippingCarrierInterface(ABC):
         carriers) don't have to override.
 
         ``schema_name`` is the tenant schema captured by the caller
-        BEFORE the deferring ``on_commit`` — overriders must stamp it
-        onto the dispatched task (``headers={"_schema_name": ...}``) so
-        the worker binds the right tenant even when on_commit fires
-        after the request's schema context has unwound.
+        BEFORE the deferring ``on_commit`` — overriders publish through
+        ``tenant.celery.dispatch_on_commit(task, [order.id],
+        schema_name=schema_name)`` so the worker binds the right tenant
+        even when on_commit fires after the request's schema context has
+        unwound, and so a broker failure (the payment is already
+        committed) is kept as a ``DeferredDispatch`` for the sweep to
+        publish again instead of leaving a paid order with no shipment.
+        A bare ``apply_async`` here raises into the payment webhook.
         """
         return
 

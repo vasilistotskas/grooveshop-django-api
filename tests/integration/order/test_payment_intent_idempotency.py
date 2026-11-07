@@ -198,7 +198,7 @@ class TestARepeatSubmitReturnsTheFirstOrder(_Checkout):
         self._create()
 
         with patch(
-            "order.signals.handlers.send_admin_new_order_email.delay"
+            "order.signals.handlers.send_admin_new_order_email.apply_async"
         ) as admin_email:
             self._create()
 

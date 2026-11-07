@@ -13,7 +13,7 @@ from core.retry import (
     TRANSIENT_HTTP_ERRORS,
     TRANSIENT_NETWORK_ERRORS,
 )
-from core.tasks import MonitoredTask
+from core.tasks import MonitoredTask, safe_task_arguments
 from tenant.celery import TenantTask, run_for_all_tenants
 
 if TYPE_CHECKING:
@@ -616,8 +616,16 @@ def redispatch_deferred_tasks() -> dict[str, int]:
     Runs in ``public``, where the rows live. A row is deleted once its task is
     out; one that fails again waits ``base * 2**attempts`` seconds (capped); a
     row older than the retention is deleted with an ERROR, because the work it
-    stood for was not done. Rows are taken ``SKIP LOCKED``, so two overlapping
-    sweeps never publish one twice.
+    stood for was not done.
+
+    The publishes run outside any transaction. A broker that stops answering
+    can hold one for longer than ``idle_in_transaction_session_timeout``, and
+    losing the transaction would bring back every row already published, to
+    go out twice. So the rows are claimed first, in a short transaction that
+    moves ``next_attempt_at`` on by ``DEFERRED_DISPATCH_LEASE_SECONDS``: two
+    overlapping sweeps never publish one twice, and a sweep killed half way
+    publishes at most one row twice (out, not yet deleted). The rows it did
+    not reach come back when the lease ends.
     """
     from datetime import timedelta
 
@@ -639,53 +647,63 @@ def redispatch_deferred_tasks() -> dict[str, int]:
                 : settings.DEFERRED_DISPATCH_BATCH
             ]
         )
-        for row in due:
-            if row.created_at < expired_before:
-                logger.error(
-                    "Deferred dispatch of %s for %s given up after %s "
-                    "attempts: %s; payload args=%r kwargs=%r",
-                    row.task_name,
-                    row.schema_name or "-",
-                    row.attempts,
-                    row.last_error,
-                    row.args,
-                    row.kwargs,
+        DeferredDispatch.objects.filter(pk__in=[row.pk for row in due]).update(
+            next_attempt_at=now
+            + timedelta(seconds=settings.DEFERRED_DISPATCH_LEASE_SECONDS)
+        )
+    for position, row in enumerate(due):
+        task = celery_app.tasks.get(row.task_name)
+        if row.created_at < expired_before:
+            safe_args, safe_kwargs = safe_task_arguments(
+                task, row.args, row.kwargs
+            )
+            logger.error(
+                "Deferred dispatch of %s for %s given up after %s "
+                "attempts: %s; payload args=%s kwargs=%s",
+                row.task_name,
+                row.schema_name or "-",
+                row.attempts,
+                row.last_error,
+                safe_args,
+                safe_kwargs,
+            )
+            row.delete()
+            expired += 1
+            continue
+        try:
+            if task is None:
+                raise LookupError(f"no task named {row.task_name!r}")
+            task.apply_async(
+                args=row.args,
+                kwargs=row.kwargs,
+                headers=row.headers,
+                **row.options,
+            )
+        except Exception as exc:
+            broker_down = isinstance(exc, TRANSIENT_NETWORK_ERRORS)
+            row.attempts += 1
+            row.last_error = f"{type(exc).__name__}: {exc}"[:255]
+            row.next_attempt_at = now + timedelta(
+                seconds=min(
+                    settings.DEFERRED_DISPATCH_BACKOFF_SECONDS
+                    * 2**row.attempts,
+                    settings.DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS,
                 )
-                row.delete()
-                expired += 1
-                continue
-            task = celery_app.tasks.get(row.task_name)
-            try:
-                if task is None:
-                    raise LookupError(f"no task named {row.task_name!r}")
-                task.apply_async(
-                    args=row.args,
-                    kwargs=row.kwargs,
-                    headers=row.headers,
-                    **row.options,
-                )
-            except Exception as exc:
-                broker_down = isinstance(exc, TRANSIENT_NETWORK_ERRORS)
-                row.attempts += 1
-                row.last_error = f"{type(exc).__name__}: {exc}"[:255]
-                row.next_attempt_at = now + timedelta(
-                    seconds=min(
-                        settings.DEFERRED_DISPATCH_BACKOFF_SECONDS
-                        * 2**row.attempts,
-                        settings.DEFERRED_DISPATCH_BACKOFF_CAP_SECONDS,
-                    )
-                )
-                row.save(
-                    update_fields=["attempts", "last_error", "next_attempt_at"]
-                )
-                failed += 1
-                if broker_down:
-                    # Every other row would wait out the same timeout; they
-                    # stay due for the next run.
-                    break
-            else:
-                row.delete()
-                done += 1
+            )
+            row.save(
+                update_fields=["attempts", "last_error", "next_attempt_at"]
+            )
+            failed += 1
+            if broker_down:
+                # Every other row would wait out the same timeout; they are
+                # due again for the next run.
+                DeferredDispatch.objects.filter(
+                    pk__in=[later.pk for later in due[position + 1 :]]
+                ).update(next_attempt_at=now)
+                break
+        else:
+            row.delete()
+            done += 1
     if failed:
         logger.error(
             "%s deferred dispatch(es) could not be published again", failed

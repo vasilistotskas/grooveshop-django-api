@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -47,13 +46,12 @@ from search.serializers import (
     SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
+from tenant.celery import publish_or_drop
 from tenant.features import feature_on
 from tenant.permissions import IsBlogEnabled, IsCatalogueEnabled
 
 if TYPE_CHECKING:
     from django_stubs_ext import StrOrPromise
-
-logger = logging.getLogger(__name__)
 
 _VALID_LANGUAGE_CODES = frozenset(
     code for code, _name in django_settings.LANGUAGES
@@ -827,7 +825,8 @@ def search_click(request):
 
     from search.tasks import save_search_click
 
-    save_search_click.delay(
+    publish_or_drop(
+        save_search_click,
         query_uuid=str(data["query_id"]),
         result_id=str(data["result_id"]),
         result_type=data["result_type"],

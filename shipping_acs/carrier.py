@@ -317,12 +317,13 @@ class AcsCarrier(ShippingCarrierInterface):
         )
         # Stamp the caller-captured tenant schema so the worker binds
         # the right store even when this dispatch is deferred past the
-        # request's schema context (see the base method's contract).
-        from django.db import connection
+        # request's schema context (see the base method's contract). A
+        # broker failure is kept as a ``DeferredDispatch`` instead of
+        # leaving a paid order with no voucher.
+        from tenant.celery import dispatch_on_commit
 
-        create_acs_voucher_for_order.apply_async(
-            args=[order.id],
-            headers={"_schema_name": schema_name or connection.schema_name},
+        dispatch_on_commit(
+            create_acs_voucher_for_order, [order.id], schema_name=schema_name
         )
 
     # ------------------------------------------------------------------

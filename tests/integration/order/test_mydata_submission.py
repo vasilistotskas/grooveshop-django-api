@@ -18,25 +18,35 @@ separate manual smoke-test suite (gated by env var).
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.core import mail
 from django.test import TestCase, override_settings
 from djmoney.money import Money
+from kombu.exceptions import OperationalError
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
+from order.models import RetailCredit
 from order.models.invoice import Invoice, MyDataStatus
+from order.models.retail_credit import CreditReason
 from order.mydata.exceptions import MyDataTransportError
 from order.tasks import (
     cancel_mydata_invoice,
     generate_order_invoice,
+    issue_pending_credits,
+    send_credit_email,
+    send_credit_to_mydata,
+    send_invoice_email,
     send_invoice_to_mydata,
 )
 from product.factories.product import ProductFactory
+from tenant.models import DeferredDispatch
+from tests.utils.dispatch import assert_published_once
 from tests.utils.mydata import issuable, mydata_enabled
 from vat.factories import VatFactory
 
@@ -162,8 +172,8 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         return order
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.tasks.send_invoice_to_mydata.delay")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_issues_nothing_when_mydata_is_disabled(
         self, mock_email, mock_submit, _mock_render
     ):
@@ -175,8 +185,8 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self.assertFalse(hasattr(order, "invoice"))
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.tasks.send_invoice_to_mydata.delay")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_routes_to_mydata_when_enabled(
         self, mock_email, mock_submit, _mock_render
     ):
@@ -184,13 +194,35 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         order = self._shipped_order()
         result = generate_order_invoice(order.id)
         self.assertTrue(result)
-        mock_submit.assert_called_once_with(order.id)
+        assert_published_once(mock_submit, [order.id])
         # Email is chained from ``send_invoice_to_mydata``, not
         # directly from ``generate_order_invoice``.
         mock_email.assert_not_called()
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.tasks.send_invoice_to_mydata.delay")
+    def test_the_receipt_is_kept_for_mydata_when_the_broker_is_down(
+        self, _mock_render
+    ):
+        """A broker outage after the receipt is issued raises nothing: the
+        receipt and its PDF stay, and the submission is kept as a row."""
+        self.enterContext(mydata_enabled())
+        order = self._shipped_order()
+
+        with patch.object(
+            send_invoice_to_mydata,
+            "apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ):
+            result = generate_order_invoice(order.id)
+
+        self.assertTrue(result)
+        self.assertTrue(Invoice.objects.get(order=order).has_document())
+        row = DeferredDispatch.objects.get()
+        self.assertEqual(row.task_name, send_invoice_to_mydata.name)
+        self.assertEqual(row.args, [order.id])
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_an_invoice_order_gets_no_document(self, mock_submit, mock_render):
         """Invoices are issued by hand in timologio (AADE decision
         Α.1128/2025): whoever asks, the platform builds nothing."""
@@ -207,7 +239,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self.assertFalse(Invoice.objects.filter(order=order).exists())
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.tasks.send_invoice_to_mydata.delay")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_an_order_that_has_not_shipped_gets_no_receipt(
         self, mock_submit, mock_render
     ):
@@ -223,7 +255,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self.assertFalse(Invoice.objects.exists())
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    @patch("order.tasks.send_invoice_to_mydata.delay")
+    @patch("order.tasks.send_invoice_to_mydata.apply_async")
     def test_a_registered_receipt_is_not_issued_again(
         self, mock_submit, _mock_render
     ):
@@ -271,8 +303,8 @@ class SendInvoiceToMydataTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.issue_pending_credits.delay")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.issue_pending_credits.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_success_persists_mark_and_chains_email(
         self, mock_email, mock_credits, mock_send, _mock_render
     ):
@@ -293,13 +325,13 @@ class SendInvoiceToMydataTestCase(TestCase):
             invoice.mydata_qr_url,
             "https://www1.aade.gr/mydata/qr/deadbeef",
         )
-        mock_email.assert_called_once_with(order.id)
+        assert_published_once(mock_email, [order.id])
         # Credit documents that waited for this MARK are released.
-        mock_credits.assert_called_once_with(order.id)
+        assert_published_once(mock_credits, [order.id])
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_a_refused_receipt_is_not_emailed(
         self, mock_email, mock_send, _mock_render
     ):
@@ -320,7 +352,7 @@ class SendInvoiceToMydataTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_transport_error_retries_then_waits_for_staff(
         self, mock_email, mock_send, _mock_render
     ):
@@ -346,7 +378,7 @@ class SendInvoiceToMydataTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_technical_error_is_retryable_not_terminal(
         self, mock_email, mock_send, _mock_render
     ):
@@ -372,7 +404,7 @@ class SendInvoiceToMydataTestCase(TestCase):
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_duplicate_uid_is_terminal_not_retried(
         self, mock_email, mock_send, _mock_render
     ):
@@ -424,10 +456,112 @@ class SendInvoiceToMydataTestCase(TestCase):
             quantity=1,
         )
         # No generate_invoice() call — order has no invoice.
-        with patch("order.tasks.send_invoice_email.delay") as mock_email:
+        with patch("order.tasks.send_invoice_email.apply_async") as mock_email:
             result = send_invoice_to_mydata(order.id)
         self.assertFalse(result)
         mock_email.assert_not_called()
+
+
+class BrokerFailureInTheMydataChainTestCase(TestCase):
+    """A broker outage between two links of the chain loses no link.
+
+    Each link is published through `dispatch_on_commit`, so a
+    `kombu` `OperationalError` is kept as a `DeferredDispatch` row and
+    raises nothing: the MARK already written stays, the task still answers
+    True, and the sweep publishes the link again. The MARK short-circuit
+    and the reserved-email flag make the replayed task safe.
+    """
+
+    def _names(self):
+        return set(DeferredDispatch.objects.values_list("task_name", flat=True))
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.mydata.client.MyDataClient.send_invoices")
+    def test_the_mark_stays_when_the_email_and_credits_cannot_be_published(
+        self, mock_send, _mock_render
+    ):
+        self.enterContext(mydata_enabled())
+        order, invoice = _make_invoice()
+        mock_send.return_value = _SUCCESS_XML
+        broker_down = OperationalError("broker unreachable")
+
+        with (
+            patch.object(
+                send_invoice_email, "apply_async", side_effect=broker_down
+            ),
+            patch.object(
+                issue_pending_credits, "apply_async", side_effect=broker_down
+            ),
+        ):
+            result = send_invoice_to_mydata(order.id)
+
+        self.assertTrue(result)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_mark, 800000165789545)
+        self.assertEqual(
+            self._names(), {send_invoice_email.name, issue_pending_credits.name}
+        )
+
+    def test_a_credit_that_cannot_be_published_is_kept_for_the_next_run(self):
+        self.enterContext(mydata_enabled())
+        order, invoice = _make_invoice()
+        invoice.mydata_mark = 400000000000001
+        invoice.save(update_fields=["mydata_mark"])
+        credit = RetailCredit.objects.create(
+            order=order,
+            invoice=invoice,
+            reason=CreditReason.SETTLEMENT,
+            credit_number="CRD-2026-000001",
+            issue_date=date(2026, 3, 20),
+        )
+        broker_down = OperationalError("broker unreachable")
+
+        with (
+            patch("order.credit_documents.create_pending_credits"),
+            patch.object(
+                send_credit_to_mydata, "apply_async", side_effect=broker_down
+            ),
+        ):
+            pending = issue_pending_credits(order.id)
+
+        self.assertEqual(pending, [credit.pk])
+        row = DeferredDispatch.objects.get()
+        self.assertEqual(row.task_name, send_credit_to_mydata.name)
+        self.assertEqual(row.args, [credit.pk])
+
+    def test_a_registered_credit_keeps_its_mark_when_its_email_is_not_published(
+        self,
+    ):
+        self.enterContext(mydata_enabled())
+        order, invoice = _make_invoice()
+        invoice.mydata_mark = 400000000000001
+        invoice.save(update_fields=["mydata_mark"])
+        credit = RetailCredit.objects.create(
+            order=order,
+            invoice=invoice,
+            reason=CreditReason.SETTLEMENT,
+            credit_number="CRD-2026-000001",
+            issue_date=date(2026, 3, 20),
+        )
+        registered = Mock(invoice_mark=400000000000002)
+
+        with (
+            patch(
+                "order.tasks._submit_document_to_mydata",
+                return_value=registered,
+            ),
+            patch.object(
+                send_credit_email,
+                "apply_async",
+                side_effect=OperationalError("broker unreachable"),
+            ),
+        ):
+            result = send_credit_to_mydata(credit.pk)
+
+        self.assertTrue(result)
+        row = DeferredDispatch.objects.get()
+        self.assertEqual(row.task_name, send_credit_email.name)
+        self.assertEqual(row.args, [credit.pk])
 
 
 @override_settings(
@@ -441,8 +575,8 @@ class CancelMydataInvoiceTestCase(TestCase):
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
     @patch("order.mydata.client.MyDataClient.cancel_invoice")
-    @patch("order.tasks.issue_pending_credits.delay")
-    @patch("order.tasks.send_invoice_email.delay")
+    @patch("order.tasks.issue_pending_credits.apply_async")
+    @patch("order.tasks.send_invoice_email.apply_async")
     def test_persists_cancellation_mark_on_success(
         self, _mock_email, _mock_credits, mock_cancel, mock_send, _mock_render
     ):

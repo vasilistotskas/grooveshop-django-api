@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import Signal, receiver
 
@@ -317,6 +317,10 @@ def dispatch_tier_changed(
             new_id,
         )
 
+    # The receivers run inside this hook, after the request's schema
+    # context can have unwound: hand them the schema registered now.
+    schema_name = connection.schema_name
+
     def send_tier_changed() -> None:
         loyalty_tier_changed.send(
             sender=sender,
@@ -324,6 +328,7 @@ def dispatch_tier_changed(
             old_tier_id=old_id,
             new_tier_id=new_id,
             direction=direction,
+            schema_name=schema_name,
         )
         logger.debug(
             "Sent loyalty_tier_changed for user %s (%s -> %s, %s)",
@@ -344,6 +349,7 @@ def notify_tier_up_live(
     sender: type[UserAccount],
     user: UserAccount,
     direction: str,
+    schema_name: str | None = None,
     **kwargs: Any,
 ) -> None:
     """Celebrate tier promotions with a live notification.
@@ -358,7 +364,9 @@ def notify_tier_up_live(
     from loyalty.tasks import notify_loyalty_tier_up_live
 
     user_id = user.pk
-    dispatch_on_commit(notify_loyalty_tier_up_live, [user_id])
+    dispatch_on_commit(
+        notify_loyalty_tier_up_live, [user_id], schema_name=schema_name
+    )
 
 
 # Loyalty switched off or on: open or close the pause that keeps points

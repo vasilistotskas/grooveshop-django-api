@@ -4,9 +4,11 @@ impression/click rows they leave behind."""
 from __future__ import annotations
 
 import uuid
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
+from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -15,6 +17,8 @@ from product.factories.product import ProductFactory
 from product.models import ProductRelation
 from recommendation.enum import EventKind, StrategyCode, Surface
 from recommendation.models import RecommendationEvent
+from recommendation.tasks import record_recommendation_event
+from tenant.models import DeferredDispatch
 from tests.utils.staff import (
     bind_store_tenant,
     store_tenant,
@@ -220,6 +224,55 @@ class TestEvents:
         assert row.product_id == product.id
         assert str(row.impression_id) == payload["impressionId"]
         assert row.position == 1
+
+    def test_a_broker_failure_drops_the_event_and_still_accepts(
+        self, client, caplog
+    ):
+        """An open analytics beacon never answers 500 for an outage, and
+        never turns anonymous traffic into `DeferredDispatch` rows."""
+        with patch.object(
+            record_recommendation_event,
+            "apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ):
+            response = client.post(
+                self.url, self._payload(_product()), format="json"
+            )
+
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert not DeferredDispatch.objects.exists()
+        assert not RecommendationEvent.objects.exists()
+        assert any(
+            f"Dropped {record_recommendation_event.name}" in r.getMessage()
+            for r in caplog.records
+        )
+
+    def test_in_an_outage_the_next_event_does_not_wait_for_the_broker(
+        self, client
+    ):
+        with patch.object(
+            record_recommendation_event,
+            "apply_async",
+            side_effect=OperationalError("broker unreachable"),
+        ) as publish:
+            for _ in range(2):
+                response = client.post(
+                    self.url, self._payload(_product()), format="json"
+                )
+                assert response.status_code == status.HTTP_202_ACCEPTED
+
+        publish.assert_called_once()
+
+    def test_a_bug_in_the_publish_is_not_swallowed(self, client):
+        with (
+            patch.object(
+                record_recommendation_event,
+                "apply_async",
+                side_effect=TypeError("bad arguments"),
+            ),
+            pytest.raises(TypeError),
+        ):
+            client.post(self.url, self._payload(_product()), format="json")
 
     def test_the_cart_header_becomes_the_event_identity(self, client):
         product = _product()

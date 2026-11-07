@@ -300,8 +300,9 @@ class TestBatching:
                 with transaction.atomic():
                     PayWay.objects.create(provider_code=code)
 
-        queue.assert_called_once_with(
-            countdown=invalidation.PURGE_DELAY_SECONDS
+        queue.assert_called_once()
+        assert queue.call_args.kwargs["countdown"] == (
+            invalidation.PURGE_DELAY_SECONDS
         )
         assert purge.call_count == 0, "nothing purges until the task runs"
 

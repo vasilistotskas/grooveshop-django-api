@@ -36,6 +36,7 @@ from shipping_acs.models import AcsShipment
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowShipmentFactory
 from shipping_boxnow.models import BoxNowShipment
+from tests.utils.dispatch import assert_published_once
 
 pytestmark = pytest.mark.django_db
 
@@ -178,7 +179,7 @@ class TestAdminButtons:
 
         with (
             patch(
-                "shipping_acs.tasks.create_acs_voucher_for_order.delay"
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
             ) as task,
             patch("django.contrib.messages.error") as error,
         ):
@@ -201,7 +202,7 @@ class TestAdminButtons:
 
         with (
             patch(
-                "shipping_boxnow.tasks.create_boxnow_shipment_for_order.delay"
+                "shipping_boxnow.tasks.create_boxnow_shipment_for_order.apply_async"
             ) as task,
             patch("django.contrib.messages.error") as error,
         ):
@@ -222,13 +223,13 @@ class TestAdminButtons:
 
         with (
             patch(
-                "shipping_boxnow.tasks.create_boxnow_shipment_for_order.delay"
+                "shipping_boxnow.tasks.create_boxnow_shipment_for_order.apply_async"
             ) as task,
             patch("django.contrib.messages.info"),
         ):
             response = admin.create_parcel_action(_request(), shipment.id)
 
-        task.assert_called_once_with(shipment.order_id)
+        assert_published_once(task, [shipment.order_id])
         assert response.status_code == 302
 
 

@@ -190,7 +190,8 @@ class TestScheduling:
         ) as queue:
             assert edge.schedule_purge() is True
             assert edge.schedule_purge() is False
-        queue.assert_called_once_with(countdown=edge.PURGE_DELAY_SECONDS)
+        queue.assert_called_once()
+        assert queue.call_args.kwargs["countdown"] == edge.PURGE_DELAY_SECONDS
 
     def test_the_purge_reopens_the_window_when_it_runs(self):
         with (

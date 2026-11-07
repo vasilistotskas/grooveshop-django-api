@@ -15,6 +15,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
+from kombu.exceptions import OperationalError
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -22,10 +23,13 @@ from shipping_boxnow.admin import BoxNowShipmentAdmin
 from shipping_boxnow.enum import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowShipmentFactory
 from shipping_boxnow.models import BoxNowShipment
+from shipping_boxnow.tasks import create_boxnow_shipment_for_order
+from tenant.models import DeferredDispatch
+from tests.utils.dispatch import assert_published_once
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
-TASK = "shipping_boxnow.tasks.create_boxnow_shipment_for_order.delay"
+TASK = "shipping_boxnow.tasks.create_boxnow_shipment_for_order.apply_async"
 
 
 def _press(shipment):
@@ -56,7 +60,7 @@ def test_a_cancelled_parcel_is_reset_and_a_new_one_requested():
     with patch(TASK) as task:
         _press(shipment)
 
-    task.assert_called_once_with(shipment.order_id)
+    assert_published_once(task, [shipment.order_id])
     shipment.refresh_from_db()
     assert shipment.delivery_request_id is None
     assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
@@ -89,3 +93,20 @@ def test_a_live_parcel_is_left_alone():
     task.assert_not_called()
     shipment.refresh_from_db()
     assert shipment.parcel_id == parcel
+
+
+def test_a_broker_failure_after_the_reset_keeps_the_request():
+    shipment = _cancelled()
+
+    with patch(
+        TASK, side_effect=OperationalError("broker unreachable")
+    ) as task:
+        response, _messages = _press(shipment)
+
+    task.assert_called_once()
+    assert response.status_code == 302
+    shipment.refresh_from_db()
+    assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION
+    row = DeferredDispatch.objects.get()
+    assert row.task_name == create_boxnow_shipment_for_order.name
+    assert row.args == [shipment.order_id]

@@ -763,6 +763,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         from shipping_acs.models import AcsShipment as _Shipment
         from shipping_acs.services import AcsService
         from shipping_acs.tasks import create_acs_voucher_for_order
+        from tenant.celery import dispatch_on_commit
 
         try:
             shipment = _Shipment.objects.get(pk=object_id)
@@ -807,7 +808,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
                 _("Cancelled shipment reset — minting a fresh voucher."),
             )
 
-        create_acs_voucher_for_order.delay(shipment.order_id)
+        dispatch_on_commit(create_acs_voucher_for_order, [shipment.order_id])
         messages.info(request, _("Voucher creation task dispatched."))
         return _back_to_changelist(self)
 

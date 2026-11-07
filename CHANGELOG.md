@@ -3,6 +3,17 @@
 
 
 
+## v3.231.2 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): run one deferred dispatch sweep at a time (#508)
+
+redispatch_deferred_tasks runs one sweep at a time, held by a session-level advisory lock outside any transaction, instead of claiming rows with a lease. While RabbitMQ blocks publishers a publish waits without end (measured: still waiting at 75 s, with or without a publish timeout, since closing the channel waits too), so any lease could be outlived and two sweeps would send the same rows. A sweep that finds the lock held does nothing and logs a WARNING with what is due; an unlock that releases nothing is an ERROR, since the connection pool resets nothing. The lock ends with the session if the worker dies. DEFERRED_DISPATCH_LEASE_SECONDS is removed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`775b5fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/775b5fedd38dc954890b04f85c14ca3b1a158583))
+
 ## v3.231.1 (2026-11-07)
 
 ### Bug fixes

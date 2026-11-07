@@ -61,7 +61,11 @@ def test_every_entry_fires_at_every_slot_exactly_once(monkeypatch):
         entry = options["headers"]["periodic_task_name"]
         fired.setdefault(entry, []).append(clock["now"].replace(second=0))
 
+    # The entries production declares, wherever the test runs: backups on,
+    # and a Kubernetes pod, which declares no Docker-only development entry.
     monkeypatch.setattr(settings_module, "DEBUG", False)
+    monkeypatch.setattr(settings_module, "DATABASE_BACKUPS_ENABLED", True)
+    monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
     declared = settings_module.get_celery_beat_schedule()
     schedule = {}
     for name, entry in declared.items():

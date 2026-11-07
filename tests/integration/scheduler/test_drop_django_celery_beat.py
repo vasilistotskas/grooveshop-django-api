@@ -119,6 +119,52 @@ def test_the_other_apps_keep_theirs(old_app):
     assert _migrations_of("scheduler") == applied
 
 
+def test_a_store_schema_is_cleaned_too():
+    # django-tenants records the shared app in every store schema; this one
+    # has no permission links, as a schema without those apps would not.
+    store = "test_other_store"
+    with connection.cursor() as cursor:
+        cursor.execute(f'CREATE SCHEMA "{store}"')
+        for table in ("django_migrations", "django_content_type"):
+            cursor.execute(
+                f'CREATE TABLE "{store}"."{table}" '
+                f"(LIKE public.{table} INCLUDING ALL)"
+            )
+        cursor.execute(
+            f'CREATE TABLE "{store}".auth_permission '
+            f"(LIKE public.auth_permission INCLUDING ALL)"
+        )
+        cursor.execute(
+            f'INSERT INTO "{store}".django_migrations (app, name, applied) '
+            "VALUES ('django_celery_beat', '0001_initial', now()), "
+            "('scheduler', '0001_initial', now())"
+        )
+        cursor.execute(
+            f'INSERT INTO "{store}".django_content_type (app_label, model) '
+            "VALUES ('django_celery_beat', 'periodictask'), "
+            "('scheduler', 'periodictask') RETURNING id"
+        )
+        old, kept = (row[0] for row in cursor.fetchall())
+        cursor.execute(
+            f'INSERT INTO "{store}".auth_permission '
+            "(content_type_id, codename, name) VALUES "
+            "(%s, 'change_periodictask', 'old'), "
+            "(%s, 'change_periodictask', 'kept')",
+            [old, kept],
+        )
+
+        _run()
+
+        cursor.execute(
+            f'SELECT app FROM "{store}".django_migrations ORDER BY app'
+        )
+        assert [row[0] for row in cursor.fetchall()] == ["scheduler"]
+        cursor.execute(f'SELECT id FROM "{store}".django_content_type')
+        assert [row[0] for row in cursor.fetchall()] == [kept]
+        cursor.execute(f'SELECT name FROM "{store}".auth_permission')
+        assert [row[0] for row in cursor.fetchall()] == ["kept"]
+
+
 def test_it_runs_again_with_nothing_to_do(old_app):
     _run()
     _run()

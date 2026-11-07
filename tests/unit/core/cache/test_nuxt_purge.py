@@ -25,7 +25,7 @@ def _configured(settings):
 
 @pytest.fixture
 def bound_tenant(db, monkeypatch):
-    from django.db import connection
+    from django.db import DEFAULT_DB_ALIAS, connections
 
     from tenant.models import Tenant, TenantDomain
 
@@ -43,7 +43,9 @@ def bound_tenant(db, monkeypatch):
     TenantDomain.objects.create(
         domain="api.purge-scope.example", tenant=tenant, is_primary=False
     )
-    monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+    monkeypatch.setattr(
+        connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+    )
     return tenant
 
 
@@ -52,9 +54,11 @@ class TestCurrentTenantHost:
         assert nuxt_client._current_tenant_host() == "purge-scope.example"
 
     def test_none_without_a_tenant(self, monkeypatch):
-        from django.db import connection
+        from django.db import DEFAULT_DB_ALIAS, connections
 
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         assert nuxt_client._current_tenant_host() is None
 
 
@@ -123,10 +127,10 @@ class TestStoreWithoutAPrimaryDomain:
     ):
         from types import SimpleNamespace
 
-        from django.db import connection
+        from django.db import DEFAULT_DB_ALIAS, connections
 
         monkeypatch.setattr(
-            connection,
+            connections[DEFAULT_DB_ALIAS],
             "tenant",
             SimpleNamespace(schema_name="public"),
             raising=False,
@@ -159,9 +163,11 @@ class TestRequestPurgeHostScoping:
         assert posted["json"]["host"] == "purge-scope.example"
 
     def test_platform_purge_sends_no_host(self, _configured, monkeypatch):
-        from django.db import connection
+        from django.db import DEFAULT_DB_ALIAS, connections
 
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         posted, fake_post = self._capture_payload()
         with mock.patch("core.cache.nuxt.requests.post", side_effect=fake_post):
             nuxt_client.request_purge(["cache:nitro:handlers:Blog*"])

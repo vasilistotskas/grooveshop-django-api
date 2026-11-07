@@ -1,6 +1,6 @@
-ARG PYTHON_VERSION=3.14.7
-ARG ALPINE_VERSION=3.23
-ARG UV_VERSION=0.13.6
+ARG PYTHON_VERSION=3.14.9
+ARG ALPINE_VERSION=3.24
+ARG UV_VERSION=0.13.7
 # PostgreSQL major of the CLIENT tools baked into the runtime image.
 # pg_dump refuses to dump a server NEWER than itself ("aborting because
 # of server version mismatch"), so this must track the server major:
@@ -17,7 +17,7 @@ ARG APP_PATH=/home/app
 FROM $UV_IMAGE AS uv
 
 # Build Tailwind CSS
-FROM node:25-alpine AS tailwind-builder
+FROM node:26.13.0-alpine AS tailwind-builder
 ARG APP_PATH
 WORKDIR ${APP_PATH}
 COPY package.json package-lock.json ./

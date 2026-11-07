@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 
 from emails.recipients import store_operator_addresses
 from emails.sender import from_address, store_reply_to
@@ -72,7 +72,9 @@ class TestFromAddress:
         assert from_address() == "Fallback Store <noreply@platform.com>"
 
     def test_no_tenant_uses_settings(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         settings.DEFAULT_FROM_EMAIL = "platform@example.com"
         assert from_address() == "platform@example.com"
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 
 from tenant.celery import TenantTask
 
@@ -101,7 +101,10 @@ class TestTenantTaskApplyAsyncHeader:
 
         # Simulate request thread inside a tenant schema_context.
         monkeypatch.setattr(
-            connection, "schema_name", "tenant_gamma", raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            "tenant_gamma",
+            raising=False,
         )
 
         def _super_apply_async(*args, **kwargs):
@@ -128,7 +131,10 @@ class TestMeiliIndexNamePerTenant:
         from product.models.product import ProductTranslation
 
         monkeypatch.setattr(
-            connection, "schema_name", "tenant_alpha", raising=False
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            "tenant_alpha",
+            raising=False,
         )
         name = ProductTranslation.get_meili_index_name()
         assert name.startswith("tenant_alpha__"), name
@@ -136,7 +142,12 @@ class TestMeiliIndexNamePerTenant:
     def test_index_name_is_bare_in_public_schema(self, monkeypatch) -> None:
         from product.models.product import ProductTranslation
 
-        monkeypatch.setattr(connection, "schema_name", "public", raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS],
+            "schema_name",
+            "public",
+            raising=False,
+        )
         name = ProductTranslation.get_meili_index_name()
         assert "__" not in name, name
 

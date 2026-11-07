@@ -15,7 +15,7 @@ URL references use ``reverse()`` so test failures surface as
 from __future__ import annotations
 
 import pytest
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -55,7 +55,9 @@ class TestBlogFeatureFlag:
 
     def test_list_posts_when_blog_enabled(self, monkeypatch):
         tenant = store_tenant("ff_blog_on", blog_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-post-list")
@@ -65,7 +67,9 @@ class TestBlogFeatureFlag:
 
     def test_list_posts_when_blog_disabled(self, monkeypatch):
         tenant = store_tenant("ff_blog_off", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-post-list")
@@ -74,7 +78,9 @@ class TestBlogFeatureFlag:
 
     def test_list_categories_when_blog_enabled(self, monkeypatch):
         tenant = store_tenant("ff_blogcat_on", blog_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-category-list")
@@ -83,7 +89,9 @@ class TestBlogFeatureFlag:
 
     def test_list_categories_when_blog_disabled(self, monkeypatch):
         tenant = store_tenant("ff_blogcat_off", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-category-list")
@@ -92,7 +100,9 @@ class TestBlogFeatureFlag:
 
     def test_list_authors_when_blog_disabled(self, monkeypatch):
         tenant = store_tenant("ff_blogauth_off", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-author-list")
@@ -101,7 +111,9 @@ class TestBlogFeatureFlag:
 
     def test_list_comments_when_blog_disabled(self, monkeypatch):
         tenant = store_tenant("ff_blogcmt_off", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-comment-list")
@@ -110,7 +122,9 @@ class TestBlogFeatureFlag:
 
     def test_list_tags_when_blog_disabled(self, monkeypatch):
         tenant = store_tenant("ff_blogtag_off", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-tag-list")
@@ -121,7 +135,9 @@ class TestBlogFeatureFlag:
         """Disabled feature must look like a missing route, not a
         permission error — 404 hides plan information from callers."""
         tenant = store_tenant("ff_blog_404", blog_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-post-list")
@@ -133,7 +149,9 @@ class TestBlogFeatureFlag:
     def test_blog_public_schema_never_gated(self, monkeypatch):
         """Public schema (no tenant) must never be gated regardless of
         any hypothetical tenant flag value."""
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
 
         client = APIClient()
         url = reverse("blog-post-list")
@@ -155,7 +173,9 @@ class TestLoyaltyFeatureFlag:
         from user.factories.account import UserAccountFactory
 
         tenant = store_tenant("ff_loyal_on", loyalty_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         user = UserAccountFactory()
         client = APIClient()
@@ -176,7 +196,9 @@ class TestLoyaltyFeatureFlag:
         below).
         """
         tenant = store_tenant("ff_loyal_anon", loyalty_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         with _loyalty_runtime(True):
@@ -195,7 +217,9 @@ class TestLoyaltyFeatureFlag:
         an absent row is "off" rather than "on".
         """
         tenant = store_tenant("ff_loyal_runtime_off", loyalty_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         with _loyalty_runtime(False):
@@ -205,7 +229,9 @@ class TestLoyaltyFeatureFlag:
 
     def test_tiers_when_loyalty_disabled(self, monkeypatch):
         tenant = store_tenant("ff_loyal_off", loyalty_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("loyalty:loyalty-tiers")
@@ -217,7 +243,9 @@ class TestLoyaltyFeatureFlag:
         from user.factories.account import UserAccountFactory
 
         tenant = store_tenant("ff_loyal_sum_off", loyalty_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         user = UserAccountFactory()
         client = APIClient()
@@ -231,7 +259,9 @@ class TestLoyaltyFeatureFlag:
         rejected by ``IsAuthenticated`` — the feature gate must NOT
         bypass auth."""
         tenant = store_tenant("ff_loyal_auth", loyalty_enabled=True)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("loyalty:loyalty-summary")
@@ -245,7 +275,9 @@ class TestLoyaltyFeatureFlag:
 
     def test_loyalty_disabled_is_404_not_403(self, monkeypatch):
         tenant = store_tenant("ff_loyal_404", loyalty_enabled=False)
-        monkeypatch.setattr(connection, "tenant", tenant, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", tenant, raising=False
+        )
 
         client = APIClient()
         url = reverse("loyalty:loyalty-tiers")
@@ -265,7 +297,9 @@ class TestLoyaltyFeatureFlag:
         deliberately anonymous now, so it could not tell a bypassed gate
         from a passed one.
         """
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
 
         client = APIClient()
         url = reverse("loyalty:loyalty-summary")

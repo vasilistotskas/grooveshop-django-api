@@ -62,6 +62,10 @@ msgid "%(chars)d chars, %(words)d words, %(lines)d lines"
 msgstr "%(chars)d chars, %(words)d words, %(lines)d lines"
 
 #, python-format
+msgid "%(client_name)s wants to access your %(site_name)s account."
+msgstr "%(client_name)s wants to access your %(site_name)s account."
+
+#, python-format
 msgid "%(code)s on cart %(cart)s"
 msgstr "%(code)s on cart %(cart)s"
 
@@ -1184,6 +1188,9 @@ msgstr "Accessory for"
 msgid "Account"
 msgstr "Account"
 
+msgid "Account Connections"
+msgstr "Account Connections"
+
 msgid "Account Transaction Created"
 msgstr "Account Transaction Created"
 
@@ -1784,6 +1791,9 @@ msgstr "Authenticator set up."
 msgid "Author"
 msgstr "Author"
 
+msgid "Authorize"
+msgstr "Authorize"
+
 msgid "Authors"
 msgstr "Authors"
 
@@ -1874,6 +1884,10 @@ msgstr "Back in stock (%(refunded)s/%(qty)s)"
 
 msgid "Back in stock (favourited product)"
 msgstr "Back in stock (favourited product)"
+
+#, python-format
+msgid "Back to %(store)s"
+msgstr "Back to %(store)s"
 
 msgid "Back to log in"
 msgstr "Back to log in"
@@ -2818,6 +2832,12 @@ msgstr "Change"
 
 msgid "Change (%)"
 msgstr "Change (%)"
+
+msgid "Change Email"
+msgstr "Change Email"
+
+msgid "Change Password"
+msgstr "Change Password"
 
 msgid "Change Type"
 msgstr "Change Type"
@@ -4203,11 +4223,8 @@ msgstr "Download BoxNow voucher (PDF)"
 msgid "Download PDF"
 msgstr "Download PDF"
 
-msgid "Download Token"
-msgstr "Download Token"
-
-msgid "Download a GDPR data export bundle"
-msgstr "Download a GDPR data export bundle"
+msgid "Download a GDPR data export"
+msgstr "Download a GDPR data export"
 
 msgid "Download shipping voucher (PDF)"
 msgstr "Download shipping voucher (PDF)"
@@ -7837,8 +7854,8 @@ msgstr "List of topic IDs to subscribe/unsubscribe"
 msgid "List public offers"
 msgstr "List public offers"
 
-msgid "List recent data-export requests for this user so the UI can show progress and the last download link."
-msgstr "List recent data-export requests for this user so the UI can show progress and the last download link."
+msgid "List recent data-export requests for this user so the UI can show their progress."
+msgstr "List recent data-export requests for this user so the UI can show their progress."
 
 msgid "List the coupons available for this cart"
 msgstr "List the coupons available for this cart"
@@ -8856,6 +8873,9 @@ msgstr "No stores yet"
 
 msgid "No stores yet."
 msgstr "No stores yet."
+
+msgid "No such export, or it is not ready"
+msgstr "No such export, or it is not ready"
 
 msgid "No term recorded"
 msgstr "No term recorded"
@@ -11088,8 +11108,8 @@ msgstr "Questions or already renewed? Reply to this email or contact us at %(ema
 msgid "Questions?"
 msgstr "Questions?"
 
-msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
-msgstr "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
+msgid "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
+msgstr "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
 
 msgid "Queued"
 msgstr "Queued"
@@ -11117,9 +11137,6 @@ msgstr "RabbitMQ"
 
 msgid "Random part length"
 msgstr "Random part length"
-
-msgid "Random token carried by the download URL."
-msgstr "Random token carried by the download URL."
 
 msgid "Rarely Used (1-2 products)"
 msgstr "Rarely Used (1-2 products)"
@@ -11908,9 +11925,6 @@ msgstr "Returns"
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Returns a list of the authenticated user's orders"
 
-msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
-msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
-
 msgid "Returns the notifications for a list of ids."
 msgstr "Returns the notifications for a list of ids."
 
@@ -12569,6 +12583,9 @@ msgstr "Session Key"
 msgid "Session key"
 msgstr "Session key"
 
+msgid "Sessions"
+msgstr "Sessions"
+
 msgid "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 msgstr "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 
@@ -12783,11 +12800,24 @@ msgstr "Show nothing rather than fewer than this many suggestions."
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 
+msgid "Sign In"
+msgstr "Sign In"
+
+msgid "Sign Out"
+msgstr "Sign Out"
+
+msgid "Sign Up"
+msgstr "Sign Up"
+
 msgid "Sign-in code"
 msgstr "Sign-in code"
 
 msgid "Signed Data Fingerprint"
 msgstr "Signed Data Fingerprint"
+
+#, python-format
+msgid "Signed in as %(email)s"
+msgstr "Signed in as %(email)s"
 
 msgid "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"
 msgstr "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"
@@ -13251,6 +13281,9 @@ msgstr "Streams the ACS label PDF through Django auth. Accessible by the order o
 
 msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 msgstr "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
+
+msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
+msgstr "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
 
 msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
 msgstr "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
@@ -13980,6 +14013,9 @@ msgstr "The exact consent sentence shown to the visitor."
 msgid "The exact email address of the person's existing platform account."
 msgstr "The exact email address of the person's existing platform account."
 
+msgid "The export has expired"
+msgstr "The export has expired"
+
 msgid "The failure's class and code; never the address."
 msgstr "The failure's class and code; never the address."
 
@@ -14483,9 +14519,6 @@ msgstr "This credit receipt is your proof of the refund — please keep it for y
 msgid "This document has no such block."
 msgstr "This document has no such block."
 
-msgid "This download link has expired."
-msgstr "This download link has expired."
-
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 
@@ -14494,6 +14527,9 @@ msgstr "This email is required and cannot be switched off."
 
 msgid "This email type does not exist."
 msgstr "This email type does not exist."
+
+msgid "This export has expired."
+msgstr "This export has expired."
 
 msgid "This field is required"
 msgstr "This field is required"
@@ -15020,6 +15056,9 @@ msgstr "Twitter/X profile URL. Must use https://. Empty → link hidden in store
 
 msgid "Two"
 msgstr "Two"
+
+msgid "Two-Factor Authentication"
+msgstr "Two-Factor Authentication"
 
 msgid "Two-step verification"
 msgstr "Two-step verification"
@@ -15941,8 +15980,8 @@ msgstr "When the customer was told the parcel is out for delivery. ACS's shipmen
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 
-msgid "When the download link stops working."
-msgstr "When the download link stops working."
+msgid "When the export can no longer be downloaded."
+msgstr "When the export can no longer be downloaded."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
@@ -16190,6 +16229,14 @@ msgstr "You already have an active alert of this kind for this product."
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
+
+#, python-format
+msgid ""
+"You are about to use your %(provider_name)s account to login to\n"
+"%(site_name)s. As a final step, please complete the following form:"
+msgstr ""
+"You are about to use your %(provider_name)s account to login to\n"
+"%(site_name)s. As a final step, please complete the following form:"
 
 msgid "You are already subscribed to the newsletter."
 msgstr "You are already subscribed to the newsletter."
@@ -17109,6 +17156,12 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Divider"
 #~ msgstr "Divider"
 
+#~ msgid "Download Token"
+#~ msgstr "Download Token"
+
+#~ msgid "Download a GDPR data export bundle"
+#~ msgstr "Download a GDPR data export bundle"
+
 #~ msgid "Email Template Management"
 #~ msgstr "Email Template Management"
 
@@ -17418,6 +17471,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "RFC 8058 one-click unsubscribe from all topics"
 #~ msgstr "RFC 8058 one-click unsubscribe from all topics"
 
+#~ msgid "Random token carried by the download URL."
+#~ msgstr "Random token carried by the download URL."
+
 #~ msgid "Reason for the refund"
 #~ msgstr "Reason for the refund"
 
@@ -17449,6 +17505,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Required compartment size: 1=Small, 2=Medium, 3=Large"
 #~ msgstr "Required compartment size: 1=Small, 2=Medium, 3=Large"
+
+#~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
+#~ msgstr "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
 
 #, python-format
 #~ msgid "Review #%(id)s: %(comment)s"
@@ -17558,6 +17617,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "There is a release after the first: someone published."
 #~ msgstr "There is a release after the first: someone published."
 
+#~ msgid "This download link has expired."
+#~ msgstr "This download link has expired."
+
 #~ msgid "This store already has page builder data."
 #~ msgstr "This store already has page builder data."
 
@@ -17585,9 +17647,6 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Trust Badges"
-
-#~ msgid "Two-factor authentication"
-#~ msgstr "Two-factor authentication"
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Unsubscribe from a topic via email link (GET)"
@@ -17622,6 +17681,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "What Is Microlearning"
 #~ msgstr "What Is Microlearning"
+
+#~ msgid "When the download link stops working."
+#~ msgstr "When the download link stops working."
 
 #~ msgid "Why Microlearning"
 #~ msgstr "Why Microlearning"

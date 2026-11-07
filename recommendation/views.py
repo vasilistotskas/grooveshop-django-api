@@ -42,6 +42,7 @@ from recommendation.serializers import (
     RecommendationQuerySerializer,
     RecommendationResponseSerializer,
 )
+from tenant.celery import publish_or_drop
 from tenant.permissions import (
     IsCatalogueEnabled,
     IsRecommendationsEnabled,
@@ -156,7 +157,8 @@ def recommendation_event(request):
     # The cart is the identity an ``attach`` is later matched on: the
     # storefront proxy forwards the same X-Cart-Id the basket uses.
     cart_uuid = cart_uuid_from_request(request)
-    record_recommendation_event.delay(
+    publish_or_drop(
+        record_recommendation_event,
         kind=data["kind"],
         surface=data["surface"],
         impression_id=str(data["impression_id"]),

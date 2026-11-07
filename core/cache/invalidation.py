@@ -62,6 +62,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 
 from core.cache.registry import iter_surfaces
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,12 @@ def _flush(schema_name: str) -> None:
         if cache.add(_SCHEDULED_KEY, True, timeout=PURGE_DELAY_SECONDS * 6):
             from core.tasks import invalidate_cache_surfaces_task
 
-            invalidate_cache_surfaces_task.apply_async(
-                countdown=PURGE_DELAY_SECONDS
+            # The schema is the one registered with the write, not
+            # whatever this hook finds on the connection when it fires.
+            dispatch_on_commit(
+                invalidate_cache_surfaces_task,
+                countdown=PURGE_DELAY_SECONDS,
+                schema_name=schema_name,
             )
     except Exception:
         logger.exception(

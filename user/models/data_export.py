@@ -12,9 +12,8 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
     """Tracks async generation of a user's GDPR data-export bundle.
 
     The actual payload (a single JSON file) is written to private media
-    storage by ``export_user_data_task``. The ``token`` column backs a
-    one-off download link that the email sends the user; it is not the
-    same as the user's auth token and carries no API access.
+    storage by ``export_user_data_task`` and reaches only its owner, signed
+    in (``UserAccountViewSet.download_data_export``).
     """
 
     class Status(models.TextChoices):
@@ -48,18 +47,11 @@ class UserDataExport(UUIDModel, TimeStampMixinModel):
         null=True,
         blank=True,
     )
-    token = models.CharField(
-        _("Download Token"),
-        max_length=64,
-        unique=True,
-        db_index=True,
-        help_text=_("Random token carried by the download URL."),
-    )
     expires_at = models.DateTimeField(
         _("Expires At"),
         null=True,
         blank=True,
-        help_text=_("When the download link stops working."),
+        help_text=_("When the export can no longer be downloaded."),
     )
     error_message = models.TextField(
         _("Error Message"),

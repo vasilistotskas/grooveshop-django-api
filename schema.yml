@@ -4,6 +4,28 @@ info:
   version: 1.0.0
   description: GrooveShop API
 paths:
+  /api/v1/agent/internal/order/{uuid}:
+    get:
+      operationId: getAgentInternalOrder
+      description: An order the agent gateway placed. Requires the gateway's shared
+        secret in `X-Internal-Token`; any other caller or order gets 404.
+      summary: Read an order (agent gateway only)
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Agent
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: ''
   /api/v1/agent/me:
     get:
       operationId: getAgentProfile
@@ -31876,8 +31898,8 @@ paths:
   /api/v1/user/account/{id}/data_exports:
     get:
       operationId: listUserAccountDataExports
-      description: Λίστα πρόσφατων αιτημάτων εξαγωγής δεδομένων για αυτόν τον χρήστη,
-        ώστε η διεπαφή να εμφανίζει την πρόοδο και τον τελευταίο σύνδεσμο λήψης.
+      description: Παραθέτει τα πρόσφατα αιτήματα εξαγωγής δεδομένων αυτού του χρήστη,
+        ώστε η διεπαφή να δείχνει την πρόοδό τους.
       summary: Λίστα εξαγωγών δεδομένων GDPR
       parameters:
       - in: query
@@ -31986,6 +32008,80 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedUserDataExportList'
           description: ''
+  /api/v1/user/account/{id}/data_exports/{export_id}/download:
+    get:
+      operationId: downloadUserAccountDataExport
+      description: 'Επιστρέφει το αρχείο JSON μιας εξαγωγής δεδομένων αυτού του χρήστη.
+        Μόνο ο κάτοχος του λογαριασμού μπορεί να το διαβάσει, συνδεδεμένος: η διεύθυνση
+        δεν περιέχει διαπιστευτήριο.'
+      summary: Λήψη εξαγωγής δεδομένων GDPR
+      parameters:
+      - in: path
+        name: exportId
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - User Accounts
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/ApiValidationError'
+                - $ref: '#/components/schemas/ApiError'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Δεν υπάρχει τέτοια εξαγωγή ή δεν είναι έτοιμη
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '410':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Η εξαγωγή έχει λήξει
   /api/v1/user/account/{id}/delete_account:
     post:
       operationId: deleteUserAccountGdpr
@@ -32651,9 +32747,9 @@ paths:
   /api/v1/user/account/{id}/request_data_export:
     post:
       operationId: requestUserAccountDataExport
-      description: Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη
-        και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή
-        UserDataExport.
+      description: Βάζει σε ουρά μια εργασία που συγκεντρώνει τα προσωπικά δεδομένα
+        του χρήστη και τον ενημερώνει με email όταν είναι έτοιμα. Επιστρέφει τη νέα
+        εγγραφή UserDataExport.
       summary: Αίτημα εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
@@ -33444,30 +33540,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddressDetail'
           description: ''
-  /api/v1/user/data_export/{token}/download:
-    get:
-      operationId: downloadUserDataExport
-      description: Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token
-        έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και
-        λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής.
-      summary: Λήψη πακέτου εξαγωγής δεδομένων GDPR
-      parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-        required: true
-      tags:
-      - User Accounts
-      security:
-      - {}
-      responses:
-        '200':
-          description: No response body
-        '404':
-          description: No response body
-        '410':
-          description: No response body
   /api/v1/user/email-preferences:
     get:
       operationId: getEmailPreferences
@@ -53510,9 +53582,6 @@ components:
         status:
           type: string
           readOnly: true
-        token:
-          type: string
-          readOnly: true
         fileSize:
           type: integer
           readOnly: true
@@ -53526,18 +53595,12 @@ components:
           type: string
           format: date-time
           readOnly: true
-        downloadUrl:
-          type: string
-          nullable: true
-          readOnly: true
       required:
       - createdAt
-      - downloadUrl
       - expiresAt
       - fileSize
       - id
       - status
-      - token
     UserDetails:
       type: object
       properties:

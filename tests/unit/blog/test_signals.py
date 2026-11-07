@@ -38,7 +38,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set={self.liker_user.id},
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_reverse_action(self):
         with patch("blog.tasks.notify_comment_liked_task") as mock_task:
@@ -49,7 +49,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=True,
                 pk_set={self.liker_user.id},
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_empty_pk_set(self):
         with patch("blog.tasks.notify_comment_liked_task") as mock_task:
@@ -60,7 +60,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set=set(),
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_none_pk_set(self):
         with patch("blog.tasks.notify_comment_liked_task") as mock_task:
@@ -71,7 +71,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set=None,
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_dispatches_task(self):
         with patch("blog.tasks.notify_comment_liked_task") as mock_task:
@@ -82,7 +82,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set={self.liker_user.id},
             )
-            mock_task.delay.assert_called_once()
+            mock_task.apply_async.assert_called_once()
 
     def test_receiver_no_comment_user(self):
         """Receiver should not dispatch task if comment has no user."""
@@ -97,7 +97,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set={self.liker_user.id},
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_no_post(self):
         """Receiver should not dispatch task if comment has no post."""
@@ -112,7 +112,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set={self.liker_user.id},
             )
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
     def test_receiver_task_called_with_correct_args(self):
         """Receiver passes correct arguments to the Celery task."""
@@ -124,7 +124,7 @@ class TestNotifyCommentLikedReceiver(TestCase):
                 reverse=False,
                 pk_set={self.liker_user.id},
             )
-            call_kwargs = mock_task.delay.call_args.kwargs
+            call_kwargs = mock_task.apply_async.call_args.kwargs["kwargs"]
             assert call_kwargs["comment_id"] == self.comment.id
             assert call_kwargs["comment_owner_id"] == self.comment_user.id
             assert list(call_kwargs["liker_user_ids"]) == [self.liker_user.id]

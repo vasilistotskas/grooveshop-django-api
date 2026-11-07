@@ -67,6 +67,10 @@ msgid "%(chars)d chars, %(words)d words, %(lines)d lines"
 msgstr "%(chars)d χαρακτήρες, %(words)d λέξεις, %(lines)d γραμμές"
 
 #, python-format
+msgid "%(client_name)s wants to access your %(site_name)s account."
+msgstr "Η εφαρμογή %(client_name)s θέλει πρόσβαση στο λογαριασμό σας %(site_name)s."
+
+#, python-format
 msgid "%(code)s on cart %(cart)s"
 msgstr "%(code)s στο καλάθι %(cart)s"
 
@@ -1189,6 +1193,9 @@ msgstr "Αξεσουάρ για"
 msgid "Account"
 msgstr "Λογαριασμός"
 
+msgid "Account Connections"
+msgstr "Συνδέσεις Λογαριασμού"
+
 msgid "Account Transaction Created"
 msgstr "Δημιουργία συναλλαγής λογαριασμού"
 
@@ -1789,6 +1796,9 @@ msgstr "Η εφαρμογή ταυτοποίησης ρυθμίστηκε."
 msgid "Author"
 msgstr "Συντάκτης"
 
+msgid "Authorize"
+msgstr "Εξουσιοδότηση"
+
 msgid "Authors"
 msgstr "Συντάκτες"
 
@@ -1879,6 +1889,10 @@ msgstr "Επέστρεψαν στο απόθεμα (%(refunded)s/%(qty)s)"
 
 msgid "Back in stock (favourited product)"
 msgstr "Διαθέσιμο ξανά (αγαπημένο προϊόν)"
+
+#, python-format
+msgid "Back to %(store)s"
+msgstr "Επιστροφή στο %(store)s"
 
 msgid "Back to log in"
 msgstr "Πίσω στη σύνδεση"
@@ -2825,6 +2839,12 @@ msgstr "Αλλαγή"
 
 msgid "Change (%)"
 msgstr "Μεταβολή (%)"
+
+msgid "Change Email"
+msgstr "Αλλαγή ηλεκτρονικού ταχυδρομείου"
+
+msgid "Change Password"
+msgstr "Αλλαγή συνθηματικού"
 
 msgid "Change Type"
 msgstr "Τύπος Αλλαγής"
@@ -4208,11 +4228,8 @@ msgstr "Λήψη BoxNow voucher (PDF)"
 msgid "Download PDF"
 msgstr "Λήψη PDF"
 
-msgid "Download Token"
-msgstr "Token Λήψης"
-
-msgid "Download a GDPR data export bundle"
-msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
+msgid "Download a GDPR data export"
+msgstr "Λήψη εξαγωγής δεδομένων GDPR"
 
 msgid "Download shipping voucher (PDF)"
 msgstr "Λήψη voucher αποστολής (PDF)"
@@ -7845,8 +7862,8 @@ msgstr "Λίστα ID θεμάτων για εγγραφή/απεγγραφή"
 msgid "List public offers"
 msgstr "Λίστα δημόσιων προσφορών"
 
-msgid "List recent data-export requests for this user so the UI can show progress and the last download link."
-msgstr "Λίστα πρόσφατων αιτημάτων εξαγωγής δεδομένων για αυτόν τον χρήστη, ώστε η διεπαφή να εμφανίζει την πρόοδο και τον τελευταίο σύνδεσμο λήψης."
+msgid "List recent data-export requests for this user so the UI can show their progress."
+msgstr "Παραθέτει τα πρόσφατα αιτήματα εξαγωγής δεδομένων αυτού του χρήστη, ώστε η διεπαφή να δείχνει την πρόοδό τους."
 
 msgid "List the coupons available for this cart"
 msgstr "Λίστα των διαθέσιμων κουπονιών για αυτό το καλάθι"
@@ -8863,6 +8880,9 @@ msgstr "Δεν υπάρχουν καταστήματα ακόμα"
 
 msgid "No stores yet."
 msgstr "Δεν υπάρχουν καταστήματα ακόμα."
+
+msgid "No such export, or it is not ready"
+msgstr "Δεν υπάρχει τέτοια εξαγωγή ή δεν είναι έτοιμη"
 
 msgid "No term recorded"
 msgstr "Χωρίς καταχωρημένη περίοδο"
@@ -11096,8 +11116,8 @@ msgstr "Απορίες ή έχετε ήδη ανανεώσει; Απαντήστ
 msgid "Questions?"
 msgstr "Ερωτήσεις;"
 
-msgid "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record."
-msgstr "Ουρά εργασίας που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και αποστέλλει με email έναν εφάπαξ σύνδεσμο λήψης. Επιστρέφει τη νέα εγγραφή UserDataExport."
+msgid "Queue a job that compiles the user's personal data and emails them when it is ready. Returns the new UserDataExport record."
+msgstr "Βάζει σε ουρά μια εργασία που συγκεντρώνει τα προσωπικά δεδομένα του χρήστη και τον ενημερώνει με email όταν είναι έτοιμα. Επιστρέφει τη νέα εγγραφή UserDataExport."
 
 msgid "Queued"
 msgstr "Σε αναμονή"
@@ -11125,9 +11145,6 @@ msgstr "RabbitMQ"
 
 msgid "Random part length"
 msgstr "Μήκος τυχαίου τμήματος"
-
-msgid "Random token carried by the download URL."
-msgstr "Τυχαίο token που φέρει το URL λήψης."
 
 msgid "Rarely Used (1-2 products)"
 msgstr "Σπάνια σε χρήση (1-2 προϊόντα)"
@@ -11915,9 +11932,6 @@ msgstr "Επιστροφές"
 msgid "Returns a list of the authenticated user's orders"
 msgstr "Επιστρέφει λίστα με τις παραγγελίες του συνδεδεμένου χρήστη"
 
-msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
-msgstr "Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής."
-
 msgid "Returns the notifications for a list of ids."
 msgstr "Επιστρέφει τις ειδοποιήσεις για μια λίστα αναγνωριστικών."
 
@@ -12576,6 +12590,9 @@ msgstr "Κλειδί συνεδρίας"
 msgid "Session key"
 msgstr "Κλειδί συνεδρίας"
 
+msgid "Sessions"
+msgstr "Συνεδρίες"
+
 msgid "Set MYDATA_ENVIRONMENT to 'prod' when you are ready."
 msgstr "Ορίστε το MYDATA_ENVIRONMENT σε 'prod' όταν είστε έτοιμοι."
 
@@ -12790,11 +12807,24 @@ msgstr "Να μην εμφανίζεται τίποτα αντί για λιγό
 msgid "Shown to shoppers and sent to shopping platforms (Google's item group title) for every product in the group. Use the product's title without the variation, per language."
 msgstr "Εμφανίζεται στους αγοραστές και αποστέλλεται στις πλατφόρμες αγορών (ως τίτλος ομάδας προϊόντων της Google) για κάθε προϊόν της ομάδας. Χρησιμοποιήστε τον τίτλο του προϊόντος χωρίς τη διαφοροποίηση, ανά γλώσσα."
 
+msgid "Sign In"
+msgstr "Είσοδος"
+
+msgid "Sign Out"
+msgstr "Αποσύνδεση"
+
+msgid "Sign Up"
+msgstr "Εγγραφή"
+
 msgid "Sign-in code"
 msgstr "Κωδικός σύνδεσης"
 
 msgid "Signed Data Fingerprint"
 msgstr "Αποτύπωμα Υπογεγραμμένων Δεδομένων"
+
+#, python-format
+msgid "Signed in as %(email)s"
+msgstr "Έχετε συνδεθεί ως %(email)s"
 
 msgid "Signed: positive adds balance (issue/refund credit), negative removes it (redeem/expire)"
 msgstr "Προσημασμένο: θετικό προσθέτει υπόλοιπο (έκδοση/πίστωση επιστροφής), αρνητικό αφαιρεί (εξαργύρωση/λήξη)"
@@ -13256,6 +13286,9 @@ msgstr "Μεταδίδει το PDF ετικέτας ACS μέσω ταυτοπο
 
 msgid "Streams the BoxNow label PDF through Django auth. Accessible by the order owner or store staff; guest orders cannot download labels. Returns 404 when no BoxNow shipment exists for the order or the parcel ID has not yet been assigned."
 msgstr "Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο από τον ιδιοκτήτη της παραγγελίας ή το προσωπικό του καταστήματος· οι παραγγελίες επισκεπτών δεν μπορούν να κατεβάσουν ετικέτες. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία ή δεν έχει ακόμα ανατεθεί ID δέματος."
+
+msgid "Streams the JSON bundle of one of this user's data exports. Only the account's owner can read it, signed in: the address holds no credential."
+msgstr "Επιστρέφει το αρχείο JSON μιας εξαγωγής δεδομένων αυτού του χρήστη. Μόνο ο κάτοχος του λογαριασμού μπορεί να το διαβάσει, συνδεδεμένος: η διεύθυνση δεν περιέχει διαπιστευτήριο."
 
 msgid "Streams the retail receipt PDF through Django auth, from the configured storage (S3 in production, the filesystem in development), so the storage URL is never exposed to the client. 404 unless the receipt is registered with AADE (myDATA). Same access check as the metadata endpoint."
 msgstr "Μεταδίδει το PDF της απόδειξης λιανικής μέσω ταυτοποίησης Django, από τον ρυθμισμένο χώρο αποθήκευσης (S3 σε παραγωγή, σύστημα αρχείων σε ανάπτυξη), ώστε το URL αποθήκευσης να μην εκτίθεται ποτέ στον client. 404 εκτός αν η απόδειξη έχει καταχωριστεί στην ΑΑΔΕ (myDATA). Ίδιος έλεγχος πρόσβασης όπως και το endpoint μεταδεδομένων."
@@ -13983,6 +14016,9 @@ msgstr "Η ακριβής φράση συγκατάθεσης που είδε ο
 msgid "The exact email address of the person's existing platform account."
 msgstr "Η ακριβής διεύθυνση email του υπάρχοντος λογαριασμού πλατφόρμας του ατόμου."
 
+msgid "The export has expired"
+msgstr "Η εξαγωγή έχει λήξει"
+
 msgid "The failure's class and code; never the address."
 msgstr "Η κλάση και ο κωδικός του σφάλματος· ποτέ η διεύθυνση."
 
@@ -14486,9 +14522,6 @@ msgstr "Αυτή η πιστωτική απόδειξη αποδεικνύει �
 msgid "This document has no such block."
 msgstr "Αυτό το έγγραφο δεν έχει τέτοιο μπλοκ."
 
-msgid "This download link has expired."
-msgstr "Ο σύνδεσμος λήψης έχει λήξει."
-
 msgid "This drops the Postgres schema and every row inside it — for good. It cannot be undone."
 msgstr "Αυτό διαγράφει οριστικά το schema της PostgreSQL και κάθε εγγραφή μέσα σε αυτό. Η ενέργεια δεν μπορεί να αναιρεθεί."
 
@@ -14497,6 +14530,9 @@ msgstr "Αυτό το email είναι υποχρεωτικό και δεν μπ
 
 msgid "This email type does not exist."
 msgstr "Αυτός ο τύπος email δεν υπάρχει."
+
+msgid "This export has expired."
+msgstr "Η εξαγωγή έχει λήξει."
 
 msgid "This field is required"
 msgstr "Αυτό το πεδίο είναι υποχρεωτικό"
@@ -15023,6 +15059,9 @@ msgstr "URL προφίλ Twitter/X. Πρέπει να χρησιμοποιεί h
 
 msgid "Two"
 msgstr "Δύο"
+
+msgid "Two-Factor Authentication"
+msgstr "Έλεγχος ταυτότητας δύο παραγόντων"
 
 msgid "Two-step verification"
 msgstr "Επαλήθευση σε δύο βήματα"
@@ -15944,8 +15983,8 @@ msgstr "Πότε ενημερώθηκε ο πελάτης ότι το δέμα �
 msgid "When the decision last took its current value. A receipt issued after it is reduced by the chargeback; one issued before it is credited."
 msgstr "Πότε η απόφαση πήρε τελευταία την τρέχουσα τιμή. Μια απόδειξη που εκδίδεται μετά μειώνεται κατά το chargeback· μια που εκδόθηκε πριν πιστώνεται."
 
-msgid "When the download link stops working."
-msgstr "Πότε σταματά να λειτουργεί ο σύνδεσμος λήψης."
+msgid "When the export can no longer be downloaded."
+msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία από το κατάστημα. Η πώληση μετράει στον μήνα αυτής της στιγμής (αναφορά τζίρου)· μια παραγγελία που δεν στάλθηκε ποτέ δεν έχει τιμή."
@@ -16193,6 +16232,14 @@ msgstr "Έχετε ήδη ενεργή ειδοποίηση αυτού του τ
 #, python-brace-format
 msgid "You already have {count} orders waiting for their payment. Pay for or cancel one before placing another."
 msgstr "Έχετε ήδη {count} παραγγελίες που περιμένουν πληρωμή. Πληρώστε ή ακυρώστε μία πριν κάνετε άλλη."
+
+#, python-format
+msgid ""
+"You are about to use your %(provider_name)s account to login to\n"
+"%(site_name)s. As a final step, please complete the following form:"
+msgstr ""
+"Πρόκειται να χρησιμοποιήσετε τον %(provider_name)s λογαριασμό σας για να συνδεθείτε στην σελίδα\n"
+"%(site_name)s. Ως τελικό βήμα, παρακαλούμε συμπληρώστε την παρακάτω φόρμα:"
 
 msgid "You are already subscribed to the newsletter."
 msgstr "Είστε ήδη εγγεγραμμένος/η στο newsletter."
@@ -17328,6 +17375,12 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Divider"
 #~ msgstr "Διαχωριστικό"
 
+#~ msgid "Download Token"
+#~ msgstr "Token Λήψης"
+
+#~ msgid "Download a GDPR data export bundle"
+#~ msgstr "Λήψη πακέτου εξαγωγής δεδομένων GDPR"
+
 #, python-format
 #~ msgid "Each CSP source must start with 'https://', 'http://localhost', or 'wss://'. Invalid entries: %(bad)s"
 #~ msgstr "Κάθε πηγή CSP πρέπει να ξεκινά με 'https://', 'http://localhost' ή 'wss://'. Μη έγκυρες καταχωρήσεις: %(bad)s"
@@ -18021,6 +18074,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "RFC 8058 one-click unsubscribe from all topics"
 #~ msgstr "Απεγγραφή με ένα κλικ από όλα τα θέματα κατά RFC 8058"
 
+#~ msgid "Random token carried by the download URL."
+#~ msgstr "Τυχαίο token που φέρει το URL λήψης."
+
 #~ msgid "Ready Status"
 #~ msgstr "Κατάσταση Ετοιμότητας"
 
@@ -18069,6 +18125,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Requires setup"
 #~ msgstr "Απαιτείται διαμόρφωση"
+
+#~ msgid "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced."
+#~ msgstr "Επιστρέφει το πακέτο JSON που παρήγαγε η εργασία εξαγωγής. Το token έχει ένα μόνο πεδίο εφαρμογής, συνδέεται με μία εγγραφή UserDataExport, και λήγει 7 ημέρες μετά την παραγωγή της εξαγωγής."
 
 #~ msgid "Revenue (€)"
 #~ msgstr "Έσοδα (€)"
@@ -18287,6 +18346,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "This Week's Highlights: %(start)s to %(end)s"
 #~ msgstr "Τα σημαντικότερα της εβδομάδας: %(start)s έως %(end)s"
 
+#~ msgid "This download link has expired."
+#~ msgstr "Ο σύνδεσμος λήψης έχει λήξει."
+
 #~ msgid "This store already has page builder data."
 #~ msgstr "Αυτό το κατάστημα έχει ήδη δεδομένα του δημιουργού σελίδων."
 
@@ -18330,9 +18392,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Σήματα εμπιστοσύνης"
-
-#~ msgid "Two-factor authentication"
-#~ msgstr "Διπλή επαλήθευση"
 
 #~ msgid "Unable to process refund for this order."
 #~ msgstr "Δεν ήταν δυνατή η επεξεργασία επιστροφής χρημάτων για αυτή την παραγγελία."
@@ -18428,6 +18487,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "What Is Microlearning"
 #~ msgstr "Τι είναι η μικρομάθηση"
+
+#~ msgid "When the download link stops working."
+#~ msgstr "Πότε σταματά να λειτουργεί ο σύνδεσμος λήψης."
 
 #~ msgid "Whether new users are automatically subscribed to this topic"
 #~ msgstr "Αν οι νέοι χρήστες εγγράφονται αυτόματα σε αυτό το θέμα"

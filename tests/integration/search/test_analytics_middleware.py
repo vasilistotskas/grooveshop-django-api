@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import RequestFactory
 from django.urls import Resolver404, resolve
+from kombu.exceptions import OperationalError
 
 from search.middleware import SearchAnalyticsMiddleware
 from search.models import SearchQuery
@@ -471,6 +472,25 @@ class TestSearchAnalyticsMiddlewareEdgeCases:
         with patch("search.tasks.save_search_query.delay") as delay:
             middleware(request)
         delay.assert_not_called()
+
+    def test_in_an_outage_the_next_search_does_not_wait_for_the_broker(
+        self, request_factory, middleware
+    ):
+        from django.contrib.sessions.backends.db import SessionStore
+
+        with patch(
+            "search.tasks.save_search_query.delay",
+            side_effect=OperationalError("broker unreachable"),
+        ) as delay:
+            for _ in range(2):
+                request = request_factory.get(
+                    "/api/v1/search/product", {"query": "x"}
+                )
+                request.user = Mock(is_authenticated=False)
+                request.session = SessionStore()
+                middleware(request)
+
+        delay.assert_called_once()
 
     def test_a_session_cookie_with_no_stored_session_is_not_recorded(
         self, request_factory, middleware

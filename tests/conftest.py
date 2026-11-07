@@ -368,6 +368,12 @@ def _start_with_an_empty_worker_cache():
 
 
 @pytest.fixture(autouse=True)
+def _broker_not_known_down(monkeypatch):
+    """One test failing a publish must not stop the next from trying its own."""
+    monkeypatch.setattr("tenant.celery._broker_down_until", 0.0)
+
+
+@pytest.fixture(autouse=True)
 def clear_caches():
     yield
     _reset_worker_cache()

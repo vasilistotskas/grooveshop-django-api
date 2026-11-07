@@ -71,6 +71,28 @@ def _safe_repr(value: Any, key: str | None = None) -> str:
     return text
 
 
+def safe_task_arguments(
+    task: Any, args: Any, kwargs: Any
+) -> tuple[list[str], dict[str, str]]:
+    """A task's arguments as a log line may show them.
+
+    Masks what ``_safe_repr`` catches by name and what the task declares in
+    ``sensitive_kwargs``. ``task`` is ``None`` when nothing in this process
+    knows it: nothing then says which of its values is secret, so none is
+    shown.
+    """
+    if task is None:
+        return ["***"] * len(args or []), dict.fromkeys(kwargs or {}, "***")
+    sensitive = getattr(task, "sensitive_kwargs", frozenset())
+    return (
+        [_safe_repr(a) for a in (args or [])],
+        {
+            k: ("***" if k in sensitive else _safe_repr(v, key=k))
+            for k, v in (kwargs or {}).items()
+        },
+    )
+
+
 class MonitoredTask(TenantTask):
     """Base task with tenant context propagation and monitoring."""
 
@@ -102,12 +124,7 @@ class MonitoredTask(TenantTask):
         )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        safe_args = [_safe_repr(a) for a in (args or [])]
-        sensitive = self.sensitive_kwargs
-        safe_kwargs = {
-            k: ("***" if k in sensitive else _safe_repr(v, key=k))
-            for k, v in (kwargs or {}).items()
-        }
+        safe_args, safe_kwargs = safe_task_arguments(self, args, kwargs)
         # ``exc_info=exc`` and not ``einfo.exception``: Celery wraps the
         # latter in billiard's ``ExceptionWithTraceback`` (its ``str()``
         # is the traceback text and its ``__traceback__`` is ``None``),

@@ -3,7 +3,6 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from user.views.account import UserAccountViewSet
 from user.views.address import UserAddressViewSet
-from user.views.data_export import UserDataExportDownloadView
 from user.views.email_preferences import EmailPreferencesView
 from user.views.subscription import (
     ConfirmSubscriptionByTokenView,
@@ -84,6 +83,11 @@ urlpatterns = [
         name="user-account-data-exports",
     ),
     path(
+        "user/account/<int:pk>/data_exports/<int:export_id>/download",
+        UserAccountViewSet.as_view({"get": "download_data_export"}),
+        name="user-account-download-data-export",
+    ),
+    path(
         "user/account/<int:pk>/request_data_export",
         UserAccountViewSet.as_view({"post": "request_data_export"}),
         name="user-account-request-data-export",
@@ -92,11 +96,6 @@ urlpatterns = [
         "user/account/<int:pk>/delete_account",
         UserAccountViewSet.as_view({"post": "delete_account"}),
         name="user-account-delete-account",
-    ),
-    path(
-        "user/data_export/<str:token>/download",
-        UserDataExportDownloadView.as_view(),
-        name="user-data-export-download",
     ),
     path(
         "user/address",

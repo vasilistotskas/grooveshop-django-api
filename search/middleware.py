@@ -91,7 +91,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         Track search query without blocking the response.
 
-        Dispatches a Celery task with ``.delay()`` so the DB write is
+        Dispatches a Celery task with ``publish_or_drop`` so the DB write is
         decoupled from the request/response cycle.
 
         Args:
@@ -183,12 +183,13 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-            # Celery .delay() is the fire-and-forget primitive here —
-            # no transaction.on_commit() wrapper needed (and it would be
-            # a no-op in autocommit mode anyway).
+            # Fire and forget: no transaction.on_commit() wrapper needed
+            # (it would be a no-op in autocommit mode anyway).
             from search.tasks import save_search_query
+            from tenant.celery import publish_or_drop
 
-            save_search_query.delay(
+            publish_or_drop(
+                save_search_query,
                 query=query,
                 language_code=language_code,
                 content_type=content_type,

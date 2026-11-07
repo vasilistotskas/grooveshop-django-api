@@ -3,6 +3,327 @@
 
 
 
+## v3.232.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): drop the data-export token column (#515)
+
+The contract half of 0035: nothing has written or read the column since
+that release.
+
+
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`6e83e4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e83e4b7af1b51b10d8de54757104eaf3b7b4bf5))
+
+## v3.232.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(accounts): show who is signed in, and mark destructive buttons
+
+allauth's default layout listed Sign Out on every page, and the new frame
+dropped it outside the account-management pages. On the OAuth consent a
+shopper on a shared device could then only grant an AI app the account
+already signed in. The frame now names the signed-in email with a Sign Out
+link, or offers Sign In to a signed-out visitor.
+
+Buttons allauth tags "danger" (remove an address, deactivate a factor) were
+drawn as the primary action; they get their own style. The consent and social
+sign-up pages reuse the frame's brand instead of reading it a second time, and
+both sentences take allauth's own Greek. The tests now show a store's own
+colour reaching the page instead of passing on the default palette.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+* fix(accounts): sign out from the consent and come back to it
+
+The Sign Out link carries the page as next, so a shopper who switches account
+on the OAuth consent returns to it. The tests now check the store name inside
+the consent and social sign-up sentences, where a missing brand would show,
+and that a signed-out page offers Sign In while the sign-in page does not.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+### Features
+
+* feat(accounts): sign-in and consent pages wear the store (#514) ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+* feat(accounts): sign-in and consent pages wear the store
+
+An AI agent sends a shopper to /accounts/login/ and then to the OAuth
+consent on the store's API host. Every page allauth renders there used its
+bare default layout: no stylesheet and a "Menu:" list. They now share one
+frame with the store's name, logo, favicon and primary colour, read with the
+helpers email and the admin already use, in light and dark colour schemes.
+Buttons take their role from allauth's tags.
+
+The consent and social sign-up pages named the django.contrib.sites site of
+SITE_ID, one row for every store, so a demo-store shopper read that Claude
+wanted to access a Webside account. Both now name the store, and the consent
+sentence has its Greek translation.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`605520b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/605520bd6a1ab8925094fd5bb9dc9c8a98bba180))
+
+## v3.231.6 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): take the data-export token out of the code (#511) ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
+* fix(user): take the data-export token out of the code
+
+Nothing reads it since the public download went, and the scheduler's
+contract release ended the rollback that still wrote it. The column becomes
+nullable and leaves Django's state; the next release drops it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
+* fix(user): build the export email's sample without a token
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`3f913a7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f913a72f921e70b3d782a638baf5009d13ab694))
+
+## v3.231.5 (2026-11-07)
+
+### Bug fixes
+
+* fix(docker): write stdout as it is printed in the production image (#513) ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
+* fix(docker): write stdout as it is printed in the production image
+
+Off a terminal Python buffers stdout in blocks, and the production image
+did not set PYTHONUNBUFFERED (the dev image does). What is printed
+rather than logged, celery beat's and worker's start banner and a
+management command's output, reached the logs only when the process
+exited, and never if it was killed: production's beat banner showed the
+previous pod's start time when the pod stopped, which read as a clock
+error. Logging flushes every record, so log lines were never late.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
+### Continuous integration
+
+* ci(coderabbit): review each pull request once, and again only when asked (#512)
+
+CodeRabbit reviews this repository on its free open-source tier: 1 to 10
+reviews an hour by stars, per author and per repository, and every push
+counts. Last week 67 of its 214 reviews across our repositories were
+re-reviews after a push. A pull request is now reviewed when it is opened
+or marked ready, and again only on `@coderabbitai review`. `drafts: false`
+is stated because the draft-first rule depends on it, and
+`inheritance: true` lets settings made in the CodeRabbit app fill in;
+`@coderabbitai configuration` showed none are set today.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`5a6e0bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a6e0bfd6b7638b108d97a7c5477cc031addc053))
+
+### Documentation
+
+* docs(docker): only beat's banner was late, not the worker's
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`2416528`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2416528808a4b213e80cd51f95071672e4c100e6))
+
+## v3.231.4 (2026-11-07)
+
+### Bug fixes
+
+* fix(scheduler): drop django-celery-beat's tables and rows (#510) ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+### Refactoring
+
+* refactor(scheduler): drop django-celery-beat's tables and rows
+
+scheduler 0002 is the contract step of 0001 (contract_of): it drops the
+six django_celery_beat tables in public, and in every schema deletes the
+app's django_migrations rows, content types and permissions, with what
+points at them as Django's on_delete would (group and user permissions
+and tagged items deleted, admin log entries keep their text with no
+content type). The scheduler no longer adopts the old beat's last runs
+on start: nothing writes those tables any more.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+### Testing
+
+* test(scheduler): run the whole schedule through five simulated weeks
+
+A soak of a day or two never reaches the weekly and monthly entries. Run every
+entry production declares through the real scheduler, across a month boundary
+and the autumn clock change, and check each fired exactly when an independent
+reading of its crontab says, exactly once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+* test(scheduler): cover a store schema and pin the production schedule
+
+The cleanup of django-celery-beat's rows is now checked in a second
+schema as well as public, one without the permission link tables. The
+five-week simulation pins backups on and a Kubernetes pod, so it checks
+the entries production declares wherever it runs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGZNWBah9VJDs8Qpbbj
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`b6bf4fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6bf4fbedc6e425a0e353a9e60a24174118c81ef))
+
+## v3.231.3 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): remove the public data-export download (#507) ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): remove the public data-export download
+
+A token in a URL was all anyone needed to read a person's whole data
+bundle for 7 days. The storefront now downloads through the owner's
+route, so the public route goes, with token and download_url from the
+API.
+
+The column stays and keeps being written, because a rollback target still
+reads it, so this release has no migration. New files are named by the
+row's uuid.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): keep the export ledger read-only without the token
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+* fix(user): let a rerun of an export keep the file it named
+
+A bundle written before this release is named by its token. A rerun wrote a
+second, uuid-named file and pointed the row at it, leaving the first where
+neither the expiry sweep nor an erasure finds it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`5991afa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5991afa1baeee3c5e8ea572c54f89003466c0888))
+
+## v3.231.2 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): run one deferred dispatch sweep at a time (#508)
+
+redispatch_deferred_tasks runs one sweep at a time, held by a session-level advisory lock outside any transaction, instead of claiming rows with a lease. While RabbitMQ blocks publishers a publish waits without end (measured: still waiting at 75 s, with or without a publish timeout, since closing the channel waits too), so any lease could be outlived and two sweeps would send the same rows. A sweep that finds the lock held does nothing and logs a WARNING with what is due; an unlock that releases nothing is an ERROR, since the connection pool resets nothing. The lock ends with the session if the worker dies. DEFERRED_DISPATCH_LEASE_SECONDS is removed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`775b5fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/775b5fedd38dc954890b04f85c14ca3b1a158583))
+
+## v3.231.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(core): publish tasks after a commit through dispatch_on_commit (#506)
+
+Every task that follows a committed change now goes through dispatch_on_commit, so a broker outage no longer answers 500 for work that was done, or loses that work.
+
+After one failed publish a process keeps the next ones without trying for DEFERRED_DISPATCH_BROKER_DOWN_SECONDS; on a closed port one order held its request 52.7 s without this. Analytics beacons go through publish_or_drop and share that window.
+
+redispatch_deferred_tasks publishes outside a transaction, claiming rows with a lease (DEFERRED_DISPATCH_LEASE_SECONDS). Holding one transaction across the batch lost it to idle_in_transaction_session_timeout on real Postgres, which sent published rows a second time.
+
+Logs of a kept or given-up dispatch use the mask a failed task's log uses, since a password reset's payload holds the live link.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGWo8gW41rU8TU53jYU ([`8b02a0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b02a0f8027e758cf38662e0be5ef3eb9d8eecbd))
+
+## v3.231.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(user): keep a data export from store staff
+
+The viewset's check lets store staff through, and walking ids would hand
+them every customer's whole bundle. Only the owner reads it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* fix(user): leave an expired export for the cleanup to remove
+
+Opening an expired export marked its row expired, and the cleanup skips
+rows that are, so the bundle stayed on disk for good. Only the cleanup
+marks a row now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+### Features
+
+* feat(user): let the account's owner download a data export (#505) ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+* feat(user): let the account's owner download a data export
+
+The bundle is the most complete copy of a person's data the system makes,
+and its only route is public: whoever holds the token can read it for 7
+days. Add a route under the account's owner check, whose address holds no
+credential, for the storefront to move to. The public route goes once it
+has.
+
+Both routes answer through one function, with a stable code for each
+refusal.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGXK22cwb7k14eCm5gz ([`36e3075`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36e30752fcf911cb806056bb5128ad5b4b9cbc92))
+
+## v3.230.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(agent): serve only agent orders on the gateway's read
+
+Other services hold the same secret, and the route's purpose is an order the
+gateway placed, so an order an agent did not place now answers 404.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+### Features
+
+* feat(agent): let the gateway read an order it placed (#504) ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
+* feat(agent): let the gateway read an order it placed
+
+A guest's uuid opens an order for a limited time, but the gateway tells a
+platform about an order for as long as the order moves, so past that limit it
+could no longer build the webhook. It now reads through its own route, with its
+shared secret. A uuid a client hands the gateway stays on the guest route.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`19aa258`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19aa25822baf228cd3457f560f3edcf2b9d19352))
+
 ## v3.229.0 (2026-11-07)
 
 ### Bug fixes

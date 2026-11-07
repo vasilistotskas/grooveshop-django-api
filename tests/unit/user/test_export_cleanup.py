@@ -32,7 +32,6 @@ def test_cleanup_expired_data_exports(tmp_path):
             status=UserDataExport.Status.READY,
             file_path=rel,
             file_size=2,
-            token="tok-expired",
             expires_at=timezone.now() - timedelta(days=1),
         )
         fresh = UserDataExport.objects.create(
@@ -40,7 +39,6 @@ def test_cleanup_expired_data_exports(tmp_path):
             status=UserDataExport.Status.READY,
             file_path=f"{user.id}/fresh.json",
             file_size=2,
-            token="tok-fresh",
             expires_at=timezone.now() + timedelta(days=1),
         )
 

@@ -128,6 +128,8 @@ def _order(
             product=ProductFactory(vat=VatFactory(value=Decimal(rate))),
             price=_eur(price),
             quantity=quantity,
+            # The factory restocks a random tenth of its lines.
+            is_refunded=False,
         )
     if paid_online:
         PaymentTransactionFactory(

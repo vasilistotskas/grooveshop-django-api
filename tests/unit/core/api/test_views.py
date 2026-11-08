@@ -1,7 +1,9 @@
 from unittest.mock import Mock, patch
 
+from amqp.exceptions import AccessRefused
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from kombu.exceptions import OperationalError as BrokerOperationalError
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.test import APIClient
@@ -249,6 +251,52 @@ class HealthLiveViewTestCase(TestCase):
         db_cursor.assert_not_called()
         redis_from_url.assert_not_called()
         celery_ping.assert_not_called()
+
+
+class HealthCheckViewTestCase(TestCase):
+    """``/api/v1/health`` reports each service as a boolean.
+
+    A broker failure is not a ``CeleryError``: a ping on a connection the
+    broker dropped raised ``ConnectionResetError``, a ping with the broker
+    down raises kombu's ``OperationalError``, and both answered 500.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("api-health")
+
+    def _get(self, ping):
+        with (
+            patch("core.api.views.Redis.from_url"),
+            patch("core.api.views.celery_app.control.ping", ping),
+        ):
+            return self.client.get(self.url)
+
+    def test_a_broker_failure_reports_celery_as_down(self):
+        failures = (
+            ConnectionResetError(104, "Connection reset by peer"),
+            BrokerOperationalError("[Errno 111] Connection refused"),
+            TimeoutError("timed out"),
+            AccessRefused("Login was refused"),
+        )
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__):
+                response = self._get(Mock(side_effect=failure))
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(
+                    response.json(),
+                    {"database": True, "redis": True, "celery": False},
+                )
+
+    def test_a_worker_reply_reports_celery_as_up(self):
+        response = self._get(Mock(return_value=[{"worker@a": {"ok": "pong"}}]))
+
+        self.assertEqual(response.json()["celery"], True)
+
+    def test_a_programming_error_is_not_reported_as_an_outage(self):
+        with self.assertRaises(TypeError):
+            self._get(Mock(side_effect=TypeError("bad call")))
 
 
 class MetadataTestCase(TestCase):

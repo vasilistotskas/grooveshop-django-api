@@ -16,7 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Literal, cast, get_args
-from xml.etree.ElementTree import Element, fromstring
+from xml.etree.ElementTree import Element
+
+# AADE's answers come over the network, and a response wraps a second XML
+# document in an element's text; defusedxml refuses entity declarations
+# and external references in both, as for every other untrusted XML here.
+from defusedxml.ElementTree import fromstring
 
 StatusCode = Literal[
     "Success", "ValidationError", "TechnicalError", "XMLSyntaxError"

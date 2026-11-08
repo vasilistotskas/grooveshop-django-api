@@ -73,6 +73,21 @@ def _login(client, *, username, password, server_name, otp=""):
 
 
 class TestAdminLoginFlow:
+    def test_the_store_login_form_posts_next_to_the_admin(
+        self, tenant_a, bind_tenant_and_schema
+    ):
+        """The form a browser submits carries next itself; without it a
+        login falls back to LOGIN_REDIRECT_URL, the storefront."""
+        bind_tenant_and_schema(tenant_a)
+
+        response = Client().get(LOGIN_URL, SERVER_NAME="tenant-a.example.com")
+
+        assert response.status_code == 200
+        assert (
+            f'<input type="hidden" name="next" value="{INDEX_URL}">'
+            in response.content.decode()
+        )
+
     def test_staff_with_membership_reaches_admin_index(
         self, tenant_a, bind_tenant_and_schema
     ):

@@ -4477,9 +4477,6 @@ msgstr "Empty while this is the current price."
 msgid "Enable experimental Meilisearch features"
 msgstr "Enable experimental Meilisearch features"
 
-msgid "Enable or disable pagination"
-msgstr "Enable or disable pagination"
-
 msgid "Enabled"
 msgstr "Enabled"
 
@@ -16859,6 +16856,9 @@ msgstr "django-extra-settings cache (extra_settings_*) and the admin dashboard s
 msgid "expired"
 msgstr "expired"
 
+msgid "false returns the whole list in one response"
+msgstr "false returns the whole list in one response"
+
 msgid "granted"
 msgstr "granted"
 
@@ -17243,6 +17243,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Email template"
 #~ msgstr "Email template"
+
+#~ msgid "Enable or disable pagination"
+#~ msgstr "Enable or disable pagination"
 
 #~ msgid "Enter a valid hex color (e.g., #003DFF)."
 #~ msgstr "Enter a valid hex color (e.g., #003DFF)."

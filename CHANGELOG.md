@@ -3,6 +3,112 @@
 
 
 
+## v3.235.0 (2026-11-08)
+
+### Bug fixes
+
+* fix(admin): small fixes found during the Django 6.1 upgrade
+
+- emails/checks.py: the Resend-key database check queries "default"
+  only when it is handed that database, as a database check must; 6.1's
+  check command now passes every database.
+- Remove 65 "classes": ("wide",) fieldset entries in 13 admins: Unfold
+  has no style for the class and Django 6.1 removed it.
+- test_only_transport_sends skips any virtualenv in the checkout, not
+  only one named .venv.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Chores
+
+* chore(deps): keep main's project version beside the Django 6.1.3 pin
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Features
+
+* feat(deps): move to Django 6.1.3 (#536) ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* feat(deps): move to Django 6.1.3
+
+- order/turnover.py: Django 6.1 applies the first model's Meta.ordering
+  to a union(), which then raised "ORDER BY term does not match any
+  column" because the values_list does not select PaymentTransaction's
+  created_at and id. Clear it with order_by() after combining, as the
+  release notes say. Turnover, profit and the store dashboard all read
+  through this one query.
+- tenant/admin.py: get_actions() takes action_location, and the bulk
+  delete keeps its last-owner guard through dataclasses.replace() on the
+  Action object instead of unpacking a tuple.
+- shipping_boxnow: drop a bare select_related(); the events serializer
+  reads no relation.
+- Django 6.1's blank choice label has no Greek translation. Django's
+  documented hook is to set BLANK_CHOICE_LABEL in an AppConfig.ready();
+  ours is core.forms.choices.BLANK_CHOICE_LABEL, translated in the el
+  catalogue and used by the chargeback dialog's hand-built select.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Refactoring
+
+* refactor(email): configure outgoing mail through MAILERS
+
+Django 6.1 deprecates EMAIL_BACKEND and the EMAIL_* settings in favour of
+MAILERS, and get_connection() with them. The default mailer is
+core.mail.DemoRecipientSuppressingBackend, which hands each send to a
+"relay" mailer, a fresh backend per call. The relay is built from the
+same EMAIL_* environment variables as before, so no deployment changes;
+the port is now a number. EMAIL_SEND_TIMEOUT carries EMAIL_TIMEOUT for
+the Resend request, since settings.EMAIL_TIMEOUT cannot exist beside
+MAILERS.
+
+In the same settings file:
+- CELERY_TASK_ROUTES sends meili.* to the meilisearch queue. Celery 5.7
+  deprecates a task's own queue= (removed in 6.0); the three meili tasks
+  drop it. Workers already consume celery,meilisearch.
+- The local log file is written as UTF-8 (on Windows the locale encoding
+  could not write a Greek line), and the bare-host LOGGING branch
+  declares the django logger like the other two, so Django's default
+  mail_admins handler is dropped there too.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* refactor(filters): end an ordering with the pk only when it is not total
+
+QuerySet.totally_ordered (Django 6.1) replaces our _ends_unique, which
+knew only the primary key: an ordering on a unique, non-null field is
+already total and no longer gets a redundant pk tiebreak.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Testing
+
+* test(core): read the editor's script order from the rendered media
+
+Django 6.1 keeps each entry of a Media's JS list as a django.forms.Script, so the test's str.endswith on the private _js list raised AttributeError. Media.render_js() gives the tags in page order through the public API.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* test: skip nested virtualenvs and cover a translated ordering key
+
+test_only_transport_sends finds every directory holding a pyvenv.cfg, at any depth, and skips the files under it; the earlier change looked only at the checkout's top level, where the old .venv rule matched at any depth. The ordering test adds a translations__ key, an expression totally_ordered cannot count as unique, so pk still ends the order. Both from the CodeRabbit review.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
 ## v3.234.5 (2026-11-08)
 
 ### Bug fixes

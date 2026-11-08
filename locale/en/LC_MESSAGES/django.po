@@ -6649,6 +6649,10 @@ msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a 
 msgstr "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
 
 #, python-format
+msgid "Give at most %(max)d values."
+msgstr "Give at most %(max)d values."
+
+#, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
 msgstr "Give from 1 to %(max)d product IDs, each a positive integer."
 

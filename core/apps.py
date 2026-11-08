@@ -12,6 +12,11 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from django.core.exceptions import ImproperlyConfigured
+        from django.db.models import fields
+
+        from core.forms.choices import BLANK_CHOICE_LABEL
+
+        fields.BLANK_CHOICE_LABEL = BLANK_CHOICE_LABEL
 
         # Every image a serializer takes passes the media service's rule,
         # not only the ones that remember to say so.

@@ -653,6 +653,9 @@ msgstr "'%(value)s' is a reserved schema name and cannot be used for a tenant."
 msgid "(no email)"
 msgstr "(no email)"
 
+msgid "- Select an option -"
+msgstr "- Select an option -"
+
 msgid "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 msgstr "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 

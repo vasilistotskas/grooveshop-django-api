@@ -12,6 +12,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from kombu.exceptions import OperationalError as BrokerOperationalError
 from redis import Redis, RedisError
 from rest_framework import serializers, status
 from rest_framework.decorators import (
@@ -521,6 +522,23 @@ class BaseModelViewSet(
         return Response(data)
 
 
+def _broker_errors() -> tuple[type[BaseException], ...]:
+    """What a ping raises when the broker is down or drops the connection.
+
+    kombu raises its own ``OperationalError`` when it cannot connect, and
+    the transport's connection and channel errors from a connection it
+    already holds: after a broker restart, the first ping on the pooled
+    connection raised ``ConnectionResetError``, and ``health_check``
+    answered 500 instead of ``celery: false``.
+    """
+    with celery_app.connection_for_write() as broker:
+        return (
+            BrokerOperationalError,
+            *broker.connection_errors,
+            *broker.channel_errors,
+        )
+
+
 # `@extend_schema` over `@api_view` is drf-spectacular's own documented
 # pattern (see its FAQ). The suppressions on the decorators below are a ty
 # limitation, not a defect here: `djangorestframework-stubs` declares
@@ -572,7 +590,7 @@ def health_check(request):
     try:
         celery_status = celery_app.control.ping(timeout=3)
         health_status["celery"] = bool(celery_status)
-    except CeleryError:
+    except (CeleryError, *_broker_errors()):
         health_status["celery"] = False
 
     response = Response(health_status)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers in production, Uvicorn `--reload` locally) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
+GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers in production, Uvicorn `--reload` locally) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.15, managed with uv.
 
 ## Common Commands
 
@@ -287,7 +287,7 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 ## Code Style
 
 - **Line length**: 80 characters
-- **Formatter/Linter**: Ruff (`target-version = "py314"`)
+- **Formatter/Linter**: Ruff (`target-version = "py315"`)
 - **Type checker**: `ty` (config under `[tool.ty]`). Not in pre-commit — run
   `uv run ty check` yourself before committing; the `.claude` PostToolUse hook
   reports per-file findings as you edit but never blocks.

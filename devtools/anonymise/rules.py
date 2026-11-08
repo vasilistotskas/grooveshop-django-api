@@ -555,6 +555,7 @@ NOT_PERSONAL: dict[str, str] = {
         "order.OrderAttribution",
         "order.OrderLegalAcceptance",
         "order.OrderVatLine",
+        "order.RefundAttemptLine",
         "order.RefundNotification",
         "order.VivaWebhookEvent",
         "order.PendingPaymentFee",

@@ -10,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
+from order.taxation import ChargeKind
+
 #: How long an attempt that never settled keeps its amount reserved. It
 #: bounds the window in which a retry may reuse the attempt's idempotency
 #: key, and stays well inside the 24 hours Stripe remembers a key for
@@ -30,6 +32,20 @@ class RefundAttemptKind(models.TextChoices):
     STORED_VALUE = "STORED_VALUE", _("Gift cards and points")
 
 
+class RefundReason(models.TextChoices):
+    """Why a refund was made, from a fixed list staff pick from (the free
+    text that goes with it is only a note)."""
+
+    RETURNED = "RETURNED", _("Returned by the customer")
+    DAMAGED = "DAMAGED", _("Arrived damaged or defective")
+    WRONG_ITEM = "WRONG_ITEM", _("Wrong item sent")
+    NOT_AS_DESCRIBED = "NOT_AS_DESCRIBED", _("Not as described")
+    NOT_DELIVERED = "NOT_DELIVERED", _("Not delivered or lost in transit")
+    DUPLICATE = "DUPLICATE", _("Charged twice")
+    GOODWILL = "GOODWILL", _("Goodwill")
+    OTHER = "OTHER", _("Other")
+
+
 class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
     def live(self):
         """Attempts that still hold their amount back: not settled, not
@@ -37,6 +53,19 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
         return self.filter(
             status=RefundAttemptStatus.PENDING,
             created_at__gte=timezone.now() - ATTEMPT_RESERVATION,
+        )
+
+
+class RefundAttemptLineQuerySet(models.QuerySet["RefundAttemptLine"]):
+    def holding(self):
+        """Rows of the shares that hold their money: settled, or pending and
+        not abandoned (the attempt's own rule, ``RefundAttempt.live``)."""
+        return self.filter(
+            models.Q(attempt__status=RefundAttemptStatus.SETTLED)
+            | models.Q(
+                attempt__status=RefundAttemptStatus.PENDING,
+                attempt__created_at__gte=timezone.now() - ATTEMPT_RESERVATION,
+            )
         )
 
 
@@ -100,6 +129,28 @@ class RefundAttempt(models.Model):
     reason = models.CharField(
         _("Reason"), max_length=255, blank=True, default=""
     )
+    reason_code = models.CharField(
+        _("Reason category"),
+        max_length=32,
+        choices=RefundReason.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The reason picked from the fixed list; empty on refunds made "
+            "before the list existed, whose free text stays in the reason."
+        ),
+    )
+    request_id = models.UUIDField(
+        _("Request"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Shared by every share of one refund made by lines, so a "
+            "retry of that refund finds them together."
+        ),
+    )
     idempotency_key = models.UUIDField(
         _("Idempotency key"),
         default=uuid.uuid4,
@@ -145,4 +196,70 @@ class RefundAttempt(models.Model):
         return gettext("Refund attempt %(key)s of %(amount)s") % {
             "key": self.idempotency_key,
             "amount": self.amount,
+        }
+
+
+class RefundAttemptLine(models.Model):
+    """What one share of a refund pays for: a goods line, or the shipping or
+    fee share of one VAT rate, at the order's frozen figures.
+
+    The credit document (myDATA 11.4) of the share reads these rows to credit
+    exactly their rates (``order.credit_documents``); a share without rows
+    (a bare amount) is spread over the receipt's rates in proportion. A line
+    split over two shares has its ``quantity`` on the first only, so the
+    units refunded of a line are the sum of ``quantity`` over the shares
+    that hold their money (:meth:`RefundAttemptLineQuerySet.holding`).
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    attempt = models.ForeignKey(
+        RefundAttempt,
+        related_name="lines",
+        on_delete=models.CASCADE,
+        verbose_name=_("Refund attempt"),
+    )
+    item = models.ForeignKey(
+        "order.OrderItem",
+        related_name="refund_lines",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        verbose_name=_("Order line"),
+        help_text=_("Empty for shipping and fees."),
+    )
+    kind = models.CharField(
+        _("Kind"),
+        max_length=16,
+        choices=ChargeKind.choices,
+        default=ChargeKind.GOODS,
+    )
+    rate = models.DecimalField(_("VAT rate"), max_digits=5, decimal_places=2)
+    quantity = models.PositiveIntegerField(_("Quantity"), default=0)
+    amount = MoneyField(
+        _("Amount"),
+        max_digits=11,
+        decimal_places=2,
+        help_text=_("Gross, VAT included."),
+    )
+
+    objects = RefundAttemptLineQuerySet.as_manager()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Refund line")
+        verbose_name_plural = _("Refund lines")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name="refund_attempt_line_amount_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["item"], name="refund_line_item_ix"),
+        ]
+
+    def __str__(self) -> str:
+        return gettext("%(kind)s refund of %(amount)s at %(rate)s%%") % {
+            "kind": self.get_kind_display(),
+            "amount": self.amount,
+            "rate": self.rate,
         }

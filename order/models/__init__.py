@@ -8,7 +8,7 @@ from .legal_acceptance import OrderLegalAcceptance
 from .order import Order
 from .payment_transaction import PaymentTransaction
 from .pending_payment_fee import PendingPaymentFee
-from .refund_attempt import RefundAttempt
+from .refund_attempt import RefundAttempt, RefundAttemptLine
 from .refund_notification import RefundNotification
 from .retail_credit import CreditCounter, RetailCredit
 from .stock_log import StockLog
@@ -32,6 +32,7 @@ __all__ = [
     "PaymentTransaction",
     "PendingPaymentFee",
     "RefundAttempt",
+    "RefundAttemptLine",
     "RefundNotification",
     "RetailCredit",
     "StockLog",

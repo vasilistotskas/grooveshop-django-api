@@ -1,5 +1,6 @@
 import logging
-from collections.abc import Iterable, Mapping
+import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -58,7 +59,9 @@ from order.models.order import PAYMENT_ID_UNIQUE_CONSTRAINT, Order
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
+    RefundAttemptLine,
     RefundAttemptStatus,
+    RefundReason,
 )
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
@@ -79,8 +82,14 @@ from order.payment_ledger import (
     PaymentLedger,
     is_cash_collection,
 )
+from order.refund_lines import (
+    RefundPiece,
+    plan_pieces,
+    split_over_attempts,
+)
 from order.signals import order_refunded, order_stored_value_returned
 from order.stock import StockManager
+from order.taxation import ChargeKind
 from order.vat_snapshot import write_vat_lines
 from page_config.legal_documents import CHECKOUT_CONSENT_SLUGS
 from page_config.models import LegalDocumentVersion
@@ -3372,9 +3381,25 @@ class OrderService:
         reason: str = "",
         *,
         repayment_reference: str = "",
+        lines: Sequence[tuple[OrderItem, int]] = (),
+        include_shipping: bool = False,
+        reason_code: str = "",
     ) -> RefundResult:
         """Refund ``amount`` of what *order* paid, or everything still
         refundable when ``amount`` is ``None``.
+
+        **By lines.** With ``lines`` (``(item, units)`` pairs) and/or
+        ``include_shipping`` the amount is derived from the order's frozen
+        figures (``order.refund_lines``: price, ``discount_allocation`` and
+        ``vat_rate`` of the units, the shipping split over the rates as the
+        receipt splits it) and ``amount`` must not be given. No line can be
+        refunded past what was sold less what earlier line refunds paid
+        back. Each share keeps the lines it pays for
+        (``RefundAttemptLine``), so its credit document (myDATA 11.4)
+        carries exactly their VAT rates. A bare ``amount`` is a goodwill
+        refund and is credited in proportion over the receipt's rates.
+        ``reason_code`` is a ``RefundReason`` and ``reason`` the note that
+        goes with it.
 
         A payment a provider captured is refunded through that provider.
         Cash a courier collected on delivery (a ``COD_COLLECTION`` row) has
@@ -3418,7 +3443,16 @@ class OrderService:
         webhook or a retry settles it.
         """
         reference = repayment_reference.strip()
-        attempts, declined = cls._claim_refund(order, amount, reason, reference)
+        reason = cls._reason_text(reason_code, reason)
+        attempts, declined = cls._claim_refund(
+            order,
+            amount,
+            reason,
+            reference,
+            requested=cls._requested_units(lines),
+            include_shipping=include_shipping,
+            reason_code=reason_code,
+        )
         if declined is not None:
             return RefundResult(
                 refunded=Money(0, order.amount_due.currency),
@@ -3456,6 +3490,26 @@ class OrderService:
             stored=stored,
         )
 
+    @staticmethod
+    def _reason_text(reason_code: str, note: str) -> str:
+        """The reason as it is written on the ledger and in the history:
+        the category's label, then the note."""
+        note = note.strip()
+        if not reason_code:
+            return note
+        label = str(RefundReason(reason_code).label)
+        return f"{label}: {note}" if note else label
+
+    @staticmethod
+    def _requested_units(
+        lines: Sequence[tuple[OrderItem, int]],
+    ) -> dict[int, int]:
+        """Order line pk to the units asked for (a line named twice adds)."""
+        requested: dict[int, int] = {}
+        for item, units in lines:
+            requested[item.pk] = requested.get(item.pk, 0) + units
+        return requested
+
     @classmethod
     @transaction.atomic
     def _claim_refund(
@@ -3464,6 +3518,10 @@ class OrderService:
         amount: Money | None,
         reason: str,
         reference: str,
+        *,
+        requested: Mapping[int, int],
+        include_shipping: bool,
+        reason_code: str,
     ) -> tuple[list[RefundAttempt], dict[str, Any] | None]:
         """Step 1 of :meth:`refund_order`: the attempts to make, or the
         provider-less refusal to report as declined."""
@@ -3480,6 +3538,14 @@ class OrderService:
         )
         payment_status = locked["payment_status"]
 
+        by_lines = bool(requested) or include_shipping
+        if by_lines and amount is not None:
+            raise PaymentError(
+                _(
+                    "A refund by lines is worth what its lines are worth: "
+                    "do not give an amount with them."
+                )
+            )
         if amount is not None and amount.amount <= 0:
             raise PaymentError(
                 _("The refund amount must be greater than zero.")
@@ -3527,7 +3593,12 @@ class OrderService:
                 )
             )
 
-        resumed = cls._attempts_to_resume(order, amount)
+        resumed = cls._attempts_to_resume(
+            order,
+            amount,
+            requested=requested if by_lines else None,
+            include_shipping=include_shipping,
+        )
         if resumed:
             for attempt in resumed:
                 if attempt.charge is not None and not provider_supports(
@@ -3543,6 +3614,16 @@ class OrderService:
                         )
                     )
             return resumed, None
+
+        pieces: list[RefundPiece] = []
+        if by_lines:
+            pieces = plan_pieces(
+                order, requested, include_shipping=include_shipping, lock=True
+            )
+            amount = Money(
+                sum((piece.amount for piece in pieces), Decimal(0)),
+                order.amount_due.currency,
+            )
 
         # The value that can still be refunded: the provider's money, then
         # what the order paid with gift cards and points.
@@ -3603,12 +3684,15 @@ class OrderService:
                     )
                 )
 
+        request_id = uuid.uuid4() if by_lines else None
         attempts = [
             RefundAttempt.objects.create(
                 order=order,
                 charge=charge,
                 amount=share,
                 reason=reason[:255],
+                reason_code=reason_code,
+                request_id=request_id,
             )
             for charge, share in plan
         ]
@@ -3620,19 +3704,52 @@ class OrderService:
                     charge=None,
                     amount=Money(stored_part, currency),
                     reason=reason[:255],
+                    reason_code=reason_code,
+                    request_id=request_id,
                 )
             )
+        if by_lines:
+            cls._keep_lines(attempts, pieces)
         return attempts, None
 
     @staticmethod
+    def _keep_lines(
+        attempts: Sequence[RefundAttempt], pieces: Sequence[RefundPiece]
+    ) -> None:
+        """Write the pieces onto the shares they pay for."""
+        per_attempt = split_over_attempts(
+            pieces, [attempt.amount.amount for attempt in attempts]
+        )
+        RefundAttemptLine.objects.bulk_create(
+            RefundAttemptLine(
+                attempt=attempt,
+                item_id=piece.item_pk,
+                kind=piece.kind,
+                rate=piece.rate,
+                quantity=piece.quantity,
+                amount=Money(piece.amount, attempt.amount.currency),
+            )
+            for attempt, taken in zip(attempts, per_attempt, strict=True)
+            for piece in taken
+        )
+
+    @staticmethod
     def _attempts_to_resume(
-        order: Order, amount: Money | None
+        order: Order,
+        amount: Money | None,
+        *,
+        requested: Mapping[int, int] | None = None,
+        include_shipping: bool = False,
     ) -> list[RefundAttempt]:
         """The live attempts a request is a repeat of: the one for the same
         amount, or all of them when together they are the amount, or, for a
         refund of everything, all of them once they hold everything that was
         left. Cash shares are never resumed: their reference is their own
-        idempotency key."""
+        idempotency key.
+
+        A refund by lines (``requested`` is given) resumes only the shares
+        of one earlier refund by exactly those lines, and a refund without
+        lines never resumes one by lines."""
         pending = list(
             RefundAttempt.objects.live()
             .select_related("charge")
@@ -3646,6 +3763,11 @@ class OrderService:
             )
             .order_by("created_at", "id")
         )
+        if requested is not None:
+            return OrderService._resume_by_lines(
+                pending, requested, include_shipping
+            )
+        pending = [a for a in pending if a.request_id is None]
         if not pending:
             return []
         if amount is None:
@@ -3657,6 +3779,31 @@ class OrderService:
             return [match]
         together = sum((a.amount.amount for a in pending), Decimal(0))
         return pending if together == amount.amount else []
+
+    @staticmethod
+    def _resume_by_lines(
+        pending: Sequence[RefundAttempt],
+        requested: Mapping[int, int],
+        include_shipping: bool,
+    ) -> list[RefundAttempt]:
+        """The live shares, all of one request, whose lines are exactly
+        ``requested`` (and the shipping when asked)."""
+        groups: dict[Any, list[RefundAttempt]] = {}
+        for attempt in pending:
+            if attempt.request_id is not None:
+                groups.setdefault(attempt.request_id, []).append(attempt)
+        for shares in groups.values():
+            rows = list(RefundAttemptLine.objects.filter(attempt__in=shares))
+            units: dict[int, int] = {}
+            for row in rows:
+                if row.item_id is not None:
+                    units[row.item_id] = (
+                        units.get(row.item_id, 0) + row.quantity
+                    )
+            shipping = any(row.kind == ChargeKind.SHIPPING for row in rows)
+            if units == dict(requested) and shipping == include_shipping:
+                return shares
+        return []
 
     @classmethod
     def _make_refund(

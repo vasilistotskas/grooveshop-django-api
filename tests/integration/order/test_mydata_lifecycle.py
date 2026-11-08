@@ -334,7 +334,8 @@ class TestCreditForEveryRefundSource:
                 {
                     "_form_submitted": "true",
                     "amount": "30.00",
-                    "reason": "One item came back",
+                    "reason": "RETURNED",
+                    "note": "One item came back",
                 },
             )
             request.user = staff

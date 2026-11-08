@@ -34,6 +34,7 @@ from unfold.widgets import (
     UnfoldAdminIntegerFieldWidget,
     UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
+    UnfoldBooleanSwitchWidget,
 )
 
 from admin.base import BaseModelAdmin
@@ -59,6 +60,7 @@ from order.chargebacks import (
     ChargebackDecisionError,
     decide_chargebacks,
 )
+from order.discounts import discounted_line_gross
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import (
@@ -85,6 +87,7 @@ from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.models.refund_attempt import RefundReason
 from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
@@ -93,6 +96,11 @@ from order.payment_ledger import (
     REPAYMENT_REFERENCE_MAX_LENGTH,
     PaymentLedger,
     is_cash_collection,
+)
+from order.refund_lines import (
+    plan_pieces,
+    refunded_quantities,
+    shipping_refunded,
 )
 from order.services import OrderService
 from order.taxation import breakdown_by_rate, order_vat_lines
@@ -317,27 +325,55 @@ class RecentOrdersFilter(DropdownFilter):
         return queryset
 
 
-class RefundOrderForm(BaseDialogForm):
-    """The "Refund (amount, reason)" dialog of an order.
+class ReturnOrderForm(BaseDialogForm):
+    """The "Return and refund" dialog of an order.
 
-    The amount is the VALUE the customer returned. It is checked against
-    what the payment ledger says can still be refunded by
-    ``OrderService.refund_order`` itself (under the order lock, so a stale
-    dialog cannot overshoot); the dialog only offers the figure. The
+    Staff pick the lines that came back (and their units), whether the
+    shipping goes back too, and a reason from the fixed list; the amount is
+    what those lines were sold for (price, discount and VAT rate frozen on
+    the line), so the credit document carries exactly their VAT rates
+    (``OrderService.refund_order`` with ``lines``). Ticking "Put the units
+    back in stock" restocks the same units once the refund is made.
+
+    A goodwill refund, money back for no line, is the amount field instead
+    (credited in proportion over the receipt's rates). Either way the
+    figures are checked against the payment ledger by ``refund_order``
+    itself, under the order lock: the dialog only offers them. The
     provider's money is paid back first, and what is beyond it goes back
     onto the gift cards and loyalty points the order paid with.
     """
 
     amount = forms.DecimalField(
-        label=_("Amount"),
+        label=_("Goodwill amount"),
         max_digits=11,
         decimal_places=2,
         min_value=Decimal("0.01"),
+        required=False,
         widget=UnfoldAdminDecimalFieldWidget,
     )
-    reason = forms.CharField(
+    include_shipping = forms.BooleanField(
+        label=_("Refund the shipping too"),
+        required=False,
+        widget=UnfoldBooleanSwitchWidget,
+    )
+    restock = forms.BooleanField(
+        label=_("Put the returned units back in stock"),
+        required=False,
+        widget=UnfoldBooleanSwitchWidget,
+        help_text=_(
+            "Only for goods that are fit to sell again. Recorded on the "
+            "stock log with your name."
+        ),
+    )
+    reason = forms.ChoiceField(
         label=_("Reason"),
-        max_length=255,
+        choices=[("", "---------"), *RefundReason.choices],
+        widget=UnfoldAdminSelectWidget,
+    )
+    note = forms.CharField(
+        label=_("Note"),
+        max_length=200,
+        required=False,
         widget=UnfoldAdminTextInputWidget,
         help_text=_("Recorded with the refund on the order's payment ledger."),
     )
@@ -364,30 +400,135 @@ class RefundOrderForm(BaseDialogForm):
             if self.order
             else Decimal(0)
         )
-        if provider + stored > 0:
-            amount = self.fields["amount"]
-            amount.initial = provider + stored
-            amount.help_text = (
-                _(
-                    "Up to %(refundable)s can still be refunded: "
-                    "%(provider)s through the payment provider, then "
-                    "%(stored)s back onto the gift cards and loyalty "
-                    "points the order paid with. Enter the value of what "
-                    "the customer returned."
-                )
-                % {
-                    "refundable": money(provider + stored),
-                    "provider": money(provider),
-                    "stored": money(stored),
-                }
-                if stored > 0
-                else _("Up to %(refundable)s can still be refunded.")
-                % {"refundable": money(provider)}
-            )
+        self._offer_amount(provider, stored)
+        self._offer_lines(request)
         # Asked only where cash a courier collected can be paid back: there
         # is no provider to refund it, so staff say how they did.
         if not self._has_refundable_cash():
             del self.fields["repayment_reference"]
+
+    def _offer_amount(self, provider: Decimal, stored: Decimal) -> None:
+        amount = self.fields["amount"]
+        if provider + stored <= 0:
+            return
+        amount.help_text = (
+            _(
+                "For a refund that is no line of the order. Up to "
+                "%(refundable)s can still be refunded: %(provider)s "
+                "through the payment provider, then %(stored)s back onto "
+                "the gift cards and loyalty points the order paid with."
+            )
+            % {
+                "refundable": money(provider + stored),
+                "provider": money(provider),
+                "stored": money(stored),
+            }
+            if stored > 0
+            else _(
+                "For a refund that is no line of the order. Up to "
+                "%(refundable)s can still be refunded."
+            )
+            % {"refundable": money(provider)}
+        )
+
+    def _offer_lines(self, request) -> None:
+        """One units field per line that has units not refunded yet, and
+        the shipping when it is not refunded and costs something."""
+        self.items: list[OrderItem] = []
+        order = self.order
+        if order is None:
+            del self.fields["include_shipping"]
+            del self.fields["restock"]
+            return
+        paid = refunded_quantities(order)
+        try:
+            gross = discounted_line_gross(order, None)
+        except ValueError:
+            # Discount snapshots that do not add up (``heal_discount_allocation``
+            # names the cure): no line can be valued, so only a goodwill
+            # amount is offered, and ``refund_order`` says why if lines are
+            # forced.
+            del self.fields["include_shipping"]
+            del self.fields["restock"]
+            return
+        for item in OrderItem.objects.filter(order=order).order_by(
+            "sort_order", "pk"
+        ):
+            left = item.quantity - paid.get(item.pk, 0)
+            if left <= 0:
+                continue
+            self.items.append(item)
+            self.fields[self.field_name(item)] = forms.IntegerField(
+                label=item.product_name or _("Unnamed Product"),
+                min_value=0,
+                max_value=left,
+                initial=0,
+                required=False,
+                widget=UnfoldAdminIntegerFieldWidget,
+                help_text=_(
+                    "Units still to refund: %(left)s of %(sold)s, worth "
+                    "%(unit)s each (VAT %(rate)s%%)."
+                )
+                % {
+                    "left": left,
+                    "sold": item.quantity,
+                    "unit": money(gross[item.pk] / item.quantity),
+                    "rate": item.vat_rate,
+                },
+            )
+        if order.shipping_price.amount <= 0 or shipping_refunded(order):
+            del self.fields["include_shipping"]
+        else:
+            self.fields["include_shipping"].help_text = _(
+                "Shipping charged: %(shipping)s."
+            ) % {"shipping": money(order.shipping_price.amount)}
+        if not (
+            self.items
+            and order.status in RETURN_HANDLING_STATUSES
+            and request.user.has_perm("order.change_orderitem")
+        ):
+            del self.fields["restock"]
+
+    @staticmethod
+    def field_name(item: OrderItem) -> str:
+        return f"quantity_{item.pk}"
+
+    def units(self) -> dict[int, int]:
+        """Order line pk to the units staff ask to refund (zeros left out)."""
+        return {
+            item.pk: units
+            for item in self.items
+            if (units := self.cleaned_data.get(self.field_name(item)))
+        }
+
+    def lines(self) -> list[tuple[OrderItem, int]]:
+        units = self.units()
+        return [
+            (item, units[item.pk]) for item in self.items if item.pk in units
+        ]
+
+    def by_lines(self) -> bool:
+        return bool(self.units()) or bool(
+            self.cleaned_data.get("include_shipping")
+        )
+
+    def requested_amount(self) -> Decimal | None:
+        """What is asked for: the lines' value, or the goodwill amount."""
+        if self.order is not None and self.by_lines():
+            return sum(
+                (
+                    piece.amount
+                    for piece in plan_pieces(
+                        self.order,
+                        self.units(),
+                        include_shipping=bool(
+                            self.cleaned_data.get("include_shipping")
+                        ),
+                    )
+                ),
+                Decimal(0),
+            )
+        return self.cleaned_data.get("amount")
 
     def _has_refundable_cash(self) -> bool:
         return self.order is not None and any(
@@ -397,7 +538,48 @@ class RefundOrderForm(BaseDialogForm):
 
     def clean(self):
         cleaned = super().clean()
+        if self.errors:
+            return cleaned
+        by_lines = self.by_lines()
         amount = cleaned.get("amount")
+        if by_lines and amount is not None:
+            raise forms.ValidationError(
+                _(
+                    "Choose lines to refund, or enter a goodwill amount, "
+                    "not both."
+                )
+            )
+        if not by_lines and amount is None:
+            raise forms.ValidationError(
+                _(
+                    "Enter how many units of at least one line to refund, "
+                    "or a goodwill amount."
+                )
+            )
+        if by_lines:
+            try:
+                amount = self.requested_amount()
+            except PaymentError as exc:
+                raise forms.ValidationError(str(exc)) from exc
+        if cleaned.get("restock") and not by_lines:
+            self.add_error(
+                "restock",
+                _("Choose the lines that came back to put them in stock."),
+            )
+        if cleaned.get("restock"):
+            for item in self.items:
+                if self.units().get(item.pk, 0) > item.net_quantity:
+                    self.add_error(
+                        "restock",
+                        _(
+                            "%(name)s: only %(left)s unit(s) are not back in "
+                            "stock yet."
+                        )
+                        % {
+                            "name": item.product_name,
+                            "left": item.net_quantity,
+                        },
+                    )
         if (
             self.order is not None
             and amount is not None
@@ -1775,48 +1957,60 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=_("Refund (amount, reason)"),
+        description=_("Return and refund"),
         icon="currency_exchange",
         permissions=["change", "refund"],
         dialog=ActionDialog(
-            title=_("Refund order"),
+            title=_("Return and refund"),
             description=_(
-                "Pays the amount back through the payment provider, or "
-                "records the cash on delivery you paid back yourself, on "
-                "the order's payment ledger. A part refund can be "
-                "followed by more until nothing is left. The order "
-                "status and its stock are not changed."
+                "Pick the lines that came back, with their units, and "
+                "whether the shipping goes back too: they are refunded for "
+                "what they were sold for, and their credit document carries "
+                "their VAT rates. Or give a goodwill amount instead. Pays "
+                "back through the payment provider, or records the cash on "
+                "delivery you paid back yourself; a part refund can be "
+                "followed by more. The order status is not changed."
             ),
-            form_class=RefundOrderForm,
+            form_class=ReturnOrderForm,
         ),
     )
     def refund_payment(
         self, request: HttpRequest, form, object_id=None, **kwargs
     ) -> HttpResponse:
         order = Order.objects.get(pk=object_id)
-        amount = Money(form.cleaned_data["amount"], order.amount_due.currency)
-        reason = form.cleaned_data["reason"]
+        currency = order.amount_due.currency
+        by_lines = form.by_lines()
+        include_shipping = bool(form.cleaned_data.get("include_shipping"))
         try:
+            requested = Money(form.requested_amount(), currency)
+            reason_code = form.cleaned_data["reason"]
+            note = form.cleaned_data["note"]
             result = OrderService.refund_order(
                 order,
-                amount=amount,
-                reason=reason,
+                amount=None if by_lines else requested,
+                reason=note,
+                reason_code=reason_code,
                 repayment_reference=form.cleaned_data.get(
                     "repayment_reference", ""
                 ),
+                lines=form.lines(),
+                include_shipping=include_shipping,
             )
         except PaymentError as exc:
             # The service names the exact reason (nothing left to refund,
-            # more than the remainder, not paid through a provider).
+            # more than the remainder, a line refunded past what was sold,
+            # not paid through a provider).
             self.message_user(request, str(exc), messages.ERROR)
         else:
+            reason = OrderService._reason_text(reason_code, note)
             if result.paid_something:
                 # Money moved, so staff are on record for it even when the
                 # rest was declined.
                 self.log_change(
                     request,
                     order,
-                    f"Refunded {result.value_returned} of {amount}: {reason}",
+                    f"Refunded {result.value_returned} of {requested}: "
+                    f"{reason}",
                 )
             if result.complete and result.paid_something:
                 self.message_user(
@@ -1838,7 +2032,7 @@ class OrderAdmin(BaseModelAdmin):
                     % {
                         "order_id": order.id,
                         "refunded": money(result.value_returned.amount),
-                        "requested": money(amount.amount),
+                        "requested": money(requested.amount),
                         "reason": (result.declined or {}).get("error", ""),
                     },
                     messages.ERROR,
@@ -1853,7 +2047,19 @@ class OrderAdmin(BaseModelAdmin):
                     % {"order_id": order.id},
                     messages.ERROR,
                 )
-            if result.paid_something and self.has_restock_permission(
+            if form.cleaned_data.get("restock"):
+                if result.complete and result.paid_something:
+                    self._restock(request, order.pk, form.units(), reason)
+                else:
+                    self.message_user(
+                        request,
+                        _(
+                            "The units were not put back in stock because "
+                            "the refund was not made in full."
+                        ),
+                        messages.WARNING,
+                    )
+            elif result.paid_something and self.has_restock_permission(
                 request, object_id
             ):
                 # A refund of goods usually has the goods coming back: offer
@@ -1874,40 +2080,30 @@ class OrderAdmin(BaseModelAdmin):
             }
         )
 
-    @action(
-        description=_("Restock returned items"),
-        icon="inventory_2",
-        permissions=["restock"],
-        dialog=ActionDialog(
-            title=_("Restock returned items"),
-            description=_(
-                "Puts the units that came back on the shelf and records "
-                "them on the order's lines, each in its own product (a "
-                "variant is a product). Only units not put back yet can "
-                "be entered. Pays nothing back: refund the payment "
-                "separately."
-            ),
-            form_class=RestockReturnedForm,
-        ),
-    )
-    def restock_returned(
-        self, request: HttpRequest, form, object_id=None, **kwargs
-    ) -> HttpResponse:
-        reason = form.cleaned_data["reason"]
-        quantities = form.quantities()
+    def _restock(
+        self,
+        request: HttpRequest,
+        order_id: int,
+        quantities: dict[int, int],
+        reason: str,
+    ) -> None:
+        """Put returned units back in stock under the order lock, and say
+        so. One path for the return dialog and the restock-only action: a
+        failure (a status that takes no returns, units already put back)
+        leaves nothing restocked and is shown to staff."""
         try:
             with transaction.atomic():
                 # The order lock serialises this with a cancel and with a
                 # second restock; ``OrderItem.refund`` judges the status
                 # under it, so the API and this action share one rule.
-                order = Order.objects.select_for_update().get(pk=object_id)
+                order = Order.objects.select_for_update().get(pk=order_id)
                 for item in OrderItem.objects.filter(
                     order=order, pk__in=quantities
                 ).order_by("pk"):
                     item.refund(
                         quantities[item.pk],
                         performed_by=request.user,
-                        reason=reason,
+                        reason=reason[:RESTOCK_REASON_MAX_LENGTH],
                     )
                 total = sum(quantities.values())
                 self.log_change(
@@ -1929,6 +2125,34 @@ class OrderAdmin(BaseModelAdmin):
                 % {"order_id": order.id, "count": total},
                 messages.SUCCESS,
             )
+
+    @action(
+        description=_("Restock returned items"),
+        icon="inventory_2",
+        permissions=["restock"],
+        dialog=ActionDialog(
+            title=_("Restock returned items"),
+            description=_(
+                "Puts the units that came back on the shelf and records "
+                "them on the order's lines, each in its own product (a "
+                "variant is a product). Only units not put back yet can "
+                'be entered. Pays nothing back: use "Return and refund" '
+                "for the money, which can restock in the same step."
+            ),
+            form_class=RestockReturnedForm,
+        ),
+    )
+    def restock_returned(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        if object_id is None:
+            raise Http404
+        self._restock(
+            request,
+            object_id,
+            form.quantities(),
+            form.cleaned_data["reason"],
+        )
         return HttpResponse(
             headers={
                 "HX-Redirect": reverse(

@@ -30,9 +30,13 @@ registered) calls the same idempotent function.
 
 **How a credit splits over VAT rates.** The receipt froze its gross per
 rate (``Invoice.vat_breakdown``: goods, shipping and fees all in it). A
-credit spreads its amount over the rates in proportion to what each still
-holds, to the cent (``order.discounts.allocate_capped``), so a partial
-refund of a mixed 24%/13% order credits both rates.
+credit for a refund by lines (``RefundAttemptLine``) takes exactly the
+rates and amounts of those lines, so returning one 13% item of a 24%/13%
+order credits 13% only. A credit for a bare amount (a goodwill refund, a
+provider's own refund) has no lines to follow and spreads over the rates
+in proportion to what each still holds, to the cent
+(``order.discounts.allocate_capped``). Either way no rate is credited
+past what the receipt still holds for it.
 
 **Nothing but this module stops an over-credit.** AADE forbids
 ``correlatedInvoices`` on an 11.4 (error 205, confirmed against the dev API
@@ -50,7 +54,7 @@ it.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -98,15 +102,19 @@ def credit_breakdown(
     receipt_rows: Iterable[dict[str, str]],
     prior_credit_rows: Iterable[Sequence[dict[str, str]]],
     amount: Decimal,
+    allocation: Mapping[Decimal, Decimal] | None = None,
 ) -> list[dict[str, str]]:
     """The VAT rows of a credit of ``amount`` (gross) against a receipt.
 
     ``receipt_rows`` is the receipt's ``vat_breakdown``;
     ``prior_credit_rows`` the ``vat_breakdown`` of every credit already
-    issued against it. Returns ``{rate, subtotal, vat, gross}`` rows
-    (strings, the shape ``Invoice.vat_breakdown`` stores), highest rate
+    issued against it. ``allocation`` is the gross per VAT rate the credit
+    is for (a refund by lines); without it the amount is spread over every
+    rate the receipt still holds. Returns ``{rate, subtotal, vat, gross}``
+    rows (strings, the shape ``Invoice.vat_breakdown`` stores), highest rate
     first. Raises :class:`CreditExceedsReceiptError` when the receipt does
-    not hold ``amount`` any more.
+    not hold ``amount`` any more, or any rate of ``allocation`` more than
+    the receipt still holds for it.
     """
     rate_key: dict[Decimal, str] = {}
     receipt_gross: dict[Decimal, Decimal] = {}
@@ -129,7 +137,24 @@ def credit_breakdown(
         rate: receipt_gross[rate] - credited_gross[rate]
         for rate in receipt_gross
     }
-    shares = allocate_capped(amount, remaining, remaining)
+    if allocation is None:
+        shares = allocate_capped(amount, remaining, remaining)
+    else:
+        if any(rate not in remaining for rate in allocation):
+            raise CreditExceedsReceiptError(
+                f"Cannot credit {amount}: the receipt has no row for "
+                "every rate of the refunded lines."
+            )
+        # The lines' own rates, in proportion to what each was refunded
+        # for: exactly the allocation when the credit is for all of it
+        # (always, but a stored-value share that returned less), and never
+        # a rate the lines do not touch.
+        shares = allocate_capped(
+            amount,
+            allocation,
+            {rate: remaining[rate] for rate in allocation},
+        )
+        shares = {rate: shares.get(rate, _ZERO) for rate in remaining}
     if sum(shares.values(), _ZERO) != amount:
         raise CreditExceedsReceiptError(
             f"Cannot credit {amount}: the receipt holds "
@@ -161,6 +186,21 @@ def credit_breakdown(
     return rows
 
 
+def _line_allocation(
+    attempt: RefundAttempt | None,
+) -> dict[Decimal, Decimal] | None:
+    """The gross per VAT rate of the lines a refund share pays for, or
+    ``None`` for a share with no lines (a bare amount)."""
+    if attempt is None:
+        return None
+    allocation: dict[Decimal, Decimal] = {}
+    for line in attempt.lines.all():
+        allocation[line.rate] = allocation.get(line.rate, _ZERO) + Decimal(
+            line.amount.amount
+        )
+    return allocation or None
+
+
 def _create_credit(
     order: Order,
     invoice: Invoice,
@@ -171,13 +211,17 @@ def _create_credit(
     refund_attempt: RefundAttempt | None = None,
     chargeback: PaymentTransaction | None = None,
 ) -> RetailCredit:
+    attempt = refund_attempt
+    if attempt is None and refund is not None:
+        attempt = RefundAttempt.objects.filter(refund=refund).first()
+    allocation = _line_allocation(attempt)
     prior = [
         credit.vat_breakdown
         for credit in RetailCredit.objects.filter(invoice=invoice).exclude(
             mydata_status=MyDataStatus.CANCELED
         )
     ]
-    rows = credit_breakdown(invoice.vat_breakdown, prior, amount)
+    rows = credit_breakdown(invoice.vat_breakdown, prior, amount, allocation)
     net = sum((Decimal(r["subtotal"]) for r in rows), _ZERO)
     vat = sum((Decimal(r["vat"]) for r in rows), _ZERO)
     currency = invoice.currency

@@ -52,23 +52,17 @@ def _client_key(request: HttpRequest) -> str:
 
 def _is_rate_limited(cache_key: str, limit: int, window_seconds: int) -> bool:
     """
-    Sliding-window counter using atomic cache increment.
+    Fixed-window counter: the window starts at the first request.
     Returns True when the request should be blocked.
 
-    Uses add() + incr() to avoid the get-then-set race condition:
-    - cache.add() is atomic: only sets the key if it doesn't exist.
-    - cache.incr() is atomic: increments without race conditions.
-    - On first hit, add() succeeds and incr() brings the value to 1.
-    - On subsequent hits, add() is a no-op and incr() atomically increments.
+    ``count_in_window`` increments and sets the expiry in one Redis
+    script, so concurrent requests each get their own number and the
+    key can never be left without an expiry.
 
     Fails open on any cache error so a Redis outage never 500s users.
     """
     try:
-        # Try to initialise the key with TTL atomically. If the key already
-        # exists, add() is a no-op (returns False) and expiry is unchanged.
-        cache.add(cache_key, 0, window_seconds)
-        current = cache.incr(cache_key)
-        return current > limit
+        return cache.count_in_window(cache_key, window_seconds) > limit
     except Exception as exc:
         logger.warning(
             "AllAuthRateLimit: cache error, failing open",

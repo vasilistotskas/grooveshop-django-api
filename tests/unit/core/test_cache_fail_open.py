@@ -69,6 +69,7 @@ def timing_out():
         "flushdb",
         "scan_iter",
         "info",
+        "eval",
     ):
         getattr(client, command).side_effect = RedisTimeoutError("timed out")
     client.pipeline.return_value.execute.side_effect = RedisTimeoutError(
@@ -148,6 +149,13 @@ class TestDecisionsAndAdminStillRaise:
     def test_incr_raises(self, down):
         with pytest.raises((RedisConnectionError, RedisTimeoutError)):
             down.incr("counter")
+
+    def test_count_in_window_and_uncount_raise(self, down):
+        # Every rate limit decides its own outage policy from the error.
+        with pytest.raises((RedisConnectionError, RedisTimeoutError)):
+            down.count_in_window("counter", 60)
+        with pytest.raises((RedisConnectionError, RedisTimeoutError)):
+            down.uncount("counter")
 
     def test_clear_raises(self, down):
         with pytest.raises((RedisConnectionError, RedisTimeoutError)):

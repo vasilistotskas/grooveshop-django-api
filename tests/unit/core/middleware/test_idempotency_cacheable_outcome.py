@@ -16,7 +16,6 @@ from django.test import (
     RequestFactory,
     SimpleTestCase,
     TestCase,
-    override_settings,
 )
 
 from core.middleware.idempotency import (
@@ -29,13 +28,6 @@ from core.middleware.idempotency import (
     _scope_id,
 )
 from tests.utils.idempotency import enter
-
-_LOCMEM = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "idempotency-cacheable-outcome-test",
-    }
-}
 
 
 def _request(method: str = "POST", key: str = "key-abc"):
@@ -131,7 +123,6 @@ class CacheableOutcomeTest(SimpleTestCase):
         }
 
 
-@override_settings(CACHES=_LOCMEM)
 class IdempotencyReplayTest(TestCase):
     def setUp(self):
         caches[CACHE_ALIAS].clear()

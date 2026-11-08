@@ -174,9 +174,9 @@ def _budget_key(owner: str) -> str:
 def _claim_budget(request: HttpRequest, owner: str) -> bool:
     """Charge one entry to this caller, or refuse when it is spent.
 
-    ``add`` then ``incr``: ``add`` initialises the counter and sets the
-    window exactly once, and Redis' ``INCR`` is atomic, so concurrent
-    requests cannot both see a stale count. The window is not sliding —
+    ``count_in_window`` increments and starts the window in one Redis
+    script, so concurrent requests cannot both see a stale count and the
+    counter always expires. The window is not sliding —
     it starts at the caller's first key and lasts as long as the entries
     it is counting, which is the property that matters.
 
@@ -187,8 +187,7 @@ def _claim_budget(request: HttpRequest, owner: str) -> bool:
     cache = caches[CACHE_ALIAS]
     budget_key = _budget_key(owner)
     try:
-        cache.add(budget_key, 0, IDEMPOTENCY_TTL_SECONDS)
-        used = cache.incr(budget_key)
+        used = cache.count_in_window(budget_key, IDEMPOTENCY_TTL_SECONDS)
     except Exception:
         logger.warning("idempotency budget unavailable", exc_info=True)
         return True

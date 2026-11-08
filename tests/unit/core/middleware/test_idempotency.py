@@ -6,7 +6,7 @@ import json
 
 from django.contrib.auth.models import AnonymousUser
 from django.http import JsonResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 
 from core.middleware.idempotency import (
     IDEMPOTENCY_HEADER,
@@ -14,15 +14,7 @@ from core.middleware.idempotency import (
 )
 from tests.utils.idempotency import enter
 
-_LOCMEM = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "idempotency-test",
-    }
-}
 
-
-@override_settings(CACHES=_LOCMEM)
 class IdempotencyInFlightTest(TestCase):
     def _request(self):
         req = RequestFactory().post("/api/v1/order/")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext
@@ -10,13 +11,19 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
-#: How long an attempt that never settled keeps its amount reserved. It
-#: bounds the window in which a retry may reuse the attempt's idempotency
-#: key, and stays well inside the 24 hours Stripe remembers a key for
-#: (docs.stripe.com/api/idempotent_requests). After it the amount is
-#: refundable again; a refund the provider did make late is still booked by
-#: its own webhook.
-ATTEMPT_RESERVATION = timedelta(hours=1)
+#: What the provider's idempotency key of an attempt starts with
+#: (``RefundAttempt.provider_key``); the rest is the attempt's UUID.
+PROVIDER_KEY_PREFIX = "refund-"
+
+
+def reconcile_after() -> timedelta:
+    """How long a refund attempt may stay PENDING before the provider is
+    asked what became of it (``REFUND_RECONCILE_AFTER_MINUTES``). Until
+    then a retry may still reuse the attempt's idempotency key: it stays
+    well inside the 24 hours Stripe remembers a key for
+    (docs.stripe.com/api/idempotent_requests). It bounds only when the
+    answer is looked for; it never frees the money an attempt holds."""
+    return timedelta(minutes=settings.REFUND_RECONCILE_AFTER_MINUTES)
 
 
 class RefundAttemptStatus(models.TextChoices):
@@ -32,11 +39,44 @@ class RefundAttemptKind(models.TextChoices):
 
 class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
     def live(self):
-        """Attempts that still hold their amount back: not settled, not
-        declined, and not abandoned (:data:`ATTEMPT_RESERVATION`)."""
-        return self.filter(
-            status=RefundAttemptStatus.PENDING,
-            created_at__gte=timezone.now() - ATTEMPT_RESERVATION,
+        """Attempts that hold their amount back: every one still PENDING,
+        whatever its age. Only a settled or declined attempt lets go of
+        its money; time never does, because a refund the provider made
+        late would otherwise be refundable a second time."""
+        return self.filter(status=RefundAttemptStatus.PENDING)
+
+    def with_provider_key(self, key: str):
+        """The attempt a provider key (:attr:`RefundAttempt.provider_key`)
+        names, found by its UUID: none for a key that is not one of ours."""
+        try:
+            token = uuid.UUID(key.removeprefix(PROVIDER_KEY_PREFIX))
+        except ValueError:
+            return self.none()
+        if not key.startswith(PROVIDER_KEY_PREFIX):
+            return self.none()
+        return self.filter(idempotency_key=token)
+
+    def overdue(self):
+        """Provider attempts still PENDING after :func:`reconcile_after`:
+        the ones whose outcome is looked up (``order.tasks``) and, when
+        that cannot decide, recorded by staff. A stored-value attempt is
+        never overdue: no provider is involved, a retry of the refund
+        finishes it."""
+        return self.live().filter(
+            kind=RefundAttemptKind.PROVIDER,
+            created_at__lte=timezone.now() - reconcile_after(),
+        )
+
+    def stalled(self):
+        """Gift card and points returns still PENDING after
+        :func:`reconcile_after`: a crash left them unfinished. No provider
+        can answer for them and staff have no outcome to record: repeating
+        the refund of the same amount resumes and finishes the attempt
+        (``OrderService._attempts_to_resume``). Until then it holds its
+        money, defers the order's receipt and refuses a new refund."""
+        return self.live().filter(
+            kind=RefundAttemptKind.STORED_VALUE,
+            created_at__lte=timezone.now() - reconcile_after(),
         )
 
 
@@ -54,10 +94,13 @@ class RefundAttempt(models.Model):
     a retry or a double click reuses the attempt and a provider that honours
     keys hands back the refund it already made instead of making another.
 
-    A crash between the call and the booking leaves the attempt PENDING;
-    the provider's webhook books the refund (and settles the attempt it
-    matches) or a retry reuses the key. Money facts stay in the ledger:
-    this row is only the claim.
+    A crash between the call and the booking leaves the attempt PENDING,
+    and it keeps holding its amount until something resolves it: the
+    provider's webhook books the refund (and settles the attempt it
+    matches, whatever its age), a retry reuses the key while the provider
+    still remembers it, the reconciliation task asks the provider once the
+    attempt is overdue, or staff record the outcome. Money facts stay in
+    the ledger: this row is only the claim.
 
     A ``STORED_VALUE`` attempt claims the part of a refund that goes back
     onto gift cards and points rather than through a provider: it names no
@@ -146,3 +189,19 @@ class RefundAttempt(models.Model):
             "key": self.idempotency_key,
             "amount": self.amount,
         }
+
+    @property
+    def provider_key(self) -> str:
+        """The idempotency key the provider receives for this attempt (and
+        that a Stripe refund carries in its metadata)."""
+        return f"{PROVIDER_KEY_PREFIX}{self.idempotency_key}"
+
+    @property
+    def is_overdue(self) -> bool:
+        """Whether this is a provider attempt still PENDING past
+        :func:`reconcile_after` (:meth:`RefundAttemptQuerySet.overdue`)."""
+        return (
+            self.status == RefundAttemptStatus.PENDING
+            and self.kind == RefundAttemptKind.PROVIDER
+            and self.created_at <= timezone.now() - reconcile_after()
+        )

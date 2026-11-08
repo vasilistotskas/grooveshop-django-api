@@ -37,13 +37,20 @@ class FakeStripeRefunds:
         *,
         status: str = "succeeded",
         fail_with: Exception | None = None,
+        lose_answer: bool = False,
+        list_fails_with: Exception | None = None,
     ):
         self.status = status
         self.fail_with = fail_with
+        #: Make the refund, then drop the connection before answering.
+        self.lose_answer = lose_answer
+        self.list_fails_with = list_fails_with
         #: Every call, as the keyword arguments Stripe received.
         self.calls: list[dict[str, Any]] = []
         #: The refunds Stripe actually made (a replayed key makes none).
         self.created: list[SimpleNamespace] = []
+        #: Every list-refunds call, as the keyword arguments Stripe received.
+        self.list_calls: list[dict[str, Any]] = []
         self._by_key: dict[str, tuple[dict[str, Any], SimpleNamespace]] = {}
         self._patches = [
             mock.patch(
@@ -52,6 +59,13 @@ class FakeStripeRefunds:
             ),
             mock.patch(
                 "order.payment.stripe.Refund.create", side_effect=self._create
+            ),
+            mock.patch(
+                "order.payment.stripe.Refund.list", side_effect=self._list
+            ),
+            mock.patch(
+                "order.payment.stripe.Refund.retrieve",
+                side_effect=self._retrieve,
             ),
             mock.patch("order.payment.Refund.sync_from_stripe_data"),
         ]
@@ -89,11 +103,36 @@ class FakeStripeRefunds:
             amount=params["amount"],
             currency="eur",
             payment_intent=params["payment_intent"],
+            metadata=params.get("metadata"),
         )
         self.created.append(refund)
         if key is not None:
             self._by_key[key] = (params, refund)
+        if self.lose_answer:
+            raise stripe.APIConnectionError("the answer was lost")
         return refund
+
+    def _list(self, **kwargs: Any) -> SimpleNamespace:
+        """``stripe.Refund.list``: the refunds of one payment intent."""
+        self.list_calls.append(kwargs)
+        if self.list_fails_with is not None:
+            raise self.list_fails_with
+        refunds = [
+            r
+            for r in self.created
+            if r.payment_intent == kwargs["payment_intent"]
+        ]
+        return SimpleNamespace(auto_paging_iter=lambda: iter(refunds))
+
+    def _retrieve(self, refund_id: str, **kwargs: Any) -> SimpleNamespace:
+        """``stripe.Refund.retrieve``: a refund by id, or Stripe's
+        "no such refund"."""
+        for refund in self.created:
+            if refund.id == refund_id:
+                return refund
+        raise stripe.InvalidRequestError(
+            f"No such refund: '{refund_id}'", "refund"
+        )
 
     @property
     def keys(self) -> list[str]:
@@ -104,3 +143,50 @@ class FakeStripeRefunds:
     def amounts(self) -> list[int]:
         """The minor-unit amount of every call, in order."""
         return [call["amount"] for call in self.calls]
+
+
+#: What Stripe says each refund IS NOW, by refund id, for the
+#: ``refund_states`` fixture (``tests/integration/order/conftest.py``). An
+#: event is a snapshot of a moment earlier; the handlers read this instead.
+CURRENT_REFUND_STATUS: dict[str, str] = {}
+#: The metadata Stripe holds on each refund (the attempt key, for a refund
+#: this app made).
+CURRENT_REFUND_METADATA: dict[str, dict[str, str]] = {}
+
+
+def refund_event(
+    refund_id: str,
+    payment_intent: str,
+    cents: int,
+    *,
+    status: str = "succeeded",
+    current: str | None = None,
+    metadata: dict[str, str] | None = None,
+    currency: str = "eur",
+    event_type: str = "refund.created",
+    event_id: str | None = None,
+) -> mock.Mock:
+    """The ``refund.created`` (or ``refund.updated``) event Stripe sends for
+    a refund: ``data.object`` is the Refund (docs.stripe.com/api/events/types).
+    *status* is the snapshot the event carries; *current* what Stripe holds
+    by the time the handler asks (default: the same).
+    """
+    from djstripe.models import Event
+
+    CURRENT_REFUND_STATUS[refund_id] = current or status
+    CURRENT_REFUND_METADATA[refund_id] = metadata or {}
+
+    event = mock.Mock(spec=Event)
+    event.id = event_id or f"evt_{refund_id}"
+    event.type = event_type
+    event.data = {
+        "object": {
+            "id": refund_id,
+            "object": "refund",
+            "payment_intent": payment_intent,
+            "amount": cents,
+            "currency": currency,
+            "status": status,
+        }
+    }
+    return event

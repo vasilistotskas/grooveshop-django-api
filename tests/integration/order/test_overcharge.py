@@ -33,18 +33,22 @@ from order.payment_binding import PaymentPurpose, binding_metadata
 from order.payment_ledger import PaymentLedger
 from order.services import OrderService
 from order.signals.handlers import (
-    handle_stripe_charge_refunded,
     handle_stripe_checkout_completed,
     handle_stripe_dispute_closed,
     handle_stripe_payment_succeeded,
     handle_stripe_refund_failed,
+    handle_stripe_refund_made,
 )
 from order.views.viva_webhook import _handle_payment_created
 from product.factories.product import ProductFactory
+from tests.utils.stripe_refunds import refund_event
 from tests.utils.viva import verified_payment
 from user.factories import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("refund_states"),
+]
 
 OWED = Decimal("40.00")
 
@@ -331,25 +335,15 @@ class TestEventsOnTheSecondIntent:
         event.data = {"object": obj}
         return event
 
-    def _refunded(self, event_id, cents, intent="pi_second"):
-        event = self._event(
-            event_id,
-            "charge.refunded",
-            {
-                "id": "ch_second",
-                "payment_intent": intent,
-                "amount": int(OWED * 100),
-                "amount_refunded": cents,
-                "currency": "eur",
-            },
-        )
+    def _refunded(self, refund_id, cents, intent="pi_second"):
+        event = refund_event(refund_id, intent, cents)
         with patch("order.signals.handlers.dispatch_on_commit"):
-            handle_stripe_charge_refunded(sender=None, event=event)
+            handle_stripe_refund_made(sender=None, event=event)
 
     def test_a_refund_of_the_second_reaches_the_ledger_and_clears_the_flag(
         self, twice
     ):
-        self._refunded("evt_refund_second", int(OWED * 100))
+        self._refunded("re_second", int(OWED * 100))
 
         twice.refresh_from_db()
         second = twice.payment_transactions.get(provider_reference="pi_second")
@@ -360,9 +354,10 @@ class TestEventsOnTheSecondIntent:
         assert twice.overcharged_at is None
 
     def test_a_failed_refund_of_the_second_reverses_it_and_flags_again(
-        self, twice
+        self, twice, refund_states
     ):
-        self._refunded("evt_refund_second", int(OWED * 100))
+        self._refunded("re_second", int(OWED * 100))
+        refund_states["re_second"] = "failed"
         failed = self._event(
             "evt_refund_failed",
             "refund.failed",
@@ -415,13 +410,15 @@ class TestEventsOnTheSecondIntent:
         ).exists()
         assert twice.overcharged_at is None
 
-    def test_an_order_with_no_ledger_row_is_still_found_by_payment_id(self):
+    def test_a_refund_of_a_payment_not_recorded_yet_is_retried_by_stripe(self):
+        """The payment's own event may still be on its way: the refund is
+        refused (Stripe redelivers it), not lost behind a 200."""
         order = _order(payment_id="pi_unrecorded")
 
-        self._refunded("evt_unrecorded", 1000, "pi_unrecorded")
+        with pytest.raises(ValueError, match="does not hold yet"):
+            self._refunded("re_unrecorded", 1000, "pi_unrecorded")
 
-        order.refresh_from_db()
-        assert order.payment_transactions.filter(
+        assert not order.payment_transactions.filter(
             kind=PaymentTransactionKind.REFUND
         ).exists()
 

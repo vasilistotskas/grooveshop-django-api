@@ -55,6 +55,7 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order import credit_allocation
 from order.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
@@ -123,6 +124,16 @@ class ReceiptNotIssuable(Exception):
     or a regeneration was asked for an order that has no receipt."""
 
 
+class ReceiptDeferred(ReceiptNotIssuable):
+    """:func:`generate_invoice` waits: the order has a refund or chargeback
+    whose place on the receipt is not decided yet, because a refund claim
+    still PENDING holds the room it needs (``order.credit_allocation``).
+    Issuing the receipt now would document the sale without netting that
+    money, and no credit would ever follow for it. Not final: the receipt
+    is issued once the claim resolves (``order.tasks.allocate_credit_sources``
+    asks for it again)."""
+
+
 def _seller_snapshot() -> dict[str, str]:
     """The seller's identity as the store has it, blanks included.
 
@@ -176,19 +187,44 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
     rows = breakdown_by_rate(order_vat_lines(order))
-    refunded = refunded_before_receipt(order)
-    if refunded <= 0:
+    allocation = _returned_before_receipt(order)
+    if not allocation:
         return rows
-    return _net_of(rows, min(refunded, _gross(rows)))
+    return _net_of(rows, allocation)
+
+
+def _returned_before_receipt(
+    order: Order, *, before: datetime | None = None
+) -> dict[Decimal, Decimal]:
+    """The gross per rate that moved back before the receipt, at the rates
+    each refund was allocated when it was claimed or booked
+    (``order.credit_allocation``): the one figure the receipt is netted by
+    and ``refunded_before_receipt`` adds up."""
+    from order.models import CreditAllocation
+
+    rows = CreditAllocation.objects.counting().filter(
+        order=order, moved_at__isnull=False
+    )
+    if before is not None:
+        rows = rows.filter(moved_at__lt=before)
+    out: dict[Decimal, Decimal] = {}
+    for row in rows:
+        out[row.rate] = out.get(row.rate, Decimal(0)) + Decimal(
+            row.amount.amount
+        )
+    return out
 
 
 def refunded_before_receipt(
     order: Order, *, before: datetime | None = None
 ) -> Decimal:
-    """What was paid back for *order* before its receipt exists: provider
-    and cash refunds on the payment ledger, net of those a provider
-    reported failed, the value returned onto gift cards and points, and
-    the chargebacks staff decided came with the goods back.
+    """What was paid back for *order* before its receipt exists, and so
+    reverses the sale: the allocations of the refunds (provider and cash,
+    net of those a provider reported failed), the value returned onto gift
+    cards and the chargebacks staff decided came with the goods back. It is
+    what the receipt is netted by (``_compute_vat_breakdown``), so the two
+    agree by construction: a duplicate payment given back is not in it, as
+    it is not a return of the sale.
 
     The cut-off is the receipt row's creation: a NEW receipt nets
     everything returned so far (``before=None``); a row that exists is
@@ -205,12 +241,8 @@ def refunded_before_receipt(
     card network took the money back, the merchant did not reverse the
     sale, and the receipt stands.
     """
-    from order.payment_ledger import PaymentLedger
-
-    return (
-        PaymentLedger.refunded(order, before=before)
-        + PaymentLedger.stored_value(order, before=before).returned
-        + PaymentLedger.chargebacks_returned(order, before=before)
+    return sum(
+        _returned_before_receipt(order, before=before).values(), Decimal(0)
     )
 
 
@@ -219,15 +251,25 @@ def _gross(rows: list[dict[str, Any]]) -> Decimal:
 
 
 def _net_of(
-    rows: list[dict[str, Any]], amount: Decimal
+    rows: list[dict[str, Any]], allocation: dict[Decimal, Decimal]
 ) -> list[dict[str, Any]]:
-    """*rows* less *amount* (gross), split over the rates exactly as a credit
-    document splits it (``credit_documents.credit_breakdown``): in proportion
-    to what each rate still holds, to the cent, the net of each rate derived
-    cumulatively so the figures add up. Rates left with nothing drop out."""
+    """*rows* less the stored *allocation* (gross per rate), the net of each
+    rate derived cumulatively exactly as a credit document derives it
+    (``credit_documents.credit_breakdown``) so the figures add up. Rates
+    left with nothing drop out. An allocation the receipt cannot hold (more
+    than a rate has) is taken up to what the rate holds."""
     from order.credit_documents import credit_breakdown
 
-    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount)}
+    held = {Decimal(r["rate"]): Decimal(r["gross"]) for r in rows}
+    capped = {
+        rate: min(gross, held.get(rate, Decimal(0)))
+        for rate, gross in allocation.items()
+        if held.get(rate, Decimal(0)) > 0
+    }
+    amount = sum(capped.values(), Decimal(0))
+    if amount <= 0:
+        return rows
+    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount, capped)}
     out = []
     for row in rows:
         cut = taken.get(row["rate"])
@@ -460,6 +502,23 @@ def _persist_invoice_row(
     predates the row, and no credit would ever cover it.
     """
     Order.objects.select_for_update().get(pk=order.pk)
+    if existing is None:
+        # The receipt nets what was returned before it, at the rates each
+        # refund was allocated at: decide the sources nobody allocated yet
+        # (a release that did not know about allocations booked them) so
+        # none is left to be credited for money the receipt never held. A
+        # source a PENDING claim keeps undecided cannot be netted, and once
+        # the row exists it is never credited either: wait for the claim.
+        credit_allocation.allocate_order(order)
+        if credit_allocation.undecided(order):
+            raise ReceiptDeferred(
+                _(
+                    "Order #%(order_id)s has a refund waiting for another "
+                    "refund that is still being confirmed, so its receipt "
+                    "is issued once that is settled."
+                )
+                % {"order_id": order.id}
+            )
     # Re-judged under the lock: a refund that committed since the caller's
     # check may have returned the whole sale.
     _refuse_if_fully_refunded(order, existing)

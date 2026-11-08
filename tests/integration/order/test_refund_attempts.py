@@ -147,7 +147,8 @@ class TestTheAttemptHoldsItsAmountBack:
             OrderService.refund_order(order, amount=_eur("30.00"))
         assert stripe_api.calls == []
 
-    def test_an_abandoned_attempt_releases_its_amount(self):
+    def test_an_old_attempt_still_holds_its_amount(self):
+        """No timer frees it: only a settled or declined attempt lets go."""
         order = _order()
         charge = order.payment_transactions.get()
         attempt = RefundAttempt.objects.create(
@@ -157,7 +158,7 @@ class TestTheAttemptHoldsItsAmountBack:
             created_at=attempt.created_at.replace(year=2000)
         )
 
-        assert PaymentLedger.refundable(order) == Decimal("100.00")
+        assert PaymentLedger.refundable(order) == Decimal("20.00")
 
     def test_a_refusal_frees_what_the_attempt_held(self):
         order = _order()

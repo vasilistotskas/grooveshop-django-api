@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -16,6 +16,7 @@ from djmoney.money import Money
 
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
+from order import credit_allocation
 from order.attribution import (
     AttributionInput,
     ClassifiedAttribution,
@@ -3479,6 +3480,9 @@ class OrderService:
             .get(pk=order.pk)
         )
         payment_status = locked["payment_status"]
+        # Every older source nobody allocated yet is decided before this
+        # claim takes its room (``order.credit_allocation``).
+        credit_allocation.allocate_order(order)
 
         if amount is not None and amount.amount <= 0:
             raise PaymentError(
@@ -3542,6 +3546,19 @@ class OrderService:
                             "trying again."
                         )
                     )
+                if attempt.is_overdue:
+                    # The provider may no longer remember the key, so
+                    # sending it again could refund twice.
+                    raise PaymentError(
+                        _(
+                            "A refund of this amount was sent to the "
+                            "payment provider a while ago and its result is "
+                            "still not known. It is looked up automatically; "
+                            "if it stays unknown, record its outcome from "
+                            "the order's refund attempts before trying "
+                            "again."
+                        )
+                    )
             return resumed, None
 
         # The value that can still be refunded: the provider's money, then
@@ -3603,6 +3620,11 @@ class OrderService:
                     )
                 )
 
+        if credit_allocation.undecided(order):
+            # An older refund still waits for a claim in flight to resolve
+            # (``credit_allocation.allocate_order``): this claim must not
+            # take the room it needs.
+            raise OrderService._waiting_error(order)
         attempts = [
             RefundAttempt.objects.create(
                 order=order,
@@ -3622,7 +3644,110 @@ class OrderService:
                     reason=reason[:255],
                 )
             )
+        cls._allocate_claim(order, attempts)
         return attempts, None
+
+    @staticmethod
+    def _waiting_error(
+        order: Order, claims: Sequence[RefundAttempt] | None = None
+    ) -> PaymentError:
+        """The refusal of a refund that must wait for claims still PENDING
+        (*claims*, or those that keep a source of the order undecided)."""
+        return PaymentError(
+            _(
+                "Another refund of this order is waiting for "
+                "%(blockers)s to be settled, so nothing more can be "
+                "refunded until then."
+            )
+            % {"blockers": credit_allocation.describe_blockers(order, claims)}
+        )
+
+    @staticmethod
+    def _allocate_claim(
+        order: Order, attempts: Sequence[RefundAttempt]
+    ) -> None:
+        """Fix, now and under the order lock, where the refund sits on the
+        receipt's VAT rates: its amount spread over the headroom left at
+        this moment (``order.credit_allocation``), laid over its shares in
+        order. A refund the headroom cannot hold is refused before any
+        provider is called: its credit document could never be issued."""
+        if not credit_allocation.has_rates(order):
+            # Nothing taxable: nothing is owed, and each claim is marked
+            # allocated so the backfill never picks it up.
+            for attempt in attempts:
+                credit_allocation.store(
+                    order, [], nothing_owed=True, refund_attempt=attempt
+                )
+            return
+        # Points are a discount, not money returned: their share owes no
+        # credit document and takes no room on the receipt. A gift card is
+        # payment the receipt holds.
+        stored = PaymentLedger.stored_value(order)
+        owed = [
+            PaymentLedger.split_stored_value(stored, a.amount.amount)[0]
+            if a.kind == RefundAttemptKind.STORED_VALUE
+            else a.amount.amount
+            for a in attempts
+        ]
+        # A duplicate payment is paid back first, and giving it back is not
+        # reversing the sale: that part owes no credit and takes no room.
+        ids = [a.pk for a in attempts]
+        excess = PaymentLedger.refundable_excess(order, exclude=ids)
+        provider_amount = sum(
+            (
+                a.amount.amount
+                for a in attempts
+                if a.kind == RefundAttemptKind.PROVIDER
+            ),
+            Decimal(0),
+        )
+        if provider_amount > 0 and min(
+            PaymentLedger.refundable_excess(
+                order, exclude=ids, claims_hold=False
+            ),
+            provider_amount,
+        ) > min(excess, provider_amount):
+            # A claim still PENDING holds part of the duplicate payment
+            # this refund would take: what it owes depends on whether that
+            # claim is settled or declined, which nobody knows yet. Decide
+            # nothing on a guess: wait, as a refund booked without a claim
+            # does.
+            raise OrderService._waiting_error(
+                order,
+                credit_allocation.excess_holders(
+                    order, provider_amount, exclude=ids
+                ),
+            )
+        for i, attempt in enumerate(attempts):
+            if attempt.kind != RefundAttemptKind.PROVIDER or excess <= 0:
+                continue
+            taken = min(excess, owed[i])
+            owed[i] -= taken
+            excess -= taken
+        total = sum(owed, Decimal(0))
+        allocation = (
+            credit_allocation.allocate_pro_rata(order, total)
+            if total > 0
+            else {}
+        )
+        held = sum(allocation.values(), Decimal(0))
+        if held < total:
+            raise PaymentError(
+                _(
+                    "The receipt of this order holds only %(left)s more "
+                    "across its VAT rates, less than the %(amount)s to "
+                    "refund, so its credit document could not be issued "
+                    "and nothing was refunded."
+                )
+                % {"left": held, "amount": total}
+            )
+        per_share = credit_allocation.split_over_shares(
+            credit_allocation.pieces_of(allocation), owed
+        )
+        for attempt, pieces in zip(attempts, per_share, strict=True):
+            credit_allocation.store(
+                order, pieces, nothing_owed=not pieces, refund_attempt=attempt
+            )
 
     @staticmethod
     def _attempts_to_resume(
@@ -3700,7 +3825,7 @@ class OrderService:
             success, response = provider.refund_payment(
                 payment_id=charge.provider_reference,
                 amount=attempt.amount,
-                idempotency_key=f"refund-{attempt.idempotency_key}",
+                idempotency_key=attempt.provider_key,
             )
             if success and not response.get("refund_id"):
                 # Money may have moved but nothing identifies it, so it
@@ -3723,6 +3848,27 @@ class OrderService:
             )
             refund_id = response["refund_id"]
 
+        return cls.book_share(
+            order, attempt, paid_back, refund_id, reason, reference
+        )
+
+    @classmethod
+    def book_share(
+        cls,
+        order: Order,
+        attempt: RefundAttempt,
+        paid_back: Money,
+        refund_id: str | None,
+        reason: str,
+        reference: str = "",
+    ) -> _SharePaid:
+        """Step 3 of :meth:`refund_order` for one share, and the one place
+        a refund the provider made becomes a ledger row: under the order
+        lock, the refund is recorded (*refund_id* is the provider's id, or
+        ``None`` for cash paid back by the merchant under *reference*), the
+        attempt settles and ``order_refunded`` fires. Also what resolves an
+        attempt whose outcome was unknown (``order.refund_reconciliation``)."""
+        charge = attempt.charge
         with transaction.atomic():
             Order.objects.select_for_update().values_list("pk", flat=True).get(
                 pk=order.pk
@@ -3736,6 +3882,15 @@ class OrderService:
                 return _SharePaid(
                     attempt.pk, paid_back, settled.refund.provider_reference
                 )
+            # Only a PENDING attempt is a claim to fulfil. One declined
+            # while the provider was asked (staff marked it not made) is
+            # never revived: if the money moved anyway it is booked as a
+            # refund nobody claimed, which the allocation then decides.
+            claim = (
+                settled
+                if settled.status == RefundAttemptStatus.PENDING
+                else None
+            )
             if refund_id is None:
                 row, created = PaymentLedger.record_cod_refund(
                     order,
@@ -3743,7 +3898,7 @@ class OrderService:
                     amount=paid_back,
                     reference=reference,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
                 )
                 refund_id = row.provider_reference
             else:
@@ -3753,7 +3908,8 @@ class OrderService:
                     amount=paid_back,
                     reference=refund_id,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
+                    match_attempt=claim is not None,
                 )
             if created:
                 # One signal per refund the ledger took, so a failure on a
@@ -3799,25 +3955,9 @@ class OrderService:
                     attempt.pk, PaymentLedger.stored_returned_by(order, settled)
                 )
 
-            stored = PaymentLedger.stored_value(order)
-            left = stored.left
-            amount = min(attempt.amount.amount, left)
-            if amount >= left:
-                gift_card_part = stored.gift_card_left
-                points_part = stored.points_left
-            else:
-                gift_card_part = (
-                    amount * stored.gift_card_left / left
-                ).quantize(Decimal("0.01"), rounding="ROUND_DOWN")
-                points_part = (
-                    int(
-                        stored.points_left
-                        * (amount - gift_card_part)
-                        / stored.points_value_left
-                    )
-                    if stored.points_value_left
-                    else 0
-                )
+            gift_card_part, points_part = PaymentLedger.split_stored_value(
+                PaymentLedger.stored_value(order), attempt.amount.amount
+            )
             gift_card = (
                 GiftCardService.credit_refund(
                     order, gift_card_part, refund_attempt=settled
@@ -3835,6 +3975,10 @@ class OrderService:
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
             returned = PaymentLedger.stored_returned_by(order, settled)
+            # Only the gift cards are payment the receipt holds: points are
+            # a discount and owe no credit document.
+            credit_allocation.scale(gift_card, refund_attempt=settled)
+            credit_allocation.mark_moved(timezone.now(), refund_attempt=settled)
             order_stored_value_returned.send(
                 sender=cls,
                 order=order,

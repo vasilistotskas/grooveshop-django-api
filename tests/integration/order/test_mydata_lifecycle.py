@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
@@ -24,7 +24,6 @@ from django.core import mail
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from djmoney.money import Money
-from djstripe.models import Event
 
 from order.admin import OrderAdmin
 from order.credit_documents import (
@@ -42,14 +41,14 @@ from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
 from order.services import OrderService
-from order.signals.handlers import handle_stripe_charge_refunded
+from order.signals.handlers import handle_stripe_refund_made
 from order.tasks import generate_order_invoice, send_invoice_to_mydata
 from order.views.viva_webhook import _handle_reversal_created
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.mydata import FakeAade, mydata_enabled
 from tests.utils.orders import courier_cash_order
-from tests.utils.stripe_refunds import FakeStripeRefunds
+from tests.utils.stripe_refunds import FakeStripeRefunds, refund_event
 from tests.utils.viva import (
     REVERSAL_CREATED_EVENT,
     FakeVivaApi,
@@ -348,26 +347,14 @@ class TestCreditForEveryRefundSource:
 
         self._assert_one_credit(order, aade, "30.00")
 
-    def test_a_stripe_dashboard_refund_webhook(self):
-        event = Mock(spec=Event)
-        event.id = "evt_dashboard_refund"
-        event.type = "charge.refunded"
-        event.data = {
-            "object": {
-                "id": "ch_x",
-                "payment_intent": PI,
-                "amount": 10000,
-                "amount_refunded": 4000,
-                "currency": "eur",
-                "refunded": False,
-            }
-        }
+    def test_a_stripe_dashboard_refund_webhook(self, refund_states):
+        event = refund_event("re_dashboard", PI, 4000)
         with mydata_enabled(), FakeAade() as aade:
             order = self._shipped()
-            handle_stripe_charge_refunded(sender=None, event=event)
+            handle_stripe_refund_made(sender=None, event=event)
             # Stripe redelivers the event: nothing new on the ledger, so no
             # second document.
-            handle_stripe_charge_refunded(sender=None, event=event)
+            handle_stripe_refund_made(sender=None, event=event)
 
         self._assert_one_credit(order, aade, "40.00")
 
@@ -448,7 +435,7 @@ class TestPartialCredits:
 
     def test_a_credit_past_the_receipt_is_never_sent(self):
         order = _order(lines=(("24", "100.00"),))
-        with mydata_enabled(), FakeAade() as aade:
+        with mydata_enabled(), FakeAade():
             invoice = _receipt(order)
             # The ledger says 150 came back, more than the receipt holds.
             charge = order.payment_transactions.get()
@@ -462,13 +449,18 @@ class TestPartialCredits:
             row.__class__.objects.filter(pk=row.pk).update(
                 created_at=invoice.created_at
             )
-            assert create_pending_credits(order.id) == []
+            create_pending_credits(order.id)
 
-        assert aade.credits == []
-        assert not RetailCredit.objects.exists()
-        assert order.history.filter(
-            new_value__note__icontains="No credit document"
-        ).exists()
+        # Cut to what the receipt holds when the refund was decided, and
+        # said so once: never the 150.00 the ledger claims.
+        [credit] = RetailCredit.objects.all()
+        assert credit.total.amount == Decimal("100.00")
+        assert (
+            order.history.filter(
+                new_value__note__icontains="receipt holds"
+            ).count()
+            == 1
+        )
 
     def test_cumulative_net_never_passes_the_receipt_with_awkward_cents(self):
         """Credits of 3.33, 3.33, 3.33 and 0.01 against 10.00 at 24%
@@ -1171,6 +1163,16 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
                 charge=None,
                 amount=_eur("50.00"),
                 status=RefundAttemptStatus.SETTLED,
+            )
+            # The claim fixed its share of the receipt's rates.
+            from order import credit_allocation
+
+            credit_allocation.store(
+                order,
+                credit_allocation.pieces_of(
+                    credit_allocation.allocate_pro_rata(order, Decimal(50))
+                ),
+                refund_attempt=attempt,
             )
             redeem = GiftCardTransaction.objects.get(
                 order=order, kind=GiftCardTransactionKind.REDEEM

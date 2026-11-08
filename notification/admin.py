@@ -193,21 +193,18 @@ class NotificationAdmin(BaseTranslatableAdmin):
             _("Notification Content"),
             {
                 "fields": ("title", "message", "link"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Classification"),
             {
                 "fields": ("kind", "category", "priority", "notification_type"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Scheduling"),
             {
                 "fields": ("expiry_date",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -403,14 +400,12 @@ class NotificationUserAdmin(BaseModelAdmin):
             _("Relationship"),
             {
                 "fields": ("user", "notification"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Status"),
             {
                 "fields": ("seen", "seen_at"),
-                "classes": ("wide",),
             },
         ),
         (

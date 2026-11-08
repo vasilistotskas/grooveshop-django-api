@@ -116,6 +116,17 @@ class TestDeployGuard:
 
         assert _run_check() == []
 
+    def test_a_run_not_handed_the_database_does_not_query_it(self, resend):
+        _verified("guard_no_db")
+
+        with CaptureQueriesContext(connection) as queries:
+            errors = checks.stores_have_their_resend_key(
+                app_configs=None, databases=None
+            )
+
+        assert errors == []
+        assert len(queries) == 0
+
     def test_the_database_check_fails_a_system_check_run(self, resend):
         _verified("guard_run")
 

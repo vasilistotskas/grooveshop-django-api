@@ -1192,39 +1192,33 @@ class ProductAdmin(
             queryset=Product.objects.only("id", "variant_group_id"),
         )
 
-        return (
-            qs.select_related("category", "vat", "variant_group")
-            .prefetch_related(
-                main_images,
-                active_reservations,
-                variant_siblings,
-                "variant_group__translations",
-            )
-            .only(
-                # Only load fields we actually display
-                "id",
-                "sku",
-                "active",
-                "price",
-                "price_currency",
-                "discount_percent",
-                "stock",
-                "view_count",
-                "created_at",
-                "updated_at",
-                "category_id",
-                "vat_id",
-                "changed_by_id",
-                "variant_group_id",
-                # django-money reads a deferred amount straight from the
-                # instance dict, so the form of a page that shows the cost
-                # price has to load it up front.
-                *(
-                    COST_PRICE_FIELDS
-                    if request.user.has_perm(COST_PRICE_PERMISSION)
-                    else ()
-                ),
-            )
+        qs = qs.select_related(
+            "category", "vat", "variant_group"
+        ).prefetch_related(
+            main_images,
+            active_reservations,
+            variant_siblings,
+            "variant_group__translations",
+        )
+        if not self.serves_changelist(request):
+            # The change form edits and saves the whole row.
+            return qs
+        return qs.only(
+            # Only load fields the list displays
+            "id",
+            "sku",
+            "active",
+            "price",
+            "price_currency",
+            "discount_percent",
+            "stock",
+            "view_count",
+            "created_at",
+            "updated_at",
+            "category_id",
+            "vat_id",
+            "changed_by_id",
+            "variant_group_id",
         )
 
     def get_prepopulated_fields(self, request, obj=None):
@@ -1952,7 +1946,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         # ``product__translations`` and the main-image prefetch keep
         # ``product_header`` and ``comment_excerpt`` from querying per
         # row; the verified-purchase flag is one annotation.
-        return (
+        qs = (
             qs.select_related("product", "user")
             .prefetch_related(
                 "translations",
@@ -1964,24 +1958,27 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
                 ),
             )
             .with_verified_purchase()
-            .only(
-                # Review fields - minimal set
-                "id",
-                "product_id",
-                "user_id",
-                "rate",
-                "status",
-                "created_at",
-                # Product fields
-                "product__id",
-                "product__slug",
-                # User fields
-                "user__id",
-                "user__email",
-                "user__username",
-                "user__first_name",
-                "user__last_name",
-            )
+        )
+        if not self.serves_changelist(request):
+            # The change form edits and saves the whole row.
+            return qs
+        return qs.only(
+            # Review fields - minimal set
+            "id",
+            "product_id",
+            "user_id",
+            "rate",
+            "status",
+            "created_at",
+            # Product fields
+            "product__id",
+            "product__slug",
+            # User fields
+            "user__id",
+            "user__email",
+            "user__username",
+            "user__first_name",
+            "user__last_name",
         )
 
     fieldsets = (

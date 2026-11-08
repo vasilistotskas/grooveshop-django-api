@@ -59,6 +59,11 @@ tenant-schema row (see `is_platform_superuser`).
 | `sort` | string | No | — |
 | `facets` | comma-separated strings | No | — |
 
+The three id lists (`categories`, `attributeValues`, `brands`) take at most
+100 ids each (`MAX_INT_CSV_ITEMS` in `core/api/query_params.py`); more is a 400
+with code `too_many_values`, so a request can never drive an unbounded filter
+into Meilisearch.
+
 `categories` stands for each category's whole subtree: the view expands the
 ids to every descendant before filtering. `inStock=true` keeps products with
 stock above zero. `onOffer=true` keeps the products that are

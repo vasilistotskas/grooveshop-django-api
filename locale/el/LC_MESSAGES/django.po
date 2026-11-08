@@ -6652,6 +6652,10 @@ msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a 
 msgstr "Δώστε στο ACS τους αριθμούς voucher και ζητήστε την κατάσταση απόδοσης της αντικαταβολής. Αν έχει γίνει απόδοση σε ημερομηνία που η νυχτερινή συμφωνία δεν ρώτησε ποτέ, επαναλάβετέ την με την εντολή reconcile_acs_cod: είναι ασφαλής σε επανάληψη."
 
 #, python-format
+msgid "Give at most %(max)d values."
+msgstr "Δώστε το πολύ %(max)d τιμές."
+
+#, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
 msgstr "Δώστε από 1 έως %(max)d ID προϊόντων, το καθένα θετικό ακέραιο."
 

@@ -13,6 +13,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from core.api.query_params import MAX_INT_CSV_ITEMS
+
 
 @pytest.mark.django_db
 class TestProductSearchParamValidation:
@@ -34,3 +36,18 @@ class TestProductSearchParamValidation:
     def test_invalid_numeric_params_return_400_not_500(self, params):
         response = self.client.get(self.url, {**params, "query": "shoe"})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.parametrize(
+        ("param", "error_key"),
+        [
+            ("categories", "categories"),
+            ("attribute_values", "attributeValues"),
+            ("brands", "brands"),
+        ],
+    )
+    def test_id_list_over_the_cap_returns_400(self, param, error_key):
+        too_many = ",".join(str(i) for i in range(1, MAX_INT_CSV_ITEMS + 2))
+        response = self.client.get(self.url, {param: too_many, "query": "x"})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        # The error body is camelCased like every response.
+        assert response.json()[error_key]

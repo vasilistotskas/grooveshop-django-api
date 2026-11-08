@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -16,6 +16,7 @@ from djmoney.money import Money
 
 from core.store_settings import store_setting
 from core.utils.i18n import active_language_code
+from order import credit_allocation
 from order.attribution import (
     AttributionInput,
     ClassifiedAttribution,
@@ -3622,7 +3623,40 @@ class OrderService:
                     reason=reason[:255],
                 )
             )
+        cls._allocate_claim(order, attempts)
         return attempts, None
+
+    @staticmethod
+    def _allocate_claim(
+        order: Order, attempts: Sequence[RefundAttempt]
+    ) -> None:
+        """Fix, now and under the order lock, where the refund sits on the
+        receipt's VAT rates: its amount spread over the headroom left at
+        this moment (``order.credit_allocation``), laid over its shares in
+        order. A refund the headroom cannot hold is refused before any
+        provider is called: its credit document could never be issued."""
+        if not credit_allocation.has_rates(order):
+            return
+        credit_allocation.ensure_allocations(order, claiming=attempts)
+        total = sum((a.amount.amount for a in attempts), Decimal(0))
+        allocation = credit_allocation.allocate_pro_rata(order, total)
+        held = sum(allocation.values(), Decimal(0))
+        if held < total:
+            raise PaymentError(
+                _(
+                    "The receipt of this order holds only %(left)s more "
+                    "across its VAT rates, less than the %(amount)s to "
+                    "refund, so its credit document could not be issued "
+                    "and nothing was refunded."
+                )
+                % {"left": held, "amount": total}
+            )
+        per_share = credit_allocation.split_over_shares(
+            credit_allocation.pieces_of(allocation),
+            [a.amount.amount for a in attempts],
+        )
+        for attempt, pieces in zip(attempts, per_share, strict=True):
+            credit_allocation.store(order, pieces, refund_attempt=attempt)
 
     @staticmethod
     def _attempts_to_resume(
@@ -3835,6 +3869,8 @@ class OrderService:
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
             returned = PaymentLedger.stored_returned_by(order, settled)
+            credit_allocation.scale(returned.amount, refund_attempt=settled)
+            credit_allocation.mark_moved(timezone.now(), refund_attempt=settled)
             order_stored_value_returned.send(
                 sender=cls,
                 order=order,

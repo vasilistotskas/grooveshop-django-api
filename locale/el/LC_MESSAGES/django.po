@@ -43,6 +43,10 @@ msgid "%(ago)s ago"
 msgstr "πριν από %(ago)s"
 
 #, python-format
+msgid "%(amount)s at %(rate)s%% VAT"
+msgstr "%(amount)s με ΦΠΑ %(rate)s%%"
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
@@ -716,6 +720,9 @@ msgstr "Ο κωδικός GTIN έχει 8, 12, 13 ή 14 ψηφία."
 
 msgid "A VAT rate with this value already exists."
 msgstr "Υπάρχει ήδη συντελεστής ΦΠΑ με αυτή την τιμή."
+
+msgid "A booked refund no attempt claimed (the provider's webhook)."
+msgstr "Επιστροφή που καταχωρίστηκε χωρίς να την έχει διεκδικήσει απόπειρα (webhook του παρόχου)."
 
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "Η ανάλυση δείχνει τις πωλήσεις πριν από τις επιστροφές, με τις μεγαλύτερες πρώτες. Για προϊόν ή κατηγορία μετράνε μόνο τα προϊόντα: τα μεταφορικά και οι χρεώσεις ανήκουν στην παραγγελία, όχι σε μια γραμμή. Η εξαγωγή περιλαμβάνει κάθε ομάδα, ανά περίοδο."
@@ -2929,6 +2936,9 @@ msgstr "Απόφαση chargeback"
 msgid "Chargeback Decisions"
 msgstr "Αποφάσεις chargeback"
 
+msgid "Chargeback decision"
+msgstr "Απόφαση για chargeback"
+
 #, python-format
 msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
 msgstr "Το chargeback %(requested)s δεν καταγράφηκε: δεν έχει μείνει ποσό στην πληρωμή (%(returned)s έχουν ήδη επιστραφεί)"
@@ -3632,6 +3642,12 @@ msgstr "Πιστωτικό"
 
 msgid "Credit Number"
 msgstr "Αριθμός πιστωτικού"
+
+msgid "Credit allocation"
+msgstr "Κατανομή πίστωσης"
+
+msgid "Credit allocations"
+msgstr "Κατανομές πίστωσης"
 
 msgid "Credit document"
 msgstr "Πιστωτικό παραστατικό"
@@ -6690,6 +6706,9 @@ msgstr "Προϊόντα"
 msgid "Goods not yet settled"
 msgstr "Προϊόντα που δεν έχουν διευθετηθεί"
 
+msgid "Goods or shipping for a refund by lines; empty else."
+msgstr "Προϊόντα ή μεταφορικά σε επιστροφή ανά γραμμή· κενό αλλιώς."
+
 msgid "Goods returned"
 msgstr "Τα προϊόντα επέστρεψαν"
 
@@ -6772,6 +6791,9 @@ msgstr "Μικτό κέρδος"
 
 msgid "Gross unit price a consumer pays now: price plus VAT, minus the markdown and any unconditional automatic promotion. Maintained automatically, never edited."
 msgstr "Η τελική τιμή μονάδας (με ΦΠΑ) που πληρώνει τώρα ο καταναλωτής: τιμή συν ΦΠΑ, μείον την έκπτωση προϊόντος και κάθε άνευ όρων αυτόματη προσφορά. Ενημερώνεται αυτόματα, δεν επεξεργάζεται."
+
+msgid "Gross, VAT included."
+msgstr "Μικτό, με ΦΠΑ."
 
 msgid "Ground Floor"
 msgstr "Ισόγειο"
@@ -8487,6 +8509,9 @@ msgstr "Μήνας"
 msgid "Most posts to return, from 1 to {max} (the default)."
 msgstr "Μέγιστος αριθμός άρθρων προς επιστροφή, από 1 έως {max} (η προεπιλογή)."
 
+msgid "Moved at"
+msgstr "Μετακινήθηκε"
+
 msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 msgstr "Αλλάζει με κάθε αλλαγή του πρόχειρου· κάθε αποθήκευση δηλώνει την αναθεώρηση πάνω στην οποία έγινε (If-Match)."
 
@@ -9642,6 +9667,9 @@ msgstr "Είδος παραγγελίας %(item)s - %(change)s - %(date)s"
 
 msgid "Order item is required for restock operation"
 msgstr "Απαιτείται προϊόν παραγγελίας για την επαναφορά στο απόθεμα"
+
+msgid "Order line"
+msgstr "Γραμμή παραγγελίας"
 
 msgid "Order marked refunded"
 msgstr "Παραγγελία κλεισμένη ως επιστραφείσα"
@@ -14306,6 +14334,10 @@ msgstr "Ο λόγος που δόθηκε για την επιστροφή."
 msgid "The reason is included in the email to the customer."
 msgstr "Η αιτιολογία συμπεριλαμβάνεται στο email προς τον πελάτη."
 
+#, python-format
+msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
+msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s στους συντελεστές ΦΠΑ της, λιγότερα από τα %(amount)s προς επιστροφή, άρα το πιστωτικό της παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα."
+
 msgid "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 msgstr "Ο παραλήπτης λαμβάνει τον κωδικό της κάρτας με email και μπορεί να τον εξαργυρώσει κατά την ολοκλήρωση της αγοράς, σε όσες παραγγελίες θέλει, μέχρι να εξαντληθεί το υπόλοιπο."
 
@@ -15208,6 +15240,9 @@ msgstr "Τιμή μονάδας: %(price)s. Τελική τιμή: %(final)s. Π
 msgid "Units"
 msgstr "Τεμάχια"
 
+msgid "Units a refund by lines asked for; informational."
+msgstr "Τεμάχια που ζήτησε μια επιστροφή ανά γραμμή· ενημερωτικό."
+
 msgid "Units can only be restocked on a delivered, completed or returned order."
 msgstr "Τα τεμάχια μπορούν να επανέλθουν στο απόθεμα μόνο σε παραγγελία που έχει παραδοθεί, ολοκληρωθεί ή επιστραφεί."
 
@@ -16047,6 +16082,9 @@ msgstr "Πότε η απόφαση πήρε τελευταία την τρέχο
 
 msgid "When the export can no longer be downloaded."
 msgstr "Πότε η εξαγωγή παύει να είναι διαθέσιμη για λήψη."
+
+msgid "When the money moved; empty while it is in flight."
+msgstr "Πότε μετακινήθηκαν τα χρήματα· κενό όσο είναι σε εξέλιξη."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "Πότε έφυγε για πρώτη φορά η παραγγελία από το κατάστημα. Η πώληση μετράει στον μήνα αυτής της στιγμής (αναφορά τζίρου)· μια παραγγελία που δεν στάλθηκε ποτέ δεν έχει τιμή."

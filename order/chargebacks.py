@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from order import credit_allocation
 from order.credit_documents import request_credit_documents
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.exceptions import OrderServiceError
@@ -104,6 +105,7 @@ def decide_chargebacks(
             changed.append(decision)
 
         for decision in changed:
+            credit_allocation.allocate_decision(order, decision)
             template = (
                 gettext(
                     "Chargeback %(amount)s: goods returned, the sale is "

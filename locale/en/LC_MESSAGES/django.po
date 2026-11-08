@@ -38,6 +38,10 @@ msgid "%(ago)s ago"
 msgstr "%(ago)s ago"
 
 #, python-format
+msgid "%(amount)s at %(rate)s%% VAT"
+msgstr "%(amount)s at %(rate)s%% VAT"
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
@@ -711,6 +715,9 @@ msgstr "A GTIN has 8, 12, 13 or 14 digits."
 
 msgid "A VAT rate with this value already exists."
 msgstr "A VAT rate with this value already exists."
+
+msgid "A booked refund no attempt claimed (the provider's webhook)."
+msgstr "A booked refund no attempt claimed (the provider's webhook)."
 
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
@@ -2922,6 +2929,9 @@ msgstr "Chargeback Decision"
 msgid "Chargeback Decisions"
 msgstr "Chargeback Decisions"
 
+msgid "Chargeback decision"
+msgstr "Chargeback decision"
+
 #, python-format
 msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
 msgstr "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
@@ -3628,6 +3638,12 @@ msgstr "Credit Note"
 
 msgid "Credit Number"
 msgstr "Credit Number"
+
+msgid "Credit allocation"
+msgstr "Credit allocation"
+
+msgid "Credit allocations"
+msgstr "Credit allocations"
 
 msgid "Credit document"
 msgstr "Credit document"
@@ -6684,6 +6700,9 @@ msgstr "Goods"
 msgid "Goods not yet settled"
 msgstr "Goods not yet settled"
 
+msgid "Goods or shipping for a refund by lines; empty else."
+msgstr "Goods or shipping for a refund by lines; empty else."
+
 msgid "Goods returned"
 msgstr "Goods returned"
 
@@ -6766,6 +6785,9 @@ msgstr "Gross profit"
 
 msgid "Gross unit price a consumer pays now: price plus VAT, minus the markdown and any unconditional automatic promotion. Maintained automatically, never edited."
 msgstr "Gross unit price a consumer pays now: price plus VAT, minus the markdown and any unconditional automatic promotion. Maintained automatically, never edited."
+
+msgid "Gross, VAT included."
+msgstr "Gross, VAT included."
 
 msgid "Ground Floor"
 msgstr "Ground Floor"
@@ -8479,6 +8501,9 @@ msgstr "Month"
 msgid "Most posts to return, from 1 to {max} (the default)."
 msgstr "Most posts to return, from 1 to {max} (the default)."
 
+msgid "Moved at"
+msgstr "Moved at"
+
 msgid "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 msgstr "Moves with every change of the draft; a save names the revision it was made against (If-Match)."
 
@@ -9634,6 +9659,9 @@ msgstr "Order item %(item)s - %(change)s - %(date)s"
 
 msgid "Order item is required for restock operation"
 msgstr "Order item is required for restock operation"
+
+msgid "Order line"
+msgstr "Order line"
 
 msgid "Order marked refunded"
 msgstr "Order marked refunded"
@@ -14303,6 +14331,10 @@ msgstr "The reason given for a refund."
 msgid "The reason is included in the email to the customer."
 msgstr "The reason is included in the email to the customer."
 
+#, python-format
+msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
+msgstr "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
+
 msgid "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 msgstr "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 
@@ -15205,6 +15237,9 @@ msgstr "Unit price: %(price)s. Final price: %(final)s. Quantity: %(qty)s. Total:
 msgid "Units"
 msgstr "Units"
 
+msgid "Units a refund by lines asked for; informational."
+msgstr "Units a refund by lines asked for; informational."
+
 msgid "Units can only be restocked on a delivered, completed or returned order."
 msgstr "Units can only be restocked on a delivered, completed or returned order."
 
@@ -16044,6 +16079,9 @@ msgstr "When the decision last took its current value. A receipt issued after it
 
 msgid "When the export can no longer be downloaded."
 msgstr "When the export can no longer be downloaded."
+
+msgid "When the money moved; empty while it is in flight."
+msgstr "When the money moved; empty while it is in flight."
 
 msgid "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."
 msgstr "When the order first left the store. The sale is counted in the month of this moment (turnover report); an order that never shipped has none."

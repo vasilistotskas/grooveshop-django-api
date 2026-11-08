@@ -175,11 +175,23 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     the lines first — VAT is owed on what the customer actually paid.
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
+    from order import credit_allocation
+    from order.models import CreditAllocation
+
     rows = breakdown_by_rate(order_vat_lines(order))
-    refunded = refunded_before_receipt(order)
-    if refunded <= 0:
+    # What moved before this receipt nets it, at the rates each refund was
+    # allocated when it was claimed or booked (``order.credit_allocation``).
+    credit_allocation.ensure_allocations(order)
+    allocation: dict[Decimal, Decimal] = {}
+    for held in CreditAllocation.objects.counting().filter(
+        order=order, moved_at__isnull=False
+    ):
+        allocation[held.rate] = allocation.get(held.rate, Decimal(0)) + (
+            Decimal(held.amount.amount)
+        )
+    if not allocation:
         return rows
-    return _net_of(rows, min(refunded, _gross(rows)))
+    return _net_of(rows, allocation)
 
 
 def refunded_before_receipt(
@@ -219,15 +231,25 @@ def _gross(rows: list[dict[str, Any]]) -> Decimal:
 
 
 def _net_of(
-    rows: list[dict[str, Any]], amount: Decimal
+    rows: list[dict[str, Any]], allocation: dict[Decimal, Decimal]
 ) -> list[dict[str, Any]]:
-    """*rows* less *amount* (gross), split over the rates exactly as a credit
-    document splits it (``credit_documents.credit_breakdown``): in proportion
-    to what each rate still holds, to the cent, the net of each rate derived
-    cumulatively so the figures add up. Rates left with nothing drop out."""
+    """*rows* less the stored *allocation* (gross per rate), the net of each
+    rate derived cumulatively exactly as a credit document derives it
+    (``credit_documents.credit_breakdown``) so the figures add up. Rates
+    left with nothing drop out. An allocation the receipt cannot hold (more
+    than a rate has) is taken up to what the rate holds."""
     from order.credit_documents import credit_breakdown
 
-    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount)}
+    held = {Decimal(r["rate"]): Decimal(r["gross"]) for r in rows}
+    capped = {
+        rate: min(gross, held.get(rate, Decimal(0)))
+        for rate, gross in allocation.items()
+        if held.get(rate, Decimal(0)) > 0
+    }
+    amount = sum(capped.values(), Decimal(0))
+    if amount <= 0:
+        return rows
+    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount, capped)}
     out = []
     for row in rows:
         cut = taken.get(row["rate"])

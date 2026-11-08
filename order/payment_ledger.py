@@ -39,6 +39,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from djmoney.money import Money
 
+from order import credit_allocation
 from order.enum.payment_transaction import (
     PaymentFeeSource,
     PaymentTransactionKind,
@@ -861,6 +862,10 @@ class PaymentLedger:
             )
         if attempt is not None:
             cls.settle_attempt(attempt, row)
+        elif created:
+            # Nobody claimed this refund (a provider's webhook, a dashboard
+            # refund): it is allocated when booked, over the headroom now.
+            credit_allocation.book_refund(order, row)
         return row, created
 
     @staticmethod
@@ -880,6 +885,7 @@ class PaymentLedger:
             attempt.refund = refund
             fields.append("refund")
         attempt.save(update_fields=fields)
+        credit_allocation.mark_moved(refund.created_at, refund_attempt=attempt)
 
     @classmethod
     def record_refund_reversal(
@@ -924,6 +930,15 @@ class PaymentLedger:
         if created:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
+            refunded = PaymentTransaction.objects.filter(
+                provider=charge.provider,
+                provider_reference=reference,
+                kind=PaymentTransactionKind.REFUND,
+            ).first()
+            if refunded is not None:
+                credit_allocation.free_reversed(
+                    refunded, Decimal(amount.amount)
+                )
         return row, created
 
     @staticmethod

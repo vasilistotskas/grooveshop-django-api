@@ -29,10 +29,15 @@ missing, so every trigger (a refund, an order closing, the receipt being
 registered) calls the same idempotent function.
 
 **How a credit splits over VAT rates.** The receipt froze its gross per
-rate (``Invoice.vat_breakdown``: goods, shipping and fees all in it). A
-credit spreads its amount over the rates in proportion to what each still
-holds, to the cent (``order.discounts.allocate_capped``), so a partial
-refund of a mixed 24%/13% order credits both rates.
+rate (``Invoice.vat_breakdown``: goods, shipping and fees all in it). The
+split of every credit was FIXED when its money was claimed, booked or
+decided, under the order lock (``order.credit_allocation``,
+``CreditAllocation``: the rates of the lines a refund pays for, or a bare
+amount spread over the headroom left at that moment), and the credit is
+issued from that allocation only. The order credits are issued in cannot
+change it, so a refund claimed first keeps its room however the later ones
+settle. The one credit with no allocation is the settlement of a closed
+order, which takes what the receipt still holds at every rate.
 
 **Nothing but this module stops an over-credit.** AADE forbids
 ``correlatedInvoices`` on an 11.4 (error 205, confirmed against the dev API
@@ -50,7 +55,7 @@ it.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -58,7 +63,8 @@ from django.db import transaction
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.discounts import allocate_capped
+from order import credit_allocation
+from order.discounts import allocate_capped, proportional_shares
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.models import (
@@ -94,10 +100,43 @@ class CreditExceedsReceiptError(ValueError):
     """The amount to credit is more than the receipt still holds."""
 
 
+def _allocated_shares(
+    amount: Decimal,
+    allocation: Mapping[Decimal, Decimal],
+    remaining: Mapping[Decimal, Decimal],
+) -> dict[Decimal, Decimal]:
+    """The gross per rate of a credit issued from its stored allocation:
+    exactly the allocation's own rates, never spilling onto another rate.
+
+    A credit for less than the allocation (a stored-value share that
+    returned less than it claimed) takes it in proportion. A rate the
+    receipt has no row for, or holds less of than the credit takes, refuses
+    the whole credit: AADE cannot check an 11.4 against its receipt."""
+    total = sum(allocation.values(), _ZERO)
+    if amount > total or amount <= 0:
+        raise CreditExceedsReceiptError(
+            f"Cannot credit {amount}: its allocation on the receipt is {total}."
+        )
+    wanted = (
+        dict(allocation)
+        if amount == total
+        else proportional_shares(amount, dict(allocation))
+    )
+    for rate, gross in wanted.items():
+        if gross > remaining.get(rate, _ZERO):
+            raise CreditExceedsReceiptError(
+                f"Cannot credit {gross} at {rate}%: the receipt holds "
+                f"{max(remaining.get(rate, _ZERO), _ZERO)} more at that "
+                "rate."
+            )
+    return {rate: wanted.get(rate, _ZERO) for rate in remaining}
+
+
 def credit_breakdown(
     receipt_rows: Iterable[dict[str, str]],
     prior_credit_rows: Iterable[Sequence[dict[str, str]]],
     amount: Decimal,
+    allocation: Mapping[Decimal, Decimal] | None = None,
 ) -> list[dict[str, str]]:
     """The VAT rows of a credit of ``amount`` (gross) against a receipt.
 
@@ -129,7 +168,10 @@ def credit_breakdown(
         rate: receipt_gross[rate] - credited_gross[rate]
         for rate in receipt_gross
     }
-    shares = allocate_capped(amount, remaining, remaining)
+    if allocation is None:
+        shares = allocate_capped(amount, remaining, remaining)
+    else:
+        shares = _allocated_shares(amount, allocation, remaining)
     if sum(shares.values(), _ZERO) != amount:
         raise CreditExceedsReceiptError(
             f"Cannot credit {amount}: the receipt holds "
@@ -170,6 +212,7 @@ def _create_credit(
     refund: PaymentTransaction | None = None,
     refund_attempt: RefundAttempt | None = None,
     chargeback: PaymentTransaction | None = None,
+    allocation: Mapping[Decimal, Decimal] | None = None,
 ) -> RetailCredit:
     prior = [
         credit.vat_breakdown
@@ -177,7 +220,7 @@ def _create_credit(
             mydata_status=MyDataStatus.CANCELED
         )
     ]
-    rows = credit_breakdown(invoice.vat_breakdown, prior, amount)
+    rows = credit_breakdown(invoice.vat_breakdown, prior, amount, allocation)
     net = sum((Decimal(r["subtotal"]) for r in rows), _ZERO)
     vat = sum((Decimal(r["vat"]) for r in rows), _ZERO)
     currency = invoice.currency
@@ -209,23 +252,6 @@ def _credited_total(invoice: Invoice) -> Decimal:
         ),
         _ZERO,
     )
-
-
-def _capped_to_receipt(invoice: Invoice, amount: Decimal) -> Decimal:
-    """*amount*, or what the receipt still holds when that is less.
-
-    Nothing left at all returns *amount* unchanged, so the guard refuses it
-    and tells staff (:func:`_guarded`) rather than saying nothing."""
-    left = Decimal(invoice.total.amount) - _credited_total(invoice)
-    if left <= 0 or amount <= left:
-        return amount
-    logger.warning(
-        "Credit of %s capped at the %s the receipt of order %s still holds",
-        amount,
-        left,
-        invoice.order_id,
-    )
-    return left
 
 
 def request_credit_documents(order_id: int) -> None:
@@ -261,6 +287,11 @@ def create_pending_credits(order_id: int) -> list[int]:
         ):
             return created
 
+        # Every source that owes a credit has its allocation by now;
+        # one created before allocations existed, or booked by a path that
+        # never claimed, gets it here, oldest first.
+        credit_allocation.ensure_allocations(order)
+
         refunds = PaymentTransaction.objects.filter(
             order=order,
             kind=PaymentTransactionKind.REFUND,
@@ -275,6 +306,8 @@ def create_pending_credits(order_id: int) -> list[int]:
                     amount=Decimal(refund.amount.amount),
                     reason=CreditReason.REFUND,
                     refund=refund,
+                    allocation=credit_allocation.allocation_of_refund(refund)
+                    or None,
                 )
             )
 
@@ -302,6 +335,10 @@ def create_pending_credits(order_id: int) -> list[int]:
                     amount=Decimal(returned.amount),
                     reason=CreditReason.REFUND,
                     refund_attempt=attempt,
+                    allocation=credit_allocation.allocation_of(
+                        refund_attempt=attempt
+                    )
+                    or None,
                 )
             )
 
@@ -315,15 +352,29 @@ def create_pending_credits(order_id: int) -> list[int]:
             decision__decided_at__gte=invoice.created_at,
             chargeback_credit__isnull=True,
         ).order_by("decision__decided_at", "id"):
+            # What the dispute may credit was capped when staff decided
+            # the goods came back (``allocate_decision``).
+            allocation = credit_allocation.allocation_of(
+                decision=chargeback.decision
+            )
+            if not allocation:
+                OrderHistory.log_note(
+                    order=order,
+                    note=(
+                        "No credit document could be issued: the receipt "
+                        "holds nothing more to credit for the chargeback "
+                        f"of {chargeback.amount}."
+                    ),
+                )
+                continue
             created.extend(
                 _guarded(
                     order,
                     invoice,
-                    amount=_capped_to_receipt(
-                        invoice, Decimal(chargeback.amount.amount)
-                    ),
+                    amount=sum(allocation.values(), _ZERO),
                     reason=CreditReason.CHARGEBACK,
                     chargeback=chargeback,
+                    allocation=allocation,
                 )
             )
 

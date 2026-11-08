@@ -3,6 +3,12 @@
 
 
 
+## v3.234.4 (2026-11-08)
+
+### Bug fixes
+
+* fix(core): count every rate limit in one Redis step so its window always ends (#532) ([`73e47ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73e47eaeb04de1654f423b801112cfb67f1e1263))
+
 ## v3.234.3 (2026-11-08)
 
 ### Bug fixes

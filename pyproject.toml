@@ -1,5 +1,5 @@
 [project]
-version = "3.234.4"
+version = "3.235.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -16,7 +16,7 @@ classifiers = [
 dependencies = [
   "channels==4.3.2",
   "channels-redis==4.3.0",
-  "django==6.0.9",
+  "django==6.1.3",
   "django-allauth[idp-oidc]==65.21.1",
   "django-extra-settings==0.15.0",
   "django-celery-results==2.6.0",

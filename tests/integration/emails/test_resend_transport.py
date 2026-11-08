@@ -81,7 +81,7 @@ class TestRequest:
             "Authorization": f"Bearer {PLATFORM_KEY}",
             "Idempotency-Key": str(log.uuid),
         }
-        assert kwargs["timeout"] == settings.EMAIL_TIMEOUT
+        assert kwargs["timeout"] == settings.EMAIL_SEND_TIMEOUT
         body = kwargs["json"]
         assert body["to"] == ["customer@example.test"]
         assert body["from"] == "Acme Gadgets <noreply@platform.test>"

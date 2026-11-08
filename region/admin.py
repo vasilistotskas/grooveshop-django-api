@@ -96,11 +96,11 @@ class RegionAdmin(PublicReferenceDataDeletionMixin, BaseTranslatableAdmin):
     fieldsets = (
         (
             _("Region Information"),
-            {"fields": ("alpha", "name", "country"), "classes": ("wide",)},
+            {"fields": ("alpha", "name", "country")},
         ),
         (
             _("Organization"),
-            {"fields": ("sort_order",), "classes": ("wide",)},
+            {"fields": ("sort_order",)},
         ),
         (
             _("Analytics"),

@@ -259,7 +259,6 @@ class CartAdmin(BaseModelAdmin):
             _("Cart Owner"),
             {
                 "fields": ("user",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -451,7 +450,6 @@ class CartItemAdmin(BaseModelAdmin):
             _("Cart Item"),
             {
                 "fields": ("cart", "product", "quantity"),
-                "classes": ("wide",),
             },
         ),
         (

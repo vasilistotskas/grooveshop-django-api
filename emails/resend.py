@@ -76,7 +76,7 @@ def send(payload: Mapping[str, Any], *, message_ref: uuid.UUID) -> str:
             "Authorization": f"Bearer {api_key()}",
             IDEMPOTENCY_HEADER: str(message_ref),
         },
-        timeout=settings.EMAIL_TIMEOUT,
+        timeout=settings.EMAIL_SEND_TIMEOUT,
     )
     if not response.ok:
         raise requests.HTTPError(_failure_text(response), response=response)

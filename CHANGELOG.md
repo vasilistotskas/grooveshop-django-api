@@ -3,6 +3,62 @@
 
 
 
+## v3.236.2 (2026-11-08)
+
+### Bug fixes
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in (#538) ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in
+
+Every BaseModelViewSet list honoured ?pagination=false and returned the whole filtered queryset, past the paginator's maximum page size: any caller, an anonymous one on the public product list included, could take a whole table in one response. A view now names the actions that honour it in unpaginated_actions (the country list and a customer's own gift cards, the two the storefront reads in full); every other list ignores it and stays paginated. The parameter is documented only on those two operations: create_schema_view_config(unpaginated_actions=...) adds PAGINATION_PARAMETER, now defined once instead of four times.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(admin): post next from the login form instead of redirecting to add it
+
+Our own core/templates/admin/login.html (not Unfold's, which the mixin's docstring blamed) rendered no next field, so a login from a bare /admin/login/ fell back to LOGIN_REDIRECT_URL, the storefront's account page. AdminSiteLoginNextMixin worked around it by redirecting every bare GET to ?next=/admin/. The form now posts next itself, which AdminSite.login fills with the requested page or the site's index, and the mixin is gone from both sites. The tests assert what the page carries on the platform host and on a store host, instead of the redirect.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(contact): leave email format to the serializer's EmailField
+
+validate_contact_content and validate_feedback_content ran their own ASCII-only regex after the serializer's EmailField had already validated the address, and refused valid internationalised ones: a Greek domain, punycode (xn--...) or Unicode. The format is now Django's EmailValidator alone; the utilities keep the disposable-domain check. The invalid-format cases moved to the serializer tests, which also prove a Greek domain is accepted.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(core): read the template VERSION from settings.RELEASE_VERSION
+
+core.context_processors re-read pyproject.toml relative to the working directory and answered 0.0.0, with a warning, whenever the process ran from elsewhere, while settings.RELEASE_VERSION already holds the same value read from BASE_DIR (the footer and the response cache use it).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(order): parse AADE's myDATA answers with defusedxml
+
+parse_response_doc and parse_requested_doc read XML that comes over the network with the stdlib parser, including a second document re-parsed from an element's text. defusedxml, already a dependency for SVG uploads, refuses entity declarations and external references in both; a test proves an entity-bearing answer is refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+### Testing
+
+* test(core): pin both sides of the unpaginated-actions rule
+
+The PaginationModelViewSet unit test assumed ?pagination=false returns the whole list on any view. It now opts its action in for that case, and a second test proves a view that has not opted in ignores the flag and goes through the paginator.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
 ## v3.236.1 (2026-11-08)
 
 ### Bug fixes

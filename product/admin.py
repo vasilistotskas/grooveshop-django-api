@@ -386,7 +386,6 @@ class AttributeAdmin(BaseTranslatableAdmin):
             _("Attribute Information"),
             {
                 "fields": ("name", "active", "is_variant", "schema_property"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -526,7 +525,6 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
             _("Value Information"),
             {
                 "fields": ("attribute", "value", "active"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1782,14 +1780,12 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
             _("Category Information"),
             {
                 "fields": ("parent", "slug", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("name", "description", "footer_text"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1993,14 +1989,12 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
             _("Review Information"),
             {
                 "fields": ("product", "user", "rate", "status"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("comment",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2219,14 +2213,12 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
             _("Image Information"),
             {
                 "fields": ("category", "image", "image_type", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("alt_text",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2302,14 +2294,12 @@ class ProductImageAdmin(BaseTranslatableAdmin):
             _("Image Information"),
             {
                 "fields": ("product", "image", "is_main"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("alt_text",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2394,7 +2384,6 @@ class ProductVariantGroupAdmin(BaseTranslatableAdmin):
                     "name",
                     "active",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2494,7 +2483,6 @@ class BrandAdmin(BaseModelAdmin):
             _("Brand"),
             {
                 "fields": ("name",),
-                "classes": ("wide",),
             },
         ),
         (

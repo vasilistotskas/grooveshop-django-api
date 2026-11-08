@@ -740,8 +740,12 @@ name); `ACCOUNT_EMAIL_SUBJECT_PREFIX`, `format_email_subject` and
 boot) names the one transport that carries the pipeline's mail.
 
 - **`smtp`** (default; production until the owner switches it, staging
-  always): `EmailMultiAlternatives.send()` through
-  `core.mail.DemoRecipientSuppressingBackend` over the `EMAIL_HOST*` relay.
+  always): `EmailMultiAlternatives.send()` through the `default` mailer,
+  `core.mail.DemoRecipientSuppressingBackend`, which hands the mail to the
+  `relay` mailer. Both are in `settings.MAILERS` (Django 6.1); the `relay`
+  is built from the same `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`,
+  `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`/`EMAIL_USE_SSL`
+  and `EMAIL_TIMEOUT` environment variables as before.
   SMTP returns no message id, so `EmailLog.provider_message_id` stays null:
   an environment fact, not a fallback.
 - **`resend`**: `POST https://api.resend.com/emails` with `requests`, one
@@ -779,8 +783,10 @@ without its own domain.
   role sees "set / not set". The webhook secret is read by the webhook
   receiver (see The Resend webhook).
 - `RESEND_API_KEY` is required in production **and staging** when
-  `EMAIL_TRANSPORT=resend`; `EMAIL_HOST_PASSWORD` is required only for
-  `smtp`.
+  `EMAIL_TRANSPORT=resend`; the `EMAIL_HOST_PASSWORD` environment variable
+  is required only for `smtp`. The `EMAIL_TIMEOUT` environment variable
+  (`settings.EMAIL_SEND_TIMEOUT`) bounds both the SMTP socket and the
+  Resend request.
 
 ### Guarding the switch (`emails/setup.py`, `emails/checks.py`)
 

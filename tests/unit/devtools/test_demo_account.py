@@ -426,12 +426,9 @@ class TestMailSuppression(TestCase):
         original = core_mail.demo_store_mailboxes
         core_mail.demo_store_mailboxes = lambda: frozenset(demo_emails)
         self.addCleanup(setattr, core_mail, "demo_store_mailboxes", original)
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            return core_mail.DemoRecipientSuppressingBackend()
+        return core_mail.DemoRecipientSuppressingBackend(
+            alias="default", relay="relay"
+        )
 
     @staticmethod
     def _message(to, cc=None):
@@ -445,15 +442,10 @@ class TestMailSuppression(TestCase):
         from django.core import mail as django_mail
 
         backend = self._backend({demo_account.RETAIL_EMAIL})
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            sent = backend.send_messages(
-                [self._message([demo_account.RETAIL_EMAIL])]
-            )
+        django_mail.outbox = []
+        sent = backend.send_messages(
+            [self._message([demo_account.RETAIL_EMAIL])]
+        )
         assert sent == 0
         assert django_mail.outbox == []
 
@@ -461,13 +453,8 @@ class TestMailSuppression(TestCase):
         from django.core import mail as django_mail
 
         backend = self._backend({demo_account.RETAIL_EMAIL})
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            sent = backend.send_messages([self._message(["real@example.com"])])
+        django_mail.outbox = []
+        sent = backend.send_messages([self._message(["real@example.com"])])
         assert sent == 1
         assert len(django_mail.outbox) == 1
 
@@ -475,65 +462,45 @@ class TestMailSuppression(TestCase):
         from django.core import mail as django_mail
 
         backend = self._backend({demo_account.RETAIL_EMAIL})
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            backend.send_messages(
-                [self._message(["real@example.com", demo_account.RETAIL_EMAIL])]
-            )
+        django_mail.outbox = []
+        backend.send_messages(
+            [self._message(["real@example.com", demo_account.RETAIL_EMAIL])]
+        )
         assert django_mail.outbox[0].to == ["real@example.com"]
 
     def test_strips_a_demo_address_hidden_in_cc(self):
         from django.core import mail as django_mail
 
         backend = self._backend({demo_account.RETAIL_EMAIL})
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            backend.send_messages(
-                [
-                    self._message(
-                        ["real@example.com"],
-                        cc=[demo_account.RETAIL_EMAIL],
-                    )
-                ]
-            )
+        django_mail.outbox = []
+        backend.send_messages(
+            [
+                self._message(
+                    ["real@example.com"],
+                    cc=[demo_account.RETAIL_EMAIL],
+                )
+            ]
+        )
         assert django_mail.outbox[0].cc == []
 
     def test_matches_a_display_name_form(self):
         from django.core import mail as django_mail
 
         backend = self._backend({demo_account.RETAIL_EMAIL})
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            sent = backend.send_messages(
-                [self._message([f"Demo <{demo_account.RETAIL_EMAIL}>"])]
-            )
+        django_mail.outbox = []
+        sent = backend.send_messages(
+            [self._message([f"Demo <{demo_account.RETAIL_EMAIL}>"])]
+        )
         assert sent == 0
 
     def test_is_a_passthrough_on_a_store_with_no_demo_account(self):
         from django.core import mail as django_mail
 
         backend = self._backend(set())
-        with self.settings(
-            EMAIL_DELEGATE_BACKEND=(
-                "django.core.mail.backends.locmem.EmailBackend"
-            )
-        ):
-            django_mail.outbox = []
-            sent = backend.send_messages(
-                [self._message([demo_account.RETAIL_EMAIL])]
-            )
+        django_mail.outbox = []
+        sent = backend.send_messages(
+            [self._message([demo_account.RETAIL_EMAIL])]
+        )
         assert sent == 1
         assert len(django_mail.outbox) == 1
 
@@ -856,7 +823,6 @@ class TestSeededAccount:
 
     @pytest.fixture(autouse=True)
     def _a_demo_store(self, settings):
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         with mock.patch(
             "devtools.demo_store._current_tenant_is_demo", return_value=True
         ):
@@ -1178,7 +1144,6 @@ class TestResetRebuildsTheAccounts:
 
     @pytest.fixture(autouse=True)
     def _a_demo_store(self, settings):
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         with mock.patch(
             "devtools.demo_store._current_tenant_is_demo", return_value=True
         ):
@@ -1415,7 +1380,6 @@ class TestDemoShipmentsAreNeverSwept:
 
     @pytest.fixture(autouse=True)
     def seeded(self, settings):
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         with mock.patch(
             "devtools.demo_store._current_tenant_is_demo", return_value=True
         ):
@@ -1575,7 +1539,6 @@ class TestResetIsSilent:
         from order.models.history import OrderHistory
         from order.models.order import Order
 
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         self._catalogue()
         demo_account.seed_demo_account()
 
@@ -1601,7 +1564,6 @@ class TestResetIsSilent:
     def test_fixtures_are_internally_consistent(self, settings):
         from order.models.order import Order
 
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         self._catalogue()
         demo_account.seed_demo_account()
 
@@ -1675,7 +1637,6 @@ class TestGuestCheckoutsAreCleared:
 
         from order.models.order import Order
 
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         order, product, reservation = self._guest_order_holding_stock()
         product.refresh_from_db()
         assert product.stock == 8
@@ -1721,7 +1682,6 @@ class TestGuestCheckoutsAreCleared:
         from order.stock import StockManager
         from product.factories.product import ProductFactory
 
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         product = ProductFactory(
             slug=f"sold-out-{uuid.uuid4().hex[:8]}",
             stock=2,
@@ -1858,7 +1818,6 @@ class TestDemoGiftCardIsRestored:
 
     @pytest.fixture(autouse=True)
     def _a_demo_store(self, settings):
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         with mock.patch(
             "devtools.demo_store._current_tenant_is_demo", return_value=True
         ):

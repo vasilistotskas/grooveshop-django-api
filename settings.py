@@ -1230,6 +1230,11 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
 
+# Search indexing has its own queue, which every worker consumes beside
+# ``celery`` (``-Q celery,meilisearch``). Celery 5.7 deprecates a task's
+# own ``queue=`` (removed in 6.0) in favour of this setting.
+CELERY_TASK_ROUTES = {"meili.*": {"queue": "meilisearch"}}
+
 # Beat scheduler
 CELERY_BEAT_SCHEDULER = "scheduler.beat:CodeOwnedScheduler"
 CELERY_BEAT_MAX_LOOP_INTERVAL = 300
@@ -3251,21 +3256,16 @@ EXTRA_SETTINGS_DEFAULTS = [
     },
 ]
 
-# The backend that actually delivers. Still env-driven, so console/
-# locmem/SMTP selection is unchanged; it is simply reached through the
-# wrapper below.
-EMAIL_DELEGATE_BACKEND = getenv(
+# Outgoing mail is configured in MAILERS (below), built from the same
+# EMAIL_* environment variables as before. Django 6.1 deprecates the
+# EMAIL_* settings and refuses them beside MAILERS, so the values live in
+# these lowercase names, which Django does not read as settings.
+#
+# The backend that actually delivers: console, locmem or SMTP.
+_email_relay_backend = getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
-# Every sender in the codebase goes through django.core.mail, so this is
-# the one place a store's SHARED demo login can be kept out of the
-# recipient list. A passthrough everywhere else: the suppression list is
-# empty unless DEMO_ACCOUNT_ENABLED is on for that schema.
-EMAIL_BACKEND = "core.mail.DemoRecipientSuppressingBackend"
-EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
-EMAIL_PORT = getenv("EMAIL_PORT", "25")
-EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
-EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
+_email_host_password = getenv("EMAIL_HOST_PASSWORD", "changeme")
 # Which transport carries the pipeline's mail (``emails.transport``): the
 # SMTP relay above, or Resend's HTTP API. Production stays on SMTP until the
 # platform's Resend team exists and one live send is verified.
@@ -3292,7 +3292,7 @@ RESEND_WEBHOOK_MAX_BODY_BYTES = int(
 if PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
-    if EMAIL_TRANSPORT == "smtp" and EMAIL_HOST_PASSWORD == "changeme":
+    if EMAIL_TRANSPORT == "smtp" and _email_host_password == "changeme":
         raise ImproperlyConfigured(
             "EMAIL_HOST_PASSWORD must be set in production "
             "(current value is the insecure default 'changeme')."
@@ -3310,9 +3310,9 @@ if PRODUCTION_PROFILE:
 # Cloudflare Email Service (smtp.mx.cloudflare.net:465) and the :465
 # endpoints of Resend, Postmark and SES among them. Defaulting SSL to off
 # keeps the existing STARTTLS behaviour unchanged.
-EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
-EMAIL_USE_SSL = getenv("EMAIL_USE_SSL", "False") == "True"
-if EMAIL_USE_TLS and EMAIL_USE_SSL:
+_email_use_tls = getenv("EMAIL_USE_TLS", "True") == "True"
+_email_use_ssl = getenv("EMAIL_USE_SSL", "False") == "True"
+if _email_use_tls and _email_use_ssl:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -3330,8 +3330,37 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
 # from both nodes, and the first send against it hung indefinitely rather
 # than erroring. The value is a per-operation socket timeout, not a deadline
 # for the whole message, so it stays comfortable for large invoice-PDF
-# attachments.
-EMAIL_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
+# attachments. Resend's HTTP API (``emails.resend``) uses the same value.
+EMAIL_SEND_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
+_SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+MAILERS = {
+    # Every sender goes through this one, so it is the one place a store's
+    # SHARED demo login is kept out of the recipient list
+    # (``core.mail``). A passthrough everywhere else: the suppression list
+    # is empty unless DEMO_ACCOUNT_ENABLED is on for that schema.
+    "default": {
+        "BACKEND": "core.mail.DemoRecipientSuppressingBackend",
+        "OPTIONS": {"relay": "relay"},
+    },
+    # What "default" hands the mail to. Only the SMTP backend takes
+    # connection options; console and locmem refuse unknown ones.
+    "relay": {
+        "BACKEND": _email_relay_backend,
+        "OPTIONS": (
+            {
+                "host": getenv("EMAIL_HOST", "localhost"),
+                "port": int(getenv("EMAIL_PORT", "25")),
+                "username": getenv("EMAIL_HOST_USER", "localhost@gmail.com"),
+                "password": _email_host_password,
+                "use_tls": _email_use_tls,
+                "use_ssl": _email_use_ssl,
+                "timeout": EMAIL_SEND_TIMEOUT,
+            }
+            if _email_relay_backend == _SMTP_BACKEND
+            else {}
+        ),
+    },
+}
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 # The platform operators' address is the ADMINS setting: the ADMIN_EMAIL env
@@ -4749,6 +4778,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "app_file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "filename": app_log_file,
+                # Not the locale's encoding: on Windows that is cp1252,
+                # which cannot write a Greek log line.
+                "encoding": "utf-8",
                 "maxBytes": 10 * 1024 * 1024,
                 "backupCount": backup_count,
                 "level": logging_level,
@@ -4804,6 +4836,16 @@ else:
                 "class": "logging.StreamHandler",
                 "formatter": "simple",
                 "filters": ["add_tenant_context"],
+            },
+        },
+        "loggers": {
+            # Declared, as in the other two branches, so dictConfig drops
+            # the handlers Django attaches by default (``mail_admins``):
+            # a server error is a log line, not an email. INFO is
+            # Django's own default level for this logger.
+            "django": {
+                "level": "INFO",
+                "propagate": True,
             },
         },
         "root": {

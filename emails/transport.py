@@ -3,9 +3,10 @@
 Everything else produces text and an envelope; this sends it, through the
 one transport ``settings.EMAIL_TRANSPORT`` names:
 
-* ``smtp``: Django's mail backend, which is
-  ``core.mail.DemoRecipientSuppressingBackend`` over the relay of the
-  ``EMAIL_HOST*`` settings. SMTP returns no message id (staging's Mailpit).
+* ``smtp``: Django's default mailer, which is
+  ``core.mail.DemoRecipientSuppressingBackend`` over the ``relay`` mailer
+  (``settings.MAILERS``, built from the ``EMAIL_*`` environment
+  variables). SMTP returns no message id (staging's Mailpit).
 * ``resend``: Resend's HTTP API (``emails.resend``), which returns one.
 
 A failure (SMTP or HTTP) propagates, so the calling task's own

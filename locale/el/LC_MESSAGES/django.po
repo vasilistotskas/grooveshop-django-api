@@ -676,6 +676,9 @@ msgstr "Το '%(value)s' είναι δεσμευμένο όνομα schema κα�
 msgid "(no email)"
 msgstr "(χωρίς email)"
 
+msgid "- Select an option -"
+msgstr "- Επιλέξτε -"
+
 msgid "0 for singular entries or for the first plural form; 1, 2, ... for subsequent plural forms defined by the language's plural rule."
 msgstr "0 για μεμονωμένες καταχωρήσεις ή για τον πρώτο πληθυντικό τύπο· 1, 2, ... για τους επόμενους πληθυντικούς τύπους που ορίζονται από τον κανόνα πληθυντικού της γλώσσας."
 

@@ -22,6 +22,9 @@ STORE_WITHOUT_RESEND_KEY = "emails.E001"
 
 @register(Tags.database)
 def stores_have_their_resend_key(app_configs, databases=None, **kwargs):
+    # A database check may query only the databases it is handed.
+    if "default" not in (databases or ()):
+        return []
     if not setup.resend_is_selected():
         return []
     connection = connections["default"]

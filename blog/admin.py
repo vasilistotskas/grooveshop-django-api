@@ -148,14 +148,12 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
             _("Basic Information"),
             {
                 "fields": ("user", "website"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Biography"),
             {
                 "fields": ("bio",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -233,14 +231,12 @@ class BlogTagAdmin(BaseTranslatableAdmin):
             _("Tag Information"),
             {
                 "fields": ("name", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Organization"),
             {
                 "fields": ("sort_order",),
-                "classes": ("wide",),
             },
         ),
     )
@@ -290,21 +286,18 @@ class BlogCategoryAdmin(BaseTranslatableAdmin):
             _("Category Information"),
             {
                 "fields": ("name", "description", "parent"),
-                "classes": ("wide",),
             },
         ),
         (
             _("URL"),
             {
                 "fields": ("slug",),
-                "classes": ("wide",),
             },
         ),
         (
             _("Media"),
             {
                 "fields": ("image",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -672,21 +665,18 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
             _("Comment Content"),
             {
                 "fields": ("content",),
-                "classes": ("wide",),
             },
         ),
         (
             _("Relations"),
             {
                 "fields": ("post", "user", "parent"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Moderation"),
             {
                 "fields": ("approved",),
-                "classes": ("wide",),
             },
         ),
         (

@@ -54,6 +54,7 @@ from admin.displays import (
 from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
+from core.forms.choices import BLANK_CHOICE_LABEL
 from order import credit_allocation, refund_reconciliation
 from order.attribution import source_label
 from order.chargebacks import (
@@ -619,7 +620,7 @@ class ChargebackDecisionForm(BaseDialogForm):
     outcome = forms.ChoiceField(
         label=_("What became of the goods?"),
         choices=[
-            ("", "---------"),
+            ("", BLANK_CHOICE_LABEL),
             (OUTCOME_RETURNED, _("The product was returned or not delivered")),
             (OUTCOME_KEPT, _("The customer kept the product")),
         ],
@@ -2886,7 +2887,6 @@ class OrderItemAdmin(BaseModelAdmin):
                     "price",
                     "vat_rate",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2897,7 +2897,6 @@ class OrderItemAdmin(BaseModelAdmin):
                     "refunded_quantity",
                     "original_quantity",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

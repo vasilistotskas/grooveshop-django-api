@@ -36,8 +36,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
-from django.conf import settings
-from django.core.mail import get_connection
+from django.core.mail import mailers
 from django.core.mail.backends.base import BaseEmailBackend
 
 from core.demo_account import demo_store_mailboxes
@@ -46,22 +45,18 @@ logger = logging.getLogger(__name__)
 
 
 class DemoRecipientSuppressingBackend(BaseEmailBackend):
-    """Delegate to the configured backend, minus demo recipients."""
+    """Hand mail to the *relay* mailer, minus demo recipients."""
 
-    def __init__(self, fail_silently: bool = False, **kwargs) -> None:
-        super().__init__(fail_silently=fail_silently)
-        self._kwargs = kwargs
-        self._fail_silently = fail_silently
+    def __init__(self, *, relay: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._relay = relay
 
     def _connection(self):
-        # Resolved per send rather than held: the delegate may be an SMTP
+        # Resolved per send rather than held: the relay may be an SMTP
         # connection, and a long-lived one in a Celery worker outlives
-        # the broker's idle timeout.
-        return get_connection(
-            backend=settings.EMAIL_DELEGATE_BACKEND,
-            fail_silently=self._fail_silently,
-            **self._kwargs,
-        )
+        # the broker's idle timeout. ``mailers[alias]`` builds a new
+        # backend on every call.
+        return mailers[self._relay]
 
     def send_messages(self, email_messages) -> int:
         if not email_messages:

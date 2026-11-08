@@ -48,3 +48,11 @@ def test_garbage_is_still_invalid_integer_list():
     with pytest.raises(ValidationError) as exc:
         parse_int_csv("1,two,3", "categories")
     assert exc.value.detail["categories"].code == "invalid_integer_list"
+
+
+def test_no_limit_when_the_caller_bounds_the_list_itself():
+    ids = ",".join(str(i) for i in range(1, 202))
+
+    assert parse_int_csv(ids, "productIds", max_items=None) == list(
+        range(1, 202)
+    )

@@ -685,6 +685,16 @@ class TestProductsPointsEndpoint:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "productIds" in response.json()["fields"]
 
+    def test_over_the_cap_keeps_the_endpoint_code(self):
+        user = UserAccountFactory(num_addresses=0)
+
+        response = self._get(user, list(range(1, 102)))
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["fields"]["productIds"][0]["code"] == (
+            "invalid_product_ids"
+        )
+
     def test_rejects_a_missing_id_list(self):
         user = UserAccountFactory(num_addresses=0)
 

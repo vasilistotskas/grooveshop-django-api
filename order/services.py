@@ -23,7 +23,11 @@ from order.attribution import (
     classify,
 )
 from order.credit_documents import receipt_headroom
-from order.discounts import add_line_discounts, spread_by_remaining_value
+from order.discounts import (
+    add_line_discounts,
+    proportional_shares,
+    spread_by_remaining_value,
+)
 from order.enum.attribution import OrderSourceType
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.legal_acceptance import LegalAcceptanceSource
@@ -86,7 +90,6 @@ from order.payment_ledger import (
 from order.refund_lines import (
     RefundPiece,
     plan_pieces,
-    request_of,
     split_over_attempts,
 )
 from order.signals import order_refunded, order_stored_value_returned
@@ -3385,6 +3388,7 @@ class OrderService:
         lines: Sequence[tuple[OrderItem, int]] = (),
         include_shipping: bool = False,
         reason_code: str = "",
+        retry_request_id: UUID | None = None,
     ) -> RefundResult:
         """Refund ``amount`` of what *order* paid, or everything still
         refundable when ``amount`` is ``None``.
@@ -3400,7 +3404,11 @@ class OrderService:
         carries exactly their VAT rates. A bare ``amount`` is a goodwill
         refund and is credited in proportion over the receipt's rates.
         ``reason_code`` is a ``RefundReason`` and ``reason`` the note that
-        goes with it.
+        goes with it. A request by lines is always planned fresh; the only
+        way to resume one is ``retry_request_id``, the ``request_id`` of a
+        refund by lines with live PENDING shares (a provider call whose
+        outcome is unknown): those shares are called again under their own
+        idempotency keys, and nothing else is claimed.
 
         A payment a provider captured is refunded through that provider.
         Cash a courier collected on delivery (a ``COD_COLLECTION`` row) has
@@ -3453,6 +3461,7 @@ class OrderService:
             requested=cls._requested_units(lines),
             include_shipping=include_shipping,
             reason_code=reason_code,
+            retry_request_id=retry_request_id,
         )
         if declined is not None:
             return RefundResult(
@@ -3523,6 +3532,7 @@ class OrderService:
         requested: Mapping[int, int],
         include_shipping: bool,
         reason_code: str,
+        retry_request_id: UUID | None,
     ) -> tuple[list[RefundAttempt], dict[str, Any] | None]:
         """Step 1 of :meth:`refund_order`: the attempts to make, or the
         provider-less refusal to report as declined."""
@@ -3594,33 +3604,24 @@ class OrderService:
                 )
             )
 
-        resumed, reclaimed = cls._attempts_to_resume(
-            order,
-            amount,
-            requested=requested if by_lines else None,
-            include_shipping=include_shipping,
-        )
-        if resumed or reclaimed:
-            # Only a share the provider may already have made needs a
-            # provider that remembers keys; a re-claimed part never reached
-            # it.
-            for attempt in resumed:
-                if attempt.charge is not None and not provider_supports(
-                    attempt.charge.provider, "idempotent_refunds"
-                ):
-                    raise PaymentError(
-                        _(
-                            "A refund of this amount was already sent to the "
-                            "payment provider and its result is not known "
-                            "yet. It is recorded when the provider confirms "
-                            "it; check the provider's dashboard before "
-                            "trying again."
-                        )
+        # A refund by lines is always planned fresh from what its lines
+        # have had back (``held_values``): a share that was declined holds
+        # nothing, so a new request covers what is left at the current
+        # charges. Only the retry of a named pending request resumes
+        # attempts, and only a bare amount is matched against live ones.
+        if retry_request_id is not None:
+            if by_lines or amount is not None:
+                raise PaymentError(
+                    _(
+                        "A retry repeats exactly what was asked: give no "
+                        "lines, shipping or amount with it."
                     )
-            return sorted(
-                [*resumed, *reclaimed],
-                key=lambda a: (a.kind == RefundAttemptKind.STORED_VALUE, a.pk),
-            ), None
+                )
+            return cls._pending_request_shares(order, retry_request_id), None
+        resumed = [] if by_lines else cls._attempts_to_resume(order, amount)
+        if resumed:
+            cls._require_idempotent_provider(resumed)
+            return resumed, None
 
         pieces: list[RefundPiece] = []
         if by_lines:
@@ -3743,28 +3744,14 @@ class OrderService:
 
     @staticmethod
     def _attempts_to_resume(
-        order: Order,
-        amount: Money | None,
-        *,
-        requested: Mapping[int, int] | None = None,
-        include_shipping: bool = False,
-    ) -> tuple[list[RefundAttempt], list[RefundAttempt]]:
-        """What a request is a repeat of: the live attempts to resume under
-        their own keys, and the parts to claim again.
-
-        A bare amount resumes the live attempt for the same amount, or all
-        of them when together they are the amount, or, for a refund of
-        everything, all of them once they hold everything that was left.
-        Cash shares are never resumed: their reference is their own
-        idempotency key. A refund by lines (``requested`` is given) is
-        compared with the whole of an earlier refund by exactly those lines,
-        every share of it whatever its status
-        (:meth:`_resume_by_lines`), and a refund without lines never
-        resumes one by lines."""
-        if requested is not None:
-            return OrderService._resume_by_lines(
-                order, requested, include_shipping
-            )
+        order: Order, amount: Money | None
+    ) -> list[RefundAttempt]:
+        """The live attempts a bare-amount request is a repeat of: the one
+        for the same amount, or all of them when together they are the
+        amount, or, for a refund of everything, all of them once they hold
+        everything that was left. Cash shares are never resumed: their
+        reference is their own idempotency key. Shares of a refund by lines
+        are never matched by amount (``request_id`` is set on them)."""
         pending = list(
             RefundAttempt.objects.live()
             .select_related("charge")
@@ -3779,104 +3766,58 @@ class OrderService:
             .order_by("created_at", "id")
         )
         if not pending:
-            return [], []
+            return []
         if amount is None:
-            if PaymentLedger.refundable_value(order) <= 0:
-                return pending, []
-            return [], []
+            return pending if PaymentLedger.refundable_value(order) <= 0 else []
         match = next(
             (a for a in pending if a.amount.amount == amount.amount), None
         )
         if match:
-            return [match], []
+            return [match]
         together = sum((a.amount.amount for a in pending), Decimal(0))
-        return (pending if together == amount.amount else []), []
+        return pending if together == amount.amount else []
 
     @classmethod
-    def _resume_by_lines(
-        cls,
-        order: Order,
-        requested: Mapping[int, int],
-        include_shipping: bool,
-    ) -> tuple[list[RefundAttempt], list[RefundAttempt]]:
-        """The unfinished part of an earlier refund by exactly these lines.
-
-        The whole request is read, every share of it: the live PENDING ones
-        (a provider call whose outcome is unknown) are resumed under their
-        own keys, and a DECLINED share, which never reached the provider or
-        was refused, is claimed again with its lines. A request with no
-        share that settled or is still live was refused as a whole, and a
-        new request starts fresh. Never reports a request complete that has
-        a share left to make."""
-        shares_of: dict[Any, list[RefundAttempt]] = {}
-        for attempt in (
-            RefundAttempt.objects.select_related("charge")
-            .select_for_update(of=("self",))
-            .filter(order=order, request_id__isnull=False)
-            .order_by("created_at", "id")
-        ):
-            shares_of.setdefault(attempt.request_id, []).append(attempt)
-        live_pks = set(
+    def _pending_request_shares(
+        cls, order: Order, request_id: UUID
+    ) -> list[RefundAttempt]:
+        """The live PENDING shares of one refund by lines, provider shares
+        first, for the retry the dialog names: nothing of any other request,
+        and no share that was declined or settled."""
+        shares = list(
             RefundAttempt.objects.live()
-            .filter(order=order, request_id__isnull=False)
-            .values_list("pk", flat=True)
+            .select_related("charge")
+            .select_for_update(of=("self",))
+            .filter(order=order, request_id=request_id)
+            .order_by("created_at", "id")
         )
-        for shares in shares_of.values():
-            asked = request_of(
-                RefundAttemptLine.objects.filter(attempt__in=shares)
+        if not shares:
+            raise PaymentError(
+                _("There is no pending refund of this order to retry.")
             )
-            if (
-                dict(asked.units) != dict(requested)
-                or asked.include_shipping != include_shipping
-            ):
-                continue
-            made = any(
-                a.status == RefundAttemptStatus.SETTLED or a.pk in live_pks
-                for a in shares
-            )
-            live = [
-                a
-                for a in shares
-                if a.pk in live_pks
-                and not (a.charge is not None and is_cash_collection(a.charge))
-            ]
-            declined = [
-                a
-                for a in shares
-                if a.status == RefundAttemptStatus.DECLINED
-                and not (a.charge is not None and is_cash_collection(a.charge))
-                and a.lines.exists()
-            ]
-            if not made or not (live or declined):
-                continue
-            refundable = PaymentLedger.refundable(
-                order
-            ) + PaymentLedger.stored_value_refundable(order)
-            owed = sum((a.amount.amount for a in declined), Decimal(0))
-            if owed > refundable:
-                raise PaymentError(
-                    _(
-                        "Refund amount ({refund}) cannot exceed the "
-                        "refundable amount ({refundable})."
-                    ).format(refund=owed, refundable=refundable)
-                )
-            return live, [cls._reclaim(a) for a in declined]
-        return [], []
+        cls._require_idempotent_provider(shares)
+        return sorted(
+            shares,
+            key=lambda a: (a.kind == RefundAttemptKind.STORED_VALUE, a.pk),
+        )
 
     @staticmethod
-    def _reclaim(declined: RefundAttempt) -> RefundAttempt:
-        """A new attempt for a declined share, which takes over its lines."""
-        fresh = RefundAttempt.objects.create(
-            order_id=declined.order_id,
-            kind=declined.kind,
-            charge=declined.charge,
-            amount=declined.amount,
-            reason=declined.reason,
-            reason_code=declined.reason_code,
-            request_id=declined.request_id,
-        )
-        RefundAttemptLine.objects.filter(attempt=declined).update(attempt=fresh)
-        return fresh
+    def _require_idempotent_provider(shares: Sequence[RefundAttempt]) -> None:
+        """A share the provider may already have made is only called again
+        when its provider remembers keys."""
+        for attempt in shares:
+            if attempt.charge is not None and not provider_supports(
+                attempt.charge.provider, "idempotent_refunds"
+            ):
+                raise PaymentError(
+                    _(
+                        "A refund of this amount was already sent to the "
+                        "payment provider and its result is not known "
+                        "yet. It is recorded when the provider confirms "
+                        "it; check the provider's dashboard before "
+                        "trying again."
+                    )
+                )
 
     @staticmethod
     def _refuse_past_the_receipt(
@@ -4026,6 +3967,36 @@ class OrderService:
                 logger.info("Order %s refunded %s", order.id, paid_back)
         return _SharePaid(attempt.pk, paid_back, refund_id)
 
+    @staticmethod
+    def _scale_lines_to(attempt: RefundAttempt, returned: Decimal) -> None:
+        """Make the lines of a share carry what it really returned.
+
+        A stored-value share claims a value and returns what the gift-card
+        and points ledgers can give (points are whole, a card may hold less).
+        The part not returned was never held back for its lines, so it is
+        refundable again, and the credit of the share takes the lines at the
+        value returned."""
+        rows = list(
+            RefundAttemptLine.objects.filter(attempt=attempt).order_by("pk")
+        )
+        claimed = sum((Decimal(r.amount.amount) for r in rows), Decimal(0))
+        if not rows or returned >= claimed:
+            return
+        shares = (
+            proportional_shares(
+                returned, {r.pk: Decimal(r.amount.amount) for r in rows}
+            )
+            if returned > 0
+            else {}
+        )
+        for row in rows:
+            share = shares.get(row.pk, Decimal(0))
+            if share > 0:
+                row.amount = Money(share, row.amount.currency)
+                row.save(update_fields=["amount", "amount_currency"])
+            else:
+                row.delete()
+
     @classmethod
     def _return_stored_value(
         cls, order: Order, attempt: RefundAttempt, reason: str
@@ -4093,6 +4064,7 @@ class OrderService:
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
             returned = PaymentLedger.stored_returned_by(order, settled)
+            cls._scale_lines_to(settled, returned.amount)
             order_stored_value_returned.send(
                 sender=cls,
                 order=order,

@@ -858,6 +858,9 @@ msgstr "Μια επιστροφή χρημάτων, ή αξία που επέσ�
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
 
+msgid "A retry repeats exactly what was asked: give no lines, shipping or amount with it."
+msgstr "Η επανάληψη επαναλαμβάνει ακριβώς ό,τι ζητήθηκε: μη δώσετε γραμμές, μεταφορικά ή ποσό μαζί της."
+
 msgid "A review is waiting for approval"
 msgstr "Μια κριτική περιμένει έγκριση"
 
@@ -11896,6 +11899,9 @@ msgstr "Χρόνος απόκρισης %(response)s · Ειδοποίηση %(s
 msgid "Restock"
 msgstr "Αναπλήρωση"
 
+msgid "Restock once the pending refund has been made, with \"Restock returned items\"."
+msgstr "Κάντε επαναφορά αποθέματος όταν ολοκληρωθεί η εκκρεμής επιστροφή, με το «Επιστροφή στο απόθεμα»."
+
 msgid "Restock returned items"
 msgstr "Επιστροφή στο απόθεμα"
 
@@ -14272,6 +14278,9 @@ msgstr "Η γραμμή από την οποία προήλθε μια γραμ�
 msgid "The lines chosen are worth nothing, so there is nothing to refund."
 msgstr "Οι γραμμές που επιλέχθηκαν δεν έχουν αξία, άρα δεν υπάρχει τίποτα προς επιστροφή."
 
+msgid "The lines chosen are worth nothing, so there is nothing to refund. Tick the restock option to put them back in stock."
+msgstr "Οι γραμμές που επιλέχθηκαν δεν έχουν αξία, άρα δεν υπάρχει τίποτα προς επιστροφή. Επιλέξτε την επαναφορά αποθέματος για να επανέλθουν στο απόθεμα."
+
 msgid "The link a store's staff member asked for to choose a new admin password."
 msgstr "Ο σύνδεσμος που ζήτησε ένα μέλος του προσωπικού του καταστήματος για να επιλέξει νέο κωδικό πρόσβασης διαχείρισης."
 
@@ -14618,6 +14627,9 @@ msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυ
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο κανάλι χρέωσης της πλατφόρμας. Οι έμποροι πληρώνουν την πλατφόρμα εκτός συστήματος (τιμολόγιο / τραπεζική μεταφορά) και το προσωπικό καταχωρεί το αποτέλεσμα ορίζοντας την ημερομηνία «Πληρωμένο έως» του tenant — επεκτείνετέ την κατά την πληρωμένη περίοδο σε κάθε ανανέωση. Τα δοκιμαστικά αποκτούν περίοδο κατά τη δημιουργία (tenant_create --trial-days, προεπιλογή 30)· κενό «Πληρωμένο έως» σημαίνει ότι η περίοδος δεν λήγει ποτέ."
+
+msgid "There is no pending refund of this order to retry."
+msgstr "Αυτή η παραγγελία δεν έχει εκκρεμή επιστροφή προς επανάληψη."
 
 msgid "There is no such document."
 msgstr "Δεν υπάρχει τέτοιο έγγραφο."

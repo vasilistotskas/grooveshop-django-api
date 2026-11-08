@@ -853,6 +853,9 @@ msgstr "A refund, or value returned to a gift card, counts in the period it was 
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 
+msgid "A retry repeats exactly what was asked: give no lines, shipping or amount with it."
+msgstr "A retry repeats exactly what was asked: give no lines, shipping or amount with it."
+
 msgid "A review is waiting for approval"
 msgstr "A review is waiting for approval"
 
@@ -11889,6 +11892,9 @@ msgstr "Response time %(response)s · Notification %(status)s · %(priority)s / 
 msgid "Restock"
 msgstr "Restock"
 
+msgid "Restock once the pending refund has been made, with \"Restock returned items\"."
+msgstr "Restock once the pending refund has been made, with \"Restock returned items\"."
+
 msgid "Restock returned items"
 msgstr "Restock returned items"
 
@@ -14270,6 +14276,9 @@ msgstr "The line a goods row was taken from; empty otherwise."
 msgid "The lines chosen are worth nothing, so there is nothing to refund."
 msgstr "The lines chosen are worth nothing, so there is nothing to refund."
 
+msgid "The lines chosen are worth nothing, so there is nothing to refund. Tick the restock option to put them back in stock."
+msgstr "The lines chosen are worth nothing, so there is nothing to refund. Tick the restock option to put them back in stock."
+
 msgid "The link a store's staff member asked for to choose a new admin password."
 msgstr "The link a store's staff member asked for to choose a new admin password."
 
@@ -14616,6 +14625,9 @@ msgstr "There can only be one main address per user."
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
+
+msgid "There is no pending refund of this order to retry."
+msgstr "There is no pending refund of this order to retry."
 
 msgid "There is no such document."
 msgstr "There is no such document."

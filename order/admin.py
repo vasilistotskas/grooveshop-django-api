@@ -568,6 +568,7 @@ class ReturnOrderForm(BaseDialogForm):
                         self.order,
                         self.units(),
                         include_shipping=self.shipping(),
+                        allow_empty=True,
                     )
                 ),
                 Decimal(0),
@@ -620,6 +621,26 @@ class ReturnOrderForm(BaseDialogForm):
                 amount = self.requested_amount()
             except PaymentError as exc:
                 raise forms.ValidationError(str(exc)) from exc
+        if (
+            by_lines
+            and amount == 0
+            and not (cleaned.get("restock") and not self.shipping())
+        ):
+            raise forms.ValidationError(
+                _(
+                    "The lines chosen are worth nothing, so there is "
+                    "nothing to refund. Tick the restock option to put "
+                    "them back in stock."
+                )
+            )
+        if cleaned.get("restock") and self.retrying():
+            self.add_error(
+                "restock",
+                _(
+                    "Restock once the pending refund has been made, with "
+                    '"Restock returned items".'
+                ),
+            )
         if cleaned.get("restock") and not by_lines:
             self.add_error(
                 "restock",
@@ -642,6 +663,7 @@ class ReturnOrderForm(BaseDialogForm):
         if (
             self.order is not None
             and amount is not None
+            and amount > 0
             and "repayment_reference" in self.fields
             and not cleaned.get("repayment_reference")
             and any(
@@ -2040,10 +2062,27 @@ class OrderAdmin(BaseModelAdmin):
         currency = order.amount_due.currency
         by_lines = form.by_lines()
         include_shipping = form.shipping()
+        reason_code = form.cleaned_data["reason"]
+        note = form.cleaned_data["note"]
+        retrying = form.retrying()
+        if by_lines and form.requested_amount() == 0:
+            # Lines worth nothing (a free gift): no money to pay back, only
+            # the shelf (the form refuses this without the restock option).
+            self._restock(
+                request,
+                order.pk,
+                form.units(),
+                OrderService._reason_text(reason_code, note),
+            )
+            return HttpResponse(
+                headers={
+                    "HX-Redirect": reverse(
+                        "admin:order_order_change", args=[object_id]
+                    ),
+                }
+            )
         try:
             requested = Money(form.requested_amount(), currency)
-            reason_code = form.cleaned_data["reason"]
-            note = form.cleaned_data["note"]
             result = OrderService.refund_order(
                 order,
                 amount=None if by_lines else requested,
@@ -2052,8 +2091,9 @@ class OrderAdmin(BaseModelAdmin):
                 repayment_reference=form.cleaned_data.get(
                     "repayment_reference", ""
                 ),
-                lines=form.lines(),
-                include_shipping=include_shipping,
+                lines=() if retrying else form.lines(),
+                include_shipping=False if retrying else include_shipping,
+                retry_request_id=form.pending.request_id if retrying else None,
             )
         except PaymentError as exc:
             # The service names the exact reason (nothing left to refund,

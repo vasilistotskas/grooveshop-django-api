@@ -14,6 +14,7 @@ Only the boundaries are faked: AADE (``FakeAade``), Stripe
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -45,7 +46,11 @@ from order.models.refund_attempt import (
     RefundReason,
 )
 from order.payment_ledger import PaymentLedger
-from order.refund_lines import RefundPiece, split_over_attempts
+from order.refund_lines import (
+    RefundPiece,
+    held_values,
+    split_over_attempts,
+)
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
 from order.taxation import ChargeKind
@@ -370,7 +375,7 @@ class TestShipping:
 
 
 class TestARetryUnderTheSameKey:
-    def test_the_same_lines_reuse_the_pending_attempt_and_its_key(self):
+    def test_the_named_request_is_resumed_under_its_own_key(self):
         order = _order()
         item = _item(order, "13")
 
@@ -383,7 +388,9 @@ class TestARetryUnderTheSameKey:
             assert pending.status == RefundAttemptStatus.PENDING
 
             with FakeStripeRefunds() as stripe_api:
-                again = OrderService.refund_order(order, lines=[(item, 1)])
+                again = OrderService.refund_order(
+                    order, retry_request_id=pending.request_id
+                )
 
         assert again.complete
         [attempt] = order.refund_attempts.all()
@@ -392,6 +399,40 @@ class TestARetryUnderTheSameKey:
         assert attempt.lines.count() == 1
         [credit] = aade.credits
         assert _rates(credit) == {CAT_13: Decimal("40.00")}
+
+    def test_the_same_lines_while_a_refund_is_pending_are_not_paid_twice(self):
+        order = _order()
+        item = _item(order, "13")
+
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, lines=[(item, 1)])
+        with (
+            FakeStripeRefunds() as stripe_api,
+            pytest.raises(PaymentError, match="already paid back"),
+        ):
+            OrderService.refund_order(order, lines=[(item, 1)])
+
+        assert stripe_api.calls == []
+        assert order.refund_attempts.count() == 1
+
+    def test_a_retry_names_a_pending_request_and_nothing_else(self):
+        order = _order()
+        item = _item(order, "13")
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, lines=[(item, 1)])
+        [pending] = order.refund_attempts.all()
+
+        with FakeStripeRefunds() as stripe_api:
+            with pytest.raises(PaymentError, match="no lines"):
+                OrderService.refund_order(
+                    order,
+                    lines=[(item, 1)],
+                    retry_request_id=pending.request_id,
+                )
+            with pytest.raises(PaymentError, match="no pending refund"):
+                OrderService.refund_order(order, retry_request_id=uuid.uuid4())
+
+        assert stripe_api.calls == []
 
     def test_other_lines_of_the_same_amount_are_not_a_retry(self):
         order = _order(lines=(("24", "40.00", 1), ("13", "40.00", 1)))
@@ -971,33 +1012,36 @@ class TestAValueIsHeldNotACountOfUnits:
         item.refresh_from_db()
         assert item.refunded_quantity == 0
 
-    def test_a_retry_of_the_same_lines_makes_the_declined_part_not_report_complete(
-        self,
-    ):
-        order = _order(lines=(("13", "100.00", 1),))
-        _two_charges(order, "60.00", "40.00")
+    def test_a_later_request_of_the_same_units_pays_its_own_quote(self):
+        # Two units at 50.00; the charges are 30.00 and 70.00.
+        order = _order(lines=(("13", "50.00", 2),))
+        _two_charges(order, "30.00", "70.00")
         item = _item(order, "13")
 
         with _SecondCallRefused() as api:
-            OrderService.refund_order(order, lines=[(item, 1)])
+            first = OrderService.refund_order(order, lines=[(item, 1)])
+            assert not first.complete
+            assert first.refunded == _eur("30.00")
             api.refusing = False
-            result = OrderService.refund_order(order, lines=[(item, 1)])
+            # Same units again: quoted at what is left of the first unit,
+            # then at the whole second unit. Never the declined share's old
+            # claim, never a request that reports complete for a quote it
+            # did not pay.
+            paid = [
+                OrderService.refund_order(order, lines=[(item, 1)])
+                for _ in range(2)
+            ]
 
-        assert result.complete
-        assert api.amounts == [6000, 4000, 4000]
-        assert (
-            order.payment_transactions.filter(
-                kind=PaymentTransactionKind.REFUND
-            ).count()
-            == 2
-        )
-        # The lines moved with the part: nothing is held twice.
-        rows = RefundAttemptLine.objects.filter(attempt__order=order)
+        assert [r.refunded for r in paid] == [_eur("20.00"), _eur("50.00")]
+        assert all(r.complete for r in paid)
+        assert api.amounts[-2:] == [2000, 5000]
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.REFUNDED
+        # Nothing is held twice.
+        rows = RefundAttemptLine.objects.holding().filter(attempt__order=order)
         assert sum(r.amount.amount for r in rows) == Decimal("100.00")
 
-    def test_card_pending_and_gift_card_declined_retries_both_under_one_request(
-        self,
-    ):
+    def test_card_pending_and_gift_card_declined_retries_the_card_only(self):
         order = _order(lines=(("13", "100.00", 1),), gift="60.00")
         item = _item(order, "13")
 
@@ -1009,18 +1053,16 @@ class TestAValueIsHeldNotACountOfUnits:
         assert gift.status == RefundAttemptStatus.DECLINED
 
         with FakeStripeRefunds() as api:
-            again = OrderService.refund_order(order, lines=[(item, 1)])
+            again = OrderService.refund_order(
+                order, retry_request_id=card.request_id
+            )
+            # The gift-card part freed its value, so a new request of the
+            # line covers what is left.
+            rest = OrderService.refund_order(order, lines=[(item, 1)])
 
         assert again.complete
-        assert again.stored == _eur("60.00")
         assert api.keys == [f"refund-{card.idempotency_key}"]
-        gift.refresh_from_db()
-        assert gift.status == RefundAttemptStatus.DECLINED
-        assert gift.lines.count() == 0
-        settled = order.refund_attempts.filter(
-            status=RefundAttemptStatus.SETTLED
-        )
-        assert settled.count() == 2
+        assert rest.stored == _eur("60.00")
         assert PaymentLedger.stored_value(order).returned == Decimal("60.00")
 
     def test_shipping_split_across_shares_keeps_what_is_left_on_offer(self):
@@ -1117,3 +1159,198 @@ class TestRetryingThePendingRefundFromTheDialog:
 
         assert api.calls == []
         assert order.refund_attempts.count() == 1
+
+
+class TestTheReceiptHeadroomSimulatesTheCreditsToCome:
+    def test_a_refund_before_the_receipt_is_netted_at_its_own_rate(self):
+        order = _order()
+
+        with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds():
+            OrderService.refund_order(order, lines=[(_item(order, "13"), 1)])
+            invoice = _receipt(order)
+            # The 13% item went back before the receipt: it is not on it,
+            # and the 24% row is whole (not cut in proportion).
+            assert [Decimal(r["rate"]) for r in invoice.vat_breakdown] == [
+                Decimal(24)
+            ]
+            assert Decimal(invoice.vat_breakdown[0]["gross"]) == Decimal(
+                "60.00"
+            )
+            # A legitimate return after it fits.
+            result = OrderService.refund_order(
+                order, lines=[(_item(order, "24"), 1)]
+            )
+
+        assert result.complete
+        [credit] = aade.credits
+        assert _rates(credit) == {CAT_24: Decimal("60.00")}
+
+    def test_a_bare_refund_before_the_receipt_still_nets_in_proportion(self):
+        order = _order()
+
+        with mydata_enabled(), FakeAade(), FakeStripeRefunds():
+            OrderService.refund_order(order, amount=_eur("50.00"))
+            invoice = _receipt(order)
+
+        assert {
+            Decimal(r["rate"]): Decimal(r["gross"])
+            for r in invoice.vat_breakdown
+        } == {Decimal(24): Decimal("30.00"), Decimal(13): Decimal("20.00")}
+
+    def test_a_goodwill_refund_whose_credit_is_not_issued_yet_counts(self):
+        order = _order()
+
+        with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
+            # A receipt row exists, not registered with AADE: no credit is
+            # issued for what follows, and the check applies all the same.
+            generate_invoice(order)
+            OrderService.refund_order(order, amount=_eur("50.00"))
+            with pytest.raises(PaymentError, match="holds only"):
+                OrderService.refund_order(
+                    order, lines=[(_item(order, "13"), 1)]
+                )
+
+        assert len(api.calls) == 1
+
+    def test_credit_breakdown_never_spills_a_capped_rate_onto_another(self):
+        receipt = [
+            {
+                "rate": "24.00",
+                "subtotal": "48.39",
+                "vat": "11.61",
+                "gross": "60.00",
+            },
+            {
+                "rate": "13.00",
+                "subtotal": "35.40",
+                "vat": "4.60",
+                "gross": "40.00",
+            },
+        ]
+        prior = [
+            [
+                {
+                    "rate": "13.00",
+                    "subtotal": "26.55",
+                    "vat": "3.45",
+                    "gross": "30.00",
+                }
+            ]
+        ]
+        lines = {
+            Decimal("24.00"): Decimal("60.00"),
+            Decimal("13.00"): Decimal("40.00"),
+        }
+
+        with pytest.raises(CreditExceedsReceiptError):
+            credit_breakdown(receipt, prior, Decimal("100.00"), lines)
+
+    def test_a_stored_share_that_returned_less_takes_its_lines_in_proportion(
+        self,
+    ):
+        receipt = [
+            {
+                "rate": "24.00",
+                "subtotal": "48.39",
+                "vat": "11.61",
+                "gross": "60.00",
+            },
+            {
+                "rate": "13.00",
+                "subtotal": "35.40",
+                "vat": "4.60",
+                "gross": "40.00",
+            },
+        ]
+        lines = {
+            Decimal("24.00"): Decimal("60.00"),
+            Decimal("13.00"): Decimal("40.00"),
+        }
+
+        rows = credit_breakdown(receipt, [], Decimal("50.00"), lines)
+
+        assert {r["rate"]: r["gross"] for r in rows} == {
+            "24.00": "30.00",
+            "13.00": "20.00",
+        }
+
+
+class TestLinesWorthNothing:
+    def _free_gift_order(self):
+        return _order(lines=(("24", "60.00", 1), ("13", "0.00", 1)))
+
+    def test_a_free_gift_is_offered_and_returns_to_the_shelf_only(
+        self, order_admin, staff
+    ):
+        order = self._free_gift_order()
+        gift = _item(order, "13")
+        request = _request(
+            staff,
+            {
+                f"quantity_{gift.pk}": "1",
+                "restock": "on",
+                "reason": RefundReason.RETURNED,
+            },
+        )
+
+        with FakeStripeRefunds() as api:
+            order_admin.refund_payment(request, object_id=order.pk)
+
+        assert api.calls == []
+        gift.refresh_from_db()
+        assert gift.refunded_quantity == 1
+        assert not RefundAttemptLine.objects.exists()
+
+    def test_without_the_restock_there_is_nothing_to_do(
+        self, order_admin, staff
+    ):
+        order = self._free_gift_order()
+        gift = _item(order, "13")
+        request = _request(
+            staff,
+            {f"quantity_{gift.pk}": "1", "reason": RefundReason.RETURNED},
+        )
+
+        with FakeStripeRefunds() as api:
+            order_admin.refund_payment(request, object_id=order.pk)
+
+        assert api.calls == []
+        gift.refresh_from_db()
+        assert gift.refunded_quantity == 0
+
+    def test_the_free_gift_next_to_a_paid_line_adds_no_money(self):
+        order = self._free_gift_order()
+
+        with FakeStripeRefunds():
+            result = OrderService.refund_order(
+                order,
+                lines=[(_item(order, "13"), 1), (_item(order, "24"), 1)],
+            )
+
+        assert result.value_returned == _eur("60.00")
+
+
+class TestAStoredShareThatReturnedLess:
+    def test_its_lines_are_scaled_to_what_it_returned(self):
+        order = _order(lines=(("13", "100.00", 1),), gift="60.00")
+        item = _item(order, "13")
+        with FakeStripeRefunds():
+            OrderService.refund_order(order, lines=[(item, 1)])
+        stored = order.refund_attempts.get(kind="STORED_VALUE")
+        assert stored.lines.get().amount == _eur("60.00")
+
+        OrderService._scale_lines_to(stored, Decimal("50.00"))
+
+        assert stored.lines.get().amount == _eur("50.00")
+        # The unreturned 10.00 is refundable again, not held.
+        assert held_values(order).goods[item.pk] == Decimal("90.00")
+
+    def test_a_share_that_returned_nothing_holds_nothing(self):
+        order = _order(lines=(("13", "100.00", 1),), gift="60.00")
+        with FakeStripeRefunds():
+            OrderService.refund_order(order, lines=[(_item(order, "13"), 1)])
+        stored = order.refund_attempts.get(kind="STORED_VALUE")
+
+        OrderService._scale_lines_to(stored, Decimal(0))
+
+        assert not stored.lines.exists()

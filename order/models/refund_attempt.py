@@ -205,10 +205,14 @@ class RefundAttemptLine(models.Model):
 
     The credit document (myDATA 11.4) of the share reads these rows to credit
     exactly their rates (``order.credit_documents``); a share without rows
-    (a bare amount) is spread over the receipt's rates in proportion. A line
-    split over two shares has its ``quantity`` on the first only, so the
-    units refunded of a line are the sum of ``quantity`` over the shares
-    that hold their money (:meth:`RefundAttemptLineQuerySet.holding`).
+    (a bare amount) is spread over the receipt's rates in proportion.
+
+    What a line has had back is the VALUE of its rows on the shares that hold
+    their money (:meth:`RefundAttemptLineQuerySet.holding`), never a count of
+    units (``order.refund_lines.held_values``). ``quantity`` is the units the
+    refund asked for on the line, the same on every row of a line cut over
+    two shares; nothing sums it. A stored-value share's rows are scaled to
+    the value it really returned once it settles.
     """
 
     id = models.BigAutoField(primary_key=True)

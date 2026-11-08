@@ -179,7 +179,28 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     refunded = refunded_before_receipt(order)
     if refunded <= 0:
         return rows
-    return _net_of(rows, min(refunded, _gross(rows)))
+    return _net_of(
+        rows, min(refunded, _gross(rows)), _refunded_lines_by_rate(order)
+    )
+
+
+def _refunded_lines_by_rate(order: Order) -> dict[Decimal, Decimal]:
+    """The gross per VAT rate of the order lines (and shipping) that settled
+    refunds by lines paid back: what the receipt is netted of at their own
+    rates, where a bare refund is netted in proportion."""
+    from order.models.refund_attempt import (
+        RefundAttemptLine,
+        RefundAttemptStatus,
+    )
+
+    gross: dict[Decimal, Decimal] = {}
+    for row in RefundAttemptLine.objects.filter(
+        attempt__order=order, attempt__status=RefundAttemptStatus.SETTLED
+    ):
+        gross[row.rate] = gross.get(row.rate, Decimal(0)) + Decimal(
+            row.amount.amount
+        )
+    return gross
 
 
 def refunded_before_receipt(
@@ -219,31 +240,64 @@ def _gross(rows: list[dict[str, Any]]) -> Decimal:
 
 
 def _net_of(
-    rows: list[dict[str, Any]], amount: Decimal
+    rows: list[dict[str, Any]],
+    amount: Decimal,
+    lines: dict[Decimal, Decimal] | None = None,
 ) -> list[dict[str, Any]]:
     """*rows* less *amount* (gross), split over the rates exactly as a credit
-    document splits it (``credit_documents.credit_breakdown``): in proportion
-    to what each rate still holds, to the cent, the net of each rate derived
-    cumulatively so the figures add up. Rates left with nothing drop out."""
-    from order.credit_documents import credit_breakdown
+    document splits it (``credit_documents.credit_breakdown``), the net of
+    each rate derived cumulatively so the figures add up. Rates left with
+    nothing drop out.
 
-    taken = {r["rate"]: r for r in credit_breakdown(rows, [], amount)}
+    What was refunded by lines (*lines*, gross per rate) is taken at those
+    rates, as its credit would have been; the rest of *amount* is a bare
+    refund and is taken in proportion to what each rate still holds. Lines
+    the receipt cannot hold at their own rates are taken in proportion too:
+    the receipt is never netted below nothing at a rate."""
+    from order.credit_documents import (
+        CreditExceedsReceiptError,
+        credit_breakdown,
+    )
+
+    cuts: list[list[dict[str, str]]] = []
+    taken_by_lines = Decimal(0)
+    wanted = min(sum((lines or {}).values(), Decimal(0)), amount)
+    if wanted > 0:
+        try:
+            cuts.append(credit_breakdown(rows, [], wanted, lines))
+            taken_by_lines = wanted
+        except CreditExceedsReceiptError:
+            pass
+    if amount > taken_by_lines:
+        cuts.append(credit_breakdown(rows, cuts, amount - taken_by_lines))
+
+    taken: dict[str, dict[str, Decimal]] = {}
+    for cut in cuts:
+        for row in cut:
+            total = taken.setdefault(
+                row["rate"],
+                {
+                    "subtotal": Decimal(0),
+                    "vat": Decimal(0),
+                    "gross": Decimal(0),
+                },
+            )
+            for key in total:
+                total[key] += Decimal(row[key])
     out = []
     for row in rows:
         cut = taken.get(row["rate"])
         if cut is None:
             out.append(row)
             continue
-        gross = Decimal(row["gross"]) - Decimal(cut["gross"])
+        gross = Decimal(row["gross"]) - cut["gross"]
         if gross <= 0:
             continue
         out.append(
             {
                 "rate": row["rate"],
-                "subtotal": str(
-                    Decimal(row["subtotal"]) - Decimal(cut["subtotal"])
-                ),
-                "vat": str(Decimal(row["vat"]) - Decimal(cut["vat"])),
+                "subtotal": str(Decimal(row["subtotal"]) - cut["subtotal"]),
+                "vat": str(Decimal(row["vat"]) - cut["vat"]),
                 "gross": str(gross),
             }
         )

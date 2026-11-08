@@ -99,7 +99,10 @@ def _units_value(gross: Decimal, quantity: int, units: int) -> Decimal:
 
 def covered_units(gross: Decimal, quantity: int, held: Decimal) -> int:
     """How many whole units of a line worth ``gross`` the value ``held``
-    has paid for."""
+    has paid for. A line worth nothing (a free gift) pays for none: it can
+    always be returned, and refunds no money."""
+    if gross <= 0:
+        return 0
     covered = 0
     while (
         covered < quantity
@@ -115,6 +118,7 @@ def plan_pieces(
     *,
     include_shipping: bool,
     lock: bool = False,
+    allow_empty: bool = False,
 ) -> list[RefundPiece]:
     """The pieces of a refund of ``requested`` (order line pk to units) and,
     when asked, the shipping that has not been refunded yet.
@@ -127,7 +131,8 @@ def plan_pieces(
 
     Raises :class:`~order.exceptions.PaymentError` for a line that is not
     the order's, more units than the line has left, a shipping with
-    nothing left to refund or not charged, or a refund of nothing.
+    nothing left to refund or not charged, or a refund of nothing (not
+    with ``allow_empty``: lines worth nothing, returned for the shelf only).
     """
     lines = OrderItem.objects.filter(order=order).order_by("pk")
     if lock:
@@ -197,7 +202,7 @@ def plan_pieces(
             for rate, amount in left
         )
 
-    if not pieces:
+    if not pieces and not allow_empty:
         raise PaymentError(
             _(
                 "The lines chosen are worth nothing, so there is nothing to "
@@ -273,6 +278,7 @@ def request_of(rows: Iterable[RefundAttemptLine]) -> LineRequest:
 class PendingRequest:
     """A refund by lines whose provider call has an unknown outcome."""
 
+    request_id: object
     request: LineRequest
     amount: Decimal
     shares: tuple[RefundAttempt, ...]
@@ -304,6 +310,7 @@ def pending_request(order: Order) -> PendingRequest | None:
             continue
         rows = RefundAttemptLine.objects.filter(attempt__in=shares)
         best = PendingRequest(
+            request_id=request_id,
             request=request_of(rows),
             amount=sum(
                 (

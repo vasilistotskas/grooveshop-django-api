@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -62,7 +63,7 @@ from django.db import transaction
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.discounts import allocate_capped
+from order.discounts import allocate_capped, proportional_shares
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.models import (
@@ -77,7 +78,6 @@ from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
-    RefundAttemptLine,
     RefundAttemptStatus,
 )
 from order.models.retail_credit import CreditReason
@@ -97,6 +97,40 @@ _ZERO = Decimal(0)
 
 class CreditExceedsReceiptError(ValueError):
     """The amount to credit is more than the receipt still holds."""
+
+
+def _lines_shares(
+    amount: Decimal,
+    allocation: Mapping[Decimal, Decimal],
+    remaining: Mapping[Decimal, Decimal],
+) -> dict[Decimal, Decimal]:
+    """The gross per rate of a credit for refunded lines: exactly their own
+    rates, never spilling onto another rate.
+
+    A credit for less than the lines (a stored-value share that returned
+    less than it claimed) takes them in proportion. A rate the receipt has
+    no row for, or holds less of than the credit takes, refuses the whole
+    credit: AADE cannot check an 11.4 against its receipt, so a credit at a
+    rate the lines did not use would be a wrong document."""
+    wanted_total = sum(allocation.values(), _ZERO)
+    if amount > wanted_total or amount <= 0:
+        raise CreditExceedsReceiptError(
+            f"Cannot credit {amount}: the refunded lines are worth "
+            f"{wanted_total}."
+        )
+    wanted = (
+        dict(allocation)
+        if amount == wanted_total
+        else proportional_shares(amount, dict(allocation))
+    )
+    for rate, gross in wanted.items():
+        if gross > remaining.get(rate, _ZERO):
+            raise CreditExceedsReceiptError(
+                f"Cannot credit {gross} at {rate}%: the receipt holds "
+                f"{max(remaining.get(rate, _ZERO), _ZERO)} more at that "
+                "rate."
+            )
+    return {rate: wanted.get(rate, _ZERO) for rate in remaining}
 
 
 def credit_breakdown(
@@ -141,21 +175,7 @@ def credit_breakdown(
     if allocation is None:
         shares = allocate_capped(amount, remaining, remaining)
     else:
-        if any(rate not in remaining for rate in allocation):
-            raise CreditExceedsReceiptError(
-                f"Cannot credit {amount}: the receipt has no row for "
-                "every rate of the refunded lines."
-            )
-        # The lines' own rates, in proportion to what each was refunded
-        # for: exactly the allocation when the credit is for all of it
-        # (always, but a stored-value share that returned less), and never
-        # a rate the lines do not touch.
-        shares = allocate_capped(
-            amount,
-            allocation,
-            {rate: remaining[rate] for rate in allocation},
-        )
-        shares = {rate: shares.get(rate, _ZERO) for rate in remaining}
+        shares = _lines_shares(amount, allocation, remaining)
     if sum(shares.values(), _ZERO) != amount:
         raise CreditExceedsReceiptError(
             f"Cannot credit {amount}: the receipt holds "
@@ -187,46 +207,124 @@ def credit_breakdown(
     return rows
 
 
-def receipt_headroom(order: Order) -> dict[Decimal, Decimal] | None:
-    """The gross each VAT rate of the order's registered receipt can still
-    be credited, or ``None`` while there is no registered receipt.
+def _uncredited_events(
+    order: Order, invoice: Invoice
+) -> list[tuple[datetime, Decimal, dict[Decimal, Decimal] | None]]:
+    """What has been, or is being, refunded after the receipt row existed
+    and has no credit document yet, oldest first, as
+    ``(when, gross, allocation)``.
 
-    The receipt's gross per rate, less the credits issued (and not
-    canceled) and less the lines of refund shares that hold their money
-    and have no credit yet (a pending refund by lines, or one whose credit
-    has not been issued): everything a new credit by lines would have to
-    fit beside. ``create_pending_credits`` applies the same cap when it
-    issues the credit; this lets a refund by lines be refused before money
-    moves."""
-    invoice = Invoice.objects.filter(order=order).first()
-    if (
-        invoice is None
-        or not invoice.mydata_mark
-        or invoice.mydata_status != MyDataStatus.CONFIRMED
+    The same cut-off ``create_pending_credits`` uses (money that moved at or
+    after the receipt's creation; earlier refunds are already netted out of
+    it), plus the refunds whose provider call is still in flight (a live
+    PENDING share has no ledger row yet), because their credits will follow.
+    ``allocation`` is the per-rate gross of the lines a share pays for, or
+    ``None`` for a bare amount."""
+    events: list[tuple[datetime, Decimal, dict[Decimal, Decimal] | None]] = []
+    for refund in PaymentTransaction.objects.filter(
+        order=order,
+        kind=PaymentTransactionKind.REFUND,
+        created_at__gte=invoice.created_at,
+        credit_document__isnull=True,
     ):
+        attempt = RefundAttempt.objects.filter(refund=refund).first()
+        events.append(
+            (
+                refund.created_at,
+                Decimal(refund.amount.amount),
+                _line_allocation(attempt),
+            )
+        )
+    live_pks = set(
+        RefundAttempt.objects.live()
+        .filter(order=order)
+        .values_list("pk", flat=True)
+    )
+    for attempt in RefundAttempt.objects.filter(
+        order=order,
+        credit_document__isnull=True,
+        created_at__gte=invoice.created_at,
+    ):
+        if attempt.kind == RefundAttemptKind.STORED_VALUE:
+            if attempt.status == RefundAttemptStatus.SETTLED:
+                returned_at = PaymentLedger.stored_returned_at(attempt)
+                returned = PaymentLedger.stored_returned_by(order, attempt)
+                if (
+                    returned_at is None
+                    or returned_at < invoice.created_at
+                    or returned.amount <= 0
+                ):
+                    continue
+                amount, when = Decimal(returned.amount), returned_at
+            elif attempt.pk in live_pks:
+                amount, when = (
+                    Decimal(attempt.amount.amount),
+                    attempt.created_at,
+                )
+            else:
+                continue
+        elif attempt.refund_id is None and attempt.pk in live_pks:
+            amount, when = Decimal(attempt.amount.amount), attempt.created_at
+        else:
+            continue
+        events.append((when, amount, _line_allocation(attempt)))
+    for chargeback in PaymentTransaction.objects.filter(
+        order=order,
+        kind=PaymentTransactionKind.CHARGEBACK,
+        decision__goods_returned=True,
+        decision__decided_at__gte=invoice.created_at,
+        chargeback_credit__isnull=True,
+    ):
+        events.append(
+            (
+                chargeback.decision.decided_at,
+                Decimal(chargeback.amount.amount),
+                None,
+            )
+        )
+    return sorted(events, key=lambda event: event[0])
+
+
+def receipt_headroom(order: Order) -> dict[Decimal, Decimal] | None:
+    """The gross each VAT rate of the order's receipt can still be credited,
+    or ``None`` while the order has no receipt row.
+
+    The receipt's breakdown is frozen when the row is created, so the
+    check holds from then on, not only once AADE confirmed it. It is what
+    the receipt still holds after the credits issued and after the credits
+    every refund without one is about to get: those are SIMULATED, oldest
+    first, with :func:`credit_breakdown` itself (a credit it refuses takes
+    nothing, as ``create_pending_credits`` would not issue it), so the rule
+    that allocates a credit over the rates is written once. Refunds made
+    before the receipt are not subtracted: it was issued net of them. A
+    refund by lines is refused before money moves when its lines do not fit
+    what is left at their rates."""
+    invoice = Invoice.objects.filter(order=order).first()
+    if invoice is None:
         return None
+    prior = [
+        credit.vat_breakdown
+        for credit in RetailCredit.objects.filter(invoice=invoice).exclude(
+            mydata_status=MyDataStatus.CANCELED
+        )
+    ]
+    for _when, amount, allocation in _uncredited_events(order, invoice):
+        try:
+            prior.append(
+                credit_breakdown(
+                    invoice.vat_breakdown, prior, amount, allocation
+                )
+            )
+        except CreditExceedsReceiptError:
+            continue
     left = {
         Decimal(row["rate"]): Decimal(row["gross"])
         for row in invoice.vat_breakdown
     }
-    for credit in RetailCredit.objects.filter(invoice=invoice).exclude(
-        mydata_status=MyDataStatus.CANCELED
-    ):
-        for row in credit.vat_breakdown:
+    for rows in prior:
+        for row in rows:
             rate = Decimal(row["rate"])
             left[rate] = left.get(rate, _ZERO) - Decimal(row["gross"])
-    for line in (
-        RefundAttemptLine.objects.holding()
-        .filter(
-            attempt__order=order,
-            attempt__credit_document__isnull=True,
-            attempt__refund__credit_document__isnull=True,
-        )
-        .select_related("attempt")
-    ):
-        left[line.rate] = left.get(line.rate, _ZERO) - Decimal(
-            line.amount.amount
-        )
     return left
 
 

@@ -558,10 +558,8 @@ class OrderDetailSerializer(OrderSerializer):
         carrier-specific call + the generic dispatcher).
         """
         cache: dict = self.context.setdefault("_shipment_cache", {})
-        sentinel = object()
-        cached = cache.get(obj.pk, sentinel)
-        if cached is not sentinel:
-            return cached
+        if obj.pk in cache:
+            return cache[obj.pk]
         from shipping.services import ShippingService
 
         result = ShippingService.serialize_shipment(obj, context=self.context)

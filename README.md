@@ -46,7 +46,7 @@ for how the services fit together. The developer docs are behind basic auth.
 
 ## Tech stack
 
-- Python 3.14, Django 6, Django REST Framework, managed with uv
+- Python 3.15, Django 6, Django REST Framework, managed with uv
 - ASGI only: Gunicorn with Uvicorn workers in production, Uvicorn locally;
   Django Channels for WebSockets
 - PostgreSQL 18 with django-tenants (schema per store)
@@ -58,7 +58,7 @@ for how the services fit together. The developer docs are behind basic auth.
 
 ## Getting started
 
-Prerequisites: Python 3.14, [uv](https://docs.astral.sh/uv/) and Docker.
+Prerequisites: Python 3.15, [uv](https://docs.astral.sh/uv/) and Docker.
 
 ```bash
 # Backing services: PostgreSQL, Redis, RabbitMQ, Meilisearch, Mailpit,

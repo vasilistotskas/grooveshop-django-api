@@ -374,7 +374,7 @@ class TestCacheDown:
         from redis.exceptions import ConnectionError as RedisConnectionError
 
         with patch(
-            "tenant.staff_login_limits.cache.incr",
+            "tenant.staff_login_limits.cache.count_in_window",
             side_effect=RedisConnectionError("down"),
         ):
             yield
@@ -422,16 +422,18 @@ class TestCacheDown:
         user = _staff(is_superuser=True)
         with schema_context("public"):
             TOTP.activate(user, generate_totp_secret())
-        real_incr = __import__(
+        real_count = __import__(
             "django.core.cache", fromlist=["cache"]
-        ).cache.incr
+        ).cache.count_in_window
 
-        def incr(key, *args, **kwargs):
+        def count(key, *args, **kwargs):
             if "staff_mfa" in key:
                 raise RedisConnectionError("down")
-            return real_incr(key, *args, **kwargs)
+            return real_count(key, *args, **kwargs)
 
-        with patch("tenant.staff_login_limits.cache.incr", side_effect=incr):
+        with patch(
+            "tenant.staff_login_limits.cache.count_in_window", side_effect=count
+        ):
             response = APIClient(**_edge("10.0.0.1")).post(
                 TOKEN_LOGIN,
                 {"email": user.email, "password": PASSWORD, "code": "123456"},

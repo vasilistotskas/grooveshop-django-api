@@ -161,6 +161,29 @@ _RESILIENCE_OPTIONS: dict[str, Any] = {
     "retry": Retry(ExponentialBackoff(), retries=3),
 }
 
+# ``CustomCache.count_in_window``: one atomic step, so a counter can never
+# exist without an expiry (TTL -1 is "no expiry", -2 "no key").
+_COUNT_IN_WINDOW = """
+local value = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return value
+"""
+
+# ``CustomCache.uncount``: a counter whose window ended is left alone, and
+# one that reaches zero is removed rather than left at zero or below.
+_UNCOUNT = """
+if redis.call('EXISTS', KEYS[1]) == 0 then
+  return 0
+end
+local value = redis.call('DECR', KEYS[1])
+if value <= 0 then
+  redis.call('DEL', KEYS[1])
+end
+return value
+"""
+
 
 class CustomCache(RedisCache):
     """
@@ -425,6 +448,28 @@ class CustomCache(RedisCache):
         name = self.make_and_validate_key(key, version=version)
         value = self._cache.get_client(name, write=True).getdel(name)
         return None if value is None else self._cache._serializer.loads(value)
+
+    def count_in_window(
+        self, key: str, timeout: int, version: int | None = None
+    ) -> int:
+        """Add one to the counter at ``key`` and return it, in ONE Redis
+        script: ``INCR``, and an expiry of ``timeout`` seconds when the key
+        has none. Django's ``incr`` is ``EXISTS`` then ``INCRBY``, so a key
+        that expired between the two was recreated with no expiry and the
+        window it counts never ended; this also gives such a key back its
+        expiry. Raises on a Redis error, like ``add``: the callers are limits
+        that must not lift when Redis is unreachable."""
+        name = self.make_and_validate_key(key, version=version)
+        client = self._cache.get_client(name, write=True)
+        return int(client.eval(_COUNT_IN_WINDOW, 1, name, timeout))
+
+    def uncount(self, key: str, version: int | None = None) -> None:
+        """Take one back from the counter at ``key``, in ONE Redis script:
+        nothing when the key is gone (its window ended), and the key deleted
+        when that reaches zero, so it never holds a negative value or a key
+        with no expiry. Raises on a Redis error, like ``count_in_window``."""
+        name = self.make_and_validate_key(key, version=version)
+        self._cache.get_client(name, write=True).eval(_UNCOUNT, 1, name)
 
     def add_to_set(self, key: str, members: list[str], timeout: int) -> None:
         """Add ``members`` to the Redis set at ``key``, renewing its expiry.

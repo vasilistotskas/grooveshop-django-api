@@ -28,6 +28,56 @@ class CustomCacheTestCase(TestCase):
         self.key = f"test_key_{test_method_name}_{unique_id}"
         self.value = "test_value"
 
+    def _raw(self):
+        name = self.cache_instance.make_and_validate_key(self.key)
+        return self.cache_instance._cache.get_client(name, write=True), name
+
+    def test_count_in_window_starts_the_window_on_the_first_count(self):
+        client, name = self._raw()
+
+        self.assertEqual(self.cache_instance.count_in_window(self.key, 60), 1)
+        self.assertEqual(self.cache_instance.count_in_window(self.key, 60), 2)
+
+        self.assertTrue(0 < client.ttl(name) <= 60)
+
+    def test_count_in_window_keeps_the_window_it_started(self):
+        client, name = self._raw()
+        self.cache_instance.count_in_window(self.key, 60)
+        client.expire(name, 10)
+
+        self.cache_instance.count_in_window(self.key, 60)
+
+        self.assertTrue(0 < client.ttl(name) <= 10)
+
+    def test_count_in_window_gives_a_counter_with_no_expiry_one(self):
+        """Django's incr recreated an expired key with no expiry."""
+        client, name = self._raw()
+        client.set(name, 5)
+        self.assertEqual(client.ttl(name), -1)
+
+        self.assertEqual(self.cache_instance.count_in_window(self.key, 60), 6)
+
+        self.assertTrue(0 < client.ttl(name) <= 60)
+
+    def test_uncount_leaves_an_ended_window_alone(self):
+        client, name = self._raw()
+
+        self.cache_instance.uncount(self.key)
+
+        self.assertFalse(client.exists(name))
+
+    def test_uncount_takes_one_back_and_removes_the_key_at_zero(self):
+        client, name = self._raw()
+        self.cache_instance.count_in_window(self.key, 60)
+        self.cache_instance.count_in_window(self.key, 60)
+
+        self.cache_instance.uncount(self.key)
+        self.assertEqual(int(client.get(name)), 1)
+        self.assertTrue(0 < client.ttl(name) <= 60)
+
+        self.cache_instance.uncount(self.key)
+        self.assertFalse(client.exists(name))
+
     def test_cache_get(self):
         self.cache_instance.set(self.key, self.value)
         cached_value = self.cache_instance.get(self.key)

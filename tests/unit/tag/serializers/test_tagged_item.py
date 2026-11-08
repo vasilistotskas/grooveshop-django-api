@@ -3,6 +3,7 @@ from django.test import TestCase
 from product.models import Product
 from tag.models import Tag, TaggedItem
 from tag.serializers.tagged_item import TaggedItemSerializer
+from vat.factories import VatFactory
 
 
 class TestTaggedItemSerializer(TestCase):
@@ -12,7 +13,9 @@ class TestTaggedItemSerializer(TestCase):
         self.tag.label = "Test Tag"
         self.tag.save()
 
-        self.product = Product.objects.create(price=10.00, stock=5)
+        self.product = Product.objects.create(
+            price=10.00, stock=5, vat=VatFactory(value=0)
+        )
         self.product.set_current_language("en")
         self.product.name = "Test Product"
         self.product.save()

@@ -17,6 +17,7 @@ from promotion.enum import (
 from promotion.factories import PromotionCodeFactory, PromotionFactory
 from promotion.models import CartPromotionCode
 from promotion.services import PromotionEngine
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -183,7 +184,7 @@ class TestFreeGift:
         gift_product = ProductFactory(
             price=Money(Decimal(15), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=5,
             active=True,
         )
@@ -376,7 +377,7 @@ def _sellable_product(price, *, stock=1000, active=True):
     return ProductFactory(
         price=Money(Decimal(str(price)), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         stock=stock,
         active=active,
     )

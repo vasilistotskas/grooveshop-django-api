@@ -38,12 +38,16 @@ class TestTurnoverSnapshotsMigration(TestCase):
         apps = _migrate_to(BEFORE)
         Order = apps.get_model("order", "Order")
         Product = apps.get_model("product", "Product")
+        Vat = apps.get_model("vat", "Vat")
         order = Order.objects.create(
             status="COMPLETED",
             shipping_price=Decimal("12.40"),
             payment_method_fee=Decimal("3.10"),
         )
-        product = Product.objects.create(slug="migration-turnover")
+        product = Product.objects.create(
+            slug="migration-turnover",
+            vat_id=Vat.objects.get_or_create(value=0)[0].pk,
+        )
         for price, rate in ((Decimal("124.00"), 24), (Decimal("56.50"), 13)):
             apps.get_model("order", "OrderItem").objects.create(
                 order=order, product=product, price=price, vat_rate=rate

@@ -35,6 +35,7 @@ from shipping_boxnow.models import BoxNowShipment
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = [
     pytest.mark.django_db,
@@ -60,7 +61,7 @@ def _product(*, cm, stock=10, **kwargs):
         stock=stock,
         price=Money(Decimal(100), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         active=True,
         num_images=0,
         num_reviews=0,

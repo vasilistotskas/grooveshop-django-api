@@ -62,7 +62,7 @@ def _cart_for(user, price="100.00", vat_rate=None, quantity=1):
         stock=10,
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(0),
-        vat=VatFactory(value=Decimal(str(vat_rate))) if vat_rate else None,
+        vat=VatFactory(value=Decimal(str(vat_rate or 0))),
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=quantity)

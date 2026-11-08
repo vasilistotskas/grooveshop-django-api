@@ -219,7 +219,8 @@ class TestVatRate:
         ProductFactory(vat=vat, num_images=0, num_reviews=0)
         purged.reset()
 
-        vat.value = 13
+        # ``Vat.value`` is unique: 9 is not a seeded rate.
+        vat.value = 9
         vat.save()
 
         assert "products" in purged()

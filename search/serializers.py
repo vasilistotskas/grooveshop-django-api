@@ -221,7 +221,7 @@ class ProductTranslationSerializer(
         return obj.master.review_average
 
     def get_vat_percent(self, obj):
-        if obj.master and obj.master.vat:
+        if obj.master:
             return float(obj.master.vat.value)
         return None
 

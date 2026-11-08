@@ -3,6 +3,16 @@
 
 
 
+## v3.234.2 (2026-11-08)
+
+### Bug fixes
+
+* fix(product): make the VAT rate NOT NULL and unique in the database (#528) ([`cf5f69d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf5f69dc5d9265471a80dcbe1d169f776fd66742))
+
+### Chores
+
+* chore(api-contract): expire the order and product overrides on storefront v3.334.0 (#526) ([`457c93b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/457c93b5c1144a846817fac84a02e788aac2e3e3))
+
 ## v3.234.1 (2026-11-07)
 
 ### Bug fixes

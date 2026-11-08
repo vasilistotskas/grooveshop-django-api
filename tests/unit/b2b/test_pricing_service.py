@@ -23,7 +23,7 @@ pytestmark = pytest.mark.django_db
 
 
 def _product(price="100.00", discount="0", vat_rate=None, **kwargs):
-    vat = VatFactory(value=Decimal(str(vat_rate))) if vat_rate else None
+    vat = VatFactory(value=Decimal(str(vat_rate or 0)))
     return ProductFactory(
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(discount),

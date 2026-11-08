@@ -4,7 +4,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import CheckConstraint, Q
+from django.db.models import CheckConstraint, Q, UniqueConstraint
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -75,6 +75,20 @@ class Vat(TimeStampMixinModel, UUIDModel):
                 condition=Q(value__gte=MIN_VAT_VALUE)
                 & Q(value__lte=MAX_VAT_VALUE),
                 name="vat_value_range",
+            ),
+            # One row per rate: "the standard row" is named by its value
+            # (``vat.constants.STANDARD_VAT_RATE``), so a repeated rate makes
+            # that lookup a guess. ``value`` is never NULL; the condition is
+            # what lets ``vat`` 0010 build this as a unique INDEX through
+            # ``AddUniqueConstraintAdaptively`` (it refuses duplicates with a
+            # message naming them, instead of failing half way).
+            UniqueConstraint(
+                fields=["value"],
+                condition=Q(value__isnull=False),
+                name="vat_value_unique",
+                violation_error_message=_(
+                    "A VAT rate with this value already exists."
+                ),
             ),
         ]
 

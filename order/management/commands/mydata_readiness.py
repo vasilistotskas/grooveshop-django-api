@@ -14,7 +14,6 @@ Reports per tenant:
   (``vat.constants.MYDATA_SUPPORTED_VAT_RATES`` — the same set the
   ``Vat`` model itself now rejects at save time, so this mostly
   catches rows written before that validator existed).
-* Products with ``vat=NULL`` — priced at 0% VAT and invoiced wrong.
 * Product count per VAT rate, for a quick sanity read of the mix.
 
 Both ``vat`` and ``product`` are TENANT_APPS-only tables, so this
@@ -33,9 +32,8 @@ from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
 class Command(TenantCommandMixin, BaseCommand):
     help = (
-        "Report myDATA readiness (unmapped VAT rates, vat=NULL "
-        "products) for a tenant or all tenants. Exits non-zero if any "
-        "violation is found."
+        "Report myDATA readiness (unmapped VAT rates) for a tenant or all "
+        "tenants. Exits non-zero if any violation is found."
     )
 
     require_tenant_scope = True
@@ -45,26 +43,22 @@ class Command(TenantCommandMixin, BaseCommand):
 
     def handle(self, *args, **options):
         total_unmapped = 0
-        total_null_vat = 0
 
         for ctx in self.iter_tenant_contexts(options):
             with ctx:
-                unmapped, null_vat = self._report_for_schema()
-                total_unmapped += unmapped
-                total_null_vat += null_vat
+                total_unmapped += self._report_for_schema()
 
-        if total_unmapped or total_null_vat:
+        if total_unmapped:
             raise CommandError(
                 f"myDATA readiness FAILED: {total_unmapped} unmapped VAT "
-                f"rate(s), {total_null_vat} product(s) with vat=NULL "
-                "across the checked tenant(s)."
+                "rate(s) across the checked tenant(s)."
             )
 
         self.stdout.write(
             self.style.SUCCESS("\nmyDATA readiness OK — no violations found.")
         )
 
-    def _report_for_schema(self) -> tuple[int, int]:
+    def _report_for_schema(self) -> int:
         from product.models.product import Product
         from vat.models import Vat
 
@@ -86,22 +80,8 @@ class Command(TenantCommandMixin, BaseCommand):
                 self.style.SUCCESS("  ✓ All Vat rates are myDATA-recognised")
             )
 
-        null_vat_count = Product.objects.filter(vat__isnull=True).count()
-        if null_vat_count:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"  ✗ {null_vat_count} product(s) with vat=NULL "
-                    "(priced/invoiced at 0%)"
-                )
-            )
-        else:
-            self.stdout.write(
-                self.style.SUCCESS("  ✓ No products with vat=NULL")
-            )
-
         counts = (
-            Product.objects.exclude(vat__isnull=True)
-            .values("vat__value")
+            Product.objects.values("vat__value")
             .order_by("vat__value")
             .annotate(count=Count("id"))
         )
@@ -112,4 +92,4 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"      - {row['vat__value']}%: {row['count']}"
                 )
 
-        return unmapped_count, null_vat_count
+        return unmapped_count

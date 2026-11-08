@@ -210,17 +210,11 @@ class ProductQuerySet(
         on the net price after the markdown."""
         hundred = Value(100, output_field=DecimalField())
         return self.annotate(
-            vat_value_annotation=Case(
-                When(
-                    vat__isnull=False,
-                    then=F("price")
-                    * (hundred - F("discount_percent"))
-                    / hundred
-                    * F("vat__value")
-                    / hundred,
-                ),
-                default=Value(0, output_field=DecimalField()),
-            )
+            vat_value_annotation=F("price")
+            * (hundred - F("discount_percent"))
+            / hundred
+            * F("vat__value")
+            / hundred
         )
 
     def with_final_price_annotation(self) -> Self:

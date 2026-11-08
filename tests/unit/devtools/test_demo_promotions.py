@@ -22,6 +22,7 @@ from django.test import TestCase
 from devtools import demo_promotions
 from devtools.demo_catalogue import CATEGORIES, PRODUCTS
 from promotion.enum import BenefitType, PromotionTrigger, TargetScope
+from vat.factories import VatFactory
 
 PRODUCT_SLUGS = {row.slug for row in PRODUCTS}
 CATEGORY_SLUGS = {row.slug for row in CATEGORIES}
@@ -222,7 +223,9 @@ class TestPromotionSeed(TestCase):
         for slug in sorted(categories):
             ProductCategory.objects.create(slug=slug)
         for index, slug in enumerate(sorted(products)):
-            Product.objects.create(slug=slug, sku=f"SEED-{index}")
+            Product.objects.create(
+                slug=slug, sku=f"SEED-{index}", vat=VatFactory(value=0)
+            )
 
     @staticmethod
     def _translate(instance, language_code="el", **fields):
@@ -351,7 +354,9 @@ class TestRetiringForeignOffers(TestCase):
         for slug in sorted(categories):
             ProductCategory.objects.create(slug=slug)
         for index, slug in enumerate(sorted(products)):
-            Product.objects.create(slug=slug, sku=f"SEED-{index}")
+            Product.objects.create(
+                slug=slug, sku=f"SEED-{index}", vat=VatFactory(value=0)
+            )
 
     @staticmethod
     def _translate(instance, language_code="el", **fields):

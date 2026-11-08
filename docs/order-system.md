@@ -456,8 +456,9 @@ catalogue can no longer change.
   item admin and API, scripts); `bulk_create` skips `save()`, so
   `devtools/demo_orders.py` passes it itself. The column has
   `db_default=0` only so the release still serving during a rollout can
-  keep inserting; a legacy product with no `Vat` row (NULL until the
-  column is made NOT NULL, see `docs/product-pricing.md`) is sold at 0.
+  keep inserting. Every product has a `Vat` row (`Product.vat` is NOT
+  NULL, see `docs/product-pricing.md`), so no line is sold at a missing
+  rate.
   The item admin cannot add a line (§3.7) and keeps the rate editable, so
   staff can correct a wrong snapshot, until the order's invoice carries a
   myDATA MARK; from then on it is read-only, because the registered

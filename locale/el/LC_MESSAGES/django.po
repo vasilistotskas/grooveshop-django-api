@@ -726,6 +726,9 @@ msgstr "Ο κωδικός GTIN περιέχει μόνο ψηφία."
 msgid "A GTIN has 8, 12, 13 or 14 digits."
 msgstr "Ο κωδικός GTIN έχει 8, 12, 13 ή 14 ψηφία."
 
+msgid "A VAT rate with this value already exists."
+msgstr "Υπάρχει ήδη συντελεστής ΦΠΑ με αυτή την τιμή."
+
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "Η ανάλυση δείχνει τις πωλήσεις πριν από τις επιστροφές, με τις μεγαλύτερες πρώτες. Για προϊόν ή κατηγορία μετράνε μόνο τα προϊόντα: τα μεταφορικά και οι χρεώσεις ανήκουν στην παραγγελία, όχι σε μια γραμμή. Η εξαγωγή περιλαμβάνει κάθε ομάδα, ανά περίοδο."
 

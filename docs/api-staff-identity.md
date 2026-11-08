@@ -335,8 +335,8 @@ login and at the token endpoint are counted by
 `PlatformStaffBackend.authenticate_staff`, which does the counting, so there is
 no second copy.
 
-- **Counted first.** `register_attempt` increments (`add` with the window,
-  then `incr`, using the value it returns) before the password is looked at,
+- **Counted first.** `register_attempt` increments (`cache.count_in_window`:
+  one Redis script that adds one and starts the window) before the password is looked at,
   and raises `StaffLoginLocked` when the result is over a budget, without
   checking the password. Parallel requests each get their own number, so the
   budget is not "the limit plus the requests in flight".

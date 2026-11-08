@@ -96,8 +96,7 @@ def _over_budget(scope: str, identity: str, limit: int) -> bool:
     )
     window = settings.STAFF_PASSWORD_RESET["WINDOW_SECONDS"]
     try:
-        cache.add(key, 0, window)
-        return cache.incr(key) > limit
+        return cache.count_in_window(key, window) > limit
     except Exception:
         logger.exception("Staff password reset budget unavailable")
         return True

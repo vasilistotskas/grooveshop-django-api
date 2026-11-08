@@ -7,8 +7,8 @@ points reach the password check through
 ``PlatformStaffBackend.authenticate_staff``, which calls this module, so the
 count is made in one place and the two share it.
 
-**Count first.** ``register_attempt`` increments (``add`` with the window,
-then ``incr``, using the value it returns) BEFORE the password is looked at,
+**Count first.** ``register_attempt`` increments (``count``: one Redis
+script that adds one and starts the window) BEFORE the password is looked at,
 and refuses once the result is over the limit, without checking the password
 at all. Counting after the check would let every request in flight read a
 count below the limit while Argon2 runs, so the budget would be "the limit

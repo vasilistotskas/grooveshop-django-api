@@ -838,6 +838,10 @@ msgstr "Η επιστροφή ανά γραμμή αξίζει όσο οι γρ�
 msgid "A refund failed"
 msgstr "Αποτυχία επιστροφής χρημάτων"
 
+#, python-format
+msgid "A refund of %(amount)s was sent to the payment provider and its result is not known yet. Retry it with the same key: the provider hands back the refund it already made instead of making another. Choose this on its own, without lines."
+msgstr "Μια επιστροφή %(amount)s στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Επαναλάβετέ την με το ίδιο κλειδί: ο πάροχος επιστρέφει την επιστροφή που έκανε ήδη αντί να κάνει νέα. Επιλέξτε το μόνο του, χωρίς γραμμές."
+
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
 
@@ -12006,6 +12010,12 @@ msgstr "Η επανάληψη υποστηρίζεται μόνο για πλη�
 msgid "Retry payment for a failed or pending order"
 msgstr "Επανάληψη πληρωμής για αποτυχημένη ή εκκρεμή παραγγελία"
 
+msgid "Retry the pending refund"
+msgstr "Επανάληψη της εκκρεμούς επιστροφής"
+
+msgid "Retry the pending refund on its own: it repeats exactly what was asked, so leave the lines, the shipping and the goodwill amount empty."
+msgstr "Η επανάληψη της εκκρεμούς επιστροφής γίνεται μόνη της: επαναλαμβάνει ακριβώς ό,τι ζητήθηκε, άρα αφήστε κενά τις γραμμές, τα μεταφορικά και το ποσό καλής θελήσεως."
+
 msgid "Retryable server error"
 msgstr "Σφάλμα διακομιστή με δυνατότητα επανάληψης"
 
@@ -12883,12 +12893,12 @@ msgstr "Τιμές αποστολής"
 msgid "Shipping Update"
 msgstr "Ενημέρωση αποστολής"
 
-#, python-format
-msgid "Shipping charged: %(shipping)s."
-msgstr "Χρεώθηκαν μεταφορικά: %(shipping)s."
-
 msgid "Shipping kind"
 msgstr "Είδος αποστολής"
+
+#, python-format
+msgid "Shipping left to refund: %(shipping)s."
+msgstr "Μεταφορικά προς επιστροφή: %(shipping)s."
 
 msgid "Shipping option matrix, locker pickers and the ACS station map. Purge after toggling a provider, editing a price, or after a station/locker sync."
 msgstr "Πίνακας επιλογών αποστολής, επιλογείς lockers και ο χάρτης καταστημάτων ACS. Εκκαθαρίστε μετά την ενεργοποίηση/απενεργοποίηση παρόχου, την επεξεργασία τιμής ή μετά από συγχρονισμό καταστήματος/locker."
@@ -14402,6 +14412,10 @@ msgstr "Η αιτιολογία συμπεριλαμβάνεται στο email 
 msgid "The reason picked from the fixed list; empty on refunds made before the list existed, whose free text stays in the reason."
 msgstr "Ο λόγος που επιλέχθηκε από τη σταθερή λίστα· κενός στις επιστροφές πριν από τη λίστα, των οποίων το ελεύθερο κείμενο μένει στον λόγο."
 
+#, python-format
+msgid "The receipt of this order holds only %(left)s more at %(rate)s%% VAT, less than these lines are worth (%(amount)s), so their credit document could not be issued and nothing was refunded. A goodwill refund of an amount can still be made."
+msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s με ΦΠΑ %(rate)s%%, λιγότερα από την αξία αυτών των γραμμών (%(amount)s), άρα το πιστωτικό τους παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα. Μπορείτε ακόμη να κάνετε επιστροφή καλής θελήσεως για ένα ποσό."
+
 msgid "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 msgstr "Ο παραλήπτης λαμβάνει τον κωδικό της κάρτας με email και μπορεί να τον εξαργυρώσει κατά την ολοκλήρωση της αγοράς, σε όσες παραγγελίες θέλει, μέχρι να εξαντληθεί το υπόλοιπο."
 
@@ -15323,8 +15337,8 @@ msgid "Units sold"
 msgstr "Τεμάχια που πουλήθηκαν"
 
 #, python-format
-msgid "Units still to refund: %(left)s of %(sold)s, worth %(unit)s each (VAT %(rate)s%%)."
-msgstr "Τεμάχια προς επιστροφή: %(left)s από %(sold)s, αξίας %(unit)s το καθένα (ΦΠΑ %(rate)s%%)."
+msgid "Units still to refund: %(left)s of %(sold)s, %(value)s left to refund (VAT %(rate)s%%)."
+msgstr "Τεμάχια προς επιστροφή: %(left)s από %(sold)s, απομένουν %(value)s προς επιστροφή (ΦΠΑ %(rate)s%%)."
 
 msgid "Unknown"
 msgstr "Άγνωστος"

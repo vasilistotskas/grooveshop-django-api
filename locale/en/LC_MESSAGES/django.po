@@ -833,6 +833,10 @@ msgstr "A refund by lines is worth what its lines are worth: do not give an amou
 msgid "A refund failed"
 msgstr "A refund failed"
 
+#, python-format
+msgid "A refund of %(amount)s was sent to the payment provider and its result is not known yet. Retry it with the same key: the provider hands back the refund it already made instead of making another. Choose this on its own, without lines."
+msgstr "A refund of %(amount)s was sent to the payment provider and its result is not known yet. Retry it with the same key: the provider hands back the refund it already made instead of making another. Choose this on its own, without lines."
+
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 
@@ -12000,6 +12004,12 @@ msgstr "Retry is only supported for Stripe payments."
 msgid "Retry payment for a failed or pending order"
 msgstr "Retry payment for a failed or pending order"
 
+msgid "Retry the pending refund"
+msgstr "Retry the pending refund"
+
+msgid "Retry the pending refund on its own: it repeats exactly what was asked, so leave the lines, the shipping and the goodwill amount empty."
+msgstr "Retry the pending refund on its own: it repeats exactly what was asked, so leave the lines, the shipping and the goodwill amount empty."
+
 msgid "Retryable server error"
 msgstr "Retryable server error"
 
@@ -12877,12 +12887,12 @@ msgstr "Shipping Rates"
 msgid "Shipping Update"
 msgstr "Shipping Update"
 
-#, python-format
-msgid "Shipping charged: %(shipping)s."
-msgstr "Shipping charged: %(shipping)s."
-
 msgid "Shipping kind"
 msgstr "Shipping kind"
+
+#, python-format
+msgid "Shipping left to refund: %(shipping)s."
+msgstr "Shipping left to refund: %(shipping)s."
 
 msgid "Shipping option matrix, locker pickers and the ACS station map. Purge after toggling a provider, editing a price, or after a station/locker sync."
 msgstr "Shipping option matrix, locker pickers and the ACS station map. Purge after toggling a provider, editing a price, or after a station/locker sync."
@@ -14400,6 +14410,10 @@ msgstr "The reason is included in the email to the customer."
 msgid "The reason picked from the fixed list; empty on refunds made before the list existed, whose free text stays in the reason."
 msgstr "The reason picked from the fixed list; empty on refunds made before the list existed, whose free text stays in the reason."
 
+#, python-format
+msgid "The receipt of this order holds only %(left)s more at %(rate)s%% VAT, less than these lines are worth (%(amount)s), so their credit document could not be issued and nothing was refunded. A goodwill refund of an amount can still be made."
+msgstr "The receipt of this order holds only %(left)s more at %(rate)s%% VAT, less than these lines are worth (%(amount)s), so their credit document could not be issued and nothing was refunded. A goodwill refund of an amount can still be made."
+
 msgid "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 msgstr "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 
@@ -15321,8 +15335,8 @@ msgid "Units sold"
 msgstr "Units sold"
 
 #, python-format
-msgid "Units still to refund: %(left)s of %(sold)s, worth %(unit)s each (VAT %(rate)s%%)."
-msgstr "Units still to refund: %(left)s of %(sold)s, worth %(unit)s each (VAT %(rate)s%%)."
+msgid "Units still to refund: %(left)s of %(sold)s, %(value)s left to refund (VAT %(rate)s%%)."
+msgstr "Units still to refund: %(left)s of %(sold)s, %(value)s left to refund (VAT %(rate)s%%)."
 
 msgid "Unknown"
 msgstr "Unknown"

@@ -98,9 +98,10 @@ from order.payment_ledger import (
     is_cash_collection,
 )
 from order.refund_lines import (
+    covered_units,
+    held_values,
+    pending_request,
     plan_pieces,
-    refunded_quantities,
-    shipping_refunded,
 )
 from order.services import OrderService
 from order.taxation import breakdown_by_rate, order_vat_lines
@@ -365,6 +366,11 @@ class ReturnOrderForm(BaseDialogForm):
             "stock log with your name."
         ),
     )
+    retry_pending = forms.BooleanField(
+        label=_("Retry the pending refund"),
+        required=False,
+        widget=UnfoldBooleanSwitchWidget,
+    )
     reason = forms.ChoiceField(
         label=_("Reason"),
         choices=[("", "---------"), *RefundReason.choices],
@@ -401,6 +407,7 @@ class ReturnOrderForm(BaseDialogForm):
             else Decimal(0)
         )
         self._offer_amount(provider, stored)
+        self._offer_retry()
         self._offer_lines(request)
         # Asked only where cash a courier collected can be paid back: there
         # is no provider to refund it, so staff say how they did.
@@ -431,16 +438,34 @@ class ReturnOrderForm(BaseDialogForm):
             % {"refundable": money(provider)}
         )
 
+    def _offer_retry(self) -> None:
+        """A refund by lines whose provider call has an unknown outcome is
+        retried from here, under the same idempotency keys, never as a new
+        refund (which could pay its lines twice)."""
+        self.pending = (
+            pending_request(self.order) if self.order is not None else None
+        )
+        if self.pending is None:
+            del self.fields["retry_pending"]
+            return
+        self.fields["retry_pending"].help_text = _(
+            "A refund of %(amount)s was sent to the payment provider and "
+            "its result is not known yet. Retry it with the same key: the "
+            "provider hands back the refund it already made instead of "
+            "making another. Choose this on its own, without lines."
+        ) % {"amount": money(self.pending.amount)}
+
     def _offer_lines(self, request) -> None:
-        """One units field per line that has units not refunded yet, and
-        the shipping when it is not refunded and costs something."""
+        """One units field per line that has units left to refund, and the
+        shipping when some of it is left. What a line has had back is the
+        value its refund shares hold, not a count of units."""
         self.items: list[OrderItem] = []
         order = self.order
         if order is None:
             del self.fields["include_shipping"]
             del self.fields["restock"]
             return
-        paid = refunded_quantities(order)
+        held = held_values(order)
         try:
             gross = discounted_line_gross(order, None)
         except ValueError:
@@ -454,7 +479,10 @@ class ReturnOrderForm(BaseDialogForm):
         for item in OrderItem.objects.filter(order=order).order_by(
             "sort_order", "pk"
         ):
-            left = item.quantity - paid.get(item.pk, 0)
+            paid = held.goods.get(item.pk, Decimal(0))
+            left = item.quantity - covered_units(
+                gross[item.pk], item.quantity, paid
+            )
             if left <= 0:
                 continue
             self.items.append(item)
@@ -466,24 +494,27 @@ class ReturnOrderForm(BaseDialogForm):
                 required=False,
                 widget=UnfoldAdminIntegerFieldWidget,
                 help_text=_(
-                    "Units still to refund: %(left)s of %(sold)s, worth "
-                    "%(unit)s each (VAT %(rate)s%%)."
+                    "Units still to refund: %(left)s of %(sold)s, %(value)s "
+                    "left to refund (VAT %(rate)s%%)."
                 )
                 % {
                     "left": left,
                     "sold": item.quantity,
-                    "unit": money(gross[item.pk] / item.quantity),
+                    "value": money(gross[item.pk] - paid),
                     "rate": item.vat_rate,
                 },
             )
-        if order.shipping_price.amount <= 0 or shipping_refunded(order):
+        shipping_left = Decimal(order.shipping_price.amount) - sum(
+            held.shipping.values(), Decimal(0)
+        )
+        if shipping_left <= 0:
             del self.fields["include_shipping"]
         else:
             self.fields["include_shipping"].help_text = _(
-                "Shipping charged: %(shipping)s."
-            ) % {"shipping": money(order.shipping_price.amount)}
+                "Shipping left to refund: %(shipping)s."
+            ) % {"shipping": money(shipping_left)}
         if not (
-            self.items
+            (self.items or self.pending is not None)
             and order.status in RETURN_HANDLING_STATUSES
             and request.user.has_perm("order.change_orderitem")
         ):
@@ -493,27 +524,42 @@ class ReturnOrderForm(BaseDialogForm):
     def field_name(item: OrderItem) -> str:
         return f"quantity_{item.pk}"
 
+    def retrying(self) -> bool:
+        return bool(
+            self.pending is not None and self.cleaned_data.get("retry_pending")
+        )
+
     def units(self) -> dict[int, int]:
-        """Order line pk to the units staff ask to refund (zeros left out)."""
+        """Order line pk to the units staff ask to refund (zeros left out);
+        the pending refund's own when it is retried."""
+        if self.retrying():
+            return dict(self.pending.request.units)
         return {
             item.pk: units
             for item in self.items
             if (units := self.cleaned_data.get(self.field_name(item)))
         }
 
+    def shipping(self) -> bool:
+        if self.retrying():
+            return self.pending.request.include_shipping
+        return bool(self.cleaned_data.get("include_shipping"))
+
     def lines(self) -> list[tuple[OrderItem, int]]:
         units = self.units()
         return [
-            (item, units[item.pk]) for item in self.items if item.pk in units
+            (item, units[item.pk])
+            for item in OrderItem.objects.filter(pk__in=units).order_by("pk")
         ]
 
     def by_lines(self) -> bool:
-        return bool(self.units()) or bool(
-            self.cleaned_data.get("include_shipping")
-        )
+        return bool(self.units()) or self.shipping()
 
     def requested_amount(self) -> Decimal | None:
-        """What is asked for: the lines' value, or the goodwill amount."""
+        """What is asked for: the lines' value (the pending refund's amount
+        when it is retried), or the goodwill amount."""
+        if self.retrying():
+            return self.pending.amount
         if self.order is not None and self.by_lines():
             return sum(
                 (
@@ -521,9 +567,7 @@ class ReturnOrderForm(BaseDialogForm):
                     for piece in plan_pieces(
                         self.order,
                         self.units(),
-                        include_shipping=bool(
-                            self.cleaned_data.get("include_shipping")
-                        ),
+                        include_shipping=self.shipping(),
                     )
                 ),
                 Decimal(0),
@@ -540,6 +584,21 @@ class ReturnOrderForm(BaseDialogForm):
         cleaned = super().clean()
         if self.errors:
             return cleaned
+        if self.retrying() and (
+            cleaned.get("amount") is not None
+            or cleaned.get("include_shipping")
+            or any(
+                self.cleaned_data.get(self.field_name(item))
+                for item in self.items
+            )
+        ):
+            raise forms.ValidationError(
+                _(
+                    "Retry the pending refund on its own: it repeats "
+                    "exactly what was asked, so leave the lines, the "
+                    "shipping and the goodwill amount empty."
+                )
+            )
         by_lines = self.by_lines()
         amount = cleaned.get("amount")
         if by_lines and amount is not None:
@@ -567,8 +626,8 @@ class ReturnOrderForm(BaseDialogForm):
                 _("Choose the lines that came back to put them in stock."),
             )
         if cleaned.get("restock"):
-            for item in self.items:
-                if self.units().get(item.pk, 0) > item.net_quantity:
+            for item, units in self.lines():
+                if units > item.net_quantity:
                     self.add_error(
                         "restock",
                         _(
@@ -1980,7 +2039,7 @@ class OrderAdmin(BaseModelAdmin):
         order = Order.objects.get(pk=object_id)
         currency = order.amount_due.currency
         by_lines = form.by_lines()
-        include_shipping = bool(form.cleaned_data.get("include_shipping"))
+        include_shipping = form.shipping()
         try:
             requested = Money(form.requested_amount(), currency)
             reason_code = form.cleaned_data["reason"]

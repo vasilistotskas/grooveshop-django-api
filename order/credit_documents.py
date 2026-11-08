@@ -77,6 +77,7 @@ from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
     RefundAttemptKind,
+    RefundAttemptLine,
     RefundAttemptStatus,
 )
 from order.models.retail_credit import CreditReason
@@ -184,6 +185,49 @@ def credit_breakdown(
             }
         )
     return rows
+
+
+def receipt_headroom(order: Order) -> dict[Decimal, Decimal] | None:
+    """The gross each VAT rate of the order's registered receipt can still
+    be credited, or ``None`` while there is no registered receipt.
+
+    The receipt's gross per rate, less the credits issued (and not
+    canceled) and less the lines of refund shares that hold their money
+    and have no credit yet (a pending refund by lines, or one whose credit
+    has not been issued): everything a new credit by lines would have to
+    fit beside. ``create_pending_credits`` applies the same cap when it
+    issues the credit; this lets a refund by lines be refused before money
+    moves."""
+    invoice = Invoice.objects.filter(order=order).first()
+    if (
+        invoice is None
+        or not invoice.mydata_mark
+        or invoice.mydata_status != MyDataStatus.CONFIRMED
+    ):
+        return None
+    left = {
+        Decimal(row["rate"]): Decimal(row["gross"])
+        for row in invoice.vat_breakdown
+    }
+    for credit in RetailCredit.objects.filter(invoice=invoice).exclude(
+        mydata_status=MyDataStatus.CANCELED
+    ):
+        for row in credit.vat_breakdown:
+            rate = Decimal(row["rate"])
+            left[rate] = left.get(rate, _ZERO) - Decimal(row["gross"])
+    for line in (
+        RefundAttemptLine.objects.holding()
+        .filter(
+            attempt__order=order,
+            attempt__credit_document__isnull=True,
+            attempt__refund__credit_document__isnull=True,
+        )
+        .select_related("attempt")
+    ):
+        left[line.rate] = left.get(line.rate, _ZERO) - Decimal(
+            line.amount.amount
+        )
+    return left
 
 
 def _line_allocation(

@@ -149,13 +149,18 @@ def test_a_tag_label_edit_persists(staff_client):
 
 def test_a_deferred_read_keeps_an_unsaved_translation():
     """The mechanism itself: set a translated value on an instance with a
-    deferred column, read that column, then save."""
+    deferred column, read that column, then save. The read is also the
+    control for ``COLUMN_RELOAD``: the pattern matches the query Django
+    really sends, so the whole-row test below cannot pass by matching
+    nothing."""
     product = ProductFactory(active=True, num_images=0, num_reviews=0)
     loaded = Product.objects.defer("stock").get(pk=product.pk)
     loaded.set_current_language("el")
     loaded.description = "<p>kept</p>"
 
-    assert loaded.stock == product.stock  # a deferred-field load
+    with CaptureQueriesContext(connection) as captured:
+        assert loaded.stock == product.stock
+    assert any(COLUMN_RELOAD.match(q["sql"]) for q in captured)
     loaded.save()
 
     row = ProductTranslation.objects.get(master=product, language_code="el")

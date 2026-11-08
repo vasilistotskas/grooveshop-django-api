@@ -878,6 +878,10 @@ msgstr "Πιστωτικό στοιχείο επιστροφής που ανατ
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
 
+#, python-format
+msgid "A return of %(amount)s onto gift cards and loyalty points stopped before it finished. Refunding this amount finishes it; nothing is given back twice."
+msgstr "Μια επιστροφή %(amount)s σε δωροκάρτες και πόντους επιβράβευσης σταμάτησε πριν ολοκληρωθεί. Η επιστροφή αυτού του ποσού την ολοκληρώνει· τίποτα δεν επιστρέφεται δύο φορές."
+
 msgid "A review is waiting for approval"
 msgstr "Μια κριτική περιμένει έγκριση"
 

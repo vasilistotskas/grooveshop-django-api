@@ -413,6 +413,24 @@ class RefundOrderForm(BaseDialogForm):
                 else _("Up to %(refundable)s can still be refunded.")
                 % {"refundable": money(provider)}
             )
+        stalled = (
+            RefundAttempt.objects.stalled()
+            .filter(order=self.order)
+            .order_by("created_at", "id")
+            .first()
+            if self.order
+            else None
+        )
+        if stalled is not None:
+            # The amount that finishes it is the stopped share's own, not
+            # the refund it was part of (``_attempts_to_resume``).
+            amount = self.fields["amount"]
+            amount.initial = stalled.amount.amount
+            amount.help_text = _(
+                "A return of %(amount)s onto gift cards and loyalty points "
+                "stopped before it finished. Refunding this amount finishes "
+                "it; nothing is given back twice."
+            ) % {"amount": money(stalled.amount.amount)}
         # Asked only where cash a courier collected can be paid back: there
         # is no provider to refund it, so staff say how they did.
         if not self._has_refundable_cash():

@@ -1836,3 +1836,126 @@ class TestEachKindOfDifferenceIsAcknowledgedOnItsOwn:
         assert row.uncovered_acknowledged_at == stamp
         assert row.understated_acknowledged_at is not None
         assert not credit_allocation.uncovered_orders().exists()
+
+
+def _legacy_gift_return(order):
+    """A gift card return the previous release booked: no allocation."""
+    from order.models.refund_attempt import RefundAttempt, RefundAttemptKind
+
+    attempt = RefundAttempt.objects.create(
+        order=order,
+        kind=RefundAttemptKind.STORED_VALUE,
+        amount=_eur("30.00"),
+    )
+    OrderService._return_stored_value(order, attempt, "old release")
+    CreditAllocation.objects.filter(refund_attempt=attempt).delete()
+    return attempt
+
+
+class TestALegacyStoredValueReturnIsAllocated:
+    def test_a_receipt_issued_afterwards_is_net_of_it(self):
+        from order.invoicing import generate_invoice
+        from order.tasks import allocate_credit_sources
+
+        order = _points_order(gift="20.00")
+        _legacy_gift_return(order)
+        allocate_credit_sources()
+        Order.objects.filter(pk=order.pk).update(status="SHIPPED")
+        with mydata_enabled(), FakeAade():
+            invoice = generate_invoice(Order.objects.get(pk=order.pk))
+
+        # 100 goods, less 10 of points (a discount), less 20 given back.
+        assert invoice.total.amount == Decimal("70.00")
+
+    def test_one_returned_after_the_receipt_is_credited(self):
+        from order.tasks import allocate_credit_sources
+
+        order = _points_order(gift="20.00")
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            _legacy_gift_return(order)
+            allocate_credit_sources()
+            create_pending_credits(order.id)
+
+        assert _credits(order).exists()
+
+    def test_one_returned_before_the_receipt_is_left_alone(self):
+        from giftcard.models import GiftCardTransaction
+        from order.tasks import allocate_credit_sources
+
+        order = _points_order(gift="20.00")
+        with mydata_enabled(), FakeAade():
+            invoice = _receipt(order)
+        attempt = _legacy_gift_return(order)
+        GiftCardTransaction.objects.filter(refund_attempt=attempt).update(
+            created_at=invoice.created_at - timedelta(hours=1)
+        )
+
+        allocate_credit_sources()
+
+        assert not CreditAllocation.objects.filter(
+            refund_attempt=attempt
+        ).exists()
+
+
+class TestAClaimDeclinedWhileTheProviderWasAsked:
+    def test_a_refund_made_anyway_is_booked_unclaimed_never_revived(self):
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _order(lines=(("24", "100.00"),))
+        claim = _pending_claim(order, "30.00")
+        stale = RefundAttempt.objects.get(pk=claim.pk)
+        _decline(claim)
+
+        with mydata_enabled(), FakeAade():
+            OrderService.book_share(
+                order, stale, _eur("30.00"), "re_late", "late answer"
+            )
+
+        claim.refresh_from_db()
+        assert claim.status == RefundAttemptStatus.DECLINED
+        assert claim.refund_id is None
+        row = order.payment_transactions.get(
+            kind=PaymentTransactionKind.REFUND, provider_reference="re_late"
+        )
+        assert credit_allocation.is_allocated(refund=row)
+
+
+class TestTheDeferredFlagMeansWaitingForUndecidedSources:
+    def test_it_is_cleared_when_the_receipt_is_asked_for_again(self):
+        from order.tasks import RECEIPT_DEFERRED_FLAG, allocate_credit_sources
+
+        order = _order(lines=(("24", "100.00"),))
+        Order.objects.filter(pk=order.pk).update(
+            metadata={RECEIPT_DEFERRED_FLAG: True}
+        )
+
+        with patch("order.tasks.dispatch_on_commit") as dispatch:
+            allocate_credit_sources()
+
+        order.refresh_from_db()
+        assert RECEIPT_DEFERRED_FLAG not in order.metadata
+        dispatch.assert_called_once()
+
+    def test_it_stays_while_a_source_is_undecided(self):
+        from order.tasks import RECEIPT_DEFERRED_FLAG, allocate_credit_sources
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        _pending_claim(order, "60.00")
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("50.00"), reference="re_50"
+        )
+        Order.objects.filter(pk=order.pk).update(
+            metadata={RECEIPT_DEFERRED_FLAG: True}
+        )
+        assert credit_allocation.undecided(order)
+
+        with patch("order.tasks.dispatch_on_commit") as dispatch:
+            allocate_credit_sources()
+
+        order.refresh_from_db()
+        assert order.metadata[RECEIPT_DEFERRED_FLAG] is True
+        dispatch.assert_not_called()

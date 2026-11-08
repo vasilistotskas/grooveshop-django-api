@@ -1775,6 +1775,10 @@ def allocate_credit_sources() -> int:
         if hasattr(order, "invoice"):
             _set_receipt_deferred(order.pk, False)
         elif not credit_allocation.undecided(order):
+            # The flag means "waiting for undecided sources", nothing more:
+            # they are decided, so from here the receipt follows the normal
+            # failure path (a failure record, retries) like any other.
+            _set_receipt_deferred(order.pk, False)
             dispatch_on_commit(generate_order_invoice, [order.pk])
     return done
 

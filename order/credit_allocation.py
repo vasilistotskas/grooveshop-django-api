@@ -583,6 +583,39 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
                     reversed_=failed,
                 )
             )
+    # A gift card return booked without an allocation (the previous
+    # release serving after the migration): what it put back onto cards is
+    # payment the receipt holds. One that moved before an existing receipt
+    # is netted by it and owes none, like every other source.
+    from order.payment_ledger import PaymentLedger
+
+    receipts = dict(
+        Invoice.objects.filter(**scope).values_list("order_id", "created_at")
+    )
+    for attempt in RefundAttempt.objects.filter(
+        kind=RefundAttemptKind.STORED_VALUE,
+        status=RefundAttemptStatus.SETTLED,
+        credit_document__isnull=True,
+        allocations__isnull=True,
+        **scope,
+    ):
+        amount = PaymentLedger.stored_gift_card_returned_by(attempt)
+        moment = PaymentLedger.stored_returned_at(attempt)
+        receipt_at = receipts.get(attempt.order_id)
+        if amount <= 0 or (
+            receipt_at is not None and (moment is None or moment < receipt_at)
+        ):
+            continue
+        out.append(
+            Owing(
+                attempt.order_id,
+                moment,
+                "a",
+                {"refund_attempt": attempt},
+                amount,
+                has_excess=False,
+            )
+        )
     decisions = ChargebackDecision.objects.filter(
         Q(chargeback__order__invoice__isnull=True)
         | Q(decided_at__gte=F("chargeback__order__invoice__created_at")),

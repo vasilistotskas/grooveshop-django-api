@@ -3882,6 +3882,15 @@ class OrderService:
                 return _SharePaid(
                     attempt.pk, paid_back, settled.refund.provider_reference
                 )
+            # Only a PENDING attempt is a claim to fulfil. One declined
+            # while the provider was asked (staff marked it not made) is
+            # never revived: if the money moved anyway it is booked as a
+            # refund nobody claimed, which the allocation then decides.
+            claim = (
+                settled
+                if settled.status == RefundAttemptStatus.PENDING
+                else None
+            )
             if refund_id is None:
                 row, created = PaymentLedger.record_cod_refund(
                     order,
@@ -3889,7 +3898,7 @@ class OrderService:
                     amount=paid_back,
                     reference=reference,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
                 )
                 refund_id = row.provider_reference
             else:
@@ -3899,7 +3908,8 @@ class OrderService:
                     amount=paid_back,
                     reference=refund_id,
                     description=reason,
-                    attempt=settled,
+                    attempt=claim,
+                    match_attempt=claim is not None,
                 )
             if created:
                 # One signal per refund the ledger took, so a failure on a

@@ -12,7 +12,9 @@ failure left behind:
 
 * a refund booked without a claim (a provider's webhook) and not credited;
 * a provider refund attempt not declined, not credited;
-* a chargeback decision that the goods came back, not credited.
+* a chargeback decision that the goods came back, not credited;
+* a settled gift card return the previous release booked without an
+  allocation (what it put back onto cards, moved after any receipt).
 
 It only chooses the orders; each is decided by ``allocate_order`` on the
 live models under its row lock, so there is one definition of the headroom,
@@ -21,8 +23,9 @@ owes a credit is allocated exactly once and is then left alone (a source
 that owes nothing is marked by a row of amount zero).
 
 Money that moved before its order's receipt row existed is left alone: the
-receipt was issued net of it and owes no credit. Stored-value attempts need
-the gift-card and points ledgers and are allocated when claimed.
+receipt was issued net of it and owes no credit. A stored-value attempt
+is allocated when claimed; only one booked without an allocation is found
+here, valued from the gift-card ledger (points owe no credit).
 """
 
 from __future__ import annotations

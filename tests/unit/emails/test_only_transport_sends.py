@@ -30,26 +30,21 @@ SENDERS = frozenset(
 ROOT = Path(__file__).resolve().parents[3]
 TRANSPORT = ROOT / "emails" / "transport.py"
 #: Not the project's modules: dependencies, and the tests, which read the
-#: outbox and may build a message to assert on. Any virtualenv in the
-#: checkout is skipped too, whatever its name (``UV_PROJECT_ENVIRONMENT``).
+#: outbox and may build a message to assert on. Every virtualenv in the
+#: checkout is skipped too, at any depth and whatever its name
+#: (``UV_PROJECT_ENVIRONMENT``): a directory holding a ``pyvenv.cfg``.
 SKIPPED_DIRECTORIES = frozenset({".git", "node_modules", "tests", "tests_mt"})
 
 
-def _is_virtualenv(directory: Path) -> bool:
-    return (directory / "pyvenv.cfg").is_file()
-
-
 def project_modules() -> Iterator[Path]:
-    virtualenvs = {
-        child.name
-        for child in ROOT.iterdir()
-        if child.is_dir() and _is_virtualenv(child)
-    }
-    skipped = SKIPPED_DIRECTORIES | virtualenvs
+    virtualenvs = [config.parent for config in ROOT.rglob("pyvenv.cfg")]
     for path in ROOT.rglob("*.py"):
         relative = path.relative_to(ROOT)
-        if not skipped.intersection(relative.parts):
-            yield path
+        if SKIPPED_DIRECTORIES.intersection(relative.parts):
+            continue
+        if any(path.is_relative_to(venv) for venv in virtualenvs):
+            continue
+        yield path
 
 
 def senders_in(source: str) -> list[tuple[int, str]]:

@@ -85,3 +85,24 @@ def test_the_primary_key_is_added_only_when_the_order_is_not_total(
     )
 
     assert queryset.query.order_by == expected
+
+
+def test_a_translated_key_still_gets_the_primary_key(monkeypatch):
+    """A ``translations__`` key orders by an expression (the value in the
+    request's language), which ``totally_ordered`` cannot count as
+    unique, so the primary key still ends the order."""
+    monkeypatch.setattr(
+        CamelCaseOrderingFilter,
+        "get_ordering",
+        lambda self, request, queryset, view: ["translations__name"],
+    )
+    request = Request(APIRequestFactory().get("/"))
+
+    queryset = CamelCaseOrderingFilter().filter_queryset(
+        request, Product.objects.all(), view=None
+    )
+
+    *keys, last = queryset.query.order_by
+    assert len(keys) == 1
+    assert not isinstance(keys[0], str)
+    assert last == "pk"

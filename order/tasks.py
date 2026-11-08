@@ -1058,6 +1058,9 @@ def generate_order_invoice(self, order_id: int) -> bool:
             refusal,
             extra={"order_id": order_id},
         )
+        # Not waiting for a refund any more: it is final (fully refunded,
+        # myDATA off, not a receipt order), so nothing asks again.
+        _set_receipt_deferred(order_id, False)
         return False
     except Exception as e:
         logger.exception(

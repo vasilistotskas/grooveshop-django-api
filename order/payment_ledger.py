@@ -706,23 +706,52 @@ class PaymentLedger:
 
         It is the excess as it stood at the refund's own moment: the ledger
         up to that row (*before*, ``None`` for a refund being claimed now),
-        which already holds what every earlier refund took of it, and the
-        PENDING provider claims (other than *exclude*) made before it, whose
-        money is spoken for. Later money never changes it, so the same
-        refund gets the same excess whenever it is allocated. With
-        ``claims_hold=False`` no claim holds any of it: what the excess
-        would be if every PENDING claim were released without a refund
-        (``credit_allocation.allocate_source`` leaves a source undecided
-        when that is more). The caller holds the order lock."""
-        claims = RefundAttempt.objects.live().filter(
+        which already holds what every earlier refund took of it, less the
+        provider claims (other than *exclude*) made before that moment, by
+        how each stands. A claim is judged by when it was MADE, never by
+        when its refund row was written:
+
+        * PENDING: its money is spoken for (released, and so not held, with
+          ``claims_hold=False``: what the excess would be if every PENDING
+          claim were released without a refund, which
+          ``credit_allocation.allocate_source`` compares to leave a source
+          undecided);
+        * SETTLED: its refund took that much of the excess, and it holds it
+          in both modes. When its refund row sorts after *before* the ledger
+          up to *before* does not hold it, so it is counted here; when the
+          row sorts before, the ledger already does;
+        * DECLINED: nothing.
+
+        Later money never changes it, so the same refund gets the same
+        excess whenever it is allocated. The caller holds the order lock."""
+        claims = RefundAttempt.objects.filter(
             order=order, kind=RefundAttemptKind.PROVIDER
-        )
+        ).exclude(pk__in=exclude)
+        pending = settled_after = _ZERO
+        if claims_hold:
+            live = claims.live()
+            if before is not None:
+                live = live.filter(created_at__lt=before.created_at)
+            pending = _total(live)
         if before is not None:
-            claims = claims.filter(created_at__lt=before.created_at)
-        in_flight = (
-            _total(claims.exclude(pk__in=exclude)) if claims_hold else _ZERO
+            settled_after = claims.filter(
+                Q(refund__created_at__gt=before.created_at)
+                | Q(
+                    refund__created_at=before.created_at,
+                    refund_id__gte=before.pk,
+                ),
+                status=RefundAttemptStatus.SETTLED,
+                refund__isnull=False,
+                created_at__lt=before.created_at,
+            ).aggregate(
+                total=Coalesce(
+                    Sum("refund__amount", output_field=_AMOUNT), _ZERO
+                )
+            )["total"]
+        return max(
+            cls.excess_held(order, before=before) - pending - settled_after,
+            _ZERO,
         )
-        return max(cls.excess_held(order, before=before) - in_flight, _ZERO)
 
     @staticmethod
     def _alert_overcharge(

@@ -750,6 +750,8 @@ class StoreAlerts(DashboardWidget):
             alerts += self._uncovered_refunds()
         if self.request.user.has_perm("order.change_order"):
             alerts += self._unknown_refunds()
+            alerts += self._unfinished_returns()
+            alerts += self._deferred_receipts()
         if self.request.user.has_perm("extra_settings.change_setting"):
             alerts += self._email_setup()
         return {"alerts": alerts}
@@ -948,13 +950,17 @@ class StoreAlerts(DashboardWidget):
         credit: the part past the receipt has no credit document (a credit
         for it would exceed the receipt, and AADE cannot check that), so an
         accountant has to look at each. The order's history says how much."""
+        from django.db.models import Max
+
         from order.credit_allocation import uncovered_orders
 
-        order_ids = list(
-            dict.fromkeys(
-                uncovered_orders().values_list("order_id", flat=True)[:5]
-            )
-        )
+        order_ids = [
+            row["order_id"]
+            for row in uncovered_orders()
+            .values("order_id")
+            .annotate(latest=Max("pk"))
+            .order_by("-latest")[:5]
+        ]
         if not order_ids:
             return []
         return [
@@ -965,14 +971,94 @@ class StoreAlerts(DashboardWidget):
                 _(
                     "These orders were refunded more than their receipt "
                     "holds. No credit document can be issued for the part "
-                    "past the receipt: check each order's history."
+                    "past the receipt: check each order's history, then "
+                    "use Acknowledge refunded money beyond the receipt on "
+                    "the order to clear it."
                 ),
                 items=[
                     link_cell(self.change_url("order.Order", pk), f"#{pk}")
                     for pk in order_ids
                 ],
                 link=(
+                    self.changelist_url("order.Order", "books=beyond_receipt"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _unfinished_returns(self) -> list[dict[str, Any]]:
+        """Gift card and points returns a crash left unfinished. Nothing
+        asks a provider about them and no outcome is recorded: repeating the
+        refund of the same amount finishes them. Until then each holds its
+        money, keeps the order's receipt waiting and refuses a new refund."""
+        from order.models.refund_attempt import RefundAttempt
+
+        stalled = RefundAttempt.objects.stalled()
+        if not stalled.exists():
+            return []
+        orders = dict.fromkeys(
+            stalled.order_by("created_at").values_list("order_id", flat=True)[
+                :5
+            ]
+        )
+        return [
+            _alert(
+                "danger",
+                "currency_exchange",
+                _("Gift card and points refunds left unfinished"),
+                _(
+                    "These refunds stopped before the value went back onto "
+                    "the customer's gift cards and points. They hold their "
+                    "money and block the order's receipt and any new refund "
+                    "until finished: refund the same amount again on the "
+                    "order."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in orders
+                ],
+                link=(
                     self.changelist_url("order.Order"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _deferred_receipts(self) -> list[dict[str, Any]]:
+        """Receipts waiting for a refund claim to resolve
+        (``order.invoicing.ReceiptDeferred``). A receipt is due when the
+        goods are dispatched, so each order is listed with what it waits
+        for."""
+        from order.credit_allocation import describe_blockers
+        from order.models import Order
+
+        waiting = list(
+            Order.objects.filter(metadata__receipt_deferred=True).order_by(
+                "-pk"
+            )[:5]
+        )
+        if not waiting:
+            return []
+        return [
+            _alert(
+                "danger",
+                "receipt_long",
+                _("Receipts waiting for a refund"),
+                _(
+                    "These orders have shipped but their receipt is issued "
+                    "only once the refund it waits for is settled. Resolve "
+                    "that refund (Record refund outcome, or refund the same "
+                    "amount again) so the receipt can be issued."
+                ),
+                items=[
+                    link_cell(
+                        self.change_url("order.Order", order.pk),
+                        f"#{order.pk}: {describe_blockers(order)}",
+                    )
+                    for order in waiting
+                ],
+                link=(
+                    self.changelist_url("order.Order", "books=receipt_waiting"),
                     _("Open the orders"),
                 ),
             )

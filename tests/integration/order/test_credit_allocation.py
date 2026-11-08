@@ -8,6 +8,7 @@ issued in cannot change it. See ``order.credit_allocation``.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -25,6 +26,7 @@ from order.enum.payment_transaction import PaymentTransactionKind
 from order.exceptions import PaymentError
 from order.models import (
     CreditAllocation,
+    Invoice,
     Order,
     OrderHistory,
     OrderItem,
@@ -1207,7 +1209,7 @@ class TestOneRuleForUndecided:
             assert not credit_allocation.is_allocated(refund=row)
             calls = len(api.calls)
 
-            with pytest.raises(PaymentError, match="still being confirmed"):
+            with pytest.raises(PaymentError, match="waiting for"):
                 OrderService.refund_order(order, amount=_eur("5.00"))
 
         assert len(api.calls) == calls
@@ -1288,3 +1290,241 @@ class TestMoneyBeyondTheReceiptIsAnAlert:
             for alert in _context(widgets.StoreAlerts, _superuser())["alerts"]
         ]
         assert "Refunded money beyond the receipt" in titles
+
+
+class TestASettledClaimKeepsItsExcessWhereverItsRowFalls:
+    """A claim holds the excess from when it was MADE, whether it settles
+    or is declined, never from when its refund row was written."""
+
+    def test_a_refund_waiting_for_a_claim_that_settles_owes_the_sale(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            _duplicate_payment(order)
+            # The claim takes the duplicate (a zero row), then a dashboard
+            # refund of the sale is booked while it is still PENDING.
+            claim = _pending_claim(order, "100.00")
+            row, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("60.00"), reference="re_60"
+            )
+            assert not credit_allocation.is_allocated(refund=row)
+
+            # The claim settles: its refund row is written AFTER the
+            # dashboard refund, and the claim is no longer live.
+            PaymentLedger.record_refund(
+                order,
+                charge=claim.charge,
+                amount=_eur("100.00"),
+                reference="re_claim",
+                attempt=claim,
+            )
+
+        assert sum(credit_allocation.allocation_of(refund=row).values()) == (
+            Decimal("60.00")
+        )
+
+
+class TestTheDeferredFlagFollowsTheReceipt:
+    def test_a_receipt_that_became_unissuable_stops_being_asked_for(self):
+        from order.tasks import allocate_credit_sources, generate_order_invoice
+        from tests.integration.order.test_mydata_lifecycle import (
+            _mark_shipped,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            claim = _pending_claim(order, "100.00")
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_30"
+            )
+            _mark_shipped(order)
+            assert generate_order_invoice(order.id) is False
+            order.refresh_from_db()
+            assert order.metadata["receipt_deferred"] is True
+
+            # The claim ends up refunding 70: with the 30, the whole sale.
+            # There is no sale left to document.
+            _decline(claim)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("70.00"), reference="re_70"
+            )
+            allocate_credit_sources()
+
+        order.refresh_from_db()
+        assert not Invoice.objects.filter(order=order).exists()
+        assert "receipt_deferred" not in order.metadata
+
+
+class TestUncoveredFollowsWhatStands:
+    @pytest.mark.parametrize(
+        ("reversed_", "left"), [("30.00", "20.00"), ("100.00", None)]
+    )
+    def test_a_reversal_shrinks_it(self, reversed_, left):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("150.00"), reference="re_150"
+            )
+            [row] = credit_allocation.uncovered_orders()
+            assert row.uncovered == Decimal("50.00")
+
+            PaymentLedger.record_refund_reversal(
+                order,
+                charge=charge,
+                amount=_eur(reversed_),
+                reference="re_150",
+            )
+
+        rows = list(credit_allocation.uncovered_orders().filter(order=order))
+        if left is None:
+            assert rows == []
+        else:
+            [row] = rows
+            assert row.uncovered == Decimal(left)
+
+    def test_staff_acknowledge_it_and_the_alert_clears(self):
+        from admin.dashboard.store import widgets
+        from tests.unit.admin.dashboard.test_store_widgets import (
+            _context,
+            _superuser,
+        )
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("150.00"), reference="re_150"
+            )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+
+        assert credit_allocation.acknowledge_uncovered(order, user=staff) == 1
+
+        assert not credit_allocation.uncovered_orders().exists()
+        titles = [
+            str(alert["title"])
+            for alert in _context(widgets.StoreAlerts, _superuser())["alerts"]
+        ]
+        assert "Refunded money beyond the receipt" not in titles
+        assert OrderHistory.objects.filter(
+            order=order, new_value__note__icontains="acknowledged"
+        ).exists()
+
+
+class TestADeferredReceiptIsVisible:
+    def _deferred(self):
+        from order.tasks import generate_order_invoice
+        from tests.integration.order.test_mydata_lifecycle import (
+            _mark_shipped,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        claim = _pending_claim(order, "100.00")
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("30.00"), reference="re_30"
+        )
+        _mark_shipped(order)
+        generate_order_invoice(order.id)
+        return order, claim
+
+    def test_the_dashboard_names_the_blocking_claim(self):
+        from admin.dashboard.store import widgets
+        from tests.unit.admin.dashboard.test_store_widgets import (
+            _context,
+            _superuser,
+        )
+
+        with mydata_enabled(), FakeAade():
+            order, _claim = self._deferred()
+
+        [alert] = [
+            a
+            for a in _context(widgets.StoreAlerts, _superuser())["alerts"]
+            if str(a["title"]) == "Receipts waiting for a refund"
+        ]
+        assert any(
+            f"#{order.pk}" in str(item) and "100" in str(item)
+            for item in alert["items"]
+        )
+
+    def test_the_admin_action_says_why_instead_of_scheduling(self):
+        from django.contrib.admin.sites import AdminSite
+
+        from order.admin import OrderAdmin
+        from tests.integration.order.test_admin_retail_documents import (
+            _messages,
+            _request,
+        )
+        from user.factories import UserAccountFactory
+
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        with mydata_enabled(), FakeAade():
+            order = _order(lines=(("24", "100.00"),))
+            charge = order.payment_transactions.get(
+                kind=PaymentTransactionKind.CHARGE
+            )
+            _pending_claim(order, "100.00")
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_30"
+            )
+            from tests.integration.order.test_mydata_lifecycle import (
+                _mark_shipped,
+            )
+
+            _mark_shipped(order)
+            request = _request(staff)
+            OrderAdmin(Order, AdminSite()).issue_receipt_now(
+                request, object_id=order.pk
+            )
+
+        [message] = _messages(request)
+        assert "deferred" in message
+        assert "payment provider" in message
+        order.refresh_from_db()
+        assert order.metadata["receipt_deferred"] is True
+
+
+class TestAStoredValueReturnLeftUnfinishedIsVisible:
+    def test_it_is_in_an_alert_once_the_reconcile_window_has_passed(self):
+        from admin.dashboard.store import widgets
+        from order.models.refund_attempt import RefundAttempt, RefundAttemptKind
+        from tests.unit.admin.dashboard.test_store_widgets import (
+            _context,
+            _superuser,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        attempt = RefundAttempt.objects.create(
+            order=order,
+            kind=RefundAttemptKind.STORED_VALUE,
+            charge=None,
+            amount=_eur("10.00"),
+        )
+
+        def titles():
+            return [
+                str(a["title"])
+                for a in _context(widgets.StoreAlerts, _superuser())["alerts"]
+            ]
+
+        assert "Gift card and points refunds left unfinished" not in titles()
+        RefundAttempt.objects.filter(pk=attempt.pk).update(
+            created_at=attempt.created_at - timedelta(days=1)
+        )
+        assert "Gift card and points refunds left unfinished" in titles()

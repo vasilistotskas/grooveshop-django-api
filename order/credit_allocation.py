@@ -39,6 +39,7 @@ from decimal import Decimal
 
 from django.db.models import Exists, F, OuterRef, Q, QuerySet, Sum
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from django.utils.translation import gettext
 from djmoney.money import Money
 
@@ -286,33 +287,49 @@ def scale(returned: Decimal, **source) -> None:
     """Make a source's rows total *returned* (less than they do): in
     proportion, rows left with nothing deleted. What was claimed and not
     returned is not held back any more. A source left with nothing at all
-    keeps one row of amount zero: it was decided, and owes nothing."""
+    keeps one row of amount zero: it was decided, and owes nothing. What no
+    credit could cover (``uncovered``) follows what stands: at most what
+    stands less what the rows hold now, never negative."""
     rows = list(CreditAllocation.objects.filter(**source).order_by("pk"))
     claimed = sum((Decimal(r.amount.amount) for r in rows), _ZERO)
-    if not rows or returned >= claimed:
+    if not rows:
         return
-    shares = (
-        proportional_shares(
-            returned, {r.pk: Decimal(r.amount.amount) for r in rows}
+    uncovered = sum((r.uncovered for r in rows), _ZERO)
+    if returned < claimed:
+        shares = (
+            proportional_shares(
+                returned, {r.pk: Decimal(r.amount.amount) for r in rows}
+            )
+            if returned > 0
+            else {}
         )
-        if returned > 0
-        else {}
-    )
-    for row in rows:
-        share = shares.get(row.pk, _ZERO)
-        if share > 0:
-            row.amount = Money(share, row.amount.currency)
-            row.save(update_fields=["amount", "amount_currency"])
-        else:
-            row.delete()
-    if returned <= 0:
-        first = rows[0]
-        store(
-            first.order,
-            [],
-            moved_at=first.moved_at,
-            nothing_owed=True,
-            **source,
+        for row in rows:
+            share = shares.get(row.pk, _ZERO)
+            if share > 0:
+                row.amount = Money(share, row.amount.currency)
+                row.save(update_fields=["amount", "amount_currency"])
+            else:
+                row.delete()
+        if returned <= 0:
+            first = rows[0]
+            store(
+                first.order,
+                [],
+                moved_at=first.moved_at,
+                nothing_owed=True,
+                **source,
+            )
+            return
+    if uncovered <= 0:
+        return
+    held = min(returned, claimed)
+    stands = min(uncovered, max(returned - held, _ZERO))
+    kept = CreditAllocation.objects.filter(**source).order_by("pk")
+    kept.update(uncovered=_ZERO)
+    first_kept = kept.first()
+    if first_kept is not None and stands > 0:
+        CreditAllocation.objects.filter(pk=first_kept.pk).update(
+            uncovered=stands
         )
 
 
@@ -565,12 +582,53 @@ def undecided(order: Order) -> bool:
 def uncovered_orders() -> QuerySet[CreditAllocation]:
     """The allocations of sources whose money moved but that the receipt
     had no room to credit (``uncovered``): refunds past what the receipt
-    holds, each for the store to look at."""
-    return (
-        CreditAllocation.objects.filter(uncovered__gt=0)
-        .select_related("order")
-        .order_by("pk")
+    holds, each for the store to look at until staff acknowledge it
+    (:func:`acknowledge_uncovered`)."""
+    return CreditAllocation.objects.filter(
+        uncovered__gt=0, uncovered_acknowledged_at__isnull=True
     )
+
+
+def acknowledge_uncovered(order: Order, *, user) -> int:
+    """Staff have seen the money past *order*'s receipt and settled it with
+    the accountant: the alert for it clears. Returns how many sources it
+    cleared; the order's history records who did it."""
+    cleared = uncovered_orders().filter(order=order)
+    amount = cleared.aggregate(total=Sum("uncovered"))["total"] or _ZERO
+    count = cleared.update(uncovered_acknowledged_at=timezone.now())
+    if count:
+        OrderHistory.log_note(
+            order=order,
+            note=gettext(
+                "%(amount)s refunded beyond the receipt was acknowledged "
+                "as handled outside the credit documents by %(who)s."
+            )
+            % {"amount": amount, "who": user},
+        )
+    return count
+
+
+def blocking_claims(order: Order) -> QuerySet[RefundAttempt]:
+    """The refund claims still PENDING on *order*: what keeps a source
+    undecided, a receipt deferred and a new refund refused."""
+    return RefundAttempt.objects.live().filter(order=order).order_by("pk")
+
+
+def describe_blockers(order: Order) -> str:
+    """The blocking claims in words, for a message to staff."""
+    parts = [
+        gettext("the %(kind)s refund of %(amount)s")
+        % {
+            "kind": (
+                gettext("gift card and points")
+                if claim.kind == RefundAttemptKind.STORED_VALUE
+                else gettext("payment provider")
+            ),
+            "amount": claim.amount,
+        }
+        for claim in blocking_claims(order)
+    ]
+    return ", ".join(parts)
 
 
 def reversed_of(refund: PaymentTransaction) -> Decimal:
@@ -649,11 +707,14 @@ __all__ = [
     "ChargeKind",
     "Owing",
     "Piece",
+    "acknowledge_uncovered",
     "allocate_order",
     "allocate_pro_rata",
     "allocate_source",
     "allocation_of",
     "allocation_of_refund",
+    "blocking_claims",
+    "describe_blockers",
     "drop",
     "free_reversed",
     "has_rates",

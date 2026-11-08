@@ -67,6 +67,18 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
             created_at__lte=timezone.now() - reconcile_after(),
         )
 
+    def stalled(self):
+        """Gift card and points returns still PENDING after
+        :func:`reconcile_after`: a crash left them unfinished. No provider
+        can answer for them and staff have no outcome to record: repeating
+        the refund of the same amount resumes and finishes the attempt
+        (``OrderService._attempts_to_resume``). Until then it holds its
+        money, defers the order's receipt and refuses a new refund."""
+        return self.live().filter(
+            kind=RefundAttemptKind.STORED_VALUE,
+            created_at__lte=timezone.now() - reconcile_after(),
+        )
+
 
 class RefundAttempt(models.Model):
     """One share of a refund, claimed before the provider is called.

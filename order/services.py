@@ -3626,11 +3626,11 @@ class OrderService:
             # take the room it needs.
             raise PaymentError(
                 _(
-                    "A refund of this order is still being confirmed with "
-                    "the payment provider and another one is waiting for "
-                    "it, so nothing more can be refunded until it is "
-                    "settled."
+                    "Another refund of this order is waiting for "
+                    "%(blockers)s to be settled, so nothing more can be "
+                    "refunded until then."
                 )
+                % {"blockers": credit_allocation.describe_blockers(order)}
             )
         attempts = [
             RefundAttempt.objects.create(

@@ -47,6 +47,10 @@ msgid "%(amount)s at %(rate)s%% VAT"
 msgstr "%(amount)s με ΦΠΑ %(rate)s%%"
 
 #, python-format
+msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
+msgstr "Τα %(amount)s που επιστράφηκαν πέρα από την απόδειξη επιβεβαιώθηκαν από %(who)s ως ρυθμισμένα εκτός των πιστωτικών παραστατικών."
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d πόντοι"
 
@@ -842,9 +846,6 @@ msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη �
 msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της από τις προσπάθειες επιστροφής της παραγγελίας πριν ξαναδοκιμάσετε."
 
-msgid "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
-msgstr "Μια επιστροφή αυτής της παραγγελίας επιβεβαιώνεται ακόμη με τον πάροχο πληρωμών και μια άλλη περιμένει γι' αυτήν, οπότε δεν μπορεί να επιστραφεί κάτι ακόμη μέχρι να ολοκληρωθεί."
-
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
 
@@ -1252,6 +1253,9 @@ msgstr "Προτιμήσεις λογαριασμού"
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
 
+msgid "Acknowledge refunded money beyond the receipt"
+msgstr "Επιβεβαίωση επιστροφής χρημάτων πέρα από την απόδειξη"
+
 msgid "Acknowledge the failure"
 msgstr "Επιβεβαίωση της αποτυχίας"
 
@@ -1629,6 +1633,10 @@ msgstr "Ανωνυμοποιεί τις παραγγελίες του χρήστ
 
 msgid "Anonymous"
 msgstr "Ανώνυμος"
+
+#, python-format
+msgid "Another refund of this order is waiting for %(blockers)s to be settled, so nothing more can be refunded until then."
+msgstr "Μια άλλη επιστροφή αυτής της παραγγελίας περιμένει να ολοκληρωθεί: %(blockers)s, οπότε δεν μπορεί να επιστραφεί κάτι ακόμη μέχρι τότε."
 
 msgid "Any APM"
 msgstr "Οποιοδήποτε APM"
@@ -6622,6 +6630,9 @@ msgstr "Η δωροκάρτα %(code)s δεν είναι εξαργυρώσιμ�
 msgid "Gift card amount must be between %(min)s and %(max)s EUR."
 msgstr "Το ποσό της δωροκάρτας πρέπει να είναι μεταξύ %(min)s και %(max)s EUR."
 
+msgid "Gift card and points refunds left unfinished"
+msgstr "Ημιτελείς επιστροφές σε δωροκάρτες και πόντους"
+
 msgid "Gift card code"
 msgstr "Κωδικός δωροκάρτας"
 
@@ -11348,6 +11359,9 @@ msgstr "Η απόδειξη δεν βρέθηκε."
 msgid "Receipt unavailable"
 msgstr "Η απόδειξη δεν είναι διαθέσιμη"
 
+msgid "Receipt waiting for a refund"
+msgstr "Απόδειξη σε αναμονή επιστροφής"
+
 #, python-brace-format
 msgid "Receipt {document_number} for your order #{order_id}"
 msgstr "Απόδειξη {document_number} για την παραγγελία σου #{order_id}"
@@ -11357,6 +11371,9 @@ msgstr "Αποδείξεις"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Αποδείξεις που απέρριψε το myDATA"
+
+msgid "Receipts waiting for a refund"
+msgstr "Αποδείξεις σε αναμονή επιστροφής"
 
 msgid "Received At"
 msgstr "Παραλήφθηκε στις"
@@ -11557,6 +11574,9 @@ msgstr "Απόπειρα επιστροφής"
 msgid "Refund attempt %(key)s of %(amount)s"
 msgstr "Απόπειρα επιστροφής %(key)s ποσού %(amount)s"
 
+msgid "Refund books"
+msgstr "Βιβλία επιστροφών"
+
 msgid "Refund credit"
 msgstr "Πίστωση επιστροφής"
 
@@ -11606,6 +11626,9 @@ msgstr "Επιστραφέν ποσό"
 
 msgid "Refunded Quantity"
 msgstr "Επιστραφείσα ποσότητα"
+
+msgid "Refunded beyond the receipt"
+msgstr "Επιστροφή πέρα από την απόδειξη"
 
 msgid "Refunded charge"
 msgstr "Επιστραφείσα χρέωση"
@@ -14410,6 +14433,10 @@ msgid "The receipt holds %(held)s of the %(owed)s this refund or chargeback woul
 msgstr "Η απόδειξη κρατά %(held)s από τα %(owed)s που θα πιστωνόταν αυτή η επιστροφή ή αμφισβήτηση: για το υπόλοιπο δεν μπορεί να εκδοθεί πιστωτικό παραστατικό."
 
 #, python-format
+msgid "The receipt of order #%(order_id)s is deferred: it waits for %(blockers)s to be settled, and is issued by itself once it is."
+msgstr "Η απόδειξη της παραγγελίας #%(order_id)s αναβλήθηκε: περιμένει να ολοκληρωθεί: %(blockers)s, και θα εκδοθεί μόνη της μόλις γίνει."
+
+#, python-format
 msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s στους συντελεστές ΦΠΑ της, λιγότερα από τα %(amount)s προς επιστροφή, άρα το πιστωτικό της παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα."
 
@@ -14442,6 +14469,9 @@ msgstr "Η επιστροφή δεν έγινε"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
+
+msgid "The refunded money beyond the receipt is acknowledged."
+msgstr "Η επιστροφή χρημάτων πέρα από την απόδειξη επιβεβαιώθηκε."
 
 msgid "The release whose versions this one restores."
 msgstr "Η δημοσίευση της οποίας τις εκδόσεις επαναφέρει αυτή."
@@ -14648,8 +14678,14 @@ msgstr "Αυτές οι αλλαγές δεν δημοσιεύτηκαν στη�
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "Αυτά τα κλειδιά είναι δεσμευμένα και δεν μπορούν να σταλούν: %(keys)s"
 
-msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
-msgstr "Αυτές οι παραγγελίες επιστράφηκαν περισσότερα από όσα κρατά η απόδειξή τους. Δεν μπορεί να εκδοθεί πιστωτικό παραστατικό για το μέρος πέρα από την απόδειξη: ελέγξτε το ιστορικό κάθε παραγγελίας."
+msgid "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
+msgstr "Αυτές οι παραγγελίες έχουν αποσταλεί αλλά η απόδειξή τους εκδίδεται μόνο όταν ολοκληρωθεί η επιστροφή που περιμένει. Επιλύστε την (Καταγραφή αποτελέσματος επιστροφής ή νέα επιστροφή του ίδιου ποσού) ώστε να εκδοθεί η απόδειξη."
+
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgstr "Αυτές οι παραγγελίες επιστράφηκαν περισσότερα από όσα κρατά η απόδειξή τους. Δεν μπορεί να εκδοθεί πιστωτικό παραστατικό για το μέρος πέρα από την απόδειξη: ελέγξτε το ιστορικό κάθε παραγγελίας και μετά χρησιμοποιήστε την Επιβεβαίωση επιστροφής χρημάτων πέρα από την απόδειξη στην παραγγελία για να σβήσει."
+
+msgid "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
+msgstr "Αυτές οι επιστροφές σταμάτησαν πριν η αξία επιστρέψει στις δωροκάρτες και τους πόντους του πελάτη. Κρατούν τα χρήματά τους και μπλοκάρουν την απόδειξη της παραγγελίας και κάθε νέα επιστροφή μέχρι να ολοκληρωθούν: επιστρέψτε ξανά το ίδιο ποσό στην παραγγελία."
 
 msgid "These system components failed their health checks:"
 msgstr "Αυτά τα στοιχεία του συστήματος απέτυχαν στους ελέγχους υγείας:"
@@ -15303,6 +15339,9 @@ msgstr "Ανάκληση έγκρισης επιλεγμένων σχολίων"
 
 msgid "Uncovered"
 msgstr "Ακάλυπτο ποσό"
+
+msgid "Uncovered acknowledged at"
+msgstr "Το ακάλυπτο ποσό επιβεβαιώθηκε στις"
 
 msgid "Unexpected failure"
 msgstr "Μη αναμενόμενη αποτυχία"
@@ -16167,6 +16206,9 @@ msgstr "Όταν ορίζεται, μόνο αυτός ο πελάτης μπο�
 msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
 msgstr "Πότε είδε κάποιος ότι απέτυχε. Ένας προγραμματισμός που απέτυχε εμφανίζεται στον πίνακα ελέγχου του καταστήματος μέχρι τότε."
 
+msgid "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
+msgstr "Πότε το προσωπικό επιβεβαίωσε το ακάλυπτο μέρος· τότε εξαιρείται από την ειδοποίηση του πίνακα ελέγχου."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
 
@@ -16992,6 +17034,9 @@ msgstr "Cache django-extra-settings (extra_settings_*) και η σύνοψη τ
 msgid "expired"
 msgstr "έληξε"
 
+msgid "gift card and points"
+msgstr "δωροκάρτες και πόντοι"
+
 msgid "granted"
 msgstr "χορηγήθηκε"
 
@@ -17114,6 +17159,9 @@ msgstr "τα πληρώνει το κατάστημα"
 msgid "payment intent is in an invalid state: {status}"
 msgstr "το payment intent βρίσκεται σε μη έγκυρη κατάσταση: {status}"
 
+msgid "payment provider"
+msgstr "πάροχος πληρωμών"
+
 msgid "sha256 of data+i18n"
 msgstr "sha256 των data+i18n"
 
@@ -17137,6 +17185,10 @@ msgstr "Το target_price είναι υποχρεωτικό για ειδοπο�
 
 msgid "test"
 msgstr "δοκιμή"
+
+#, python-format
+msgid "the %(kind)s refund of %(amount)s"
+msgstr "η επιστροφή %(kind)s ύψους %(amount)s"
 
 msgid "threshold"
 msgstr "όριο"

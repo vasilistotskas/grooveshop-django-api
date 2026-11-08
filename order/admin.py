@@ -54,7 +54,7 @@ from admin.displays import (
 from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
-from order import refund_reconciliation
+from order import credit_allocation, refund_reconciliation
 from order.attribution import source_label
 from order.chargebacks import (
     ChargebackDecisionError,
@@ -249,6 +249,32 @@ class OverchargedFilter(DropdownFilter):
     def queryset(self, request, queryset):
         if self.value() == "yes":
             return queryset.overcharged()
+        return queryset
+
+
+class BooksFilter(DropdownFilter):
+    """Orders whose refund books need a person: a receipt waiting for a
+    refund to be settled (``metadata["receipt_deferred"]``), or refunded
+    money past what the receipt could credit
+    (``CreditAllocation.uncovered``). The store dashboard alerts link
+    here."""
+
+    title = _("Refund books")
+    parameter_name = "books"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("receipt_waiting", _("Receipt waiting for a refund")),
+            ("beyond_receipt", _("Refunded beyond the receipt")),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "receipt_waiting":
+            return queryset.filter(metadata__receipt_deferred=True)
+        if self.value() == "beyond_receipt":
+            return queryset.filter(
+                pk__in=credit_allocation.uncovered_orders().values("order_id")
+            )
         return queryset
 
 
@@ -1008,6 +1034,7 @@ class OrderAdmin(BaseModelAdmin):
         WholesaleOrderFilter,
         RefundOwedFilter,
         OverchargedFilter,
+        BooksFilter,
         ChargebackDecisionFilter,
         FollowUpFilter,
         RecentOrdersFilter,
@@ -1264,6 +1291,7 @@ class OrderAdmin(BaseModelAdmin):
         "confirm_offline_payment",
         "refund_payment",
         "record_refund_outcome",
+        "acknowledge_uncovered",
         "restock_returned",
         "decide_chargeback",
         "download_shipping_voucher",
@@ -2103,6 +2131,38 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
+        description=_("Acknowledge refunded money beyond the receipt"),
+        icon="task_alt",
+        permissions=["change", "acknowledge_uncovered"],
+    )
+    def acknowledge_uncovered(self, request, object_id):
+        """Clear the dashboard alert for money refunded past the receipt:
+        staff looked at the order's history and settled it with the
+        accountant. Recorded in the order's history with who did it."""
+        order = Order.objects.get(pk=object_id)
+        with transaction.atomic():
+            Order.objects.select_for_update().get(pk=order.pk)
+            credit_allocation.acknowledge_uncovered(order, user=request.user)
+        self.log_change(
+            request, order, "Acknowledged refunded money beyond the receipt"
+        )
+        messages.success(
+            request,
+            _("The refunded money beyond the receipt is acknowledged."),
+        )
+        return self._redirect_to_order_change(object_id)
+
+    def has_acknowledge_uncovered_permission(self, request, object_id=None):
+        """Offered while the order has refunded money past its receipt that
+        nobody acknowledged."""
+        return (
+            object_id is not None
+            and credit_allocation.uncovered_orders()
+            .filter(order_id=object_id)
+            .exists()
+        )
+
+    @action(
         description=_("Settle chargeback (goods)"),
         icon="gavel",
         permissions=["change", "decide_chargeback"],
@@ -2414,6 +2474,32 @@ class OrderAdmin(BaseModelAdmin):
                 },
             )
             return self._redirect_to_order_change(object_id)
+
+        if not Invoice.objects.filter(order=order).exists():
+            # The receipt would wait for a refund claim still PENDING
+            # (``ReceiptDeferred``): say so now, and leave it to the
+            # periodic task, rather than "Scheduled" for nothing.
+            with transaction.atomic():
+                locked = Order.objects.select_for_update().get(pk=order.pk)
+                credit_allocation.allocate_order(locked)
+                waiting = credit_allocation.undecided(locked)
+            if waiting:
+                from order.tasks import _set_receipt_deferred
+
+                _set_receipt_deferred(order.id, True)
+                messages.warning(
+                    request,
+                    _(
+                        "The receipt of order #%(order_id)s is deferred: it "
+                        "waits for %(blockers)s to be settled, and is "
+                        "issued by itself once it is."
+                    )
+                    % {
+                        "order_id": order.id,
+                        "blockers": credit_allocation.describe_blockers(order),
+                    },
+                )
+                return self._redirect_to_order_change(object_id)
 
         generate_order_invoice.delay(order.id)
         messages.success(

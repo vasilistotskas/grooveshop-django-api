@@ -42,6 +42,10 @@ msgid "%(amount)s at %(rate)s%% VAT"
 msgstr "%(amount)s at %(rate)s%% VAT"
 
 #, python-format
+msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
+msgstr "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
+
+#, python-format
 msgid "%(balance)d points"
 msgstr "%(balance)d points"
 
@@ -837,9 +841,6 @@ msgstr "A refund of this amount was already sent to the payment provider and its
 msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 msgstr "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 
-msgid "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
-msgstr "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
-
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
 
@@ -1247,6 +1248,9 @@ msgstr "Account preferences"
 msgid "Account security notice"
 msgstr "Account security notice"
 
+msgid "Acknowledge refunded money beyond the receipt"
+msgstr "Acknowledge refunded money beyond the receipt"
+
 msgid "Acknowledge the failure"
 msgstr "Acknowledge the failure"
 
@@ -1624,6 +1628,10 @@ msgstr "Anonymises the user's orders (kept for tax/accounting) and hard-deletes 
 
 msgid "Anonymous"
 msgstr "Anonymous"
+
+#, python-format
+msgid "Another refund of this order is waiting for %(blockers)s to be settled, so nothing more can be refunded until then."
+msgstr "Another refund of this order is waiting for %(blockers)s to be settled, so nothing more can be refunded until then."
 
 msgid "Any APM"
 msgstr "Any APM"
@@ -6616,6 +6624,9 @@ msgstr "Gift card %(code)s is not redeemable (inactive, expired or empty)."
 msgid "Gift card amount must be between %(min)s and %(max)s EUR."
 msgstr "Gift card amount must be between %(min)s and %(max)s EUR."
 
+msgid "Gift card and points refunds left unfinished"
+msgstr "Gift card and points refunds left unfinished"
+
 msgid "Gift card code"
 msgstr "Gift card code"
 
@@ -11340,6 +11351,9 @@ msgstr "Receipt not found."
 msgid "Receipt unavailable"
 msgstr "Receipt unavailable"
 
+msgid "Receipt waiting for a refund"
+msgstr "Receipt waiting for a refund"
+
 #, python-brace-format
 msgid "Receipt {document_number} for your order #{order_id}"
 msgstr "Receipt {document_number} for your order #{order_id}"
@@ -11349,6 +11363,9 @@ msgstr "Receipts"
 
 msgid "Receipts rejected by myDATA"
 msgstr "Receipts rejected by myDATA"
+
+msgid "Receipts waiting for a refund"
+msgstr "Receipts waiting for a refund"
 
 msgid "Received At"
 msgstr "Received At"
@@ -11549,6 +11566,9 @@ msgstr "Refund attempt"
 msgid "Refund attempt %(key)s of %(amount)s"
 msgstr "Refund attempt %(key)s of %(amount)s"
 
+msgid "Refund books"
+msgstr "Refund books"
+
 msgid "Refund credit"
 msgstr "Refund credit"
 
@@ -11598,6 +11618,9 @@ msgstr "Refunded Amount"
 
 msgid "Refunded Quantity"
 msgstr "Refunded Quantity"
+
+msgid "Refunded beyond the receipt"
+msgstr "Refunded beyond the receipt"
 
 msgid "Refunded charge"
 msgstr "Refunded charge"
@@ -14407,6 +14430,10 @@ msgid "The receipt holds %(held)s of the %(owed)s this refund or chargeback woul
 msgstr "The receipt holds %(held)s of the %(owed)s this refund or chargeback would credit: no credit document can be issued for the rest."
 
 #, python-format
+msgid "The receipt of order #%(order_id)s is deferred: it waits for %(blockers)s to be settled, and is issued by itself once it is."
+msgstr "The receipt of order #%(order_id)s is deferred: it waits for %(blockers)s to be settled, and is issued by itself once it is."
+
+#, python-format
 msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 msgstr "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 
@@ -14439,6 +14466,9 @@ msgstr "The refund was not made"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
+
+msgid "The refunded money beyond the receipt is acknowledged."
+msgstr "The refunded money beyond the receipt is acknowledged."
 
 msgid "The release whose versions this one restores."
 msgstr "The release whose versions this one restores."
@@ -14645,8 +14675,14 @@ msgstr "These changes did not go live at their time and your live pages are unch
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "These keys are reserved and cannot be sent: %(keys)s"
 
-msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
-msgstr "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
+msgid "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
+msgstr "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
+
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgstr "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+
+msgid "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
+msgstr "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
 
 msgid "These system components failed their health checks:"
 msgstr "These system components failed their health checks:"
@@ -15300,6 +15336,9 @@ msgstr "Unapprove selected comments"
 
 msgid "Uncovered"
 msgstr "Uncovered"
+
+msgid "Uncovered acknowledged at"
+msgstr "Uncovered acknowledged at"
 
 msgid "Unexpected failure"
 msgstr "Unexpected failure"
@@ -16164,6 +16203,9 @@ msgstr "When set, only this customer can redeem the code (personal coupon)"
 msgid "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
 msgstr "When someone saw that it failed. A failed schedule shows on the store dashboard until then."
 
+msgid "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
+msgstr "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
+
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 
@@ -16989,6 +17031,9 @@ msgstr "django-extra-settings cache (extra_settings_*) and the admin dashboard s
 msgid "expired"
 msgstr "expired"
 
+msgid "gift card and points"
+msgstr "gift card and points"
+
 msgid "granted"
 msgstr "granted"
 
@@ -17111,6 +17156,9 @@ msgstr "paid by the store"
 msgid "payment intent is in an invalid state: {status}"
 msgstr "payment intent is in an invalid state: {status}"
 
+msgid "payment provider"
+msgstr "payment provider"
+
 msgid "sha256 of data+i18n"
 msgstr "sha256 of data+i18n"
 
@@ -17134,6 +17182,10 @@ msgstr "target_price is required for price-drop alerts."
 
 msgid "test"
 msgstr "test"
+
+#, python-format
+msgid "the %(kind)s refund of %(amount)s"
+msgstr "the %(kind)s refund of %(amount)s"
 
 msgid "threshold"
 msgstr "threshold"

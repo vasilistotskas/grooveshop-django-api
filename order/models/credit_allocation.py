@@ -139,6 +139,15 @@ class CreditAllocation(models.Model):
         blank=True,
         help_text=_("When the money moved; empty while it is in flight."),
     )
+    uncovered_acknowledged_at = models.DateTimeField(
+        _("Uncovered acknowledged at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When staff acknowledged the uncovered part; it is then left "
+            "out of the store dashboard alert."
+        ),
+    )
     uncovered = models.DecimalField(
         _("Uncovered"),
         max_digits=11,

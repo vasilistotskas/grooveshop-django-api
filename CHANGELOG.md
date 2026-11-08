@@ -3,6 +3,65 @@
 
 
 
+## v3.236.1 (2026-11-08)
+
+### Bug fixes
+
+* fix(search): cap the id lists a search request may carry (#535) ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): cap the id lists the public product search accepts
+
+parse_int_csv had no length limit, and the public (AllowAny) product
+search turns categories, attribute_values and brands into Meilisearch
+IN [...] filters (categories expanded to their whole subtree). One
+crafted URL could therefore drive thousands of ids into a single filter.
+
+parse_int_csv now takes a keyword max_items defaulting to
+MAX_INT_CSV_ITEMS (100), so every caller inherits the bound. The count is
+checked before any value is converted to int, so an oversized list costs
+one split. Over the limit is a 400 with code too_many_values and a
+translated message naming the limit; garbage is still invalid_integer_list.
+100 is far above any real selection: the storefront builds these lists
+from the filter chips a shopper ticks plus the listing's own category.
+The loyalty product-points preview keeps its stricter own check.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(loyalty): keep the points preview's own error for an oversized list
+
+The new default cap in parse_int_csv (100, the same as the points
+preview's own MAX_POINTS_PREVIEW_PRODUCTS) answered a 101-id request to
+GET /api/v1/loyalty/product/points with `too_many_values` before the
+view's documented `invalid_product_ids` check could run (found by
+coldtea-pr-lens). The existing test only asserted a 400, so it passed.
+
+`max_items=None` lets a caller that bounds the list itself right after
+parsing opt out; the points preview does, so one bound and one error
+answer it. A test now pins the code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): count distinct ids against the cap and pin the code in tests
+
+Review follow-ups (independent review on #535):
+- parse_int_csv counts distinct values, first occurrence kept. The
+  storefront's queryIdList neither dedupes nor caps, so a mangled or
+  stale filter link that repeats an id must not turn the listing into
+  a 400. The repeated values were never useful to the filter either.
+- The search endpoint test asserted only that the field was named in
+  the 400; it now pins `too_many_values`, so another 400 cannot pass for
+  it. A test covers a repeated id, and the count-before-conversion test
+  uses distinct garbage values.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
 ## v3.236.0 (2026-11-08)
 
 ### Continuous integration

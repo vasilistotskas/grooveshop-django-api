@@ -248,7 +248,7 @@ class ProductQuerySetTestCase(TestCase):
         self.product2 = ProductFactory(
             price=Decimal("0.00"),
             discount_percent=Decimal("0.0"),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=0,
             active=False,
         )
@@ -256,7 +256,7 @@ class ProductQuerySetTestCase(TestCase):
         self.product3 = ProductFactory(
             price=Decimal("50.00"),
             discount_percent=Decimal("10.0"),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=5,
             active=True,
         )
@@ -453,12 +453,3 @@ class ProductQuerySetTestCase(TestCase):
 
         queryset = Product.objects.with_likes_count()
         self.assertEqual(queryset.count(), 0)
-
-    def test_annotation_with_none_values(self):
-        """Test annotations handle None values correctly"""
-        product_no_vat = ProductFactory(vat=None, price=Decimal("100.00"))
-
-        queryset = Product.objects.with_vat_value_annotation()
-        product = queryset.get(id=product_no_vat.id)
-
-        self.assertEqual(product.vat_value_annotation, Decimal("0.00"))

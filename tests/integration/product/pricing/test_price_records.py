@@ -200,6 +200,8 @@ class TestProductSave:
         product.delete()
         clock.advance(days=3)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("6.0")).delete()
         vat.value = Decimal("6.0")
         vat.save()
         product.restore()
@@ -369,6 +371,8 @@ class TestVatChange:
         )
         clock.advance(days=40)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("6.0")).delete()
         vat.value = Decimal("6.0")
         vat.save()
 
@@ -392,6 +396,8 @@ class TestVatChange:
         product.save()
         clock.advance(days=5)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("13.0")).delete()
         vat.value = Decimal("13.0")
         vat.save()
 

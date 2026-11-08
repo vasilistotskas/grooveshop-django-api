@@ -709,6 +709,9 @@ msgstr "A GTIN contains digits only."
 msgid "A GTIN has 8, 12, 13 or 14 digits."
 msgstr "A GTIN has 8, 12, 13 or 14 digits."
 
+msgid "A VAT rate with this value already exists."
+msgstr "A VAT rate with this value already exists."
+
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 
@@ -14473,9 +14476,6 @@ msgstr "The visitor ticked the consent box. Must be true."
 msgid "The voucher is already cancelled."
 msgstr "The voucher is already cancelled."
 
-msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
-msgstr "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
-
 msgid "The wholesale pricing tier this business gets"
 msgstr "The wholesale pricing tier this business gets"
 
@@ -17670,6 +17670,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
+
+#~ msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
+#~ msgstr "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
 
 #~ msgid "Theme Metadata"
 #~ msgstr "Theme Metadata"

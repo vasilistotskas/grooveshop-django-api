@@ -55,9 +55,7 @@ def post_create_historical_record_callback(
         discount = price_amount * discount_pct / 100
         return price_amount + vat - discount
 
-    from decimal import Decimal
-
-    vat_rate = instance.vat_percent if instance.vat_id else Decimal(0)
+    vat_rate = instance.vat_percent
 
     old_price = _customer_price(
         prev_record.price.amount,

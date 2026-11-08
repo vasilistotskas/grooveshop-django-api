@@ -34,6 +34,7 @@ from tests.utils.fake_stripe import fake_stripe
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = [
     pytest.mark.django_db,
@@ -67,7 +68,7 @@ def _checkout(products: str, discount: str | None):
             stock=10,
             price=Money(Decimal(products), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             active=True,
             num_images=0,
             num_reviews=0,

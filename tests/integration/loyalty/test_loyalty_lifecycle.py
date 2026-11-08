@@ -75,9 +75,7 @@ def _create_product(
     bonus_points=0,
 ):
     """Create a Product with optional Vat in the database."""
-    vat = None
-    if vat_percent > 0:
-        vat = Vat.objects.create(value=vat_percent)
+    vat, _ = Vat.objects.get_or_create(value=vat_percent)
 
     return Product.objects.create(
         price=Money(price, settings.DEFAULT_CURRENCY),

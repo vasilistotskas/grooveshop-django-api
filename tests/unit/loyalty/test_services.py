@@ -18,6 +18,7 @@ from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService, PointsRates
 from order.enum.status import OrderStatus, PaymentStatus
 from tests.utils.loyalty import loyalty_settings
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.assert_english
 
@@ -84,7 +85,7 @@ class TestDisabledSystem:
         product = ProductFactory(
             price=Money(Decimal("10.00"), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             points_coefficient=Decimal("1.00"),
             points=0,
             num_images=0,

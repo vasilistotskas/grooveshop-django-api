@@ -18,6 +18,7 @@ from tests.utils.legal import checkout_acceptance
 from tests.utils.payments import captured_for
 from tests.utils.shipping import enable_rate
 from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.usefixtures("trust_intent_binding")
 
@@ -236,7 +237,7 @@ class TestTransactionFailuresRollbackCompletely:
         product = ProductFactory.create(
             price=Money("50.00", settings.DEFAULT_CURRENCY),
             stock=initial_stock,
-            vat=None,
+            vat=VatFactory(value=0),
         )
         product.set_current_language("en")
         product.name = "Test Product"
@@ -322,7 +323,9 @@ class TestTransactionFailuresRollbackCompletely:
         """
         # Create product with initial stock
         product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=50, vat=None
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=50,
+            vat=VatFactory(value=0),
         )
         product.set_current_language("en")
         product.name = "Test Product"
@@ -391,7 +394,7 @@ class TestTransactionFailuresRollbackCompletely:
         product = ProductFactory.create(
             price=Money("50.00", settings.DEFAULT_CURRENCY),
             stock=initial_stock,
-            vat=None,
+            vat=VatFactory(value=0),
         )
         product.set_current_language("en")
         product.name = "Test Product"

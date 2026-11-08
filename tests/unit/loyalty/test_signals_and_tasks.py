@@ -15,6 +15,7 @@ from djmoney.money import Money
 
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
+from vat.factories import VatFactory
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,6 +32,7 @@ def _create_product(price: Decimal = Decimal("50.00")):
         active=True,
         points_coefficient=Decimal("1.00"),
         points=0,
+        vat=VatFactory(value=0),
     )
 
 

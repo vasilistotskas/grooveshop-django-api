@@ -32,7 +32,7 @@ Everything here runs under the order's row lock (the callers hold it).
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -100,17 +100,23 @@ def _credited(issued: QuerySet[RetailCredit]) -> Q:
 
 
 def headroom(
-    order: Order, *, settled_only: bool = False
+    order: Order,
+    *,
+    settled_only: bool = False,
+    released: Collection[int] = (),
 ) -> dict[Decimal, Decimal]:
     """The gross each VAT rate can still be credited. See the module doc.
     With *settled_only* the claims still PENDING hold nothing: the room
-    there would be once each is resolved without a refund."""
+    there would be once each is resolved without a refund. *released* is
+    the same for the named attempts alone."""
     left, invoice = _base(order)
     counting = CreditAllocation.objects.counting().filter(order=order)
     if settled_only:
         counting = counting.exclude(
             refund_attempt__status=RefundAttemptStatus.PENDING
         )
+    if released:
+        counting = counting.exclude(refund_attempt__in=released)
     issued = RetailCredit.objects.none()
     if invoice is not None:
         issued = RetailCredit.objects.filter(invoice=invoice).exclude(
@@ -131,13 +137,19 @@ def headroom(
 
 
 def allocate_pro_rata(
-    order: Order, amount: Decimal, *, settled_only: bool = False
+    order: Order,
+    amount: Decimal,
+    *,
+    settled_only: bool = False,
+    released: Collection[int] = (),
 ) -> dict[Decimal, Decimal]:
     """*amount* spread over the headroom, capped to it; the result sums to
     less than *amount* when the headroom cannot hold it all."""
     left = {
         rate: gross
-        for rate, gross in headroom(order, settled_only=settled_only).items()
+        for rate, gross in headroom(
+            order, settled_only=settled_only, released=released
+        ).items()
         if gross > 0
     }
     if not left:
@@ -154,6 +166,29 @@ def has_rates(order: Order) -> bool:
     """Whether there is anything to allocate against: an order without
     taxable lines (and no receipt) has no rates, and owes no credit."""
     return bool(_base(order)[0])
+
+
+def goods_returned(order: Order, *, before: datetime | None = None) -> Decimal:
+    """The goods the provider's money has paid back: what the order's
+    sources that moved before *before* (``None``: every one that moved)
+    allocated to goods, and the part no credit could cover. Gift card and
+    points returns are not the provider's money, and a chargeback whose
+    goods did not come back returned none. A refund's duplicate-payment part
+    owes no credit and is no goods: the order is still for what the ledger
+    holds less this, so the excess is what is above it
+    (``PaymentLedger.excess_held``)."""
+    rows = (
+        CreditAllocation.objects.filter(order=order, moved_at__isnull=False)
+        .exclude(refund_attempt__kind=RefundAttemptKind.STORED_VALUE)
+        .exclude(decision__goods_returned=False)
+    )
+    if before is not None:
+        rows = rows.filter(moved_at__lt=before)
+    totals = rows.aggregate(
+        amount=Coalesce(Sum("amount"), _ZERO),
+        uncovered=Coalesce(Sum("uncovered"), _ZERO),
+    )
+    return Decimal(totals["amount"]) + Decimal(totals["uncovered"])
 
 
 def pieces_of(allocation: Mapping[Decimal, Decimal]) -> list[Piece]:
@@ -340,6 +375,7 @@ def allocate_source(
     moved_at: datetime | None,
     excess: Decimal = _ZERO,
     excess_if_claims_fail: Decimal | None = None,
+    reversed_: Decimal = _ZERO,
     **source,
 ) -> bool:
     """Allocate a source that was booked without a claim (a provider's
@@ -348,7 +384,12 @@ def allocate_source(
     one caller.
 
     *excess* of *amount* gives back a duplicate payment
-    (``PaymentLedger.refundable_excess``) and owes nothing.
+    (``PaymentLedger.refundable_excess``) and owes nothing. *amount* is what
+    was booked; *reversed_* is what the provider reported failed of it. A
+    reversal comes off the duplicate part first, exactly as
+    :func:`scale` does for a source decided before it was reversed, so the
+    source owes the same whenever it is decided: its goods part, at most
+    what stands.
 
     What a source owes depends on two things a claim still PENDING holds
     back: the room on the receipt and the duplicate-payment excess. Both
@@ -365,7 +406,7 @@ def allocate_source(
     """
     if excess_if_claims_fail is not None and excess_if_claims_fail > excess:
         return False
-    owed = amount - min(excess, amount)
+    owed = min(amount - min(excess, amount), amount - reversed_)
     taxable = has_rates(order)
     pieces: list[Piece] = []
     if owed > 0 and taxable:
@@ -414,6 +455,7 @@ class Owing:
     before: PaymentTransaction | None = None
     exclude: tuple[int, ...] = ()
     has_excess: bool = True
+    reversed_: Decimal = _ZERO
 
 
 def owing_sources(order: Order | None = None) -> list[Owing]:
@@ -431,16 +473,17 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
         allocations__isnull=True,
         **scope,
     ):
-        amount = Decimal(refund.amount.amount) - reversed_of(refund)
-        if amount > 0:
+        failed = reversed_of(refund)
+        if Decimal(refund.amount.amount) - failed > 0:
             out.append(
                 Owing(
                     refund.order_id,
                     refund.created_at,
                     "r",
                     {"refund": refund},
-                    amount,
+                    Decimal(refund.amount.amount),
                     before=refund,
+                    reversed_=failed,
                 )
             )
     attempts = (
@@ -467,12 +510,9 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
     )
     for attempt in attempts:
         refund = attempt.refund
-        amount = (
-            Decimal(refund.amount.amount) - reversed_of(refund)
-            if refund
-            else Decimal(attempt.amount.amount)
-        )
-        if amount > 0:
+        amount = Decimal((refund or attempt).amount.amount)
+        failed = reversed_of(refund) if refund else _ZERO
+        if amount - failed > 0:
             out.append(
                 Owing(
                     attempt.order_id,
@@ -482,6 +522,7 @@ def owing_sources(order: Order | None = None) -> list[Owing]:
                     amount,
                     before=refund,
                     exclude=(attempt.pk,),
+                    reversed_=failed,
                 )
             )
     decisions = ChargebackDecision.objects.filter(
@@ -555,10 +596,20 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
             moved_at=owing.moment,
             excess=excess,
             excess_if_claims_fail=max_excess,
+            reversed_=owing.reversed_,
             **owing.source,
         ):
             break
         done += 1
+    if done:
+        # What the order is still for moved with the goods just decided.
+        newest = (
+            PaymentTransaction.objects.filter(order=order)
+            .order_by("created_at", "pk")
+            .last()
+        )
+        if newest is not None:
+            PaymentLedger.sync_overcharge(order, newest)
     if (
         done
         and request_credits
@@ -580,13 +631,21 @@ def undecided(order: Order) -> bool:
 
 
 def uncovered_orders() -> QuerySet[CreditAllocation]:
-    """The allocations of sources whose money moved but that the receipt
-    had no room to credit (``uncovered``): refunds past what the receipt
-    holds, each for the store to look at until staff acknowledge it
-    (:func:`acknowledge_uncovered`)."""
+    """The allocations of sources whose books need a person: money that
+    moved but that the receipt had no room to credit (``uncovered``: refunds
+    past what the receipt holds), or a receipt left short by a refund the
+    provider later reversed (``understated``). Each is for the store to look
+    at until staff acknowledge it (:func:`acknowledge_uncovered`)."""
     return CreditAllocation.objects.filter(
-        uncovered__gt=0, uncovered_acknowledged_at__isnull=True
+        Q(uncovered__gt=0) | Q(understated__gt=0),
+        uncovered_acknowledged_at__isnull=True,
     )
+
+
+def understated_orders() -> QuerySet[CreditAllocation]:
+    """The rows among :func:`uncovered_orders` that leave the receipt short
+    of goods the customer kept (a refund netted from it was reversed)."""
+    return uncovered_orders().filter(understated__gt=0)
 
 
 def acknowledge_uncovered(order: Order, *, user) -> int:
@@ -594,28 +653,103 @@ def acknowledge_uncovered(order: Order, *, user) -> int:
     the accountant: the alert for it clears. Returns how many sources it
     cleared; the order's history records who did it."""
     cleared = uncovered_orders().filter(order=order)
-    amount = cleared.aggregate(total=Sum("uncovered"))["total"] or _ZERO
+    totals = cleared.aggregate(
+        uncovered=Sum("uncovered"), understated=Sum("understated")
+    )
     count = cleared.update(uncovered_acknowledged_at=timezone.now())
-    if count:
+    if count and totals["uncovered"]:
         OrderHistory.log_note(
             order=order,
             note=gettext(
                 "%(amount)s refunded beyond the receipt was acknowledged "
                 "as handled outside the credit documents by %(who)s."
             )
-            % {"amount": amount, "who": user},
+            % {"amount": totals["uncovered"], "who": user},
+        )
+    if count and totals["understated"]:
+        OrderHistory.log_note(
+            order=order,
+            note=gettext(
+                "%(amount)s of goods the receipt is short of, after a "
+                "refund was reversed, was acknowledged as corrected "
+                "outside the receipt by %(who)s."
+            )
+            % {"amount": totals["understated"], "who": user},
         )
     return count
 
 
-def blocking_claims(order: Order) -> QuerySet[RefundAttempt]:
-    """The refund claims still PENDING on *order*: what keeps a source
-    undecided, a receipt deferred and a new refund refused."""
-    return RefundAttempt.objects.live().filter(order=order).order_by("pk")
+def _blocks(order: Order, owing: Owing, claim: RefundAttempt) -> bool:
+    """Whether *claim* (PENDING) keeps *owing* undecided: whether releasing
+    it alone, with no refund, would change what the source owes."""
+    from order.payment_ledger import PaymentLedger
+
+    if claim.pk in owing.exclude:
+        return False
+    excess = _ZERO
+    if owing.has_excess:
+        excess = PaymentLedger.refundable_excess(
+            order, before=owing.before, exclude=owing.exclude
+        )
+        freed = PaymentLedger.refundable_excess(
+            order,
+            before=owing.before,
+            exclude=(*owing.exclude, claim.pk),
+        )
+        if freed > excess:
+            return True
+    owed = min(
+        owing.amount - min(excess, owing.amount),
+        owing.amount - owing.reversed_,
+    )
+    if owed <= 0 or not has_rates(order):
+        return False
+    return sum(
+        allocate_pro_rata(order, owed, released=(claim.pk,)).values(), _ZERO
+    ) > sum(allocate_pro_rata(order, owed).values(), _ZERO)
 
 
-def describe_blockers(order: Order) -> str:
-    """The blocking claims in words, for a message to staff."""
+def blocking_claims(order: Order) -> list[RefundAttempt]:
+    """The refund claims still PENDING that keep a source of *order*
+    undecided: a receipt deferred, a new refund refused. A claim that holds
+    nothing a waiting source needs is not one."""
+    waiting = owing_sources(order)
+    if not waiting:
+        return []
+    return [
+        claim
+        for claim in RefundAttempt.objects.live()
+        .filter(order=order)
+        .order_by("pk")
+        if any(_blocks(order, owing, claim) for owing in waiting)
+    ]
+
+
+def excess_holders(
+    order: Order, *, exclude: Collection[int] = ()
+) -> list[RefundAttempt]:
+    """The PENDING provider claims that hold part of the order's duplicate
+    payment: releasing one alone would leave more excess for a refund
+    claimed now."""
+    from order.payment_ledger import PaymentLedger
+
+    held = PaymentLedger.refundable_excess(order, exclude=exclude)
+    return [
+        claim
+        for claim in RefundAttempt.objects.live()
+        .filter(order=order, kind=RefundAttemptKind.PROVIDER)
+        .exclude(pk__in=exclude)
+        .order_by("pk")
+        if PaymentLedger.refundable_excess(order, exclude=(*exclude, claim.pk))
+        > held
+    ]
+
+
+def describe_blockers(
+    order: Order, claims: Sequence[RefundAttempt] | None = None
+) -> str:
+    """The claims that block, in words, for a message to staff (*claims*, or
+    those that keep a source of the order undecided)."""
     parts = [
         gettext("the %(kind)s refund of %(amount)s")
         % {
@@ -626,7 +760,7 @@ def describe_blockers(order: Order) -> str:
             ),
             "amount": claim.amount,
         }
-        for claim in blocking_claims(order)
+        for claim in (blocking_claims(order) if claims is None else claims)
     ]
     return ", ".join(parts)
 
@@ -662,7 +796,11 @@ def free_reversed(refund: PaymentTransaction) -> None:
     the money was never paid back, so its room on the receipt is free
     again, scaled by everything reversed so far. A credit document that
     was issued for the refund already stays, as the record of what was
-    sent to AADE, and the order is told so an accountant can look at it."""
+    sent to AADE, and the order is told so an accountant can look at it.
+    A refund the receipt netted (its money moved before the receipt) has no
+    credit to cancel: the receipt itself is then short of the goods the
+    customer kept, and the order and the store dashboard say so
+    (:func:`understated_orders`)."""
     attempt = RefundAttempt.objects.filter(refund=refund).first()
     source = (
         {"refund_attempt": attempt}
@@ -673,6 +811,15 @@ def free_reversed(refund: PaymentTransaction) -> None:
         RetailCredit.objects.filter(refund=refund)
         .exclude(mydata_status=MyDataStatus.CANCELED)
         .first()
+    )
+    before = _goods_of(**source)
+    first = CreditAllocation.objects.filter(**source).order_by("pk").first()
+    # Always scaled, a credit or not: the goods that came back are what the
+    # provider really paid (``goods_returned``). A credit already issued
+    # holds its room by its own document, not by this allocation.
+    scale(
+        max(Decimal(refund.amount.amount) - reversed_of(refund), _ZERO),
+        **source,
     )
     if credit is not None:
         OrderHistory.log_note(
@@ -688,10 +835,45 @@ def free_reversed(refund: PaymentTransaction) -> None:
             },
         )
         return
-    scale(
-        max(Decimal(refund.amount.amount) - reversed_of(refund), _ZERO),
-        **source,
+    invoice = Invoice.objects.filter(order=refund.order).first()
+    if (
+        invoice is None
+        or first is None
+        or first.moved_at is None
+        or first.moved_at >= invoice.created_at
+    ):
+        return
+    freed = before - _goods_of(**source)
+    if freed <= 0:
+        return
+    CreditAllocation.objects.filter(
+        pk=CreditAllocation.objects.filter(**source)
+        .order_by("pk")
+        .values("pk")[:1]
+    ).update(
+        understated=F("understated") + freed,
+        uncovered_acknowledged_at=None,
     )
+    OrderHistory.log_note(
+        order=refund.order,
+        note=gettext(
+            "The provider reported refund %(reference)s failed, but the "
+            "receipt had already been issued net of it: the receipt is "
+            "%(amount)s short of the goods the customer kept. An "
+            "accountant has to correct it."
+        )
+        % {"reference": refund.provider_reference, "amount": freed},
+    )
+
+
+def _goods_of(**source) -> Decimal:
+    """What one source holds of goods: its allocation and the part no
+    credit could cover."""
+    totals = CreditAllocation.objects.filter(**source).aggregate(
+        amount=Coalesce(Sum("amount"), _ZERO),
+        uncovered=Coalesce(Sum("uncovered"), _ZERO),
+    )
+    return Decimal(totals["amount"]) + Decimal(totals["uncovered"])
 
 
 def link_attempt(attempt: RefundAttempt, refund: PaymentTransaction) -> None:
@@ -716,7 +898,9 @@ __all__ = [
     "blocking_claims",
     "describe_blockers",
     "drop",
+    "excess_holders",
     "free_reversed",
+    "goods_returned",
     "has_rates",
     "headroom",
     "headroom_total",
@@ -733,4 +917,5 @@ __all__ = [
     "store",
     "uncovered_orders",
     "undecided",
+    "understated_orders",
 ]

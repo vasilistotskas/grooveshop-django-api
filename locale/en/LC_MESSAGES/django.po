@@ -42,6 +42,10 @@ msgid "%(amount)s at %(rate)s%% VAT"
 msgstr "%(amount)s at %(rate)s%% VAT"
 
 #, python-format
+msgid "%(amount)s of goods the receipt is short of, after a refund was reversed, was acknowledged as corrected outside the receipt by %(who)s."
+msgstr "%(amount)s of goods the receipt is short of, after a refund was reversed, was acknowledged as corrected outside the receipt by %(who)s."
+
+#, python-format
 msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 msgstr "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 
@@ -843,6 +847,9 @@ msgstr "A refund of this amount was sent to the payment provider a while ago and
 
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
+
+msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgstr "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
 
 msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
 msgstr "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
@@ -6747,6 +6754,9 @@ msgstr "Goods returned"
 msgid "Goods returned after a chargeback"
 msgstr "Goods returned after a chargeback"
 
+msgid "Goods the receipt is short of: a refund it was issued net of was reported failed by the provider afterwards; set on one row of the source."
+msgstr "Goods the receipt is short of: a refund it was issued net of was reported failed by the provider afterwards; set on one row of the source."
+
 msgid "Google Ads Add-Payment-Info Label"
 msgstr "Google Ads Add-Payment-Info Label"
 
@@ -11364,6 +11374,9 @@ msgstr "Receipts"
 msgid "Receipts rejected by myDATA"
 msgstr "Receipts rejected by myDATA"
 
+msgid "Receipts short of goods the customer kept"
+msgstr "Receipts short of goods the customer kept"
+
 msgid "Receipts waiting for a refund"
 msgstr "Receipts waiting for a refund"
 
@@ -14401,6 +14414,10 @@ msgstr "The provider report the fee was read from."
 msgid "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
 msgstr "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
 
+#, python-format
+msgid "The provider reported refund %(reference)s failed, but the receipt had already been issued net of it: the receipt is %(amount)s short of the goods the customer kept. An accountant has to correct it."
+msgstr "The provider reported refund %(reference)s failed, but the receipt had already been issued net of it: the receipt is %(amount)s short of the goods the customer kept. An accountant has to correct it."
+
 msgid "The provider's own id for the movement the fee is for."
 msgstr "The provider's own id for the movement the fee is for."
 
@@ -15339,6 +15356,9 @@ msgstr "Uncovered"
 
 msgid "Uncovered acknowledged at"
 msgstr "Uncovered acknowledged at"
+
+msgid "Understated"
+msgstr "Understated"
 
 msgid "Unexpected failure"
 msgstr "Unexpected failure"

@@ -160,6 +160,19 @@ class CreditAllocation(models.Model):
         ),
     )
 
+    understated = models.DecimalField(
+        _("Understated"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+        help_text=_(
+            "Goods the receipt is short of: a refund it was issued net of "
+            "was reported failed by the provider afterwards; set on one row "
+            "of the source."
+        ),
+    )
+
     objects = CreditAllocationQuerySet.as_manager()
 
     class Meta(TypedModelMeta):

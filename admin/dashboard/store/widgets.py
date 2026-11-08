@@ -748,6 +748,7 @@ class StoreAlerts(DashboardWidget):
         if self.request.user.has_perm("order.view_retailcredit"):
             alerts += self._reversed_credits()
             alerts += self._uncovered_refunds()
+            alerts += self._understated_receipts()
         if self.request.user.has_perm("order.change_order"):
             alerts += self._unknown_refunds()
             alerts += self._unfinished_returns()
@@ -957,6 +958,7 @@ class StoreAlerts(DashboardWidget):
         order_ids = [
             row["order_id"]
             for row in uncovered_orders()
+            .filter(uncovered__gt=0)
             .values("order_id")
             .annotate(latest=Max("pk"))
             .order_by("-latest")[:5]
@@ -986,21 +988,68 @@ class StoreAlerts(DashboardWidget):
             )
         ]
 
+    def _understated_receipts(self) -> list[dict[str, Any]]:
+        """Receipts left short of goods the customer kept: a refund the
+        receipt was issued net of was reported failed by the provider
+        afterwards. There is no credit document to cancel; an accountant
+        has to correct the receipt."""
+        from django.db.models import Max
+
+        from order.credit_allocation import understated_orders
+
+        order_ids = [
+            row["order_id"]
+            for row in understated_orders()
+            .values("order_id")
+            .annotate(latest=Max("pk"))
+            .order_by("-latest")[:5]
+        ]
+        if not order_ids:
+            return []
+        return [
+            _alert(
+                "warning",
+                "receipt_long",
+                _("Receipts short of goods the customer kept"),
+                _(
+                    "A refund these receipts were issued net of was "
+                    "reported failed by the payment provider, so the "
+                    "customer kept the goods: check each order's history "
+                    "and have the receipt corrected, then use Acknowledge "
+                    "refunded money beyond the receipt on the order to "
+                    "clear it."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in order_ids
+                ],
+                link=(
+                    self.changelist_url("order.Order", "books=beyond_receipt"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
     def _unfinished_returns(self) -> list[dict[str, Any]]:
         """Gift card and points returns a crash left unfinished. Nothing
         asks a provider about them and no outcome is recorded: repeating the
         refund of the same amount finishes them. Until then each holds its
         money, keeps the order's receipt waiting and refuses a new refund."""
+        from django.db.models import Min
+
         from order.models.refund_attempt import RefundAttempt
 
-        stalled = RefundAttempt.objects.stalled()
-        if not stalled.exists():
-            return []
-        orders = dict.fromkeys(
-            stalled.order_by("created_at").values_list("order_id", flat=True)[
-                :5
-            ]
+        # One entry per order, the one stalled longest first: grouped before
+        # the limit, or an order with several would fill the whole list.
+        orders = list(
+            RefundAttempt.objects.stalled()
+            .values("order_id")
+            .annotate(oldest=Min("created_at"))
+            .order_by("oldest", "order_id")
+            .values_list("order_id", flat=True)[:5]
         )
+        if not orders:
+            return []
         return [
             _alert(
                 "danger",

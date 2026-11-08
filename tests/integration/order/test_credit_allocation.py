@@ -103,17 +103,18 @@ class TestTheSplitIsFixedWhenClaimed:
 
         with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
             _receipt(order)
-            # A credit that took 60.00 of the receipt (booked outside any
-            # claim): the receipt, not the ledger, bounds the next credit.
+            # A credit that took 60.00 of the receipt stands although the
+            # provider reported the refund failed: the receipt, not the
+            # ledger (which holds all 100.00 again), bounds the next credit.
             PaymentLedger.record_refund(
                 order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
-            # And 100.00 paid twice: 40.00 of the 140.00 held is the
-            # duplicate, the other 100.00 is the sale, of which the receipt
-            # has 40.00 left.
-            _duplicate_payment(order)
+            create_pending_credits(order.id)
+            PaymentLedger.record_refund_reversal(
+                order, charge=charge, amount=_eur("60.00"), reference="re_60"
+            )
             with pytest.raises(PaymentError, match="holds only"):
-                OrderService.refund_order(order, amount=_eur("140.00"))
+                OrderService.refund_order(order, amount=_eur("100.00"))
 
         assert api.calls == []
         assert not order.refund_attempts.exists()
@@ -634,14 +635,17 @@ class TestEveryWritePathAllocatesFirst:
             _duplicate_payment(order)
             CreditAllocation.objects.all().delete()
 
-            # 40.00 of the 100.00 claimed is the duplicate; the other 60.00
-            # fits only if the older refund had not taken its 60.00 first.
-            with pytest.raises(PaymentError, match="holds only"):
-                OrderService.refund_order(order, amount=_eur("100.00"))
+            # 100.00 of the 140.00 claimed is the duplicate; the other 40.00
+            # is the sale's, and the older refund must have its 60.00 of the
+            # receipt first (it is allocated before the claim is judged).
+            OrderService.refund_order(order, amount=_eur("140.00"))
 
-        # Refused, and the refusal rolled the claim's step back with it.
-        assert api.calls == []
-        assert not order.refund_attempts.exists()
+        assert api.calls
+        old = order.payment_transactions.get(provider_reference="re_old")
+        assert credit_allocation.allocation_of(refund=old) == {
+            Decimal(24): Decimal("60.00")
+        }
+        assert credit_allocation.headroom_total(order) == Decimal("0.00")
 
 
 class TestTheHeadroomCountsTheCreditsThemselves:
@@ -1528,3 +1532,68 @@ class TestAStoredValueReturnLeftUnfinishedIsVisible:
             created_at=attempt.created_at - timedelta(days=1)
         )
         assert "Gift card and points refunds left unfinished" in titles()
+
+
+class TestOnlyTheClaimsThatBlockAreNamed:
+    def test_a_claim_that_holds_nothing_is_left_out(self):
+        from order.models.refund_attempt import RefundAttempt, RefundAttemptKind
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        blocker = _pending_claim(order, "60.00")
+        # A gift card and points return owes no credit and holds no room.
+        RefundAttempt.objects.create(
+            order=order,
+            kind=RefundAttemptKind.STORED_VALUE,
+            charge=None,
+            amount=_eur("10.00"),
+        )
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("50.00"), reference="re_50"
+        )
+
+        assert credit_allocation.undecided(order)
+        assert credit_allocation.blocking_claims(order) == [blocker]
+        said = credit_allocation.describe_blockers(order)
+        assert "payment provider" in said
+        assert "gift card" not in said
+
+
+class TestTheUnfinishedReturnsAlertListsEachOrderOnce:
+    def test_an_order_with_many_stalled_returns_does_not_hide_the_others(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from admin.dashboard.store import widgets
+        from order.models.refund_attempt import RefundAttempt, RefundAttemptKind
+        from tests.unit.admin.dashboard.test_store_widgets import (
+            _context,
+            _superuser,
+        )
+
+        first = _order(lines=(("24", "100.00"),))
+        Order.objects.filter(pk=first.pk).update(payment_id="pi_first")
+        first.payment_transactions.update(provider_reference="pi_first")
+        second = _order(lines=(("24", "100.00"),))
+        for order, count in ((first, 6), (second, 1)):
+            for _i in range(count):
+                RefundAttempt.objects.create(
+                    order=order,
+                    kind=RefundAttemptKind.STORED_VALUE,
+                    charge=None,
+                    amount=_eur("1.00"),
+                )
+        RefundAttempt.objects.update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+
+        [alert] = [
+            a
+            for a in _context(widgets.StoreAlerts, _superuser())["alerts"]
+            if str(a["title"]) == "Gift card and points refunds left unfinished"
+        ]
+
+        assert len(alert["items"]) == 2

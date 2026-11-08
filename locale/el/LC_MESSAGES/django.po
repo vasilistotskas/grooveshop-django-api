@@ -47,6 +47,10 @@ msgid "%(amount)s at %(rate)s%% VAT"
 msgstr "%(amount)s με ΦΠΑ %(rate)s%%"
 
 #, python-format
+msgid "%(amount)s of goods the receipt is short of, after a refund was reversed, was acknowledged as corrected outside the receipt by %(who)s."
+msgstr "Το ποσό %(amount)s ειδών που λείπει από την απόδειξη, μετά από αναστροφή επιστροφής, επιβεβαιώθηκε ως διορθωμένο εκτός απόδειξης από τον/την %(who)s."
+
+#, python-format
 msgid "%(amount)s refunded beyond the receipt was acknowledged as handled outside the credit documents by %(who)s."
 msgstr "Τα %(amount)s που επιστράφηκαν πέρα από την απόδειξη επιβεβαιώθηκαν από %(who)s ως ρυθμισμένα εκτός των πιστωτικών παραστατικών."
 
@@ -848,6 +852,9 @@ msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε 
 
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
+
+msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgstr "Μια επιστροφή, χωρίς την οποία εκδόθηκαν αυτές οι αποδείξεις, δηλώθηκε αποτυχημένη από τον πάροχο πληρωμών, άρα ο πελάτης κράτησε τα προϊόντα: ελέγξτε το ιστορικό κάθε παραγγελίας και φροντίστε να διορθωθεί η απόδειξη, και μετά χρησιμοποιήστε το Επιβεβαίωση επιστραμμένων χρημάτων πέραν της απόδειξης στην παραγγελία για να αφαιρεθεί."
 
 msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
 msgstr "Μια επιστροφή χρημάτων στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της παραμένει άγνωστο μετά την αυτόματη αναζήτηση. Ελέγξτε τον πίνακα ελέγχου του παρόχου και καταγράψτε αν έγινε. Δεσμεύει τα χρήματά της μέχρι να το κάνετε."
@@ -6753,6 +6760,9 @@ msgstr "Τα προϊόντα επέστρεψαν"
 msgid "Goods returned after a chargeback"
 msgstr "Επιστροφή προϊόντων μετά από chargeback"
 
+msgid "Goods the receipt is short of: a refund it was issued net of was reported failed by the provider afterwards; set on one row of the source."
+msgstr "Προϊόντα που λείπουν από την απόδειξη: μια επιστροφή, χωρίς την οποία εκδόθηκε, δηλώθηκε αργότερα αποτυχημένη από τον πάροχο· ορίζεται σε μία γραμμή της πηγής."
+
 msgid "Google Ads Add-Payment-Info Label"
 msgstr "Ετικέτα Προσθήκης Στοιχείων Πληρωμής Google Ads"
 
@@ -11372,6 +11382,9 @@ msgstr "Αποδείξεις"
 msgid "Receipts rejected by myDATA"
 msgstr "Αποδείξεις που απέρριψε το myDATA"
 
+msgid "Receipts short of goods the customer kept"
+msgstr "Αποδείξεις που υπολείπονται προϊόντων που κράτησε ο πελάτης"
+
 msgid "Receipts waiting for a refund"
 msgstr "Αποδείξεις σε αναμονή επιστροφής"
 
@@ -14404,6 +14417,10 @@ msgstr "Η αναφορά του παρόχου από την οποία δια�
 msgid "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
 msgstr "Ο πάροχος ανέφερε ότι η επιστροφή %(reference)s απέτυχε αφού εκδόθηκε το πιστωτικό της στοιχείο %(number)s. Το στοιχείο ισχύει μέχρι να το ακυρώσει ο λογιστής."
 
+#, python-format
+msgid "The provider reported refund %(reference)s failed, but the receipt had already been issued net of it: the receipt is %(amount)s short of the goods the customer kept. An accountant has to correct it."
+msgstr "Ο πάροχος δήλωσε ότι η επιστροφή %(reference)s απέτυχε, αλλά η απόδειξη είχε ήδη εκδοθεί χωρίς αυτήν: η απόδειξη υπολείπεται κατά %(amount)s των προϊόντων που κράτησε ο πελάτης. Πρέπει να τη διορθώσει ο λογιστής."
+
 msgid "The provider's own id for the movement the fee is for."
 msgstr "Το δικό του αναγνωριστικό του παρόχου για την κίνηση στην οποία αφορά η προμήθεια."
 
@@ -15342,6 +15359,9 @@ msgstr "Ακάλυπτο ποσό"
 
 msgid "Uncovered acknowledged at"
 msgstr "Το ακάλυπτο ποσό επιβεβαιώθηκε στις"
+
+msgid "Understated"
+msgstr "Υποτιμημένο ποσό"
 
 msgid "Unexpected failure"
 msgstr "Μη αναμενόμενη αποτυχία"

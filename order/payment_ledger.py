@@ -596,8 +596,12 @@ class PaymentLedger:
         amount: Money,
         provider: str,
         reference: str,
+        sync: bool = True,
         **extra,
     ) -> tuple[PaymentTransaction, bool]:
+        """Write one ledger row. *sync* is off for a row whose effect on the
+        overcharge flag is only known once its credit allocation is decided
+        (a refund, a reversal): the caller syncs afterwards."""
         row, created = PaymentTransaction.objects.get_or_create(
             provider=provider,
             provider_reference=reference,
@@ -616,7 +620,8 @@ class PaymentLedger:
             )
         if created:
             PaymentLedger._apply_pending_fee(row)
-            PaymentLedger.sync_overcharge(order, row)
+            if sync:
+                PaymentLedger.sync_overcharge(order, row)
         return row, created
 
     @classmethod
@@ -647,11 +652,13 @@ class PaymentLedger:
     @classmethod
     def sync_overcharge(cls, order: Order, trigger: PaymentTransaction) -> None:
         """Keep ``Order.overcharged_at`` equal to the ledger: set while
-        :meth:`held` exceeds what the order is for by more than the rounding
-        tolerance, cleared when refunds or a chargeback bring it back.
+        :meth:`held` exceeds what the order is STILL for by more than the
+        rounding tolerance (:meth:`excess_held`), cleared when refunds or a
+        chargeback bring it back.
         What the order is for is ``calculate_order_total_amount()``, the one
         figure every payment path charges and compares a capture with (lines
-        and extras, less promotion, loyalty and gift card). It is not
+        and extras, less promotion, loyalty and gift card), less the goods
+        already returned. It is not
         ``amount_due``: that column is a copy written at creation, and an
         order from the previous release can carry its default 0. The
         figure cannot move after placement: the admin and the API have no
@@ -680,14 +687,21 @@ class PaymentLedger:
     def excess_held(
         cls, order: Order, *, before: PaymentTransaction | None = None
     ) -> Decimal:
-        """What the ledger holds above what the order is for, zero while
-        within the rounding tolerance: the one definition of an overcharge
-        (:meth:`sync_overcharge` stamps it, :meth:`refundable_excess` reads
-        it). With *before*, the figure as it stood just before that ledger
-        row (:meth:`held`)."""
+        """What the ledger holds above what the order is STILL for, zero
+        while within the rounding tolerance: the one definition of an
+        overcharge (:meth:`sync_overcharge` stamps it,
+        :meth:`refundable_excess` reads it). What the order is still for is
+        its total less the goods already returned: a refund of goods lowers
+        what the ledger holds without making what is left a duplicate. With
+        *before*, the figure as it stood just before that ledger row
+        (:meth:`held`, and the goods returned before it)."""
         excess = (
             cls.held(order, before=before)
             - order.calculate_order_total_amount().amount
+            + credit_allocation.goods_returned(
+                order,
+                before=before.created_at if before is not None else None,
+            )
         )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
 
@@ -971,6 +985,7 @@ class PaymentLedger:
             reference=reference,
             charge=charge,
             description=description[:255],
+            sync=False,
         )
         if created:
             order.payment_status = cls.refund_status(order)
@@ -989,6 +1004,7 @@ class PaymentLedger:
             # now, oldest first: a refund nobody claimed (a provider's
             # webhook, a dashboard refund) over the headroom of this moment.
             credit_allocation.allocate_order(order)
+            cls.sync_overcharge(order, row)
         return row, created
 
     @staticmethod
@@ -1056,6 +1072,7 @@ class PaymentLedger:
             reference=reference,
             charge=charge,
             description=description[:255],
+            sync=False,
         )
         if created:
             order.payment_status = cls.refund_status(order)
@@ -1067,6 +1084,7 @@ class PaymentLedger:
             ).first()
             if refunded is not None:
                 credit_allocation.free_reversed(refunded)
+            cls.sync_overcharge(order, row)
         return row, created
 
     @staticmethod

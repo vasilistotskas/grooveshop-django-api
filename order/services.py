@@ -3624,14 +3624,7 @@ class OrderService:
             # An older refund still waits for a claim in flight to resolve
             # (``credit_allocation.allocate_order``): this claim must not
             # take the room it needs.
-            raise PaymentError(
-                _(
-                    "Another refund of this order is waiting for "
-                    "%(blockers)s to be settled, so nothing more can be "
-                    "refunded until then."
-                )
-                % {"blockers": credit_allocation.describe_blockers(order)}
-            )
+            raise OrderService._waiting_error(order)
         attempts = [
             RefundAttempt.objects.create(
                 order=order,
@@ -3653,6 +3646,21 @@ class OrderService:
             )
         cls._allocate_claim(order, attempts)
         return attempts, None
+
+    @staticmethod
+    def _waiting_error(
+        order: Order, claims: Sequence[RefundAttempt] | None = None
+    ) -> PaymentError:
+        """The refusal of a refund that must wait for claims still PENDING
+        (*claims*, or those that keep a source of the order undecided)."""
+        return PaymentError(
+            _(
+                "Another refund of this order is waiting for "
+                "%(blockers)s to be settled, so nothing more can be "
+                "refunded until then."
+            )
+            % {"blockers": credit_allocation.describe_blockers(order, claims)}
+        )
 
     @staticmethod
     def _allocate_claim(
@@ -3683,9 +3691,22 @@ class OrderService:
         ]
         # A duplicate payment is paid back first, and giving it back is not
         # reversing the sale: that part owes no credit and takes no room.
-        excess = PaymentLedger.refundable_excess(
-            order, exclude=[a.pk for a in attempts]
-        )
+        ids = [a.pk for a in attempts]
+        excess = PaymentLedger.refundable_excess(order, exclude=ids)
+        if (
+            any(a.kind == RefundAttemptKind.PROVIDER for a in attempts)
+            and PaymentLedger.refundable_excess(
+                order, exclude=ids, claims_hold=False
+            )
+            > excess
+        ):
+            # A claim still PENDING holds part of the duplicate payment:
+            # what this refund owes depends on whether that claim is
+            # settled or declined, which nobody knows yet. Decide nothing
+            # on a guess: wait, as a refund booked without a claim does.
+            raise OrderService._waiting_error(
+                order, credit_allocation.excess_holders(order, exclude=ids)
+            )
         for i, attempt in enumerate(attempts):
             if attempt.kind != RefundAttemptKind.PROVIDER or excess <= 0:
                 continue

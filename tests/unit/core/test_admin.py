@@ -68,6 +68,10 @@ class ExportActionMixinTest(TestCase):
         # export_csv/export_xml enforce a MAX_EXPORT_ROWS cap via
         # queryset.count(); default to 0 so mocked querysets pass the guard.
         self.queryset.count.return_value = 0
+        # These tests cover the CSV/XML formatting over mocked fields;
+        # how the rows are queried (``_export_queryset``) is covered against
+        # the database in tests/integration/admin/test_export_reads_whole_rows.py.
+        self.mixin._export_queryset = lambda queryset, fields: queryset
 
         self.test_model_instance = MagicMock(spec=MockAdminModel)
         self.test_model_instance.name = "Test Model"

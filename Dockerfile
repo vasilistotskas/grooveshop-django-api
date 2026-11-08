@@ -1,4 +1,4 @@
-ARG PYTHON_VERSION=3.14.9
+ARG PYTHON_VERSION=3.15.2
 ARG ALPINE_VERSION=3.24
 ARG UV_VERSION=0.13.7
 # PostgreSQL major of the CLIENT tools baked into the runtime image.
@@ -29,12 +29,18 @@ FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
 ARG UV_IMAGE
 ARG APP_PATH
 
-RUN apk add --no-cache \
-    gcc musl-dev python3-dev linux-headers gettext \
-    # WeasyPrint native dependencies (PDF invoice rendering). Ship in
-    # the builder stage because pip resolves a source build for the
-    # Python bindings if these aren't present.
-    cairo-dev pango-dev gdk-pixbuf-dev libffi-dev
+# The image's own interpreter, in both stages. Without this, a
+# .python-version that differs from PYTHON_VERSION makes uv download its
+# own Python into /root, which the production stage does not copy: the
+# image builds and its venv has no interpreter. With it, such a mismatch
+# fails the build.
+ENV UV_PYTHON_DOWNLOADS=0
+
+# A compiler for the few dependencies that ship only an sdist for this
+# Python (PyYAML, djangorestframework-camel-case), and gettext for
+# compilemessages. WeasyPrint needs no headers: it is pure Python and
+# loads its native libraries at run time with cffi's dlopen.
+RUN apk add --no-cache gcc musl-dev linux-headers gettext
 
 COPY --from=uv /uv /uvx /bin/
 WORKDIR ${APP_PATH}
@@ -68,14 +74,15 @@ ARG POSTGRES_MAJOR
 RUN apk add --no-cache \
     postgresql${POSTGRES_MAJOR}-client \
     gzip \
-    # WeasyPrint runtime shared libraries — cairo/pango/gdk-pixbuf are
-    # dlopen'd at PDF-generation time, so the runtime image needs them
-    # even though the Python wheels live in the builder's .venv.
+    # The libraries WeasyPrint dlopens at PDF-generation time
+    # (weasyprint/text/ffi.py): pango brings gobject, harfbuzz,
+    # fontconfig and pangoft2; harfbuzz-subset embeds font subsets, and
+    # WeasyPrint warns at import without it.
     # Pango needs actual font files at runtime (without them you get
     # ``pango_font_describe: font != NULL`` criticals and blank PDFs);
     # ttf-dejavu covers Latin + Greek, font-noto-cjk covers CJK in case
     # a product name ever sneaks a Chinese character into an invoice.
-    cairo pango gdk-pixbuf libffi \
+    pango harfbuzz-subset \
     ttf-dejavu font-noto font-noto-cjk \
     fontconfig \
     && addgroup -g ${GID} -S app \

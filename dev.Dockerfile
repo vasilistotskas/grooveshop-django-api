@@ -1,10 +1,10 @@
-ARG PYTHON_VERSION=3.14.7
-ARG UV_VERSION=0.13.6
+ARG PYTHON_VERSION=3.15.2
+ARG UV_VERSION=0.13.7
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:${UV_VERSION}
 
 FROM $UV_IMAGE AS uv
 
-FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+FROM python:${PYTHON_VERSION}-slim-trixie AS base
 ARG UID=1000
 ARG GID=1000
 ARG APP_PATH=/home/app
@@ -16,8 +16,13 @@ ARG APP_PATH=/home/app
 # version mismatch".
 ARG POSTGRES_MAJOR=18
 
+# UV_PYTHON_DOWNLOADS=0: the image's own interpreter only. A
+# .python-version that differs from PYTHON_VERSION then fails the build
+# instead of uv downloading a second Python into $HOME, which the dev
+# stack's bind mount hides at run time.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    UV_PYTHON_DOWNLOADS=0 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     HOME=${APP_PATH}
@@ -31,23 +36,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     postgresql-client-${POSTGRES_MAJOR} \
-    postgresql-${POSTGRES_MAJOR} \
     gzip \
     # gettext tools (msgfmt / xgettext) for `makemessages` +
     # `compilemessages`. Prod Alpine ships these via apk `gettext`;
     # match that here so dev has parity with CI on translation work.
     gettext \
-    # WeasyPrint runtime shared libraries — cairo/pango/gdk-pixbuf are
-    # dlopen'd at PDF-generation time, so the image needs them even
-    # though the Python wheels live in the .venv. libglib2.0-0 is
-    # what provides libgobject-2.0.so.0.
-    libglib2.0-0 \
+    # The libraries WeasyPrint dlopens at PDF-generation time
+    # (weasyprint/text/ffi.py): gobject (from glib), pango, pangoft2,
+    # harfbuzz and harfbuzz-subset, and fontconfig below.
+    libglib2.0-0t64 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libharfbuzz0b \
-    libcairo2 \
-    libgdk-pixbuf-2.0-0 \
-    libffi8 \
+    libharfbuzz-subset0 \
     # Pango needs actual font files at runtime (without them you get
     # ``pango_font_describe: font != NULL`` criticals and blank PDFs);
     # dejavu covers Latin + Greek, noto-cjk covers CJK in case a

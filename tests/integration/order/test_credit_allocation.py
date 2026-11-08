@@ -1061,3 +1061,230 @@ class TestTheExcessIsReadAtTheSourcesOwnMoment:
         assert sum(credit_allocation.allocation_of(refund=second).values()) == (
             Decimal("50.00")
         )
+
+
+def _pending_claim(order, amount):
+    """A refund claim whose outcome is unknown: it stays PENDING."""
+    with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
+        OrderService.refund_order(order, amount=_eur(amount))
+    return order.refund_attempts.get(amount=amount)
+
+
+def _decline(claim):
+    claim.status = RefundAttemptStatus.DECLINED
+    claim.save(update_fields=["status"])
+
+
+class TestAReceiptWaitsForUndecidedMoney:
+    """A source a PENDING claim keeps undecided cannot be netted by the
+    receipt, and once the receipt row exists it is never credited: the
+    receipt is issued after the claim resolves."""
+
+    def test_the_receipt_is_deferred_then_issued_net(self):
+        from order.invoicing import ReceiptDeferred, generate_invoice
+        from order.models import Invoice
+        from order.tasks import allocate_credit_sources, generate_order_invoice
+        from tests.integration.order.test_mydata_lifecycle import (
+            _mark_shipped,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            claim = _pending_claim(order, "100.00")
+            late, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_30"
+            )
+            _mark_shipped(order)
+
+            with pytest.raises(ReceiptDeferred):
+                generate_invoice(order)
+            assert not Invoice.objects.filter(order=order).exists()
+            assert generate_order_invoice(order.id) is False
+            order.refresh_from_db()
+            assert order.metadata["receipt_deferred"] is True
+            # Still waiting: nothing is asked for.
+            allocate_credit_sources()
+            assert not Invoice.objects.filter(order=order).exists()
+
+            _decline(claim)
+            allocate_credit_sources()
+
+        invoice = Invoice.objects.get(order=order)
+        assert invoice.total.amount == Decimal("70.00")
+        order.refresh_from_db()
+        assert "receipt_deferred" not in order.metadata
+        assert credit_allocation.is_allocated(refund=late)
+
+    def test_a_duplicate_given_back_before_the_receipt_is_not_a_return(self):
+        from order.invoicing import generate_invoice
+        from tests.integration.order.test_mydata_lifecycle import (
+            _mark_shipped,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        duplicate = _duplicate_payment(order)
+        PaymentLedger.record_refund(
+            order, charge=duplicate, amount=_eur("100.00"), reference="re_dup"
+        )
+        _mark_shipped(order)
+
+        with mydata_enabled(), FakeAade():
+            invoice = generate_invoice(order)
+
+        assert invoice.total.amount == Decimal("100.00")
+
+
+class TestOneRuleForUndecided:
+    def test_excess_held_by_a_pending_claim_is_not_final(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            _duplicate_payment(order)
+            claim = _pending_claim(order, "100.00")
+            row, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("50.00"), reference="re_50"
+            )
+
+            assert not credit_allocation.is_allocated(refund=row)
+
+            # The claim never moved money: the duplicate is still there to
+            # be given back first, so the 50.00 is not the sale.
+            _decline(claim)
+            create_pending_credits(order.id)
+
+        assert credit_allocation.allocation_of(refund=row) == {}
+        assert not _credits(order).exists()
+
+    def test_a_younger_source_never_takes_the_room_an_older_one_waits_for(
+        self,
+    ):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            _pending_claim(order, "60.00")
+            older, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("50.00"), reference="re_50"
+            )
+            younger, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("40.00"), reference="re_40"
+            )
+
+            assert not credit_allocation.is_allocated(refund=older)
+            assert not credit_allocation.is_allocated(refund=younger)
+
+            # The claim settles: the 60.00 took its room, then the older
+            # refund gets what is left, and the younger finds none.
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("60.00"), reference="re_60"
+            )
+
+        assert sum(credit_allocation.allocation_of(refund=older).values()) == (
+            Decimal("40.00")
+        )
+        assert credit_allocation.allocation_of(refund=younger) == {}
+
+    def test_a_new_claim_is_refused_while_an_older_source_waits(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
+            _receipt(order)
+            _duplicate_payment(order)
+            _pending_claim(order, "60.00")
+            row, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("50.00"), reference="re_50"
+            )
+            assert not credit_allocation.is_allocated(refund=row)
+            calls = len(api.calls)
+
+            with pytest.raises(PaymentError, match="still being confirmed"):
+                OrderService.refund_order(order, amount=_eur("5.00"))
+
+        assert len(api.calls) == calls
+
+    def test_the_settlement_credit_waits_while_a_source_is_undecided(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            _pending_claim(order, "100.00")
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_30"
+            )
+            Order.objects.filter(pk=order.pk).update(payment_status="REFUNDED")
+
+            create_pending_credits(order.id)
+
+        assert not _credits(order).exists()
+
+    def test_two_decisions_decided_in_one_pass_note_the_cap_once(self):
+        from order.chargebacks import decide_chargebacks
+        from order.models.payment_transaction import PaymentTransaction
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("90.00"), reference="re_90"
+            )
+            for i in range(2):
+                PaymentTransaction.objects.create(
+                    order=order,
+                    kind=PaymentTransactionKind.CHARGEBACK,
+                    provider="stripe",
+                    provider_reference=f"dp_{i}",
+                    amount=_eur("8.00"),
+                    charge=charge,
+                )
+            decide_chargebacks(order.id, goods_returned=True, user=staff)
+
+        assert (
+            OrderHistory.objects.filter(
+                order=order, new_value__note__icontains="receipt holds"
+            ).count()
+            == 1
+        )
+
+
+class TestMoneyBeyondTheReceiptIsAnAlert:
+    def test_the_dashboard_lists_the_order(self):
+        from admin.dashboard.store import widgets
+        from tests.unit.admin.dashboard.test_store_widgets import (
+            _context,
+            _superuser,
+        )
+
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            charge = order.payment_transactions.get(
+                kind=PaymentTransactionKind.CHARGE
+            )
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("150.00"), reference="re_150"
+            )
+
+        [uncovered] = credit_allocation.uncovered_orders()
+        assert uncovered.uncovered == Decimal("50.00")
+        titles = [
+            str(alert["title"])
+            for alert in _context(widgets.StoreAlerts, _superuser())["alerts"]
+        ]
+        assert "Refunded money beyond the receipt" in titles

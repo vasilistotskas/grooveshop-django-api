@@ -207,11 +207,14 @@ def store(
     *,
     moved_at: datetime | None = None,
     nothing_owed: bool = False,
+    uncovered: Decimal = _ZERO,
     **source,
 ) -> None:
     """Write *pieces* as the allocation of one source (``refund_attempt=``,
     ``refund=`` or ``decision=``). *nothing_owed* says the source owes no
-    credit at all: it is marked allocated by a row of amount zero."""
+    credit at all: it is marked allocated by a row of amount zero.
+    *uncovered* is the part the receipt had no room for, kept on the
+    source's first row so the store can be told (:func:`uncovered_orders`)."""
     currency = order.amount_due.currency
     if nothing_owed:
         CreditAllocation.objects.create(
@@ -219,6 +222,7 @@ def store(
             rate=_ZERO,
             amount=Money(_ZERO, currency),
             moved_at=moved_at,
+            uncovered=uncovered,
             **source,
         )
         return
@@ -231,10 +235,10 @@ def store(
             quantity=piece.quantity,
             amount=Money(piece.amount, currency),
             moved_at=moved_at,
+            uncovered=uncovered if i == 0 else _ZERO,
             **source,
         )
-        for piece in pieces
-        if piece.amount > 0
+        for i, piece in enumerate(p for p in pieces if p.amount > 0)
     )
 
 
@@ -318,6 +322,7 @@ def allocate_source(
     *,
     moved_at: datetime | None,
     excess: Decimal = _ZERO,
+    excess_if_claims_fail: Decimal | None = None,
     **source,
 ) -> bool:
     """Allocate a source that was booked without a claim (a provider's
@@ -328,15 +333,21 @@ def allocate_source(
     *excess* of *amount* gives back a duplicate payment
     (``PaymentLedger.refundable_excess``) and owes nothing.
 
-    There are two kinds of "no room". Room taken by settled sources and
-    issued credits is final: the source is cut to what fits (a source that
-    owes nothing, or whose receipt has no taxable room, gets one row of
-    amount zero) and the order's history says so ONCE, here. Room held only
-    by claims still PENDING is temporary: the source gets NO row, which
-    says "not decided yet", and the call returns ``False``; it is decided
-    once those claims resolve (``allocate_order`` runs again). Returns
-    whether the source was decided.
+    What a source owes depends on two things a claim still PENDING holds
+    back: the room on the receipt and the duplicate-payment excess. Both
+    follow ONE rule. What settled sources and issued credits took is final:
+    the source is cut to what fits (a source that owes nothing, or whose
+    receipt has no taxable room, gets one row of amount zero), the part no
+    credit can cover is kept on the row (``uncovered``) and the order's
+    history says so ONCE, here. But when the PENDING claims decide the
+    outcome (more room, or more excess, if they were all released) the
+    source gets NO row, which says "not decided yet", and the call returns
+    ``False``; it is decided once those claims resolve. *excess_if_claims_fail*
+    is the excess with no claim holding any. Returns whether the source was
+    decided.
     """
+    if excess_if_claims_fail is not None and excess_if_claims_fail > excess:
+        return False
     owed = amount - min(excess, amount)
     taxable = has_rates(order)
     pieces: list[Piece] = []
@@ -350,8 +361,16 @@ def allocate_source(
             return False
         pieces = pieces_of(fit)
     held = sum((p.amount for p in pieces), _ZERO)
-    store(order, pieces, moved_at=moved_at, nothing_owed=not pieces, **source)
-    if taxable and held < owed:
+    uncovered = owed - held if taxable and held < owed else _ZERO
+    store(
+        order,
+        pieces,
+        moved_at=moved_at,
+        nothing_owed=not pieces,
+        uncovered=uncovered,
+        **source,
+    )
+    if uncovered > 0:
         OrderHistory.log_note(
             order=order,
             note=gettext(
@@ -475,16 +494,24 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
     first, each over what the ones before it left. The caller holds the
     order's row lock, and the sources are read inside it.
 
-    Every WRITE path that reads allocations calls this first (the receipt,
-    a claim, the credit documents, a booked refund, a decision), so the
-    allocation never depends on which of them ran first: what a release that
-    did not know about allocations booked, or what a failure left, is
-    allocated before anything else reads or takes the room. A read path (a
-    specimen render, the admin) never calls it. Returns how many sources
-    were decided. A write path issues the credits itself (or its caller
-    does, once the money is booked); the periodic task passes
-    *request_credits*, so a source decided on an order that already has a
-    receipt (one skipped for lack of an allocation) is credited now.
+    The write paths that read allocations call this first (the receipt, a
+    new claim, the credit documents, a booked refund; a chargeback decision
+    calls it once it has changed its decisions), so the allocation never
+    depends on which of them ran first: what a release that did not know
+    about allocations booked, or what a failure left, is allocated before
+    anything else reads or takes the room. A read path (a specimen render,
+    the admin) never calls it. Returns how many sources were decided. A
+    write path issues the credits itself (or its caller does, once the money
+    is booked); the periodic task passes *request_credits*, so a source
+    decided on an order that already has a receipt is credited now.
+
+    Sources are decided strictly oldest first, and the first one that
+    cannot be decided yet (:func:`allocate_source`: a claim still PENDING
+    holds the room or the excess it needs) stops the run: a younger source
+    never takes room an older one waits for, and the order of decisions is
+    the order of the money, whatever the order the claims resolve in. The
+    cost is that a younger source waits too, until the claim resolves and
+    the next run decides both.
     """
     from order.payment_ledger import PaymentLedger
 
@@ -494,19 +521,27 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
         key=lambda o: (o.moment is None, o.moment, o.rank),
     )
     for owing in pending:
-        excess = _ZERO
+        excess = max_excess = _ZERO
         if owing.has_excess:
             excess = PaymentLedger.refundable_excess(
                 order, before=owing.before, exclude=owing.exclude
             )
-        if allocate_source(
+            max_excess = PaymentLedger.refundable_excess(
+                order,
+                before=owing.before,
+                exclude=owing.exclude,
+                claims_hold=False,
+            )
+        if not allocate_source(
             order,
             owing.amount,
             moved_at=owing.moment,
             excess=excess,
+            excess_if_claims_fail=max_excess,
             **owing.source,
         ):
-            done += 1
+            break
+        done += 1
     if (
         done
         and request_credits
@@ -518,13 +553,24 @@ def allocate_order(order: Order, *, request_credits: bool = False) -> int:
     return done
 
 
-def allocate_decision(order: Order, decision: ChargebackDecision) -> None:
-    """The room a lost dispute's returned goods take on the receipt,
-    decided now: the chargeback spread over the headroom, capped to it
-    (:func:`allocate_order` decides the decision among the sources before
-    and after it)."""
-    CreditAllocation.objects.filter(decision=decision).delete()
-    allocate_order(order)
+def undecided(order: Order) -> bool:
+    """Whether *order* still has a source that owes a credit and has no
+    allocation. After :func:`allocate_order` ran, that is exactly a source
+    waiting for a claim still PENDING: nothing may rely on the order's
+    books being complete (a receipt, the settlement credit, a new claim)
+    until it resolves."""
+    return bool(owing_sources(order))
+
+
+def uncovered_orders() -> QuerySet[CreditAllocation]:
+    """The allocations of sources whose money moved but that the receipt
+    had no room to credit (``uncovered``): refunds past what the receipt
+    holds, each for the store to look at."""
+    return (
+        CreditAllocation.objects.filter(uncovered__gt=0)
+        .select_related("order")
+        .order_by("pk")
+    )
 
 
 def reversed_of(refund: PaymentTransaction) -> Decimal:
@@ -603,7 +649,6 @@ __all__ = [
     "ChargeKind",
     "Owing",
     "Piece",
-    "allocate_decision",
     "allocate_order",
     "allocate_pro_rata",
     "allocate_source",
@@ -625,4 +670,6 @@ __all__ = [
     "scale",
     "split_over_shares",
     "store",
+    "uncovered_orders",
+    "undecided",
 ]

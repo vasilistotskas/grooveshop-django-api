@@ -698,6 +698,7 @@ class PaymentLedger:
         *,
         before: PaymentTransaction | None = None,
         exclude: Collection[int] = (),
+        claims_hold: bool = True,
     ) -> Decimal:
         """The part of a refund that gives back a duplicate payment and not
         the sale: a refund pays the excess back first, so it owes no credit
@@ -708,14 +709,19 @@ class PaymentLedger:
         which already holds what every earlier refund took of it, and the
         PENDING provider claims (other than *exclude*) made before it, whose
         money is spoken for. Later money never changes it, so the same
-        refund gets the same excess whenever it is allocated. The caller
-        holds the order lock."""
+        refund gets the same excess whenever it is allocated. With
+        ``claims_hold=False`` no claim holds any of it: what the excess
+        would be if every PENDING claim were released without a refund
+        (``credit_allocation.allocate_source`` leaves a source undecided
+        when that is more). The caller holds the order lock."""
         claims = RefundAttempt.objects.live().filter(
             order=order, kind=RefundAttemptKind.PROVIDER
         )
         if before is not None:
             claims = claims.filter(created_at__lt=before.created_at)
-        in_flight = _total(claims.exclude(pk__in=exclude))
+        in_flight = (
+            _total(claims.exclude(pk__in=exclude)) if claims_hold else _ZERO
+        )
         return max(cls.excess_held(order, before=before) - in_flight, _ZERO)
 
     @staticmethod

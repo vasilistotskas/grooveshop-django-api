@@ -104,8 +104,13 @@ def decide_chargebacks(
                 continue
             changed.append(decision)
 
+        # A decision that changed starts over; every returned one is then
+        # decided in one pass, oldest first (``allocate_order``).
+        credit_allocation.drop(
+            decision__in=[decision.pk for decision in changed]
+        )
+        credit_allocation.allocate_order(order)
         for decision in changed:
-            credit_allocation.allocate_decision(order, decision)
             template = (
                 gettext(
                     "Chargeback %(amount)s: goods returned, the sale is "

@@ -371,7 +371,7 @@ def create_pending_credits(order_id: int) -> list[int]:
             chargeback_credit__isnull=True,
         ).order_by("decision__decided_at", "id"):
             # What the dispute may credit was capped when staff decided
-            # the goods came back (``allocate_decision``).
+            # the goods came back (``allocate_order``).
             allocation = credit_allocation.allocation_of(
                 decision=chargeback.decision
             )
@@ -390,10 +390,16 @@ def create_pending_credits(order_id: int) -> list[int]:
                 )
             )
 
-        if order.payment_status in SETTLEMENT_PAYMENT_STATUSES and not (
-            RetailCredit.objects.filter(
-                order=order, reason=CreditReason.SETTLEMENT
-            ).exists()
+        # The settlement takes what the receipt still holds, so it waits
+        # while a source is undecided: that source may need the room.
+        if (
+            order.payment_status in SETTLEMENT_PAYMENT_STATUSES
+            and not credit_allocation.undecided(order)
+            and not (
+                RetailCredit.objects.filter(
+                    order=order, reason=CreditReason.SETTLEMENT
+                ).exists()
+            )
         ):
             left = Decimal(invoice.total.amount) - _credited_total(invoice)
             if left > 0:

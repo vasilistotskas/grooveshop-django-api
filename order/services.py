@@ -3620,6 +3620,18 @@ class OrderService:
                     )
                 )
 
+        if credit_allocation.undecided(order):
+            # An older refund still waits for a claim in flight to resolve
+            # (``credit_allocation.allocate_order``): this claim must not
+            # take the room it needs.
+            raise PaymentError(
+                _(
+                    "A refund of this order is still being confirmed with "
+                    "the payment provider and another one is waiting for "
+                    "it, so nothing more can be refunded until it is "
+                    "settled."
+                )
+            )
         attempts = [
             RefundAttempt.objects.create(
                 order=order,

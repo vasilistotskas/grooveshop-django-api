@@ -139,6 +139,17 @@ class CreditAllocation(models.Model):
         blank=True,
         help_text=_("When the money moved; empty while it is in flight."),
     )
+    uncovered = models.DecimalField(
+        _("Uncovered"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+        help_text=_(
+            "The part of the source's money that moved but that the receipt "
+            "had no room to credit; set on one row of the source."
+        ),
+    )
 
     objects = CreditAllocationQuerySet.as_manager()
 

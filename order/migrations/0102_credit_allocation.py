@@ -22,6 +22,7 @@ class Migration(migrations.Migration):
                 ('amount_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3)),
                 ('amount', djmoney.models.fields.MoneyField(decimal_places=2, help_text='Gross, VAT included.', max_digits=11, verbose_name='Amount')),
                 ('moved_at', models.DateTimeField(blank=True, help_text='When the money moved; empty while it is in flight.', null=True, verbose_name='Moved at')),
+                ('uncovered', models.DecimalField(db_default=0, decimal_places=2, default=0, help_text="The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source.", max_digits=11, verbose_name='Uncovered')),
                 ('decision', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='allocations', to='order.chargebackdecision', verbose_name='Chargeback decision')),
                 ('item', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='credit_allocations', to='order.orderitem', verbose_name='Order line')),
                 ('order', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='credit_allocations', to='order.order', verbose_name='Order')),

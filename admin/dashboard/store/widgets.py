@@ -747,6 +747,7 @@ class StoreAlerts(DashboardWidget):
             alerts += self._mydata()
         if self.request.user.has_perm("order.view_retailcredit"):
             alerts += self._reversed_credits()
+            alerts += self._uncovered_refunds()
         if self.request.user.has_perm("order.change_order"):
             alerts += self._unknown_refunds()
         if self.request.user.has_perm("extra_settings.change_setting"):
@@ -938,6 +939,41 @@ class StoreAlerts(DashboardWidget):
                 link=(
                     self.changelist_url("order.RetailCredit"),
                     _("Open the credit documents"),
+                ),
+            )
+        ]
+
+    def _uncovered_refunds(self) -> list[dict[str, Any]]:
+        """Orders whose refunded money is more than their receipt could
+        credit: the part past the receipt has no credit document (a credit
+        for it would exceed the receipt, and AADE cannot check that), so an
+        accountant has to look at each. The order's history says how much."""
+        from order.credit_allocation import uncovered_orders
+
+        order_ids = list(
+            dict.fromkeys(
+                uncovered_orders().values_list("order_id", flat=True)[:5]
+            )
+        )
+        if not order_ids:
+            return []
+        return [
+            _alert(
+                "warning",
+                "receipt_long",
+                _("Refunded money beyond the receipt"),
+                _(
+                    "These orders were refunded more than their receipt "
+                    "holds. No credit document can be issued for the part "
+                    "past the receipt: check each order's history."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in order_ids
+                ],
+                link=(
+                    self.changelist_url("order.Order"),
+                    _("Open the orders"),
                 ),
             )
         ]

@@ -837,6 +837,9 @@ msgstr "A refund of this amount was already sent to the payment provider and its
 msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 msgstr "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 
+msgid "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
+msgstr "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
+
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
 
@@ -9413,6 +9416,10 @@ msgid "Order #%(order_id)s already has a receipt, so the decision that the goods
 msgstr "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
 
 #, python-format
+msgid "Order #%(order_id)s has a refund waiting for another refund that is still being confirmed, so its receipt is issued once that is settled."
+msgstr "Order #%(order_id)s has a refund waiting for another refund that is still being confirmed, so its receipt is issued once that is settled."
+
+#, python-format
 msgid "Order #%(order_id)s has no chargeback to decide."
 msgstr "Order #%(order_id)s has no chargeback to decide."
 
@@ -11594,6 +11601,9 @@ msgstr "Refunded Quantity"
 
 msgid "Refunded charge"
 msgstr "Refunded charge"
+
+msgid "Refunded money beyond the receipt"
+msgstr "Refunded money beyond the receipt"
 
 msgid "Refunded quantity cannot exceed the ordered quantity."
 msgstr "Refunded quantity cannot exceed the ordered quantity."
@@ -14278,6 +14288,9 @@ msgstr "The pages, theme and sections a store published with the page builder, a
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 
+msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
+msgstr "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
+
 #, python-format
 msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
 msgstr "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
@@ -14631,6 +14644,9 @@ msgstr "These changes did not go live at their time and your live pages are unch
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "These keys are reserved and cannot be sent: %(keys)s"
+
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
+msgstr "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
 
 msgid "These system components failed their health checks:"
 msgstr "These system components failed their health checks:"
@@ -15281,6 +15297,9 @@ msgstr "Unable to update this subscription."
 
 msgid "Unapprove selected comments"
 msgstr "Unapprove selected comments"
+
+msgid "Uncovered"
+msgstr "Uncovered"
 
 msgid "Unexpected failure"
 msgstr "Unexpected failure"

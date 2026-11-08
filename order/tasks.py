@@ -979,6 +979,30 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         return False
 
 
+#: ``Order.metadata`` key: the receipt waits for a refund claim to resolve.
+RECEIPT_DEFERRED_FLAG = "receipt_deferred"
+
+
+def _set_receipt_deferred(order_id: int, deferred: bool) -> None:
+    """Record, or clear, that the order's receipt waits for a refund claim
+    still PENDING (``order.invoicing.ReceiptDeferred``)."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(pk=order_id).first()
+        if (
+            order is None
+            or bool((order.metadata or {}).get(RECEIPT_DEFERRED_FLAG))
+            == deferred
+        ):
+            return
+        metadata = dict(order.metadata or {})
+        if deferred:
+            metadata[RECEIPT_DEFERRED_FLAG] = True
+        else:
+            metadata.pop(RECEIPT_DEFERRED_FLAG)
+        order.metadata = metadata
+        order.save(update_fields=["metadata"])
+
+
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
@@ -993,9 +1017,16 @@ def generate_order_invoice(self, order_id: int) -> bool:
     has nothing left to issue. ``generate_invoice`` refuses an order that
     is not a shipped receipt order (an invoice order is issued by hand in
     timologio) and a store that issues outside the platform, whoever
-    asked; that refusal is final, not retried.
+    asked; that refusal is final, not retried. An order whose refunds are not all
+    placed on the receipt yet (a claim still PENDING holds the room,
+    ``ReceiptDeferred``) is flagged ``receipt_deferred``; the periodic
+    ``allocate_credit_sources`` asks for the receipt again once they are.
     """
-    from order.invoicing import ReceiptNotIssuable, generate_invoice
+    from order.invoicing import (
+        ReceiptDeferred,
+        ReceiptNotIssuable,
+        generate_invoice,
+    )
 
     try:
         order = Order.objects.select_related(
@@ -1011,6 +1042,15 @@ def generate_order_invoice(self, order_id: int) -> bool:
 
     try:
         invoice = generate_invoice(order)
+    except ReceiptDeferred as waiting:
+        logger.info(
+            "Receipt of order #%s waits: %s",
+            order_id,
+            waiting,
+            extra={"order_id": order_id},
+        )
+        _set_receipt_deferred(order_id, True)
+        return False
     except ReceiptNotIssuable as refusal:
         logger.info(
             "No receipt issued for order #%s: %s",
@@ -1029,6 +1069,7 @@ def generate_order_invoice(self, order_id: int) -> bool:
             raise self.retry(exc=e) from e
         return False
 
+    _set_receipt_deferred(order_id, False)
     logger.info(
         "Receipt %s ready for order #%s", invoice.invoice_number, order_id
     )
@@ -1704,20 +1745,34 @@ def reconcile_pending_refunds() -> dict[str, int]:
     retry_jitter=True,
 )
 def allocate_credit_sources() -> int:
-    """Allocate every refund, refund attempt and returned chargeback that
-    owes a credit and has no allocation (``order.credit_allocation_backfill``).
+    """Decide every refund, refund attempt and returned chargeback that owes
+    a credit and has no allocation (``order.credit_allocation_backfill``),
+    and ask again for the receipts that were waiting on them.
 
-    Every source is allocated when it is created, except those a release
-    that did not know about allocations booked while it still served after
-    the migration; this closes that window. Idempotent: a source with an
-    allocation is left alone, and each order is handled under its lock.
-    Returns how many sources it allocated.
+    The write paths decide an order's unallocated sources before they read
+    or take room (``credit_allocation.allocate_order``); this decides what
+    none of them has touched since: what a release that did not know about
+    allocations booked, and a source that waited for a refund claim still
+    PENDING to resolve (settled, declined, or recorded by staff, whichever
+    path resolved it). When it decided sources of an order that has a
+    receipt, the credit documents are requested. An order flagged
+    ``receipt_deferred`` that has no undecided source left is issued its
+    receipt now (``generate_order_invoice``). Idempotent; each order is
+    handled under its lock. Returns how many sources it decided.
     """
+    from order import credit_allocation
     from order.credit_allocation_backfill import backfill_credit_allocations
 
     done = backfill_credit_allocations()
     if done:
         logger.info("allocate_credit_sources: allocated %s sources", done)
+    for order in Order.objects.filter(
+        **{f"metadata__{RECEIPT_DEFERRED_FLAG}": True}
+    ):
+        if hasattr(order, "invoice"):
+            _set_receipt_deferred(order.pk, False)
+        elif not credit_allocation.undecided(order):
+            dispatch_on_commit(generate_order_invoice, [order.pk])
     return done
 
 

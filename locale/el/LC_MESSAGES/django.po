@@ -842,6 +842,9 @@ msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη �
 msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της από τις προσπάθειες επιστροφής της παραγγελίας πριν ξαναδοκιμάσετε."
 
+msgid "A refund of this order is still being confirmed with the payment provider and another one is waiting for it, so nothing more can be refunded until it is settled."
+msgstr "Μια επιστροφή αυτής της παραγγελίας επιβεβαιώνεται ακόμη με τον πάροχο πληρωμών και μια άλλη περιμένει γι' αυτήν, οπότε δεν μπορεί να επιστραφεί κάτι ακόμη μέχρι να ολοκληρωθεί."
+
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
 
@@ -9421,6 +9424,10 @@ msgid "Order #%(order_id)s already has a receipt, so the decision that the goods
 msgstr "Η παραγγελία #%(order_id)s έχει ήδη απόδειξη, επομένως η απόφαση ότι τα προϊόντα επέστρεψαν δεν μπορεί πλέον να αλλάξει."
 
 #, python-format
+msgid "Order #%(order_id)s has a refund waiting for another refund that is still being confirmed, so its receipt is issued once that is settled."
+msgstr "Η παραγγελία #%(order_id)s έχει μια επιστροφή που περιμένει μια άλλη επιστροφή η οποία επιβεβαιώνεται ακόμη, οπότε η απόδειξή της θα εκδοθεί όταν αυτή ολοκληρωθεί."
+
+#, python-format
 msgid "Order #%(order_id)s has no chargeback to decide."
 msgstr "Η παραγγελία #%(order_id)s δεν έχει chargeback για απόφαση."
 
@@ -11602,6 +11609,9 @@ msgstr "Επιστραφείσα ποσότητα"
 
 msgid "Refunded charge"
 msgstr "Επιστραφείσα χρέωση"
+
+msgid "Refunded money beyond the receipt"
+msgstr "Επιστροφές χρημάτων πέρα από την απόδειξη"
 
 msgid "Refunded quantity cannot exceed the ordered quantity."
 msgstr "Η ποσότητα επιστροφής δεν μπορεί να υπερβαίνει την παραγγελθείσα ποσότητα."
@@ -14281,6 +14291,9 @@ msgstr "Οι σελίδες, το θέμα και οι ενότητες που �
 msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
 msgstr "Η τιμή paid_until στην οποία αναφέρεται το στάδιο ειδοποίησης. Ασυμφωνία με το τρέχον paid_until σημαίνει ότι το στάδιο είναι παρωχημένο και μηδενίζεται στην επόμενη εκτέλεση χρέωσης."
 
+msgid "The part of the source's money that moved but that the receipt had no room to credit; set on one row of the source."
+msgstr "Το μέρος των χρημάτων της πηγής που κινήθηκε αλλά που η απόδειξη δεν είχε περιθώριο να πιστώσει· ορίζεται σε μία γραμμή της πηγής."
+
 #, python-format
 msgid "The payment for gift card purchase %(purchase_uuid)s (%(amount)s) is being disputed. The card is voided automatically if the dispute is lost; consider disabling it now."
 msgstr "Η πληρωμή για την αγορά δωροκάρτας %(purchase_uuid)s (%(amount)s) αμφισβητείται. Η κάρτα ακυρώνεται αυτόματα αν χαθεί η αμφισβήτηση· σκεφτείτε να την απενεργοποιήσετε τώρα."
@@ -14634,6 +14647,9 @@ msgstr "Αυτές οι αλλαγές δεν δημοσιεύτηκαν στη�
 #, python-format
 msgid "These keys are reserved and cannot be sent: %(keys)s"
 msgstr "Αυτά τα κλειδιά είναι δεσμευμένα και δεν μπορούν να σταλούν: %(keys)s"
+
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history."
+msgstr "Αυτές οι παραγγελίες επιστράφηκαν περισσότερα από όσα κρατά η απόδειξή τους. Δεν μπορεί να εκδοθεί πιστωτικό παραστατικό για το μέρος πέρα από την απόδειξη: ελέγξτε το ιστορικό κάθε παραγγελίας."
 
 msgid "These system components failed their health checks:"
 msgstr "Αυτά τα στοιχεία του συστήματος απέτυχαν στους ελέγχους υγείας:"
@@ -15284,6 +15300,9 @@ msgstr "Δεν είναι δυνατή η ενημέρωση αυτής της �
 
 msgid "Unapprove selected comments"
 msgstr "Ανάκληση έγκρισης επιλεγμένων σχολίων"
+
+msgid "Uncovered"
+msgstr "Ακάλυπτο ποσό"
 
 msgid "Unexpected failure"
 msgstr "Μη αναμενόμενη αποτυχία"

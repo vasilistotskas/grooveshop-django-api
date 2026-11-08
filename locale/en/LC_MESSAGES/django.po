@@ -851,8 +851,8 @@ msgstr "A refund of this amount was sent to the payment provider a while ago and
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
 
-msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
-msgstr "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge receipt differences on the order to clear it."
+msgstr "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge receipt differences on the order to clear it."
 
 msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
 msgstr "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
@@ -1258,8 +1258,8 @@ msgstr "Account preferences"
 msgid "Account security notice"
 msgstr "Account security notice"
 
-msgid "Acknowledge refunded money beyond the receipt"
-msgstr "Acknowledge refunded money beyond the receipt"
+msgid "Acknowledge receipt differences"
+msgstr "Acknowledge receipt differences"
 
 msgid "Acknowledge the failure"
 msgstr "Acknowledge the failure"
@@ -2019,6 +2019,9 @@ msgstr "Best sellers"
 
 msgid "Better mobile experience"
 msgstr "Better mobile experience"
+
+msgid "Beyond or short of the receipt"
+msgstr "Beyond or short of the receipt"
 
 msgid "Billing"
 msgstr "Billing"
@@ -6744,6 +6747,9 @@ msgstr "Good news! Your order #%(order_id)s has been shipped and is on its way t
 
 msgid "Goods"
 msgstr "Goods"
+
+msgid "Goods claimed"
+msgstr "Goods claimed"
 
 msgid "Goods not yet settled"
 msgstr "Goods not yet settled"
@@ -11635,9 +11641,6 @@ msgstr "Refunded Amount"
 msgid "Refunded Quantity"
 msgstr "Refunded Quantity"
 
-msgid "Refunded beyond the receipt"
-msgstr "Refunded beyond the receipt"
-
 msgid "Refunded charge"
 msgstr "Refunded charge"
 
@@ -14298,6 +14301,9 @@ msgstr "The manufacturer's part number, as the manufacturer prints it. Use it fo
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "The marketing emails this store sends, each with whether your account's address still receives it."
 
+msgid "The money beyond the receipt and the goods short of it are acknowledged."
+msgstr "The money beyond the receipt and the goods short of it are acknowledged."
+
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 
@@ -14486,9 +14492,6 @@ msgstr "The refund was not made"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
-
-msgid "The refunded money beyond the receipt is acknowledged."
-msgstr "The refunded money beyond the receipt is acknowledged."
 
 msgid "The release whose versions this one restores."
 msgstr "The release whose versions this one restores."
@@ -14698,8 +14701,8 @@ msgstr "These keys are reserved and cannot be sent: %(keys)s"
 msgid "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
 msgstr "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
 
-msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
-msgstr "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge receipt differences on the order to clear it."
+msgstr "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge receipt differences on the order to clear it."
 
 msgid "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
 msgstr "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
@@ -15362,6 +15365,9 @@ msgstr "Uncovered acknowledged at"
 
 msgid "Understated"
 msgstr "Understated"
+
+msgid "Understated acknowledged at"
+msgstr "Understated acknowledged at"
 
 msgid "Unexpected failure"
 msgstr "Unexpected failure"
@@ -16187,6 +16193,9 @@ msgstr "What the provider reported"
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 
+msgid "What the source returned of goods before any reversal of it by the provider (what it owed after the duplicate payment); set on one row of the source."
+msgstr "What the source returned of goods before any reversal of it by the provider (what it owed after the duplicate payment); set on one row of the source."
+
 msgid "What the store earned after what the goods cost, the payment fees, the shipping you pay and your other expenses. A management figure, not the profit of your tax return."
 msgstr "What the store earned after what the goods cost, the payment fees, the shipping you pay and your other expenses. A management figure, not the profit of your tax return."
 
@@ -16228,6 +16237,9 @@ msgstr "When someone saw that it failed. A failed schedule shows on the store da
 
 msgid "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
 msgstr "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
+
+msgid "When staff acknowledged the understated receipt; it is then left out of the store dashboard alert."
+msgstr "When staff acknowledged the understated receipt; it is then left out of the store dashboard alert."
 
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
@@ -17319,6 +17331,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Account security"
 #~ msgstr "Account security"
 
+#~ msgid "Acknowledge refunded money beyond the receipt"
+#~ msgstr "Acknowledge refunded money beyond the receipt"
+
 #~ msgid "Active (Last 24h)"
 #~ msgstr "Active (Last 24h)"
 
@@ -17773,6 +17788,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Refund amount must be greater than 0"
 #~ msgstr "Refund amount must be greater than 0"
+
+#~ msgid "Refunded beyond the receipt"
+#~ msgstr "Refunded beyond the receipt"
 
 #~ msgid "Reminder Count"
 #~ msgstr "Reminder Count"

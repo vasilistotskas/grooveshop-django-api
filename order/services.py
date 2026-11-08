@@ -3693,19 +3693,30 @@ class OrderService:
         # reversing the sale: that part owes no credit and takes no room.
         ids = [a.pk for a in attempts]
         excess = PaymentLedger.refundable_excess(order, exclude=ids)
-        if (
-            any(a.kind == RefundAttemptKind.PROVIDER for a in attempts)
-            and PaymentLedger.refundable_excess(
+        provider_amount = sum(
+            (
+                a.amount.amount
+                for a in attempts
+                if a.kind == RefundAttemptKind.PROVIDER
+            ),
+            Decimal(0),
+        )
+        if provider_amount > 0 and min(
+            PaymentLedger.refundable_excess(
                 order, exclude=ids, claims_hold=False
-            )
-            > excess
-        ):
-            # A claim still PENDING holds part of the duplicate payment:
-            # what this refund owes depends on whether that claim is
-            # settled or declined, which nobody knows yet. Decide nothing
-            # on a guess: wait, as a refund booked without a claim does.
+            ),
+            provider_amount,
+        ) > min(excess, provider_amount):
+            # A claim still PENDING holds part of the duplicate payment
+            # this refund would take: what it owes depends on whether that
+            # claim is settled or declined, which nobody knows yet. Decide
+            # nothing on a guess: wait, as a refund booked without a claim
+            # does.
             raise OrderService._waiting_error(
-                order, credit_allocation.excess_holders(order, exclude=ids)
+                order,
+                credit_allocation.excess_holders(
+                    order, provider_amount, exclude=ids
+                ),
             )
         for i, attempt in enumerate(attempts):
             if attempt.kind != RefundAttemptKind.PROVIDER or excess <= 0:

@@ -148,6 +148,27 @@ class CreditAllocation(models.Model):
             "out of the store dashboard alert."
         ),
     )
+    understated_acknowledged_at = models.DateTimeField(
+        _("Understated acknowledged at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When staff acknowledged the understated receipt; it is then "
+            "left out of the store dashboard alert."
+        ),
+    )
+    goods_claimed = models.DecimalField(
+        _("Goods claimed"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+        help_text=_(
+            "What the source returned of goods before any reversal of it "
+            "by the provider (what it owed after the duplicate payment); "
+            "set on one row of the source."
+        ),
+    )
     uncovered = models.DecimalField(
         _("Uncovered"),
         max_digits=11,

@@ -629,9 +629,11 @@ class PaymentLedger:
         cls, order: Order, *, before: PaymentTransaction | None = None
     ) -> Decimal:
         """What the ledger holds for *order* now: received, less what was
-        paid back by refunds and what a lost dispute took. With *before*,
-        as it stood just before that ledger row (rows are ordered by
-        creation, ties by id)."""
+        paid back by refunds. A lost dispute is not taken off: what it took
+        is sale money lost, never a credit and never what a duplicate
+        payment is measured against, however staff decide its goods
+        (:meth:`excess_held`). With *before*, as it stood just before that
+        ledger row (rows are ordered by creation, ties by id)."""
         rows = PaymentTransaction.objects.filter(order=order)
         if before is not None:
             rows = rows.filter(
@@ -646,7 +648,6 @@ class PaymentLedger:
                     PaymentTransactionKind.REFUND_REVERSAL,
                 )
             ).aggregate(total=_taken_out())["total"]
-            - _total(rows.filter(kind=PaymentTransactionKind.CHARGEBACK))
         )
 
     @classmethod
@@ -692,16 +693,18 @@ class PaymentLedger:
         overcharge (:meth:`sync_overcharge` stamps it,
         :meth:`refundable_excess` reads it). What the order is still for is
         its total less the goods already returned: a refund of goods lowers
-        what the ledger holds without making what is left a duplicate. With
-        *before*, the figure as it stood just before that ledger row
-        (:meth:`held`, and the goods returned before it)."""
+        what the ledger holds without making what is left a duplicate. A
+        chargeback is in neither term: what a lost dispute took is sale
+        money lost, so a duplicate payment stays a duplicate whether the
+        dispute is undecided, kept or returned, and the figure never
+        depends on when staff decide. With *before*, the figure as it stood
+        just before that ledger row, every input read at that one cut
+        (:meth:`held`, and :func:`credit_allocation.goods_returned`, which
+        ignores reversals booked at or after it)."""
         excess = (
             cls.held(order, before=before)
             - order.calculate_order_total_amount().amount
-            + credit_allocation.goods_returned(
-                order,
-                before=before.created_at if before is not None else None,
-            )
+            + credit_allocation.goods_returned(order, before=before)
         )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
 

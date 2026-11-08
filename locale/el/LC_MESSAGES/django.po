@@ -714,6 +714,9 @@ msgstr "Ο κωδικός GTIN περιέχει μόνο ψηφία."
 msgid "A GTIN has 8, 12, 13 or 14 digits."
 msgstr "Ο κωδικός GTIN έχει 8, 12, 13 ή 14 ψηφία."
 
+msgid "A VAT rate with this value already exists."
+msgstr "Υπάρχει ήδη συντελεστής ΦΠΑ με αυτή την τιμή."
+
 msgid "A breakdown shows sales before returns, biggest first. For a product or a category it counts the goods only: shipping and fees belong to the order, not to a line. The export lists every group, period by period."
 msgstr "Η ανάλυση δείχνει τις πωλήσεις πριν από τις επιστροφές, με τις μεγαλύτερες πρώτες. Για προϊόν ή κατηγορία μετράνε μόνο τα προϊόντα: τα μεταφορικά και οι χρεώσεις ανήκουν στην παραγγελία, όχι σε μια γραμμή. Η εξαγωγή περιλαμβάνει κάθε ομάδα, ανά περίοδο."
 
@@ -14476,9 +14479,6 @@ msgstr "Ο επισκέπτης επέλεξε το πλαίσιο συγκατ�
 msgid "The voucher is already cancelled."
 msgstr "Το voucher έχει ήδη ακυρωθεί."
 
-msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
-msgstr "Η ομάδα χονδρικής που τιμολόγησε αυτή την παραγγελία δεν υπάρχει πια, οπότε δεν μπορεί να τιμολογηθεί νέα γραμμή για αυτήν."
-
 msgid "The wholesale pricing tier this business gets"
 msgstr "Η βαθμίδα τιμών χονδρικής που λαμβάνει αυτή η επιχείρηση"
 
@@ -18389,6 +18389,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "The storefront's page title and meta description for this page. Left empty, the page keeps its built-in title and the store description."
 #~ msgstr "Ο τίτλος σελίδας και η meta description του storefront για αυτή τη σελίδα. Αν μείνουν κενά, η σελίδα διατηρεί τον ενσωματωμένο τίτλο της και την περιγραφή του καταστήματος."
+
+#~ msgid "The wholesale group that priced this order no longer exists, so a new line cannot be priced for it."
+#~ msgstr "Η ομάδα χονδρικής που τιμολόγησε αυτή την παραγγελία δεν υπάρχει πια, οπότε δεν μπορεί να τιμολογηθεί νέα γραμμή για αυτήν."
 
 #~ msgid "Theme Metadata"
 #~ msgstr "Μεταδεδομένα Θέματος"

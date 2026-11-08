@@ -91,7 +91,7 @@ class TestBoundProperties:
         extra_product = ProductFactory(
             price=Money(Decimal("50.00"), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=100,
             active=True,
         )
@@ -114,7 +114,7 @@ class TestBindCart:
         product = ProductFactory(
             price=Money(Decimal("100.00"), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=10,
             active=True,
         )

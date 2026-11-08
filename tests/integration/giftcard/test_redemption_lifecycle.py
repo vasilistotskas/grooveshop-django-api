@@ -26,6 +26,7 @@ from product.factories import ProductFactory
 from tests.utils.legal import checkout_acceptance
 from tests.utils.shipping import enable_rate
 from user.factories import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -55,7 +56,7 @@ def checkout():
         stock=10,
         price=Money(Decimal(100), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=1)

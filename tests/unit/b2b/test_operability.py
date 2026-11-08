@@ -12,6 +12,7 @@ from b2b.models import PriceListItem
 from b2b.services import B2BPricingContext, B2BPricingService, B2BService
 from cart.factories import CartFactory, CartItemFactory
 from product.factories import ProductFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -23,7 +24,7 @@ def _bound_cart(price="100.00", quantity=1, **group_kwargs):
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         stock=100,
         active=True,
     )

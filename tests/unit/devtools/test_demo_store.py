@@ -40,6 +40,7 @@ from devtools.management.commands import seed_demo_store
 from product.enum.review import RateEnum
 from product.models import Product
 from tenant.validators import validate_business_hours_setting
+from vat.factories import VatFactory
 
 
 def _has_greek(value: object) -> bool:
@@ -1547,7 +1548,11 @@ class TestProductVariantGroups:
         old = self._group("charger-20w")
         for slug in ("demo-charger-20w-white", "demo-charger-20w-mint"):
             Product.objects.create(
-                slug=slug, price=1, active=True, variant_group=old
+                slug=slug,
+                price=1,
+                active=True,
+                variant_group=old,
+                vat=VatFactory(value=0),
             )
 
         seed()

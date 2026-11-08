@@ -258,10 +258,24 @@ write path and its rate cannot be deleted:
   the rows are updated in place, so the price records and search documents
   catch up in the nightly `reevaluate_price_episodes` sweep.
 
-The column is still nullable (`null=True`), so `Product.vat_percent` still reads
-a NULL as 0% and `with_vat_value_annotation` is its SQL twin; both are the only
-places left. The release after this one confirms `manage.py mydata_readiness`
-reports zero `vat=NULL` products in every store of staging and production, then
-makes the column NOT NULL (`AlterField` to `null=False`; a NOT NULL tightening
-is safe only once no pod of the previous release can INSERT without a rate) and
-deletes both NULL branches and the readiness check's NULL count.
+Both releases have shipped. Release 1 (v3.234.0: `product` 0068 backfill,
+0069 `PROTECT` and required on every write path) ran in production before
+release 2 tightened the column, because a NOT NULL tightening is safe only once
+no pod of the previous release can INSERT without a rate.
+
+- **`Product.vat` is NOT NULL in the database** (`product` 0070, the contract
+  step of 0069: `contract_of = [("product", "0069_product_vat_required")]`). It
+  REFUSES to run while any product in the schema (soft-deleted ones included)
+  holds a NULL, with an error naming the schema and the count, before it
+  alters anything; it never fills or guesses a rate. So `Product.vat_percent`
+  is `self.vat.value`, `with_vat_value_annotation` has no NULL case, and
+  `mydata_readiness` no longer counts NULLs: no code path handles a product
+  without a rate, because none can exist.
+- **`Vat.value` is unique** (`vat` 0010, `vat_value_unique`). A store holding
+  two rows of one rate makes the migration abort with an `IntegrityError`
+  naming the duplicated values and the schema, before anything is built: which
+  row stays is a person's call (move the products of one to the other in the
+  admin, delete the empty row, migrate again). The Vat admin form shows a
+  repeated rate as a form error. This is what makes "the standard row" a
+  lookup (`Vat.objects.get(value=STANDARD_VAT_RATE)` in the demo-store seed)
+  instead of a guess.

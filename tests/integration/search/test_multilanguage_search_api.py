@@ -26,6 +26,7 @@ from tests.utils.meilisearch import (
     unique_greek_word,
     unique_marker,
 )
+from vat.factories import VatFactory
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def make_product(names, *, price="10.00", active=True, **fields):
     return ProductFactory(
         price=Decimal(price),
         discount_percent=0,
-        vat=None,
+        vat=VatFactory(value=0),
         active=active,
         stock=5,
         translations=[

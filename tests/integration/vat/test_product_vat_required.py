@@ -5,10 +5,10 @@ left its products without one, and a product without one is priced, indexed,
 snapshotted onto its order lines and invoiced at 0%: a silently wrong Greek
 invoice. The write API and the admin accepted such a product as well.
 
-The column is still nullable in this release (the contract step makes it
-NOT NULL once no tenant holds a NULL), so what is pinned here is every
-WRITE path and the delete: nothing the code does can create a product
-without a rate, or take the rate from a product that has one.
+What is pinned here is every WRITE path and the delete: nothing the code does
+can create a product without a rate, or take the rate from a product that has
+one. The database's own refusal (NOT NULL, ``product`` 0070) is pinned in
+``test_vat_database_invariants``.
 """
 
 from __future__ import annotations
@@ -285,79 +285,6 @@ class TestDeletingARateInTheAdmin:
 
         assert response.status_code == 302
         assert not Vat.objects.filter(pk=unused.pk).exists()
-
-
-class TestTheBackfillMigration:
-    """``product`` 0068: products without a rate get the standard one."""
-
-    @pytest.fixture
-    def run(self):
-        import importlib
-
-        from django.apps import apps
-        from django.db import connection
-
-        module = importlib.import_module(
-            "product.migrations.0068_backfill_missing_vat"
-        )
-
-        class _Editor:
-            pass
-
-        _Editor.connection = connection
-
-        def _run():
-            module.set_standard_vat(apps, _Editor)
-
-        return _run
-
-    def test_it_fills_every_missing_rate_and_nothing_else(
-        self, run, vat, category
-    ):
-        reduced = Vat.objects.get_or_create(value=D("13.0"))[0]
-        without = ProductFactory.create_batch(2, category=category, vat=None)
-        kept = ProductFactory(category=category, vat=reduced)
-
-        run()
-
-        for product in without:
-            product.refresh_from_db()
-            assert product.vat_id == vat.pk
-        kept.refresh_from_db()
-        assert kept.vat_id == reduced.pk
-
-    def test_a_soft_deleted_product_is_filled_too(self, run, vat, category):
-        product = ProductFactory(category=category, vat=None)
-        product.delete()
-
-        run()
-
-        assert Product._base_manager.get(pk=product.pk).vat_id == vat.pk
-
-    def test_it_fails_loudly_without_a_standard_row(self, run, category):
-        Vat.objects.filter(value=D("24.0")).delete()
-        product = ProductFactory(category=category, vat=None)
-
-        with pytest.raises(RuntimeError, match="standard"):
-            run()
-
-        product.refresh_from_db()
-        assert product.vat_id is None
-
-    def test_a_store_with_nothing_to_fill_needs_no_row(self, run, category):
-        reduced = Vat.objects.get_or_create(value=D("13.0"))[0]
-        ProductFactory(category=category, vat=reduced)
-        Vat.objects.filter(value=D("24.0")).delete()
-
-        run()
-
-    def test_it_is_idempotent(self, run, vat, category):
-        ProductFactory(category=category, vat=None)
-
-        run()
-        run()
-
-        assert not Product.objects.filter(vat__isnull=True).exists()
 
 
 class TestTheStandardRate:

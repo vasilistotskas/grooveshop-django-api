@@ -42,6 +42,7 @@ from shipping.interfaces import (
 )
 from shipping.models import ShippingProvider
 from tests.utils.shipping import enable_rate
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -109,7 +110,7 @@ def _cart(*lines: tuple[str, int], category=None):
             product=ProductFactory(
                 price=Money(Decimal(price), "EUR"),
                 discount_percent=Decimal(0),
-                vat=None,
+                vat=VatFactory(value=0),
                 stock=100,
                 active=True,
                 weight=Weight(kg=1),

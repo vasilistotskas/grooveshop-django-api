@@ -250,10 +250,12 @@ def test_every_accordion_label_has_a_greek_translation():
 def test_greek_labels_load_between_the_pack_and_the_editor():
     """After the pack, or its empty values win; before the editor
     initialises, or its UI is already drawn."""
-    scripts = list(AdminTinyMCE().media._js)
+    # The rendered <script> tags, in page order. Django 6.1 keeps each
+    # entry of a Media's JS list as a ``Script`` object, not a string.
+    scripts = AdminTinyMCE().media.render_js()
 
     order = [
-        next(i for i, s in enumerate(scripts) if s.endswith(name))
+        next(i for i, tag in enumerate(scripts) if f'{name}"' in tag)
         for name in (
             "tinymce/tinymce.min.js",
             "tinymce/langs/el.js",

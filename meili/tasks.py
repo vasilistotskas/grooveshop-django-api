@@ -61,7 +61,6 @@ class MeiliTask(TenantTask):
     base=MeiliTask,
     bind=True,
     name="meili.index_document",
-    queue="meilisearch",
 )
 def index_document_task(
     self,
@@ -177,7 +176,6 @@ def index_document_task(
     base=MeiliTask,
     bind=True,
     name="meili.delete_document",
-    queue="meilisearch",
 )
 def delete_document_task(
     self,
@@ -233,7 +231,6 @@ def delete_document_task(
     base=MeiliTask,
     bind=True,
     name="meili.reindex_model",
-    queue="meilisearch",
     soft_time_limit=7200,  # 2 hours soft limit
     time_limit=7500,  # 2 hours 5 min hard limit
 )

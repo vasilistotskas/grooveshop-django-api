@@ -254,9 +254,7 @@ class TestAdmin:
         request._messages = FallbackStorage(request)
         request.POST = request.POST.copy()
         request.POST["post"] = "yes"
-        _func, _name, _desc = self._admin().get_actions(request)[
-            "delete_selected"
-        ]
+        _func = self._admin().get_actions(request)["delete_selected"].func
 
         response = _func(
             self._admin(),

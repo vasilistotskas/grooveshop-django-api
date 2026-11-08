@@ -503,7 +503,6 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         (
             None,
             {
-                "classes": ("wide",),
                 "fields": ("email", "username", "password1", "password2"),
             },
         ),
@@ -898,11 +897,11 @@ class UserAddressAdmin(BaseModelAdmin):
     fieldsets = (
         (
             _("Address Owner"),
-            {"fields": ("user", "title"), "classes": ("wide",)},
+            {"fields": ("user", "title")},
         ),
         (
             _("Contact Person"),
-            {"fields": ("first_name", "last_name"), "classes": ("wide",)},
+            {"fields": ("first_name", "last_name")},
         ),
         (
             _("Address Details"),
@@ -915,19 +914,17 @@ class UserAddressAdmin(BaseModelAdmin):
                     "country",
                     "region",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
             _("Additional Information"),
             {
                 "fields": ("floor", "location_type", "notes", "is_main"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Contact Information"),
-            {"fields": ("phone",), "classes": ("wide",)},
+            {"fields": ("phone",)},
         ),
         (
             _("System Information"),
@@ -989,14 +986,12 @@ class SubscriptionTopicAdmin(BaseTranslatableAdmin):
             _("Topic Information"),
             {
                 "fields": ("name", "slug", "description", "category"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Settings"),
             {
                 "fields": ("is_active", "is_default", "requires_confirmation"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1123,7 +1118,6 @@ class UserSubscriptionAdmin(BaseModelAdmin):
                     "source",
                     "language",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1139,7 +1133,6 @@ class UserSubscriptionAdmin(BaseModelAdmin):
                     "confirmed_at",
                     "confirmed_ip",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1151,7 +1144,6 @@ class UserSubscriptionAdmin(BaseModelAdmin):
                     "created_at",
                     "updated_at",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

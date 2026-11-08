@@ -829,7 +829,6 @@ class TestReviewSeed:
 
         from django.core import mail
 
-        settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
         monkeypatch.setattr(demo_store, "ensure_assets", lambda keys: {})
         monkeypatch.setattr(
             demo_store, "storage_name", lambda key: f"uploads/{key}.avif"

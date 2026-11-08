@@ -223,14 +223,12 @@ class ContactAdmin(RetentionNoticeMixin, ExportActionMixin, BaseModelAdmin):
             _("Contact Information"),
             {
                 "fields": ("name", "email", "company", "phone"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Message"),
             {
                 "fields": ("subject", "message"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -393,14 +391,12 @@ class FeedbackAdmin(RetentionNoticeMixin, ExportActionMixin, BaseModelAdmin):
             _("Submitter"),
             {
                 "fields": ("name", "email"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Feedback"),
             {
                 "fields": ("rating", "category", "message"),
-                "classes": ("wide",),
             },
         ),
         (

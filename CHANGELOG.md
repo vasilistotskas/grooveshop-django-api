@@ -3,6 +3,34 @@
 
 
 
+## v3.234.5 (2026-11-08)
+
+### Bug fixes
+
+* fix(deps): take Django 6.0.10 for its security fixes (#534)
+
+Django 6.0.10 (2026-11-03) fixes six security issues in 6.0.9. Two of
+them reach this API:
+
+- CVE-2026-108147: a multipart upload sent with
+  Content-Transfer-Encoding: base64 was buffered whole in memory,
+  whatever FILE_UPLOAD_MAX_MEMORY_SIZE says.
+- CVE-2026-113593: an empty and a missing Vary header produced the same
+  cache key. core/utils/views.py wraps cache_page around
+  vary_on_headers("Authorization", "Cookie"). The new keys mean one cache
+  miss per cached page after the deploy.
+
+CVE-2026-113733 does not reach us: UserAccount builds on the abstract
+AbstractBaseUser, and no other model with a password hash is in an
+admin. The three GIS issues do not either: there is no contrib.gis.
+
+Only the pin and the lock change.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`225adc0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/225adc0ca573213265048ddab6971154ff917f0c))
+
 ## v3.234.4 (2026-11-08)
 
 ### Bug fixes

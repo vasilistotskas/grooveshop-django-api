@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 import stripe
@@ -379,32 +380,40 @@ class TestRecordRefundOutcomeAction:
         _age(order)
         return order, _only_attempt(order)
 
+    def _overdue_order_stripe_made(self):
+        """Stripe made the refund (``re_1``) and the answer was lost."""
+        order = _order()
+        stripe_api = _stripe_unknown(order)
+        _age(order)
+        return order, _only_attempt(order), stripe_api
+
     def test_it_is_a_detail_action(self, order_admin):
         assert "record_refund_outcome" in order_admin.actions_detail
 
     def test_staff_record_a_refund_that_was_made(
         self, order_admin, staff_user, refunded_signals
     ):
-        order, attempt = self._overdue_order()
+        order, attempt, stripe_api = self._overdue_order_stripe_made()
         request = _post(
             staff_user,
             {
                 "attempt": attempt.pk,
                 "outcome": "settled",
-                "reference": "re_dash",
+                "reference": "re_1",
             },
         )
 
-        response = order_admin.record_refund_outcome(
-            request, object_id=order.pk
-        )
+        with stripe_api:
+            response = order_admin.record_refund_outcome(
+                request, object_id=order.pk
+            )
 
         assert response.headers["HX-Redirect"].endswith(
             f"/order/order/{order.pk}/change/"
         )
         attempt.refresh_from_db()
         [row] = _rows(order)
-        assert row.provider_reference == "re_dash"
+        assert row.provider_reference == "re_1"
         assert attempt.status == RefundAttemptStatus.SETTLED
         assert attempt.refund == row
         assert len(refunded_signals) == 1
@@ -412,7 +421,7 @@ class TestRecordRefundOutcomeAction:
             order=order, change_type="NOTE"
         ).latest("id")
         assert note.user == staff_user
-        assert "re_dash" in note.new_value["note"]
+        assert "re_1" in note.new_value["note"]
         assert _messages(request) == ["The refund outcome is recorded."]
 
     def test_staff_record_a_refund_that_was_not_made(
@@ -448,23 +457,147 @@ class TestRecordRefundOutcomeAction:
     def test_a_reference_already_in_the_ledger_is_refused(
         self, order_admin, staff_user
     ):
-        order, attempt = self._overdue_order()
+        order, attempt, stripe_api = self._overdue_order_stripe_made()
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
         )
         PaymentLedger.record_refund(
-            order, charge=charge, amount=_eur("5.00"), reference="re_dash"
+            order, charge=charge, amount=_eur("5.00"), reference="re_1"
         )
         request = _post(
             staff_user,
             {
                 "attempt": attempt.pk,
                 "outcome": "settled",
-                "reference": "re_dash",
+                "reference": "re_1",
             },
         )
 
-        order_admin.record_refund_outcome(request, object_id=order.pk)
+        with stripe_api:
+            order_admin.record_refund_outcome(request, object_id=order.pk)
+
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+        assert "already recorded" in _messages(request)[0]
+
+    @pytest.mark.parametrize(
+        "reference", ["re_typo", "re_other_payment", "re_other_amount"]
+    )
+    def test_a_reference_the_provider_cannot_confirm_is_refused(
+        self, order_admin, staff_user, reference
+    ):
+        order, attempt, stripe_api = self._overdue_order_stripe_made()
+        made = stripe_api.created[0]
+        stripe_api.created.append(
+            SimpleNamespace(
+                id="re_other_payment",
+                status="succeeded",
+                amount=made.amount,
+                currency="eur",
+                payment_intent="pi_somebody_else",
+                metadata=None,
+            )
+        )
+        stripe_api.created.append(
+            SimpleNamespace(
+                id="re_other_amount",
+                status="succeeded",
+                amount=1000,
+                currency="eur",
+                payment_intent=made.payment_intent,
+                metadata=None,
+            )
+        )
+        request = _post(
+            staff_user,
+            {
+                "attempt": attempt.pk,
+                "outcome": "settled",
+                "reference": reference,
+            },
+        )
+
+        with stripe_api:
+            order_admin.record_refund_outcome(request, object_id=order.pk)
+
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+        assert not _rows(order).exists()
+        assert "holds no refund with this reference" in _messages(request)[0]
+
+    def test_a_refund_the_provider_reports_failed_is_not_booked_as_made(
+        self, order_admin, staff_user
+    ):
+        order, attempt, stripe_api = self._overdue_order_stripe_made()
+        stripe_api.created[0].status = "failed"
+        request = _post(
+            staff_user,
+            {
+                "attempt": attempt.pk,
+                "outcome": "settled",
+                "reference": "re_1",
+            },
+        )
+
+        with stripe_api:
+            order_admin.record_refund_outcome(request, object_id=order.pk)
+
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.PENDING
+        assert "reports this refund failed" in _messages(request)[0]
+
+    def test_a_viva_reference_is_booked_as_viva_spells_it(
+        self, order_admin, staff_user
+    ):
+        order = _viva_order()
+        _viva_unknown(order)
+        _age(order)
+        attempt = _only_attempt(order)
+        request = _post(
+            staff_user,
+            {
+                "attempt": attempt.pk,
+                "outcome": "settled",
+                "reference": "refund-tx-1",
+            },
+        )
+
+        with FakeVivaApi(
+            by_order_code=_viva_listing(_viva_row("Refund-TX-1", 40.0))
+        ):
+            order_admin.record_refund_outcome(request, object_id=order.pk)
+
+        [row] = _rows(order)
+        assert row.provider_reference == "Refund-TX-1"
+
+    def test_a_reference_taken_in_another_case_is_refused(
+        self, order_admin, staff_user
+    ):
+        order = _viva_order()
+        _viva_unknown(order)
+        _age(order)
+        attempt = _only_attempt(order)
+        PaymentTransactionFactory(
+            order=order,
+            charge=order.payment_transactions.get(),
+            kind=PaymentTransactionKind.REFUND,
+            provider="viva_wallet",
+            provider_reference="REFUND-TX-1",
+            amount=_eur("5.00"),
+        )
+        request = _post(
+            staff_user,
+            {
+                "attempt": attempt.pk,
+                "outcome": "settled",
+                "reference": "refund-tx-1",
+            },
+        )
+
+        with FakeVivaApi(
+            by_order_code=_viva_listing(_viva_row("refund-tx-1", 40.0))
+        ):
+            order_admin.record_refund_outcome(request, object_id=order.pk)
 
         attempt.refresh_from_db()
         assert attempt.status == RefundAttemptStatus.PENDING

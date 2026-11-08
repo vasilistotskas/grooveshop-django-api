@@ -6,8 +6,8 @@ refunded from it and the money a lost dispute took back (a CHARGEBACK).
 Everything else is read from them: how much can still be refunded, which
 payment a refund goes against, and whether ``Order.payment_status`` is
 REFUNDED or PARTIALLY_REFUNDED (:meth:`PaymentLedger.refund_status`, the
-one place that decides it, for the in-app refund, the Stripe
-``charge.refunded`` webhook and the Viva reversal webhook alike). A
+one place that decides it, for the in-app refund, the
+Stripe refund webhook and the Viva reversal webhook alike). A
 chargeback lowers what is refundable but never moves ``payment_status``:
 the money is already gone, it was not paid back.
 
@@ -22,6 +22,7 @@ returning ``created=False``.
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, NamedTuple
@@ -304,7 +305,7 @@ class PaymentLedger:
     @staticmethod
     def refunded_on(charge: PaymentTransaction) -> Decimal:
         """What has been refunded out of this one payment (a chargeback is
-        not a refund: Stripe's ``charge.refunded`` reports refunds only),
+        not a refund),
         less refunds Stripe reported failed."""
         return charge.refunds.filter(
             kind__in=(
@@ -312,23 +313,6 @@ class PaymentLedger:
                 PaymentTransactionKind.REFUND_REVERSAL,
             )
         ).aggregate(total=_taken_out())["total"]
-
-    @staticmethod
-    def reversed_after(charge: PaymentTransaction, event_time) -> bool:
-        """Whether a refund on *charge* was reported failed after the
-        provider event stamped *event_time* was raised.
-
-        A cumulative refunded figure from before the failure still counts
-        the failed refund, and bringing the ledger up to it would book the
-        reversed money as refunded again. Providers do not deliver events
-        in order, so such an event is recognised by its own timestamp and
-        ignored. No timestamp, no judgement: ``False``."""
-        if not isinstance(event_time, datetime):
-            return False
-        return charge.refunds.filter(
-            kind=PaymentTransactionKind.REFUND_REVERSAL,
-            created_at__gt=event_time,
-        ).exists()
 
     @staticmethod
     def reserved_on(charge: PaymentTransaction) -> Decimal:
@@ -663,15 +647,48 @@ class PaymentLedger:
         here: which payment to give back is a person's call. *trigger* is
         the row that made the change, named in the alert.
         """
-        owed = order.calculate_order_total_amount()
-        excess = cls.held(order) - owed.amount
-        over = excess > PAYMENT_AMOUNT_TOLERANCE
+        excess = cls.excess_held(order)
+        over = excess > 0
         if over == (order.overcharged_at is not None):
             return
         order.overcharged_at = timezone.now() if over else None
         order.save(update_fields=["overcharged_at"])
         if over:
-            cls._alert_overcharge(order, trigger, Money(excess, owed.currency))
+            cls._alert_overcharge(
+                order, trigger, Money(excess, order.amount_due.currency)
+            )
+
+    @classmethod
+    def excess_held(cls, order: Order, *, add_back: Decimal = _ZERO) -> Decimal:
+        """What the ledger holds above what the order is for, zero while
+        within the rounding tolerance: the one definition of an overcharge
+        (:meth:`sync_overcharge` stamps it, :meth:`refundable_excess` reads
+        it). *add_back* is a refund just booked, to read the figure as it
+        stood before it."""
+        excess = (
+            cls.held(order) + add_back
+        ) - order.calculate_order_total_amount().amount
+        return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
+
+    @classmethod
+    def refundable_excess(
+        cls,
+        order: Order,
+        *,
+        add_back: Decimal = _ZERO,
+        exclude: Collection[int] = (),
+    ) -> Decimal:
+        """The part of the next refund that gives back a duplicate payment
+        and not the sale: a refund pays the excess back first, so it owes
+        no credit document and takes no room on the receipt. What PENDING
+        provider claims (other than *exclude*) already hold is spoken for.
+        The caller holds the order lock."""
+        in_flight = _total(
+            RefundAttempt.objects.live()
+            .filter(order=order, kind=RefundAttemptKind.PROVIDER)
+            .exclude(pk__in=exclude)
+        )
+        return max(cls.excess_held(order, add_back=add_back) - in_flight, _ZERO)
 
     @staticmethod
     def _alert_overcharge(
@@ -903,7 +920,13 @@ class PaymentLedger:
         elif created:
             # Nobody claimed this refund (a provider's webhook, a dashboard
             # refund): it is allocated when booked, over the headroom now.
-            credit_allocation.book_refund(order, row)
+            credit_allocation.book_refund(
+                order,
+                row,
+                excess=cls.refundable_excess(
+                    order, add_back=Decimal(row.amount.amount)
+                ),
+            )
         return row, created
 
     @staticmethod
@@ -912,7 +935,7 @@ class PaymentLedger:
     ) -> None:
         """The ledger holds the refund *attempt* was claimed for. A refund
         row already answering another attempt is not linked twice: this one
-        is settled without a link."""
+        is settled without a link, and without an allocation."""
         attempt.status = RefundAttemptStatus.SETTLED
         fields = ["status"]
         linked = (
@@ -927,9 +950,10 @@ class PaymentLedger:
         if linked:
             credit_allocation.link_attempt(attempt, refund)
         else:
-            credit_allocation.mark_moved(
-                refund.created_at, refund_attempt=attempt
-            )
+            # The refund is another attempt's and carries that attempt's
+            # allocation: this one's money did not move, so it holds no
+            # room and owes no credit.
+            credit_allocation.drop(refund_attempt=attempt)
 
     @classmethod
     def record_refund_reversal(

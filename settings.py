@@ -1696,6 +1696,12 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_reconcile_pending_refunds",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
+        # Refunds, attempts and chargeback decisions booked without an
+        # allocation (by a release that predates it) are allocated here.
+        "allocate-credit-sources": {
+            "task": "tenant.tasks.fanout_allocate_credit_sources",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
+        },
         "check-low-stock-products": {
             "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],

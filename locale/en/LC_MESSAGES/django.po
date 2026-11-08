@@ -14292,8 +14292,17 @@ msgstr "The payment method is free once the products, after discounts and exclud
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
 
+msgid "The payment provider cannot be reached to check this reference."
+msgstr "The payment provider cannot be reached to check this reference."
+
+msgid "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
+msgstr "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
+
 msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
 msgstr "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
+
+msgid "The payment provider reports this refund failed. Record the refund as not made instead."
+msgstr "The payment provider reports this refund failed. Record the refund as not made instead."
 
 msgid "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."
 msgstr "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."

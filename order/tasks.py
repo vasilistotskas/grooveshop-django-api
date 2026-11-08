@@ -1703,6 +1703,33 @@ def reconcile_pending_refunds() -> dict[str, int]:
     retry_backoff=True,
     retry_jitter=True,
 )
+def allocate_credit_sources() -> int:
+    """Allocate every refund, refund attempt and returned chargeback that
+    owes a credit and has no allocation (``order.credit_allocation_backfill``).
+
+    Every source is allocated when it is created, except those a release
+    that did not know about allocations booked while it still served after
+    the migration; this closes that window. Idempotent: a source with an
+    allocation is left alone, and each order is handled under its lock.
+    Returns how many sources it allocated.
+    """
+    from django.apps import apps
+
+    from order.credit_allocation_backfill import backfill_credit_allocations
+
+    done = backfill_credit_allocations(apps)
+    if done:
+        logger.info("allocate_credit_sources: allocated %s sources", done)
+    return done
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=TRANSIENT_ERRORS,
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     """Auto-cancel PENDING orders that will never be paid.
 

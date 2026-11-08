@@ -14295,8 +14295,17 @@ msgstr "Η μέθοδος πληρωμής είναι δωρεάν όταν τα
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακόμη, επομένως δεν υπάρχει κάτι προς επιστροφή."
 
+msgid "The payment provider cannot be reached to check this reference."
+msgstr "Ο πάροχος πληρωμών δεν είναι προσβάσιμος για να ελεγχθεί αυτός ο κωδικός."
+
+msgid "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
+msgstr "Ο πάροχος πληρωμών δεν έχει επιστροφή με αυτόν τον κωδικό για αυτήν την πληρωμή και αυτό το ποσό, ή δεν μπόρεσε να διαβαστεί. Ελέγξτε τον κωδικό στον πίνακα ελέγχου του παρόχου."
+
 msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
 msgstr "Ο πάροχος πληρωμών ανέφερε ότι αυτές οι επιστροφές απέτυχαν αφού εκδόθηκαν τα πιστωτικά τους στοιχεία. Τα χρήματα δεν επέστρεψαν στον πελάτη: ακυρώστε το στοιχείο αν εκδόθηκε κατά λάθος."
+
+msgid "The payment provider reports this refund failed. Record the refund as not made instead."
+msgstr "Ο πάροχος πληρωμών αναφέρει ότι αυτή η επιστροφή απέτυχε. Καταχωρίστε την επιστροφή ως μη ολοκληρωμένη."
 
 msgid "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."
 msgstr "Ο αναγνωριστικός κωδικός της επιστροφής από τον πάροχο πληρωμών ή, για μετρητά που επιστρέψατε εσείς, ο κωδικός της τραπεζικής μεταφοράς. Απαιτείται όταν η επιστροφή έγινε."

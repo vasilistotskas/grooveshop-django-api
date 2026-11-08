@@ -197,6 +197,37 @@ def record_outcome(
         raise PaymentError(_("This refund has already been resolved."))
 
 
+def _confirmed(attempt: RefundAttempt, reference: str) -> ProviderRefund:
+    """The provider's own refund for *reference*, or a refusal saying why
+    it cannot be booked."""
+    charge = attempt.charge
+    try:
+        provider = get_payment_provider(charge.provider)
+    except ImproperlyConfigured, ValueError:
+        raise PaymentError(
+            _("The payment provider cannot be reached to check this reference.")
+        ) from None
+    refund = provider.confirm_refund(
+        attempt.order, charge.provider_reference, attempt.amount, reference
+    )
+    if refund is None:
+        raise PaymentError(
+            _(
+                "The payment provider holds no refund with this reference "
+                "for this payment and amount, or could not be read. Check "
+                "the reference in the provider's dashboard."
+            )
+        )
+    if not refund.made:
+        raise PaymentError(
+            _(
+                "The payment provider reports this refund failed. Record "
+                "the refund as not made instead."
+            )
+        )
+    return refund
+
+
 def _record_settled(attempt: RefundAttempt, user, reference: str) -> None:
     charge = attempt.charge
     if not reference:
@@ -207,14 +238,22 @@ def _record_settled(attempt: RefundAttempt, user, reference: str) -> None:
             )
         )
     cash = is_cash_collection(charge)
-    if cash:
-        taken = PaymentLedger.has_cod_refund(attempt.order, charge, reference)
-    else:
-        taken = PaymentTransaction.objects.filter(
+    if not cash:
+        # What staff typed is never booked unchecked: the provider must
+        # hold this refund, for this payment and this amount, and have made
+        # it. It is booked as the provider spells it, the key the
+        # provider's own webhook books under.
+        confirmed = _confirmed(attempt, reference)
+        reference = confirmed.refund_id
+    taken = (
+        PaymentLedger.has_cod_refund(attempt.order, charge, reference)
+        if cash
+        else PaymentTransaction.objects.filter(
             kind=PaymentTransactionKind.REFUND,
             provider=charge.provider,
-            provider_reference=reference,
+            provider_reference__iexact=reference,
         ).exists()
+    )
     if taken:
         raise PaymentError(
             _("A refund with this reference is already recorded.")

@@ -3660,8 +3660,23 @@ class OrderService:
             else a.amount.amount
             for a in attempts
         ]
+        # A duplicate payment is paid back first, and giving it back is not
+        # reversing the sale: that part owes no credit and takes no room.
+        excess = PaymentLedger.refundable_excess(
+            order, exclude=[a.pk for a in attempts]
+        )
+        for i, attempt in enumerate(attempts):
+            if attempt.kind != RefundAttemptKind.PROVIDER or excess <= 0:
+                continue
+            taken = min(excess, owed[i])
+            owed[i] -= taken
+            excess -= taken
         total = sum(owed, Decimal(0))
-        allocation = credit_allocation.allocate_pro_rata(order, total)
+        allocation = (
+            credit_allocation.allocate_pro_rata(order, total)
+            if total > 0
+            else {}
+        )
         held = sum(allocation.values(), Decimal(0))
         if held < total:
             raise PaymentError(
@@ -3677,7 +3692,9 @@ class OrderService:
             credit_allocation.pieces_of(allocation), owed
         )
         for attempt, pieces in zip(attempts, per_share, strict=True):
-            credit_allocation.store(order, pieces, refund_attempt=attempt)
+            credit_allocation.store(
+                order, pieces, nothing_owed=not pieces, refund_attempt=attempt
+            )
 
     @staticmethod
     def _attempts_to_resume(

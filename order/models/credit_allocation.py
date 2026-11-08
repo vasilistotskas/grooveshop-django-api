@@ -40,9 +40,11 @@ class CreditAllocationQuerySet(models.QuerySet["CreditAllocation"]):
         not declined, and of a decision that the goods came back."""
         from order.models.refund_attempt import RefundAttemptStatus
 
-        return self.exclude(
-            refund_attempt__status=RefundAttemptStatus.DECLINED
-        ).exclude(decision__goods_returned=False)
+        return (
+            self.filter(amount__gt=0)
+            .exclude(refund_attempt__status=RefundAttemptStatus.DECLINED)
+            .exclude(decision__goods_returned=False)
+        )
 
 
 class CreditAllocation(models.Model):
@@ -55,6 +57,13 @@ class CreditAllocation(models.Model):
     claim is in flight, when it counts as moving now. A receipt already
     nets what moved before it was created, so only rows that move at or
     after it hold room on it.
+
+    A source that owes no credit at all (the part of a refund that gives a
+    duplicate payment back, a share fully reversed) has one row of amount
+    zero: the mark that it WAS allocated, so the backfill never allocates it
+    and the credit reconciliation can tell "owes nothing" from "never
+    allocated". A zero row holds no room (:meth:`CreditAllocationQuerySet
+    .counting`).
     """
 
     id = models.BigAutoField(primary_key=True)
@@ -135,8 +144,8 @@ class CreditAllocation(models.Model):
         verbose_name_plural = _("Credit allocations")
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(amount__gt=0),
-                name="credit_allocation_amount_positive",
+                condition=models.Q(amount__gte=0),
+                name="credit_allocation_amount_not_negative",
             ),
             models.CheckConstraint(
                 condition=(

@@ -204,6 +204,18 @@ class PaymentProvider(ABC):
         """
 
     @abstractmethod
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The refund the provider holds under *reference* when it is a
+        refund of exactly *amount* on *payment_id*, else ``None``: a
+        reference that does not exist, belongs to another payment or
+        amount, or a provider that could not be read. What staff typed is
+        never booked without this answer. The refund's ``refund_id`` is the
+        id as the provider writes it, the key its own webhook books under.
+        """
+
+    @abstractmethod
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
@@ -888,6 +900,34 @@ class StripePaymentProvider(PaymentProvider):
             return None
         return found
 
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The Stripe refund *reference* (``re_...``), retrieved by id: it
+        must be a refund of this PaymentIntent for exactly *amount*, and
+        ``succeeded``/``pending`` (made) or ``failed``/``canceled`` (not
+        made); ``requires_action`` is no decision."""
+        try:
+            refund = stripe.Refund.retrieve(reference, api_key=self.api_key)
+        except stripe.StripeError:
+            logger.exception(
+                "Stripe refund lookup failed",
+                extra={"payment_id": payment_id},
+            )
+            return None
+        if refund.payment_intent != payment_id:
+            return None
+        moved = money_from_minor_units(refund.amount, refund.currency)
+        if moved != amount:
+            return None
+        if refund.status in self._ACCEPTED_REFUND_STATUSES:
+            made = True
+        elif refund.status in self._FAILED_REFUND_STATUSES:
+            made = False
+        else:
+            return None
+        return ProviderRefund(refund_id=refund.id, amount=moved, made=made)
+
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
@@ -1473,6 +1513,26 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
             return None
         return list(found.values())
+
+    def confirm_refund(
+        self, order: Order, payment_id: str, amount: Money, reference: str
+    ) -> ProviderRefund | None:
+        """The Viva transaction *reference* among the refunds of *amount*
+        on *payment_id* (:meth:`find_refunds`): a child of the payment, a
+        refund or void, for exactly *amount*, finished or failed. Viva's
+        ids are compared without regard to case; the id returned is Viva's
+        own spelling, the one its webhook books under."""
+        refunds = self.find_refunds(
+            order, payment_id, amount, idempotency_key=""
+        )
+        return next(
+            (
+                r
+                for r in refunds or []
+                if r.refund_id.lower() == reference.lower()
+            ),
+            None,
+        )
 
     @staticmethod
     def _refund_child(

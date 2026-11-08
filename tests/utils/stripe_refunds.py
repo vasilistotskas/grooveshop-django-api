@@ -63,6 +63,10 @@ class FakeStripeRefunds:
             mock.patch(
                 "order.payment.stripe.Refund.list", side_effect=self._list
             ),
+            mock.patch(
+                "order.payment.stripe.Refund.retrieve",
+                side_effect=self._retrieve,
+            ),
             mock.patch("order.payment.Refund.sync_from_stripe_data"),
         ]
 
@@ -120,6 +124,16 @@ class FakeStripeRefunds:
         ]
         return SimpleNamespace(auto_paging_iter=lambda: iter(refunds))
 
+    def _retrieve(self, refund_id: str, **kwargs: Any) -> SimpleNamespace:
+        """``stripe.Refund.retrieve``: a refund by id, or Stripe's
+        "no such refund"."""
+        for refund in self.created:
+            if refund.id == refund_id:
+                return refund
+        raise stripe.InvalidRequestError(
+            f"No such refund: '{refund_id}'", "refund"
+        )
+
     @property
     def keys(self) -> list[str]:
         """The idempotency key of every call, in order."""
@@ -129,3 +143,34 @@ class FakeStripeRefunds:
     def amounts(self) -> list[int]:
         """The minor-unit amount of every call, in order."""
         return [call["amount"] for call in self.calls]
+
+
+def refund_event(
+    refund_id: str,
+    payment_intent: str,
+    cents: int,
+    *,
+    status: str = "succeeded",
+    currency: str = "eur",
+    event_type: str = "refund.created",
+    event_id: str | None = None,
+) -> mock.Mock:
+    """The ``refund.created`` (or ``refund.updated``) event Stripe sends for
+    a refund: ``data.object`` is the Refund (docs.stripe.com/api/events/types).
+    """
+    from djstripe.models import Event
+
+    event = mock.Mock(spec=Event)
+    event.id = event_id or f"evt_{refund_id}"
+    event.type = event_type
+    event.data = {
+        "object": {
+            "id": refund_id,
+            "object": "refund",
+            "payment_intent": payment_intent,
+            "amount": cents,
+            "currency": currency,
+            "status": status,
+        }
+    }
+    return event

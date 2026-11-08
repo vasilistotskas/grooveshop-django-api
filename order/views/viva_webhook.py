@@ -1714,7 +1714,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
 def _handle_reversal_created(order, event_data, transaction_id):
     """Book a refund Viva made against one of this order's payments.
 
-    Mirrors ``handle_stripe_charge_refunded``: the refund becomes a
+    Mirrors ``handle_stripe_refund_made``: the refund becomes a
     ``PaymentTransaction`` row, ``PaymentLedger.record_refund`` derives
     ``payment_status`` from the ledger's sums, and ``order_refunded`` fires
     so the refund email, live WS toast, and Meta CAPI Refund event all run.

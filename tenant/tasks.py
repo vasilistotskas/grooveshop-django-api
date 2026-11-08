@@ -144,9 +144,23 @@ def fanout_complete_paid_delivered_orders():
     return run_for_all_tenants("order.tasks.complete_paid_delivered_orders")
 
 
+# A suspended store's PENDING refunds still hold the customer's money until
+# resolved: the task only reads the provider and resolves idempotently, so
+# SUSPENDED tenants are included like the retention sweeps.
 @celery_app.task(base=TenantTask)
 def fanout_reconcile_pending_refunds():
-    return run_for_all_tenants("order.tasks.reconcile_pending_refunds")
+    return run_for_all_tenants(
+        "order.tasks.reconcile_pending_refunds", include_suspended=True
+    )
+
+
+# Sources booked by a release that did not know about allocations: allocated
+# once the new code runs, in every store (pure database work).
+@celery_app.task(base=TenantTask)
+def fanout_allocate_credit_sources():
+    return run_for_all_tenants(
+        "order.tasks.allocate_credit_sources", include_suspended=True
+    )
 
 
 @celery_app.task(base=TenantTask)

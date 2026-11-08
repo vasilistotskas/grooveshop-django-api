@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                 'verbose_name': 'Credit allocation',
                 'verbose_name_plural': 'Credit allocations',
                 'indexes': [models.Index(fields=['order', 'moved_at'], name='credit_alloc_order_ix')],
-                'constraints': [models.CheckConstraint(condition=models.Q(('amount__gt', 0)), name='credit_allocation_amount_positive'), models.CheckConstraint(condition=models.Q(models.Q(('decision__isnull', True), ('refund__isnull', True), ('refund_attempt__isnull', False)), models.Q(('decision__isnull', True), ('refund__isnull', False), ('refund_attempt__isnull', True)), models.Q(('decision__isnull', False), ('refund__isnull', True), ('refund_attempt__isnull', True)), _connector='OR'), name='credit_allocation_exactly_one_source')],
+                'constraints': [models.CheckConstraint(condition=models.Q(('amount__gte', 0)), name='credit_allocation_amount_not_negative'), models.CheckConstraint(condition=models.Q(models.Q(('decision__isnull', True), ('refund__isnull', True), ('refund_attempt__isnull', False)), models.Q(('decision__isnull', True), ('refund__isnull', False), ('refund_attempt__isnull', True)), models.Q(('decision__isnull', False), ('refund__isnull', True), ('refund_attempt__isnull', True)), _connector='OR'), name='credit_allocation_exactly_one_source')],
             },
         ),
     ]

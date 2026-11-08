@@ -302,6 +302,13 @@ def create_pending_credits(order_id: int) -> list[int]:
             ) - credit_allocation.reversed_of(refund)
             if amount <= 0:
                 continue
+            allocation = credit_allocation.allocation_of_refund(refund)
+            if credit_allocation.is_refund_allocated(refund):
+                # Only what the receipt holds is credited: the part of a
+                # refund that gave a duplicate payment back owes nothing.
+                amount = min(amount, sum(allocation.values(), _ZERO))
+                if amount <= 0:
+                    continue
             created.extend(
                 _guarded(
                     order,
@@ -309,7 +316,7 @@ def create_pending_credits(order_id: int) -> list[int]:
                     amount=amount,
                     reason=CreditReason.REFUND,
                     refund=refund,
-                    allocation=credit_allocation.allocation_of_refund(refund),
+                    allocation=allocation,
                 )
             )
 

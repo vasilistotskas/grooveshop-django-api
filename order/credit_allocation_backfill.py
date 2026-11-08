@@ -25,7 +25,9 @@ the historical models and a test runs it on the real ones (the lines' VAT
 come from the one live function, ``order.taxation.order_vat_lines``, as in
 ``order.vat_snapshot``). Idempotent, and safe while the previous release
 still writes: a source it books afterwards has no allocation and is
-reported by ``create_pending_credits`` instead of being credited wrongly.
+reported by ``create_pending_credits`` instead of being credited wrongly, and
+``order.tasks.allocate_credit_sources`` runs this function periodically on the
+live models to allocate it.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Q
 
 from order.discounts import allocate_capped
@@ -128,7 +131,11 @@ def _owing(models, invoices) -> dict[int, list]:
     for attempt in (
         models["attempt"]
         .objects.filter(
-            Q(refund__isnull=True) | Q(refund__credit_document__isnull=True),
+            # No refund yet: only a claim still in flight holds room. A
+            # SETTLED attempt without one answered a refund another attempt
+            # owns and holds nothing.
+            Q(refund__isnull=True, status="PENDING")
+            | Q(refund__isnull=False, refund__credit_document__isnull=True),
             kind="PROVIDER",
             credit_document__isnull=True,
             allocations__isnull=True,
@@ -185,30 +192,47 @@ def backfill_credit_allocations(apps) -> int:
         order = (
             models["order"].objects.prefetch_related("items").get(pk=order_id)
         )
-        try:
-            left = _headroom(models, order, invoices.get(order_id))
-        except ValueError:
-            logger.warning("Order %s: no VAT lines derivable", order_id)
-            continue
-        for moment, _rank, source, amount in sorted(
-            sources, key=lambda s: (s[0] is None, s[0], s[1])
+        with transaction.atomic():
+            done += _allocate_order(models, order, invoices, sources)
+    return done
+
+
+def _allocate_order(models, order, invoices, sources) -> int:
+    """Allocate one order's sources under its row lock, so a claim made
+    meanwhile sees them and they see its allocation."""
+    done = 0
+    order_id = order.pk
+    models["order"].objects.select_for_update().get(pk=order_id)
+    try:
+        left = _headroom(models, order, invoices.get(order_id))
+    except ValueError:
+        logger.warning("Order %s: no VAT lines derivable", order_id)
+        return 0
+    for moment, _rank, source, amount in sorted(
+        sources, key=lambda s: (s[0] is None, s[0], s[1])
+    ):
+        if (
+            models["allocation"]
+            .objects.filter(order_id=order_id, **source)
+            .exists()
         ):
-            room = {rate: gross for rate, gross in left.items() if gross > 0}
-            shares = allocate_capped(amount, room, room) if room else {}
-            rows = [
-                models["allocation"](
-                    order_id=order_id,
-                    rate=rate,
-                    amount=share,
-                    amount_currency=order.amount_due_currency,
-                    moved_at=moment,
-                    **source,
-                )
-                for rate, share in shares.items()
-                if share > 0
-            ]
-            models["allocation"].objects.bulk_create(rows)
-            for rate, share in shares.items():
-                left[rate] = left.get(rate, _ZERO) - share
-            done += 1
+            continue
+        room = {rate: gross for rate, gross in left.items() if gross > 0}
+        shares = allocate_capped(amount, room, room) if room else {}
+        rows = [
+            models["allocation"](
+                order_id=order_id,
+                rate=rate,
+                amount=share,
+                amount_currency=order.amount_due_currency,
+                moved_at=moment,
+                **source,
+            )
+            for rate, share in shares.items()
+            if share > 0
+        ]
+        models["allocation"].objects.bulk_create(rows)
+        for rate, share in shares.items():
+            left[rate] = left.get(rate, _ZERO) - share
+        done += 1
     return done

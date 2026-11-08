@@ -189,11 +189,22 @@ def store(
     pieces: Sequence[Piece],
     *,
     moved_at: datetime | None = None,
+    nothing_owed: bool = False,
     **source,
 ) -> None:
     """Write *pieces* as the allocation of one source (``refund_attempt=``,
-    ``refund=`` or ``decision=``)."""
+    ``refund=`` or ``decision=``). *nothing_owed* says the source owes no
+    credit at all: it is marked allocated by a row of amount zero."""
     currency = order.amount_due.currency
+    if nothing_owed:
+        CreditAllocation.objects.create(
+            order=order,
+            rate=_ZERO,
+            amount=Money(_ZERO, currency),
+            moved_at=moved_at,
+            **source,
+        )
+        return
     CreditAllocation.objects.bulk_create(
         CreditAllocation(
             order=order,
@@ -213,7 +224,7 @@ def store(
 def allocation_of(**source) -> dict[Decimal, Decimal]:
     """The gross per rate stored for one source."""
     out: dict[Decimal, Decimal] = {}
-    for row in CreditAllocation.objects.filter(**source):
+    for row in CreditAllocation.objects.filter(amount__gt=0, **source):
         out[row.rate] = out.get(row.rate, _ZERO) + Decimal(row.amount.amount)
     return out
 
@@ -225,6 +236,25 @@ def allocation_of_refund(refund: PaymentTransaction) -> dict[Decimal, Decimal]:
     if attempt is not None:
         return allocation_of(refund_attempt=attempt)
     return allocation_of(refund=refund)
+
+
+def drop(**source) -> None:
+    """Delete a source's allocation: it holds no room any more."""
+    CreditAllocation.objects.filter(**source).delete()
+
+
+def is_allocated(**source) -> bool:
+    """Whether a source was allocated at all, even to nothing."""
+    return CreditAllocation.objects.filter(**source).exists()
+
+
+def is_refund_allocated(refund: PaymentTransaction) -> bool:
+    """:func:`is_allocated` for the allocation a booked refund's credit is
+    issued from (its attempt's when an attempt claimed it, else its own)."""
+    attempt = RefundAttempt.objects.filter(refund=refund).first()
+    if attempt is not None:
+        return is_allocated(refund_attempt=attempt)
+    return is_allocated(refund=refund)
 
 
 def mark_moved(when: datetime, **source) -> None:
@@ -265,14 +295,28 @@ def _allocate_unclaimed(
     store(order, pieces, moved_at=when, **source)
 
 
-def book_refund(order: Order, refund: PaymentTransaction) -> None:
+def book_refund(
+    order: Order, refund: PaymentTransaction, *, excess: Decimal = _ZERO
+) -> None:
     """Allocate a refund that was booked without a claim (a provider's
-    webhook): pro rata over the headroom now, capped to it."""
-    if allocation_of(refund=refund) or not has_rates(order):
+    webhook): pro rata over the headroom now, capped to it. *excess* of it
+    gives back a duplicate payment (``PaymentLedger.refundable_excess``)
+    and is not allocated."""
+    if is_allocated(refund=refund) or not has_rates(order):
         return
-    _allocate_unclaimed(
-        order, Decimal(refund.amount.amount), refund.created_at, refund=refund
+    owed = Decimal(refund.amount.amount) - min(
+        excess, Decimal(refund.amount.amount)
     )
+    if owed <= 0:
+        store(
+            order,
+            [],
+            moved_at=refund.created_at,
+            nothing_owed=True,
+            refund=refund,
+        )
+        return
+    _allocate_unclaimed(order, owed, refund.created_at, refund=refund)
 
 
 def allocate_decision(order: Order, decision: ChargebackDecision) -> None:
@@ -369,10 +413,13 @@ __all__ = [
     "allocation_of",
     "allocation_of_refund",
     "book_refund",
+    "drop",
     "free_reversed",
     "has_rates",
     "headroom",
     "headroom_total",
+    "is_allocated",
+    "is_refund_allocated",
     "link_attempt",
     "mark_moved",
     "pieces_of",

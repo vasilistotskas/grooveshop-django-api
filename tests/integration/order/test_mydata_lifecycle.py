@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.admin.sites import AdminSite
@@ -24,7 +24,6 @@ from django.core import mail
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from djmoney.money import Money
-from djstripe.models import Event
 
 from order.admin import OrderAdmin
 from order.credit_documents import (
@@ -42,14 +41,14 @@ from order.models import Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.retail_credit import CreditReason
 from order.services import OrderService
-from order.signals.handlers import handle_stripe_charge_refunded
+from order.signals.handlers import handle_stripe_refund_made
 from order.tasks import generate_order_invoice, send_invoice_to_mydata
 from order.views.viva_webhook import _handle_reversal_created
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from tests.utils.mydata import FakeAade, mydata_enabled
 from tests.utils.orders import courier_cash_order
-from tests.utils.stripe_refunds import FakeStripeRefunds
+from tests.utils.stripe_refunds import FakeStripeRefunds, refund_event
 from tests.utils.viva import (
     REVERSAL_CREATED_EVENT,
     FakeVivaApi,
@@ -349,25 +348,13 @@ class TestCreditForEveryRefundSource:
         self._assert_one_credit(order, aade, "30.00")
 
     def test_a_stripe_dashboard_refund_webhook(self):
-        event = Mock(spec=Event)
-        event.id = "evt_dashboard_refund"
-        event.type = "charge.refunded"
-        event.data = {
-            "object": {
-                "id": "ch_x",
-                "payment_intent": PI,
-                "amount": 10000,
-                "amount_refunded": 4000,
-                "currency": "eur",
-                "refunded": False,
-            }
-        }
+        event = refund_event("re_dashboard", PI, 4000)
         with mydata_enabled(), FakeAade() as aade:
             order = self._shipped()
-            handle_stripe_charge_refunded(sender=None, event=event)
+            handle_stripe_refund_made(sender=None, event=event)
             # Stripe redelivers the event: nothing new on the ledger, so no
             # second document.
-            handle_stripe_charge_refunded(sender=None, event=event)
+            handle_stripe_refund_made(sender=None, event=event)
 
         self._assert_one_credit(order, aade, "40.00")
 

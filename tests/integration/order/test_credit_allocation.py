@@ -96,21 +96,23 @@ class TestTheSplitIsFixedWhenClaimed:
         self,
     ):
         order = _order(lines=(("24", "100.00"),))
-        from order.models.payment_transaction import PaymentTransaction
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
 
         with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
             _receipt(order)
-            # The ledger holds 100.00 more than the receipt (a second
-            # payment): the receipt, not the ledger, bounds the credit.
-            PaymentTransaction.objects.create(
-                order=order,
-                kind=PaymentTransactionKind.CHARGE,
-                provider="stripe",
-                provider_reference="pi_extra",
-                amount=_eur("50.00"),
+            # A credit that took 60.00 of the receipt (booked outside any
+            # claim): the receipt, not the ledger, bounds the next credit.
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("60.00"), reference="re_60"
             )
+            # And 100.00 paid twice: 40.00 of the 140.00 held is the
+            # duplicate, the other 100.00 is the sale, of which the receipt
+            # has 40.00 left.
+            _duplicate_payment(order)
             with pytest.raises(PaymentError, match="holds only"):
-                OrderService.refund_order(order, amount=_eur("150.00"))
+                OrderService.refund_order(order, amount=_eur("140.00"))
 
         assert api.calls == []
         assert not order.refund_attempts.exists()
@@ -705,3 +707,164 @@ class TestSmallCentsDoNotDependOnTheSettlementOrder:
                 Decimal(13): Decimal("0.49"),
             },
         }
+
+
+def _duplicate_payment(order, amount="100.00"):
+    """The customer paid again: the ledger holds *amount* more than the
+    order is for."""
+    from order.models.payment_transaction import PaymentTransaction
+
+    return PaymentTransaction.objects.create(
+        order=order,
+        kind=PaymentTransactionKind.CHARGE,
+        provider="stripe",
+        provider_reference="pi_duplicate",
+        amount=_eur(amount),
+    )
+
+
+class TestADuplicatePaymentOwesNoCredit:
+    """A refund pays the excess the ledger holds back first: that part gives
+    a duplicate payment back, it does not reverse the sale, so it takes no
+    room on the receipt and gets no credit document."""
+
+    def test_the_duplicate_is_refundable_after_the_sale_took_its_room(self):
+        order = _order(lines=(("24", "100.00"),))
+
+        with mydata_enabled(), FakeAade(), FakeStripeRefunds():
+            _receipt(order)
+            _duplicate_payment(order)
+            first = OrderService.refund_order(order, amount=_eur("100.00"))
+            second = OrderService.refund_order(order, amount=_eur("100.00"))
+            create_pending_credits(order.id)
+
+        assert first.complete
+        assert second.complete
+        a_first, a_second = order.refund_attempts.order_by("id")
+        # The first 100.00 gave the duplicate back: nothing owed.
+        assert credit_allocation.allocation_of(refund_attempt=a_first) == {}
+        assert credit_allocation.is_allocated(refund_attempt=a_first)
+        assert credit_allocation.allocation_of(refund_attempt=a_second) == {
+            Decimal(24): Decimal("100.00")
+        }
+        [credit] = _credits(order)
+        assert credit.total.amount == Decimal("100.00")
+
+    def test_a_duplicate_booked_by_a_webhook_is_not_allocated(self):
+        order = _order(lines=(("24", "100.00"),))
+
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            duplicate = _duplicate_payment(order)
+            row, _ = PaymentLedger.record_refund(
+                order,
+                charge=duplicate,
+                amount=_eur("100.00"),
+                reference="re_dup",
+            )
+            create_pending_credits(order.id)
+
+        assert credit_allocation.allocation_of(refund=row) == {}
+        assert credit_allocation.is_allocated(refund=row)
+        assert not _credits(order).exists()
+        assert credit_allocation.headroom_total(order) == Decimal("100.00")
+        # Allocated to nothing is not "never allocated": no alarm, and the
+        # backfill leaves it alone.
+        assert not OrderHistory.objects.filter(
+            order=order, new_value__note__icontains="No credit document"
+        ).exists()
+        assert backfill_credit_allocations(apps) == 0
+
+
+class TestASettledAttemptWithoutItsRefundHoldsNothing:
+    def test_the_attempt_that_lost_the_refund_to_another_drops_its_room(self):
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _mixed()
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        first, second = (
+            RefundAttempt.objects.create(
+                order=order, charge=charge, amount=_eur("30.00")
+            )
+            for _ in range(2)
+        )
+        OrderService._allocate_claim(order, [first])
+        OrderService._allocate_claim(order, [second])
+        assert credit_allocation.headroom_total(order) == Decimal("40.00")
+        row, _ = PaymentLedger.record_refund(
+            order,
+            charge=charge,
+            amount=_eur("30.00"),
+            reference="re_1",
+            attempt=first,
+        )
+
+        # The second overlapped run finds the same refund (nothing in the
+        # provider's answer ties it to an attempt): it is settled without
+        # a link, and its room goes with it.
+        PaymentLedger.settle_attempt(second, row)
+
+        second.refresh_from_db()
+        assert second.status == RefundAttemptStatus.SETTLED
+        assert not CreditAllocation.objects.filter(
+            refund_attempt=second
+        ).exists()
+        assert credit_allocation.headroom_total(order) == Decimal("70.00")
+
+    def test_the_backfill_gives_a_settled_attempt_with_no_refund_nothing(self):
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _mixed()
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        RefundAttempt.objects.create(
+            order=order,
+            charge=charge,
+            amount=_eur("30.00"),
+            status=RefundAttemptStatus.SETTLED,
+        )
+
+        assert backfill_credit_allocations(apps) == 0
+
+        assert credit_allocation.headroom_total(order) == Decimal("100.00")
+
+
+class TestSourcesBookedByTheOldReleaseAreAllocatedAfterwards:
+    """The previous release keeps serving after the migration, so what it
+    books has no allocation until ``allocate_credit_sources`` runs."""
+
+    def test_the_task_allocates_them_and_the_credit_follows(self):
+        from order.tasks import allocate_credit_sources
+
+        order = _mixed()
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_1"
+            )
+            # What the old release booked: the row, no allocation.
+            CreditAllocation.objects.all().delete()
+            create_pending_credits(order.id)
+            assert not _credits(order).exists()
+
+            assert allocate_credit_sources() == 1
+            assert allocate_credit_sources() == 0
+            create_pending_credits(order.id)
+
+        assert _gross(_credits(order).get()) == {
+            Decimal(24): Decimal("18.00"),
+            Decimal(13): Decimal("12.00"),
+        }
+
+    def test_it_is_in_the_beat_schedule_through_the_fanout(self):
+        from django.conf import settings
+
+        entry = settings.CELERY_BEAT_SCHEDULE["allocate-credit-sources"]
+
+        assert entry["task"] == "tenant.tasks.fanout_allocate_credit_sources"

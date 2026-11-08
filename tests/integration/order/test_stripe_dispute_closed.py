@@ -29,10 +29,11 @@ from order.models import OrderHistory, RefundNotification
 from order.payment_ledger import PaymentLedger
 from order.signals import order_charged_back
 from order.signals.handlers import (
-    handle_stripe_charge_refunded,
     handle_stripe_dispute_closed,
     handle_stripe_dispute_created,
+    handle_stripe_refund_made,
 )
+from tests.utils.stripe_refunds import refund_event
 from user.factories import UserAccountFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
@@ -347,18 +348,9 @@ class TestChargebackAmongRefunds:
         _close(_event("evt_lost_8"))
         assert PaymentLedger.refunded_on(charge) == 0
 
-        event = Mock(spec=Event)
-        event.id = "evt_refund_1"
-        event.data = {
-            "object": {
-                "id": "ch_test_1",
-                "payment_intent": PI,
-                "amount": 5000,
-                "amount_refunded": 1000,
-                "currency": "eur",
-            }
-        }
-        handle_stripe_charge_refunded(sender=None, event=event)
+        handle_stripe_refund_made(
+            sender=None, event=refund_event("re_1000", PI, 1000)
+        )
 
         assert PaymentLedger.refunded_on(charge) == Decimal("10.00")
         assert PaymentLedger.refunded(order) == Decimal("10.00")

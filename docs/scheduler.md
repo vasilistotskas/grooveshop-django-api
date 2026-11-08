@@ -42,13 +42,22 @@ not in the settings, because Celery installs it while
 ## Money jobs
 
 `reconcile-pending-refunds` runs hourly through
-`tenant.tasks.fanout_reconcile_pending_refunds` (one run per store). It asks the
+`tenant.tasks.fanout_reconcile_pending_refunds` (one run per store, suspended stores included: their PENDING refunds hold the customer's money too). It asks the
 payment provider what became of each refund attempt still `PENDING` after
 `REFUND_RECONCILE_AFTER_MINUTES`, and settles or declines only on an
 unambiguous answer (`order/refund_reconciliation.py`, `docs/order-system.md`
 §7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
 caught by the next hour. An attempt it cannot decide stays `PENDING`, holds its
 money and shows on the store dashboard until staff record its outcome.
+
+`allocate-credit-sources` runs every five minutes through
+`tenant.tasks.fanout_allocate_credit_sources` (one run per store, suspended
+stores included). It gives every refund, refund attempt and returned
+chargeback that owes a credit document and has no allocation its place on the
+receipt's VAT rates (`order/credit_allocation_backfill.py`): the sources the
+previous release booked while it still served after the migration. It is
+idempotent, takes each order's row lock, and finds nothing once every release
+in production allocates at claim time.
 
 ## Time zones
 

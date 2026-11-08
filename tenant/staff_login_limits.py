@@ -23,9 +23,11 @@ Three counters, each with its own budget (``settings.STAFF_LOGIN_LIMITS``):
   many addresses; it locks the account for everyone once exceeded, which is
   the remaining denial-of-service bound (see ``docs/api-staff-identity.md``).
   It is the only account limit for a request without a proven address.
-- **Address**: a run of guesses across many accounts. A success does NOT
-  clear it: one valid login of the attacker's own would otherwise reset the
-  run.
+- **Address**: a run of guesses across many accounts. A success gives back
+  only the one attempt it counted (``uncount``), so the counter holds the
+  address's failures and an office's staff signing in never lock each other
+  out; it does NOT clear it, or one valid login of the attacker's own would
+  reset the run.
 
 An address is ``trusted_client_ip`` (the request carried our edge's
 ``X-Origin-Verify``), IPv6 reduced to its /64 so one allocation cannot rotate
@@ -132,6 +134,16 @@ def count(key: str, window: int) -> int:
         return 1
 
 
+def uncount(key: str) -> None:
+    """Take back one attempt ``count`` added to *key*, never below zero. A
+    key that expired meanwhile has nothing left to take back."""
+    try:
+        if cache.decr(key) < 0:
+            cache.delete(key)
+    except ValueError:
+        return
+
+
 def _generation_key(username: str) -> str:
     return f"{_KEY}generation:{_digest(username)}"
 
@@ -186,12 +198,14 @@ def _register_attempt(request: HttpRequest | None, username: str) -> None:
 
 def clear_after_success(request: HttpRequest | None, username: str) -> None:
     """A right password ends the account's counts for the address that
-    proved it. The address counter stays."""
+    proved it, and gives the address back the attempt it counted: the
+    address counter holds failures, not sign-ins."""
     with refuse_when_cache_is_down():
         cache.delete(_ceiling_key(username))
         network = _proven_network(request)
         if network is not None:
             cache.delete(_pair_key(username, network))
+            uncount(_address_key(network))
 
 
 def clear_account(username: str) -> None:

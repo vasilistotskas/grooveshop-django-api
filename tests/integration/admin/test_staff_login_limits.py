@@ -229,6 +229,18 @@ class TestAddressLimit:
             _admin_login(_staff().email, PASSWORD, ip="10.6.6.6")
         )
 
+    def test_successful_sign_ins_never_spend_the_address_budget(self):
+        """An office's staff signing in from one address are not guesses."""
+        team = [_staff() for _ in range(PER_IP + 2)]
+        for member in team:
+            assert _admin_signed_in(
+                _admin_login(member.email, PASSWORD, ip="10.4.4.4")
+            )
+
+        assert _admin_signed_in(
+            _admin_login(team[0].email, PASSWORD, ip="10.4.4.4")
+        )
+
     def test_an_ipv6_allocation_is_counted_as_its_64(self):
         user = _staff()
         for _attempt in range(PAIR):

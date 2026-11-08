@@ -3,6 +3,78 @@
 
 
 
+## v3.236.3 (2026-11-08)
+
+### Bug fixes
+
+* fix(admin): keep a product's edited translation through its save (#539) ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+* fix(admin): keep a product's edited translation through its save
+
+Editing a product's description in the admin saved the product and
+dropped the description. ProductAdmin.get_queryset loads a column subset
+with .only(), and get_queryset also loads the object the change form
+edits. Product.save reads reduction_started_at for the pricing plan,
+Django loads that deferred column with refresh_from_db(fields=[...]),
+and parler's refresh_from_db override clears every cached translation
+on any refresh, so the edit set by the form was gone before parler
+saved the translations.
+
+- core/apps.py: a refresh of named fields keeps the cached translations
+  (it reloads only master columns, which no translation is); a full
+  refresh still clears them. This replaces the save_model workaround
+  that re-wrote the translation with a second upsert after every save.
+- BaseModelAdmin.serves_changelist: ProductAdmin and ProductReviewAdmin
+  apply their .only() column subset to the changelist alone, so the
+  change form loads whole rows. A product save went from 70 queries to
+  50, none of them a deferred-column reload.
+- ExportActionMixin._export_queryset: an export reads whole rows with
+  their foreign keys and translations in a fixed number of queries,
+  instead of one query per deferred column, foreign key and language
+  per row.
+
+Tests drive the real admin change form over HTTP (product description,
+tag label), a deferred read with an unsaved translation, the change
+form's query log, and the export's query count at 2 and 5 rows.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+* fix(pay_way): stop migration 0023 failing on every new schema
+
+pay_way 0023 purged parler cache entries that 0022's queryset update
+left stale. It read the current PayWay model, whose later columns a
+fresh schema does not have at that point, so every new store and every
+test database logged "Could not purge the parler cache". The cache it
+purged is gone: PARLER_ENABLE_CACHING has been off since #359, so the
+migration is emptied, as tenant 0049 was.
+
+The same change left a search test counting calls to parler's cache
+write, which returns at once with caching off, and the docstring of
+ProductTranslation.get_search_result_queryset giving that cache as the
+reason the category is prefetched. The test is removed (the category
+query count stays covered by the two constant-query tests beside it)
+and the docstring states what the prefetch buys now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+### Testing
+
+* test(admin): prove the column-reload pattern matches a real deferred load
+
+The whole-row test asserts no query matches COLUMN_RELOAD, which would
+also pass if a change to the SQL shape left the pattern matching
+nothing. The deferred-read test now asserts the pattern matches the
+query its own deferred load sends.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
 ## v3.236.2 (2026-11-08)
 
 ### Bug fixes

@@ -90,13 +90,21 @@ def _viva_unknown(order, amount="40.00"):
     assert result.declined["outcome_unknown"] is True
 
 
-def _viva_row(refund_id, amount, *, status="F", type_id=7, parent=VIVA_PAYMENT):
+def _viva_type(type_id: int, name: str) -> dict:
+    """``TransactionType`` as ``GET /api/transactions/?ordercode=`` nests
+    it (seen on a demo refund, 2026-11-08): there is no top-level
+    ``TransactionTypeId`` on these rows."""
+    return {"Name": name, "TransactionTypeId": type_id}
+
+
+def _viva_row(refund_id, amount, *, status="F", type_id=4, parent=VIVA_PAYMENT):
     return {
         "TransactionId": refund_id,
         "ParentId": parent,
         "Amount": -amount,
+        "OriginalAmount": -amount,
         "StatusId": status,
-        "TransactionTypeId": type_id,
+        "TransactionType": _viva_type(type_id, "CardRefund"),
     }
 
 
@@ -105,8 +113,9 @@ def _viva_listing(*rows):
         "TransactionId": VIVA_PAYMENT,
         "ParentId": None,
         "Amount": 100.0,
-        "StatusId": "F",
-        "TransactionTypeId": 5,
+        "OriginalAmount": 100.0,
+        "StatusId": "R",
+        "TransactionType": _viva_type(5, "CardCharge"),
     }
     return {str(ORDER_CODE): (200, {"Transactions": [charge, *rows]})}
 

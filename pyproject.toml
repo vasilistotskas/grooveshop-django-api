@@ -16,7 +16,7 @@ classifiers = [
 dependencies = [
   "channels==4.3.2",
   "channels-redis==4.3.0",
-  "django==6.0.9",
+  "django==6.0.10",
   "django-allauth[idp-oidc]==65.21.1",
   "django-extra-settings==0.15.0",
   "django-celery-results==2.6.0",

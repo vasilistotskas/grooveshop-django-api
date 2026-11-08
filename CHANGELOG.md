@@ -3,6 +3,12 @@
 
 
 
+## v3.237.0 (2026-11-08)
+
+### Features
+
+* feat(order): allocate each credit's VAT split when the money moves (#530) ([`2aefd33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2aefd334c59f3e50aab3bfc05b8709ef19aa4fbc))
+
 ## v3.236.3 (2026-11-08)
 
 ### Bug fixes

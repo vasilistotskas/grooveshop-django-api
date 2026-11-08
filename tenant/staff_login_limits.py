@@ -23,9 +23,11 @@ Three counters, each with its own budget (``settings.STAFF_LOGIN_LIMITS``):
   many addresses; it locks the account for everyone once exceeded, which is
   the remaining denial-of-service bound (see ``docs/api-staff-identity.md``).
   It is the only account limit for a request without a proven address.
-- **Address**: a run of guesses across many accounts. A success does NOT
-  clear it: one valid login of the attacker's own would otherwise reset the
-  run.
+- **Address**: a run of guesses across many accounts. A success gives back
+  only the one attempt it counted (``uncount``), so successes do not use the
+  address budget; failures, and attempts refused while it is spent, do. It
+  does NOT clear the counter, or one valid login of the attacker's own would
+  reset the run.
 
 An address is ``trusted_client_ip`` (the request carried our edge's
 ``X-Origin-Verify``), IPv6 reduced to its /64 so one allocation cannot rotate
@@ -120,16 +122,19 @@ def _proven_network(request: HttpRequest | None) -> str | None:
 
 
 def count(key: str, window: int) -> int:
-    """Add one to *key* (created with *window* seconds to live) and return
-    the new value. ``add`` then ``incr`` is atomic in Redis, so parallel
-    callers each get their own number."""
-    cache.add(key, 0, timeout=window)
-    try:
-        return cache.incr(key)
-    except ValueError:
-        # Expired between the two calls.
-        cache.set(key, 1, timeout=window)
-        return 1
+    """Add one to *key* and return the new value, in one Redis script
+    (``CustomCache.count_in_window``): parallel callers each get their own
+    number, and the key always carries the *window* it was started with.
+    Django's ``add`` + ``incr`` is three commands, and a key that expired
+    between them came back with no expiry: a lock that never ended."""
+    return cache.count_in_window(key, window)
+
+
+def uncount(key: str) -> None:
+    """Take back one attempt ``count`` added to *key*, in one Redis script
+    (``CustomCache.uncount``): nothing when the window ended meanwhile, and
+    the key removed at zero, so it never goes negative."""
+    cache.uncount(key)
 
 
 def _generation_key(username: str) -> str:
@@ -186,12 +191,14 @@ def _register_attempt(request: HttpRequest | None, username: str) -> None:
 
 def clear_after_success(request: HttpRequest | None, username: str) -> None:
     """A right password ends the account's counts for the address that
-    proved it. The address counter stays."""
+    proved it, and gives the address back the attempt it counted: the
+    address counter holds failures, not sign-ins."""
     with refuse_when_cache_is_down():
         cache.delete(_ceiling_key(username))
         network = _proven_network(request)
         if network is not None:
             cache.delete(_pair_key(username, network))
+            uncount(_address_key(network))
 
 
 def clear_account(username: str) -> None:

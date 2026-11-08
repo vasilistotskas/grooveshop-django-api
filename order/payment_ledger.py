@@ -696,16 +696,38 @@ class PaymentLedger:
         dispute took is sale money lost, never a credit and never what a
         duplicate payment is measured against, so the excess is the same
         whether the dispute is undecided, kept or returned and never depends
-        on when staff decide. With *before*, the figure as it stood just
+        on when staff decide. The one limit is money: the excess is at most
+        what the provider still holds (captures less refunds and less every
+        dispute). With *before*, the figure as it stood just
         before that ledger row, every input read at that one cut
         (:meth:`held`, and :func:`credit_allocation.goods_returned`, which
         ignores reversals booked at or after it)."""
+        held = cls.held(order, before=before)
         excess = (
-            cls.held(order, before=before)
+            held
             - order.calculate_order_total_amount().amount
             + credit_allocation.goods_returned(order, before=before)
         )
+        # A money fact, not a rule: no refund can pay back more than the
+        # provider still holds (what lost disputes took is gone).
+        excess = min(excess, held - cls._charged_back_before(order, before))
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
+
+    @staticmethod
+    def _charged_back_before(
+        order: Order, before: PaymentTransaction | None
+    ) -> Decimal:
+        """What lost disputes had taken from *order*'s payments by the ledger
+        row *before* (``None``: all of it)."""
+        rows = PaymentTransaction.objects.filter(
+            order=order, kind=PaymentTransactionKind.CHARGEBACK
+        )
+        if before is not None:
+            rows = rows.filter(
+                Q(created_at__lt=before.created_at)
+                | Q(created_at=before.created_at, pk__lt=before.pk)
+            )
+        return _total(rows)
 
     @classmethod
     def overcharge_held(cls, order: Order) -> Decimal:

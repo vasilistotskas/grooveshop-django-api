@@ -250,6 +250,8 @@ class Source:
     covered: Decimal = ZERO
     uncovered: Decimal = ZERO
     allocated: bool = False
+    #: Allocated before any receipt, against the order's own lines.
+    pre_allocated: bool = False
     #: A credit was issued before a reversal: it stands whatever follows.
     frozen: bool = False
 
@@ -287,6 +289,11 @@ class Oracle:
       refund, therefore judges that refund exactly as the decision would
       have if taken at the chargeback's own moment. Its goods are a credit
       source when staff decided they came back, at the decision;
+    * before any receipt, a source whose money moved is netted from the
+      receipt-to-be, capped by the order's own lines (the sale): goods
+      claimed beyond what the order sold are ``uncovered``, whether or not a
+      receipt is ever issued (an impossible "goods returned" decision is
+      flagged for staff and the accountant);
     * gift card value paid back is goods but not provider money;
     * the receipt is net of the goods that came back before it; what comes
       back after it is credited, up to what the receipt still holds (money
@@ -360,6 +367,8 @@ class Oracle:
         parts: dict[str, list] = {}
         waiting: list[Source] = []
         sources: list[Source] = []
+        #: what the order's lines can still take before any receipt
+        pre_room = self.sale
 
         def allocate(src: Source) -> None:
             nonlocal room
@@ -374,22 +383,35 @@ class Oracle:
         def new_source(
             goods: Decimal, when: datetime, *, claim: bool = False
         ) -> Source:
+            nonlocal pre_room
             after = receipt_at is not None and when > receipt_at
             kind = "post" if after else "open" if claim else "pre"
             src = Source(goods, kind)
             sources.append(src)
             if after:
                 allocate(src)
+            else:
+                # Before any receipt: a claim at the moment it is made, a
+                # refund nobody claimed at its own row.
+                src.covered = min(goods, pre_room)
+                src.uncovered = goods - src.covered
+                src.pre_allocated = True
+                pre_room -= src.covered
             return src
 
         def drop_goods(src: Source, amount: Decimal, stood: bool) -> None:
-            nonlocal room, understated
+            nonlocal room, understated, pre_room
             if amount <= 0:
                 return
             src.goods -= amount
             if src.when == "pre":
                 if receipt_total is not None:
                     understated += amount
+                elif src.pre_allocated:
+                    from_uncovered = min(src.uncovered, amount)
+                    src.uncovered -= from_uncovered
+                    src.covered -= amount - from_uncovered
+                    pre_room += amount - from_uncovered
             elif stood:
                 src.frozen = True
             elif src.allocated and not src.frozen:
@@ -400,7 +422,14 @@ class Oracle:
 
         for when, _rank, _pk, kind, obj in events:
             if kind == "receipt":
-                pre = sum((s.goods for s in sources if s.when == "pre"), ZERO)
+                pre = sum(
+                    (
+                        s.covered if s.pre_allocated else s.goods
+                        for s in sources
+                        if s.when == "pre"
+                    ),
+                    ZERO,
+                )
                 receipt_total = self.sale - pre
                 room = receipt_total
                 for src in waiting:
@@ -468,7 +497,12 @@ class Oracle:
 
         credited = sum((s.covered for s in sources if s.when == "post"), ZERO)
         uncovered = sum(
-            (s.uncovered for s in sources if s.when == "post"), ZERO
+            (
+                s.uncovered
+                for s in sources
+                if s.when == "post" or s.pre_allocated
+            ),
+            ZERO,
         )
         return Replay(receipt_total, credited, uncovered, understated)
 
@@ -1136,13 +1170,15 @@ def test_a_reversal_inside_the_duplicate_leaves_the_receipt_alone():
     assert Invoice.objects.get(order=order).total.amount == Decimal("100.00")
 
 
-def test_a_reversal_comes_off_the_duplicate_whether_it_comes_before_or_after():
-    """A refund of 80 on the duplicate payment waits (a claim in flight
-    holds part of the excess), the provider reverses 70 of it, then the
-    claim settles and the refund is decided. A reversal comes off the
-    duplicate part first, as it does for a refund decided before it was
-    reversed: the 10 that stands is goods (the 60 of the duplicate failed
-    first), not a duplicate returned."""
+def test_a_claim_made_before_the_duplicate_leaves_the_duplicate_whole():
+    """Sale 100. A claim of 40 times out; it was made before the duplicate
+    payment existed, so the claim-time rule judges it as goods 40. The
+    customer then pays 100 again and 80 of it is refunded from the
+    dashboard, and the provider reverses 70 of that 80. Whether the claim
+    settles (held 160, still for 60) or is declined (held 200, still for
+    100) the excess is 100: the 80 refund is all duplicate, the reversal
+    comes off its duplicate part, and the 10 that stands is duplicate too.
+    It owes nothing and is decided at once, with no wait for the claim."""
     order, charge = _paid_order()
     with (
         mydata_enabled(auto_submit=False),
@@ -1161,9 +1197,52 @@ def test_a_reversal_comes_off_the_duplicate_whether_it_comes_before_or_after():
         PaymentLedger.record_refund_reversal(
             order, charge=dup, amount=_eur("70.00"), reference="re_dash"
         )
-        assert credit_allocation.undecided(order)
+        assert not credit_allocation.undecided(order)
         PaymentLedger.record_refund(
             order, charge=charge, amount=_eur("40.00"), reference="re_claim"
+        )
+
+    dash = order.payment_transactions.get(
+        provider_reference="re_dash", kind=PaymentTransactionKind.REFUND
+    )
+    assert not credit_allocation.undecided(order)
+    assert credit_allocation.allocation_of(refund=dash) == {}
+    assert CreditAllocation.objects.filter(refund=dash).count() == 1
+
+
+def test_a_reversal_comes_off_the_duplicate_part_of_a_refund_first():
+    """Sale 100 and a duplicate payment of 100 (it exists before the claim).
+    A claim of 40 times out: it takes 40 of the excess. A dashboard refund
+    of 80 on the duplicate therefore waits (the excess it can take depends
+    on the claim), the provider reverses 70 of it, then the claim settles.
+    The 80 is 60 duplicate and 20 goods; the reversal comes off the
+    duplicate part first (60) and then the goods (10), so the 10 that
+    stands is goods, exactly as for a refund decided before its reversal."""
+    order, _charge = _paid_order()
+    with (
+        mydata_enabled(auto_submit=False),
+        FakeAade(),
+        FakeStripeRefunds() as f,
+    ):
+        dup, _created = PaymentLedger.record_charge(
+            order, amount=_eur("100.00"), provider="stripe", reference="pi_d6b"
+        )
+        f.fail_with = stripe.APIConnectionError("x")
+        OrderService.refund_order(order, amount=_eur("40.00"))
+        f.fail_with = None
+        claim = RefundAttempt.objects.live().get(order=order)
+        PaymentLedger.record_refund(
+            order, charge=dup, amount=_eur("80.00"), reference="re_dash"
+        )
+        PaymentLedger.record_refund_reversal(
+            order, charge=dup, amount=_eur("70.00"), reference="re_dash"
+        )
+        assert credit_allocation.undecided(order)
+        PaymentLedger.record_refund(
+            order,
+            charge=claim.charge,
+            amount=_eur("40.00"),
+            reference="re_claim",
         )
 
     dash = order.payment_transactions.get(
@@ -1173,6 +1252,42 @@ def test_a_reversal_comes_off_the_duplicate_whether_it_comes_before_or_after():
     assert credit_allocation.allocation_of(refund=dash) == {
         Decimal(24): Decimal("10.00")
     }
+
+
+def test_the_excess_is_at_most_what_the_provider_still_holds():
+    """Sale 100 refunded in full, a duplicate payment of 40 and a lost
+    dispute of 30 on it: the ledger holds 40 but the provider only 10, so
+    no refund can pay back more than 10 of the duplicate."""
+    order, charge = _paid_order()
+    with mydata_enabled(auto_submit=False), FakeAade():
+        PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("100.00"), reference="re_all"
+        )
+        dup, _created = PaymentLedger.record_charge(
+            order, amount=_eur("40.00"), provider="stripe", reference="pi_d9"
+        )
+        PaymentLedger.record_chargeback(
+            order, charge=dup, amount=_eur("30.00"), reference="dp_9"
+        )
+
+    assert PaymentLedger.excess_held(order) == Decimal("10.00")
+
+
+def test_a_kept_chargeback_on_the_sale_leaves_the_whole_duplicate_refundable():
+    """The cap is money, not a rule: sale 100, a lost dispute of 30 on it
+    and a duplicate payment of 100 still give an excess of 100 (the
+    provider holds 170)."""
+    order, charge = _paid_order()
+    with mydata_enabled(auto_submit=False), FakeAade():
+        PaymentLedger.record_chargeback(
+            order, charge=charge, amount=_eur("30.00"), reference="dp_k"
+        )
+        PaymentLedger.record_charge(
+            order, amount=_eur("100.00"), provider="stripe", reference="pi_dk"
+        )
+        order.refresh_from_db()
+
+    assert PaymentLedger.excess_held(order) == Decimal("100.00")
 
 
 @pytest.mark.parametrize("decision", [None, True, False])

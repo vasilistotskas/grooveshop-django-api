@@ -102,11 +102,11 @@ class ContentPageAdmin(BaseTranslatableAdmin):
     fieldsets = (
         (
             _("Content"),
-            {"fields": ("title", "body"), "classes": ("wide",)},
+            {"fields": ("title", "body")},
         ),
         (
             _("Organization"),
-            {"fields": ("slug", "is_published"), "classes": ("wide",)},
+            {"fields": ("slug", "is_published")},
         ),
         (
             _("SEO"),
@@ -172,7 +172,6 @@ class ContentPageAdmin(BaseTranslatableAdmin):
                 _("Platform update to review"),
                 {
                     "fields": ("legal_update_text",),
-                    "classes": ("wide",),
                     "description": LEGAL_UPDATE_HELP,
                 },
             ),

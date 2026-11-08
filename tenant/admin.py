@@ -28,6 +28,7 @@ Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
 
 from __future__ import annotations
 
+import dataclasses
 from functools import wraps
 from typing import Any
 
@@ -647,14 +648,16 @@ class TenantAdmin(BaseModelAdmin):
             return True
         return request.user.has_perm("tenant.change_tenant")
 
-    def get_actions(self, request, *args, **kwargs):
+    def get_actions(
+        self, request, action_location=admin.ActionLocation.CHANGE_LIST
+    ):
         """Drop delete_selected, and platform lifecycle for merchants.
 
         Suspend/activate/destroy are the platform's levers; leaving them
         exposed would let a merchant suspend — or destroy — their own
         store from the store admin.
         """
-        actions = super().get_actions(request, *args, **kwargs)
+        actions = super().get_actions(request, action_location=action_location)
         actions.pop("delete_selected", None)
         if self_service_tenant(request) is not None:
             for name in (
@@ -1166,15 +1169,15 @@ class UserTenantMembershipAdmin(BaseModelAdmin):
             kwargs["form"] = StoreTeamMemberForm
         return super().get_form(request, obj, change=change, **kwargs)
 
-    def get_actions(self, request, *args, **kwargs):
+    def get_actions(
+        self, request, action_location=admin.ActionLocation.CHANGE_LIST
+    ):
         """Bulk delete keeps the store's last owner (a message, not a 500)."""
-        actions: dict[str, Any] = super().get_actions(request, *args, **kwargs)
-        if "delete_selected" in actions:
-            _func, name, description = actions["delete_selected"]
-            actions["delete_selected"] = (
-                _delete_selected_keeping_an_owner,
-                name,
-                description,
+        actions = super().get_actions(request, action_location=action_location)
+        delete = actions.get("delete_selected")
+        if delete is not None:
+            actions["delete_selected"] = dataclasses.replace(
+                delete, func=_delete_selected_keeping_an_owner
             )
         return actions
 

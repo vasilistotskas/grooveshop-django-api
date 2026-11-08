@@ -770,7 +770,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "type",
                     "is_active",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -787,7 +786,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "lng",
                     "note",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -799,7 +797,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "created_at",
                     "updated_at",
                 ),
-                "classes": ("wide",),
             },
         ),
     )
@@ -895,7 +892,6 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
                     "event_time",
                     "received_at",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -906,7 +902,6 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
                     "postal_code",
                     "additional_information",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

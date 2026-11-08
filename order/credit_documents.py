@@ -367,6 +367,12 @@ def create_pending_credits(order_id: int) -> list[int]:
             allocation = credit_allocation.allocation_of(
                 decision=chargeback.decision
             )
+            if not allocation and credit_allocation.is_allocated(
+                decision=chargeback.decision
+            ):
+                # Allocated to nothing: the receipt had no room, said once
+                # when it was allocated.
+                continue
             if not allocation:
                 OrderHistory.log_note(
                     order=order,

@@ -27,6 +27,7 @@ from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.models.refund_attempt import RefundAttempt
 from order.mydata.config import load_config as load_mydata_config
 from order.notifications import (
     notify_order_created_live,
@@ -1102,8 +1103,10 @@ def _locked_order_for_stripe_intent(payment_intent_id: str) -> Order | None:
     its order whichever intent ``Order.payment_id`` points at: an order
     paid twice keeps its FIRST intent there, so a refund, a failed refund or
     a dispute on the second would find nothing by ``payment_id``. An order
-    whose capture the ledger never recorded (paid while the previous release
-    served) has no row, and is found by ``payment_id``. Call inside
+    whose payment has not been recorded yet (its ``payment_intent.succeeded``
+    still in flight; ``payment_id`` is set when the intent is created) has no
+    row, and is found by ``payment_id``, which is how the refund handler
+    tells "not recorded yet, redeliver" from "not ours". Call inside
     ``transaction.atomic``.
     """
     order_id = (
@@ -1214,8 +1217,9 @@ def handle_stripe_refund_made(sender, **kwargs):
         # ``pending`` created event processed after the failure must not
         # book a refund that failed. A Stripe error propagates, so Stripe
         # redelivers the event.
+        current = StripePaymentProvider().retrieve_refund(refund_id)
         if (
-            StripePaymentProvider().retrieve_refund(refund_id).status
+            current.status
             not in StripePaymentProvider._ACCEPTED_REFUND_STATUSES
         ):
             return
@@ -1256,8 +1260,25 @@ def handle_stripe_refund_made(sender, **kwargs):
                     f"of order {order.id}, which the ledger does not hold yet"
                 )
             previous_payment_status = order.payment_status
+            # The attempt this refund was made for names itself in the
+            # refund's metadata (``refund_payment`` puts it there): link
+            # that one, never an older attempt of the same amount. A refund
+            # without the key (a dashboard refund) is matched by amount.
+            key = StripePaymentProvider.refund_attempt_key(current)
+            attempt = next(
+                (
+                    a
+                    for a in RefundAttempt.objects.live().filter(charge=charge)
+                    if key and a.provider_key == key
+                ),
+                None,
+            )
             refund_row, created = PaymentLedger.record_refund(
-                order, charge=charge, amount=refunded, reference=refund_id
+                order,
+                charge=charge,
+                amount=refunded,
+                reference=refund_id,
+                attempt=attempt,
             )
             if not created:
                 return

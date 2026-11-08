@@ -211,6 +211,52 @@ class TestRefundWebhook:
 
         assert not _refunds(order).exists()
 
+    def test_the_attempt_named_in_the_metadata_is_the_one_settled(self):
+        """Two attempts of one amount are PENDING: the refund carries the
+        key of the SECOND, so it settles that one, not the oldest."""
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _order("pi_key_1")
+        charge = order.payment_transactions.get()
+        first, second = (
+            RefundAttempt.objects.create(
+                order=order, charge=charge, amount=Money("20.00", "EUR")
+            )
+            for _ in range(2)
+        )
+
+        _deliver(
+            "re_key_1",
+            "pi_key_1",
+            2000,
+            metadata={REFUND_ATTEMPT_METADATA_KEY: second.provider_key},
+        )
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert second.status == RefundAttemptStatus.SETTLED
+        assert second.refund == _refunds(order).get()
+        assert first.status == RefundAttemptStatus.PENDING
+
+    def test_a_refund_without_a_key_settles_the_oldest_matching_attempt(self):
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _order("pi_key_2")
+        charge = order.payment_transactions.get()
+        first, second = (
+            RefundAttempt.objects.create(
+                order=order, charge=charge, amount=Money("20.00", "EUR")
+            )
+            for _ in range(2)
+        )
+
+        _deliver("re_key_2", "pi_key_2", 2000)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.status == RefundAttemptStatus.SETTLED
+        assert second.status == RefundAttemptStatus.PENDING
+
     def test_each_refund_is_its_own_row_under_its_own_id(
         self, refunded_signals
     ):

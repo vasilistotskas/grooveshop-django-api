@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 import pytest
 import stripe
-from django.apps import apps
 
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
@@ -223,7 +222,7 @@ class TestAReversalFreesTheAllocation:
         PaymentLedger.record_refund_reversal(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
-        assert backfill_credit_allocations(apps) == 0
+        assert backfill_credit_allocations() == 0
 
         assert credit_allocation.headroom_total(order) == Decimal("100.00")
 
@@ -287,10 +286,10 @@ class TestTheBackfill:
         booked = (_rows(refund=first), _rows(refund=second))
         CreditAllocation.objects.all().delete()
 
-        assert backfill_credit_allocations(apps) == 2
+        assert backfill_credit_allocations() == 2
 
         assert (_rows(refund=first), _rows(refund=second)) == booked
-        assert backfill_credit_allocations(apps) == 0
+        assert backfill_credit_allocations() == 0
 
     def test_a_refund_booked_before_the_receipt_nets_it(self):
         order = _mixed()
@@ -303,7 +302,7 @@ class TestTheBackfill:
         booked = _rows(refund=row)
         CreditAllocation.objects.all().delete()
 
-        backfill_credit_allocations(apps)
+        backfill_credit_allocations()
 
         assert _rows(refund=row) == booked
         with mydata_enabled(), FakeAade():
@@ -318,7 +317,7 @@ class TestTheBackfill:
             create_pending_credits(order.id)
         CreditAllocation.objects.all().delete()
 
-        assert backfill_credit_allocations(apps) == 0
+        assert backfill_credit_allocations() == 0
 
         assert not CreditAllocation.objects.exists()
         # The document itself holds the room.
@@ -343,7 +342,7 @@ class TestTheBackfill:
         assert decided
         CreditAllocation.objects.all().delete()
 
-        assert backfill_credit_allocations(apps) == 1
+        assert backfill_credit_allocations() == 1
 
         assert _rows(decision=decision) == decided
 
@@ -357,7 +356,7 @@ class TestTheBackfill:
         claimed = _rows(refund_attempt=attempt)
         CreditAllocation.objects.all().delete()
 
-        assert backfill_credit_allocations(apps) == 1
+        assert backfill_credit_allocations() == 1
 
         assert _rows(refund_attempt=attempt) == claimed
 
@@ -377,7 +376,7 @@ class TestTheBackfill:
         scaled = _rows(refund=row)
         CreditAllocation.objects.all().delete()
 
-        backfill_credit_allocations(apps)
+        backfill_credit_allocations()
 
         assert _rows(refund=row) == scaled
         assert sum(r[1] for r in scaled) == Decimal("20.00")
@@ -591,7 +590,8 @@ class TestReadPathsNeverWrite:
         assert not _credits(order).exists()
         assert not CreditAllocation.objects.exists()
         assert OrderHistory.objects.filter(
-            order=order, new_value__note__icontains="No credit document"
+            order=order,
+            new_value__note__icontains="No credit document could be issued",
         ).exists()
 
     def test_the_receipt_render_writes_no_allocation(self):
@@ -771,9 +771,10 @@ class TestADuplicatePaymentOwesNoCredit:
         # Allocated to nothing is not "never allocated": no alarm, and the
         # backfill leaves it alone.
         assert not OrderHistory.objects.filter(
-            order=order, new_value__note__icontains="No credit document"
+            order=order,
+            new_value__note__icontains="No credit document could be issued",
         ).exists()
-        assert backfill_credit_allocations(apps) == 0
+        assert backfill_credit_allocations() == 0
 
 
 class TestASettledAttemptWithoutItsRefundHoldsNothing:
@@ -827,7 +828,7 @@ class TestASettledAttemptWithoutItsRefundHoldsNothing:
             status=RefundAttemptStatus.SETTLED,
         )
 
-        assert backfill_credit_allocations(apps) == 0
+        assert backfill_credit_allocations() == 0
 
         assert credit_allocation.headroom_total(order) == Decimal("100.00")
 
@@ -868,3 +869,85 @@ class TestSourcesBookedByTheOldReleaseAreAllocatedAfterwards:
         entry = settings.CELERY_BEAT_SCHEDULE["allocate-credit-sources"]
 
         assert entry["task"] == "tenant.tasks.fanout_allocate_credit_sources"
+
+
+class TestTheBackfillUsesTheLiveRules:
+    def test_a_credited_source_is_counted_by_its_document_only(self):
+        order = _mixed()
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_a"
+            )
+            create_pending_credits(order.id)
+            # The old release books another 65.00 with no allocation.
+            late, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("65.00"), reference="re_b"
+            )
+            CreditAllocation.objects.filter(refund=late).delete()
+
+            assert backfill_credit_allocations() == 1
+
+        # 100.00 less the 30.00 document leaves 70.00 of room: the 65.00 fits
+        # whole (the credited refund's own rows are not counted twice).
+        assert sum(credit_allocation.allocation_of(refund=late).values()) == (
+            Decimal("65.00")
+        )
+
+    def test_a_duplicate_payment_refund_is_not_allocated(self):
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            duplicate = _duplicate_payment(order)
+            row, _ = PaymentLedger.record_refund(
+                order,
+                charge=duplicate,
+                amount=_eur("100.00"),
+                reference="re_dup",
+            )
+            CreditAllocation.objects.all().delete()
+
+            assert backfill_credit_allocations() == 1
+
+        assert credit_allocation.allocation_of(refund=row) == {}
+        assert credit_allocation.is_allocated(refund=row)
+        assert credit_allocation.headroom_total(order) == Decimal("100.00")
+
+
+class TestASourceTheReceiptCannotHoldIsMarkedOnce:
+    def test_it_is_allocated_to_nothing_and_noted_once(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("100.00"), reference="re_1"
+            )
+            # The receipt is full: this one finds no room.
+            late, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("5.00"), reference="re_2"
+            )
+
+            assert credit_allocation.is_allocated(refund=late)
+            assert credit_allocation.allocation_of(refund=late) == {}
+            assert backfill_credit_allocations() == 0
+            create_pending_credits(order.id)
+            create_pending_credits(order.id)
+
+        notes = OrderHistory.objects.filter(
+            order=order, new_value__note__icontains="receipt holds"
+        )
+        assert notes.count() == 1
+        assert not [
+            n.new_value["note"]
+            for n in OrderHistory.objects.filter(
+                order=order,
+                new_value__note__icontains="No credit document could be issued",
+            )
+        ]
+        assert _credits(order).count() == 1

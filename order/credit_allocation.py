@@ -17,8 +17,9 @@ is left on the receipt:
   allocated by a read: a refund claim by ``OrderService._claim_refund``, a
   refund nobody claimed (a provider's webhook) by :func:`book_refund` over
   the headroom of that moment, a returned chargeback by
-  :func:`allocate_decision`. Money booked before allocations existed was
-  allocated by migration ``0103`` (``order.credit_allocation_backfill``).
+  :func:`allocate_decision`; both write through :func:`allocate_source`.
+  What a release that did not know about allocations booked is allocated by
+  ``order.tasks.allocate_credit_sources`` (``order.credit_allocation_backfill``).
 * A provider's reversal of a refund scales its allocation down
   (:func:`free_reversed`) unless a credit document was already issued.
 
@@ -285,50 +286,72 @@ def scale(returned: Decimal, **source) -> None:
             row.delete()
 
 
-def _allocate_unclaimed(
+def allocate_source(
     order: Order,
     amount: Decimal,
-    when: datetime | None,
+    *,
+    moved_at: datetime | None,
+    excess: Decimal = _ZERO,
     **source,
 ) -> None:
-    pieces = pieces_of(allocate_pro_rata(order, amount))
-    store(order, pieces, moved_at=when, **source)
+    """Allocate a source that was booked without a claim (a provider's
+    webhook refund, a returned chargeback), pro rata over the headroom now.
+    The one writer for money nobody claimed, whether it is booked now or
+    found later by the backfill.
+
+    *excess* of *amount* gives back a duplicate payment
+    (``PaymentLedger.refundable_excess``) and owes nothing. A source is
+    ALWAYS left allocated, so it is never picked up again: a source that
+    owes nothing, or whose receipt (or order) has no taxable room, gets one
+    row of amount zero; one the headroom cannot hold in full gets what fits
+    and the order's history says so ONCE, here, so no later read repeats it.
+    """
+    owed = amount - min(excess, amount)
+    taxable = has_rates(order)
+    pieces = (
+        pieces_of(allocate_pro_rata(order, owed))
+        if owed > 0 and taxable
+        else []
+    )
+    held = sum((p.amount for p in pieces), _ZERO)
+    store(order, pieces, moved_at=moved_at, nothing_owed=not pieces, **source)
+    if taxable and held < owed:
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"The receipt holds {held} of the {owed} this refund or "
+                "chargeback would credit: no credit document can be issued "
+                "for the rest."
+            ),
+        )
 
 
 def book_refund(
     order: Order, refund: PaymentTransaction, *, excess: Decimal = _ZERO
 ) -> None:
     """Allocate a refund that was booked without a claim (a provider's
-    webhook): pro rata over the headroom now, capped to it. *excess* of it
-    gives back a duplicate payment (``PaymentLedger.refundable_excess``)
-    and is not allocated."""
-    if is_allocated(refund=refund) or not has_rates(order):
+    webhook): see :func:`allocate_source`."""
+    if is_allocated(refund=refund):
         return
-    owed = Decimal(refund.amount.amount) - min(
-        excess, Decimal(refund.amount.amount)
+    allocate_source(
+        order,
+        Decimal(refund.amount.amount),
+        moved_at=refund.created_at,
+        excess=excess,
+        refund=refund,
     )
-    if owed <= 0:
-        store(
-            order,
-            [],
-            moved_at=refund.created_at,
-            nothing_owed=True,
-            refund=refund,
-        )
-        return
-    _allocate_unclaimed(order, owed, refund.created_at, refund=refund)
 
 
 def allocate_decision(order: Order, decision: ChargebackDecision) -> None:
     """The room a lost dispute's returned goods take on the receipt,
     decided now: the chargeback spread over the headroom, capped to it."""
     CreditAllocation.objects.filter(decision=decision).delete()
-    if not decision.goods_returned or not has_rates(order):
+    if not decision.goods_returned:
         return
-    _allocate_unclaimed(
+    allocate_source(
         order,
         Decimal(decision.chargeback.amount.amount),
-        decision.decided_at,
+        moved_at=decision.decided_at,
         decision=decision,
     )
 
@@ -410,6 +433,7 @@ __all__ = [
     "Piece",
     "allocate_decision",
     "allocate_pro_rata",
+    "allocate_source",
     "allocation_of",
     "allocation_of_refund",
     "book_refund",

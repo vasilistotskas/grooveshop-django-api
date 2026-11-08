@@ -149,6 +149,9 @@ class FakeStripeRefunds:
 #: ``refund_states`` fixture (``tests/integration/order/conftest.py``). An
 #: event is a snapshot of a moment earlier; the handlers read this instead.
 CURRENT_REFUND_STATUS: dict[str, str] = {}
+#: The metadata Stripe holds on each refund (the attempt key, for a refund
+#: this app made).
+CURRENT_REFUND_METADATA: dict[str, dict[str, str]] = {}
 
 
 def refund_event(
@@ -158,6 +161,7 @@ def refund_event(
     *,
     status: str = "succeeded",
     current: str | None = None,
+    metadata: dict[str, str] | None = None,
     currency: str = "eur",
     event_type: str = "refund.created",
     event_id: str | None = None,
@@ -170,6 +174,7 @@ def refund_event(
     from djstripe.models import Event
 
     CURRENT_REFUND_STATUS[refund_id] = current or status
+    CURRENT_REFUND_METADATA[refund_id] = metadata or {}
 
     event = mock.Mock(spec=Event)
     event.id = event_id or f"evt_{refund_id}"

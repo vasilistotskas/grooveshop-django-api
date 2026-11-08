@@ -1,33 +1,31 @@
-"""Allocate the money that was booked before allocations existed.
+"""Allocate money that was booked without an allocation.
 
-A credit document is read off its own VAT rows from the moment it exists
-(``order.credit_allocation.headroom``), so what needs an allocation is every
-source that still OWES a credit, or will be netted off a receipt that does
-not exist yet:
+Every source is allocated when it is created (``order.credit_allocation``).
+The exceptions are the sources a release that did not know about allocations
+booked while it still served after the migration that created the table, and
+anything a failure left behind. ``order.tasks.allocate_credit_sources`` runs
+:func:`backfill_credit_allocations` periodically to allocate them:
 
 * a refund booked without a claim (a provider's webhook) and not credited;
 * a provider refund attempt not declined, not credited;
 * a chargeback decision that the goods came back, not credited.
 
-Each is given what ``order.credit_allocation`` would have given it when it
-was booked: pro rata over the headroom of that moment, oldest first, capped
-to it. Allocating them here, once, is what lets every read path (the credit
-reconciliation, the receipt render) stay free of writes.
+It runs on the live models and writes through the same functions as the
+code that books money (``credit_allocation.allocate_source``), so there is
+one definition of the headroom, of the duplicate-payment excess and of what
+"allocated" means: pro rata over the headroom of the moment, capped to it,
+oldest first, each order under its row lock. A source that owes a credit is
+allocated exactly once and is then left alone (a source that owes nothing is
+marked by a row of amount zero), so a run finds nothing once every release
+in production allocates at claim time.
 
 Money that moved before its order's receipt row existed is left alone: the
 receipt was issued net of it and owes no credit. Stored-value attempts need
-the gift-card and points ledgers; none exist on any store that issues
-documents (production and staging held no refund attempt at all when this
-was written, 2026-11-08).
+the gift-card and points ledgers and are allocated when claimed.
 
-Written against the app registry it is given, so the migration runs it on
-the historical models and a test runs it on the real ones (the lines' VAT
-come from the one live function, ``order.taxation.order_vat_lines``, as in
-``order.vat_snapshot``). Idempotent, and safe while the previous release
-still writes: a source it books afterwards has no allocation and is
-reported by ``create_pending_credits`` instead of being credited wrongly, and
-``order.tasks.allocate_credit_sources`` runs this function periodically on the
-live models to allocate it.
+The duplicate-payment excess is read as it stands now, as if the refund were
+the latest (the excess it was booked against is not recorded); that only
+matters for a refund of an order paid twice that the old release booked.
 """
 
 from __future__ import annotations
@@ -38,71 +36,35 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Q
 
-from order.discounts import allocate_capped
-from order.taxation import breakdown_by_rate, order_vat_lines
+from order import credit_allocation
+from order.enum.payment_transaction import PaymentTransactionKind
+from order.models import (
+    ChargebackDecision,
+    Invoice,
+    Order,
+    PaymentTransaction,
+)
+from order.models.refund_attempt import (
+    RefundAttempt,
+    RefundAttemptKind,
+    RefundAttemptStatus,
+)
+from order.payment_ledger import PaymentLedger
 
 logger = logging.getLogger(__name__)
 
 _ZERO = Decimal(0)
-_CANCELED = "CANCELED"
-_REFUND = "REFUND"
-_REFUND_REVERSAL = "REFUND_REVERSAL"
 
 
-def _reversed(models, refund) -> Decimal:
-    """What the provider reported failed of *refund*, in all."""
-    return sum(
-        (
-            Decimal(row.amount.amount)
-            for row in models["transaction"].objects.filter(
-                provider=refund.provider,
-                provider_reference=refund.provider_reference,
-                kind=_REFUND_REVERSAL,
-            )
-        ),
-        _ZERO,
-    )
-
-
-def _headroom(models, order, invoice) -> dict[Decimal, Decimal]:
-    """The headroom of ``order.credit_allocation`` on the registry's models."""
-    rows = (
-        invoice.vat_breakdown
-        if invoice is not None
-        else breakdown_by_rate(order_vat_lines(order))
-    )
-    left = {Decimal(r["rate"]): Decimal(r["gross"]) for r in rows}
-    held = (
-        models["allocation"]
-        .objects.filter(order_id=order.pk)
-        .exclude(refund_attempt__status="DECLINED")
-        .exclude(decision__goods_returned=False)
-    )
-    if invoice is not None:
-        held = held.filter(
-            Q(moved_at__isnull=True) | Q(moved_at__gte=invoice.created_at)
-        )
-    for row in held:
-        left[row.rate] = left.get(row.rate, _ZERO) - Decimal(row.amount.amount)
-    if invoice is not None:
-        # The documents themselves count, whatever their source holds.
-        for credit in (
-            models["credit"]
-            .objects.filter(invoice_id=invoice.pk)
-            .exclude(mydata_status=_CANCELED)
-        ):
-            for row in credit.vat_breakdown:
-                rate = Decimal(row["rate"])
-                left[rate] = left.get(rate, _ZERO) - Decimal(row["gross"])
-    return left
-
-
-def _owing(models, invoices) -> dict[int, list]:
+def _owing() -> dict[int, list]:
     """Every source that needs an allocation, by order:
-    ``(moment, tiebreak, source, amount)``."""
+    ``(moment, rank, source, amount, excess)`` where *excess* is ``None``
+    (a duplicate payment cannot be part of it) or the keyword arguments for
+    ``PaymentLedger.refundable_excess``."""
+    invoices = {i.order_id: i for i in Invoice.objects.all()}
     by_order: dict[int, list] = {}
 
-    def add(order_id, moment, rank, source, amount):
+    def add(order_id, moment, rank, source, amount, excess):
         invoice = invoices.get(order_id)
         if (
             invoice is not None
@@ -112,11 +74,11 @@ def _owing(models, invoices) -> dict[int, list]:
             return
         if amount > 0:
             by_order.setdefault(order_id, []).append(
-                (moment, rank, source, amount)
+                (moment, rank, source, amount, excess)
             )
 
-    for refund in models["transaction"].objects.filter(
-        kind=_REFUND,
+    for refund in PaymentTransaction.objects.filter(
+        kind=PaymentTransactionKind.REFUND,
         attempt__isnull=True,
         credit_document__isnull=True,
         allocations__isnull=True,
@@ -125,22 +87,26 @@ def _owing(models, invoices) -> dict[int, list]:
             refund.order_id,
             refund.created_at,
             "r",
-            {"refund_id": refund.pk},
-            Decimal(refund.amount.amount) - _reversed(models, refund),
+            {"refund": refund},
+            Decimal(refund.amount.amount)
+            - credit_allocation.reversed_of(refund),
+            {
+                "add_back": Decimal(refund.amount.amount)
+                - credit_allocation.reversed_of(refund)
+            },
         )
     for attempt in (
-        models["attempt"]
-        .objects.filter(
+        RefundAttempt.objects.filter(
             # No refund yet: only a claim still in flight holds room. A
             # SETTLED attempt without one answered a refund another attempt
             # owns and holds nothing.
-            Q(refund__isnull=True, status="PENDING")
+            Q(refund__isnull=True, status=RefundAttemptStatus.PENDING)
             | Q(refund__isnull=False, refund__credit_document__isnull=True),
-            kind="PROVIDER",
+            kind=RefundAttemptKind.PROVIDER,
             credit_document__isnull=True,
             allocations__isnull=True,
         )
-        .exclude(status="DECLINED")
+        .exclude(status=RefundAttemptStatus.DECLINED)
         .select_related("refund")
     ):
         refund = attempt.refund
@@ -148,91 +114,54 @@ def _owing(models, invoices) -> dict[int, list]:
             attempt.order_id,
             refund.created_at if refund else None,
             "a",
-            {"refund_attempt_id": attempt.pk},
-            Decimal(refund.amount.amount) - _reversed(models, refund)
+            {"refund_attempt": attempt},
+            Decimal(refund.amount.amount)
+            - credit_allocation.reversed_of(refund)
             if refund
             else Decimal(attempt.amount.amount),
+            {
+                "add_back": Decimal(refund.amount.amount)
+                - credit_allocation.reversed_of(refund)
+                if refund
+                else _ZERO,
+                "exclude": [attempt.pk],
+            },
         )
-    for decision in (
-        models["decision"]
-        .objects.filter(
-            goods_returned=True,
-            chargeback__chargeback_credit__isnull=True,
-            allocations__isnull=True,
-        )
-        .select_related("chargeback")
-    ):
+    for decision in ChargebackDecision.objects.filter(
+        goods_returned=True,
+        chargeback__chargeback_credit__isnull=True,
+        allocations__isnull=True,
+    ).select_related("chargeback"):
         add(
             decision.chargeback.order_id,
             decision.decided_at,
             "d",
-            {"decision_id": decision.pk},
+            {"decision": decision},
             Decimal(decision.chargeback.amount.amount),
+            None,
         )
     return by_order
 
 
-def backfill_credit_allocations(apps) -> int:
+def backfill_credit_allocations() -> int:
     """Allocate every source that owes a credit and has no allocation;
     returns how many sources were given one."""
-    models = {
-        "order": apps.get_model("order", "Order"),
-        "invoice": apps.get_model("order", "Invoice"),
-        "credit": apps.get_model("order", "RetailCredit"),
-        "allocation": apps.get_model("order", "CreditAllocation"),
-        "attempt": apps.get_model("order", "RefundAttempt"),
-        "decision": apps.get_model("order", "ChargebackDecision"),
-        "transaction": apps.get_model("order", "PaymentTransaction"),
-    }
-    invoices = {
-        invoice.order_id: invoice for invoice in models["invoice"].objects.all()
-    }
     done = 0
-    for order_id, sources in _owing(models, invoices).items():
-        order = (
-            models["order"].objects.prefetch_related("items").get(pk=order_id)
-        )
+    for order_id, sources in _owing().items():
         with transaction.atomic():
-            done += _allocate_order(models, order, invoices, sources)
-    return done
-
-
-def _allocate_order(models, order, invoices, sources) -> int:
-    """Allocate one order's sources under its row lock, so a claim made
-    meanwhile sees them and they see its allocation."""
-    done = 0
-    order_id = order.pk
-    models["order"].objects.select_for_update().get(pk=order_id)
-    try:
-        left = _headroom(models, order, invoices.get(order_id))
-    except ValueError:
-        logger.warning("Order %s: no VAT lines derivable", order_id)
-        return 0
-    for moment, _rank, source, amount in sorted(
-        sources, key=lambda s: (s[0] is None, s[0], s[1])
-    ):
-        if (
-            models["allocation"]
-            .objects.filter(order_id=order_id, **source)
-            .exists()
-        ):
-            continue
-        room = {rate: gross for rate, gross in left.items() if gross > 0}
-        shares = allocate_capped(amount, room, room) if room else {}
-        rows = [
-            models["allocation"](
-                order_id=order_id,
-                rate=rate,
-                amount=share,
-                amount_currency=order.amount_due_currency,
-                moved_at=moment,
-                **source,
-            )
-            for rate, share in shares.items()
-            if share > 0
-        ]
-        models["allocation"].objects.bulk_create(rows)
-        for rate, share in shares.items():
-            left[rate] = left.get(rate, _ZERO) - share
-        done += 1
+            order = Order.objects.select_for_update().get(pk=order_id)
+            for moment, _rank, source, amount, excess_of in sorted(
+                sources, key=lambda s: (s[0] is None, s[0], s[1])
+            ):
+                if credit_allocation.is_allocated(**source):
+                    continue
+                excess = (
+                    PaymentLedger.refundable_excess(order, **excess_of)
+                    if excess_of is not None
+                    else _ZERO
+                )
+                credit_allocation.allocate_source(
+                    order, amount, moved_at=moment, excess=excess, **source
+                )
+                done += 1
     return done

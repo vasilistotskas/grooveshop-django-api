@@ -870,12 +870,7 @@ class StripePaymentProvider(PaymentProvider):
             for refund in stripe.Refund.list(
                 payment_intent=payment_id, limit=100, api_key=self.api_key
             ).auto_paging_iter():
-                metadata = refund.metadata
-                if (
-                    metadata is None
-                    or REFUND_ATTEMPT_METADATA_KEY not in metadata
-                    or metadata[REFUND_ATTEMPT_METADATA_KEY] != idempotency_key
-                ):
+                if self.refund_attempt_key(refund) != idempotency_key:
                     continue
                 if refund.status in self._ACCEPTED_REFUND_STATUSES:
                     made = True
@@ -899,6 +894,16 @@ class StripePaymentProvider(PaymentProvider):
             )
             return None
         return found
+
+    @staticmethod
+    def refund_attempt_key(refund) -> str | None:
+        """The refund attempt's key a refund carries in its metadata
+        (``refund_payment`` puts it there), or ``None`` for a refund this app
+        did not make (a dashboard refund)."""
+        metadata = refund.metadata
+        if metadata is None or REFUND_ATTEMPT_METADATA_KEY not in metadata:
+            return None
+        return metadata[REFUND_ATTEMPT_METADATA_KEY]
 
     def retrieve_refund(self, refund_id: str) -> stripe.Refund:
         """The refund as Stripe holds it NOW (``re_...``). A refund event

@@ -1713,11 +1713,9 @@ def allocate_credit_sources() -> int:
     allocation is left alone, and each order is handled under its lock.
     Returns how many sources it allocated.
     """
-    from django.apps import apps
-
     from order.credit_allocation_backfill import backfill_credit_allocations
 
-    done = backfill_credit_allocations(apps)
+    done = backfill_credit_allocations()
     if done:
         logger.info("allocate_credit_sources: allocated %s sources", done)
     return done

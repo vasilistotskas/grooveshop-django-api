@@ -3649,6 +3649,12 @@ class OrderService:
         order. A refund the headroom cannot hold is refused before any
         provider is called: its credit document could never be issued."""
         if not credit_allocation.has_rates(order):
+            # Nothing taxable: nothing is owed, and each claim is marked
+            # allocated so the backfill never picks it up.
+            for attempt in attempts:
+                credit_allocation.store(
+                    order, [], nothing_owed=True, refund_attempt=attempt
+                )
             return
         # Points are a discount, not money returned: their share owes no
         # credit document and takes no room on the receipt. A gift card is

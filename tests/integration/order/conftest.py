@@ -29,7 +29,11 @@ def refund_states():
 
     import stripe
 
-    from tests.utils.stripe_refunds import CREDENTIALS, CURRENT_REFUND_STATUS
+    from tests.utils.stripe_refunds import (
+        CREDENTIALS,
+        CURRENT_REFUND_METADATA,
+        CURRENT_REFUND_STATUS,
+    )
 
     def retrieve(refund_id, **kwargs):
         if refund_id not in CURRENT_REFUND_STATUS:
@@ -37,10 +41,13 @@ def refund_states():
                 f"No such refund: '{refund_id}'", "refund"
             )
         return SimpleNamespace(
-            id=refund_id, status=CURRENT_REFUND_STATUS[refund_id]
+            id=refund_id,
+            status=CURRENT_REFUND_STATUS[refund_id],
+            metadata=CURRENT_REFUND_METADATA.get(refund_id, {}),
         )
 
     CURRENT_REFUND_STATUS.clear()
+    CURRENT_REFUND_METADATA.clear()
     with (
         mock.patch(
             "tenant.credentials.stripe_credentials", return_value=CREDENTIALS
@@ -51,3 +58,4 @@ def refund_states():
     ):
         yield CURRENT_REFUND_STATUS
     CURRENT_REFUND_STATUS.clear()
+    CURRENT_REFUND_METADATA.clear()

@@ -958,7 +958,9 @@ def test_a_reversal_comes_off_the_duplicate_whether_it_comes_before_or_after():
             order, charge=charge, amount=_eur("40.00"), reference="re_claim"
         )
 
-    dash = order.payment_transactions.get(provider_reference="re_dash")
+    dash = order.payment_transactions.get(
+        provider_reference="re_dash", kind=PaymentTransactionKind.REFUND
+    )
     assert not credit_allocation.undecided(order)
     assert credit_allocation.allocation_of(refund=dash) == {
         Decimal(24): Decimal("10.00")

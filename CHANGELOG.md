@@ -3,6 +3,66 @@
 
 
 
+## v3.236.0 (2026-11-08)
+
+### Continuous integration
+
+* ci(infra): match Meilisearch v1.56.0 and RabbitMQ 4.3.7 to the cluster (#533)
+
+The cluster moves Meilisearch to chart 0.42.0 (engine v1.56.0) and the
+broker to rabbitmq:4.3.7-management in the cluster upgrades of
+2026-11-08/09 (grooveshop-infrastructure #269, #272-#275). CI's service
+containers and infra.compose.yml follow, so dev, CI and production run
+the same engines. Redis stays on redis:8-alpine (8.10, as the cluster
+now runs).
+
+The recommendations-engine page stated the cluster "runs v1.53.1";
+it now says that was the version at the time of the check.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`07fd55d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07fd55d5e94186c65add78a2d5ea76de7bddb8cd))
+
+### Features
+
+* feat(deps): run on Python 3.15.2 (#537)
+
+Django 6.1.3 is the first release that supports Python 3.15. 3.15.2, not
+3.15.0: it fixes the 3.15.0 import-lock deadlock (gh-159963) on
+concurrent first imports, which our function-level imports under the
+asgiref and Channels thread pools would meet.
+
+- .python-version, both Dockerfiles, requires-python, the ruff and ty
+  targets, CLAUDE.md and README. A new test keeps .python-version, the
+  Dockerfiles' PYTHON_VERSION and the tool targets in agreement, so a
+  mismatch fails the PR instead of the release image build.
+- Both images set UV_PYTHON_DOWNLOADS=0 (uv's Docker guidance). Without
+  it, a .python-version that differs from PYTHON_VERSION made uv
+  download its own interpreter into /root, and the production stage
+  shipped a venv with no interpreter.
+- [tool.uv] CVE floors are constraint-dependencies, not overrides. An
+  override replaced fonttools' brotlicffi requirement marker and all,
+  so the PyPy-only brotlicffi was compiled into every image (36 s in the
+  v3.234.4 build); it is no longer installed.
+- WeasyPrint libraries: the runtime image installs pango and
+  harfbuzz-subset (WeasyPrint warned it was missing) instead of cairo,
+  gdk-pixbuf and libffi; the builder drops python3-dev (it installed
+  Alpine's own Python) and the cairo/pango/gdk-pixbuf/libffi headers
+  (WeasyPrint is pure Python and dlopens its libraries). A Greek PDF
+  renders in the new image with no warning. The dev image moves to
+  trixie, uv 0.13.7, and drops the unused PostgreSQL server package.
+- Python 3.15 makes sentinel a builtin: the shipment cache in the order
+  serializer checks membership instead of a sentinel object, and a test
+  renames its local.
+- CI runs the locked ruff through uv instead of downloading it again
+  through ruff-action.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`acde187`](https://github.com/vasilistotskas/grooveshop-django-api/commit/acde1876f96b0828906aa012b42d2054ba60befd))
+
 ## v3.235.0 (2026-11-08)
 
 ### Bug fixes

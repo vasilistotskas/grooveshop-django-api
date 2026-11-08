@@ -3,6 +3,16 @@
 
 
 
+## v3.234.3 (2026-11-08)
+
+### Bug fixes
+
+* fix(tenant): count only wrong staff sign-ins against an address (#531) ([`436dd31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/436dd3122b56f8fb7243cf034defc85458da5f64))
+
+### Chores
+
+* chore(api-contract): drop the overrides storefront v3.334.0 made unnecessary (#529) ([`95e7dba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95e7dba6653d0914825851a0a5127a79d01fb08a))
+
 ## v3.234.2 (2026-11-08)
 
 ### Bug fixes

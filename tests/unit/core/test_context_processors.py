@@ -55,3 +55,16 @@ def test_a_template_that_reads_a_value_gets_it():
 def test_request_details_only_for_superusers():
     request = _request()
     assert dict(metadata(request)["REQUEST_DETAILS"]) == {}
+
+
+def test_version_is_the_release_wherever_the_process_runs(
+    monkeypatch, tmp_path
+):
+    """``VERSION`` is ``settings.RELEASE_VERSION``. It used to open
+    ``pyproject.toml`` relative to the working directory and answered
+    ``0.0.0`` from anywhere else."""
+    from django.conf import settings
+
+    monkeypatch.chdir(tmp_path)
+
+    assert metadata(_request())["VERSION"] == settings.RELEASE_VERSION

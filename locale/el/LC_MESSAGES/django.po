@@ -856,8 +856,8 @@ msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε 
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
 
-msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge refunded money beyond the receipt on the order to clear it."
-msgstr "Μια επιστροφή, χωρίς την οποία εκδόθηκαν αυτές οι αποδείξεις, δηλώθηκε αποτυχημένη από τον πάροχο πληρωμών, άρα ο πελάτης κράτησε τα προϊόντα: ελέγξτε το ιστορικό κάθε παραγγελίας και φροντίστε να διορθωθεί η απόδειξη, και μετά χρησιμοποιήστε το Επιβεβαίωση επιστραμμένων χρημάτων πέραν της απόδειξης στην παραγγελία για να αφαιρεθεί."
+msgid "A refund these receipts were issued net of was reported failed by the payment provider, so the customer kept the goods: check each order's history and have the receipt corrected, then use Acknowledge receipt differences on the order to clear it."
+msgstr "Μια επιστροφή, από την οποία εκδόθηκαν καθαρές αυτές οι αποδείξεις, δηλώθηκε ως αποτυχημένη από τον πάροχο πληρωμών, οπότε ο πελάτης κράτησε τα προϊόντα: ελέγξτε το ιστορικό κάθε παραγγελίας και φροντίστε να διορθωθεί η απόδειξη, και μετά χρησιμοποιήστε την ενέργεια «Επιβεβαίωση διαφορών απόδειξης» στην παραγγελία για να το καθαρίσετε."
 
 msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
 msgstr "Μια επιστροφή χρημάτων στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της παραμένει άγνωστο μετά την αυτόματη αναζήτηση. Ελέγξτε τον πίνακα ελέγχου του παρόχου και καταγράψτε αν έγινε. Δεσμεύει τα χρήματά της μέχρι να το κάνετε."
@@ -1263,8 +1263,8 @@ msgstr "Προτιμήσεις λογαριασμού"
 msgid "Account security notice"
 msgstr "Ειδοποίηση ασφαλείας λογαριασμού"
 
-msgid "Acknowledge refunded money beyond the receipt"
-msgstr "Επιβεβαίωση επιστροφής χρημάτων πέρα από την απόδειξη"
+msgid "Acknowledge receipt differences"
+msgstr "Επιβεβαίωση διαφορών απόδειξης"
 
 msgid "Acknowledge the failure"
 msgstr "Επιβεβαίωση της αποτυχίας"
@@ -2024,6 +2024,9 @@ msgstr "Δημοφιλέστερα προϊόντα"
 
 msgid "Better mobile experience"
 msgstr "Καλύτερη εμπειρία σε κινητά"
+
+msgid "Beyond or short of the receipt"
+msgstr "Πέρα ή κάτω από την απόδειξη"
 
 msgid "Billing"
 msgstr "Χρέωση"
@@ -4534,9 +4537,6 @@ msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
 msgid "Enable experimental Meilisearch features"
 msgstr "Ενεργοποίηση πειραματικών λειτουργιών Meilisearch"
 
-msgid "Enable or disable pagination"
-msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
-
 msgid "Enabled"
 msgstr "Ενεργοποιημένο"
 
@@ -6716,6 +6716,10 @@ msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a 
 msgstr "Δώστε στο ACS τους αριθμούς voucher και ζητήστε την κατάσταση απόδοσης της αντικαταβολής. Αν έχει γίνει απόδοση σε ημερομηνία που η νυχτερινή συμφωνία δεν ρώτησε ποτέ, επαναλάβετέ την με την εντολή reconcile_acs_cod: είναι ασφαλής σε επανάληψη."
 
 #, python-format
+msgid "Give at most %(max)d values."
+msgstr "Δώστε το πολύ %(max)d τιμές."
+
+#, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
 msgstr "Δώστε από 1 έως %(max)d ID προϊόντων, το καθένα θετικό ακέραιο."
 
@@ -6750,6 +6754,9 @@ msgstr "Καλά νέα! Η παραγγελία σας #%(order_id)s έχει �
 
 msgid "Goods"
 msgstr "Προϊόντα"
+
+msgid "Goods claimed"
+msgstr "Εμπορεύματα που διεκδικήθηκαν"
 
 msgid "Goods not yet settled"
 msgstr "Προϊόντα που δεν έχουν διευθετηθεί"
@@ -10578,9 +10585,6 @@ msgstr "Επισυνάπτουμε σε PDF την απόδειξη της πα�
 msgid "Please include your order number"
 msgstr "Παρακαλούμε συμπεριλάβετε τον αριθμό παραγγελίας"
 
-msgid "Please provide a valid email address"
-msgstr "Παρακαλούμε δώστε μια έγκυρη διεύθυνση email"
-
 msgid "Please review and restock as needed."
 msgstr "Παρακαλούμε ελέγξτε και αναπληρώστε το απόθεμα όπου χρειάζεται."
 
@@ -11642,9 +11646,6 @@ msgstr "Επιστραφέν ποσό"
 
 msgid "Refunded Quantity"
 msgstr "Επιστραφείσα ποσότητα"
-
-msgid "Refunded beyond the receipt"
-msgstr "Επιστροφή πέρα από την απόδειξη"
 
 msgid "Refunded charge"
 msgstr "Επιστραφείσα χρέωση"
@@ -14301,6 +14302,9 @@ msgstr "Ο κωδικός εξαρτήματος του κατασκευαστή
 msgid "The marketing emails this store sends, each with whether your account's address still receives it."
 msgstr "Τα προωθητικά email που στέλνει αυτό το κατάστημα, με ένδειξη αν η διεύθυνση του λογαριασμού σας τα λαμβάνει ακόμη."
 
+msgid "The money beyond the receipt and the goods short of it are acknowledged."
+msgstr "Τα χρήματα πέρα από την απόδειξη και τα εμπορεύματα που λείπουν από αυτήν επιβεβαιώθηκαν."
+
 msgid "The newest published posts with their full body, in one response, for the storefront's RSS feed."
 msgstr "Τα πιο πρόσφατα δημοσιευμένα άρθρα με ολόκληρο το κείμενό τους, σε μία απάντηση, για το RSS feed του καταστήματος."
 
@@ -14489,9 +14493,6 @@ msgstr "Η επιστροφή δεν έγινε"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
-
-msgid "The refunded money beyond the receipt is acknowledged."
-msgstr "Η επιστροφή χρημάτων πέρα από την απόδειξη επιβεβαιώθηκε."
 
 msgid "The release whose versions this one restores."
 msgstr "Η δημοσίευση της οποίας τις εκδόσεις επαναφέρει αυτή."
@@ -14701,8 +14702,8 @@ msgstr "Αυτά τα κλειδιά είναι δεσμευμένα και δε
 msgid "These orders have shipped but their receipt is issued only once the refund it waits for is settled. Resolve that refund (Record refund outcome, or refund the same amount again) so the receipt can be issued."
 msgstr "Αυτές οι παραγγελίες έχουν αποσταλεί αλλά η απόδειξή τους εκδίδεται μόνο όταν ολοκληρωθεί η επιστροφή που περιμένει. Επιλύστε την (Καταγραφή αποτελέσματος επιστροφής ή νέα επιστροφή του ίδιου ποσού) ώστε να εκδοθεί η απόδειξη."
 
-msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge refunded money beyond the receipt on the order to clear it."
-msgstr "Αυτές οι παραγγελίες επιστράφηκαν περισσότερα από όσα κρατά η απόδειξή τους. Δεν μπορεί να εκδοθεί πιστωτικό παραστατικό για το μέρος πέρα από την απόδειξη: ελέγξτε το ιστορικό κάθε παραγγελίας και μετά χρησιμοποιήστε την Επιβεβαίωση επιστροφής χρημάτων πέρα από την απόδειξη στην παραγγελία για να σβήσει."
+msgid "These orders were refunded more than their receipt holds. No credit document can be issued for the part past the receipt: check each order's history, then use Acknowledge receipt differences on the order to clear it."
+msgstr "Αυτές οι παραγγελίες επιστράφηκαν για περισσότερα από όσα καλύπτει η απόδειξή τους. Για το μέρος πέρα από την απόδειξη δεν μπορεί να εκδοθεί πιστωτικό παραστατικό: ελέγξτε το ιστορικό κάθε παραγγελίας και μετά χρησιμοποιήστε την ενέργεια «Επιβεβαίωση διαφορών απόδειξης» στην παραγγελία για να το καθαρίσετε."
 
 msgid "These refunds stopped before the value went back onto the customer's gift cards and points. They hold their money and block the order's receipt and any new refund until finished: refund the same amount again on the order."
 msgstr "Αυτές οι επιστροφές σταμάτησαν πριν η αξία επιστρέψει στις δωροκάρτες και τους πόντους του πελάτη. Κρατούν τα χρήματά τους και μπλοκάρουν την απόδειξη της παραγγελίας και κάθε νέα επιστροφή μέχρι να ολοκληρωθούν: επιστρέψτε ξανά το ίδιο ποσό στην παραγγελία."
@@ -15365,6 +15366,9 @@ msgstr "Το ακάλυπτο ποσό επιβεβαιώθηκε στις"
 
 msgid "Understated"
 msgstr "Υποτιμημένο ποσό"
+
+msgid "Understated acknowledged at"
+msgstr "Η υποτιμημένη απόδειξη επιβεβαιώθηκε στις"
 
 msgid "Unexpected failure"
 msgstr "Μη αναμενόμενη αποτυχία"
@@ -16190,6 +16194,9 @@ msgstr "Τι ανέφερε ο πάροχος"
 msgid "What the shopper pays for this (provider, country, kind), before ``free_shipping_threshold`` or a carrier's own ``live_quote`` override it."
 msgstr "Τι πληρώνει ο πελάτης για αυτόν τον συνδυασμό (πάροχος, χώρα, τρόπος αποστολής), πριν από το ``free_shipping_threshold`` ή τη ζωντανή τιμή (``live_quote``) του courier."
 
+msgid "What the source returned of goods before any reversal of it by the provider (what it owed after the duplicate payment); set on one row of the source."
+msgstr "Όσα εμπορεύματα επέστρεψε η πηγή πριν από οποιαδήποτε ακύρωσή της από τον πάροχο (όσα όφειλε μετά την διπλή πληρωμή)· ορίζεται σε μία γραμμή της πηγής."
+
 msgid "What the store earned after what the goods cost, the payment fees, the shipping you pay and your other expenses. A management figure, not the profit of your tax return."
 msgstr "Τι κέρδισε το κατάστημα μετά το κόστος των προϊόντων, τις προμήθειες πληρωμών, τα μεταφορικά που πληρώνετε και τα λοιπά έξοδά σας. Ένα διοικητικό μέγεθος, όχι το κέρδος της φορολογικής σας δήλωσης."
 
@@ -16231,6 +16238,9 @@ msgstr "Πότε είδε κάποιος ότι απέτυχε. Ένας προ�
 
 msgid "When staff acknowledged the uncovered part; it is then left out of the store dashboard alert."
 msgstr "Πότε το προσωπικό επιβεβαίωσε το ακάλυπτο μέρος· τότε εξαιρείται από την ειδοποίηση του πίνακα ελέγχου."
+
+msgid "When staff acknowledged the understated receipt; it is then left out of the store dashboard alert."
+msgstr "Πότε το προσωπικό επιβεβαίωσε την υποτιμημένη απόδειξη· τότε εξαιρείται από την ειδοποίηση του πίνακα ελέγχου."
 
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
@@ -17057,6 +17067,9 @@ msgstr "Cache django-extra-settings (extra_settings_*) και η σύνοψη τ
 msgid "expired"
 msgstr "έληξε"
 
+msgid "false returns the whole list in one response"
+msgstr "Με false επιστρέφεται ολόκληρη η λίστα σε μία απόκριση"
+
 msgid "gift card and points"
 msgstr "δωροκάρτες και πόντοι"
 
@@ -17412,6 +17425,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Account security"
 #~ msgstr "Ασφάλεια λογαριασμού"
 
+#~ msgid "Acknowledge refunded money beyond the receipt"
+#~ msgstr "Επιβεβαίωση επιστροφής χρημάτων πέρα από την απόδειξη"
+
 #~ msgid "Activate selected subscriptions"
 #~ msgstr "Ενεργοποίηση επιλεγμένων συνδρομών"
 
@@ -17671,6 +17687,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Email template"
 #~ msgstr "Πρότυπο email"
+
+#~ msgid "Enable or disable pagination"
+#~ msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
 
 #~ msgid "End date for export (ISO format: YYYY-MM-DD)"
 #~ msgstr "Ημερομηνία λήξης για την εξαγωγή (μορφή ISO: YYYY-MM-DD)"
@@ -18271,6 +18290,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Place or district (optional)"
 #~ msgstr "Τόπος ή περιοχή (προαιρετικό)"
 
+#~ msgid "Please provide a valid email address"
+#~ msgstr "Παρακαλούμε δώστε μια έγκυρη διεύθυνση email"
+
 #, python-format
 #~ msgid "Points amount %(val)d is out of range (must be between -10000 and 10000)."
 #~ msgstr "Το ποσό πόντων %(val)d είναι εκτός εύρους (πρέπει να είναι μεταξύ -10000 και 10000)."
@@ -18384,6 +18406,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Refund an order payment"
 #~ msgstr "Επιστροφή πληρωμής παραγγελίας"
+
+#~ msgid "Refunded beyond the receipt"
+#~ msgstr "Επιστροφή πέρα από την απόδειξη"
 
 #~ msgid "Reminder Count"
 #~ msgstr "Πλήθος υπενθυμίσεων"

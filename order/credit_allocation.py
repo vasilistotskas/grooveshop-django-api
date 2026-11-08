@@ -168,27 +168,61 @@ def has_rates(order: Order) -> bool:
     return bool(_base(order)[0])
 
 
-def goods_returned(order: Order, *, before: datetime | None = None) -> Decimal:
-    """The goods the provider's money has paid back: what the order's
-    sources that moved before *before* (``None``: every one that moved)
-    allocated to goods, and the part no credit could cover. Gift card and
-    points returns are not the provider's money, and a chargeback whose
-    goods did not come back returned none. A refund's duplicate-payment part
-    owes no credit and is no goods: the order is still for what the ledger
-    holds less this, so the excess is what is above it
-    (``PaymentLedger.excess_held``)."""
+def goods_returned(
+    order: Order, *, before: PaymentTransaction | None = None
+) -> Decimal:
+    """The goods the provider's money has paid back, as it stood at a cut:
+    what every refund that moved before the ledger row *before* (``None``:
+    every one that moved) returned of goods (``goods_claimed``: what it
+    owed after the duplicate payment), less what the provider reported
+    failed of it by the same cut. A reversal booked at or after the cut is
+    not yet known there, however late the refund is decided. Gift card and
+    points returns are not the provider's money; a chargeback is no part of
+    it (``PaymentLedger.excess_held`` takes off only what a lost dispute
+    took of the duplicate payment itself: a dispute on the sale is sale
+    money lost, whichever way staff decide its goods). A refund's
+    duplicate-payment part owes no credit and is no goods: the order is
+    still for what the ledger holds less this, so the excess is what is
+    above it (``PaymentLedger.excess_held``)."""
     rows = (
-        CreditAllocation.objects.filter(order=order, moved_at__isnull=False)
+        CreditAllocation.objects.filter(
+            order=order,
+            moved_at__isnull=False,
+            goods_claimed__gt=0,
+            decision__isnull=True,
+        )
         .exclude(refund_attempt__kind=RefundAttemptKind.STORED_VALUE)
-        .exclude(decision__goods_returned=False)
+        .select_related("refund", "refund_attempt__refund")
     )
     if before is not None:
-        rows = rows.filter(moved_at__lt=before)
-    totals = rows.aggregate(
-        amount=Coalesce(Sum("amount"), _ZERO),
-        uncovered=Coalesce(Sum("uncovered"), _ZERO),
+        rows = rows.filter(moved_at__lt=before.created_at)
+    sources = [(row, row.refund or row.refund_attempt.refund) for row in rows]
+    if not sources:
+        return _ZERO
+    reversals = PaymentTransaction.objects.filter(
+        kind=PaymentTransactionKind.REFUND_REVERSAL,
+        provider_reference__in={
+            refund.provider_reference for _row, refund in sources if refund
+        },
     )
-    return Decimal(totals["amount"]) + Decimal(totals["uncovered"])
+    if before is not None:
+        reversals = reversals.filter(
+            Q(created_at__lt=before.created_at)
+            | Q(created_at=before.created_at, pk__lt=before.pk)
+        )
+    failed: dict[tuple[str, str], Decimal] = {}
+    for reversal in reversals:
+        key = (reversal.provider, reversal.provider_reference)
+        failed[key] = failed.get(key, _ZERO) + Decimal(reversal.amount.amount)
+    total = _ZERO
+    for row, refund in sources:
+        paid = Decimal((refund or row.refund_attempt).amount.amount)
+        if refund:
+            paid -= failed.get(
+                (refund.provider, refund.provider_reference), _ZERO
+            )
+        total += max(min(row.goods_claimed, paid), _ZERO)
+    return total
 
 
 def pieces_of(allocation: Mapping[Decimal, Decimal]) -> list[Piece]:
@@ -244,14 +278,20 @@ def store(
     moved_at: datetime | None = None,
     nothing_owed: bool = False,
     uncovered: Decimal = _ZERO,
+    goods: Decimal | None = None,
     **source,
 ) -> None:
     """Write *pieces* as the allocation of one source (``refund_attempt=``,
     ``refund=`` or ``decision=``). *nothing_owed* says the source owes no
     credit at all: it is marked allocated by a row of amount zero.
     *uncovered* is the part the receipt had no room for, kept on the
-    source's first row so the store can be told (:func:`uncovered_orders`)."""
+    source's first row so the store can be told (:func:`uncovered_orders`).
+    *goods* is what the source returned of goods before any reversal
+    (``goods_claimed``, also on the first row): the pieces and the
+    uncovered part when not given."""
     currency = order.amount_due.currency
+    if goods is None:
+        goods = sum((p.amount for p in pieces), _ZERO) + uncovered
     if nothing_owed:
         CreditAllocation.objects.create(
             order=order,
@@ -259,6 +299,7 @@ def store(
             amount=Money(_ZERO, currency),
             moved_at=moved_at,
             uncovered=uncovered,
+            goods_claimed=goods,
             **source,
         )
         return
@@ -272,6 +313,7 @@ def store(
             amount=Money(piece.amount, currency),
             moved_at=moved_at,
             uncovered=uncovered if i == 0 else _ZERO,
+            goods_claimed=goods if i == 0 else _ZERO,
             **source,
         )
         for i, piece in enumerate(p for p in pieces if p.amount > 0)
@@ -330,6 +372,7 @@ def scale(returned: Decimal, **source) -> None:
     if not rows:
         return
     uncovered = sum((r.uncovered for r in rows), _ZERO)
+    goods = sum((r.goods_claimed for r in rows), _ZERO)
     if returned < claimed:
         shares = (
             proportional_shares(
@@ -352,9 +395,18 @@ def scale(returned: Decimal, **source) -> None:
                 [],
                 moved_at=first.moved_at,
                 nothing_owed=True,
+                goods=goods,
                 **source,
             )
             return
+        # The goods the source claimed stay on its first row left.
+        left = CreditAllocation.objects.filter(**source).order_by("pk")
+        first_left = left.first()
+        left.update(goods_claimed=_ZERO)
+        if first_left is not None:
+            CreditAllocation.objects.filter(pk=first_left.pk).update(
+                goods_claimed=goods
+            )
     if uncovered <= 0:
         return
     held = min(returned, claimed)
@@ -401,12 +453,17 @@ def allocate_source(
     outcome (more room, or more excess, if they were all released) the
     source gets NO row, which says "not decided yet", and the call returns
     ``False``; it is decided once those claims resolve. *excess_if_claims_fail*
-    is the excess with no claim holding any. Returns whether the source was
+    is the excess with no claim holding any; only the part of it this
+    source can take counts, so a claim that holds excess the source would
+    not take anyway never makes it wait. Returns whether the source was
     decided.
     """
-    if excess_if_claims_fail is not None and excess_if_claims_fail > excess:
+    if excess_if_claims_fail is not None and min(
+        excess_if_claims_fail, amount
+    ) > min(excess, amount):
         return False
-    owed = min(amount - min(excess, amount), amount - reversed_)
+    goods = amount - min(excess, amount)
+    owed = min(goods, amount - reversed_)
     taxable = has_rates(order)
     pieces: list[Piece] = []
     if owed > 0 and taxable:
@@ -426,6 +483,7 @@ def allocate_source(
         moved_at=moved_at,
         nothing_owed=not pieces,
         uncovered=uncovered,
+        goods=goods if taxable else _ZERO,
         **source,
     )
     if uncovered > 0:
@@ -636,27 +694,45 @@ def uncovered_orders() -> QuerySet[CreditAllocation]:
     past what the receipt holds), or a receipt left short by a refund the
     provider later reversed (``understated``). Each is for the store to look
     at until staff acknowledge it (:func:`acknowledge_uncovered`)."""
+    return beyond_receipt_orders() | understated_orders()
+
+
+def beyond_receipt_orders() -> QuerySet[CreditAllocation]:
+    """The rows among :func:`uncovered_orders` whose money moved past what
+    the receipt could credit, not yet acknowledged."""
     return CreditAllocation.objects.filter(
-        Q(uncovered__gt=0) | Q(understated__gt=0),
-        uncovered_acknowledged_at__isnull=True,
+        uncovered__gt=0, uncovered_acknowledged_at__isnull=True
     )
 
 
 def understated_orders() -> QuerySet[CreditAllocation]:
     """The rows among :func:`uncovered_orders` that leave the receipt short
     of goods the customer kept (a refund netted from it was reversed)."""
-    return uncovered_orders().filter(understated__gt=0)
+    return CreditAllocation.objects.filter(
+        understated__gt=0, understated_acknowledged_at__isnull=True
+    )
 
 
 def acknowledge_uncovered(order: Order, *, user) -> int:
-    """Staff have seen the money past *order*'s receipt and settled it with
-    the accountant: the alert for it clears. Returns how many sources it
+    """Staff have seen the money past *order*'s receipt, or the receipt
+    short of goods the customer kept, and settled it with the accountant:
+    each alert clears on its own timestamp. Returns how many sources it
     cleared; the order's history records who did it."""
-    cleared = uncovered_orders().filter(order=order)
-    totals = cleared.aggregate(
-        uncovered=Sum("uncovered"), understated=Sum("understated")
+    now = timezone.now()
+    over = beyond_receipt_orders().filter(order=order)
+    short = understated_orders().filter(order=order)
+    totals = {
+        "uncovered": over.aggregate(total=Sum("uncovered"))["total"],
+        "understated": short.aggregate(total=Sum("understated"))["total"],
+    }
+    count = len(
+        {
+            *over.values_list("pk", flat=True),
+            *short.values_list("pk", flat=True),
+        }
     )
-    count = cleared.update(uncovered_acknowledged_at=timezone.now())
+    over.update(uncovered_acknowledged_at=now)
+    short.update(understated_acknowledged_at=now)
     if count and totals["uncovered"]:
         OrderHistory.log_note(
             order=order,
@@ -696,7 +772,7 @@ def _blocks(order: Order, owing: Owing, claim: RefundAttempt) -> bool:
             before=owing.before,
             exclude=(*owing.exclude, claim.pk),
         )
-        if freed > excess:
+        if min(freed, owing.amount) > min(excess, owing.amount):
             return True
     owed = min(
         owing.amount - min(excess, owing.amount),
@@ -726,21 +802,26 @@ def blocking_claims(order: Order) -> list[RefundAttempt]:
 
 
 def excess_holders(
-    order: Order, *, exclude: Collection[int] = ()
+    order: Order, amount: Decimal, *, exclude: Collection[int] = ()
 ) -> list[RefundAttempt]:
     """The PENDING provider claims that hold part of the order's duplicate
-    payment: releasing one alone would leave more excess for a refund
-    claimed now."""
+    payment that a refund of *amount* claimed now would take: releasing
+    one alone would leave it more excess."""
     from order.payment_ledger import PaymentLedger
 
-    held = PaymentLedger.refundable_excess(order, exclude=exclude)
+    held = min(PaymentLedger.refundable_excess(order, exclude=exclude), amount)
     return [
         claim
         for claim in RefundAttempt.objects.live()
         .filter(order=order, kind=RefundAttemptKind.PROVIDER)
         .exclude(pk__in=exclude)
         .order_by("pk")
-        if PaymentLedger.refundable_excess(order, exclude=(*exclude, claim.pk))
+        if min(
+            PaymentLedger.refundable_excess(
+                order, exclude=(*exclude, claim.pk)
+            ),
+            amount,
+        )
         > held
     ]
 
@@ -852,7 +933,7 @@ def free_reversed(refund: PaymentTransaction) -> None:
         .values("pk")[:1]
     ).update(
         understated=F("understated") + freed,
-        uncovered_acknowledged_at=None,
+        understated_acknowledged_at=None,
     )
     OrderHistory.log_note(
         order=refund.order,
@@ -895,6 +976,7 @@ __all__ = [
     "allocate_source",
     "allocation_of",
     "allocation_of_refund",
+    "beyond_receipt_orders",
     "blocking_claims",
     "describe_blockers",
     "drop",

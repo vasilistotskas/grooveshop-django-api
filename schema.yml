@@ -439,15 +439,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -1107,15 +1098,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -1533,15 +1515,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -2095,15 +2068,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -2208,15 +2172,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -2320,15 +2275,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -2797,15 +2743,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -2963,15 +2900,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -3331,15 +3259,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -4241,15 +4160,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -4774,15 +4684,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -5418,15 +5319,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -5851,15 +5743,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -7074,15 +6957,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -7557,15 +7431,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -8260,15 +8125,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -12305,15 +12161,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -12720,15 +12567,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -13398,7 +13236,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+        description: Με false επιστρέφεται ολόκληρη η λίστα σε μία απόκριση
       - in: query
         name: paginationType
         schema:
@@ -14130,7 +13968,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+        description: Με false επιστρέφεται ολόκληρη η λίστα σε μία απόκριση
       - in: query
         name: paginationType
         schema:
@@ -14643,15 +14481,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -14953,15 +14782,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -16024,15 +15844,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -16844,15 +16655,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -19104,15 +18906,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -19815,15 +19608,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -20719,15 +20503,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -21431,15 +21206,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -21764,15 +21530,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -22186,15 +21943,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -22721,15 +22469,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -23181,15 +22920,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -23584,15 +23314,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -24210,15 +23931,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -24967,15 +24679,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -26049,15 +25752,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -26333,15 +26027,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -26883,15 +26568,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -27942,15 +27618,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -29224,15 +28891,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -29826,15 +29484,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -30438,15 +30087,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -31047,15 +30687,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -31378,15 +31009,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -31498,15 +31120,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -31680,15 +31293,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -31948,15 +31552,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -32069,15 +31664,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -32295,15 +31881,6 @@ paths:
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
       - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
-      - in: query
         name: paginationType
         schema:
           type: string
@@ -32416,15 +31993,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -32740,15 +32308,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -33453,15 +33012,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -34409,15 +33959,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Αριθμός αποτελεσμάτων ανά σελίδα
-      - in: query
-        name: pagination
-        schema:
-          type: string
-          enum:
-          - 'false'
-          - 'true'
-          default: 'true'
-        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:

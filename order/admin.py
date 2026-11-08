@@ -266,7 +266,7 @@ class BooksFilter(DropdownFilter):
     def lookups(self, request, model_admin):
         return [
             ("receipt_waiting", _("Receipt waiting for a refund")),
-            ("beyond_receipt", _("Refunded beyond the receipt")),
+            ("beyond_receipt", _("Beyond or short of the receipt")),
         ]
 
     def queryset(self, request, queryset):
@@ -2132,30 +2132,36 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @action(
-        description=_("Acknowledge refunded money beyond the receipt"),
+        description=_("Acknowledge receipt differences"),
         icon="task_alt",
         permissions=["change", "acknowledge_uncovered"],
     )
     def acknowledge_uncovered(self, request, object_id):
-        """Clear the dashboard alert for money refunded past the receipt:
-        staff looked at the order's history and settled it with the
-        accountant. Recorded in the order's history with who did it."""
+        """Clear the dashboard alerts for money refunded past the receipt
+        and for a receipt short of goods the customer kept: staff looked at
+        the order's history and settled it with the accountant. Recorded in
+        the order's history with who did it."""
         order = Order.objects.get(pk=object_id)
         with transaction.atomic():
             Order.objects.select_for_update().get(pk=order.pk)
             credit_allocation.acknowledge_uncovered(order, user=request.user)
         self.log_change(
-            request, order, "Acknowledged refunded money beyond the receipt"
+            request,
+            order,
+            "Acknowledged the money beyond, or goods short of, the receipt",
         )
         messages.success(
             request,
-            _("The refunded money beyond the receipt is acknowledged."),
+            _(
+                "The money beyond the receipt and the goods short of it "
+                "are acknowledged."
+            ),
         )
         return self._redirect_to_order_change(object_id)
 
     def has_acknowledge_uncovered_permission(self, request, object_id=None):
-        """Offered while the order has refunded money past its receipt that
-        nobody acknowledged."""
+        """Offered while the order has refunded money past its receipt,
+        or a receipt short of goods, that nobody acknowledged."""
         return (
             object_id is not None
             and credit_allocation.uncovered_orders()

@@ -3,6 +3,121 @@
 
 
 
+## v3.236.2 (2026-11-08)
+
+### Bug fixes
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in (#538) ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in
+
+Every BaseModelViewSet list honoured ?pagination=false and returned the whole filtered queryset, past the paginator's maximum page size: any caller, an anonymous one on the public product list included, could take a whole table in one response. A view now names the actions that honour it in unpaginated_actions (the country list and a customer's own gift cards, the two the storefront reads in full); every other list ignores it and stays paginated. The parameter is documented only on those two operations: create_schema_view_config(unpaginated_actions=...) adds PAGINATION_PARAMETER, now defined once instead of four times.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(admin): post next from the login form instead of redirecting to add it
+
+Our own core/templates/admin/login.html (not Unfold's, which the mixin's docstring blamed) rendered no next field, so a login from a bare /admin/login/ fell back to LOGIN_REDIRECT_URL, the storefront's account page. AdminSiteLoginNextMixin worked around it by redirecting every bare GET to ?next=/admin/. The form now posts next itself, which AdminSite.login fills with the requested page or the site's index, and the mixin is gone from both sites. The tests assert what the page carries on the platform host and on a store host, instead of the redirect.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(contact): leave email format to the serializer's EmailField
+
+validate_contact_content and validate_feedback_content ran their own ASCII-only regex after the serializer's EmailField had already validated the address, and refused valid internationalised ones: a Greek domain, punycode (xn--...) or Unicode. The format is now Django's EmailValidator alone; the utilities keep the disposable-domain check. The invalid-format cases moved to the serializer tests, which also prove a Greek domain is accepted.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(core): read the template VERSION from settings.RELEASE_VERSION
+
+core.context_processors re-read pyproject.toml relative to the working directory and answered 0.0.0, with a warning, whenever the process ran from elsewhere, while settings.RELEASE_VERSION already holds the same value read from BASE_DIR (the footer and the response cache use it).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(order): parse AADE's myDATA answers with defusedxml
+
+parse_response_doc and parse_requested_doc read XML that comes over the network with the stdlib parser, including a second document re-parsed from an element's text. defusedxml, already a dependency for SVG uploads, refuses entity declarations and external references in both; a test proves an entity-bearing answer is refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+### Testing
+
+* test(core): pin both sides of the unpaginated-actions rule
+
+The PaginationModelViewSet unit test assumed ?pagination=false returns the whole list on any view. It now opts its action in for that case, and a second test proves a view that has not opted in ignores the flag and goes through the paginator.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+## v3.236.1 (2026-11-08)
+
+### Bug fixes
+
+* fix(search): cap the id lists a search request may carry (#535) ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): cap the id lists the public product search accepts
+
+parse_int_csv had no length limit, and the public (AllowAny) product
+search turns categories, attribute_values and brands into Meilisearch
+IN [...] filters (categories expanded to their whole subtree). One
+crafted URL could therefore drive thousands of ids into a single filter.
+
+parse_int_csv now takes a keyword max_items defaulting to
+MAX_INT_CSV_ITEMS (100), so every caller inherits the bound. The count is
+checked before any value is converted to int, so an oversized list costs
+one split. Over the limit is a 400 with code too_many_values and a
+translated message naming the limit; garbage is still invalid_integer_list.
+100 is far above any real selection: the storefront builds these lists
+from the filter chips a shopper ticks plus the listing's own category.
+The loyalty product-points preview keeps its stricter own check.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(loyalty): keep the points preview's own error for an oversized list
+
+The new default cap in parse_int_csv (100, the same as the points
+preview's own MAX_POINTS_PREVIEW_PRODUCTS) answered a 101-id request to
+GET /api/v1/loyalty/product/points with `too_many_values` before the
+view's documented `invalid_product_ids` check could run (found by
+coldtea-pr-lens). The existing test only asserted a 400, so it passed.
+
+`max_items=None` lets a caller that bounds the list itself right after
+parsing opt out; the points preview does, so one bound and one error
+answer it. A test now pins the code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): count distinct ids against the cap and pin the code in tests
+
+Review follow-ups (independent review on #535):
+- parse_int_csv counts distinct values, first occurrence kept. The
+  storefront's queryIdList neither dedupes nor caps, so a mangled or
+  stale filter link that repeats an id must not turn the listing into
+  a 400. The repeated values were never useful to the filter either.
+- The search endpoint test asserted only that the field was named in
+  the 400; it now pins `too_many_values`, so another 400 cannot pass for
+  it. A test covers a repeated id, and the count-before-conversion test
+  uses distinct garbage values.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
 ## v3.236.0 (2026-11-08)
 
 ### Continuous integration

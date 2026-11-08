@@ -511,3 +511,17 @@ class TestMine:
             response = _client(user).get(MINE_URL)
 
         assert response.status_code == 404
+
+    def test_pagination_false_returns_every_card_as_a_list(self):
+        """The account summary reads every card in one request
+        (``GiftCardViewSet.unpaginated_actions``)."""
+        user = UserAccountFactory()
+        for n in range(3):
+            GiftCardFactory(code=f"GC-MINE-ALL{n}-CARD", issued_to=user)
+
+        with _gift_cards():
+            response = _client(user).get(MINE_URL, {"pagination": "false"})
+
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+        assert len(response.json()) == 3

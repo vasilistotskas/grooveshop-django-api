@@ -1597,3 +1597,242 @@ class TestTheUnfinishedReturnsAlertListsEachOrderOnce:
         ]
 
         assert len(alert["items"]) == 2
+
+
+def _credited_gross(order) -> Decimal:
+    from order.models import RetailCredit
+
+    return sum(
+        (
+            Decimal(row["gross"])
+            for credit in RetailCredit.objects.filter(order=order)
+            for row in credit.vat_breakdown
+        ),
+        Decimal(0),
+    )
+
+
+class TestASourceOwesTheSameWheneverItIsDecided:
+    """Everything a source's decision reads is as it stood at the source's
+    own cut: later reversals and disputes never change what it owes."""
+
+    def test_a_reversal_after_the_cut_does_not_change_the_excess(self):
+        """Sale 100. A goods refund of 80. A claim of 5 times out. The
+        customer pays 100 again and 50 of it is given back (it waits for the
+        claim). The provider then reverses 70 of the 80, and the claim
+        settles. The 50 gave the duplicate back whenever it is decided;
+        the goods returned are 10 + 5, so the receipt is 85."""
+        from order.models.refund_attempt import RefundAttempt
+        from order.tasks import allocate_credit_sources
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            with FakeStripeRefunds() as api:
+                PaymentLedger.record_refund(
+                    order,
+                    charge=charge,
+                    amount=_eur("80.00"),
+                    reference="re_80",
+                )
+                api.fail_with = stripe.APIConnectionError("x")
+                OrderService.refund_order(order, amount=_eur("5.00"))
+                api.fail_with = None
+                claim = RefundAttempt.objects.live().get(order=order)
+                dup, _ = PaymentLedger.record_charge(
+                    order,
+                    amount=_eur("100.00"),
+                    provider="stripe",
+                    reference="pi_d",
+                )
+                PaymentLedger.record_refund(
+                    order, charge=dup, amount=_eur("50.00"), reference="re_dup"
+                )
+                PaymentLedger.record_refund_reversal(
+                    order,
+                    charge=charge,
+                    amount=_eur("70.00"),
+                    reference="re_80",
+                )
+                order.refresh_from_db()
+                OrderService.book_share(
+                    order, claim, claim.amount, "re_c", claim.reason
+                )
+                allocate_credit_sources()
+                _receipt(order)
+
+        assert Invoice.objects.get(order=order).total.amount == Decimal("85.00")
+
+    @pytest.mark.parametrize("receipt_first", [True, False])
+    def test_an_undecided_chargeback_does_not_change_a_duplicate_refund(
+        self, receipt_first
+    ):
+        """Sale 100, a lost dispute of 30 not yet decided, a duplicate
+        payment of 100 given back, then staff say the goods came back. The
+        customer kept 70 of goods: the credits total 30, whichever of the
+        receipt and the decision came first."""
+        from order.chargebacks import decide_chargebacks
+        from order.tasks import allocate_credit_sources
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        with mydata_enabled(auto_submit=False), FakeAade():
+            if receipt_first:
+                _receipt(order)
+            PaymentLedger.record_chargeback(
+                order, charge=charge, amount=_eur("30.00"), reference="dp_1"
+            )
+            dup, _ = PaymentLedger.record_charge(
+                order,
+                amount=_eur("100.00"),
+                provider="stripe",
+                reference="pi_d",
+            )
+            PaymentLedger.record_refund(
+                order, charge=dup, amount=_eur("100.00"), reference="re_dup"
+            )
+            decide_chargebacks(order.id, goods_returned=True, user=staff)
+            if not receipt_first:
+                _receipt(order)
+            allocate_credit_sources()
+            create_pending_credits(order.id)
+
+        receipt = Invoice.objects.get(order=order).total.amount
+        assert receipt - _credited_gross(order) == Decimal("70.00")
+
+    def test_a_chargeback_whose_goods_were_kept_never_eats_a_duplicate(self):
+        """Goods kept means the receipt stands: the money the dispute took
+        is sale money lost, and the duplicate given back is all excess."""
+        from order.chargebacks import decide_chargebacks
+        from order.tasks import allocate_credit_sources
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_chargeback(
+                order, charge=charge, amount=_eur("30.00"), reference="dp_1"
+            )
+            dup, _ = PaymentLedger.record_charge(
+                order,
+                amount=_eur("100.00"),
+                provider="stripe",
+                reference="pi_d",
+            )
+            PaymentLedger.record_refund(
+                order, charge=dup, amount=_eur("100.00"), reference="re_dup"
+            )
+            decide_chargebacks(order.id, goods_returned=False, user=staff)
+            allocate_credit_sources()
+            create_pending_credits(order.id)
+
+        assert _credited_gross(order) == Decimal(0)
+        assert Invoice.objects.get(order=order).total.amount == Decimal(
+            "100.00"
+        )
+
+    def test_the_overcharge_does_not_depend_on_the_chargeback_decision(self):
+        from order.chargebacks import decide_chargebacks
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_chargeback(
+                order, charge=charge, amount=_eur("30.00"), reference="dp_1"
+            )
+            PaymentLedger.record_charge(
+                order,
+                amount=_eur("100.00"),
+                provider="stripe",
+                reference="pi_d",
+            )
+            order.refresh_from_db()
+            undecided = PaymentLedger.excess_held(order)
+            decide_chargebacks(order.id, goods_returned=True, user=staff)
+            returned = PaymentLedger.excess_held(order)
+
+        assert undecided == returned == Decimal("100.00")
+        assert order.overcharged_at is not None
+
+
+class TestAWaitIsOnlyForWhatChangesTheOutcome:
+    def test_a_refund_beyond_what_a_pending_claim_holds_is_not_held_up(self):
+        """The duplicate is 100 and a claim of 10 holds part of it: a new
+        refund of 5 takes 5 of the duplicate under either outcome of the
+        claim, so it goes through."""
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            _duplicate_payment(order)
+            _pending_claim(order, "10.00")
+            with FakeStripeRefunds():
+                OrderService.refund_order(order, amount=_eur("5.00"))
+
+        assert order.refund_attempts.filter(amount="5.00").exists()
+
+    def test_a_refund_the_claim_could_change_still_waits(self):
+        order = _order(lines=(("24", "100.00"),))
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            _duplicate_payment(order)
+            _pending_claim(order, "60.00")
+            with (
+                FakeStripeRefunds(),
+                pytest.raises(PaymentError, match="waiting for"),
+            ):
+                OrderService.refund_order(order, amount=_eur("70.00"))
+
+
+class TestEachKindOfDifferenceIsAcknowledgedOnItsOwn:
+    def test_acknowledging_one_kind_leaves_the_other_showing(self):
+        """A source with money past the receipt, already acknowledged, and a
+        receipt short of goods: the short receipt still shows, and
+        acknowledging it stamps only its own timestamp."""
+        from django.utils import timezone
+
+        from user.factories import UserAccountFactory
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        refund, _ = PaymentLedger.record_refund(
+            order, charge=charge, amount=_eur("10.00"), reference="re_10"
+        )
+        stamp = timezone.now()
+        CreditAllocation.objects.filter(refund=refund).delete()
+        row = CreditAllocation.objects.create(
+            order=order,
+            refund=refund,
+            rate=Decimal(24),
+            amount=_eur("0.00"),
+            uncovered=Decimal("5.00"),
+            uncovered_acknowledged_at=stamp,
+            understated=Decimal("3.00"),
+        )
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+
+        assert not credit_allocation.beyond_receipt_orders().exists()
+        assert credit_allocation.understated_orders().filter(pk=row.pk)
+
+        assert credit_allocation.acknowledge_uncovered(order, user=staff) == 1
+
+        row.refresh_from_db()
+        assert row.uncovered_acknowledged_at == stamp
+        assert row.understated_acknowledged_at is not None
+        assert not credit_allocation.uncovered_orders().exists()

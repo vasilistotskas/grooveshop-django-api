@@ -30,6 +30,11 @@ serializers_config: SerializersConfig = {
 }
 
 
+# The storefront's country pickers (shipping, phone prefix) need the
+# whole list, about 250 rows, in one request.
+UNPAGINATED_ACTIONS = frozenset({"list"})
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=Country,
@@ -38,12 +43,14 @@ serializers_config: SerializersConfig = {
         },
         serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
+        unpaginated_actions=UNPAGINATED_ACTIONS,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
     serializers_config = serializers_config
+    unpaginated_actions = UNPAGINATED_ACTIONS
     filterset_class = CountryFilter
 
     def get_permissions(self):

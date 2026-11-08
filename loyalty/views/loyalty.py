@@ -356,8 +356,12 @@ class LoyaltyViewSet(BaseModelViewSet):
 
         One request for a cart's products instead of one per product.
         """
+        # Its own bound below answers an oversized list with this
+        # endpoint's documented ``invalid_product_ids``.
         product_ids = parse_int_csv(
-            request.query_params.get("product_ids"), "productIds"
+            request.query_params.get("product_ids"),
+            "productIds",
+            max_items=None,
         )
         if not (
             1 <= len(product_ids) <= MAX_POINTS_PREVIEW_PRODUCTS

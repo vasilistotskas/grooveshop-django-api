@@ -170,3 +170,21 @@ class TestFeedbackWriteSerializer(TestCase):
         assert data["category"] == FeedbackCategory.SUPPORT
         assert "id" in data
         assert "uuid" in data
+
+    def test_an_internationalised_address_is_accepted(self):
+        serializer = FeedbackWriteSerializer(
+            data={
+                **self.valid_data,
+                "email": "user@xn--hxajbheg2az3al.xn--qxam",
+            }
+        )
+
+        assert serializer.is_valid(), serializer.errors
+
+    def test_a_malformed_address_is_refused_by_the_email_field(self):
+        serializer = FeedbackWriteSerializer(
+            data={**self.valid_data, "email": "invalid-email"}
+        )
+
+        assert not serializer.is_valid()
+        assert "email" in serializer.errors

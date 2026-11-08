@@ -953,12 +953,11 @@ class StoreAlerts(DashboardWidget):
         accountant has to look at each. The order's history says how much."""
         from django.db.models import Max
 
-        from order.credit_allocation import uncovered_orders
+        from order.credit_allocation import beyond_receipt_orders
 
         order_ids = [
             row["order_id"]
-            for row in uncovered_orders()
-            .filter(uncovered__gt=0)
+            for row in beyond_receipt_orders()
             .values("order_id")
             .annotate(latest=Max("pk"))
             .order_by("-latest")[:5]
@@ -974,8 +973,8 @@ class StoreAlerts(DashboardWidget):
                     "These orders were refunded more than their receipt "
                     "holds. No credit document can be issued for the part "
                     "past the receipt: check each order's history, then "
-                    "use Acknowledge refunded money beyond the receipt on "
-                    "the order to clear it."
+                    "use Acknowledge receipt differences on the order to "
+                    "clear it."
                 ),
                 items=[
                     link_cell(self.change_url("order.Order", pk), f"#{pk}")
@@ -1016,8 +1015,7 @@ class StoreAlerts(DashboardWidget):
                     "reported failed by the payment provider, so the "
                     "customer kept the goods: check each order's history "
                     "and have the receipt corrected, then use Acknowledge "
-                    "refunded money beyond the receipt on the order to "
-                    "clear it."
+                    "receipt differences on the order to clear it."
                 ),
                 items=[
                     link_cell(self.change_url("order.Order", pk), f"#{pk}")

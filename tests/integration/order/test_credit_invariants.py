@@ -74,6 +74,7 @@ from unittest import mock
 import pytest
 import stripe
 from django.db.models import Q
+from django.utils import timezone
 
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
@@ -697,6 +698,14 @@ class State:
             ids = create_pending_credits(order.id)
             self.log.append(f"credits created {len(ids)}")
 
+    def looked_up(self, att):
+        """The automatic lookup asked the provider about *att* and could
+        not decide: staff may record its outcome from now on."""
+        RefundAttempt.objects.filter(pk=att.pk).update(
+            looked_up_at=timezone.now()
+        )
+        att.refresh_from_db()
+
     def stripe_refund(self, att):
         """The refund Stripe made for a claim whose answer was lost."""
         entry = self.fake._by_key.get(att.provider_key)
@@ -717,6 +726,7 @@ class State:
             )
         elif how == "settle_staff":
             made = self.stripe_refund(att)
+            self.looked_up(att)
             with mock.patch(
                 "order.models.refund_attempt.reconcile_after",
                 return_value=timedelta(0),
@@ -725,6 +735,7 @@ class State:
                     att, user=self.staff, settled=True, reference=made.id
                 )
         elif how == "decline_staff":
+            self.looked_up(att)
             with mock.patch(
                 "order.models.refund_attempt.reconcile_after",
                 return_value=timedelta(0),

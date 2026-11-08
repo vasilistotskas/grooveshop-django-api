@@ -67,6 +67,13 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
             created_at__lte=timezone.now() - reconcile_after(),
         )
 
+    def awaiting_staff(self):
+        """Overdue attempts the automatic lookup asked the provider about
+        and could not decide (``looked_up_at``): what staff are told about
+        and may record the outcome of. Until the lookup has had its turn
+        the provider may still answer on its own."""
+        return self.overdue().filter(looked_up_at__isnull=False)
+
     def stalled(self):
         """Gift card and points returns still PENDING after
         :func:`reconcile_after`: a crash left them unfinished. No provider
@@ -166,6 +173,15 @@ class RefundAttempt(models.Model):
         help_text=_("The ledger refund this attempt produced."),
     )
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
+    looked_up_at = models.DateTimeField(
+        _("Looked up at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the automatic lookup last asked the payment provider "
+            "about this refund and could not decide it."
+        ),
+    )
 
     objects = RefundAttemptQuerySet.as_manager()
 
@@ -205,3 +221,9 @@ class RefundAttempt(models.Model):
             and self.kind == RefundAttemptKind.PROVIDER
             and self.created_at <= timezone.now() - reconcile_after()
         )
+
+    @property
+    def is_awaiting_staff(self) -> bool:
+        """Whether staff may record this attempt's outcome
+        (:meth:`RefundAttemptQuerySet.awaiting_staff`)."""
+        return self.is_overdue and self.looked_up_at is not None

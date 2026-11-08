@@ -845,8 +845,8 @@ msgstr "A refund failed"
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 
-msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
-msgstr "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
+msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome with Record refund outcome on the order before trying again."
+msgstr "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome with Record refund outcome on the order before trying again."
 
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
@@ -8062,6 +8062,9 @@ msgstr "Longitude (string as returned by BoxNow)"
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Look up an order from Viva Wallet's post-payment redirect params"
 
+msgid "Looked up at"
+msgstr "Looked up at"
+
 msgid "Looking forward to seeing you again!"
 msgstr "Looking forward to seeing you again!"
 
@@ -11875,8 +11878,8 @@ msgstr "Reservation Status"
 msgid "Reserve"
 msgstr "Reserve"
 
-msgid "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations with 15-minute TTL. Returns list of reservation IDs to be used during order creation."
-msgstr "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations with 15-minute TTL. Returns list of reservation IDs to be used during order creation."
+msgid "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations that last the store's reservation time. Returns list of reservation IDs to be used during order creation."
+msgstr "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations that last the store's reservation time. Returns list of reservation IDs to be used during order creation."
 
 msgid "Reserve stock for cart items"
 msgstr "Reserve stock for cart items"
@@ -14351,6 +14354,9 @@ msgstr "The payment on delivery has not been collected yet, so there is nothing 
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "The payment provider cannot be reached to check this reference."
 
+msgid "The payment provider has not been asked about this refund yet: it is looked up automatically first."
+msgstr "The payment provider has not been asked about this refund yet: it is looked up automatically first."
+
 msgid "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
 msgstr "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
 
@@ -14901,9 +14907,6 @@ msgstr "This receipt is your proof of purchase — please keep it for your recor
 msgid "This refund has already been resolved."
 msgstr "This refund has already been resolved."
 
-msgid "This refund is not overdue yet: the payment provider is asked about it automatically first."
-msgstr "This refund is not overdue yet: the payment provider is asked about it automatically first."
-
 msgid "This schedule has already run or been cancelled."
 msgstr "This schedule has already run or been cancelled."
 
@@ -15049,9 +15052,6 @@ msgstr "Timestamp the envelope was generated"
 
 msgid "Timestamp when GrooveShop received the webhook (separate from event_time)"
 msgstr "Timestamp when GrooveShop received the webhook (separate from event_time)"
-
-msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
-msgstr "Timestamp when reservation expires (typically 15 minutes from creation)"
 
 msgid "Timestamp when the event occurred at BoxNow"
 msgstr "Timestamp when the event occurred at BoxNow"
@@ -16242,6 +16242,9 @@ msgstr "When staff acknowledged the understated receipt; it is then left out of 
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 
+msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
+msgstr "When the automatic lookup last asked the payment provider about this refund and could not decide it."
+
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "When the current confirmation link was issued. The link expires a week later."
 
@@ -16271,6 +16274,9 @@ msgstr "When the reduction in force began; empty when the product is not reduced
 
 msgid "When the reminder to review this order's products was settled: sent, or skipped because there was nothing left to ask for or the customer opted out. The reminder is never sent twice."
 msgstr "When the reminder to review this order's products was settled: sent, or skipped because there was nothing left to ask for or the customer opted out. The reminder is never sent twice."
+
+msgid "When the reservation expires: the store's reservation time after it was created."
+msgstr "When the reservation expires: the store's reservation time after it was created."
 
 msgid "When the retained records were finally erased. Null while retention is still running."
 msgstr "When the retained records were finally erased. Null while retention is still running."
@@ -17931,6 +17937,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Timestamp of the most recent reminder email."
 #~ msgstr "Timestamp of the most recent reminder email."
+
+#~ msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
+#~ msgstr "Timestamp when reservation expires (typically 15 minutes from creation)"
 
 #~ msgid "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
 #~ msgstr "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."

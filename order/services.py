@@ -3554,9 +3554,9 @@ class OrderService:
                             "A refund of this amount was sent to the "
                             "payment provider a while ago and its result is "
                             "still not known. It is looked up automatically; "
-                            "if it stays unknown, record its outcome from "
-                            "the order's refund attempts before trying "
-                            "again."
+                            "if it stays unknown, record its outcome with "
+                            "Record refund outcome on the order before "
+                            "trying again."
                         )
                     )
             return resumed, None

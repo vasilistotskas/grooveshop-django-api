@@ -456,8 +456,8 @@ class RefundOrderForm(BaseDialogForm):
 class RecordRefundOutcomeForm(BaseDialogForm):
     """The "Record refund outcome" dialog of an order.
 
-    Offers the order's provider refunds still PENDING past the point where
-    the automatic lookup is due (``RefundAttempt.objects.overdue()``): the
+    Offers the order's provider refunds still PENDING that the automatic
+    lookup could not decide (``RefundAttempt.objects.awaiting_staff()``): the
     provider was asked about them and could not decide, so staff look at the
     provider's dashboard and say what became of each. The service
     (``order.refund_reconciliation.record_outcome``) checks it all again
@@ -494,7 +494,7 @@ class RecordRefundOutcomeForm(BaseDialogForm):
     def __init__(self, request, object_id=None, *args, **kwargs):
         super().__init__(request, object_id, *args, **kwargs)
         self.fields["attempt"].queryset = (
-            RefundAttempt.objects.overdue()
+            RefundAttempt.objects.awaiting_staff()
             .filter(order_id=object_id)
             .order_by("created_at", "id")
         )
@@ -2122,11 +2122,11 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     def has_record_refund_outcome_permission(self, request, object_id=None):
-        """Offered where a provider refund is overdue: the automatic lookup
-        had its turn and could not decide."""
+        """Offered where the automatic lookup asked the provider about an
+        overdue refund and could not decide it."""
         return (
             object_id is not None
-            and RefundAttempt.objects.overdue()
+            and RefundAttempt.objects.awaiting_staff()
             .filter(order_id=object_id)
             .exists()
         )

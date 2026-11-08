@@ -15,7 +15,8 @@ class StockReservation(TimeStampMixinModel):
     Temporary stock hold during checkout process.
 
     Represents a reservation of product inventory for a specific duration
-    (default 15 minutes) to prevent stock from being sold to other customers
+    (the store's ``STOCK_RESERVATION_TTL_MINUTES``) to prevent stock from
+    being sold to other customers
     while a user completes their checkout.
 
     Lifecycle:
@@ -54,7 +55,8 @@ class StockReservation(TimeStampMixinModel):
     expires_at = models.DateTimeField(
         _("Expires At"),
         help_text=_(
-            "Timestamp when reservation expires (typically 15 minutes from creation)"
+            "When the reservation expires: the store's reservation time "
+            "after it was created."
         ),
     )
     consumed = models.BooleanField(

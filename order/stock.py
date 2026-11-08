@@ -124,7 +124,8 @@ class StockManager:
         Counts EVERY active hold, the caller's own included. A cart reserves
         through ``reserve_cart_stock``, which replaces its holds first.
 
-        Creates a temporary stock reservation with a configurable TTL (default 15 minutes).
+        Creates a temporary stock reservation that lasts the store's
+        ``STOCK_RESERVATION_TTL_MINUTES`` (:meth:`get_reservation_ttl_minutes`).
         Uses SELECT FOR UPDATE to prevent race conditions when multiple customers
         attempt to reserve the same product simultaneously.
 
@@ -923,8 +924,7 @@ class StockManager:
 
         This method is designed to be called by a Celery periodic task every
         5 minutes to clean up reservations that have exceeded their TTL
-        (Time To Live, configurable via STOCK_RESERVATION_TTL_MINUTES setting,
-        default 15 minutes).
+        (Time To Live, the store's STOCK_RESERVATION_TTL_MINUTES setting).
 
         The method finds all reservations where:
         - expires_at < current_time (reservation has expired)

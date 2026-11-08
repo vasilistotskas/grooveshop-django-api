@@ -21,7 +21,7 @@ from core.store_settings import store_setting
 from core.tasks import MonitoredTask
 from emails.send import send_email, was_sent
 from emails.transport import Attachment
-from order import payment_hold
+from order import payment_hold, refund_reconciliation
 from order.emails import (
     STATUS_EMAIL_KEYS,
     OrderDispute,
@@ -1669,6 +1669,31 @@ def complete_paid_delivered_orders() -> dict[str, int]:
             advanced,
         )
     return {"candidates": len(candidate_ids), "advanced": advanced}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    autoretry_for=TRANSIENT_ERRORS,
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def reconcile_pending_refunds() -> dict[str, int]:
+    """Ask the payment provider what became of every refund attempt still
+    PENDING after ``REFUND_RECONCILE_AFTER_MINUTES``.
+
+    A provider call that ended without an answer leaves its attempt PENDING,
+    holding its money until something resolves it
+    (``order.refund_reconciliation``). A refund found at the provider is
+    recorded, one the provider reports failed is declined, and one the
+    lookup cannot decide (nothing found, several candidates, the provider
+    unreadable) stays PENDING for staff: the dashboard counts it. Safe to
+    repeat: an attempt is only ever resolved once, under the order lock.
+    """
+    counts = refund_reconciliation.reconcile_overdue()
+    if any(counts.values()):
+        logger.info("reconcile_pending_refunds: %s", counts)
+    return counts
 
 
 @celery_app.task(

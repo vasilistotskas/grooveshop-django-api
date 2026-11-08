@@ -1155,6 +1155,13 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # whenever this is set (celery/beat.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
+# Minutes a provider refund attempt may stay PENDING before the provider is
+# asked what became of it (``order.tasks.reconcile_pending_refunds``) and the
+# store's dashboard lists it. Must stay under the 24 hours Stripe remembers an
+# idempotency key for: until then a retry may reuse the attempt's key.
+REFUND_RECONCILE_AFTER_MINUTES = int(
+    getenv("REFUND_RECONCILE_AFTER_MINUTES", "60")
+)
 # Retention sweeps (``core.retention``): primary keys deleted per statement.
 RETENTION_PURGE_BATCH_SIZE = int(getenv("RETENTION_PURGE_BATCH_SIZE", "1000"))
 # Days a ``CachePurgeLog`` audit row (public schema, every store's purges)
@@ -1680,6 +1687,13 @@ def get_celery_beat_schedule():
         # webhook after delivery, an inline attempt that failed once).
         "complete-paid-delivered-orders": {
             "task": "tenant.tasks.fanout_complete_paid_delivered_orders",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        # Provider refunds still PENDING after
+        # ``REFUND_RECONCILE_AFTER_MINUTES``: the provider is asked what
+        # became of each. A pending attempt holds its money until resolved.
+        "reconcile-pending-refunds": {
+            "task": "tenant.tasks.fanout_reconcile_pending_refunds",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
         "check-low-stock-products": {

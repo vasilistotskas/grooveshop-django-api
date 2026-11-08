@@ -54,6 +54,7 @@ from admin.displays import (
 from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
+from order import refund_reconciliation
 from order.attribution import source_label
 from order.chargebacks import (
     ChargebackDecisionError,
@@ -85,6 +86,7 @@ from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
+from order.models.refund_attempt import RefundAttempt
 from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
@@ -420,6 +422,68 @@ class RefundOrderForm(BaseDialogForm):
                     "Say how the cash was paid back: this refund returns "
                     "money collected on delivery."
                 ),
+            )
+        return cleaned
+
+
+class RecordRefundOutcomeForm(BaseDialogForm):
+    """The "Record refund outcome" dialog of an order.
+
+    Offers the order's provider refunds still PENDING past the point where
+    the automatic lookup is due (``RefundAttempt.objects.overdue()``): the
+    provider was asked about them and could not decide, so staff look at the
+    provider's dashboard and say what became of each. The service
+    (``order.refund_reconciliation.record_outcome``) checks it all again
+    under the order lock.
+    """
+
+    OUTCOME_SETTLED = "settled"
+    OUTCOME_FAILED = "failed"
+
+    attempt = forms.ModelChoiceField(
+        label=_("Refund"),
+        queryset=RefundAttempt.objects.none(),
+        widget=UnfoldAdminSelectWidget,
+    )
+    outcome = forms.ChoiceField(
+        label=_("What happened"),
+        choices=[
+            (OUTCOME_SETTLED, _("The refund was made")),
+            (OUTCOME_FAILED, _("The refund was not made")),
+        ],
+        widget=UnfoldAdminSelectWidget,
+    )
+    reference = forms.CharField(
+        label=_("Reference"),
+        max_length=REPAYMENT_REFERENCE_MAX_LENGTH,
+        required=False,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_(
+            "The payment provider's id of the refund, or for cash paid back "
+            "by you the bank transfer id. Required when the refund was made."
+        ),
+    )
+
+    def __init__(self, request, object_id=None, *args, **kwargs):
+        super().__init__(request, object_id, *args, **kwargs)
+        self.fields["attempt"].queryset = (
+            RefundAttempt.objects.overdue()
+            .filter(order_id=object_id)
+            .order_by("created_at", "id")
+        )
+        self.fields["attempt"].label_from_instance = lambda attempt: (
+            f"{money(attempt.amount.amount)} "
+            f"({attempt.created_at:%Y-%m-%d %H:%M})"
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("outcome") == self.OUTCOME_SETTLED and not cleaned.get(
+            "reference"
+        ):
+            self.add_error(
+                "reference",
+                _("Enter the reference of the refund that was made."),
             )
         return cleaned
 
@@ -1199,6 +1263,7 @@ class OrderAdmin(BaseModelAdmin):
     actions_detail = [
         "confirm_offline_payment",
         "refund_payment",
+        "record_refund_outcome",
         "restock_returned",
         "decide_chargeback",
         "download_shipping_voucher",
@@ -1974,6 +2039,68 @@ class OrderAdmin(BaseModelAdmin):
             else None
         )
         return order is not None and PaymentLedger.refund_open(order)
+
+    @action(
+        description=_("Record refund outcome"),
+        icon="fact_check",
+        permissions=["change", "record_refund_outcome"],
+        dialog=ActionDialog(
+            title=_("Record refund outcome"),
+            description=_(
+                "A refund was sent to the payment provider and its result "
+                "is still not known after the automatic lookup. Check the "
+                "provider's dashboard and record whether it was made. It "
+                "holds its money until you do."
+            ),
+            form_class=RecordRefundOutcomeForm,
+        ),
+    )
+    def record_refund_outcome(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        attempt = form.cleaned_data["attempt"]
+        settled = (
+            form.cleaned_data["outcome"]
+            == RecordRefundOutcomeForm.OUTCOME_SETTLED
+        )
+        try:
+            refund_reconciliation.record_outcome(
+                attempt,
+                user=request.user,
+                settled=settled,
+                reference=form.cleaned_data["reference"],
+            )
+        except PaymentError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.log_change(
+                request,
+                attempt.order,
+                f"Recorded the refund of {attempt.amount} as "
+                f"{'made' if settled else 'not made'}",
+            )
+            self.message_user(
+                request,
+                _("The refund outcome is recorded."),
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
+
+    def has_record_refund_outcome_permission(self, request, object_id=None):
+        """Offered where a provider refund is overdue: the automatic lookup
+        had its turn and could not decide."""
+        return (
+            object_id is not None
+            and RefundAttempt.objects.overdue()
+            .filter(order_id=object_id)
+            .exists()
+        )
 
     @action(
         description=_("Settle chargeback (goods)"),

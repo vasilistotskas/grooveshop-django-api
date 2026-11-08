@@ -332,14 +332,14 @@ class PaymentLedger:
 
     @staticmethod
     def reserved_on(charge: PaymentTransaction) -> Decimal:
-        """What live refund attempts hold back from this one payment."""
+        """What PENDING refund attempts hold back from this one payment."""
         return _total(charge.refund_attempts.live())
 
     @classmethod
     def balances(cls, order: Order) -> list[ChargeBalance]:
         """Every payment of *order* with money left in it, oldest first: a
         provider's CHARGE or a courier's COD_COLLECTION. Money a chargeback
-        took back, and money a live refund attempt holds, is not left in
+        took back, and money a PENDING refund attempt holds, is not left in
         it."""
         charges = (
             PaymentTransaction.objects.filter(
@@ -510,7 +510,7 @@ class PaymentLedger:
     @classmethod
     def stored_value_refundable(cls, order: Order) -> Decimal:
         """What can still go back onto gift cards and points: what has not
-        gone back, less what live stored-value attempts hold."""
+        gone back, less what PENDING stored-value attempts hold."""
         held = _total(
             RefundAttempt.objects.live().filter(
                 order=order, kind=RefundAttemptKind.STORED_VALUE
@@ -869,8 +869,8 @@ class PaymentLedger:
         the refund was made outside it.
 
         *attempt* is the claim this refund fulfils. A refund booked without
-        one (a provider's webhook) settles the oldest live attempt on the
-        charge for the same amount, so the attempt that made it cannot book
+        one (a provider's webhook) settles the oldest PENDING attempt on the
+        charge for the same amount, whatever its age, so the attempt that made it cannot book
         it a second time (:meth:`settle_attempt`).
 
         The status is written here, from the ledger, whoever the writer is,

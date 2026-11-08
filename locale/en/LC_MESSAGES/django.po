@@ -286,6 +286,12 @@ msgstr[0] "%(count)s product selected: %(active_count)s active, %(inactive_count
 msgstr[1] "%(count)s products selected: %(active_count)s active, %(inactive_count)s inactive."
 
 #, python-format
+msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
+msgid_plural "%(count)s refunds were sent to the payment provider and their results are still unknown. They hold their money until resolved: check the provider's dashboard and use Record refund outcome on each order."
+msgstr[0] "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
+msgstr[1] "%(count)s refunds were sent to the payment provider and their results are still unknown. They hold their money until resolved: check the provider's dashboard and use Record refund outcome on each order."
+
+#, python-format
 msgid "%(count)s scheduled task enabled"
 msgid_plural "%(count)s scheduled tasks enabled"
 msgstr[0] "%(count)s scheduled task enabled"
@@ -828,11 +834,20 @@ msgstr "A refund failed"
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 
+msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
+msgstr "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
+
 msgid "A refund the provider accepted failed"
 msgstr "A refund the provider accepted failed"
 
+msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
+msgstr "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
+
 msgid "A refund with this reference is already recorded for this order."
 msgstr "A refund with this reference is already recorded for this order."
+
+msgid "A refund with this reference is already recorded."
+msgstr "A refund with this reference is already recorded."
 
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
@@ -4598,6 +4613,12 @@ msgstr "Enter the host name without a port."
 
 msgid "Enter the host name without a trailing dot."
 msgstr "Enter the host name without a trailing dot."
+
+msgid "Enter the provider's reference of the refund, or, for cash paid back, how it was paid back."
+msgstr "Enter the provider's reference of the refund, or, for cash paid back, how it was paid back."
+
+msgid "Enter the reference of the refund that was made."
+msgstr "Enter the reference of the refund that was made."
 
 msgid "Enter the street name here; the number goes in the street number field."
 msgstr "Enter the street name here; the number goes in the street number field."
@@ -9283,6 +9304,9 @@ msgstr "Open the myDATA settings"
 msgid "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 msgstr "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 
+msgid "Open the orders"
+msgstr "Open the orders"
+
 msgid "Open the shipment timeline"
 msgstr "Open the shipment timeline"
 
@@ -11406,6 +11430,9 @@ msgstr "Record COD received outside ACS"
 msgid "Record a suggestion impression or click"
 msgstr "Record a suggestion impression or click"
 
+msgid "Record refund outcome"
+msgstr "Record refund outcome"
+
 msgid "Recorded on the ledger row"
 msgstr "Recorded on the ledger row"
 
@@ -11450,6 +11477,9 @@ msgstr "Reduction Started At"
 
 msgid "Ref"
 msgstr "Ref"
+
+msgid "Reference"
+msgstr "Reference"
 
 msgid "Reference Order"
 msgstr "Reference Order"
@@ -11570,6 +11600,9 @@ msgstr "Refunded quantity cannot exceed the ordered quantity."
 
 msgid "Refunds"
 msgstr "Refunds"
+
+msgid "Refunds with an unknown outcome"
+msgstr "Refunds with an unknown outcome"
 
 msgid "Refused silently: unprinted labels"
 msgstr "Refused silently: unprinted labels"
@@ -14262,6 +14295,9 @@ msgstr "The payment on delivery has not been collected yet, so there is nothing 
 msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
 msgstr "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
 
+msgid "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."
+msgstr "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."
+
 msgid "The payment provider's result for the failed call."
 msgstr "The payment provider's result for the failed call."
 
@@ -14357,6 +14393,9 @@ msgstr "The refund amount must be greater than zero."
 msgid "The refund could not be processed."
 msgstr "The refund could not be processed."
 
+msgid "The refund outcome is recorded."
+msgstr "The refund outcome is recorded."
+
 msgid "The refund that gave back points the customer had spent, when this row is one."
 msgstr "The refund that gave back points the customer had spent, when this row is one."
 
@@ -14365,6 +14404,12 @@ msgstr "The refund that returned this credit, when it was one."
 
 msgid "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
 msgstr "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
+
+msgid "The refund was made"
+msgstr "The refund was made"
+
+msgid "The refund was not made"
+msgstr "The refund was not made"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "The refund whose confirmation email this claims."
@@ -14766,6 +14811,12 @@ msgstr "This range would show more than %(rows)s rows: choose longer periods, or
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "This receipt is your proof of purchase — please keep it for your records."
+
+msgid "This refund has already been resolved."
+msgstr "This refund has already been resolved."
+
+msgid "This refund is not overdue yet: the payment provider is asked about it automatically first."
+msgstr "This refund is not overdue yet: the payment provider is asked about it automatically first."
 
 msgid "This schedule has already run or been cancelled."
 msgstr "This schedule has already run or been cancelled."
@@ -16017,6 +16068,9 @@ msgstr "What became of the goods?"
 
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
+
+msgid "What happened"
+msgstr "What happened"
 
 msgid "What is enforced"
 msgstr "What is enforced"

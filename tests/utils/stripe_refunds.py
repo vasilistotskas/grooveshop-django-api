@@ -37,13 +37,20 @@ class FakeStripeRefunds:
         *,
         status: str = "succeeded",
         fail_with: Exception | None = None,
+        lose_answer: bool = False,
+        list_fails_with: Exception | None = None,
     ):
         self.status = status
         self.fail_with = fail_with
+        #: Make the refund, then drop the connection before answering.
+        self.lose_answer = lose_answer
+        self.list_fails_with = list_fails_with
         #: Every call, as the keyword arguments Stripe received.
         self.calls: list[dict[str, Any]] = []
         #: The refunds Stripe actually made (a replayed key makes none).
         self.created: list[SimpleNamespace] = []
+        #: Every list-refunds call, as the keyword arguments Stripe received.
+        self.list_calls: list[dict[str, Any]] = []
         self._by_key: dict[str, tuple[dict[str, Any], SimpleNamespace]] = {}
         self._patches = [
             mock.patch(
@@ -52,6 +59,9 @@ class FakeStripeRefunds:
             ),
             mock.patch(
                 "order.payment.stripe.Refund.create", side_effect=self._create
+            ),
+            mock.patch(
+                "order.payment.stripe.Refund.list", side_effect=self._list
             ),
             mock.patch("order.payment.Refund.sync_from_stripe_data"),
         ]
@@ -89,11 +99,26 @@ class FakeStripeRefunds:
             amount=params["amount"],
             currency="eur",
             payment_intent=params["payment_intent"],
+            metadata=params.get("metadata"),
         )
         self.created.append(refund)
         if key is not None:
             self._by_key[key] = (params, refund)
+        if self.lose_answer:
+            raise stripe.APIConnectionError("the answer was lost")
         return refund
+
+    def _list(self, **kwargs: Any) -> SimpleNamespace:
+        """``stripe.Refund.list``: the refunds of one payment intent."""
+        self.list_calls.append(kwargs)
+        if self.list_fails_with is not None:
+            raise self.list_fails_with
+        refunds = [
+            r
+            for r in self.created
+            if r.payment_intent == kwargs["payment_intent"]
+        ]
+        return SimpleNamespace(auto_paging_iter=lambda: iter(refunds))
 
     @property
     def keys(self) -> list[str]:

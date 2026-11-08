@@ -145,6 +145,11 @@ def fanout_complete_paid_delivered_orders():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_reconcile_pending_refunds():
+    return run_for_all_tenants("order.tasks.reconcile_pending_refunds")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_send_checkout_abandonment_emails():
     return run_for_all_tenants("order.tasks.send_checkout_abandonment_emails")
 

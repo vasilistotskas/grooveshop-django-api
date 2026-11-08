@@ -747,6 +747,8 @@ class StoreAlerts(DashboardWidget):
             alerts += self._mydata()
         if self.request.user.has_perm("order.view_retailcredit"):
             alerts += self._reversed_credits()
+        if self.request.user.has_perm("order.change_order"):
+            alerts += self._unknown_refunds()
         if self.request.user.has_perm("extra_settings.change_setting"):
             alerts += self._email_setup()
         return {"alerts": alerts}
@@ -936,6 +938,54 @@ class StoreAlerts(DashboardWidget):
                 link=(
                     self.changelist_url("order.RetailCredit"),
                     _("Open the credit documents"),
+                ),
+            )
+        ]
+
+    def _unknown_refunds(self) -> list[dict[str, Any]]:
+        """Refunds sent to the payment provider whose outcome is still
+        unknown after the automatic lookup. Each holds its money until
+        resolved, so the store is told: staff check the provider's
+        dashboard and record the outcome on the order. Recording it takes
+        the refund away."""
+        from order.models.refund_attempt import RefundAttempt
+
+        overdue = RefundAttempt.objects.overdue()
+        count = overdue.count()
+        if not count:
+            return []
+        orders = dict.fromkeys(
+            overdue.order_by("created_at").values_list("order_id", flat=True)[
+                :5
+            ]
+        )
+        return [
+            _alert(
+                "danger",
+                "currency_exchange",
+                _("Refunds with an unknown outcome"),
+                ngettext(
+                    "%(count)s refund was sent to the payment provider and "
+                    "its result is still unknown. It holds its money until "
+                    "it is resolved: check the provider's dashboard and use "
+                    "Record refund outcome on the order.",
+                    "%(count)s refunds were sent to the payment provider and "
+                    "their results are still unknown. They hold their money "
+                    "until resolved: check the provider's dashboard and use "
+                    "Record refund outcome on each order.",
+                    count,
+                )
+                % {"count": count},
+                items=[
+                    link_cell(
+                        self.change_url("order.Order", order_id),
+                        f"#{order_id}",
+                    )
+                    for order_id in orders
+                ],
+                link=(
+                    self.changelist_url("order.Order"),
+                    _("Open the orders"),
                 ),
             )
         ]

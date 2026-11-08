@@ -3543,6 +3543,19 @@ class OrderService:
                             "trying again."
                         )
                     )
+                if attempt.is_overdue:
+                    # The provider may no longer remember the key, so
+                    # sending it again could refund twice.
+                    raise PaymentError(
+                        _(
+                            "A refund of this amount was sent to the "
+                            "payment provider a while ago and its result is "
+                            "still not known. It is looked up automatically; "
+                            "if it stays unknown, record its outcome from "
+                            "the order's refund attempts before trying "
+                            "again."
+                        )
+                    )
             return resumed, None
 
         # The value that can still be refunded: the provider's money, then
@@ -3742,7 +3755,7 @@ class OrderService:
             success, response = provider.refund_payment(
                 payment_id=charge.provider_reference,
                 amount=attempt.amount,
-                idempotency_key=f"refund-{attempt.idempotency_key}",
+                idempotency_key=attempt.provider_key,
             )
             if success and not response.get("refund_id"):
                 # Money may have moved but nothing identifies it, so it
@@ -3765,6 +3778,27 @@ class OrderService:
             )
             refund_id = response["refund_id"]
 
+        return cls.book_share(
+            order, attempt, paid_back, refund_id, reason, reference
+        )
+
+    @classmethod
+    def book_share(
+        cls,
+        order: Order,
+        attempt: RefundAttempt,
+        paid_back: Money,
+        refund_id: str | None,
+        reason: str,
+        reference: str = "",
+    ) -> _SharePaid:
+        """Step 3 of :meth:`refund_order` for one share, and the one place
+        a refund the provider made becomes a ledger row: under the order
+        lock, the refund is recorded (*refund_id* is the provider's id, or
+        ``None`` for cash paid back by the merchant under *reference*), the
+        attempt settles and ``order_refunded`` fires. Also what resolves an
+        attempt whose outcome was unknown (``order.refund_reconciliation``)."""
+        charge = attempt.charge
         with transaction.atomic():
             Order.objects.select_for_update().values_list("pk", flat=True).get(
                 pk=order.pk

@@ -39,6 +39,17 @@ not in the settings, because Celery installs it while
   test enforces: a daily job discarded because a worker was down would lose its
   day. django-celery-beat silently dropped this option.
 
+## Money jobs
+
+`reconcile-pending-refunds` runs hourly through
+`tenant.tasks.fanout_reconcile_pending_refunds` (one run per store). It asks the
+payment provider what became of each refund attempt still `PENDING` after
+`REFUND_RECONCILE_AFTER_MINUTES`, and settles or declines only on an
+unambiguous answer (`order/refund_reconciliation.py`, `docs/order-system.md`
+§7.2). It is safe to repeat and has no `expires`: a run lost to a restart is
+caught by the next hour. An attempt it cannot decide stays `PENDING`, holds its
+money and shows on the store dashboard until staff record its outcome.
+
 ## Time zones
 
 Times are Athens local (`CELERY_TIMEZONE`). Celery's crontab decides around a

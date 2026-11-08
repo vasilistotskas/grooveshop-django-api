@@ -291,6 +291,12 @@ msgstr[0] "Επιλέχθηκε %(count)s προϊόν: %(active_count)s ενε�
 msgstr[1] "Επιλέχθηκαν %(count)s προϊόντα: %(active_count)s ενεργά, %(inactive_count)s ανενεργά."
 
 #, python-format
+msgid "%(count)s refund was sent to the payment provider and its result is still unknown. It holds its money until it is resolved: check the provider's dashboard and use Record refund outcome on the order."
+msgid_plural "%(count)s refunds were sent to the payment provider and their results are still unknown. They hold their money until resolved: check the provider's dashboard and use Record refund outcome on each order."
+msgstr[0] "%(count)s επιστροφή χρημάτων στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της παραμένει άγνωστο. Δεσμεύει τα χρήματά της μέχρι να επιλυθεί: ελέγξτε τον πίνακα ελέγχου του παρόχου και χρησιμοποιήστε το «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία."
+msgstr[1] "%(count)s επιστροφές χρημάτων στάλθηκαν στον πάροχο πληρωμών και τα αποτελέσματά τους παραμένουν άγνωστα. Δεσμεύουν τα χρήματά τους μέχρι να επιλυθούν: ελέγξτε τον πίνακα ελέγχου του παρόχου και χρησιμοποιήστε το «Καταγραφή αποτελέσματος επιστροφής» σε κάθε παραγγελία."
+
+#, python-format
 msgid "%(count)s scheduled task enabled"
 msgid_plural "%(count)s scheduled tasks enabled"
 msgstr[0] "%(count)s προγραμματισμένη εργασία ενεργή"
@@ -833,11 +839,20 @@ msgstr "Αποτυχία επιστροφής χρημάτων"
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
 
+msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
+msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της από τις προσπάθειες επιστροφής της παραγγελίας πριν ξαναδοκιμάσετε."
+
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
 
+msgid "A refund was sent to the payment provider and its result is still not known after the automatic lookup. Check the provider's dashboard and record whether it was made. It holds its money until you do."
+msgstr "Μια επιστροφή χρημάτων στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της παραμένει άγνωστο μετά την αυτόματη αναζήτηση. Ελέγξτε τον πίνακα ελέγχου του παρόχου και καταγράψτε αν έγινε. Δεσμεύει τα χρήματά της μέχρι να το κάνετε."
+
 msgid "A refund with this reference is already recorded for this order."
 msgstr "Μια επιστροφή με αυτή την αναφορά έχει ήδη καταγραφεί για αυτή την παραγγελία."
+
+msgid "A refund with this reference is already recorded."
+msgstr "Μια επιστροφή με αυτή την αναφορά έχει ήδη καταγραφεί."
 
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "Μια επιστροφή χρημάτων, ή αξία που επέστρεψε σε δωροκάρτα, μετράει στην περίοδο που έγινε και όχι στην περίοδο της πώλησης, και μοιράζεται ανάμεσα σε προϊόντα, μεταφορικά και χρεώσεις αναλογικά με την απόδειξη."
@@ -4603,6 +4618,12 @@ msgstr "Εισαγάγετε το όνομα host χωρίς θύρα."
 
 msgid "Enter the host name without a trailing dot."
 msgstr "Εισαγάγετε το όνομα host χωρίς τελεία στο τέλος."
+
+msgid "Enter the provider's reference of the refund, or, for cash paid back, how it was paid back."
+msgstr "Εισαγάγετε την αναφορά της επιστροφής από τον πάροχο ή, για μετρητά που επιστράφηκαν, τον τρόπο επιστροφής."
+
+msgid "Enter the reference of the refund that was made."
+msgstr "Εισαγάγετε την αναφορά της επιστροφής που έγινε."
 
 msgid "Enter the street name here; the number goes in the street number field."
 msgstr "Εισαγάγετε εδώ την οδό· ο αριθμός μπαίνει στο πεδίο του αριθμού οδού."
@@ -9290,6 +9311,9 @@ msgstr "Άνοιγμα ρυθμίσεων myDATA"
 msgid "Open the order and use Settle chargeback (goods) to say whether the goods came back or were never delivered: if they did, the receipt is credited, and the order stays on the dashboard until you decide."
 msgstr "Ανοίξτε την παραγγελία και επιλέξτε «Διευθέτηση chargeback (προϊόντα)» για να δηλώσετε αν τα προϊόντα επέστρεψαν ή δεν παραδόθηκαν: αν ναι, πιστώνεται η απόδειξη. Η παραγγελία παραμένει στον πίνακα ελέγχου μέχρι να αποφασίσετε."
 
+msgid "Open the orders"
+msgstr "Άνοιγμα των παραγγελιών"
+
 msgid "Open the shipment timeline"
 msgstr "Άνοιγμα χρονολογίου της αποστολής"
 
@@ -11414,6 +11438,9 @@ msgstr "Καταγραφή αντικαταβολής που εισπράχθη�
 msgid "Record a suggestion impression or click"
 msgstr "Καταγραφή προβολής ή κλικ πρότασης"
 
+msgid "Record refund outcome"
+msgstr "Καταγραφή αποτελέσματος επιστροφής"
+
 msgid "Recorded on the ledger row"
 msgstr "Καταγράφεται στη γραμμή του καθολικού"
 
@@ -11458,6 +11485,9 @@ msgstr "Έναρξη μείωσης"
 
 msgid "Ref"
 msgstr "Αρ. αναφοράς"
+
+msgid "Reference"
+msgstr "Αναφορά"
 
 msgid "Reference Order"
 msgstr "Σχετική παραγγελία"
@@ -11578,6 +11608,9 @@ msgstr "Η ποσότητα επιστροφής δεν μπορεί να υπε
 
 msgid "Refunds"
 msgstr "Επιστροφές χρημάτων"
+
+msgid "Refunds with an unknown outcome"
+msgstr "Επιστροφές με άγνωστο αποτέλεσμα"
 
 msgid "Refused silently: unprinted labels"
 msgstr "Σιωπηλή απόρριψη: ανεκτύπωτες ετικέτες"
@@ -14265,6 +14298,9 @@ msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακό�
 msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
 msgstr "Ο πάροχος πληρωμών ανέφερε ότι αυτές οι επιστροφές απέτυχαν αφού εκδόθηκαν τα πιστωτικά τους στοιχεία. Τα χρήματα δεν επέστρεψαν στον πελάτη: ακυρώστε το στοιχείο αν εκδόθηκε κατά λάθος."
 
+msgid "The payment provider's id of the refund, or for cash paid back by you the bank transfer id. Required when the refund was made."
+msgstr "Ο αναγνωριστικός κωδικός της επιστροφής από τον πάροχο πληρωμών ή, για μετρητά που επιστρέψατε εσείς, ο κωδικός της τραπεζικής μεταφοράς. Απαιτείται όταν η επιστροφή έγινε."
+
 msgid "The payment provider's result for the failed call."
 msgstr "Το αποτέλεσμα του παρόχου πληρωμών για την αποτυχημένη κλήση."
 
@@ -14360,6 +14396,9 @@ msgstr "Το ποσό επιστροφής πρέπει να είναι μεγα
 msgid "The refund could not be processed."
 msgstr "Η επιστροφή χρημάτων δεν ήταν δυνατό να ολοκληρωθεί."
 
+msgid "The refund outcome is recorded."
+msgstr "Το αποτέλεσμα της επιστροφής καταγράφηκε."
+
 msgid "The refund that gave back points the customer had spent, when this row is one."
 msgstr "Η επιστροφή μέσω της οποίας επιστράφηκαν οι πόντοι που είχε ξοδέψει ο πελάτης, αν η γραμμή προέρχεται από επιστροφή."
 
@@ -14368,6 +14407,12 @@ msgstr "Η επιστροφή μέσω της οποίας επιστράφηκ�
 
 msgid "The refund that returned value onto gift cards and points, which this document credits; none for a provider refund."
 msgstr "Η επιστροφή που επέστρεψε αξία σε δωροκάρτες και πόντους και την οποία πιστώνει αυτό το παραστατικό· καμία για επιστροφή από πάροχο."
+
+msgid "The refund was made"
+msgstr "Η επιστροφή έγινε"
+
+msgid "The refund was not made"
+msgstr "Η επιστροφή δεν έγινε"
 
 msgid "The refund whose confirmation email this claims."
 msgstr "Η επιστροφή της οποίας το email επιβεβαίωσης δεσμεύεται εδώ."
@@ -14769,6 +14814,12 @@ msgstr "Αυτό το εύρος θα εμφάνιζε περισσότερες 
 
 msgid "This receipt is your proof of purchase — please keep it for your records."
 msgstr "Αυτή η απόδειξη αποδεικνύει την αγορά σου — κράτησέ την για το αρχείο σου."
+
+msgid "This refund has already been resolved."
+msgstr "Αυτή η επιστροφή έχει ήδη επιλυθεί."
+
+msgid "This refund is not overdue yet: the payment provider is asked about it automatically first."
+msgstr "Αυτή η επιστροφή δεν έχει καθυστερήσει ακόμη: ο πάροχος πληρωμών ερωτάται πρώτα αυτόματα γι' αυτήν."
 
 msgid "This schedule has already run or been cancelled."
 msgstr "Αυτός ο προγραμματισμός έχει ήδη εκτελεστεί ή ακυρωθεί."
@@ -16020,6 +16071,9 @@ msgstr "Τι απέγιναν τα προϊόντα;"
 
 msgid "What each attached coupon does for this cart right now: the money it takes off, the free shipping or gift it earns, or why the engine refuses it. A code that would change nothing is refused, so exactly one of the four holds per entry."
 msgstr "Τι κάνει αυτή τη στιγμή κάθε συνδεδεμένο κουπόνι για το καλάθι: το ποσό που αφαιρεί, τα δωρεάν μεταφορικά ή το δώρο που κερδίζει, ή γιατί το απορρίπτει ο μηχανισμός. Ένας κωδικός που δεν θα άλλαζε τίποτα απορρίπτεται, οπότε σε κάθε εγγραφή ισχύει ακριβώς ένα από τα τέσσερα."
+
+msgid "What happened"
+msgstr "Τι συνέβη"
 
 msgid "What is enforced"
 msgstr "Τι επιβάλλεται αυτόματα"

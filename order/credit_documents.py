@@ -391,17 +391,39 @@ def create_pending_credits(order_id: int) -> list[int]:
             )
 
         # The settlement takes what the receipt still holds, so it waits
-        # while a source is undecided: that source may need the room.
+        # while a source is undecided: that source may need the room. A
+        # lost dispute is credited only through staff's decision on its
+        # goods, never by the settlement: it waits while any chargeback is
+        # undecided (the dashboard counts those orders), and what a
+        # chargeback took whose goods the customer kept is never credited.
         if (
             order.payment_status in SETTLEMENT_PAYMENT_STATUSES
             and not credit_allocation.undecided(order)
+            and not PaymentTransaction.objects.filter(
+                order=order,
+                kind=PaymentTransactionKind.CHARGEBACK,
+                decision__isnull=True,
+            ).exists()
             and not (
                 RetailCredit.objects.filter(
                     order=order, reason=CreditReason.SETTLEMENT
                 ).exists()
             )
         ):
-            left = Decimal(invoice.total.amount) - _credited_total(invoice)
+            kept = sum(
+                (
+                    Decimal(row.amount.amount)
+                    for row in PaymentTransaction.objects.filter(
+                        order=order,
+                        kind=PaymentTransactionKind.CHARGEBACK,
+                        decision__goods_returned=False,
+                    )
+                ),
+                _ZERO,
+            )
+            left = (
+                Decimal(invoice.total.amount) - _credited_total(invoice) - kept
+            )
             if left > 0:
                 created.extend(
                     _guarded(

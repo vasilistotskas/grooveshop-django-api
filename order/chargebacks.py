@@ -129,6 +129,8 @@ def decide_chargebacks(
                 note=template
                 % {"amount": decision.chargeback.amount, "who": user},
             )
-        if goods_returned and changed:
+        if changed:
+            # Whichever way it was decided, a settlement that waited for the
+            # decision is now due, and a goods-returned one owes its credit.
             request_credit_documents(order.id)
     return changed

@@ -657,23 +657,6 @@ class State:
         if self.reversed_after_credit:
             return  # a credit stands after a reversal: documented, not netted
         if (
-            order.payment_status == PaymentStatus.REFUNDED
-            and PaymentTransaction.objects.filter(
-                order=order, kind=PaymentTransactionKind.CHARGEBACK
-            ).exists()
-            and not ChargebackDecision.objects.filter(
-                chargeback__order=order, goods_returned=True
-            ).exists()
-        ):
-            # NOT a rule this test blesses: an order whose refunds and a lost
-            # dispute together took every cent is REFUNDED, and its
-            # settlement credit (``create_pending_credits``) then credits
-            # what the receipt still holds, whether staff decided the
-            # chargeback's goods came back, kept them, or have not decided.
-            # Whether a dispute the customer kept the goods of may be
-            # settled that way is a business decision (PR #530, round 6).
-            return
-        if (
             self.receipt_sale - receipt
         ) - understated + credited + uncovered != (goods):
             said = (
@@ -965,3 +948,51 @@ def test_a_reversal_comes_off_the_duplicate_whether_it_comes_before_or_after():
     assert credit_allocation.allocation_of(refund=dash) == {
         Decimal(24): Decimal("10.00")
     }
+
+
+@pytest.mark.parametrize("decision", [None, True, False])
+def test_the_settlement_never_credits_a_chargeback_staff_did_not_decide(
+    decision,
+):
+    """A lost dispute is credited only through staff's decision on its goods.
+    Order of 219.62, a chargeback of 107.63, everything else refunded (the
+    order is REFUNDED), the receipt issued net of that refund (107.63):
+    with no decision the settlement waits (and the order is on the
+    chargeback worklist), goods returned credits the 107.63 once, goods kept
+    credits nothing, ever."""
+    from order.chargebacks import decide_chargebacks
+    from tests.integration.order.test_mydata_lifecycle import _receipt
+
+    order = _order(lines=(("24", "100.00"), ("13", "119.62")))
+    charge = order.payment_transactions.get(kind=PaymentTransactionKind.CHARGE)
+    staff = UserAccountFactory(is_staff=True, is_superuser=True)
+    with mydata_enabled(auto_submit=False), FakeAade(), FakeStripeRefunds():
+        PaymentLedger.record_chargeback(
+            order,
+            charge=charge,
+            amount=_eur("107.63"),
+            reference="dp_settle",
+        )
+        OrderService.refund_order(order)
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.REFUNDED
+        invoice = _receipt(order)
+        assert invoice.total.amount == Decimal("107.63")
+
+        create_pending_credits(order.id)
+        assert _credited_total(order) == ZERO
+        assert (
+            Order.objects.awaiting_chargeback_decision()
+            .filter(pk=order.pk)
+            .exists()
+        )
+
+        if decision is not None:
+            decide_chargebacks(order.id, goods_returned=decision, user=staff)
+            create_pending_credits(order.id)
+            create_pending_credits(order.id)
+
+    assert _credited_total(order) == (Decimal("107.63") if decision else ZERO)
+    assert not RetailCredit.objects.filter(
+        order=order, reason="SETTLEMENT"
+    ).exists()

@@ -34,7 +34,8 @@ def test_over_the_limit_is_rejected_with_a_stable_code():
 def test_the_count_is_checked_before_values_are_converted():
     # Garbage past the limit is reported as too many, proving no int() ran.
     with pytest.raises(ValidationError) as exc:
-        parse_int_csv(",".join(["x"] * (MAX_INT_CSV_ITEMS + 1)), "brands")
+        garbage = [f"x{i}" for i in range(MAX_INT_CSV_ITEMS + 1)]
+        parse_int_csv(",".join(garbage), "brands")
     assert exc.value.detail["brands"].code == "too_many_values"
 
 
@@ -56,3 +57,9 @@ def test_no_limit_when_the_caller_bounds_the_list_itself():
     assert parse_int_csv(ids, "productIds", max_items=None) == list(
         range(1, 202)
     )
+
+
+def test_repeated_ids_count_once():
+    repeated = ",".join(["7"] * (MAX_INT_CSV_ITEMS + 1))
+
+    assert parse_int_csv(repeated, "brands") == [7]

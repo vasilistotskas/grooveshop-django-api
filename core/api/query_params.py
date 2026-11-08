@@ -29,7 +29,11 @@ def parse_int_csv(
     """
     if not value:
         return []
-    parts = [v.strip() for v in value.split(",") if v.strip()]
+    # Distinct values, first occurrence kept: a link that repeats an id (a
+    # mangled or stale filter URL) must not cost the shopper the listing.
+    parts = list(
+        dict.fromkeys(v.strip() for v in value.split(",") if v.strip())
+    )
     if max_items is not None and len(parts) > max_items:
         raise ValidationError(
             {name: _("Give at most %(max)d values.") % {"max": max_items}},

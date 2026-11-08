@@ -50,4 +50,13 @@ class TestProductSearchParamValidation:
         response = self.client.get(self.url, {param: too_many, "query": "x"})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         # The error body is camelCased like every response.
-        assert response.json()[error_key]
+        assert response.json()["fields"][error_key][0]["code"] == (
+            "too_many_values"
+        )
+
+    def test_repeated_ids_count_once(self):
+        # A mangled or stale link that repeats an id must not empty the
+        # listing: the cap counts distinct ids.
+        repeated = ",".join(["7"] * (MAX_INT_CSV_ITEMS + 1))
+        response = self.client.get(self.url, {"brands": repeated, "query": "x"})
+        assert response.status_code != status.HTTP_400_BAD_REQUEST

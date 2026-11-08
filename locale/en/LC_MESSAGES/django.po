@@ -4532,9 +4532,6 @@ msgstr "Empty while this is the current price."
 msgid "Enable experimental Meilisearch features"
 msgstr "Enable experimental Meilisearch features"
 
-msgid "Enable or disable pagination"
-msgstr "Enable or disable pagination"
-
 msgid "Enabled"
 msgstr "Enabled"
 
@@ -6711,6 +6708,10 @@ msgstr "Github Profile"
 
 msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
 msgstr "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
+
+#, python-format
+msgid "Give at most %(max)d values."
+msgstr "Give at most %(max)d values."
 
 #, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
@@ -10575,9 +10576,6 @@ msgstr "Please find the receipt for your order attached to this email as a PDF."
 
 msgid "Please include your order number"
 msgstr "Please include your order number"
-
-msgid "Please provide a valid email address"
-msgstr "Please provide a valid email address"
 
 msgid "Please review and restock as needed."
 msgstr "Please review and restock as needed."
@@ -17066,6 +17064,9 @@ msgstr "django-extra-settings cache (extra_settings_*) and the admin dashboard s
 msgid "expired"
 msgstr "expired"
 
+msgid "false returns the whole list in one response"
+msgstr "false returns the whole list in one response"
+
 msgid "gift card and points"
 msgstr "gift card and points"
 
@@ -17464,6 +17465,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Email template"
 #~ msgstr "Email template"
 
+#~ msgid "Enable or disable pagination"
+#~ msgstr "Enable or disable pagination"
+
 #~ msgid "Enter a valid hex color (e.g., #003DFF)."
 #~ msgstr "Enter a valid hex color (e.g., #003DFF)."
 
@@ -17739,6 +17743,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
 #~ msgstr "Phone number for BoxNow shipment notifications. No platform fallback — empty disables BoxNow."
+
+#~ msgid "Please provide a valid email address"
+#~ msgstr "Please provide a valid email address"
 
 #~ msgid "Primary Color"
 #~ msgstr "Primary Color"

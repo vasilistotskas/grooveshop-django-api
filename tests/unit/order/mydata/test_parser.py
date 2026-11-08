@@ -8,9 +8,10 @@ namespace and the parser must stay tolerant of both shapes.
 
 from __future__ import annotations
 
+import pytest
 from django.test import SimpleTestCase
 
-from order.mydata.parser import parse_response_doc
+from order.mydata.parser import parse_requested_doc, parse_response_doc
 
 _SUCCESS_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ResponseDoc>
@@ -140,3 +141,19 @@ class ParseResponseDocTestCase(SimpleTestCase):
         self.assertEqual(row.status_code, "TechnicalError")
         self.assertFalse(row.is_success)
         self.assertEqual(len(row.errors), 1)
+
+
+@pytest.mark.parametrize("parse", [parse_response_doc, parse_requested_doc])
+def test_an_answer_that_declares_an_entity_is_refused(parse):
+    """AADE's answers come over the network: an entity declaration (the
+    billion-laughs shape) is refused, never expanded."""
+    from defusedxml import EntitiesForbidden
+
+    body = (
+        b'<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "aaaa">]>'
+        b"<ResponseDoc><response><index>1</index>"
+        b"<statusCode>&a;</statusCode></response></ResponseDoc>"
+    )
+
+    with pytest.raises(EntitiesForbidden):
+        parse(body)

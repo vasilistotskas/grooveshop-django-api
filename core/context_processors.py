@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import os
-import tomllib
-from functools import lru_cache
 from typing import Any
 
+from django.conf import settings
 from django.http import HttpRequest
 from django.utils.functional import SimpleLazyObject
 
@@ -13,30 +12,6 @@ from core.utils.tenant_urls import (
     get_tenant_static_base_url,
 )
 from tenant.credentials import tenant_contact_email, tenant_site_name
-
-
-@lru_cache(maxsize=1)
-def get_version_from_toml() -> str:
-    """
-    Read version from pyproject.toml file.
-
-    Uses Python 3.11+ tomllib for proper TOML parsing.
-    Cached to avoid repeated file reads.
-
-    Returns:
-        Version string from pyproject.toml, or "0.0.0" if not found
-    """
-    try:
-        with open("pyproject.toml", "rb") as toml_file:
-            data = tomllib.load(toml_file)
-            version = data.get("project", {}).get("version", "0.0.0")
-            return version
-    except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError) as e:
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to read version from pyproject.toml: {e}")
-        return "0.0.0"
 
 
 def metadata(request: HttpRequest) -> dict[str, Any]:
@@ -64,7 +39,7 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
         return {}
 
     return {
-        "VERSION": get_version_from_toml(),
+        "VERSION": settings.RELEASE_VERSION,
         "SITE_NAME": SimpleLazyObject(tenant_site_name),
         "SITE_DESCRIPTION": os.getenv(
             "SITE_DESCRIPTION", "Grooveshop Description"

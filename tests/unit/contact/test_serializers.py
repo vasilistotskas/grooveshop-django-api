@@ -365,3 +365,33 @@ class TestContactWriteSerializer(TestCase):
         assert "name" in serializer.errors
         assert "email" in serializer.errors
         assert "message" in serializer.errors
+
+    def test_an_internationalised_address_is_accepted(self):
+        """The serializer's EmailField decides the format. The utility's
+        own ASCII-only regex used to refuse a Greek domain, punycode or
+        not."""
+        for email in (
+            "user@xn--hxajbheg2az3al.xn--qxam",
+            "user@παράδειγμα.ελ",
+        ):
+            serializer = ContactWriteSerializer(
+                data={**self.valid_data, "email": email}
+            )
+            assert serializer.is_valid(), (email, serializer.errors)
+
+    def test_a_malformed_address_is_refused_by_the_email_field(self):
+        for email in (
+            "invalid-email",
+            "test@",
+            "@example.com",
+            "test@.com",
+            "test.example.com",
+            "test@example",
+            "test@@example.com",
+            "",
+        ):
+            serializer = ContactWriteSerializer(
+                data={**self.valid_data, "email": email}
+            )
+            assert not serializer.is_valid(), email
+            assert "email" in serializer.errors, email

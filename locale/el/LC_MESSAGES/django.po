@@ -4537,9 +4537,6 @@ msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
 msgid "Enable experimental Meilisearch features"
 msgstr "Ενεργοποίηση πειραματικών λειτουργιών Meilisearch"
 
-msgid "Enable or disable pagination"
-msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
-
 msgid "Enabled"
 msgstr "Ενεργοποιημένο"
 
@@ -6717,6 +6714,10 @@ msgstr "Προφίλ Github"
 
 msgid "Give ACS the voucher numbers and ask for the COD remittance status. If a payout HAS been made on a date the nightly reconcile never queried, replay it with the reconcile_acs_cod command; it is idempotent."
 msgstr "Δώστε στο ACS τους αριθμούς voucher και ζητήστε την κατάσταση απόδοσης της αντικαταβολής. Αν έχει γίνει απόδοση σε ημερομηνία που η νυχτερινή συμφωνία δεν ρώτησε ποτέ, επαναλάβετέ την με την εντολή reconcile_acs_cod: είναι ασφαλής σε επανάληψη."
+
+#, python-format
+msgid "Give at most %(max)d values."
+msgstr "Δώστε το πολύ %(max)d τιμές."
 
 #, python-format
 msgid "Give from 1 to %(max)d product IDs, each a positive integer."
@@ -10583,9 +10584,6 @@ msgstr "Επισυνάπτουμε σε PDF την απόδειξη της πα�
 
 msgid "Please include your order number"
 msgstr "Παρακαλούμε συμπεριλάβετε τον αριθμό παραγγελίας"
-
-msgid "Please provide a valid email address"
-msgstr "Παρακαλούμε δώστε μια έγκυρη διεύθυνση email"
 
 msgid "Please review and restock as needed."
 msgstr "Παρακαλούμε ελέγξτε και αναπληρώστε το απόθεμα όπου χρειάζεται."
@@ -17069,6 +17067,9 @@ msgstr "Cache django-extra-settings (extra_settings_*) και η σύνοψη τ
 msgid "expired"
 msgstr "έληξε"
 
+msgid "false returns the whole list in one response"
+msgstr "Με false επιστρέφεται ολόκληρη η λίστα σε μία απόκριση"
+
 msgid "gift card and points"
 msgstr "δωροκάρτες και πόντοι"
 
@@ -17687,6 +17688,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Email template"
 #~ msgstr "Πρότυπο email"
 
+#~ msgid "Enable or disable pagination"
+#~ msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
+
 #~ msgid "End date for export (ISO format: YYYY-MM-DD)"
 #~ msgstr "Ημερομηνία λήξης για την εξαγωγή (μορφή ISO: YYYY-MM-DD)"
 
@@ -18285,6 +18289,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Place or district (optional)"
 #~ msgstr "Τόπος ή περιοχή (προαιρετικό)"
+
+#~ msgid "Please provide a valid email address"
+#~ msgstr "Παρακαλούμε δώστε μια έγκυρη διεύθυνση email"
 
 #, python-format
 #~ msgid "Points amount %(val)d is out of range (must be between -10000 and 10000)."

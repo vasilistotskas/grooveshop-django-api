@@ -4482,9 +4482,6 @@ msgstr "Κενό όσο αυτή είναι η τρέχουσα τιμή."
 msgid "Enable experimental Meilisearch features"
 msgstr "Ενεργοποίηση πειραματικών λειτουργιών Meilisearch"
 
-msgid "Enable or disable pagination"
-msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
-
 msgid "Enabled"
 msgstr "Ενεργοποιημένο"
 
@@ -16862,6 +16859,9 @@ msgstr "Cache django-extra-settings (extra_settings_*) και η σύνοψη τ
 msgid "expired"
 msgstr "έληξε"
 
+msgid "false returns the whole list in one response"
+msgstr "Με false επιστρέφεται ολόκληρη η λίστα σε μία απόκριση"
+
 msgid "granted"
 msgstr "χορηγήθηκε"
 
@@ -17466,6 +17466,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Email template"
 #~ msgstr "Πρότυπο email"
+
+#~ msgid "Enable or disable pagination"
+#~ msgstr "Ενεργοποίηση/απενεργοποίηση σελιδοποίησης"
 
 #~ msgid "End date for export (ISO format: YYYY-MM-DD)"
 #~ msgstr "Ημερομηνία λήξης για την εξαγωγή (μορφή ISO: YYYY-MM-DD)"

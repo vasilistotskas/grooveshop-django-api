@@ -897,6 +897,7 @@ class ProductAdmin(
     search_fields = [
         "id",
         "sku",
+        "external_reference",
         "translations__name",
         "translations__description",
         "category__translations__name",
@@ -973,6 +974,7 @@ class ProductAdmin(
             {
                 "fields": (
                     "sku",
+                    "external_reference",
                     "category",
                     "variant_group",
                     "brand",
@@ -1543,6 +1545,8 @@ class ProductAdmin(
         # cleared the row is an insert, and `uuid` already holds the
         # original's value, so it must be reset to a fresh one.
         clone.uuid = uuid4()
+        # Unique per product: the copy is not the other system's product.
+        clone.external_reference = None
         clone.active = False
         clone.stock = 0
         clone.view_count = 0
@@ -2283,7 +2287,13 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     ]
     list_select_related = ["product"]
     autocomplete_fields = ("product",)
-    readonly_fields = ("created_at", "updated_at", "uuid")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "uuid",
+        "source_url",
+        "source_sha256",
+    )
     ordering = ["product", "-is_main", "sort_order"]
 
     fieldsets = (
@@ -2309,7 +2319,13 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         (
             _("System Information"),
             {
-                "fields": ("uuid", "created_at", "updated_at"),
+                "fields": (
+                    "uuid",
+                    "source_url",
+                    "source_sha256",
+                    "created_at",
+                    "updated_at",
+                ),
                 "classes": ("collapse",),
             },
         ),

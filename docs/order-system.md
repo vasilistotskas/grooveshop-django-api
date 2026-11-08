@@ -241,6 +241,20 @@ Two entry points in `order/services.py` (the legacy `OrderService.create_order`
   returned are irrelevant: they are already consumed, and
   `release-reservations` treats a consumed id as a no-op.
 
+  **Setting an absolute stock (`StockManager.set_stock`).** A writer that knows
+  the number it wants rather than a delta (the catalogue import) calls
+  `set_stock(product_id, quantity, reason_code=StockLogReason.CATALOGUE_IMPORT,
+  reason=..., performed_by=...)`. It locks the product row, saves the new stock
+  under the `"StockManager: set_stock"` change reason (so the stock-save signal in
+  `product/signals.py`, which writes a `MANUAL_ADJUSTMENT` row for any stock save
+  not made by a `StockManager` method, writes nothing) and writes exactly ONE
+  `StockLog` row with the reason code, the before and after values and the staff
+  member. A stock that already equals `quantity` writes nothing at all (no save,
+  no history row, no log, no reindex) and the call returns `False`. A negative
+  quantity raises `ValueError`. Like the other `StockManager` writers it does not
+  look at reservations: the import's preview warns when the new stock is below
+  what is reserved.
+
 ### 3.2 `create_order_from_cart_offline` — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow, and the
   agent gateway's UCP/ACP checkout.

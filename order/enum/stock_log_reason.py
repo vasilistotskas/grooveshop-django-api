@@ -15,3 +15,7 @@ class StockLogReason(models.TextChoices):
         "manual_adjustment",
         _("Manual stock adjustment via admin panel"),
     )
+    CATALOGUE_IMPORT = (
+        "catalogue_import",
+        _("Stock set by a catalogue import"),
+    )

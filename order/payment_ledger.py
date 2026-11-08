@@ -629,9 +629,8 @@ class PaymentLedger:
         cls, order: Order, *, before: PaymentTransaction | None = None
     ) -> Decimal:
         """What the ledger holds for *order* now: received, less what was
-        paid back by refunds. A lost dispute is not taken off: what it took
-        is sale money lost, never a credit and never what a duplicate
-        payment is measured against, however staff decide its goods
+        paid back by refunds. A lost dispute is not taken off here: what it
+        took is sale money lost unless it hit the duplicate payment itself
         (:meth:`excess_held`). With *before*, as it stood just before that
         ledger row (rows are ordered by creation, ties by id)."""
         rows = PaymentTransaction.objects.filter(order=order)
@@ -694,19 +693,64 @@ class PaymentLedger:
         :meth:`refundable_excess` reads it). What the order is still for is
         its total less the goods already returned: a refund of goods lowers
         what the ledger holds without making what is left a duplicate. A
-        chargeback is in neither term: what a lost dispute took is sale
-        money lost, so a duplicate payment stays a duplicate whether the
-        dispute is undecided, kept or returned, and the figure never
-        depends on when staff decide. With *before*, the figure as it stood
+        chargeback is no part of the goods returned, and takes money off
+        the excess only where it hit the duplicate payment itself
+        (:meth:`_duplicate_charged_back`): what a dispute took of the sale
+        is sale money lost, so a duplicate payment stays a duplicate
+        whether the dispute is undecided, kept or returned, and the figure
+        never depends on when staff decide. With *before*, the figure as it stood
         just before that ledger row, every input read at that one cut
         (:meth:`held`, and :func:`credit_allocation.goods_returned`, which
         ignores reversals booked at or after it)."""
+        total = order.calculate_order_total_amount().amount
         excess = (
             cls.held(order, before=before)
-            - order.calculate_order_total_amount().amount
+            - cls._duplicate_charged_back(order, total, before=before)
+            - total
             + credit_allocation.goods_returned(order, before=before)
         )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
+
+    @classmethod
+    def _duplicate_charged_back(
+        cls,
+        order: Order,
+        total: Decimal,
+        *,
+        before: PaymentTransaction | None = None,
+    ) -> Decimal:
+        """What lost disputes took out of the payments that lie above what
+        the order is for: the money received is laid out in the order it
+        arrived, the first *total* of it is the sale and the rest the
+        duplicate, and a dispute on a payment takes its amount out of that
+        payment's duplicate part at most. A dispute on the sale's own
+        payment is sale money lost and takes none of it."""
+        rows = PaymentTransaction.objects.filter(order=order)
+        if before is not None:
+            rows = rows.filter(
+                Q(created_at__lt=before.created_at)
+                | Q(created_at=before.created_at, pk__lt=before.pk)
+            )
+        disputed = {
+            row["charge_id"]: row["total"]
+            for row in rows.filter(
+                kind=PaymentTransactionKind.CHARGEBACK,
+                charge__isnull=False,
+            )
+            .values("charge_id")
+            .annotate(total=Sum("amount", output_field=_AMOUNT))
+        }
+        if not disputed:
+            return _ZERO
+        paid = taken = _ZERO
+        for charge in rows.filter(kind__in=_RECEIPT_KINDS).order_by(
+            "created_at", "pk"
+        ):
+            amount = Decimal(charge.amount.amount)
+            duplicate = max(min(amount, paid + amount - total), _ZERO)
+            taken += min(disputed.get(charge.pk, _ZERO), duplicate)
+            paid += amount
+        return taken
 
     @classmethod
     def refundable_excess(

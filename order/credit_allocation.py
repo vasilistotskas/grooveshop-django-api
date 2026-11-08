@@ -178,8 +178,9 @@ def goods_returned(
     failed of it by the same cut. A reversal booked at or after the cut is
     not yet known there, however late the refund is decided. Gift card and
     points returns are not the provider's money; a chargeback is no part of
-    it (``PaymentLedger.excess_held`` ignores disputes: a lost dispute is
-    sale money lost, whichever way staff decide its goods). A refund's
+    it (``PaymentLedger.excess_held`` takes off only what a lost dispute
+    took of the duplicate payment itself: a dispute on the sale is sale
+    money lost, whichever way staff decide its goods). A refund's
     duplicate-payment part owes no credit and is no goods: the order is
     still for what the ledger holds less this, so the excess is what is
     above it (``PaymentLedger.excess_held``)."""

@@ -842,6 +842,9 @@ msgstr "Μια επιστροφή με αυτή την αναφορά έχει �
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "Μια επιστροφή χρημάτων, ή αξία που επέστρεψε σε δωροκάρτα, μετράει στην περίοδο που έγινε και όχι στην περίοδο της πώλησης, και μοιράζεται ανάμεσα σε προϊόντα, μεταφορικά και χρεώσεις αναλογικά με την απόδειξη."
 
+msgid "A refunded credit document was reversed"
+msgstr "Πιστωτικό στοιχείο επιστροφής που ανατράπηκε"
+
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
@@ -9272,6 +9275,9 @@ msgstr "Αδιαφανής δείκτης (στρατηγική σελιδοπο
 msgid "Open full stock history chart"
 msgstr "Άνοιγμα πλήρους ιστορικού αποθέματος →"
 
+msgid "Open the credit documents"
+msgstr "Άνοιγμα των πιστωτικών στοιχείων"
+
 msgid "Open the email log"
 msgstr "Άνοιγμα του αρχείου email"
 
@@ -14256,6 +14262,9 @@ msgstr "Η μέθοδος πληρωμής είναι δωρεάν όταν τα
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακόμη, επομένως δεν υπάρχει κάτι προς επιστροφή."
 
+msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
+msgstr "Ο πάροχος πληρωμών ανέφερε ότι αυτές οι επιστροφές απέτυχαν αφού εκδόθηκαν τα πιστωτικά τους στοιχεία. Τα χρήματα δεν επέστρεψαν στον πελάτη: ακυρώστε το στοιχείο αν εκδόθηκε κατά λάθος."
+
 msgid "The payment provider's result for the failed call."
 msgstr "Το αποτέλεσμα του παρόχου πληρωμών για την αποτυχημένη κλήση."
 
@@ -14309,6 +14318,10 @@ msgstr "Η προσφορά δεν έχει ξεκινήσει ακόμα"
 
 msgid "The provider report the fee was read from."
 msgstr "Η αναφορά του παρόχου από την οποία διαβάστηκε η προμήθεια."
+
+#, python-format
+msgid "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
+msgstr "Ο πάροχος ανέφερε ότι η επιστροφή %(reference)s απέτυχε αφού εκδόθηκε το πιστωτικό της στοιχείο %(number)s. Το στοιχείο ισχύει μέχρι να το ακυρώσει ο λογιστής."
 
 msgid "The provider's own id for the movement the fee is for."
 msgstr "Το δικό του αναγνωριστικό του παρόχου για την κίνηση στην οποία αφορά η προμήθεια."

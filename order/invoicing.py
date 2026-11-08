@@ -175,13 +175,11 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     the lines first — VAT is owed on what the customer actually paid.
     Gift-card amounts are payment, never allocated (order/discounts.py).
     """
-    from order import credit_allocation
     from order.models import CreditAllocation
 
     rows = breakdown_by_rate(order_vat_lines(order))
     # What moved before this receipt nets it, at the rates each refund was
     # allocated when it was claimed or booked (``order.credit_allocation``).
-    credit_allocation.ensure_allocations(order)
     allocation: dict[Decimal, Decimal] = {}
     for held in CreditAllocation.objects.counting().filter(
         order=order, moved_at__isnull=False
@@ -199,8 +197,8 @@ def refunded_before_receipt(
 ) -> Decimal:
     """What was paid back for *order* before its receipt exists: provider
     and cash refunds on the payment ledger, net of those a provider
-    reported failed, the value returned onto gift cards and points, and
-    the chargebacks staff decided came with the goods back.
+    reported failed, the value returned onto gift cards, and the
+    chargebacks staff decided came with the goods back.
 
     The cut-off is the receipt row's creation: a NEW receipt nets
     everything returned so far (``before=None``); a row that exists is
@@ -221,7 +219,7 @@ def refunded_before_receipt(
 
     return (
         PaymentLedger.refunded(order, before=before)
-        + PaymentLedger.stored_value(order, before=before).returned
+        + PaymentLedger.stored_value(order, before=before).gift_card_returned
         + PaymentLedger.chargebacks_returned(order, before=before)
     )
 

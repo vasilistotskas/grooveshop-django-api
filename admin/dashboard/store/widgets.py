@@ -745,6 +745,8 @@ class StoreAlerts(DashboardWidget):
             alerts += self._legal_identity()
         if self.is_superuser:
             alerts += self._mydata()
+        if self.request.user.has_perm("order.view_retailcredit"):
+            alerts += self._reversed_credits()
         if self.request.user.has_perm("extra_settings.change_setting"):
             alerts += self._email_setup()
         return {"alerts": alerts}
@@ -902,6 +904,41 @@ class StoreAlerts(DashboardWidget):
                 )
             )
         return alerts
+
+    def _reversed_credits(self) -> list[dict[str, Any]]:
+        """Credit documents of refunds the payment provider later reported
+        failed. The document stands (it records what was sent to AADE), so
+        an accountant has to decide whether to cancel it; cancelling takes
+        the alert away."""
+        from order.credit_allocation import reversed_credits
+
+        documents = list(reversed_credits().select_related("order")[:5])
+        if not documents:
+            return []
+        return [
+            _alert(
+                "warning",
+                "currency_exchange",
+                _("A refunded credit document was reversed"),
+                _(
+                    "The payment provider reported these refunds failed after "
+                    "their credit documents were issued. The money did not "
+                    "go back to the customer: cancel the document if it was "
+                    "issued in error."
+                ),
+                items=[
+                    link_cell(
+                        self.change_url("order.RetailCredit", credit.pk),
+                        f"{credit.credit_number} (#{credit.order_id})",
+                    )
+                    for credit in documents
+                ],
+                link=(
+                    self.changelist_url("order.RetailCredit"),
+                    _("Open the credit documents"),
+                ),
+            )
+        ]
 
     def _mydata(self) -> list[dict[str, Any]]:
         from order.mydata.config import load_config

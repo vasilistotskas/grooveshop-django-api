@@ -837,6 +837,9 @@ msgstr "A refund with this reference is already recorded for this order."
 msgid "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 msgstr "A refund, or value returned to a gift card, counts in the period it was made, not in the period of the sale, and is split between goods, shipping and fees in proportion to the receipt."
 
+msgid "A refunded credit document was reversed"
+msgstr "A refunded credit document was reversed"
+
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
@@ -9265,6 +9268,9 @@ msgstr "Opaque cursor (cursor pagination strategy)"
 msgid "Open full stock history chart"
 msgstr "Open full stock history chart"
 
+msgid "Open the credit documents"
+msgstr "Open the credit documents"
+
 msgid "Open the email log"
 msgstr "Open the email log"
 
@@ -14253,6 +14259,9 @@ msgstr "The payment method is free once the products, after discounts and exclud
 msgid "The payment on delivery has not been collected yet, so there is nothing to refund."
 msgstr "The payment on delivery has not been collected yet, so there is nothing to refund."
 
+msgid "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
+msgstr "The payment provider reported these refunds failed after their credit documents were issued. The money did not go back to the customer: cancel the document if it was issued in error."
+
 msgid "The payment provider's result for the failed call."
 msgstr "The payment provider's result for the failed call."
 
@@ -14306,6 +14315,10 @@ msgstr "The promotion has not started yet"
 
 msgid "The provider report the fee was read from."
 msgstr "The provider report the fee was read from."
+
+#, python-format
+msgid "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
+msgstr "The provider reported refund %(reference)s failed after its credit document %(number)s was issued. The document stands until an accountant cancels it."
 
 msgid "The provider's own id for the movement the fee is for."
 msgstr "The provider's own id for the movement the fee is for."

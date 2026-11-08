@@ -1,10 +1,13 @@
-"""Give the credits issued so far the allocation they were issued from.
+"""Allocate the money booked before allocations existed.
 
-Split from the CREATE TABLE migration on purpose, like ``0101``: credits the
-previous release issues while it still serves the rollout are covered by the
-lazy rule (``order.credit_allocation.ensure_allocations`` counts a credit
-without an allocation against the headroom), and
-``order.credit_allocation_backfill`` is idempotent.
+Split from the CREATE TABLE migration on purpose, like ``0101``. Every
+source that still owes a credit (a refund booked without a claim, a
+provider refund attempt, a chargeback decision that the goods came back)
+is given its allocation here, once, so no read path ever allocates
+(``order.credit_allocation_backfill``). Money the previous release books
+while it still serves the rollout has no allocation: the credit
+reconciliation reports it on the order instead of crediting it wrongly, and
+the function is idempotent, so a re-run allocates it.
 """
 
 from django.db import migrations

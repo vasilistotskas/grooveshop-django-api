@@ -3637,8 +3637,17 @@ class OrderService:
         provider is called: its credit document could never be issued."""
         if not credit_allocation.has_rates(order):
             return
-        credit_allocation.ensure_allocations(order, claiming=attempts)
-        total = sum((a.amount.amount for a in attempts), Decimal(0))
+        # Points are a discount, not money returned: their share owes no
+        # credit document and takes no room on the receipt. A gift card is
+        # payment the receipt holds.
+        stored = PaymentLedger.stored_value(order)
+        owed = [
+            PaymentLedger.split_stored_value(stored, a.amount.amount)[0]
+            if a.kind == RefundAttemptKind.STORED_VALUE
+            else a.amount.amount
+            for a in attempts
+        ]
+        total = sum(owed, Decimal(0))
         allocation = credit_allocation.allocate_pro_rata(order, total)
         held = sum(allocation.values(), Decimal(0))
         if held < total:
@@ -3652,8 +3661,7 @@ class OrderService:
                 % {"left": held, "amount": total}
             )
         per_share = credit_allocation.split_over_shares(
-            credit_allocation.pieces_of(allocation),
-            [a.amount.amount for a in attempts],
+            credit_allocation.pieces_of(allocation), owed
         )
         for attempt, pieces in zip(attempts, per_share, strict=True):
             credit_allocation.store(order, pieces, refund_attempt=attempt)
@@ -3833,25 +3841,9 @@ class OrderService:
                     attempt.pk, PaymentLedger.stored_returned_by(order, settled)
                 )
 
-            stored = PaymentLedger.stored_value(order)
-            left = stored.left
-            amount = min(attempt.amount.amount, left)
-            if amount >= left:
-                gift_card_part = stored.gift_card_left
-                points_part = stored.points_left
-            else:
-                gift_card_part = (
-                    amount * stored.gift_card_left / left
-                ).quantize(Decimal("0.01"), rounding="ROUND_DOWN")
-                points_part = (
-                    int(
-                        stored.points_left
-                        * (amount - gift_card_part)
-                        / stored.points_value_left
-                    )
-                    if stored.points_value_left
-                    else 0
-                )
+            gift_card_part, points_part = PaymentLedger.split_stored_value(
+                PaymentLedger.stored_value(order), attempt.amount.amount
+            )
             gift_card = (
                 GiftCardService.credit_refund(
                     order, gift_card_part, refund_attempt=settled
@@ -3869,7 +3861,9 @@ class OrderService:
             order.payment_status = PaymentLedger.refund_status(order)
             order.save(update_fields=["payment_status"])
             returned = PaymentLedger.stored_returned_by(order, settled)
-            credit_allocation.scale(returned.amount, refund_attempt=settled)
+            # Only the gift cards are payment the receipt holds: points are
+            # a discount and owe no credit document.
+            credit_allocation.scale(gift_card, refund_attempt=settled)
             credit_allocation.mark_moved(timezone.now(), refund_attempt=settled)
             order_stored_value_returned.send(
                 sender=cls,

@@ -287,11 +287,6 @@ def create_pending_credits(order_id: int) -> list[int]:
         ):
             return created
 
-        # Every source that owes a credit has its allocation by now;
-        # one created before allocations existed, or booked by a path that
-        # never claimed, gets it here, oldest first.
-        credit_allocation.ensure_allocations(order)
-
         refunds = PaymentTransaction.objects.filter(
             order=order,
             kind=PaymentTransactionKind.REFUND,
@@ -299,15 +294,22 @@ def create_pending_credits(order_id: int) -> list[int]:
             credit_document__isnull=True,
         ).order_by("created_at", "id")
         for refund in refunds:
+            # What the provider reported failed was never paid back: a
+            # refund reversed in full owes nothing, a partly reversed one
+            # is credited for what stands (its allocation was scaled to it).
+            amount = Decimal(
+                refund.amount.amount
+            ) - credit_allocation.reversed_of(refund)
+            if amount <= 0:
+                continue
             created.extend(
                 _guarded(
                     order,
                     invoice,
-                    amount=Decimal(refund.amount.amount),
+                    amount=amount,
                     reason=CreditReason.REFUND,
                     refund=refund,
-                    allocation=credit_allocation.allocation_of_refund(refund)
-                    or None,
+                    allocation=credit_allocation.allocation_of_refund(refund),
                 )
             )
 
@@ -321,24 +323,25 @@ def create_pending_credits(order_id: int) -> list[int]:
             credit_document__isnull=True,
         ).order_by("id"):
             returned_at = PaymentLedger.stored_returned_at(attempt)
-            returned = PaymentLedger.stored_returned_by(order, attempt)
+            # Only what went back onto gift cards is payment the receipt
+            # holds: the points are a discount and owe no credit.
+            returned = PaymentLedger.stored_gift_card_returned_by(attempt)
             if (
                 returned_at is None
                 or returned_at < invoice.created_at
-                or returned.amount <= 0
+                or returned <= 0
             ):
                 continue
             created.extend(
                 _guarded(
                     order,
                     invoice,
-                    amount=Decimal(returned.amount),
+                    amount=returned,
                     reason=CreditReason.REFUND,
                     refund_attempt=attempt,
                     allocation=credit_allocation.allocation_of(
                         refund_attempt=attempt
-                    )
-                    or None,
+                    ),
                 )
             )
 

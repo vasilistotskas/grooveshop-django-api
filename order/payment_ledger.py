@@ -426,17 +426,55 @@ class PaymentLedger:
         )
 
     @staticmethod
+    def split_stored_value(
+        stored: StoredValue, amount: Decimal
+    ) -> tuple[Decimal, int]:
+        """How *amount* of value going back onto gift cards and points
+        divides: ``(gift card amount, points)``.
+
+        In proportion to what each has not yet got back, so both are used
+        up together and the last refund returns exactly what is left (no
+        cent or point is lost to rounding). The one rule, read when a refund
+        is claimed (the gift-card part is what owes a credit document) and
+        again when it is executed."""
+        left = stored.left
+        amount = min(amount, left)
+        if amount >= left:
+            return stored.gift_card_left, stored.points_left
+        gift_card = (amount * stored.gift_card_left / left).quantize(
+            Decimal("0.01"), rounding="ROUND_DOWN"
+        )
+        points = (
+            int(
+                stored.points_left
+                * (amount - gift_card)
+                / stored.points_value_left
+            )
+            if stored.points_value_left
+            else 0
+        )
+        return gift_card, points
+
+    @staticmethod
+    def stored_gift_card_returned_by(attempt: RefundAttempt) -> Decimal:
+        """What *attempt* put back onto gift cards: the part of a stored
+        value refund that is payment the receipt holds (points are a
+        discount)."""
+        from giftcard.models import GiftCardTransaction
+
+        return GiftCardTransaction.objects.filter(
+            refund_attempt=attempt
+        ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
+
+    @staticmethod
     def stored_returned_by(order: Order, attempt: RefundAttempt) -> Money:
         """What *attempt* actually put back onto gift cards and points, read
         from the rows that name it. Not the amount it claimed: a cancel or a
         racing refund may have returned part of it first, and the ledgers
         only credit what is still owed."""
-        from giftcard.models import GiftCardTransaction
         from loyalty.models.transaction import PointsTransaction
 
-        gift_card = GiftCardTransaction.objects.filter(
-            refund_attempt=attempt
-        ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
+        gift_card = PaymentLedger.stored_gift_card_returned_by(attempt)
         points = PointsTransaction.objects.filter(
             refund_attempt=attempt
         ).aggregate(total=Coalesce(Sum("points"), 0))["total"]
@@ -877,15 +915,21 @@ class PaymentLedger:
         is settled without a link."""
         attempt.status = RefundAttemptStatus.SETTLED
         fields = ["status"]
-        if (
+        linked = (
             not RefundAttempt.objects.filter(refund=refund)
             .exclude(pk=attempt.pk)
             .exists()
-        ):
+        )
+        if linked:
             attempt.refund = refund
             fields.append("refund")
         attempt.save(update_fields=fields)
-        credit_allocation.mark_moved(refund.created_at, refund_attempt=attempt)
+        if linked:
+            credit_allocation.link_attempt(attempt, refund)
+        else:
+            credit_allocation.mark_moved(
+                refund.created_at, refund_attempt=attempt
+            )
 
     @classmethod
     def record_refund_reversal(
@@ -936,9 +980,7 @@ class PaymentLedger:
                 kind=PaymentTransactionKind.REFUND,
             ).first()
             if refunded is not None:
-                credit_allocation.free_reversed(
-                    refunded, Decimal(amount.amount)
-                )
+                credit_allocation.free_reversed(refunded)
         return row, created
 
     @staticmethod

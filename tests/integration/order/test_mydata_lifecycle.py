@@ -1172,6 +1172,16 @@ class TestCreditForValueReturnedOntoGiftCardsAndPoints:
                 amount=_eur("50.00"),
                 status=RefundAttemptStatus.SETTLED,
             )
+            # The claim fixed its share of the receipt's rates.
+            from order import credit_allocation
+
+            credit_allocation.store(
+                order,
+                credit_allocation.pieces_of(
+                    credit_allocation.allocate_pro_rata(order, Decimal(50))
+                ),
+                refund_attempt=attempt,
+            )
             redeem = GiftCardTransaction.objects.get(
                 order=order, kind=GiftCardTransactionKind.REDEEM
             )

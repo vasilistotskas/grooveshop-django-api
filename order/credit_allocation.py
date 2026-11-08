@@ -7,15 +7,24 @@ is left on the receipt:
 * :func:`headroom` is a plain sum: the receipt's gross per rate (the order's
   VAT lines while there is no receipt), less the allocations of every source
   that was not declined and whose money moves at or after the receipt (an
-  in-flight claim included), less the credits of anything that has no
+  in-flight claim included), less the credit documents themselves. A source
+  that has a credit is counted by the document's own VAT rows, never by its
   allocation.
 * :func:`allocate_pro_rata` spreads an amount over that headroom, to the
   cent, capped to it; a claim that does not fit is refused by its caller
   before any money moves.
-* :func:`ensure_allocations` gives an allocation to a source created before
-  allocations existed, or booked by a path that never claimed (a provider's
-  webhook): pro rata over the headroom at that moment, under the order lock,
-  oldest first. This is the one documented rule for money nobody claimed.
+* Every source is allocated when it is created, so nothing here is ever
+  allocated by a read: a refund claim by ``OrderService._claim_refund``, a
+  refund nobody claimed (a provider's webhook) by :func:`book_refund` over
+  the headroom of that moment, a returned chargeback by
+  :func:`allocate_decision`. Money booked before allocations existed was
+  allocated by migration ``0103`` (``order.credit_allocation_backfill``).
+* A provider's reversal of a refund scales its allocation down
+  (:func:`free_reversed`) unless a credit document was already issued.
+
+Points owe no credit (they are a discount, the receipt does not hold their
+value), so a refund's points share is never allocated; a gift card is
+payment and is.
 
 Everything here runs under the order's row lock (the callers hold it).
 """
@@ -27,7 +36,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q, QuerySet, Sum
+from django.db.models.functions import Coalesce
+from django.utils.translation import gettext
 from djmoney.money import Money
 
 from order.discounts import allocate_capped, proportional_shares
@@ -37,14 +48,13 @@ from order.models import (
     CreditAllocation,
     Invoice,
     Order,
+    OrderHistory,
     PaymentTransaction,
     RetailCredit,
 )
 from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
-    RefundAttemptKind,
-    RefundAttemptStatus,
 )
 from order.taxation import ChargeKind, breakdown_by_rate, order_vat_lines
 
@@ -75,45 +85,37 @@ def _base(order: Order) -> tuple[dict[Decimal, Decimal], Invoice | None]:
     return {Decimal(r["rate"]): Decimal(r["gross"]) for r in rows}, invoice
 
 
-def _has_allocation(**source) -> bool:
-    return CreditAllocation.objects.filter(**source).exists()
+def _credited(issued: QuerySet[RetailCredit]) -> Q:
+    """Allocation rows whose source has one of the *issued* credits."""
+    return (
+        Exists(issued.filter(refund_attempt=OuterRef("refund_attempt")))
+        | Exists(issued.filter(refund=OuterRef("refund")))
+        | Exists(issued.filter(refund=OuterRef("refund_attempt__refund")))
+        | Exists(issued.filter(chargeback=OuterRef("decision__chargeback")))
+    )
 
 
 def headroom(order: Order) -> dict[Decimal, Decimal]:
     """The gross each VAT rate can still be credited. See the module doc."""
     left, invoice = _base(order)
     counting = CreditAllocation.objects.counting().filter(order=order)
+    issued = RetailCredit.objects.none()
     if invoice is not None:
+        issued = RetailCredit.objects.filter(invoice=invoice).exclude(
+            mydata_status=MyDataStatus.CANCELED
+        )
+        # What a credit holds is read off the document itself; the
+        # allocation it was issued from has done its work.
         counting = counting.filter(
             Q(moved_at__isnull=True) | Q(moved_at__gte=invoice.created_at)
-        )
+        ).exclude(_credited(issued))
     for row in counting:
         left[row.rate] = left.get(row.rate, _ZERO) - Decimal(row.amount.amount)
-    if invoice is not None:
-        for credit in RetailCredit.objects.filter(invoice=invoice).exclude(
-            mydata_status=MyDataStatus.CANCELED
-        ):
-            if _credit_has_allocation(credit):
-                continue
-            for row in credit.vat_breakdown:
-                rate = Decimal(row["rate"])
-                left[rate] = left.get(rate, _ZERO) - Decimal(row["gross"])
+    for credit in issued:
+        for row in credit.vat_breakdown:
+            rate = Decimal(row["rate"])
+            left[rate] = left.get(rate, _ZERO) - Decimal(row["gross"])
     return left
-
-
-def _credit_has_allocation(credit: RetailCredit) -> bool:
-    if credit.refund_id is not None:
-        attempt = RefundAttempt.objects.filter(refund_id=credit.refund_id)
-        return _has_allocation(refund_id=credit.refund_id) or (
-            CreditAllocation.objects.filter(refund_attempt__in=attempt).exists()
-        )
-    if credit.refund_attempt_id is not None:
-        return _has_allocation(refund_attempt_id=credit.refund_attempt_id)
-    if credit.chargeback_id is not None:
-        return CreditAllocation.objects.filter(
-            decision__chargeback_id=credit.chargeback_id
-        ).exists()
-    return False
 
 
 def allocate_pro_rata(order: Order, amount: Decimal) -> dict[Decimal, Decimal]:
@@ -287,127 +289,76 @@ def allocate_decision(order: Order, decision: ChargebackDecision) -> None:
     )
 
 
-def ensure_allocations(
-    order: Order, *, claiming: Sequence[RefundAttempt] = ()
-) -> None:
-    """Allocate every source that owes a credit and has no allocation: a
-    refund claimed or booked before allocations existed, or booked by a
-    path that never claimed, oldest first, each pro rata over the headroom
-    at that moment. A source whose credit was issued already keeps what it
-    was credited (:func:`headroom` counts that credit). *claiming* are the
-    attempts a claim is allocating right now: they are not unclaimed money."""
-    if not has_rates(order):
-        return
-    pending: list[tuple[datetime, str, object, Decimal, datetime | None]] = []
-    for attempt in (
-        RefundAttempt.objects.filter(order=order, credit_document__isnull=True)
-        .exclude(status=RefundAttemptStatus.DECLINED)
-        .exclude(pk__in=[a.pk for a in claiming])
-        .exclude(refund__credit_document__isnull=False)
-    ):
-        if _has_allocation(refund_attempt=attempt) or (
-            attempt.refund is not None and _fully_reversed(attempt.refund)
-        ):
-            continue
-        when, amount = _attempt_moment(attempt)
-        if amount > 0:
-            pending.append(
-                (when or attempt.created_at, "a", attempt, amount, when)
-            )
-    for refund in PaymentTransaction.objects.filter(
-        order=order,
-        kind=PaymentTransactionKind.REFUND,
-        credit_document__isnull=True,
-        attempt__isnull=True,
-    ):
-        if not _has_allocation(refund=refund) and not _fully_reversed(refund):
-            pending.append(
-                (
-                    refund.created_at,
-                    "r",
-                    refund,
-                    Decimal(refund.amount.amount),
-                    refund.created_at,
-                )
-            )
-    for decision in ChargebackDecision.objects.filter(
-        chargeback__order=order,
-        goods_returned=True,
-        chargeback__chargeback_credit__isnull=True,
-    ):
-        if not _has_allocation(decision=decision):
-            pending.append(
-                (
-                    decision.decided_at,
-                    "d",
-                    decision,
-                    Decimal(decision.chargeback.amount.amount),
-                    decision.decided_at,
-                )
-            )
-    for _key, kind, source, amount, when in sorted(
-        pending, key=lambda p: (p[0], p[1])
-    ):
-        name = {"a": "refund_attempt", "r": "refund", "d": "decision"}[kind]
-        _allocate_unclaimed(order, amount, when, **{name: source})
+def reversed_of(refund: PaymentTransaction) -> Decimal:
+    """What the provider reported failed of a booked refund, in all."""
+    return PaymentTransaction.objects.filter(
+        provider=refund.provider,
+        provider_reference=refund.provider_reference,
+        kind=PaymentTransactionKind.REFUND_REVERSAL,
+    ).aggregate(total=Coalesce(Sum("amount"), _ZERO))["total"]
 
 
-def _fully_reversed(refund: PaymentTransaction) -> bool:
-    """Whether the provider reported this refund failed for all of it."""
-    reversed_amount = sum(
-        (
-            Decimal(row.amount.amount)
-            for row in PaymentTransaction.objects.filter(
-                provider=refund.provider,
-                provider_reference=refund.provider_reference,
-                kind=PaymentTransactionKind.REFUND_REVERSAL,
-            )
-        ),
-        _ZERO,
+def reversed_credits() -> QuerySet[RetailCredit]:
+    """The credit documents of refunds a provider later reported failed:
+    each stands (it records what was sent to AADE) until an accountant
+    cancels it, so each is for someone to look at."""
+    reversals = PaymentTransaction.objects.filter(
+        kind=PaymentTransactionKind.REFUND_REVERSAL,
+        provider=OuterRef("refund__provider"),
+        provider_reference=OuterRef("refund__provider_reference"),
     )
-    return reversed_amount >= Decimal(refund.amount.amount)
-
-
-def _attempt_moment(
-    attempt: RefundAttempt,
-) -> tuple[datetime | None, Decimal]:
-    """When an attempt's money moved (``None`` while in flight) and how
-    much of it: a stored-value share counts what it really returned."""
-    from order.payment_ledger import PaymentLedger
-
-    if attempt.kind == RefundAttemptKind.STORED_VALUE:
-        if attempt.status != RefundAttemptStatus.SETTLED:
-            return None, Decimal(attempt.amount.amount)
-        order = attempt.order
-        return (
-            PaymentLedger.stored_returned_at(attempt),
-            Decimal(PaymentLedger.stored_returned_by(order, attempt).amount),
-        )
-    refund = attempt.refund
     return (
-        refund.created_at if refund is not None else None,
-        Decimal(attempt.amount.amount),
+        RetailCredit.objects.filter(refund__isnull=False)
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .filter(Exists(reversals))
+        .order_by("pk")
     )
 
 
-def free_reversed(refund: PaymentTransaction, reversed_amount: Decimal) -> None:
-    """A provider reported a booked refund failed: the money was never paid
-    back, so its room on the receipt is free again, unless a credit
-    document was issued for it (the document stays: it records what the
-    merchant owes). Scales the allocation down by what was reversed."""
+def free_reversed(refund: PaymentTransaction) -> None:
+    """A provider reported a booked refund failed (in whole or in part):
+    the money was never paid back, so its room on the receipt is free
+    again, scaled by everything reversed so far. A credit document that
+    was issued for the refund already stays, as the record of what was
+    sent to AADE, and the order is told so an accountant can look at it."""
     attempt = RefundAttempt.objects.filter(refund=refund).first()
     source = (
         {"refund_attempt": attempt}
         if attempt is not None
         else {"refund": refund}
     )
-    credited = (
-        attempt is not None
-        and RetailCredit.objects.filter(refund_attempt=attempt).exists()
-    ) or RetailCredit.objects.filter(refund=refund).exists()
-    if credited:
+    credit = (
+        RetailCredit.objects.filter(refund=refund)
+        .exclude(mydata_status=MyDataStatus.CANCELED)
+        .first()
+    )
+    if credit is not None:
+        OrderHistory.log_note(
+            order=refund.order,
+            note=gettext(
+                "The provider reported refund %(reference)s failed after "
+                "its credit document %(number)s was issued. The document "
+                "stands until an accountant cancels it."
+            )
+            % {
+                "reference": refund.provider_reference,
+                "number": credit.credit_number,
+            },
+        )
         return
-    scale(max(Decimal(refund.amount.amount) - reversed_amount, _ZERO), **source)
+    scale(
+        max(Decimal(refund.amount.amount) - reversed_of(refund), _ZERO),
+        **source,
+    )
+
+
+def link_attempt(attempt: RefundAttempt, refund: PaymentTransaction) -> None:
+    """The ledger refund *refund* answers *attempt*: the attempt's own
+    allocation is the refund's (scaled to what really moved), so the
+    allocation the refund got when it was booked unclaimed is dropped."""
+    CreditAllocation.objects.filter(refund=refund).delete()
+    scale(Decimal(refund.amount.amount), refund_attempt=attempt)
+    mark_moved(refund.created_at, refund_attempt=attempt)
 
 
 __all__ = [
@@ -418,13 +369,15 @@ __all__ = [
     "allocation_of",
     "allocation_of_refund",
     "book_refund",
-    "ensure_allocations",
     "free_reversed",
     "has_rates",
     "headroom",
     "headroom_total",
+    "link_attempt",
     "mark_moved",
     "pieces_of",
+    "reversed_credits",
+    "reversed_of",
     "scale",
     "split_over_shares",
     "store",

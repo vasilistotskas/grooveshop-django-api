@@ -900,6 +900,14 @@ class StripePaymentProvider(PaymentProvider):
             return None
         return found
 
+    def retrieve_refund(self, refund_id: str) -> stripe.Refund:
+        """The refund as Stripe holds it NOW (``re_...``). A refund event
+        is a snapshot of the moment it was raised and events are not
+        delivered in order, so what a refund is, and whether it counts, is
+        read here, never from an event's own status. Raises
+        ``stripe.StripeError``."""
+        return stripe.Refund.retrieve(refund_id, api_key=self.api_key)
+
     def confirm_refund(
         self, order: Order, payment_id: str, amount: Money, reference: str
     ) -> ProviderRefund | None:
@@ -908,7 +916,7 @@ class StripePaymentProvider(PaymentProvider):
         ``succeeded``/``pending`` (made) or ``failed``/``canceled`` (not
         made); ``requires_action`` is no decision."""
         try:
-            refund = stripe.Refund.retrieve(reference, api_key=self.api_key)
+            refund = self.retrieve_refund(reference)
         except stripe.StripeError:
             logger.exception(
                 "Stripe refund lookup failed",

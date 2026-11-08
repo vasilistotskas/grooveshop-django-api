@@ -35,7 +35,10 @@ from order.signals.handlers import (
 from tests.utils.payments import CAPTURED
 from tests.utils.stripe_refunds import FakeStripeRefunds, refund_event
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("refund_states"),
+]
 
 
 def _order(payment_intent_id: str, **kwargs):
@@ -156,6 +159,57 @@ class TestRefundWebhook:
 
         assert _refunds(order).count() == 1
         assert len(refunded_signals) == 1
+
+    def test_a_late_created_event_for_a_refund_that_failed_books_nothing(
+        self, refunded_signals
+    ):
+        """``refund.created`` says ``pending``; by the time it is processed
+        Stripe reports the refund failed: its status NOW decides."""
+        order = _order("pi_late_created_1")
+
+        _deliver(
+            "re_late_created",
+            "pi_late_created_1",
+            1500,
+            status="pending",
+            current="failed",
+        )
+
+        assert not _refunds(order).exists()
+        assert refunded_signals == []
+
+    def test_an_updated_event_that_reports_succeeded_books_once(
+        self, refunded_signals
+    ):
+        order = _order("pi_updated_1")
+
+        for _ in range(2):
+            _deliver(
+                "re_updated_1",
+                "pi_updated_1",
+                1500,
+                status="succeeded",
+                event_type="refund.updated",
+            )
+
+        assert [r.provider_reference for r in _refunds(order)] == [
+            "re_updated_1"
+        ]
+        assert len(refunded_signals) == 1
+
+    def test_a_stripe_error_reading_the_refund_propagates_for_redelivery(self):
+        order = _order("pi_error_1")
+
+        with (
+            patch(
+                "order.payment.stripe.Refund.retrieve",
+                side_effect=stripe.APIConnectionError("down"),
+            ),
+            pytest.raises(stripe.APIConnectionError),
+        ):
+            _deliver("re_error_1", "pi_error_1", 1500)
+
+        assert not _refunds(order).exists()
 
     def test_each_refund_is_its_own_row_under_its_own_id(
         self, refunded_signals
@@ -332,12 +386,15 @@ class TestAWebhookRefundIsKeyedLikeEveryOtherPath:
         assert [r.provider_reference for r in _refunds(order)] == ["re_keyed"]
         assert PaymentLedger.refunded(order) == Decimal("20.00")
 
-    def test_a_failed_refund_frees_the_credit_of_a_webhook_booked_one(self):
+    def test_a_failed_refund_frees_the_credit_of_a_webhook_booked_one(
+        self, refund_states
+    ):
         from order import credit_allocation
 
         order = _order("pi_keyed_2", amount_due=Money("50.00", "EUR"))
         _deliver("re_keyed_2", "pi_keyed_2", 2000)
         refund = _refunds(order).get()
+        refund_states["re_keyed_2"] = "failed"
 
         failed = Mock(spec=Event)
         failed.id = "evt_failed_keyed_2"

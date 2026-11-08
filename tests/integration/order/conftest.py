@@ -16,3 +16,38 @@ def refunded_signals():
     order_refunded.connect(receiver, weak=False)
     yield received
     order_refunded.disconnect(receiver)
+
+
+@pytest.fixture
+def refund_states():
+    """Stripe's current state of each refund an event is built for
+    (``tests.utils.stripe_refunds.refund_event``): the refund handlers read
+    it with ``Refund.retrieve`` instead of trusting the event's snapshot.
+    ``refund_states[refund_id] = "failed"`` changes what Stripe reports."""
+    from types import SimpleNamespace
+    from unittest import mock
+
+    import stripe
+
+    from tests.utils.stripe_refunds import CREDENTIALS, CURRENT_REFUND_STATUS
+
+    def retrieve(refund_id, **kwargs):
+        if refund_id not in CURRENT_REFUND_STATUS:
+            raise stripe.InvalidRequestError(
+                f"No such refund: '{refund_id}'", "refund"
+            )
+        return SimpleNamespace(
+            id=refund_id, status=CURRENT_REFUND_STATUS[refund_id]
+        )
+
+    CURRENT_REFUND_STATUS.clear()
+    with (
+        mock.patch(
+            "tenant.credentials.stripe_credentials", return_value=CREDENTIALS
+        ),
+        mock.patch(
+            "order.payment.stripe.Refund.retrieve", side_effect=retrieve
+        ),
+    ):
+        yield CURRENT_REFUND_STATUS
+    CURRENT_REFUND_STATUS.clear()

@@ -45,7 +45,10 @@ from tests.utils.stripe_refunds import refund_event
 from tests.utils.viva import verified_payment
 from user.factories import UserAccountFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.usefixtures("refund_states"),
+]
 
 OWED = Decimal("40.00")
 
@@ -351,9 +354,10 @@ class TestEventsOnTheSecondIntent:
         assert twice.overcharged_at is None
 
     def test_a_failed_refund_of_the_second_reverses_it_and_flags_again(
-        self, twice
+        self, twice, refund_states
     ):
         self._refunded("re_second", int(OWED * 100))
+        refund_states["re_second"] = "failed"
         failed = self._event(
             "evt_refund_failed",
             "refund.failed",

@@ -27,9 +27,17 @@ from order.signals.handlers import (
     handle_stripe_refund_made,
 )
 from pay_way.factories import PayWayFactory
-from tests.utils.stripe_refunds import FakeStripeRefunds, refund_event
+from tests.utils.stripe_refunds import (
+    CURRENT_REFUND_STATUS,
+    FakeStripeRefunds,
+    refund_event,
+)
 
-pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
+pytestmark = [
+    pytest.mark.django_db,
+    pytest.mark.assert_english,
+    pytest.mark.usefixtures("refund_states"),
+]
 
 REVERSAL = PaymentTransactionKind.REFUND_REVERSAL
 
@@ -61,6 +69,7 @@ def _event(
     kind: str = "refund.failed",
     payment_intent: str = "pi_failed",
 ) -> Mock:
+    CURRENT_REFUND_STATUS[refund_id] = status
     event = Mock(spec=Event)
     event.id = f"evt_{kind}_{refund_id}"
     event.type = kind
@@ -215,12 +224,38 @@ class TestOnlyAFailureCounts:
         alerts.assert_not_called()
 
 
+class TestTheCurrentStateDecides:
+    def test_a_failure_event_for_a_refund_stripe_now_reports_succeeded_is_ignored(
+        self, alerts, refund_states
+    ):
+        order = _order()
+        _refund_made("re_flip", 6000)
+        event = _event("re_flip", 6000)
+        refund_states["re_flip"] = "succeeded"
+
+        _deliver(event)
+
+        assert PaymentLedger.refunded(order) == Decimal("60.00")
+        assert not order.payment_transactions.filter(kind=REVERSAL).exists()
+        alerts.assert_not_called()
+
+    def test_a_canceled_refund_is_reversed_like_a_failed_one(self, alerts):
+        order = _order()
+        _refund_made("re_cancel", 6000)
+
+        _deliver(_event("re_cancel", 6000, status="canceled"))
+
+        assert PaymentLedger.refunded(order) == 0
+
+
 class TestTheLedgerKeepsAddingUpAfterAReversal:
     def test_a_failed_refund_can_be_refunded_again(self, alerts):
         order = _order()
         with FakeStripeRefunds() as stripe_api:
             OrderService.refund_order(order)
+            stripe_api.created[0].status = "failed"
             _deliver(_event(stripe_api.created[0].id, 10000))
+            stripe_api.status = "succeeded"
             result = OrderService.refund_order(order)
 
         assert result.refunded == _eur("100.00")
@@ -228,9 +263,12 @@ class TestTheLedgerKeepsAddingUpAfterAReversal:
         assert PaymentLedger.refunded(order) == Decimal("100.00")
 
 
-def _refund_made(refund_id: str, cents: int) -> None:
+def _refund_made(
+    refund_id: str, cents: int, current: str | None = None
+) -> None:
     handle_stripe_refund_made(
-        sender=None, event=refund_event(refund_id, "pi_failed", cents)
+        sender=None,
+        event=refund_event(refund_id, "pi_failed", cents, current=current),
     )
 
 
@@ -258,7 +296,7 @@ class TestRefundEventsAroundAFailure:
 
         _deliver(_event(failed.id, 2000))
         _refund_made(first.id, 3000)
-        _refund_made(failed.id, 2000)
+        _refund_made(failed.id, 2000, current="failed")
 
         assert PaymentLedger.refunded(order) == Decimal("30.00")
         assert _kinds(order) == [
@@ -276,7 +314,7 @@ class TestRefundEventsAroundAFailure:
         assert PaymentLedger.refunded(order) == Decimal("50.00")
 
         _deliver(_event("re_failed", 2000))
-        _refund_made("re_failed", 2000)
+        _refund_made("re_failed", 2000, current="failed")
 
         assert PaymentLedger.refunded(order) == Decimal("30.00")
         assert _kinds(order) == [

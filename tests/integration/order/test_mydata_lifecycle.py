@@ -347,7 +347,7 @@ class TestCreditForEveryRefundSource:
 
         self._assert_one_credit(order, aade, "30.00")
 
-    def test_a_stripe_dashboard_refund_webhook(self):
+    def test_a_stripe_dashboard_refund_webhook(self, refund_states):
         event = refund_event("re_dashboard", PI, 4000)
         with mydata_enabled(), FakeAade() as aade:
             order = self._shipped()

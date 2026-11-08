@@ -343,7 +343,9 @@ class TestChargebackIsCappedAtWhatIsLeft:
 
 
 class TestChargebackAmongRefunds:
-    def test_charge_refunded_arithmetic_ignores_a_chargeback(self):
+    def test_charge_refunded_arithmetic_ignores_a_chargeback(
+        self, refund_states
+    ):
         order, charge = _paid_order()
         _close(_event("evt_lost_8"))
         assert PaymentLedger.refunded_on(charge) == 0

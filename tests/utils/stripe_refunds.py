@@ -145,20 +145,31 @@ class FakeStripeRefunds:
         return [call["amount"] for call in self.calls]
 
 
+#: What Stripe says each refund IS NOW, by refund id, for the
+#: ``refund_states`` fixture (``tests/integration/order/conftest.py``). An
+#: event is a snapshot of a moment earlier; the handlers read this instead.
+CURRENT_REFUND_STATUS: dict[str, str] = {}
+
+
 def refund_event(
     refund_id: str,
     payment_intent: str,
     cents: int,
     *,
     status: str = "succeeded",
+    current: str | None = None,
     currency: str = "eur",
     event_type: str = "refund.created",
     event_id: str | None = None,
 ) -> mock.Mock:
     """The ``refund.created`` (or ``refund.updated``) event Stripe sends for
     a refund: ``data.object`` is the Refund (docs.stripe.com/api/events/types).
+    *status* is the snapshot the event carries; *current* what Stripe holds
+    by the time the handler asks (default: the same).
     """
     from djstripe.models import Event
+
+    CURRENT_REFUND_STATUS[refund_id] = current or status
 
     event = mock.Mock(spec=Event)
     event.id = event_id or f"evt_{refund_id}"

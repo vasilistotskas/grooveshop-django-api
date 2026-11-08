@@ -1194,7 +1194,9 @@ def handle_stripe_refund_made(sender, **kwargs):
 
     ``succeeded`` and ``pending`` are a refund made; ``failed``,
     ``canceled`` and ``requires_action`` are not (a failure is
-    :func:`handle_stripe_refund_failed`). A refund this app made is already
+    :func:`handle_stripe_refund_failed`). Which it is comes from Stripe's
+    current state of the refund, never from the event, so the two handlers
+    cannot disagree. A refund this app made is already
     in the ledger under the same id, so its event adds nothing, and so
     does a redelivery. One nobody claimed settles the PENDING attempt that
     matches it (``PaymentLedger.record_refund``).
@@ -1207,12 +1209,17 @@ def handle_stripe_refund_made(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         refund = event.data["object"]
-        if refund.get("status") not in (
-            StripePaymentProvider._ACCEPTED_REFUND_STATUSES
+        refund_id = refund["id"]
+        # The refund's status NOW, not the event's snapshot of it: a
+        # ``pending`` created event processed after the failure must not
+        # book a refund that failed. A Stripe error propagates, so Stripe
+        # redelivers the event.
+        if (
+            StripePaymentProvider().retrieve_refund(refund_id).status
+            not in StripePaymentProvider._ACCEPTED_REFUND_STATUSES
         ):
             return
 
-        refund_id = refund["id"]
         payment_intent_id = refund.get("payment_intent") or ""
         if not payment_intent_id:
             logger.warning(
@@ -1304,10 +1311,15 @@ def handle_stripe_refund_failed(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         refund = event.data["object"]
-        if refund.get("status") != "failed":
+        refund_id = refund["id"]
+        # Stripe's current state of the refund, the same rule as
+        # ``handle_stripe_refund_made``; an error propagates for redelivery.
+        if (
+            StripePaymentProvider().retrieve_refund(refund_id).status
+            not in StripePaymentProvider._FAILED_REFUND_STATUSES
+        ):
             return
 
-        refund_id = refund["id"]
         payment_intent_id = refund.get("payment_intent") or ""
         if not payment_intent_id:
             logger.warning(

@@ -75,7 +75,7 @@ services:
 
   rabbitmq:
     container_name: rabbitmq
-    image: rabbitmq:4.3.5-management
+    image: rabbitmq:4.3.7-management
     restart: no
     environment:
       - RABBITMQ_DEFAULT_USER=guest
@@ -94,7 +94,7 @@ services:
 
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:v1.53.1
+    image: getmeili/meilisearch:v1.56.0
     env_file:
       - ./docker/meilisearch/.env
     volumes:

@@ -240,7 +240,7 @@ jobs:
         ports:
           - 6379:6379
       meilisearch:
-        image: getmeili/meilisearch:v1.53.1
+        image: getmeili/meilisearch:v1.56.0
         ports:
           - 7700:7700
         env:
@@ -373,7 +373,7 @@ jobs:
         ports:
           - 6379:6379
       meilisearch:
-        image: getmeili/meilisearch:v1.53.1
+        image: getmeili/meilisearch:v1.56.0
         ports:
           - 7700:7700
         env:

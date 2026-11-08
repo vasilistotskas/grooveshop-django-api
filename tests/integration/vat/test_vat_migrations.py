@@ -63,12 +63,16 @@ class TestProductVatNotNull(TestCase):
     def test_it_refuses_while_a_product_has_no_rate(self):
         apps = _migrate_to(PRODUCT_BEFORE)
         Product = apps.get_model("product", "Product")
-        pk = Product.objects.create(slug="no-rate").pk
+        pk = Product.objects.create(slug="no-rate", sku="NO-RATE-1").pk
         _settle_deferred_constraints()
         self.assertIsNone(Product.objects.get(pk=pk).vat_id)
 
-        with self.assertRaisesMessage(RuntimeError, "1 product(s) without"):
+        with self.assertRaises(RuntimeError) as refused:
             _migrate_to(PRODUCT_AFTER)
+
+        # The refusal names the product to fix, not a tool to look it up.
+        self.assertIn("1 product(s) without", str(refused.exception))
+        self.assertIn(f"{pk} (NO-RATE-1)", str(refused.exception))
 
         self.assertTrue(_vat_id_is_nullable())
 

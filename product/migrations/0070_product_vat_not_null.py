@@ -6,9 +6,9 @@ product without a rate is left. Only now may the column be tightened; doing it
 in 0069 would have broken the release still serving during that rollout.
 
 REFUSES to run while any product holds a NULL rate, in this schema, soft
-deleted rows included, and says how many. Nothing is guessed: a rate is a tax
-decision, so an operator sets it (``manage.py mydata_readiness`` named such
-products before this release; 0068 gave each the standard rate). The refusal
+deleted rows included, and names them (id and SKU, the first ``LISTED``).
+Nothing is guessed: a rate is a tax decision, so an operator sets it (0068
+gave every product it found the standard rate). The refusal
 comes before the ``ALTER``, inside the same transaction, so the PreSync hook
 stops and the serving pods keep their schema.
 
@@ -19,6 +19,8 @@ from django.db import migrations, models
 from django.db.models import deletion
 
 TABLE = "product_product"
+# How many of the products without a rate the refusal names.
+LISTED = 20
 
 
 def refuse_a_product_without_a_rate(apps, schema_editor):
@@ -26,14 +28,22 @@ def refuse_a_product_without_a_rate(apps, schema_editor):
     with connection.cursor() as cursor:
         cursor.execute(f"SELECT count(*) FROM {TABLE} WHERE vat_id IS NULL")
         (missing,) = cursor.fetchone()
-    if missing:
-        schema = getattr(connection, "schema_name", "public")
-        raise RuntimeError(
-            f"Schema {schema!r} has {missing} product(s) without a VAT rate "
-            "(soft-deleted ones included), so product.vat cannot become NOT "
-            "NULL. Set their rate (manage.py mydata_readiness lists them), "
-            "then migrate again. Nothing was changed."
+        if not missing:
+            return
+        cursor.execute(
+            f"SELECT id, sku FROM {TABLE} WHERE vat_id IS NULL "
+            "ORDER BY id LIMIT %s",
+            [LISTED],
         )
+        named = ", ".join(f"{pk} ({sku})" for pk, sku in cursor.fetchall())
+    schema = getattr(connection, "schema_name", "public")
+    more = f" and {missing - LISTED} more" if missing > LISTED else ""
+    raise RuntimeError(
+        f"Schema {schema!r} has {missing} product(s) without a VAT rate "
+        "(soft-deleted ones included), so product.vat cannot become NOT "
+        f"NULL: id (sku) {named}{more}. Set their rate in the admin, then "
+        "migrate again. Nothing was changed."
+    )
 
 
 class Migration(migrations.Migration):

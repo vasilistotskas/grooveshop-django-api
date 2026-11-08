@@ -238,6 +238,36 @@ class TestRefundWebhook:
         assert second.refund == _refunds(order).get()
         assert first.status == RefundAttemptStatus.PENDING
 
+    def test_a_keyed_refund_is_never_matched_by_amount(self):
+        """The refund names an attempt that is no longer live: it is booked
+        unclaimed, and the other PENDING attempt of the same amount (which
+        is another refund's) stays PENDING."""
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _order("pi_key_3")
+        charge = order.payment_transactions.get()
+        gone, other = (
+            RefundAttempt.objects.create(
+                order=order, charge=charge, amount=Money("20.00", "EUR")
+            )
+            for _ in range(2)
+        )
+        RefundAttempt.objects.filter(pk=gone.pk).update(
+            status=RefundAttemptStatus.DECLINED
+        )
+
+        _deliver(
+            "re_key_3",
+            "pi_key_3",
+            2000,
+            metadata={REFUND_ATTEMPT_METADATA_KEY: gone.provider_key},
+        )
+
+        other.refresh_from_db()
+        assert other.status == RefundAttemptStatus.PENDING
+        assert other.refund is None
+        assert _refunds(order).count() == 1
+
     def test_a_refund_without_a_key_settles_the_oldest_matching_attempt(self):
         from order.models.refund_attempt import RefundAttempt
 

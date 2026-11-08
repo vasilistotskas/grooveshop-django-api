@@ -435,7 +435,7 @@ class TestPartialCredits:
 
     def test_a_credit_past_the_receipt_is_never_sent(self):
         order = _order(lines=(("24", "100.00"),))
-        with mydata_enabled(), FakeAade() as aade:
+        with mydata_enabled(), FakeAade():
             invoice = _receipt(order)
             # The ledger says 150 came back, more than the receipt holds.
             charge = order.payment_transactions.get()
@@ -449,13 +449,18 @@ class TestPartialCredits:
             row.__class__.objects.filter(pk=row.pk).update(
                 created_at=invoice.created_at
             )
-            assert create_pending_credits(order.id) == []
+            create_pending_credits(order.id)
 
-        assert aade.credits == []
-        assert not RetailCredit.objects.exists()
-        assert order.history.filter(
-            new_value__note__icontains="No credit document"
-        ).exists()
+        # Cut to what the receipt holds when the refund was decided, and
+        # said so once: never the 150.00 the ledger claims.
+        [credit] = RetailCredit.objects.all()
+        assert credit.total.amount == Decimal("100.00")
+        assert (
+            order.history.filter(
+                new_value__note__icontains="receipt holds"
+            ).count()
+            == 1
+        )
 
     def test_cumulative_net_never_passes_the_receipt_with_awkward_cents(self):
         """Credits of 3.33, 3.33, 3.33 and 0.01 against 10.00 at 24%

@@ -14390,6 +14390,10 @@ msgid "The reason is included in the email to the customer."
 msgstr "The reason is included in the email to the customer."
 
 #, python-format
+msgid "The receipt holds %(held)s of the %(owed)s this refund or chargeback would credit: no credit document can be issued for the rest."
+msgstr "The receipt holds %(held)s of the %(owed)s this refund or chargeback would credit: no credit document can be issued for the rest."
+
+#, python-format
 msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 msgstr "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 

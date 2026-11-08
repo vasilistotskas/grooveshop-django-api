@@ -13,13 +13,13 @@ is left on the receipt:
 * :func:`allocate_pro_rata` spreads an amount over that headroom, to the
   cent, capped to it; a claim that does not fit is refused by its caller
   before any money moves.
-* Every source is allocated when it is created, so nothing here is ever
-  allocated by a read: a refund claim by ``OrderService._claim_refund``, a
-  refund nobody claimed (a provider's webhook) by :func:`book_refund` over
-  the headroom of that moment, a returned chargeback by
-  :func:`allocate_decision`; both write through :func:`allocate_source`.
-  What a release that did not know about allocations booked is allocated by
-  ``order.tasks.allocate_credit_sources`` (``order.credit_allocation_backfill``).
+* A refund claim is allocated by ``OrderService._claim_refund`` when it is
+  made. Every other source (a refund nobody claimed, a returned chargeback)
+  is decided by :func:`allocate_order`, which every WRITE path calls first
+  (the receipt, a claim, the credit documents, a booked refund, a decision)
+  and the periodic task ``order.tasks.allocate_credit_sources`` runs for
+  the rest; it reads the order's sources inside the order lock and decides
+  them oldest first through :func:`allocate_source`. A read never allocates.
 * A provider's reversal of a refund scales its allocation down
   (:func:`free_reversed`) unless a credit document was already issued.
 
@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from django.db.models import Exists, OuterRef, Q, QuerySet, Sum
+from django.db.models import Exists, F, OuterRef, Q, QuerySet, Sum
 from django.db.models.functions import Coalesce
 from django.utils.translation import gettext
 from djmoney.money import Money
@@ -56,6 +56,8 @@ from order.models import (
 from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
+    RefundAttemptKind,
+    RefundAttemptStatus,
 )
 from order.taxation import ChargeKind, breakdown_by_rate, order_vat_lines
 
@@ -96,10 +98,18 @@ def _credited(issued: QuerySet[RetailCredit]) -> Q:
     )
 
 
-def headroom(order: Order) -> dict[Decimal, Decimal]:
-    """The gross each VAT rate can still be credited. See the module doc."""
+def headroom(
+    order: Order, *, settled_only: bool = False
+) -> dict[Decimal, Decimal]:
+    """The gross each VAT rate can still be credited. See the module doc.
+    With *settled_only* the claims still PENDING hold nothing: the room
+    there would be once each is resolved without a refund."""
     left, invoice = _base(order)
     counting = CreditAllocation.objects.counting().filter(order=order)
+    if settled_only:
+        counting = counting.exclude(
+            refund_attempt__status=RefundAttemptStatus.PENDING
+        )
     issued = RetailCredit.objects.none()
     if invoice is not None:
         issued = RetailCredit.objects.filter(invoice=invoice).exclude(
@@ -119,10 +129,16 @@ def headroom(order: Order) -> dict[Decimal, Decimal]:
     return left
 
 
-def allocate_pro_rata(order: Order, amount: Decimal) -> dict[Decimal, Decimal]:
+def allocate_pro_rata(
+    order: Order, amount: Decimal, *, settled_only: bool = False
+) -> dict[Decimal, Decimal]:
     """*amount* spread over the headroom, capped to it; the result sums to
     less than *amount* when the headroom cannot hold it all."""
-    left = {rate: gross for rate, gross in headroom(order).items() if gross > 0}
+    left = {
+        rate: gross
+        for rate, gross in headroom(order, settled_only=settled_only).items()
+        if gross > 0
+    }
     if not left:
         return {}
     shares = allocate_capped(amount, left, left)
@@ -265,7 +281,8 @@ def mark_moved(when: datetime, **source) -> None:
 def scale(returned: Decimal, **source) -> None:
     """Make a source's rows total *returned* (less than they do): in
     proportion, rows left with nothing deleted. What was claimed and not
-    returned is not held back any more."""
+    returned is not held back any more. A source left with nothing at all
+    keeps one row of amount zero: it was decided, and owes nothing."""
     rows = list(CreditAllocation.objects.filter(**source).order_by("pk"))
     claimed = sum((Decimal(r.amount.amount) for r in rows), _ZERO)
     if not rows or returned >= claimed:
@@ -284,6 +301,15 @@ def scale(returned: Decimal, **source) -> None:
             row.save(update_fields=["amount", "amount_currency"])
         else:
             row.delete()
+    if returned <= 0:
+        first = rows[0]
+        store(
+            first.order,
+            [],
+            moved_at=first.moved_at,
+            nothing_owed=True,
+            **source,
+        )
 
 
 def allocate_source(
@@ -293,67 +319,212 @@ def allocate_source(
     moved_at: datetime | None,
     excess: Decimal = _ZERO,
     **source,
-) -> None:
+) -> bool:
     """Allocate a source that was booked without a claim (a provider's
     webhook refund, a returned chargeback), pro rata over the headroom now.
-    The one writer for money nobody claimed, whether it is booked now or
-    found later by the backfill.
+    The one writer for money nobody claimed; :func:`allocate_order` is its
+    one caller.
 
     *excess* of *amount* gives back a duplicate payment
-    (``PaymentLedger.refundable_excess``) and owes nothing. A source is
-    ALWAYS left allocated, so it is never picked up again: a source that
-    owes nothing, or whose receipt (or order) has no taxable room, gets one
-    row of amount zero; one the headroom cannot hold in full gets what fits
-    and the order's history says so ONCE, here, so no later read repeats it.
+    (``PaymentLedger.refundable_excess``) and owes nothing.
+
+    There are two kinds of "no room". Room taken by settled sources and
+    issued credits is final: the source is cut to what fits (a source that
+    owes nothing, or whose receipt has no taxable room, gets one row of
+    amount zero) and the order's history says so ONCE, here. Room held only
+    by claims still PENDING is temporary: the source gets NO row, which
+    says "not decided yet", and the call returns ``False``; it is decided
+    once those claims resolve (``allocate_order`` runs again). Returns
+    whether the source was decided.
     """
     owed = amount - min(excess, amount)
     taxable = has_rates(order)
-    pieces = (
-        pieces_of(allocate_pro_rata(order, owed))
-        if owed > 0 and taxable
-        else []
-    )
+    pieces: list[Piece] = []
+    if owed > 0 and taxable:
+        fit = allocate_pro_rata(order, owed)
+        held = sum(fit.values(), _ZERO)
+        if held < owed and (
+            sum(allocate_pro_rata(order, owed, settled_only=True).values())
+            > held
+        ):
+            return False
+        pieces = pieces_of(fit)
     held = sum((p.amount for p in pieces), _ZERO)
     store(order, pieces, moved_at=moved_at, nothing_owed=not pieces, **source)
     if taxable and held < owed:
         OrderHistory.log_note(
             order=order,
-            note=(
-                f"The receipt holds {held} of the {owed} this refund or "
+            note=gettext(
+                "The receipt holds %(held)s of the %(owed)s this refund or "
                 "chargeback would credit: no credit document can be issued "
                 "for the rest."
-            ),
+            )
+            % {"held": held, "owed": owed},
         )
+    return True
 
 
-def book_refund(
-    order: Order, refund: PaymentTransaction, *, excess: Decimal = _ZERO
-) -> None:
-    """Allocate a refund that was booked without a claim (a provider's
-    webhook): see :func:`allocate_source`."""
-    if is_allocated(refund=refund):
-        return
-    allocate_source(
-        order,
-        Decimal(refund.amount.amount),
-        moved_at=refund.created_at,
-        excess=excess,
-        refund=refund,
+@dataclass(frozen=True)
+class Owing:
+    """A source of credit with no allocation. *before* is the ledger row the
+    duplicate-payment excess is read before (``None``: now), *exclude* the
+    attempts whose own claim is not held against it."""
+
+    order_id: int
+    moment: datetime | None
+    rank: str
+    source: dict
+    amount: Decimal
+    before: PaymentTransaction | None = None
+    exclude: tuple[int, ...] = ()
+    has_excess: bool = True
+
+
+def owing_sources(order: Order | None = None) -> list[Owing]:
+    """Every source that owes a credit and has no allocation (of one
+    *order*, or of all), as the live models say. A source whose money moved
+    before its order's receipt is netted by the receipt and owes none."""
+    scope = {"order": order} if order is not None else {}
+    out: list[Owing] = []
+    for refund in PaymentTransaction.objects.filter(
+        Q(order__invoice__isnull=True)
+        | Q(created_at__gte=F("order__invoice__created_at")),
+        kind=PaymentTransactionKind.REFUND,
+        attempt__isnull=True,
+        credit_document__isnull=True,
+        allocations__isnull=True,
+        **scope,
+    ):
+        amount = Decimal(refund.amount.amount) - reversed_of(refund)
+        if amount > 0:
+            out.append(
+                Owing(
+                    refund.order_id,
+                    refund.created_at,
+                    "r",
+                    {"refund": refund},
+                    amount,
+                    before=refund,
+                )
+            )
+    attempts = (
+        RefundAttempt.objects.filter(
+            # No refund yet: only a claim still in flight holds room. A
+            # SETTLED attempt without one answered a refund another attempt
+            # owns and holds nothing.
+            Q(refund__isnull=True, status=RefundAttemptStatus.PENDING)
+            | Q(
+                refund__isnull=False,
+                refund__credit_document__isnull=True,
+            )
+            & (
+                Q(order__invoice__isnull=True)
+                | Q(refund__created_at__gte=F("order__invoice__created_at"))
+            ),
+            kind=RefundAttemptKind.PROVIDER,
+            credit_document__isnull=True,
+            allocations__isnull=True,
+            **scope,
+        )
+        .exclude(status=RefundAttemptStatus.DECLINED)
+        .select_related("refund")
     )
+    for attempt in attempts:
+        refund = attempt.refund
+        amount = (
+            Decimal(refund.amount.amount) - reversed_of(refund)
+            if refund
+            else Decimal(attempt.amount.amount)
+        )
+        if amount > 0:
+            out.append(
+                Owing(
+                    attempt.order_id,
+                    refund.created_at if refund else None,
+                    "a",
+                    {"refund_attempt": attempt},
+                    amount,
+                    before=refund,
+                    exclude=(attempt.pk,),
+                )
+            )
+    decisions = ChargebackDecision.objects.filter(
+        Q(chargeback__order__invoice__isnull=True)
+        | Q(decided_at__gte=F("chargeback__order__invoice__created_at")),
+        goods_returned=True,
+        chargeback__chargeback_credit__isnull=True,
+        allocations__isnull=True,
+        **{f"chargeback__{key}": value for key, value in scope.items()},
+    ).select_related("chargeback")
+    for decision in decisions:
+        out.append(
+            Owing(
+                decision.chargeback.order_id,
+                decision.decided_at,
+                "d",
+                {"decision": decision},
+                Decimal(decision.chargeback.amount.amount),
+                has_excess=False,
+            )
+        )
+    return out
+
+
+def allocate_order(order: Order, *, request_credits: bool = False) -> int:
+    """Decide every source of *order* that has no allocation yet, oldest
+    first, each over what the ones before it left. The caller holds the
+    order's row lock, and the sources are read inside it.
+
+    Every WRITE path that reads allocations calls this first (the receipt,
+    a claim, the credit documents, a booked refund, a decision), so the
+    allocation never depends on which of them ran first: what a release that
+    did not know about allocations booked, or what a failure left, is
+    allocated before anything else reads or takes the room. A read path (a
+    specimen render, the admin) never calls it. Returns how many sources
+    were decided. A write path issues the credits itself (or its caller
+    does, once the money is booked); the periodic task passes
+    *request_credits*, so a source decided on an order that already has a
+    receipt (one skipped for lack of an allocation) is credited now.
+    """
+    from order.payment_ledger import PaymentLedger
+
+    done = 0
+    pending = sorted(
+        owing_sources(order),
+        key=lambda o: (o.moment is None, o.moment, o.rank),
+    )
+    for owing in pending:
+        excess = _ZERO
+        if owing.has_excess:
+            excess = PaymentLedger.refundable_excess(
+                order, before=owing.before, exclude=owing.exclude
+            )
+        if allocate_source(
+            order,
+            owing.amount,
+            moved_at=owing.moment,
+            excess=excess,
+            **owing.source,
+        ):
+            done += 1
+    if (
+        done
+        and request_credits
+        and Invoice.objects.filter(order=order).exists()
+    ):
+        from order.credit_documents import request_credit_documents
+
+        request_credit_documents(order.pk)
+    return done
 
 
 def allocate_decision(order: Order, decision: ChargebackDecision) -> None:
     """The room a lost dispute's returned goods take on the receipt,
-    decided now: the chargeback spread over the headroom, capped to it."""
+    decided now: the chargeback spread over the headroom, capped to it
+    (:func:`allocate_order` decides the decision among the sources before
+    and after it)."""
     CreditAllocation.objects.filter(decision=decision).delete()
-    if not decision.goods_returned:
-        return
-    allocate_source(
-        order,
-        Decimal(decision.chargeback.amount.amount),
-        moved_at=decision.decided_at,
-        decision=decision,
-    )
+    allocate_order(order)
 
 
 def reversed_of(refund: PaymentTransaction) -> Decimal:
@@ -430,13 +601,14 @@ def link_attempt(attempt: RefundAttempt, refund: PaymentTransaction) -> None:
 
 __all__ = [
     "ChargeKind",
+    "Owing",
     "Piece",
     "allocate_decision",
+    "allocate_order",
     "allocate_pro_rata",
     "allocate_source",
     "allocation_of",
     "allocation_of_refund",
-    "book_refund",
     "drop",
     "free_reversed",
     "has_rates",
@@ -446,6 +618,7 @@ __all__ = [
     "is_refund_allocated",
     "link_attempt",
     "mark_moved",
+    "owing_sources",
     "pieces_of",
     "reversed_credits",
     "reversed_of",

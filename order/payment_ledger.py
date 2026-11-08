@@ -32,6 +32,7 @@ from django.db.models import (
     Case,
     DecimalField,
     F,
+    Q,
     QuerySet,
     Sum,
     When,
@@ -619,11 +620,28 @@ class PaymentLedger:
         return row, created
 
     @classmethod
-    def held(cls, order: Order) -> Decimal:
+    def held(
+        cls, order: Order, *, before: PaymentTransaction | None = None
+    ) -> Decimal:
         """What the ledger holds for *order* now: received, less what was
-        paid back by refunds and what a lost dispute took."""
+        paid back by refunds and what a lost dispute took. With *before*,
+        as it stood just before that ledger row (rows are ordered by
+        creation, ties by id)."""
+        rows = PaymentTransaction.objects.filter(order=order)
+        if before is not None:
+            rows = rows.filter(
+                Q(created_at__lt=before.created_at)
+                | Q(created_at=before.created_at, pk__lt=before.pk)
+            )
         return (
-            cls.captured(order) - cls.refunded(order) - cls.charged_back(order)
+            _total(rows.filter(kind__in=_RECEIPT_KINDS))
+            - rows.filter(
+                kind__in=(
+                    PaymentTransactionKind.REFUND,
+                    PaymentTransactionKind.REFUND_REVERSAL,
+                )
+            ).aggregate(total=_taken_out())["total"]
+            - _total(rows.filter(kind=PaymentTransactionKind.CHARGEBACK))
         )
 
     @classmethod
@@ -659,15 +677,18 @@ class PaymentLedger:
             )
 
     @classmethod
-    def excess_held(cls, order: Order, *, add_back: Decimal = _ZERO) -> Decimal:
+    def excess_held(
+        cls, order: Order, *, before: PaymentTransaction | None = None
+    ) -> Decimal:
         """What the ledger holds above what the order is for, zero while
         within the rounding tolerance: the one definition of an overcharge
         (:meth:`sync_overcharge` stamps it, :meth:`refundable_excess` reads
-        it). *add_back* is a refund just booked, to read the figure as it
-        stood before it."""
+        it). With *before*, the figure as it stood just before that ledger
+        row (:meth:`held`)."""
         excess = (
-            cls.held(order) + add_back
-        ) - order.calculate_order_total_amount().amount
+            cls.held(order, before=before)
+            - order.calculate_order_total_amount().amount
+        )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
 
     @classmethod
@@ -675,20 +696,27 @@ class PaymentLedger:
         cls,
         order: Order,
         *,
-        add_back: Decimal = _ZERO,
+        before: PaymentTransaction | None = None,
         exclude: Collection[int] = (),
     ) -> Decimal:
-        """The part of the next refund that gives back a duplicate payment
-        and not the sale: a refund pays the excess back first, so it owes
-        no credit document and takes no room on the receipt. What PENDING
-        provider claims (other than *exclude*) already hold is spoken for.
-        The caller holds the order lock."""
-        in_flight = _total(
-            RefundAttempt.objects.live()
-            .filter(order=order, kind=RefundAttemptKind.PROVIDER)
-            .exclude(pk__in=exclude)
+        """The part of a refund that gives back a duplicate payment and not
+        the sale: a refund pays the excess back first, so it owes no credit
+        document and takes no room on the receipt.
+
+        It is the excess as it stood at the refund's own moment: the ledger
+        up to that row (*before*, ``None`` for a refund being claimed now),
+        which already holds what every earlier refund took of it, and the
+        PENDING provider claims (other than *exclude*) made before it, whose
+        money is spoken for. Later money never changes it, so the same
+        refund gets the same excess whenever it is allocated. The caller
+        holds the order lock."""
+        claims = RefundAttempt.objects.live().filter(
+            order=order, kind=RefundAttemptKind.PROVIDER
         )
-        return max(cls.excess_held(order, add_back=add_back) - in_flight, _ZERO)
+        if before is not None:
+            claims = claims.filter(created_at__lt=before.created_at)
+        in_flight = _total(claims.exclude(pk__in=exclude))
+        return max(cls.excess_held(order, before=before) - in_flight, _ZERO)
 
     @staticmethod
     def _alert_overcharge(
@@ -879,6 +907,7 @@ class PaymentLedger:
         description: str = "",
         provider: str | None = None,
         attempt: RefundAttempt | None = None,
+        match_attempt: bool = True,
     ) -> tuple[PaymentTransaction, bool]:
         """Record that *charge* was refunded *amount* under *reference* (the
         provider's refund id), and bring ``order.payment_status`` in line.
@@ -887,8 +916,11 @@ class PaymentLedger:
 
         *attempt* is the claim this refund fulfils. A refund booked without
         one (a provider's webhook) settles the oldest PENDING attempt on the
-        charge for the same amount, whatever its age, so the attempt that made it cannot book
-        it a second time (:meth:`settle_attempt`).
+        charge for the same amount, whatever its age, so the attempt that
+        made it cannot book it a second time (:meth:`settle_attempt`). A
+        caller that knows the refund names an attempt which is not live
+        passes ``match_attempt=False``: the refund is then nobody's claim,
+        and no other attempt of the same amount may take it.
 
         The status is written here, from the ledger, whoever the writer is,
         so no path decides REFUNDED or PARTIALLY_REFUNDED for itself. A
@@ -908,7 +940,7 @@ class PaymentLedger:
         if created:
             order.payment_status = cls.refund_status(order)
             order.save(update_fields=["payment_status"])
-        if attempt is None and created:
+        if attempt is None and created and match_attempt:
             attempt = (
                 RefundAttempt.objects.live()
                 .filter(charge=charge, amount=amount)
@@ -917,16 +949,11 @@ class PaymentLedger:
             )
         if attempt is not None:
             cls.settle_attempt(attempt, row)
-        elif created:
-            # Nobody claimed this refund (a provider's webhook, a dashboard
-            # refund): it is allocated when booked, over the headroom now.
-            credit_allocation.book_refund(
-                order,
-                row,
-                excess=cls.refundable_excess(
-                    order, add_back=Decimal(row.amount.amount)
-                ),
-            )
+        if created:
+            # Whoever booked it, the order's unallocated sources are decided
+            # now, oldest first: a refund nobody claimed (a provider's
+            # webhook, a dashboard refund) over the headroom of this moment.
+            credit_allocation.allocate_order(order)
         return row, created
 
     @staticmethod

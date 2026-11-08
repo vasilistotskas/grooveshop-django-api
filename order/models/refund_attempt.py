@@ -11,6 +11,10 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
+#: What the provider's idempotency key of an attempt starts with
+#: (``RefundAttempt.provider_key``); the rest is the attempt's UUID.
+PROVIDER_KEY_PREFIX = "refund-"
+
 
 def reconcile_after() -> timedelta:
     """How long a refund attempt may stay PENDING before the provider is
@@ -40,6 +44,17 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
         its money; time never does, because a refund the provider made
         late would otherwise be refundable a second time."""
         return self.filter(status=RefundAttemptStatus.PENDING)
+
+    def with_provider_key(self, key: str):
+        """The attempt a provider key (:attr:`RefundAttempt.provider_key`)
+        names, found by its UUID: none for a key that is not one of ours."""
+        try:
+            token = uuid.UUID(key.removeprefix(PROVIDER_KEY_PREFIX))
+        except ValueError:
+            return self.none()
+        if not key.startswith(PROVIDER_KEY_PREFIX):
+            return self.none()
+        return self.filter(idempotency_key=token)
 
     def overdue(self):
         """Provider attempts still PENDING after :func:`reconcile_after`:
@@ -167,7 +182,7 @@ class RefundAttempt(models.Model):
     def provider_key(self) -> str:
         """The idempotency key the provider receives for this attempt (and
         that a Stripe refund carries in its metadata)."""
-        return f"refund-{self.idempotency_key}"
+        return f"{PROVIDER_KEY_PREFIX}{self.idempotency_key}"
 
     @property
     def is_overdue(self) -> bool:

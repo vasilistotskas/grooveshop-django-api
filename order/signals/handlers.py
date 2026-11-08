@@ -1263,15 +1263,17 @@ def handle_stripe_refund_made(sender, **kwargs):
             # The attempt this refund was made for names itself in the
             # refund's metadata (``refund_payment`` puts it there): link
             # that one, never an older attempt of the same amount. A refund
-            # without the key (a dashboard refund) is matched by amount.
+            # that carries the key is that attempt's or nobody's, so it is
+            # never matched by amount; one without it (a dashboard refund)
+            # is matched by amount.
             key = StripePaymentProvider.refund_attempt_key(current)
-            attempt = next(
-                (
-                    a
-                    for a in RefundAttempt.objects.live().filter(charge=charge)
-                    if key and a.provider_key == key
-                ),
-                None,
+            attempt = (
+                RefundAttempt.objects.live()
+                .filter(charge=charge)
+                .with_provider_key(key)
+                .first()
+                if key
+                else None
             )
             refund_row, created = PaymentLedger.record_refund(
                 order,
@@ -1279,6 +1281,7 @@ def handle_stripe_refund_made(sender, **kwargs):
                 amount=refunded,
                 reference=refund_id,
                 attempt=attempt,
+                match_attempt=not key,
             )
             if not created:
                 return

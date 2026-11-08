@@ -52,12 +52,7 @@ money and shows on the store dashboard until staff record its outcome.
 
 `allocate-credit-sources` runs every five minutes through
 `tenant.tasks.fanout_allocate_credit_sources` (one run per store, suspended
-stores included). It gives every refund, refund attempt and returned
-chargeback that owes a credit document and has no allocation its place on the
-receipt's VAT rates (`order/credit_allocation_backfill.py`): the sources the
-previous release booked while it still served after the migration. It is
-idempotent, takes each order's row lock, and finds nothing once every release
-in production allocates at claim time.
+stores included). Every write path decides an order's unallocated sources before it reads or takes room (`credit_allocation.allocate_order`); this task runs the same function for every order that still has a refund, refund attempt or returned chargeback that owes a credit document and has no allocation (`order/credit_allocation_backfill.py`): what the previous release booked while it still served after the migration, and a source that had to wait until a claim still PENDING resolved. When it decides a source of an order that has a receipt it asks for the credit documents. It is idempotent and takes each order's row lock.
 
 ## Time zones
 

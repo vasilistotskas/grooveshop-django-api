@@ -287,6 +287,11 @@ def create_pending_credits(order_id: int) -> list[int]:
         ):
             return created
 
+        # Every source is decided before any is credited: what nobody
+        # allocated yet (a refund booked while a claim held the room, or by
+        # a release that did not know about allocations) is allocated now.
+        credit_allocation.allocate_order(order)
+
         refunds = PaymentTransaction.objects.filter(
             order=order,
             kind=PaymentTransactionKind.REFUND,
@@ -302,13 +307,16 @@ def create_pending_credits(order_id: int) -> list[int]:
             ) - credit_allocation.reversed_of(refund)
             if amount <= 0:
                 continue
+            if not credit_allocation.is_refund_allocated(refund):
+                # Not decided yet (the room is held by a claim still in
+                # flight): credited once it is.
+                continue
             allocation = credit_allocation.allocation_of_refund(refund)
-            if credit_allocation.is_refund_allocated(refund):
-                # Only what the receipt holds is credited: the part of a
-                # refund that gave a duplicate payment back owes nothing.
-                amount = min(amount, sum(allocation.values(), _ZERO))
-                if amount <= 0:
-                    continue
+            # Only what the receipt holds is credited: the part of a refund
+            # that gave a duplicate payment back owes nothing.
+            amount = min(amount, sum(allocation.values(), _ZERO))
+            if amount <= 0:
+                continue
             created.extend(
                 _guarded(
                     order,
@@ -367,21 +375,9 @@ def create_pending_credits(order_id: int) -> list[int]:
             allocation = credit_allocation.allocation_of(
                 decision=chargeback.decision
             )
-            if not allocation and credit_allocation.is_allocated(
-                decision=chargeback.decision
-            ):
-                # Allocated to nothing: the receipt had no room, said once
-                # when it was allocated.
-                continue
             if not allocation:
-                OrderHistory.log_note(
-                    order=order,
-                    note=(
-                        "No credit document could be issued: the receipt "
-                        "holds nothing more to credit for the chargeback "
-                        f"of {chargeback.amount}."
-                    ),
-                )
+                # Allocated to nothing (the receipt had no room, said once
+                # when it was allocated), or not decided yet.
                 continue
             created.extend(
                 _guarded(

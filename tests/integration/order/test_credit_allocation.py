@@ -533,7 +533,9 @@ class TestCreditsAreIssuedNetOfReversals:
         with mydata_enabled(), FakeAade():
             create_pending_credits(order.id)
             assert not _credits(order).exists()
-            assert not CreditAllocation.objects.exists()
+            # Decided, and owing nothing: one row of amount zero.
+            [zero] = CreditAllocation.objects.all()
+            assert zero.amount.amount == 0
             assert credit_allocation.headroom_total(order) == Decimal("100.00")
             # The room is real: a later refund is credited in full.
             PaymentLedger.record_refund(
@@ -573,8 +575,11 @@ class TestCreditsAreIssuedNetOfReversals:
         assert "A refunded credit document was reversed" in titles
 
 
-class TestReadPathsNeverWrite:
-    def test_a_refund_without_an_allocation_is_reported_not_allocated(self):
+class TestEveryWritePathAllocatesFirst:
+    """What nobody allocated (a release that did not know about allocations
+    booked it) is decided before a write path reads or takes the room."""
+
+    def test_the_credit_documents_allocate_what_is_missing_then_issue(self):
         order = _mixed()
         charge = order.payment_transactions.get(
             kind=PaymentTransactionKind.CHARGE
@@ -587,14 +592,12 @@ class TestReadPathsNeverWrite:
             CreditAllocation.objects.all().delete()
             create_pending_credits(order.id)
 
-        assert not _credits(order).exists()
-        assert not CreditAllocation.objects.exists()
-        assert OrderHistory.objects.filter(
-            order=order,
-            new_value__note__icontains="No credit document could be issued",
-        ).exists()
+        assert _gross(_credits(order).get()) == {
+            Decimal(24): Decimal("18.00"),
+            Decimal(13): Decimal("12.00"),
+        }
 
-    def test_the_receipt_render_writes_no_allocation(self):
+    def test_a_receipt_issued_before_the_first_task_run_is_net(self):
         from order.invoicing import generate_invoice
 
         order = _mixed()
@@ -604,13 +607,39 @@ class TestReadPathsNeverWrite:
         PaymentLedger.record_refund(
             order, charge=charge, amount=_eur("30.00"), reference="re_1"
         )
+        # What the previous release booked: the row, no allocation.
         CreditAllocation.objects.all().delete()
         Order.objects.filter(pk=order.pk).update(status="SHIPPED")
 
         with mydata_enabled(), FakeAade():
-            generate_invoice(Order.objects.get(pk=order.pk))
+            invoice = generate_invoice(Order.objects.get(pk=order.pk))
 
-        assert not CreditAllocation.objects.exists()
+        assert invoice.total.amount == Decimal("70.00")
+        assert CreditAllocation.objects.filter(refund__isnull=False).exists()
+
+    def test_an_older_unallocated_source_takes_its_room_before_a_new_claim(
+        self,
+    ):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade(), FakeStripeRefunds() as api:
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("60.00"), reference="re_old"
+            )
+            _duplicate_payment(order)
+            CreditAllocation.objects.all().delete()
+
+            # 40.00 of the 100.00 claimed is the duplicate; the other 60.00
+            # fits only if the older refund had not taken its 60.00 first.
+            with pytest.raises(PaymentError, match="holds only"):
+                OrderService.refund_order(order, amount=_eur("100.00"))
+
+        # Refused, and the refusal rolled the claim's step back with it.
+        assert api.calls == []
+        assert not order.refund_attempts.exists()
 
 
 class TestTheHeadroomCountsTheCreditsThemselves:
@@ -849,14 +878,13 @@ class TestSourcesBookedByTheOldReleaseAreAllocatedAfterwards:
             PaymentLedger.record_refund(
                 order, charge=charge, amount=_eur("30.00"), reference="re_1"
             )
-            # What the old release booked: the row, no allocation.
+            # What the old release booked: the row, no allocation, and a
+            # credit pass that skipped it.
             CreditAllocation.objects.all().delete()
-            create_pending_credits(order.id)
             assert not _credits(order).exists()
 
             assert allocate_credit_sources() == 1
             assert allocate_credit_sources() == 0
-            create_pending_credits(order.id)
 
         assert _gross(_credits(order).get()) == {
             Decimal(24): Decimal("18.00"),
@@ -951,3 +979,85 @@ class TestASourceTheReceiptCannotHoldIsMarkedOnce:
             )
         ]
         assert _credits(order).count() == 1
+
+
+class TestRoomHeldByAClaimInFlightIsOnlyTemporary:
+    """A PENDING claim holds room that is not spent: a source booked while
+    it holds the room is decided once the claim resolves, never cut to zero
+    for good."""
+
+    def test_a_refund_booked_meanwhile_is_allocated_and_credited_after(self):
+        from order.tasks import allocate_credit_sources
+
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            with FakeStripeRefunds(fail_with=stripe.APIConnectionError("x")):
+                OrderService.refund_order(order, amount=_eur("100.00"))
+            [claim] = order.refund_attempts.all()
+            late, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("30.00"), reference="re_30"
+            )
+
+            # Not decided: no row says "owes nothing".
+            assert not credit_allocation.is_allocated(refund=late)
+            assert allocate_credit_sources() == 0
+
+            claim.status = RefundAttemptStatus.DECLINED
+            claim.save(update_fields=["status"])
+            assert allocate_credit_sources() == 1
+
+        assert sum(credit_allocation.allocation_of(refund=late).values()) == (
+            Decimal("30.00")
+        )
+        [credit] = _credits(order)
+        assert credit.total.amount == Decimal("30.00")
+
+    def test_room_taken_by_settled_sources_is_final(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(), FakeAade():
+            _receipt(order)
+            PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("100.00"), reference="re_1"
+            )
+            late, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("5.00"), reference="re_2"
+            )
+
+        assert credit_allocation.is_allocated(refund=late)
+        assert credit_allocation.allocation_of(refund=late) == {}
+
+
+class TestTheExcessIsReadAtTheSourcesOwnMoment:
+    def test_a_later_refund_does_not_give_an_older_one_more_excess(self):
+        order = _order(lines=(("24", "100.00"),))
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        with mydata_enabled(auto_submit=False), FakeAade():
+            _receipt(order)
+            duplicate = _duplicate_payment(order)
+            # The duplicate is paid back, then 50.00 of the sale.
+            first, _ = PaymentLedger.record_refund(
+                order,
+                charge=duplicate,
+                amount=_eur("100.00"),
+                reference="re_dup",
+            )
+            second, _ = PaymentLedger.record_refund(
+                order, charge=charge, amount=_eur("50.00"), reference="re_50"
+            )
+            CreditAllocation.objects.all().delete()
+
+            assert backfill_credit_allocations() == 2
+
+        assert credit_allocation.allocation_of(refund=first) == {}
+        assert sum(credit_allocation.allocation_of(refund=second).values()) == (
+            Decimal("50.00")
+        )

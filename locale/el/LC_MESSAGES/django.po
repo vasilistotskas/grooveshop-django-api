@@ -14393,6 +14393,10 @@ msgid "The reason is included in the email to the customer."
 msgstr "Η αιτιολογία συμπεριλαμβάνεται στο email προς τον πελάτη."
 
 #, python-format
+msgid "The receipt holds %(held)s of the %(owed)s this refund or chargeback would credit: no credit document can be issued for the rest."
+msgstr "Η απόδειξη κρατά %(held)s από τα %(owed)s που θα πιστωνόταν αυτή η επιστροφή ή αμφισβήτηση: για το υπόλοιπο δεν μπορεί να εκδοθεί πιστωτικό παραστατικό."
+
+#, python-format
 msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s στους συντελεστές ΦΠΑ της, λιγότερα από τα %(amount)s προς επιστροφή, άρα το πιστωτικό της παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα."
 

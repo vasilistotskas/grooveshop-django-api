@@ -3480,6 +3480,9 @@ class OrderService:
             .get(pk=order.pk)
         )
         payment_status = locked["payment_status"]
+        # Every older source nobody allocated yet is decided before this
+        # claim takes its room (``order.credit_allocation``).
+        credit_allocation.allocate_order(order)
 
         if amount is not None and amount.amount <= 0:
             raise PaymentError(

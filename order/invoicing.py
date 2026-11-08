@@ -55,6 +55,7 @@ from core.store_settings import store_settings
 from core.utils.i18n import get_order_language
 from core.utils.qr import qr_svg
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order.credit_allocation import allocate_order
 from order.discounts import order_discount_total
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus
@@ -480,6 +481,12 @@ def _persist_invoice_row(
     predates the row, and no credit would ever cover it.
     """
     Order.objects.select_for_update().get(pk=order.pk)
+    if existing is None:
+        # The receipt nets what was returned before it, at the rates each
+        # refund was allocated at: decide the sources nobody allocated yet
+        # (a release that did not know about allocations booked them) so
+        # none is left to be credited for money the receipt never held.
+        allocate_order(order)
     # Re-judged under the lock: a refund that committed since the caller's
     # check may have returned the whole sale.
     _refuse_if_fully_refunded(order, existing)

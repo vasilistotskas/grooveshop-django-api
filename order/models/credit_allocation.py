@@ -58,13 +58,15 @@ class CreditAllocation(models.Model):
     nets what moved before it was created, so only rows that move at or
     after it hold room on it.
 
-    A source with NO row was never allocated; the backfill finds it and the
-    credit reconciliation reports it. A source that WAS allocated but holds
-    nothing (it owes no credit: the part of a refund that gives a duplicate
-    payment back, a share fully reversed, an order with nothing taxable; or
-    the receipt had no room for it, which the order's history says once) has
-    one row of amount zero. A zero row holds no room
-    (:meth:`CreditAllocationQuerySet.counting`).
+    The contract, exactly: a source with NO row is not decided yet, and
+    owes no credit until it is (a source booked while a claim still PENDING
+    holds the room; every write path and the periodic task decide it, oldest
+    first, once that claim resolves). A source with a row of amount ZERO was
+    decided and owes nothing: the part of a refund that gives a duplicate
+    payment back, a share fully reversed, an order with nothing taxable, or
+    a source the receipt has no room for because settled sources and issued
+    credits took it (which the order's history says once). A zero row holds
+    no room (:meth:`CreditAllocationQuerySet.counting`).
     """
 
     id = models.BigAutoField(primary_key=True)

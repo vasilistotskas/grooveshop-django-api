@@ -48,6 +48,13 @@ decided after a refund, is read as taking money from the duplicate payment):
 a chargeback, a duplicate payment, a refund of it, and a receipt, with no
 decision before the refund (seeds 21 and more).
 
+Also failing before it: a refund nobody claimed, judged while a claim for
+goods is still in flight, which took the claim's whole amount out of the
+excess (netted from what the ledger holds, but not from what the order is
+still for): a claim, a duplicate payment, a dashboard refund of it, then the
+claim settles (seeds 539, 697, 1013, 1783, 1990). A claim holds only the
+duplicate part it was judged to take when it was made.
+
 ``CREDIT_INVARIANT_SEEDS=0-999`` (or ``4,9,20-30``) runs more seeds than the
 committed list; a failing seed is shrunk to a minimal event sequence before it
 is reported.

@@ -653,7 +653,7 @@ class PaymentLedger:
     def sync_overcharge(cls, order: Order, trigger: PaymentTransaction) -> None:
         """Keep ``Order.overcharged_at`` equal to the ledger: set while
         :meth:`held` exceeds what the order is STILL for by more than the
-        rounding tolerance (:meth:`excess_held`), cleared when refunds or a
+        rounding tolerance (:meth:`overcharge_held`), cleared when refunds or a
         chargeback bring it back.
         What the order is for is ``calculate_order_total_amount()``, the one
         figure every payment path charges and compares a capture with (lines
@@ -672,7 +672,7 @@ class PaymentLedger:
         here: which payment to give back is a person's call. *trigger* is
         the row that made the change, named in the alert.
         """
-        excess = cls.excess_held(order)
+        excess = cls.overcharge_held(order)
         over = excess > 0
         if over == (order.overcharged_at is not None):
             return
@@ -688,69 +688,62 @@ class PaymentLedger:
         cls, order: Order, *, before: PaymentTransaction | None = None
     ) -> Decimal:
         """What the ledger holds above what the order is STILL for, zero
-        while within the rounding tolerance: the one definition of an
-        overcharge (:meth:`sync_overcharge` stamps it,
-        :meth:`refundable_excess` reads it). What the order is still for is
-        its total less the goods already returned: a refund of goods lowers
-        what the ledger holds without making what is left a duplicate. A
-        chargeback is no part of the goods returned, and takes money off
-        the excess only where it hit the duplicate payment itself
-        (:meth:`_duplicate_charged_back`): what a dispute took of the sale
-        is sale money lost, so a duplicate payment stays a duplicate
-        whether the dispute is undecided, kept or returned, and the figure
-        never depends on when staff decide. With *before*, the figure as it stood
-        just before that ledger row, every input read at that one cut
+        while within the rounding tolerance: the duplicate-payment excess a
+        refund pays back first (:meth:`refundable_excess` reads it). What the
+        order is still for is its total less the goods already returned: a
+        refund of goods lowers what the ledger holds without making what is
+        left a duplicate. A chargeback is in neither term: what a lost
+        dispute took is sale money lost, never a credit and never what a
+        duplicate payment is measured against, so the excess is the same
+        whether the dispute is undecided, kept or returned and never depends
+        on when staff decide. With *before*, the figure as it stood just
+        before that ledger row, every input read at that one cut
         (:meth:`held`, and :func:`credit_allocation.goods_returned`, which
         ignores reversals booked at or after it)."""
-        total = order.calculate_order_total_amount().amount
         excess = (
             cls.held(order, before=before)
-            - cls._duplicate_charged_back(order, total, before=before)
-            - total
+            - order.calculate_order_total_amount().amount
             + credit_allocation.goods_returned(order, before=before)
         )
         return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
 
     @classmethod
-    def _duplicate_charged_back(
-        cls,
-        order: Order,
-        total: Decimal,
-        *,
-        before: PaymentTransaction | None = None,
-    ) -> Decimal:
-        """What lost disputes took out of the payments that lie above what
-        the order is for: the money received is laid out in the order it
-        arrived, the first *total* of it is the sale and the rest the
-        duplicate, and a dispute on a payment takes its amount out of that
-        payment's duplicate part at most. A dispute on the sale's own
-        payment is sale money lost and takes none of it."""
-        rows = PaymentTransaction.objects.filter(order=order)
-        if before is not None:
-            rows = rows.filter(
-                Q(created_at__lt=before.created_at)
-                | Q(created_at=before.created_at, pk__lt=before.pk)
-            )
-        disputed = {
-            row["charge_id"]: row["total"]
-            for row in rows.filter(
-                kind=PaymentTransactionKind.CHARGEBACK,
-                charge__isnull=False,
-            )
-            .values("charge_id")
-            .annotate(total=Sum("amount", output_field=_AMOUNT))
-        }
-        if not disputed:
-            return _ZERO
-        paid = taken = _ZERO
-        for charge in rows.filter(kind__in=_RECEIPT_KINDS).order_by(
-            "created_at", "pk"
-        ):
-            amount = Decimal(charge.amount.amount)
-            duplicate = max(min(amount, paid + amount - total), _ZERO)
-            taken += min(disputed.get(charge.pk, _ZERO), duplicate)
-            paid += amount
-        return taken
+    def overcharge_held(cls, order: Order) -> Decimal:
+        """What the customer paid above what the order is for, in money: the
+        operational figure behind ``Order.overcharged_at`` ("refund this").
+        Unlike :meth:`excess_held`, which says what a refund owes no credit
+        for, it counts what lost disputes took back (the card network
+        already returned that money) and the goods of a chargeback staff
+        decided came back (it lowers what the order is for)."""
+        excess = (
+            cls.held(order)
+            - cls.charged_back(order)
+            - order.calculate_order_total_amount().amount
+            + credit_allocation.goods_returned(order)
+            + cls.chargebacks_returned(order)
+        )
+        return excess if excess > PAYMENT_AMOUNT_TOLERANCE else _ZERO
+
+    @staticmethod
+    def _duplicate_part(claims: QuerySet[RefundAttempt]) -> Decimal:
+        """What *claims* hold of the duplicate payment: each one's amount
+        less the goods it claimed (``CreditAllocation.goods_claimed``, fixed
+        when it was made, after the excess then). A claim for goods takes
+        money out of the ledger and adds the same to the goods returned, so
+        it leaves the excess where it was: it is on both sides or neither."""
+        return sum(
+            (
+                max(Decimal(claim.amount.amount) - claim.goods, _ZERO)
+                for claim in claims.annotate(
+                    goods=Coalesce(
+                        Sum("allocations__goods_claimed"),
+                        _ZERO,
+                        output_field=_AMOUNT,
+                    )
+                )
+            ),
+            _ZERO,
+        )
 
     @classmethod
     def refundable_excess(
@@ -793,22 +786,20 @@ class PaymentLedger:
             live = claims.live()
             if before is not None:
                 live = live.filter(created_at__lt=before.created_at)
-            pending = _total(live)
+            pending = cls._duplicate_part(live)
         if before is not None:
-            settled_after = claims.filter(
-                Q(refund__created_at__gt=before.created_at)
-                | Q(
-                    refund__created_at=before.created_at,
-                    refund_id__gte=before.pk,
-                ),
-                status=RefundAttemptStatus.SETTLED,
-                refund__isnull=False,
-                created_at__lt=before.created_at,
-            ).aggregate(
-                total=Coalesce(
-                    Sum("refund__amount", output_field=_AMOUNT), _ZERO
+            settled_after = cls._duplicate_part(
+                claims.filter(
+                    Q(refund__created_at__gt=before.created_at)
+                    | Q(
+                        refund__created_at=before.created_at,
+                        refund_id__gte=before.pk,
+                    ),
+                    status=RefundAttemptStatus.SETTLED,
+                    refund__isnull=False,
+                    created_at__lt=before.created_at,
                 )
-            )["total"]
+            )
         return max(
             cls.excess_held(order, before=before) - pending - settled_after,
             _ZERO,

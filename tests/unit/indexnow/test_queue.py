@@ -8,7 +8,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.db import models
+from django.db import DatabaseError, models
 from django.utils import timezone
 
 from blog.factories.post import BlogPostFactory
@@ -219,3 +219,16 @@ class TestSwitchedOff:
             ProductFactory(active=True)
 
         assert queued() == set()
+
+
+def test_a_failed_go_live_queue_write_fails_the_sweep(indexnow_on):
+    """The sweep must repeat its window rather than move past an
+    unannounced page (``core.publication``)."""
+    post = BlogPostFactory(is_published=True)
+    drain()
+
+    with (
+        patch("indexnow.signals.queue", side_effect=DatabaseError("down")),
+        pytest.raises(DatabaseError),
+    ):
+        went_live.send(sender=BlogPost, instance=post)

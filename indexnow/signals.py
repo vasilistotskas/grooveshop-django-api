@@ -96,9 +96,13 @@ def _queue_saved_translation(sender: type, instance: Any, **kwargs) -> None:
 
 
 def _queue_went_live(sender: type, instance: Any, **kwargs) -> None:
-    """A page dated in the future whose date just passed."""
+    """A page dated in the future whose date just passed.
+
+    Unlike a save, a failed queue write fails the sweep: the sweep then
+    repeats its window, where a swallowed error would move past the page
+    and leave it unannounced (``core.publication``)."""
     if sender in _PAGES and is_enabled() and _is_published(instance):
-        _queue(instance)
+        queue([instance.storefront_path])
 
 
 went_live.connect(_queue_went_live, dispatch_uid="indexnow.went_live")

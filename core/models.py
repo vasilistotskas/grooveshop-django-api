@@ -410,6 +410,38 @@ class PublishableModel(models.Model):
         )
 
 
+class SweepCursor(models.Model):
+    """How far a periodic sweep over a window of time has got, per store.
+
+    A sweep acts on the rows whose date fell in ``(position, now]``
+    (``core.sweeps``) and moves the position only after the work ran, so
+    a run that fails repeats its window. Kept in Postgres, not the cache:
+    the cache fails open (``core.caches.CustomCache``: an unreachable
+    Redis reads as a miss and drops the write), so a cursor there was lost
+    with every outage, and the sweep fell back to a fixed window: missing
+    what went live before it, repeating what came after.
+
+    ``core`` is a shared app, so the table is in ``public`` and names the
+    store whose sweep it is.
+    """
+
+    schema_name = models.CharField(_("Schema"), max_length=63)
+    name = models.CharField(_("Sweep"), max_length=80)
+    position = models.DateTimeField(_("Swept up to"))
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Sweep cursor")
+        verbose_name_plural = _("Sweep cursors")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schema_name", "name"], name="sweep_cursor_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.schema_name}:{self.name} @ {self.position.isoformat()}"
+
+
 class MetaDataModel(models.Model):
     """
     Abstract model that adds private_metadata and metadata JSON fields.

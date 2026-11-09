@@ -13,8 +13,9 @@ declares the row's model in ``invalidated_by``, and sends ``went_live`` for
 each row (IndexNow queues the page). A row saved on or after its date is left
 out: that save already did both.
 
-The cursor moves only after the work ran, so a run that fails repeats its
-window instead of skipping it, the same contract as
+The window is a durable per-store cursor (``core.sweeps``) that moves only
+after the work ran, so a run that fails repeats its window instead of
+skipping it, the same contract as
 ``promotion.offer_sync.refresh_window_changes``.
 """
 
@@ -24,13 +25,13 @@ import logging
 from datetime import datetime, timedelta
 
 from django.apps import apps
-from django.core.cache import cache
 from django.db.models import F, Model
 from django.dispatch import Signal
 from django.utils import timezone
 
 from core.cache.invalidation import mark_surface_stale, surfaces_invalidated_by
 from core.models import PublishableModel
+from core.sweeps import advance_sweep, sweep_start
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,11 @@ logger = logging.getLogger(__name__)
 #: moment. ``sender`` is the model, ``instance`` the row.
 went_live = Signal()
 
-#: How far back the first run looks, and any run after the cursor was lost.
-WINDOW_FALLBACK = timedelta(days=1)
+#: How far back a store's very first run looks.
+FIRST_WINDOW = timedelta(days=1)
 
-# Per store: the cache's key function prefixes the schema.
-_CURSOR_KEY = "publication:go-live-cursor"
+#: The sweep's name in ``core.models.SweepCursor``.
+SWEEP_NAME = "publication-go-live"
 
 
 def publishable_models() -> list[type[Model]]:
@@ -62,12 +63,7 @@ def release_due_publications(now: datetime | None = None) -> int:
     """
 
     now = now or timezone.now()
-    cursor_raw = cache.get(_CURSOR_KEY)
-    cursor = (
-        datetime.fromisoformat(cursor_raw)
-        if cursor_raw
-        else now - WINDOW_FALLBACK
-    )
+    cursor = sweep_start(SWEEP_NAME, now, FIRST_WINDOW)
 
     released = 0
     for model in publishable_models():
@@ -94,6 +90,5 @@ def release_due_publications(now: datetime | None = None) -> int:
             model._meta.label,
         )
 
-    # No expiry: losing the cursor only widens the next window.
-    cache.set(_CURSOR_KEY, now.isoformat(), timeout=None)
+    advance_sweep(SWEEP_NAME, now)
     return released

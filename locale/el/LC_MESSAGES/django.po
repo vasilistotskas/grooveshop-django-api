@@ -13812,6 +13812,18 @@ msgstr "Ανεστάλη από το admin της πλατφόρμας"
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Η αναστολή (η ενέργεια στη λίστα Καταστήματα ή η εργασία χρέωσης) σημειώνει το κατάστημα ως ανενεργό και καταγράφει πότε και γιατί: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία. Το storefront σταματά να αποκρίνεται άμεσα (οι επισκέπτες βλέπουν ότι το κατάστημα δεν βρέθηκε), οι συνδέσεις WebSocket απορρίπτονται, οι προγραμματισμένες εργασίες παρακάμπτουν το κατάστημα και το agent gateway δεν το εξυπηρετεί πλέον. Τα δεδομένα μένουν ανέπαφα· η ενέργεια «Ενεργοποίηση επιλεγμένων καταστημάτων» επαναφέρει τα πάντα."
 
+msgid "Sweep"
+msgstr "Σάρωση"
+
+msgid "Sweep cursor"
+msgstr "Θέση σάρωσης"
+
+msgid "Sweep cursors"
+msgstr "Θέσεις σάρωσης"
+
+msgid "Swept up to"
+msgstr "Σαρώθηκε έως"
+
 msgid "Switch off"
 msgstr "Απενεργοποίηση"
 

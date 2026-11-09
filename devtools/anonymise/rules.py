@@ -471,6 +471,10 @@ NOT_PERSONAL: dict[str, str] = {
         "scheduler.PeriodicTask",
     ),
     **_exempt(
+        "how far a periodic sweep has got: a store name and a date",
+        "core.SweepCursor",
+    ),
+    **_exempt(
         "catalogue and storefront content the merchant authored",
         "product.Attribute",
         "product.AttributeTranslation",

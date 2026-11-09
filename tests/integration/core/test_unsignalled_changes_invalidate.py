@@ -18,7 +18,6 @@ from unittest import mock
 
 import pytest
 from django.contrib.admin.sites import AdminSite
-from django.core.cache import cache
 from django.test import RequestFactory
 from django.utils import timezone
 
@@ -175,10 +174,6 @@ class TestCouponCodes:
 
 
 class TestPromotionWindow:
-    @pytest.fixture(autouse=True)
-    def _fresh_cursor(self):
-        cache.delete(offer_sync._WINDOW_CURSOR_KEY)
-
     def test_a_window_closing_purges_the_offers(self, purged):
         now = timezone.now()
         PromotionFactory(

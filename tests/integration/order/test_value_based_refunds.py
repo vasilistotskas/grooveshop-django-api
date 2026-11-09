@@ -546,14 +546,14 @@ class TestAStalledStoredShareCanBeFinished:
     def test_the_dialog_offers_the_share_that_stopped(self):
         from django.test import RequestFactory
 
-        from order.admin import RefundOrderForm
+        from order.admin import ReturnOrderForm
         from user.factories import UserAccountFactory
 
         order, _card, _attempt = self._stalled()
         request = RequestFactory().post("/")
         request.user = UserAccountFactory(is_superuser=True, is_staff=True)
 
-        form = RefundOrderForm(request, order.pk)
+        form = ReturnOrderForm(request, order.pk)
 
         assert form.fields["amount"].initial == Decimal("60.00")
         assert "60.00" in str(form.fields["amount"].help_text)

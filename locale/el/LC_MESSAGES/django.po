@@ -460,8 +460,16 @@ msgid "%(name)s is not declared in the schedule."
 msgstr "Το %(name)s δεν υπάρχει στο πρόγραμμα."
 
 #, python-format
+msgid "%(name)s: %(requested)s unit(s) cannot be refunded, %(sold)s were sold and %(paid)s already paid back."
+msgstr "%(name)s: δεν μπορούν να επιστραφούν %(requested)s τεμάχια· πουλήθηκαν %(sold)s και έχουν ήδη επιστραφεί %(paid)s."
+
+#, python-format
 msgid "%(name)s: invoices retained until %(until)s under the statutory record-keeping obligation; everything else erased."
 msgstr "%(name)s: τα τιμολόγια διατηρούνται έως %(until)s βάσει της νόμιμης υποχρέωσης τήρησης αρχείων· όλα τα υπόλοιπα διαγράφηκαν."
+
+#, python-format
+msgid "%(name)s: only %(left)s unit(s) are not back in stock yet."
+msgstr "%(name)s: μόνο %(left)s τεμάχια δεν έχουν επανέλθει ακόμη στο απόθεμα."
 
 #, python-format
 msgid "%(num)d day"
@@ -799,6 +807,9 @@ msgstr "Μια νομική σελίδα πρέπει να μένει δημοσ
 msgid "A legal page needs a body in every language the store serves: the storefront shows nothing in that language, and checkout refuses every order there."
 msgstr "Μια νομική σελίδα χρειάζεται κείμενο σε κάθε γλώσσα του καταστήματος: αλλιώς το κατάστημα δεν δείχνει τίποτα σε αυτή τη γλώσσα, και το ταμείο αρνείται κάθε παραγγελία σε αυτήν."
 
+msgid "A line to refund is not on this order."
+msgstr "Η γραμμή προς επιστροφή δεν ανήκει σε αυτή την παραγγελία."
+
 msgid "A lost dispute took money back; say whether the goods came back. Returned or not delivered credits the receipt (retail credit document), as a refund does. The customer keeping the goods leaves the sale as it is."
 msgstr "Μια χαμένη αμφισβήτηση επέστρεψε χρήματα στον πελάτη· δηλώστε αν τα προϊόντα επέστρεψαν. Αν επιστράφηκαν ή δεν παραδόθηκαν, πιστώνεται η απόδειξη (πιστωτικό στοιχείο λιανικής), όπως σε μια επιστροφή χρημάτων. Αν ο πελάτης κράτησε τα προϊόντα, η πώληση μένει ως έχει."
 
@@ -844,8 +855,15 @@ msgstr "Μια δημοσίευση μπορεί να προγραμματιστ
 msgid "A real-shaped example mobile number, national format (e.g. GR '6912345678', CY '96123456')."
 msgstr "Ένα ρεαλιστικό παράδειγμα αριθμού κινητού σε εθνική μορφή (π.χ. GR «6912345678», CY «96123456»)."
 
+msgid "A refund by lines is worth what its lines are worth: do not give an amount with them."
+msgstr "Η επιστροφή ανά γραμμή αξίζει όσο οι γραμμές της: μην δίνετε ποσό μαζί τους."
+
 msgid "A refund failed"
 msgstr "Αποτυχία επιστροφής χρημάτων"
+
+#, python-format
+msgid "A refund of %(amount)s was sent to the payment provider and its result is not known yet. Retry it with the same key: the provider hands back the refund it already made instead of making another. Choose this on its own, without lines."
+msgstr "Μια επιστροφή %(amount)s στάλθηκε στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Επαναλάβετέ την με το ίδιο κλειδί: ο πάροχος επιστρέφει την επιστροφή που έκανε ήδη αντί να κάνει νέα. Επιλέξτε το μόνο του, χωρίς γραμμές."
 
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
@@ -877,6 +895,9 @@ msgstr "Πιστωτικό στοιχείο επιστροφής που ανατ
 #, python-format
 msgid "A retail receipt is issued for a receipt order once it has shipped. Order #%(order_id)s is %(doc)s, status %(status)s."
 msgstr "Η απόδειξη λιανικής εκδίδεται για παραγγελία με απόδειξη μόλις αποσταλεί. Η παραγγελία #%(order_id)s είναι %(doc)s, κατάσταση %(status)s."
+
+msgid "A retry repeats exactly what was asked: give no lines, shipping or amount with it."
+msgstr "Η επανάληψη επαναλαμβάνει ακριβώς ό,τι ζητήθηκε: μη δώσετε γραμμές, μεταφορικά ή ποσό μαζί της."
 
 #, python-format
 msgid "A return of %(amount)s onto gift cards and loyalty points stopped before it finished. Refunding this amount finishes it; nothing is given back twice."
@@ -1717,6 +1738,9 @@ msgstr "Ορίσματα"
 
 msgid "Arrival notified at"
 msgstr "Ειδοποίηση άφιξης στις"
+
+msgid "Arrived damaged or defective"
+msgstr "Έφτασε κατεστραμμένο ή ελαττωματικό"
 
 msgid "As a browser shows it, in px."
 msgstr "Όπως το εμφανίζει ο φυλλομετρητής, σε px."
@@ -2989,6 +3013,9 @@ msgstr "Απόφαση για chargeback"
 msgid "Chargeback of %(requested)s not recorded: nothing is left on the payment (%(returned)s already returned)"
 msgstr "Το chargeback %(requested)s δεν καταγράφηκε: δεν έχει μείνει ποσό στην πληρωμή (%(returned)s έχουν ήδη επιστραφεί)"
 
+msgid "Charged twice"
+msgstr "Χρεώθηκε δύο φορές"
+
 msgid "Charges"
 msgstr "Χρεώσεις"
 
@@ -3093,6 +3120,12 @@ msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δη�
 
 msgid "Choose at least one document to share."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για κοινοποίηση."
+
+msgid "Choose lines to refund, or enter a goodwill amount, not both."
+msgstr "Επιλέξτε γραμμές προς επιστροφή ή εισάγετε ποσό καλής θελήσεως, όχι και τα δύο."
+
+msgid "Choose the lines that came back to put them in stock."
+msgstr "Επιλέξτε τις γραμμές που επιστράφηκαν για να επανέλθουν στο απόθεμα."
 
 msgid "City"
 msgstr "Πόλη"
@@ -4618,6 +4651,9 @@ msgstr "Εισαγάγετε μια τιμή μεταξύ 0 και 100. Για �
 
 msgid "Enter how many units of at least one line came back."
 msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μίας γραμμής επιστράφηκαν."
+
+msgid "Enter how many units of at least one line to refund, or a goodwill amount."
+msgstr "Συμπληρώστε πόσα τεμάχια τουλάχιστον μίας γραμμής θα επιστραφούν ή ένα ποσό καλής θελήσεως."
 
 #, python-format
 msgid "Enter the URL of your profile on %(hosts)s: https://, one of those hosts and a path naming the profile, not only the home page."
@@ -6219,6 +6255,14 @@ msgstr "Υποσέλιδο"
 msgid "Footer text"
 msgstr "Κείμενο υποσέλιδου"
 
+#, python-format
+msgid "For a refund that is no line of the order. Up to %(refundable)s can still be refunded."
+msgstr "Για επιστροφή που δεν αφορά γραμμή της παραγγελίας. Μπορούν να επιστραφούν ακόμη έως %(refundable)s."
+
+#, python-format
+msgid "For a refund that is no line of the order. Up to %(refundable)s can still be refunded: %(provider)s through the payment provider, then %(stored)s back onto the gift cards and loyalty points the order paid with."
+msgstr "Για επιστροφή που δεν αφορά γραμμή της παραγγελίας. Μπορούν να επιστραφούν ακόμη έως %(refundable)s: %(provider)s μέσω του παρόχου πληρωμών και %(stored)s πίσω στις δωροκάρτες και τους πόντους πιστότητας με τους οποίους πληρώθηκε η παραγγελία."
+
 msgid "For price_drop alerts: trigger when the product's price falls to or below this value. Ignored for restock alerts."
 msgstr "Για ειδοποιήσεις price_drop: ενεργοποιείται όταν η τιμή του προϊόντος πέσει στο ή κάτω από αυτή την τιμή. Αγνοείται για ειδοποιήσεις επαναδιαθεσιμότητας."
 
@@ -6779,6 +6823,12 @@ msgstr "Επιστροφή προϊόντων μετά από chargeback"
 
 msgid "Goods the receipt is short of: a refund it was issued net of was reported failed by the provider afterwards; set on one row of the source."
 msgstr "Προϊόντα που λείπουν από την απόδειξη: μια επιστροφή, χωρίς την οποία εκδόθηκε, δηλώθηκε αργότερα αποτυχημένη από τον πάροχο· ορίζεται σε μία γραμμή της πηγής."
+
+msgid "Goodwill"
+msgstr "Καλή θέληση"
+
+msgid "Goodwill amount"
+msgstr "Ποσό καλής θελήσεως"
 
 msgid "Google Ads Add-Payment-Info Label"
 msgstr "Ετικέτα Προσθήκης Στοιχείων Πληρωμής Google Ads"
@@ -9054,8 +9104,14 @@ msgstr "Δεν είναι έγκυρη αναφορά."
 msgid "Not an email type you can choose: %(keys)s."
 msgstr "Δεν είναι τύπος email που μπορείτε να επιλέξετε: %(keys)s."
 
+msgid "Not as described"
+msgstr "Δεν ανταποκρίνεται στην περιγραφή"
+
 msgid "Not checked"
 msgstr "Δεν έχει ελεγχθεί"
+
+msgid "Not delivered or lost in transit"
+msgstr "Δεν παραδόθηκε ή χάθηκε στη μεταφορά"
 
 #, python-brace-format
 msgid "Not enough stock available. Only {product_stock} remaining."
@@ -9249,6 +9305,9 @@ msgstr "ID αντικειμένου"
 msgid "Occurred at"
 msgstr "Συνέβη στις"
 
+msgid "Of a refund by lines, the part of the line's value that went back as loyalty points: a discount, so no room on the receipt and no credit, but value the line has had back."
+msgstr "Σε επιστροφή ανά γραμμές, το μέρος της αξίας της γραμμής που επέστρεψε ως πόντοι πιστότητας: έκπτωση, άρα δεν καταλαμβάνει χώρο στην απόδειξη και δεν πιστώνεται, αλλά είναι αξία που η γραμμή έχει πάρει πίσω."
+
 msgid "Off"
 msgstr "Ανενεργό"
 
@@ -9306,6 +9365,9 @@ msgstr "Επιβεβαίωση χρειάζεται μόνο ένας προγρ
 
 msgid "Only a page can be deleted."
 msgstr "Μόνο μια σελίδα μπορεί να διαγραφεί."
+
+msgid "Only for goods that are fit to sell again. Recorded on the stock log with your name."
+msgstr "Μόνο για προϊόντα που μπορούν να πουληθούν ξανά. Καταγράφεται στο ιστορικό αποθέματος με το όνομά σας."
 
 msgid "Only images of this store can be imported, not other sites."
 msgstr "Εισάγονται μόνο εικόνες αυτού του καταστήματος, όχι άλλων ιστότοπων."
@@ -10017,6 +10079,9 @@ msgstr "Το γονικό σχόλιο πρέπει να ανήκει στο ί�
 msgid "Part of the order's discount this line carries, fixed when the order was created. Invoices and myDATA use it to split the VAT of what was actually charged."
 msgstr "Μέρος της έκπτωσης της παραγγελίας που αναλογεί σε αυτή τη γραμμή, καθορισμένο κατά τη δημιουργία της παραγγελίας. Τιμολόγια και myDATA το χρησιμοποιούν για να διαχωρίσουν τον ΦΠΑ αυτού που πράγματι χρεώθηκε."
 
+msgid "Part of this refund was paid back in cash and its outcome is not recorded yet. Cash is never repeated: record how it was paid back with Record refund outcome on the order."
+msgstr "Μέρος αυτής της επιστροφής επιστράφηκε σε μετρητά και το αποτέλεσμά του δεν έχει καταχωρηθεί ακόμη. Τα μετρητά δεν επαναλαμβάνονται ποτέ: καταχωρίστε πώς επιστράφηκαν με την ενέργεια «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία."
+
 msgid "Partial"
 msgstr "Μερικό"
 
@@ -10320,9 +10385,6 @@ msgstr "Η απόδοση σημάνθηκε ως συμφωνημένη."
 msgid "Payroll"
 msgstr "Μισθοδοσία"
 
-msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
-msgstr "Επιστρέφει το ποσό μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι, στο καθολικό πληρωμών της παραγγελίας. Μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες μέχρι να μην απομένει τίποτα. Η κατάσταση της παραγγελίας και το απόθεμά της δεν αλλάζουν."
-
 msgid "Pending"
 msgstr "Εκκρεμεί"
 
@@ -10440,6 +10502,9 @@ msgstr "Τηλέφωνο για τις ειδοποιήσεις αποστολή
 
 msgid "Phone-number validation shape for this country, derived from Django's own ``phonenumbers`` dependency — never stored. Null only for a placeholder/reserved alpha-2 code ``phonenumbers`` has no metadata for."
 msgstr "Η μορφή επικύρωσης τηλεφώνου για αυτή τη χώρα, όπως προκύπτει από τη βιβλιοθήκη ``phonenumbers`` που χρησιμοποιεί το Django — δεν αποθηκεύεται ποτέ. Null μόνο για δεσμευμένο κωδικό alpha-2 για τον οποίο η ``phonenumbers`` δεν έχει δεδομένα."
+
+msgid "Pick the lines that came back, with their units, and whether the shipping goes back too: they are refunded for what they were sold for, and their credit document carries their VAT rates. Or give a goodwill amount instead. Pays back through the payment provider, or records the cash on delivery you paid back yourself; a part refund can be followed by more. The order status is not changed."
+msgstr "Επιλέξτε τις γραμμές που επιστράφηκαν, με τα τεμάχιά τους, και αν επιστρέφονται και τα μεταφορικά: επιστρέφονται με την αξία που πουλήθηκαν και το πιστωτικό τους παραστατικό φέρει τους δικούς τους συντελεστές ΦΠΑ. Ή δώστε αντί γι' αυτό ένα ποσό καλής θελήσεως. Επιστρέφει τα χρήματα μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι· μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες. Η κατάσταση της παραγγελίας δεν αλλάζει."
 
 msgid "Pickup Points"
 msgstr "Σημεία παραλαβής"
@@ -11195,11 +11260,14 @@ msgstr "Καθαρίστηκαν %(d)s κλειδιά Django + %(n)s κλειδ�
 msgid "Purged At"
 msgstr "Εκκαθαρίστηκε στις"
 
+msgid "Put the returned units back in stock"
+msgstr "Επαναφορά των επιστρεφόμενων τεμαχίων στο απόθεμα"
+
 msgid "Puts returned units of an order line back into stock and records them on the line. It moves no money: refund the payment with the order's refund action."
 msgstr "Επιστρέφει στο απόθεμα τα επιστρεφόμενα τεμάχια μιας γραμμής παραγγελίας και τα καταγράφει στη γραμμή. Δεν μετακινεί χρήματα: επιστρέψτε την πληρωμή με την ενέργεια επιστροφής της παραγγελίας."
 
-msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: refund the payment separately."
-msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (μια παραλλαγή είναι προϊόν). Μπορείτε να δηλώσετε μόνο τεμάχια που δεν έχουν ήδη επανέλθει. Δεν επιστρέφει χρήματα: επιστρέψτε την πληρωμή ξεχωριστά."
+msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: use \"Return and refund\" for the money, which can restock in the same step."
+msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (η παραλλαγή είναι προϊόν). Μπορούν να δηλωθούν μόνο τεμάχια που δεν έχουν επανέλθει ακόμη. Δεν επιστρέφει χρήματα: χρησιμοποιήστε το «Επιστροφή και επιστροφή χρημάτων» για τα χρήματα, που μπορεί να κάνει επαναφορά αποθέματος στο ίδιο βήμα."
 
 #, python-format
 msgid "Q%(quarter)s %(year)s"
@@ -11360,6 +11428,9 @@ msgstr "Αιτία"
 
 msgid "Reason Code"
 msgstr "Κωδικός αιτίας"
+
+msgid "Reason category"
+msgstr "Κατηγορία λόγου"
 
 msgid "Receipt"
 msgstr "Απόδειξη"
@@ -11568,9 +11639,6 @@ msgstr "Ανανεώθηκε"
 msgid "Refund"
 msgstr "Επιστροφή χρημάτων"
 
-msgid "Refund (amount, reason)"
-msgstr "Επιστροφή χρημάτων (ποσό, λόγος)"
-
 msgid "Refund Attempt"
 msgstr "Απόπειρα επιστροφής"
 
@@ -11597,6 +11665,9 @@ msgstr "Κατάσταση επιστροφής"
 msgid "Refund amount ({refund}) cannot exceed the refundable amount ({refundable})."
 msgstr "Το ποσό επιστροφής ({refund}) δεν μπορεί να υπερβαίνει το επιστρέψιμο ποσό ({refundable})."
 
+msgid "Refund at least one unit of a line."
+msgstr "Επιστρέψτε τουλάχιστον ένα τεμάχιο μίας γραμμής."
+
 msgid "Refund attempt"
 msgstr "Απόπειρα επιστροφής"
 
@@ -11618,9 +11689,6 @@ msgstr "Αποτυχία επιστροφής χρημάτων για την π�
 msgid "Refund or reconcile the payment in the %(provider)s dashboard."
 msgstr "Επιστρέψτε ή τακτοποιήστε την πληρωμή από τον πίνακα του %(provider)s."
 
-msgid "Refund order"
-msgstr "Επιστροφή χρημάτων παραγγελίας"
-
 msgid "Refund processed"
 msgstr "Η επιστροφή χρημάτων ολοκληρώθηκε"
 
@@ -11640,6 +11708,9 @@ msgstr "Επιστρέψτε τα χρήματα στον πελάτη από τ
 
 msgid "Refund the excess from the order page. The alert clears once the refunds bring the total back to what the order is for."
 msgstr "Επιστρέψτε το επιπλέον ποσό από τη σελίδα της παραγγελίας. Η ειδοποίηση σβήνει όταν οι επιστροφές φέρουν το σύνολο πίσω στην αξία της παραγγελίας."
+
+msgid "Refund the shipping too"
+msgstr "Επιστροφή και των μεταφορικών"
 
 msgid "Refund this order's payment first."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας."
@@ -11835,6 +11906,9 @@ msgstr "Αντικαθιστά την αλυσίδα, τα βάρη, την εκ
 msgid "Reply to this email to answer the customer."
 msgstr "Απαντήστε σε αυτό το email για να απαντήσετε στον πελάτη."
 
+msgid "Request"
+msgstr "Αίτημα"
+
 msgid "Request Cookies"
 msgstr "Cookies αιτήματος"
 
@@ -11941,6 +12015,9 @@ msgstr "Χρόνος απόκρισης %(response)s · Ειδοποίηση %(s
 
 msgid "Restock"
 msgstr "Αναπλήρωση"
+
+msgid "Restock once the pending refund has been made, with \"Restock returned items\"."
+msgstr "Κάντε επαναφορά αποθέματος όταν ολοκληρωθεί η εκκρεμής επιστροφή, με το «Επιστροφή στο απόθεμα»."
 
 msgid "Restock returned items"
 msgstr "Επιστροφή στο απόθεμα"
@@ -12056,11 +12133,20 @@ msgstr "Η επανάληψη υποστηρίζεται μόνο για πλη�
 msgid "Retry payment for a failed or pending order"
 msgstr "Επανάληψη πληρωμής για αποτυχημένη ή εκκρεμή παραγγελία"
 
+msgid "Retry the pending refund"
+msgstr "Επανάληψη της εκκρεμούς επιστροφής"
+
+msgid "Retry the pending refund on its own: it repeats exactly what was asked, so leave the lines, the shipping and the goodwill amount empty."
+msgstr "Η επανάληψη της εκκρεμούς επιστροφής γίνεται μόνη της: επαναλαμβάνει ακριβώς ό,τι ζητήθηκε, άρα αφήστε κενά τις γραμμές, τα μεταφορικά και το ποσό καλής θελήσεως."
+
 msgid "Retryable server error"
 msgstr "Σφάλμα διακομιστή με δυνατότητα επανάληψης"
 
 msgid "Return Label"
 msgstr "Ετικέτα επιστροφής"
+
+msgid "Return and refund"
+msgstr "Επιστροφή και επιστροφή χρημάτων"
 
 msgid "Return the most popular search queries from the last 24 hours, suitable for surfacing in the search modal empty state. Cached for 5 minutes per (language_code, content_type, limit)."
 msgstr "Επιστρέφει τα πιο δημοφιλή ερωτήματα αναζήτησης των τελευταίων 24 ωρών, κατάλληλα για εμφάνιση στην κενή κατάσταση του modal αναζήτησης. Αποθηκεύεται σε cache για 5 λεπτά ανά (language_code, content_type, limit)."
@@ -12081,6 +12167,9 @@ msgstr "Επιστράφηκε"
 #, python-format
 msgid "Returned and still to put back: %(left)s"
 msgstr "Επιστράφηκαν και δεν έχουν επανέλθει στο απόθεμα: %(left)s"
+
+msgid "Returned by the customer"
+msgstr "Επιστράφηκε από τον πελάτη"
 
 msgid "Returned flag"
 msgstr "Ένδειξη επιστροφής"
@@ -12849,6 +12938,9 @@ msgstr "Κοινά χαρακτηριστικά, ετικέτες και μάρ�
 msgid "Shared by (staff)"
 msgstr "Κοινοποιήθηκε από (προσωπικό)"
 
+msgid "Shared by every share of one refund made by lines, so a retry of that refund finds them together."
+msgstr "Κοινό σε όλα τα μερίδια μιας επιστροφής ανά γραμμή, ώστε η επανάληψή της να τα βρίσκει μαζί."
+
 msgid "Shared text"
 msgstr "Κοινό κείμενο"
 
@@ -12926,6 +13018,10 @@ msgstr "Ενημέρωση αποστολής"
 
 msgid "Shipping kind"
 msgstr "Είδος αποστολής"
+
+#, python-format
+msgid "Shipping left to refund: %(shipping)s."
+msgstr "Μεταφορικά προς επιστροφή: %(shipping)s."
 
 msgid "Shipping option matrix, locker pickers and the ACS station map. Purge after toggling a provider, editing a price, or after a station/locker sync."
 msgstr "Πίνακας επιλογών αποστολής, επιλογείς lockers και ο χάρτης καταστημάτων ACS. Εκκαθαρίστε μετά την ενεργοποίηση/απενεργοποίηση παρόχου, την επεξεργασία τιμής ή μετά από συγχρονισμό καταστήματος/locker."
@@ -14305,6 +14401,12 @@ msgstr "Η νομική υποχρέωση στην οποία βασίζετα�
 msgid "The line a goods row was taken from; empty otherwise."
 msgstr "Η γραμμή από την οποία προήλθε μια γραμμή προϊόντων· κενό σε κάθε άλλη περίπτωση."
 
+msgid "The lines chosen are worth nothing, so there is nothing to refund."
+msgstr "Οι γραμμές που επιλέχθηκαν δεν έχουν αξία, άρα δεν υπάρχει τίποτα προς επιστροφή."
+
+msgid "The lines chosen are worth nothing, so there is nothing to refund. Tick the restock option to put them back in stock."
+msgstr "Οι γραμμές που επιλέχθηκαν δεν έχουν αξία, άρα δεν υπάρχει τίποτα προς επιστροφή. Επιλέξτε την επαναφορά αποθέματος για να επανέλθουν στο απόθεμα."
+
 msgid "The link a store's staff member asked for to choose a new admin password."
 msgstr "Ο σύνδεσμος που ζήτησε ένα μέλος του προσωπικού του καταστήματος για να επιλέξει νέο κωδικό πρόσβασης διαχείρισης."
 
@@ -14477,6 +14579,9 @@ msgstr "Ο λόγος που δόθηκε για την επιστροφή."
 msgid "The reason is included in the email to the customer."
 msgstr "Η αιτιολογία συμπεριλαμβάνεται στο email προς τον πελάτη."
 
+msgid "The reason picked from the fixed list; empty on refunds made before the list existed, whose free text stays in the reason."
+msgstr "Ο λόγος που επιλέχθηκε από τη σταθερή λίστα· κενός στις επιστροφές πριν από τη λίστα, των οποίων το ελεύθερο κείμενο μένει στον λόγο."
+
 #, python-format
 msgid "The receipt holds %(held)s of the %(owed)s this refund or chargeback would credit: no credit document can be issued for the rest."
 msgstr "Η απόδειξη κρατά %(held)s από τα %(owed)s που θα πιστωνόταν αυτή η επιστροφή ή αμφισβήτηση: για το υπόλοιπο δεν μπορεί να εκδοθεί πιστωτικό παραστατικό."
@@ -14488,6 +14593,10 @@ msgstr "Η απόδειξη της παραγγελίας #%(order_id)s αναβ
 #, python-format
 msgid "The receipt of this order holds only %(left)s more across its VAT rates, less than the %(amount)s to refund, so its credit document could not be issued and nothing was refunded."
 msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s στους συντελεστές ΦΠΑ της, λιγότερα από τα %(amount)s προς επιστροφή, άρα το πιστωτικό της παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα."
+
+#, python-format
+msgid "The receipt of this order holds only %(left)s more at %(rate)s%% VAT, less than these lines are worth (%(amount)s), so their credit document could not be issued and nothing was refunded. A goodwill refund of an amount can still be made."
+msgstr "Η απόδειξη αυτής της παραγγελίας κρατά ακόμη μόνο %(left)s με ΦΠΑ %(rate)s%%, λιγότερα από την αξία αυτών των γραμμών (%(amount)s), άρα το πιστωτικό τους παραστατικό δεν θα μπορούσε να εκδοθεί και δεν επιστράφηκε τίποτα. Μπορείτε ακόμη να κάνετε επιστροφή καλής θελήσεως για ένα ποσό."
 
 msgid "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out."
 msgstr "Ο παραλήπτης λαμβάνει τον κωδικό της κάρτας με email και μπορεί να τον εξαργυρώσει κατά την ολοκλήρωση της αγοράς, σε όσες παραγγελίες θέλει, μέχρι να εξαντληθεί το υπόλοιπο."
@@ -14580,6 +14689,9 @@ msgstr "Ο επιλεγμένος μεταφορέας δεν είναι δια�
 msgid "The sending key of this store's own Resend team, restricted to its verified domain. Secret. Used only while From Email is verified; a store without its own domain sends through the platform's team. There is NO platform fallback for a verified store: empty means its mail is not sent."
 msgstr "Το κλειδί αποστολής της δικής σας ομάδας Resend, περιορισμένο στο επαληθευμένο domain. Μυστικό. Χρησιμοποιείται μόνο όσο το From Email είναι επαληθευμένο· ένα κατάστημα χωρίς δικό του domain στέλνει μέσω της ομάδας της πλατφόρμας. ΔΕΝ υπάρχει εναλλακτική από την πλατφόρμα για κατάστημα με επαληθευμένο domain: αν είναι κενό, τα email του δεν στέλνονται."
 
+msgid "The shipping of this order was already refunded."
+msgstr "Τα μεταφορικά αυτής της παραγγελίας έχουν ήδη επιστραφεί."
+
 msgid "The signing secret of the webhook endpoint in this store's own Resend team, used to verify the delivery events it sends. Secret. Empty for a store on the platform's team."
 msgstr "Το μυστικό υπογραφής του webhook endpoint της δικής σας ομάδας Resend, για την επαλήθευση των συμβάντων παράδοσης που στέλνει. Μυστικό. Κενό για κατάστημα στην ομάδα της πλατφόρμας."
 
@@ -14659,6 +14771,9 @@ msgstr "Ο τίτλος που εμφανίζεται στο Google Merchant Cen
 msgid "The type must look like name@version."
 msgstr "Ο τύπος πρέπει να έχει τη μορφή όνομα@έκδοση."
 
+msgid "The units were not put back in stock because the refund was not made in full."
+msgstr "Τα τεμάχια δεν επανήλθαν στο απόθεμα επειδή η επιστροφή χρημάτων δεν ολοκληρώθηκε πλήρως."
+
 msgid "The updated cart, as returned by the cart detail endpoint"
 msgstr "Το ενημερωμένο καλάθι, όπως το επιστρέφει η λήψη καλαθιού"
 
@@ -14694,6 +14809,9 @@ msgstr "Μπορεί να υπάρχει μόνο μία κύρια διεύθυ
 
 msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
 msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο κανάλι χρέωσης της πλατφόρμας. Οι έμποροι πληρώνουν την πλατφόρμα εκτός συστήματος (τιμολόγιο / τραπεζική μεταφορά) και το προσωπικό καταχωρεί το αποτέλεσμα ορίζοντας την ημερομηνία «Πληρωμένο έως» του tenant — επεκτείνετέ την κατά την πληρωμένη περίοδο σε κάθε ανανέωση. Τα δοκιμαστικά αποκτούν περίοδο κατά τη δημιουργία (tenant_create --trial-days, προεπιλογή 30)· κενό «Πληρωμένο έως» σημαίνει ότι η περίοδος δεν λήγει ποτέ."
+
+msgid "There is no pending refund of this order to retry."
+msgstr "Αυτή η παραγγελία δεν έχει εκκρεμή επιστροφή προς επανάληψη."
 
 msgid "There is no such document."
 msgstr "Δεν υπάρχει τέτοιο έγγραφο."
@@ -14866,6 +14984,9 @@ msgstr "Η παραγγελία δεν έχει επιστροφή χρημάτ�
 
 msgid "This order has no registered receipt."
 msgstr "Η παραγγελία δεν έχει καταχωρισμένη απόδειξη."
+
+msgid "This order has no shipping to refund."
+msgstr "Αυτή η παραγγελία δεν έχει μεταφορικά προς επιστροφή."
 
 msgid "This order has no specimen receipt."
 msgstr "Η παραγγελία δεν έχει δείγμα απόδειξης."
@@ -15433,6 +15554,10 @@ msgstr "Πληρωμένα τεμάχια"
 msgid "Units sold"
 msgstr "Τεμάχια που πουλήθηκαν"
 
+#, python-format
+msgid "Units still to refund: %(left)s of %(sold)s, %(value)s left to refund (VAT %(rate)s%%)."
+msgstr "Τεμάχια προς επιστροφή: %(left)s από %(sold)s, απομένουν %(value)s προς επιστροφή (ΦΠΑ %(rate)s%%)."
+
 msgid "Unknown"
 msgstr "Άγνωστος"
 
@@ -15563,14 +15688,6 @@ msgstr "Προϊόν χωρίς τίτλο"
 
 msgid "Unused Tags"
 msgstr "Μη χρησιμοποιημένες ετικέτες"
-
-#, python-format
-msgid "Up to %(refundable)s can still be refunded."
-msgstr "Μπορούν να επιστραφούν ακόμη έως %(refundable)s."
-
-#, python-format
-msgid "Up to %(refundable)s can still be refunded: %(provider)s through the payment provider, then %(stored)s back onto the gift cards and loyalty points the order paid with. Enter the value of what the customer returned."
-msgstr "Μπορείτε να επιστρέψετε έως %(refundable)s: %(provider)s μέσω του παρόχου πληρωμών και %(stored)s πίσω στις δωροκάρτες και τους πόντους πιστότητας με τους οποίους πληρώθηκε η παραγγελία. Εισαγάγετε την αξία των προϊόντων που επέστρεψε ο πελάτης."
 
 #, python-format
 msgid "Update %(name)s information. Requires authentication."
@@ -16467,6 +16584,9 @@ msgstr "Καταχωρεί μια γραμμή ADJUST στο καθολικό �
 
 msgid "Writes an adjustment row on the customer's points ledger; it cannot be undone, only offset by another adjustment."
 msgstr "Καταχωρεί μια εγγραφή προσαρμογής στο καθολικό πόντων του πελάτη· δεν μπορεί να αναιρεθεί, μόνο να αντισταθμιστεί με άλλη προσαρμογή."
+
+msgid "Wrong item sent"
+msgstr "Στάλθηκε λάθος προϊόν"
 
 msgid "XML export successful."
 msgstr "Η εξαγωγή XML ολοκληρώθηκε επιτυχώς."
@@ -18288,6 +18408,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Payments — Viva Wallet"
 #~ msgstr "Πληρωμές — Viva Wallet"
 
+#~ msgid "Pays the amount back through the payment provider, or records the cash on delivery you paid back yourself, on the order's payment ledger. A part refund can be followed by more until nothing is left. The order status and its stock are not changed."
+#~ msgstr "Επιστρέφει το ποσό μέσω του παρόχου πληρωμών ή καταγράφει την αντικαταβολή που επιστρέψατε εσείς οι ίδιοι, στο καθολικό πληρωμών της παραγγελίας. Μετά από μερική επιστροφή μπορούν να ακολουθήσουν κι άλλες μέχρι να μην απομένει τίποτα. Η κατάσταση της παραγγελίας και το απόθεμά της δεν αλλάζουν."
+
 #~ msgid "Pending Reviews"
 #~ msgstr "Κριτικές προς Έγκριση"
 
@@ -18408,9 +18531,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Real Order"
 #~ msgstr "Πραγματική παραγγελία"
 
-#~ msgid "Reason for the refund"
-#~ msgstr "Αιτία της επιστροφής χρημάτων"
-
 #~ msgid "Recent"
 #~ msgstr "Πρόσφατη"
 
@@ -18423,6 +18543,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 #~ msgid "Reference Cards"
 #~ msgstr "Κάρτες αναφοράς"
 
+#~ msgid "Refund (amount, reason)"
+#~ msgstr "Επιστροφή χρημάτων (ποσό, λόγος)"
+
 #~ msgid "Refund Information"
 #~ msgstr "Πληροφορίες επιστροφής"
 
@@ -18431,6 +18554,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Refund an order payment"
 #~ msgstr "Επιστροφή πληρωμής παραγγελίας"
+
+#~ msgid "Refund order"
+#~ msgstr "Επιστροφή χρημάτων παραγγελίας"
 
 #~ msgid "Refunded beyond the receipt"
 #~ msgstr "Επιστροφή πέρα από την απόδειξη"
@@ -18723,9 +18849,6 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Trust Badges"
 #~ msgstr "Σήματα εμπιστοσύνης"
-
-#~ msgid "Unable to process refund for this order."
-#~ msgstr "Δεν ήταν δυνατή η επεξεργασία επιστροφής χρημάτων για αυτή την παραγγελία."
 
 #~ msgid "Unsubscribe from a topic via email link (GET)"
 #~ msgstr "Απεγγραφή από θέμα μέσω συνδέσμου email (GET)"

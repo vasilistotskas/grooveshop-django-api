@@ -14,7 +14,9 @@ is left on the receipt:
   cent, capped to it; a claim that does not fit is refused by its caller
   before any money moves.
 * A refund claim is allocated by ``OrderService._claim_refund`` when it is
-  made. Every other source (a refund nobody claimed, a returned chargeback)
+  made: a bare amount pro rata over the headroom, a refund by lines (see
+  :mod:`order.refund_lines`) as its own pieces, each at its line's rate,
+  which must fit their rates (:func:`first_short_rate`). Every other source (a refund nobody claimed, a returned chargeback)
   is decided by :func:`allocate_order`, which every WRITE path calls first
   (the receipt, a claim, the credit documents, a booked refund, a decision)
   and the periodic task ``order.tasks.allocate_credit_sources`` runs for
@@ -32,7 +34,7 @@ Everything here runs under the order's row lock (the callers hold it).
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -74,6 +76,10 @@ class Piece:
     amount: Decimal
     item_pk: int | None = None
     quantity: int = 0
+    #: Of a refund by lines, the part of the line's value that went back as
+    #: loyalty points: no room and no credit, but value the line has had
+    #: back. ``amount`` is the part that is room.
+    points: Decimal = _ZERO
 
 
 def _base(order: Order) -> tuple[dict[Decimal, Decimal], Invoice | None]:
@@ -271,6 +277,65 @@ def split_over_shares(
     return out
 
 
+def scale_pieces(pieces: Sequence[Piece], total: Decimal) -> list[Piece]:
+    """*pieces* cut down to *total* of room in proportion, to the cent, each
+    keeping its line, kind and rate. What is cut off is not lost: it becomes
+    the piece's ``points``, value the line has had back that owes no credit
+    (a piece left with no room at all stays, as points only). A *total* that
+    is not less than their sum leaves them as they are."""
+    held = sum((p.amount for p in pieces), _ZERO)
+    if total >= held:
+        return list(pieces)
+    shares = (
+        proportional_shares(
+            max(total, _ZERO),
+            {i: piece.amount for i, piece in enumerate(pieces)},
+        )
+        if total > 0
+        else {i: _ZERO for i in range(len(pieces))}
+    )
+    return [
+        Piece(
+            kind=piece.kind,
+            rate=piece.rate,
+            amount=shares[i],
+            item_pk=piece.item_pk,
+            quantity=piece.quantity,
+            points=piece.points + piece.amount - shares[i],
+        )
+        for i, piece in enumerate(pieces)
+    ]
+
+
+def by_rate(pieces: Iterable[Piece]) -> dict[Decimal, Decimal]:
+    """The gross of *pieces* per VAT rate."""
+    out: dict[Decimal, Decimal] = {}
+    for piece in pieces:
+        out[piece.rate] = out.get(piece.rate, _ZERO) + piece.amount
+    return out
+
+
+def first_short_rate(
+    order: Order,
+    wanted: Mapping[Decimal, Decimal],
+    *,
+    settled_only: bool = False,
+    released: Collection[int] = (),
+) -> tuple[Decimal, Decimal] | None:
+    """The first VAT rate (highest first) whose headroom cannot hold the
+    gross *wanted* at it, with what it can hold; ``None`` when every rate
+    fits. A refund by lines needs each of its rates to fit: its credit
+    document must carry exactly them. *settled_only* and *released* are
+    :func:`headroom`'s: the room there would be with the claims still
+    PENDING (or the named ones) resolved without a refund."""
+    left = headroom(order, settled_only=settled_only, released=released)
+    for rate in sorted(wanted, reverse=True):
+        room = max(left.get(rate, _ZERO), _ZERO)
+        if wanted[rate] > room:
+            return rate, room
+    return None
+
+
 def store(
     order: Order,
     pieces: Sequence[Piece],
@@ -311,12 +376,15 @@ def store(
             rate=piece.rate,
             quantity=piece.quantity,
             amount=Money(piece.amount, currency),
+            points=piece.points,
             moved_at=moved_at,
             uncovered=uncovered if i == 0 else _ZERO,
             goods_claimed=goods if i == 0 else _ZERO,
             **source,
         )
-        for i, piece in enumerate(p for p in pieces if p.amount > 0)
+        for i, piece in enumerate(
+            p for p in pieces if p.amount > 0 or p.points > 0
+        )
     )
 
 
@@ -386,9 +454,16 @@ def scale(returned: Decimal, **source) -> None:
             if share > 0:
                 row.amount = Money(share, row.amount.currency)
                 row.save(update_fields=["amount", "amount_currency"])
+            elif row.points > 0:
+                # No room left, but the line keeps the value it had back.
+                row.amount = Money(_ZERO, row.amount.currency)
+                row.save(update_fields=["amount", "amount_currency"])
             else:
                 row.delete()
-        if returned <= 0:
+        # The goods the source claimed stay on its first row left.
+        left = CreditAllocation.objects.filter(**source).order_by("pk")
+        first_left = left.first()
+        if first_left is None:
             first = rows[0]
             store(
                 first.order,
@@ -399,14 +474,10 @@ def scale(returned: Decimal, **source) -> None:
                 **source,
             )
             return
-        # The goods the source claimed stay on its first row left.
-        left = CreditAllocation.objects.filter(**source).order_by("pk")
-        first_left = left.first()
         left.update(goods_claimed=_ZERO)
-        if first_left is not None:
-            CreditAllocation.objects.filter(pk=first_left.pk).update(
-                goods_claimed=goods
-            )
+        CreditAllocation.objects.filter(pk=first_left.pk).update(
+            goods_claimed=goods
+        )
     if uncovered <= 0:
         return
     held = min(returned, claimed)
@@ -417,6 +488,43 @@ def scale(returned: Decimal, **source) -> None:
     if first_kept is not None and stands > 0:
         CreditAllocation.objects.filter(pk=first_kept.pk).update(
             uncovered=stands
+        )
+
+
+def scale_points(returned: Decimal, **source) -> None:
+    """Make the points a source's rows carry total *returned* (less than
+    they do), in proportion: what was claimed as points and not returned is
+    not held back for its lines any more. A row left with neither room nor
+    points is deleted; a source left with no row at all keeps one row of
+    amount zero, so that it stays decided and owes nothing."""
+    rows = list(
+        CreditAllocation.objects.filter(points__gt=0, **source).order_by("pk")
+    )
+    claimed = sum((r.points for r in rows), _ZERO)
+    if not rows or returned >= claimed:
+        return
+    shares = (
+        proportional_shares(returned, {r.pk: r.points for r in rows})
+        if returned > 0
+        else {}
+    )
+    for row in rows:
+        CreditAllocation.objects.filter(pk=row.pk).update(
+            points=shares.get(row.pk, _ZERO)
+        )
+    for row in CreditAllocation.objects.filter(
+        amount=0, points=0, **source
+    ).exclude(item__isnull=True):
+        row.delete()
+    if not CreditAllocation.objects.filter(**source).exists():
+        first = rows[0]
+        store(
+            first.order,
+            [],
+            moved_at=first.moved_at,
+            nothing_owed=True,
+            goods=_ZERO,
+            **source,
         )
 
 
@@ -818,6 +926,37 @@ def _blocks(order: Order, owing: Owing, claim: RefundAttempt) -> bool:
     ) > sum(allocate_pro_rata(order, owed).values(), _ZERO)
 
 
+def room_blockers(
+    order: Order,
+    short: Callable[..., bool],
+    *,
+    exclude: Collection[int] = (),
+) -> list[RefundAttempt]:
+    """The claims still PENDING that a refund short of room waits for, or
+    ``[]`` when it is a final refusal (it would not fit with every one of
+    them released either). *short* says whether the refund is still short
+    given :func:`headroom`'s ``settled_only`` / ``released`` keywords. A
+    claim whose release alone makes it fit is named; when only several
+    together do, every claim holding room is."""
+    claims = list(
+        RefundAttempt.objects.live()
+        .filter(order=order)
+        .exclude(pk__in=exclude)
+        .order_by("pk")
+    )
+    if not claims or short(settled_only=True):
+        return []
+    alone = [c for c in claims if not short(released=(c.pk,))]
+    if alone:
+        return alone
+    held = set(
+        CreditAllocation.objects.counting()
+        .filter(order=order, refund_attempt__in=claims)
+        .values_list("refund_attempt", flat=True)
+    )
+    return [c for c in claims if c.pk in held]
+
+
 def blocking_claims(order: Order) -> list[RefundAttempt]:
     """The refund claims still PENDING that keep a source of *order*
     undecided: a receipt deferred, a new refund refused. A claim that holds
@@ -1011,9 +1150,11 @@ __all__ = [
     "allocation_of_refund",
     "beyond_receipt_orders",
     "blocking_claims",
+    "by_rate",
     "describe_blockers",
     "drop",
     "excess_holders",
+    "first_short_rate",
     "free_reversed",
     "goods_returned",
     "has_rates",
@@ -1027,7 +1168,10 @@ __all__ = [
     "pieces_of",
     "reversed_credits",
     "reversed_of",
+    "room_blockers",
     "scale",
+    "scale_pieces",
+    "scale_points",
     "split_over_shares",
     "store",
     "uncovered_orders",

@@ -26,7 +26,7 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from djmoney.money import Money
 
-from order.admin import OrderAdmin, RefundOrderForm
+from order.admin import OrderAdmin, ReturnOrderForm
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory, PaymentTransactionFactory
@@ -100,7 +100,12 @@ class TestRefundAction:
     ):
         order = _delivered_order("100.00")
         request = _post(
-            staff_user, {"amount": "30.00", "reason": "One item came back"}
+            staff_user,
+            {
+                "amount": "30.00",
+                "reason": "RETURNED",
+                "note": "One item came back",
+            },
         )
 
         with FakeStripeRefunds() as stripe_api:
@@ -114,7 +119,9 @@ class TestRefundAction:
         assert order.payment_status == PaymentStatus.PARTIALLY_REFUNDED
         [refund] = _refunds(order)
         assert refund.amount == Money(Decimal("30.00"), "EUR")
-        assert refund.description == "One item came back"
+        assert refund.description == (
+            "Returned by the customer: One item came back"
+        )
         assert stripe_api.amounts == [3000]
         [attempt] = order.refund_attempts.all()
         assert stripe_api.keys == [f"refund-{attempt.idempotency_key}"]
@@ -122,7 +129,7 @@ class TestRefundAction:
 
     def test_who_refunded_is_in_the_admin_log(self, order_admin, staff_user):
         order = _delivered_order("100.00")
-        request = _post(staff_user, {"amount": "30.00", "reason": "Return"})
+        request = _post(staff_user, {"amount": "30.00", "reason": "RETURNED"})
 
         with FakeStripeRefunds():
             order_admin.refund_payment(request, object_id=order.pk)
@@ -140,7 +147,7 @@ class TestRefundAction:
         with FakeStripeRefunds() as stripe_api:
             for amount in ("30.00", "70.00"):
                 order_admin.refund_payment(
-                    _post(staff_user, {"amount": amount, "reason": "Return"}),
+                    _post(staff_user, {"amount": amount, "reason": "RETURNED"}),
                     object_id=order.pk,
                 )
 
@@ -153,7 +160,7 @@ class TestRefundAction:
         self, order_admin, staff_user
     ):
         order = _delivered_order("100.00")
-        request = _post(staff_user, {"amount": "100.01", "reason": "Return"})
+        request = _post(staff_user, {"amount": "100.01", "reason": "RETURNED"})
 
         with FakeStripeRefunds() as stripe_api:
             response = order_admin.refund_payment(request, object_id=order.pk)
@@ -190,7 +197,7 @@ class TestRefundAction:
         self, order_admin, staff_user
     ):
         order = _delivered_order("100.00")
-        request = _post(staff_user, {"amount": "10.00", "reason": "Return"})
+        request = _post(staff_user, {"amount": "10.00", "reason": "RETURNED"})
 
         with FakeStripeRefunds(status="failed"):
             order_admin.refund_payment(request, object_id=order.pk)
@@ -216,7 +223,7 @@ class TestRefundAction:
             amount=Money(Decimal("40.00"), "EUR"),
             provider_reference="pi_second",
         )
-        request = _post(staff_user, {"amount": "100.00", "reason": "Return"})
+        request = _post(staff_user, {"amount": "100.00", "reason": "RETURNED"})
         calls = {"n": 0}
 
         class _SecondPaymentRefused(FakeStripeRefunds):
@@ -248,11 +255,11 @@ class TestRefundAction:
     @pytest.mark.parametrize(
         "data",
         [
-            {"reason": "no amount"},
+            {"reason": "RETURNED"},
             {"amount": "10.00"},
             {"amount": "10.00", "reason": ""},
-            {"amount": "0.00", "reason": "zero"},
-            {"amount": "-5.00", "reason": "negative"},
+            {"amount": "0.00", "reason": "RETURNED"},
+            {"amount": "-5.00", "reason": "RETURNED"},
         ],
         ids=[
             "no-amount",
@@ -290,9 +297,8 @@ class TestTheDialogOffersTheRemainder:
             provider_reference="re_earlier",
         )
 
-        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+        form = ReturnOrderForm(_post(staff_user, {}), order.pk)
 
-        assert form.fields["amount"].initial == Decimal("65.00")
         assert "65.00" in str(form.fields["amount"].help_text)
 
     def test_nothing_is_offered_for_an_order_with_no_recorded_payment(
@@ -300,7 +306,7 @@ class TestTheDialogOffersTheRemainder:
     ):
         order = OrderFactory(num_order_items=0)
 
-        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+        form = ReturnOrderForm(_post(staff_user, {}), order.pk)
 
         assert form.fields["amount"].initial is None
 
@@ -338,7 +344,7 @@ class TestWhereTheActionIsOffered:
 
         with FakeStripeRefunds() as stripe_api:
             request = _post(
-                staff_user, {"amount": "100.00", "reason": "declined earlier"}
+                staff_user, {"amount": "100.00", "reason": "RETURNED"}
             )
             order_admin.refund_payment(request, object_id=order.pk)
 
@@ -371,7 +377,7 @@ class TestWhereTheActionIsOffered:
 
         with FakeStripeRefunds() as stripe_api, pytest.raises(PermissionDenied):
             order_admin.refund_payment(
-                _post(staff_user, {"amount": "10.00", "reason": "x"}),
+                _post(staff_user, {"amount": "10.00", "reason": "RETURNED"}),
                 object_id=order.pk,
             )
 
@@ -450,14 +456,13 @@ class TestTheDialogOffersTheValueOfWhatCanComeBack:
         )
         return order, card
 
-    def test_the_amount_defaults_to_the_card_and_the_stored_value(
+    def test_the_goodwill_amount_explains_the_card_and_the_stored_value(
         self, staff_user
     ):
         order, _card = self._paid_with_a_gift_card()
 
-        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+        form = ReturnOrderForm(_post(staff_user, {}), order.pk)
 
-        assert form.fields["amount"].initial == Decimal("100.00")
         help_text = str(form.fields["amount"].help_text)
         assert "€100.00" in help_text
         assert "through the payment provider" in help_text
@@ -470,19 +475,18 @@ class TestTheDialogOffersTheValueOfWhatCanComeBack:
     ):
         order = _delivered_order("100.00")
 
-        form = RefundOrderForm(_post(staff_user, {}), order.pk)
+        form = ReturnOrderForm(_post(staff_user, {}), order.pk)
 
         assert str(form.fields["amount"].help_text) == (
-            "Up to €100.00 can still be refunded."
+            "For a refund that is no line of the order. Up to €100.00 can "
+            "still be refunded."
         )
 
     def test_the_action_returns_the_value_and_says_how_much(
         self, order_admin, staff_user
     ):
         order, card = self._paid_with_a_gift_card()
-        request = _post(
-            staff_user, {"amount": "70.00", "reason": "Two items back"}
-        )
+        request = _post(staff_user, {"amount": "70.00", "reason": "RETURNED"})
 
         with FakeStripeRefunds() as stripe_api:
             order_admin.refund_payment(request, object_id=order.pk)

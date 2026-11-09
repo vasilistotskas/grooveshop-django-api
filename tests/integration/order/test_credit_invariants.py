@@ -9,6 +9,9 @@ through the REAL service and ledger paths, in any order:
                 refunded; Stripe answers, times out (a claim left PENDING)
                 or loses its answer (made, but nobody knows)
   refund_full   ``refund_order`` for everything
+  lines*        ``refund_order`` by lines (units of a line, several lines,
+                the shipping), answered, timed out or lost like ``refund``;
+                ``retry_lines`` resumes the pending one under its own keys
   settle_*      a PENDING claim settled by reconciliation (``book_share``),
                 by the provider's webhook (``record_refund`` with no attempt)
                 or by staff ("Record refund outcome")
@@ -35,7 +38,19 @@ ledger in time order and says what the books should hold. The invariants:
    its goods back, no refund reference booked twice, no refund linked to two
    claims or allocated both through its claim and itself;
 5. at rest no receipt is deferred and no source (claim or chargeback) is
-   undecided.
+   undecided;
+6. a refund by lines is credited at exactly the rates of its own lines, which
+   the oracle takes from the lines asked for (each item's VAT rate, the
+   order's shipping rates), never from the rows the code wrote; and no line
+   is held for more than its value (price x units less its discount);
+7. a refund by lines is worth what the oracle prices it at: price x units
+   less the line's discount allocation, priced cumulatively (the first k
+   units are worth gross x k / n, half up, the last taking the rest), the
+   shipping once; the allocation rows of a request (room plus loyalty
+   points) add up to exactly that;
+8. a line the oracle has asked every unit of, in requests that hold in full,
+   is never offered for refund again (points included: value back, though no
+   credit).
 
 The oracle encodes the product rules of ``docs/order-system.md`` §7 from
 first principles, never through the code's formulas (see ``Oracle``). The
@@ -68,7 +83,7 @@ import random
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from unittest import mock
 
 import pytest
@@ -83,6 +98,7 @@ from loyalty.models.transaction import PointsTransaction
 from order import credit_allocation, refund_reconciliation
 from order.chargebacks import ChargebackDecisionError, decide_chargebacks
 from order.credit_documents import create_pending_credits
+from order.discounts import discounted_line_gross
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import PaymentStatus
 from order.exceptions import PaymentError
@@ -102,12 +118,14 @@ from order.models.refund_attempt import (
     RefundAttemptStatus,
 )
 from order.payment_ledger import PAYMENT_AMOUNT_TOLERANCE, PaymentLedger
+from order.refund_lines import covered_units, held_values, pending_request
 from order.services import OrderService
 from order.tasks import (
     allocate_credit_sources,
     generate_order_invoice,
     send_invoice_to_mydata,
 )
+from order.taxation import ChargeKind, order_vat_lines
 from tests.integration.order.test_credit_allocation import (  # noqa: F401
     _render_and_site,
 )
@@ -160,6 +178,11 @@ EVENTS = [
     "refund_timeout",
     "refund_lost",
     "refund_full",
+    "lines",
+    "lines",
+    "lines_timeout",
+    "lines_lost",
+    "retry_lines",
     "settle_rec",
     "settle_wh",
     "settle_staff",
@@ -193,17 +216,49 @@ def gen(seed: int):
         for _ in range(rnd.randint(3, 9))
     ]
     final = [round(rnd.random(), 4) for _ in range(12)]
-    return tuple((r, f"{g:.2f}") for r, g in lines), points, gift, seq, final
+    # Drawn last, so the draws above keep their meaning: units per line
+    # (only where the gross splits to the cent) and a shipping charge.
+    shape = random.Random(f"shape-{seed}")
+    out = []
+    for rate, gross in lines:
+        units = shape.choice((1, 1, 2, 3, 4))
+        if (gross * 100) % units:
+            units = 1
+        out.append((rate, f"{gross:.2f}", units))
+    shipping = (
+        Decimal(shape.randint(100, 1500)) / 100
+        if shape.random() < 0.4
+        else ZERO
+    )
+    return tuple(out), points, gift, shipping, seq, final
 
 
-def _build_order(lines, points: Decimal, gift: Decimal) -> Order:
-    """A receipt order of *lines* (rate, gross) with *points* of its first
-    line paid by loyalty points and *gift* by a gift card; the card paid the
-    rest and is the ledger's one charge."""
+def _build_order(
+    lines, points: Decimal, gift: Decimal, shipping: Decimal
+) -> Order:
+    """A receipt order of *lines* (rate, gross, units) and *shipping*, with
+    *points* of its first line paid by loyalty points and *gift* by a gift
+    card; the card paid the rest and is the ledger's one charge."""
     user = UserAccountFactory(num_addresses=0)
-    order = _order(lines=lines, user=user)
+    order = _order(
+        lines=tuple((r, g) for r, g, _u in lines),
+        shipping=f"{shipping:.2f}",
+        user=user,
+    )
+    for (_r, gross, units), item in zip(
+        lines, OrderItem.objects.filter(order=order).order_by("pk"), strict=True
+    ):
+        if units > 1:
+            OrderItem.objects.filter(pk=item.pk).update(
+                quantity=units, price=_money(Decimal(gross) / units)
+            )
     if points or gift:
-        card = sum((Decimal(g) for _r, g in lines), ZERO) - points - gift
+        card = (
+            sum((Decimal(g) for _r, g, _u in lines), ZERO)
+            + shipping
+            - points
+            - gift
+        )
         item = OrderItem.objects.filter(order=order).order_by("pk").first()
         OrderItem.objects.filter(pk=item.pk).update(
             discount_allocation=_money(points)
@@ -450,7 +505,9 @@ class Oracle:
                     sum((ex for _s, ex in pending.values()), ZERO),
                 )
                 amount = Decimal(obj.amount.amount)
-                excess = min(excess, amount)
+                # A refund by lines is goods returned: it takes none of a
+                # duplicate payment (docs/order-system.md, refund by lines).
+                excess = ZERO if obj.request_id else min(excess, amount)
                 src = new_source(amount - excess, when, claim=True)
                 pending[obj.pk] = (src, excess)
             elif kind == "gift":
@@ -509,14 +566,22 @@ class Oracle:
 
 
 class State:
-    def __init__(self, lines, points, gift, fake, staff):
+    def __init__(self, lines, points, gift, shipping, fake, staff):
         self.fake = fake
         self.staff = staff
-        self.order = _build_order(lines, points, gift)
-        goods = sum((Decimal(g) for _r, g in lines), ZERO)
+        self.shipping = shipping
+        self.order = _build_order(lines, points, gift, shipping)
+        goods = sum((Decimal(g) for _r, g, _u in lines), ZERO) + shipping
         #: The provider's money the order is for, and what the receipt holds.
         self.total = goods - points - gift
         self.receipt_sale = goods - points
+        #: lines-refund attempt pk -> the VAT rates its lines asked for
+        self.line_rates: dict[int, set[Decimal]] = {}
+        #: request id -> units asked per order line pk, whether the shipping,
+        #: and whether the oracle could price it in full when it was made
+        #: (a request planned while an earlier one held only part of a line
+        #: is worth the remainder: what it holds is a value, not its units)
+        self.requests: dict[object, tuple[dict[int, int], bool, bool]] = {}
         assert self.order.calculate_order_total_amount().amount == self.total
         self.oracle = Oracle(self.order, self.total, self.receipt_sale)
         self.shipped = False
@@ -592,6 +657,8 @@ class State:
                 )
             except PaymentError as e:
                 self.log.append(f"{ev} {amt} REFUSED: {e}")
+        elif ev in ("lines", "lines_timeout", "lines_lost", "retry_lines"):
+            self.refund_lines(order, ev, a, b)
         elif ev in ("settle_rec", "settle_wh", "settle_staff", "decline"):
             live = self.live()
             if ev == "settle_staff":
@@ -697,6 +764,214 @@ class State:
         elif ev == "credits":
             ids = create_pending_credits(order.id)
             self.log.append(f"credits created {len(ids)}")
+
+    # -- refunds by lines: what the oracle expects ------------------------
+    @staticmethod
+    def line_gross(item) -> Decimal:
+        """What a line is worth: price x units less its discount."""
+        return Decimal(item.price.amount) * item.quantity - Decimal(
+            item.discount_allocation.amount
+        )
+
+    @staticmethod
+    def cumulative(gross: Decimal, quantity: int, units: int) -> Decimal:
+        """The value of the first *units* of *quantity*: gross x k / n to
+        the cent, half up; the last unit takes what is left."""
+        if units >= quantity:
+            return gross
+        return (gross * units / quantity).quantize(CENT, rounding=ROUND_HALF_UP)
+
+    def request_state(self, rid) -> str:
+        """``full``: every share holds what it claimed; ``none``: every
+        share was declined; ``mixed``: anything else (a share declined, a
+        refund reversed, a stored share that returned less than it
+        claimed), where what a line has had back is a value, not units."""
+        atts = list(RefundAttempt.objects.filter(request_id=rid))
+        declined = [a.status == RefundAttemptStatus.DECLINED for a in atts]
+        if all(declined):
+            return "none"
+        if any(declined):
+            return "mixed"
+        reversed_refs = set(
+            PaymentTransaction.objects.filter(
+                order=self.order, kind=PaymentTransactionKind.REFUND_REVERSAL
+            ).values_list("provider_reference", flat=True)
+        )
+        for att in atts:
+            if att.refund_id and att.refund.provider_reference in reversed_refs:
+                return "mixed"
+            if (
+                att.kind == RefundAttemptKind.STORED_VALUE
+                and att.status == RefundAttemptStatus.SETTLED
+                and PaymentLedger.stored_returned_by(self.order, att).amount
+                < att.amount.amount
+            ):
+                return "mixed"
+        return "full"
+
+    def done(self, item_pk=None):
+        """Units of a line (or, with no line, whether the shipping) already
+        asked in requests that hold in full; ``None`` when a request that
+        touches it holds only in part."""
+        units, shipped = 0, False
+        for rid, (asked, ship, priced) in self.requests.items():
+            touches = ship if item_pk is None else item_pk in asked
+            if not touches:
+                continue
+            state = self.request_state(rid)
+            if state == "mixed" or not priced:
+                return None
+            if state == "full":
+                if item_pk is None:
+                    shipped = True
+                else:
+                    units += asked[item_pk]
+        return shipped if item_pk is None else units
+
+    def expect_lines(self, order, chosen, include):
+        """The value the oracle puts on each line asked for and on the
+        shipping (``None``: not knowable, a request holds only in part),
+        and the VAT rates the request is credited at."""
+        goods: dict[int, Decimal | None] = {}
+        rates: set[Decimal] = set()
+        for item, units in chosen:
+            rates.add(Decimal(item.vat_rate))
+            done = self.done(item.pk)
+            if done is None:
+                goods[item.pk] = None
+                continue
+            gross = self.line_gross(item)
+            goods[item.pk] = self.cumulative(
+                gross, item.quantity, done + units
+            ) - self.cumulative(gross, item.quantity, done)
+        shipping = None
+        if include:
+            rates |= {
+                line.rate
+                for line in order_vat_lines(order)
+                if line.kind == ChargeKind.SHIPPING
+            }
+            if self.done() is False:
+                shipping = self.shipping
+        return goods, shipping, rates
+
+    def refund_lines(self, order, ev, a, b):
+        """A refund by lines: one or two lines with some of their units, and
+        the shipping now and then; or the retry of the pending one."""
+        self.fake.fail_with = (
+            stripe.APIConnectionError("x") if ev == "lines_timeout" else None
+        )
+        self.fake.lose_answer = ev == "lines_lost"
+        before = set(
+            RefundAttempt.objects.filter(order=order).values_list(
+                "pk", flat=True
+            )
+        )
+        self.asked = None
+        try:
+            self._refund_lines(order, ev, a, b)
+        finally:
+            self.fake.fail_with = None
+            self.fake.lose_answer = False
+            new = list(
+                RefundAttempt.objects.filter(
+                    order=order, request_id__isnull=False
+                ).exclude(pk__in=before)
+            )
+            if new and self.asked is not None:
+                self.check_request(new, *self.asked)
+
+    def check_request(self, new, chosen, include, expected):
+        goods, shipping, rates = expected
+        rid = new[0].request_id
+        priced = all(v is not None for v in goods.values()) and (
+            not include or shipping is not None
+        )
+        self.requests[rid] = ({i.pk: u for i, u in chosen}, include, priced)
+        for att in new:
+            self.line_rates[att.pk] = rates
+        rows = CreditAllocation.objects.filter(refund_attempt__in=new)
+        for item, _units in chosen:
+            want = goods[item.pk]
+            got = sum(
+                (
+                    Decimal(r.amount.amount) + r.points
+                    for r in rows
+                    if r.item_id == item.pk
+                ),
+                ZERO,
+            )
+            if want is not None and got != want:
+                said = f"line {item.pk} priced {got}, the oracle says {want}"
+                self.viol.append(("inv7", said))
+        if include:
+            got = sum(
+                (
+                    Decimal(r.amount.amount) + r.points
+                    for r in rows
+                    if r.kind == ChargeKind.SHIPPING
+                ),
+                ZERO,
+            )
+            if shipping is not None and got != shipping:
+                said = f"shipping priced {got}, the oracle says {shipping}"
+                self.viol.append(("inv7", said))
+
+    def _refund_lines(self, order, ev, a, b):
+        try:
+            if ev == "retry_lines":
+                pending = pending_request(order)
+                if pending is None:
+                    self.log.append("retry_lines skipped (none pending)")
+                    return
+                OrderService.refund_order(
+                    order, retry_request_id=pending.request_id
+                )
+                self.log.append(f"retry_lines {pending.request_id}")
+                return
+            held = held_values(order)
+            gross = discounted_line_gross(order, None)
+            options = []
+            for item in OrderItem.objects.filter(order=order).order_by("pk"):
+                left = item.quantity - covered_units(
+                    gross[item.pk],
+                    item.quantity,
+                    held.goods.get(item.pk, ZERO),
+                )
+                if left > 0:
+                    options.append((item, left))
+            shipping = (
+                self.shipping > 0 and self.shipping - held.shipping_total() > 0
+            )
+            if not options and not shipping:
+                self.log.append(f"{ev} skipped (nothing left)")
+                return
+            chosen = []
+            if options:
+                first = int(b * len(options)) % len(options)
+                picks = [first]
+                if len(options) > 1 and a > 0.7:
+                    picks.append((first + 1) % len(options))
+                for i in picks:
+                    item, left = options[i]
+                    chosen.append((item, 1 + int(a * 100) % left))
+            include = shipping and (not chosen or a > 0.5)
+            self.asked = (
+                chosen,
+                include,
+                self.expect_lines(order, chosen, include),
+            )
+            res = OrderService.refund_order(
+                order, lines=chosen, include_shipping=include
+            )
+            self.log.append(
+                f"{ev} {[(i.pk, u) for i, u in chosen]}"
+                f"{' +shipping' if include else ''} -> refunded "
+                f"{res.refunded.amount} stored {res.stored.amount}"
+                f" declined={bool(res.declined)}"
+            )
+        except PaymentError as e:
+            self.log.append(f"{ev} REFUSED: {e}")
 
     def looked_up(self, att):
         """The automatic lookup asked the provider about *att* and could
@@ -850,6 +1125,38 @@ class State:
         for ch in self.charges():
             if PaymentLedger.left_on(ch) < 0:
                 self.viol.append(("inv4", f"{where}: charge over-refunded"))
+        for c in issued.select_related("refund_attempt"):
+            att = c.refund_attempt or (
+                RefundAttempt.objects.filter(refund_id=c.refund_id).first()
+                if c.refund_id
+                else None
+            )
+            if att is None or att.pk not in self.line_rates:
+                continue
+            rates = {Decimal(r["rate"]) for r in c.vat_breakdown}
+            if not rates <= self.line_rates[att.pk]:
+                own = self.line_rates[att.pk]
+                said = f"{where}: credit for lines at {own} carries {rates}"
+                self.viol.append(("inv6", said))
+        held = held_values(order)
+        items = {i.pk: i for i in OrderItem.objects.filter(order=order)}
+        for pk, value in held.goods.items():
+            worth = self.line_gross(items[pk])
+            if value > worth:
+                said = f"{where}: line {pk} held {value} > {worth}"
+                self.viol.append(("inv6", said))
+        # A line the oracle has asked every unit of, in requests that hold
+        # in full, is never offered again (points included).
+        for pk, item in items.items():
+            if self.done(pk) == item.quantity and self.line_gross(item) > 0:
+                offered = item.quantity - covered_units(
+                    discounted_line_gross(order, None)[pk],
+                    item.quantity,
+                    held.goods.get(pk, ZERO),
+                )
+                if offered > 0:
+                    said = f"{where}: line {pk} fully asked, {offered} offered"
+                    self.viol.append(("inv8", said))
         for att in RefundAttempt.objects.filter(order=order):
             if (
                 CreditAllocation.objects.filter(refund_attempt=att).exists()
@@ -937,8 +1244,8 @@ class State:
             return
 
 
-def run(lines, points, gift, seq, final, fake, staff):
-    st = State(lines, points, gift, fake, staff)
+def run(lines, points, gift, shipping, seq, final, fake, staff):
+    st = State(lines, points, gift, shipping, fake, staff)
     for ev, a, b in seq:
         st.do(ev, a, b)
         st.check_always(ev)
@@ -951,14 +1258,14 @@ def kinds(st) -> set[str]:
 
 
 def _run_seed(seed: int):
-    lines, points, gift, seq, final = gen(seed)
+    lines, points, gift, shipping, seq, final = gen(seed)
     staff = UserAccountFactory(is_staff=True, is_superuser=True)
     with (
         mydata_enabled(auto_submit=False),
         FakeAade(),
         FakeStripeRefunds() as fake,
     ):
-        st = run(lines, points, gift, seq, final, fake, staff)
+        st = run(lines, points, gift, shipping, seq, final, fake, staff)
         if not st.viol:
             return None
         target = kinds(st)
@@ -968,13 +1275,14 @@ def _run_seed(seed: int):
             changed = False
             for i in range(len(best_seq)):
                 cand = best_seq[:i] + best_seq[i + 1 :]
-                c = run(lines, points, gift, cand, final, fake, staff)
+                c = run(lines, points, gift, shipping, cand, final, fake, staff)
                 if kinds(c) & target:
                     best_seq, best = cand, c
                     changed = True
                     break
     return (
-        f"seed {seed}: lines {lines} points {points} gift {gift}\n"
+        f"seed {seed}: lines {lines} points {points} gift {gift} "
+        f"shipping {shipping}\n"
         f"violations: {st.viol}\nminimal events: {best_seq}\n"
         "log:\n  " + "\n  ".join(best.log) + f"\nviolations there: {best.viol}"
     )

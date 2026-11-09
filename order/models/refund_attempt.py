@@ -37,6 +37,20 @@ class RefundAttemptKind(models.TextChoices):
     STORED_VALUE = "STORED_VALUE", _("Gift cards and points")
 
 
+class RefundReason(models.TextChoices):
+    """Why a refund was made, from a fixed list staff pick from (the free
+    text that goes with it is only a note)."""
+
+    RETURNED = "RETURNED", _("Returned by the customer")
+    DAMAGED = "DAMAGED", _("Arrived damaged or defective")
+    WRONG_ITEM = "WRONG_ITEM", _("Wrong item sent")
+    NOT_AS_DESCRIBED = "NOT_AS_DESCRIBED", _("Not as described")
+    NOT_DELIVERED = "NOT_DELIVERED", _("Not delivered or lost in transit")
+    DUPLICATE = "DUPLICATE", _("Charged twice")
+    GOODWILL = "GOODWILL", _("Goodwill")
+    OTHER = "OTHER", _("Other")
+
+
 class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
     def live(self):
         """Attempts that hold their amount back: every one still PENDING,
@@ -154,6 +168,28 @@ class RefundAttempt(models.Model):
     amount = MoneyField(_("Amount"), max_digits=11, decimal_places=2)
     reason = models.CharField(
         _("Reason"), max_length=255, blank=True, default=""
+    )
+    reason_code = models.CharField(
+        _("Reason category"),
+        max_length=32,
+        choices=RefundReason.choices,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_(
+            "The reason picked from the fixed list; empty on refunds made "
+            "before the list existed, whose free text stays in the reason."
+        ),
+    )
+    request_id = models.UUIDField(
+        _("Request"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Shared by every share of one refund made by lines, so a "
+            "retry of that refund finds them together."
+        ),
     )
     idempotency_key = models.UUIDField(
         _("Idempotency key"),

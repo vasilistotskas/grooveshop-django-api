@@ -33,6 +33,8 @@ _REPO_PATH = re.compile(
 )
 # A template is named the way Django loads it, relative to this folder.
 _TEMPLATE_ROOT = "core/templates"
+# Directories whose entries are importable top-level packages.
+_SOURCE_ROOTS = ("src",)
 _MEMORY_NOTE = re.compile(r"\b(?:project|feedback|reference)_[a-z0-9_]+\.md\b")
 _SOURCE_DIRS_SKIPPED = frozenset(
     {".venv", "node_modules", ".git", "migrations", "__pycache__", "htmlcov"}
@@ -46,8 +48,22 @@ def _doc_files() -> list[Path]:
     return [path for path in files if path.is_file()]
 
 
-def _top_level_names() -> frozenset[str]:
-    return frozenset(path.name for path in REPO_ROOT.iterdir())
+def _first_party_roots() -> frozenset[str]:
+    """First segments that mean "a path of this repository".
+
+    The entries at the repository root, and the entries of a source
+    directory under it. The second set is what keeps a moved package
+    checked: once ``order/`` lives in ``src/``, a doc still saying
+    ``order/services.py`` names a first-party path that does not exist,
+    and is reported rather than taken for another repository's.
+    """
+    roots = {path.name for path in REPO_ROOT.iterdir()}
+    for source_dir in _SOURCE_ROOTS:
+        if (REPO_ROOT / source_dir).is_dir():
+            roots.update(
+                path.name for path in (REPO_ROOT / source_dir).iterdir()
+            )
+    return frozenset(roots)
 
 
 def _exceptions() -> set[str]:
@@ -62,11 +78,11 @@ def _missing_paths() -> set[str]:
     """``<doc>: <path>`` for every backticked repo path that is absent.
 
     A token counts as a path of this repository when its first segment
-    is a file or folder at the repository root, which leaves out the
+    is one of ``_first_party_roots``, which leaves out the
     sibling repositories' paths (``app/components/...``) that the docs
     also mention.
     """
-    top_level = _top_level_names()
+    roots = _first_party_roots()
     missing = set()
     for doc in _doc_files():
         rel_doc = doc.relative_to(REPO_ROOT).as_posix()
@@ -75,7 +91,7 @@ def _missing_paths() -> set[str]:
             if match is None:
                 continue
             path = match["path"]
-            if path.split("/")[0] not in top_level:
+            if path.split("/")[0] not in roots:
                 continue
             if (REPO_ROOT / path).exists():
                 continue
@@ -106,7 +122,7 @@ def _memory_note_citations() -> set[str]:
 
 def test_the_scan_reads_the_docs():
     assert len(_doc_files()) >= 20
-    assert "tests" in _top_level_names()
+    assert "tests" in _first_party_roots()
 
 
 def test_every_backticked_repo_path_exists():
@@ -131,3 +147,18 @@ def test_the_exception_list_only_shrinks():
         f"These entries of {EXCEPTIONS_FILE.name} no longer fail. Delete "
         "them:\n  " + "\n  ".join(stale)
     )
+
+
+def test_a_package_moved_under_a_source_root_is_still_checked(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "src" / "order").mkdir(parents=True)
+    (tmp_path / "src" / "order" / "services.py").touch()
+    (tmp_path / "CLAUDE.md").write_text(
+        "Old `order/services.py`, new `src/order/services.py`, "
+        "and the storefront's `app/pages/index.vue`.",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("tests.unit.test_doc_references.REPO_ROOT", tmp_path)
+
+    assert _missing_paths() == {"CLAUDE.md: order/services.py"}

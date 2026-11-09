@@ -5,14 +5,15 @@ the platform control-plane host (``platform.grooveshop.space``).
 
 Tenant admin + platform-staff endpoints run here (public schema only).
 Everything else is ``core.urls.public_shared_urlpatterns`` — the SHARED
-subset of the main URL surface: admin/auth/editor infra, OAuth AS
-discovery, health, schema, and shared reference/control-plane data
-(country/region, ``tenant-resolve``, ``tenant-memberships-mine``). It
-deliberately OMITS the merchant storefront/commerce API (product, order,
-cart, user, blog, loyalty, search, pay_way, shipping, notification,
-contact, tag, page_config, agent) — those live in ``core.urls`` and are
-served on tenant hosts only, so the control plane never exposes a store's
-data even behind the platform auth wall (defence in depth).
+subset of the main URL surface: admin/auth/editor infra, health,
+schema, and shared reference/control-plane data (country/region,
+``tenant-resolve``, ``tenant-memberships-mine``). It deliberately OMITS
+the merchant storefront/commerce API (product, order, cart, user, blog,
+loyalty, search, pay_way, shipping, notification, contact, tag,
+page_config, agent) and the OIDC provider — those live in ``core.urls``
+and are served on tenant hosts only, so the control plane never exposes
+a store's data even behind the platform auth wall (defence in depth). The
+staff issuer is served by the staff connect host (``agent.urls_connect``).
 
 NOTE: We import the shared list from ``core.urls`` and extend it instead
 of using ``include("core.urls")`` because that list contains

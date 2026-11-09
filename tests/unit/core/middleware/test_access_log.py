@@ -382,15 +382,13 @@ class TestPlacementInMiddleware:
         assert probe < cid < access
 
     def test_it_sits_above_tenant_resolution(self):
-        """``TenantMainMiddleware`` is stripped from the unit-test
+        """The tenant routing middleware is stripped from the unit-test
         settings, so read the declared order from the settings module
         itself rather than ``settings.MIDDLEWARE``."""
         import settings as project_settings
 
         order = project_settings.MIDDLEWARE
-        tenant = order.index(
-            "django_tenants.middleware.main.TenantMainMiddleware"
-        )
+        tenant = order.index("tenant.middleware.PlatformTenantMainMiddleware")
         access = order.index("core.middleware.access_log.AccessLogMiddleware")
 
         assert access < tenant

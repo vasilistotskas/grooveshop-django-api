@@ -140,6 +140,12 @@ jobs:
       - name: Type check (ty)
         run: uv run ty check
 
+      # The contracts are in pyproject.toml ([tool.importlinter]). Each
+      # lists the imports that broke it on the day it was written; a
+      # new one fails here.
+      - name: Import contracts (import-linter)
+        run: uv run lint-imports
+
       - name: Compile translations
         # The schema depends on the compiled catalogue: without the .mo
         # files drf-spectacular inlines the choice enums instead of

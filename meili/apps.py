@@ -24,6 +24,7 @@ class MeiliConfig(AppConfig):
         )
 
         from ._client import client as _client
+        from .batching import collect_if_active
         from .models import IndexMixin
 
         # No import guard: celery is a hard runtime dependency, so this
@@ -53,6 +54,10 @@ class MeiliConfig(AppConfig):
             )
             if use_async:
                 logger.debug("Indexing/removing document async")
+                if collect_if_active(
+                    model._meta.app_label, model._meta.model_name, [model.pk]
+                ):
+                    return
                 # index_document_task indexes qualifying instances and
                 # deletes ones that no longer match meili_filter().
                 dispatch_on_commit(

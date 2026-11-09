@@ -155,6 +155,7 @@ class IndexMixin(models.Model):
         pagination = getattr(meta, "pagination", None)
         supports_geo = getattr(meta, "supports_geo", False)
         search_cutoff_ms = getattr(meta, "search_cutoff_ms", None)
+        primary_key = getattr(meta, "primary_key", "pk")
 
         # Add geo fields if geo-search is enabled
         if supports_geo:
@@ -182,6 +183,7 @@ class IndexMixin(models.Model):
             faceting=faceting,
             pagination=pagination,
             search_cutoff_ms=search_cutoff_ms,
+            primary_key=primary_key,
         )
 
     @classmethod

@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.store_settings import store_setting
+from order.enum.stock_log_reason import StockLogReason
 from order.exceptions import (
     CartStockUnavailableError,
     InsufficientStockError,
@@ -837,6 +838,67 @@ class StockManager:
             ),
             performed_by_staff_id=staff_id(performed_by),
         )
+
+    @classmethod
+    @transaction.atomic
+    def set_stock(
+        cls,
+        product_id: int,
+        quantity: int,
+        *,
+        reason_code: StockLogReason,
+        reason: str = "",
+        performed_by=None,
+    ) -> bool:
+        """
+        Set a product's stock to an absolute ``quantity`` with one log row.
+
+        For a writer that knows the number it wants rather than a delta
+        (the catalogue import). The row is locked first, the new stock is
+        saved under a ``StockManager`` change reason so the stock-save
+        signal does not write its own ``MANUAL_ADJUSTMENT`` row, and
+        exactly one ``StockLog`` row records the move. A stock that
+        already equals ``quantity`` writes nothing: no save, no history,
+        no log, no reindex.
+
+        Returns whether the stock changed.
+
+        Raises:
+            ProductNotFoundError: If the product doesn't exist
+            ValueError: If ``quantity`` is negative
+        """
+        if quantity < 0:
+            raise ValueError("Quantity must not be negative")
+
+        try:
+            product = Product.objects.select_for_update().get(pk=product_id)
+        except Product.DoesNotExist:
+            raise ProductNotFoundError(product_id=product_id)
+
+        stock_before = product.stock
+        if stock_before == quantity:
+            return False
+
+        product.stock = quantity
+        product._change_reason = "StockManager: set_stock"
+        product.save(update_fields=["stock", "updated_at"])
+
+        delta = quantity - stock_before
+        StockLog.objects.create(
+            product=product,
+            operation_type=(
+                StockLog.OPERATION_INCREMENT
+                if delta > 0
+                else StockLog.OPERATION_DECREMENT
+            ),
+            quantity_delta=delta,
+            stock_before=stock_before,
+            stock_after=quantity,
+            reason_code=reason_code,
+            reason=reason,
+            performed_by_staff_id=staff_id(performed_by),
+        )
+        return True
 
     @classmethod
     def get_available_stock(

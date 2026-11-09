@@ -103,6 +103,21 @@ class Product(
     sku = models.CharField(
         _("SKU"), unique=True, max_length=100, default=uuid.uuid4
     )
+    # The id another system gives this product (a catalogue import's
+    # "woo:123"), for rows that have no SKU of ours. Empty is stored as
+    # NULL so that any number of products can have none while a given
+    # value stays unique. Not part of the API.
+    external_reference = models.CharField(
+        _("External reference"),
+        max_length=255,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=_(
+            "The product's id in another system, used to match it when a "
+            "catalogue file is imported. Leave empty if it has none."
+        ),
+    )
     # The manufacturer's identifiers, which Google Merchant Center asks
     # for. Never derived from ``sku``: that is the store's own code, and a
     # made-up identifier gets the whole feed disapproved.
@@ -393,6 +408,9 @@ class Product(
     def save(self, *args, **kwargs):
         if not self.sku:
             self.sku = self.generate_unique_sku()
+
+        # NULL, never "": a blank value would collide on the unique index.
+        self.external_reference = self.external_reference or None
 
         if not self.slug:
             config = SlugifyConfig(

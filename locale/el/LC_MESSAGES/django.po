@@ -4852,6 +4852,9 @@ msgstr "Εξαγωγή δεδομένων καταστήματος (πριν α�
 msgid "External ID"
 msgstr "Εξωτερικό ID"
 
+msgid "External reference"
+msgstr "Εξωτερική αναφορά"
+
 msgid "Facebook Profile"
 msgstr "Προφίλ Facebook"
 
@@ -13167,6 +13170,12 @@ msgstr "Πεδία ταξινόμησης"
 msgid "Source"
 msgstr "Πηγή"
 
+msgid "Source SHA-256"
+msgstr "SHA-256 πηγής"
+
+msgid "Source URL"
+msgstr "URL πηγής"
+
 msgid "Source log"
 msgstr "Εγγραφή προέλευσης"
 
@@ -13373,6 +13382,9 @@ msgstr "Καταχώρηση αποθέματος %(id)s - %(product)s: %(operat
 
 msgid "Stock reservation no longer valid"
 msgstr "Η δέσμευση αποθέματος δεν ισχύει πλέον"
+
+msgid "Stock set by a catalogue import"
+msgstr "Απόθεμα που ορίστηκε από εισαγωγή καταλόγου"
 
 msgid "Store"
 msgstr "Κατάστημα"
@@ -14417,6 +14429,9 @@ msgstr "Το προϊόν επιστράφηκε / δεν παραδόθηκε"
 
 msgid "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
 msgstr "Ο κωδικός SKU του προϊόντος όταν δημιουργήθηκε η γραμμή. Τα παραστατικά χρησιμοποιούν αυτόν, ποτέ τον τρέχοντα SKU του προϊόντος."
+
+msgid "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
+msgstr "Το αναγνωριστικό του προϊόντος σε άλλο σύστημα, που χρησιμοποιείται για την αντιστοίχισή του όταν εισάγεται αρχείο καταλόγου. Αφήστε το κενό αν δεν έχει."
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "Το όνομα του προϊόντος όταν δημιουργήθηκε η γραμμή, στη γλώσσα της παραγγελίας. Τα παραστατικά και τα email χρησιμοποιούν αυτό, ποτέ το τρέχον όνομα του προϊόντος."

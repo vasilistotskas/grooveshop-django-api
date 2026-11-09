@@ -222,13 +222,15 @@ def test_deleting_a_brand_reindexes_its_products_without_it(
 
     with (
         online(),
-        patch("meili.tasks.index_document_task.apply_async") as index,
+        patch("meili.tasks.index_documents_task.apply_async") as index,
         django_capture_on_commit_callbacks(execute=True),
     ):
         brand.delete()
 
     dispatched_pks = {
-        call.kwargs["kwargs"]["pk"] for call in index.call_args_list
+        pk
+        for call in index.call_args_list
+        for pk in call.kwargs["kwargs"]["pks"]
     }
     assert dispatched_pks == set(
         branded.translations.values_list("pk", flat=True)
@@ -285,13 +287,15 @@ def test_deleting_a_category_reindexes_the_products_of_its_children(
 
     with (
         online(),
-        patch("meili.tasks.index_document_task.apply_async") as index,
+        patch("meili.tasks.index_documents_task.apply_async") as index,
         django_capture_on_commit_callbacks(execute=True),
     ):
         parent.delete()
 
     dispatched_pks = {
-        call.kwargs["kwargs"]["pk"] for call in index.call_args_list
+        pk
+        for call in index.call_args_list
+        for pk in call.kwargs["kwargs"]["pks"]
     }
     assert dispatched_pks == set(
         ProductTranslation.objects.filter(

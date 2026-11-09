@@ -4847,6 +4847,9 @@ msgstr "Export store data (before destroying)"
 msgid "External ID"
 msgstr "External ID"
 
+msgid "External reference"
+msgstr "External reference"
+
 msgid "Facebook Profile"
 msgstr "Facebook Profile"
 
@@ -13160,6 +13163,12 @@ msgstr "Sortable Fields"
 msgid "Source"
 msgstr "Source"
 
+msgid "Source SHA-256"
+msgstr "Source SHA-256"
+
+msgid "Source URL"
+msgstr "Source URL"
+
 msgid "Source log"
 msgstr "Source log"
 
@@ -13366,6 +13375,9 @@ msgstr "Stock log %(id)s - %(product)s: %(operation)s (%(before)s → %(after)s)
 
 msgid "Stock reservation no longer valid"
 msgstr "Stock reservation no longer valid"
+
+msgid "Stock set by a catalogue import"
+msgstr "Stock set by a catalogue import"
 
 msgid "Store"
 msgstr "Store"
@@ -14414,6 +14426,9 @@ msgstr "The product was returned or not delivered"
 
 msgid "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
 msgstr "The product's SKU when the line was created. Invoices use it, never the product's current SKU."
+
+msgid "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
+msgstr "The product's id in another system, used to match it when a catalogue file is imported. Leave empty if it has none."
 
 msgid "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."
 msgstr "The product's name when the line was created, in the order's language. Invoices and emails use it, never the product's current name."

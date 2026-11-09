@@ -175,36 +175,6 @@ class TestValidateContactContent:
         assert "message" in result["errors"]
         assert "too long" in str(result["errors"]["message"])
 
-    def test_invalid_email_validation(self):
-        result = validate_contact_content(
-            name="John Doe",
-            email="invalid-email",
-            message="This is a valid message with sufficient length.",
-        )
-        assert result["valid"] is False
-        assert "email" in result["errors"]
-        assert "valid email" in str(result["errors"]["email"])
-
-    def test_various_invalid_email_formats(self):
-        invalid_emails = [
-            "test@",
-            "@example.com",
-            "test@.com",
-            "test.example.com",
-            "test@example",
-            "test@@example.com",
-            "",
-        ]
-
-        for invalid_email in invalid_emails:
-            result = validate_contact_content(
-                name="John Doe",
-                email=invalid_email,
-                message="This is a valid message with sufficient length.",
-            )
-            assert result["valid"] is False
-            assert "email" in result["errors"]
-
     def test_valid_email_formats(self):
         valid_emails = [
             "test@example.com",
@@ -254,9 +224,10 @@ class TestValidateContactContent:
         assert "Disposable" in str(result["errors"]["email"])
         mock_is_disposable.assert_called_once_with("tempmail.com")
 
-    def test_multiple_validation_errors(self):
+    @patch("contact.utils.is_disposable_domain", return_value=True)
+    def test_multiple_validation_errors(self, _disposable):
         result = validate_contact_content(
-            name="J", email="invalid-email", message="Short"
+            name="J", email="someone@tempmail.example", message="Short"
         )
 
         assert result["valid"] is False

@@ -745,6 +745,14 @@ class StoreAlerts(DashboardWidget):
             alerts += self._legal_identity()
         if self.is_superuser:
             alerts += self._mydata()
+        if self.request.user.has_perm("order.view_retailcredit"):
+            alerts += self._reversed_credits()
+            alerts += self._uncovered_refunds()
+            alerts += self._understated_receipts()
+        if self.request.user.has_perm("order.change_order"):
+            alerts += self._unknown_refunds()
+            alerts += self._unfinished_returns()
+            alerts += self._deferred_receipts()
         if self.request.user.has_perm("extra_settings.change_setting"):
             alerts += self._email_setup()
         return {"alerts": alerts}
@@ -902,6 +910,254 @@ class StoreAlerts(DashboardWidget):
                 )
             )
         return alerts
+
+    def _reversed_credits(self) -> list[dict[str, Any]]:
+        """Credit documents of refunds the payment provider later reported
+        failed. The document stands (it records what was sent to AADE), so
+        an accountant has to decide whether to cancel it; cancelling takes
+        the alert away."""
+        from order.credit_allocation import reversed_credits
+
+        documents = list(reversed_credits().select_related("order")[:5])
+        if not documents:
+            return []
+        return [
+            _alert(
+                "warning",
+                "currency_exchange",
+                _("A refunded credit document was reversed"),
+                _(
+                    "The payment provider reported these refunds failed after "
+                    "their credit documents were issued. The money did not "
+                    "go back to the customer: cancel the document if it was "
+                    "issued in error."
+                ),
+                items=[
+                    link_cell(
+                        self.change_url("order.RetailCredit", credit.pk),
+                        f"{credit.credit_number} (#{credit.order_id})",
+                    )
+                    for credit in documents
+                ],
+                link=(
+                    self.changelist_url("order.RetailCredit"),
+                    _("Open the credit documents"),
+                ),
+            )
+        ]
+
+    def _uncovered_refunds(self) -> list[dict[str, Any]]:
+        """Orders whose refunded money is more than their receipt could
+        credit: the part past the receipt has no credit document (a credit
+        for it would exceed the receipt, and AADE cannot check that), so an
+        accountant has to look at each. The order's history says how much."""
+        from django.db.models import Max
+
+        from order.credit_allocation import beyond_receipt_orders
+
+        order_ids = [
+            row["order_id"]
+            for row in beyond_receipt_orders()
+            .values("order_id")
+            .annotate(latest=Max("pk"))
+            .order_by("-latest")[:5]
+        ]
+        if not order_ids:
+            return []
+        return [
+            _alert(
+                "warning",
+                "receipt_long",
+                _("Refunded money beyond the receipt"),
+                _(
+                    "These orders were refunded more than their receipt "
+                    "holds. No credit document can be issued for the part "
+                    "past the receipt: check each order's history, then "
+                    "use Acknowledge receipt differences on the order to "
+                    "clear it."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in order_ids
+                ],
+                link=(
+                    self.changelist_url("order.Order", "books=beyond_receipt"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _understated_receipts(self) -> list[dict[str, Any]]:
+        """Receipts left short of goods the customer kept: a refund the
+        receipt was issued net of was reported failed by the provider
+        afterwards. There is no credit document to cancel; an accountant
+        has to correct the receipt."""
+        from django.db.models import Max
+
+        from order.credit_allocation import understated_orders
+
+        order_ids = [
+            row["order_id"]
+            for row in understated_orders()
+            .values("order_id")
+            .annotate(latest=Max("pk"))
+            .order_by("-latest")[:5]
+        ]
+        if not order_ids:
+            return []
+        return [
+            _alert(
+                "warning",
+                "receipt_long",
+                _("Receipts short of goods the customer kept"),
+                _(
+                    "A refund these receipts were issued net of was "
+                    "reported failed by the payment provider, so the "
+                    "customer kept the goods: check each order's history "
+                    "and have the receipt corrected, then use Acknowledge "
+                    "receipt differences on the order to clear it."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in order_ids
+                ],
+                link=(
+                    self.changelist_url("order.Order", "books=beyond_receipt"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _unfinished_returns(self) -> list[dict[str, Any]]:
+        """Gift card and points returns a crash left unfinished. Nothing
+        asks a provider about them and no outcome is recorded: repeating the
+        refund of the same amount finishes them. Until then each holds its
+        money, keeps the order's receipt waiting and refuses a new refund."""
+        from django.db.models import Min
+
+        from order.models.refund_attempt import RefundAttempt
+
+        # One entry per order, the one stalled longest first: grouped before
+        # the limit, or an order with several would fill the whole list.
+        orders = list(
+            RefundAttempt.objects.stalled()
+            .values("order_id")
+            .annotate(oldest=Min("created_at"))
+            .order_by("oldest", "order_id")
+            .values_list("order_id", flat=True)[:5]
+        )
+        if not orders:
+            return []
+        return [
+            _alert(
+                "danger",
+                "currency_exchange",
+                _("Gift card and points refunds left unfinished"),
+                _(
+                    "These refunds stopped before the value went back onto "
+                    "the customer's gift cards and points. They hold their "
+                    "money and block the order's receipt and any new refund "
+                    "until finished: refund the same amount again on the "
+                    "order."
+                ),
+                items=[
+                    link_cell(self.change_url("order.Order", pk), f"#{pk}")
+                    for pk in orders
+                ],
+                link=(
+                    self.changelist_url("order.Order"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _deferred_receipts(self) -> list[dict[str, Any]]:
+        """Receipts waiting for a refund claim to resolve
+        (``order.invoicing.ReceiptDeferred``). A receipt is due when the
+        goods are dispatched, so each order is listed with what it waits
+        for."""
+        from order.credit_allocation import describe_blockers
+        from order.models import Order
+
+        waiting = list(
+            Order.objects.filter(metadata__receipt_deferred=True).order_by(
+                "-pk"
+            )[:5]
+        )
+        if not waiting:
+            return []
+        return [
+            _alert(
+                "danger",
+                "receipt_long",
+                _("Receipts waiting for a refund"),
+                _(
+                    "These orders have shipped but their receipt is issued "
+                    "only once the refund it waits for is settled. Resolve "
+                    "that refund (Record refund outcome, or refund the same "
+                    "amount again) so the receipt can be issued."
+                ),
+                items=[
+                    link_cell(
+                        self.change_url("order.Order", order.pk),
+                        f"#{order.pk}: {describe_blockers(order)}",
+                    )
+                    for order in waiting
+                ],
+                link=(
+                    self.changelist_url("order.Order", "books=receipt_waiting"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
+
+    def _unknown_refunds(self) -> list[dict[str, Any]]:
+        """Refunds sent to the payment provider whose outcome is still
+        unknown after the automatic lookup. Each holds its money until
+        resolved, so the store is told: staff check the provider's
+        dashboard and record the outcome on the order. Recording it takes
+        the refund away."""
+        from order.models.refund_attempt import RefundAttempt
+
+        overdue = RefundAttempt.objects.overdue()
+        count = overdue.count()
+        if not count:
+            return []
+        orders = dict.fromkeys(
+            overdue.order_by("created_at").values_list("order_id", flat=True)[
+                :5
+            ]
+        )
+        return [
+            _alert(
+                "danger",
+                "currency_exchange",
+                _("Refunds with an unknown outcome"),
+                ngettext(
+                    "%(count)s refund was sent to the payment provider and "
+                    "its result is still unknown. It holds its money until "
+                    "it is resolved: check the provider's dashboard and use "
+                    "Record refund outcome on the order.",
+                    "%(count)s refunds were sent to the payment provider and "
+                    "their results are still unknown. They hold their money "
+                    "until resolved: check the provider's dashboard and use "
+                    "Record refund outcome on each order.",
+                    count,
+                )
+                % {"count": count},
+                items=[
+                    link_cell(
+                        self.change_url("order.Order", order_id),
+                        f"#{order_id}",
+                    )
+                    for order_id in orders
+                ],
+                link=(
+                    self.changelist_url("order.Order"),
+                    _("Open the orders"),
+                ),
+            )
+        ]
 
     def _mydata(self) -> list[dict[str, Any]]:
         from order.mydata.config import load_config

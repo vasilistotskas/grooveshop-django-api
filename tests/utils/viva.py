@@ -281,8 +281,11 @@ class FakeVivaApi:
         cancel: tuple[int, Any] = (200, CANCEL_SUCCESS),
         retrieve: tuple[int, Any] | None = None,
         transactions: dict[str, tuple[int, Any]] | None = None,
+        by_order_code: dict[str, tuple[int, Any]] | None = None,
     ):
         self.cancel = cancel
+        #: ``GET /api/transactions/?ordercode=`` answers, per order code.
+        self.by_order_code = by_order_code or {}
         self.retrieve = retrieve or (
             200,
             {**deepcopy(RETRIEVE_TRANSACTION), "amount": captured},
@@ -330,6 +333,11 @@ class FakeVivaApi:
             transaction_id = path.rsplit("/", 1)[-1]
             return _response(
                 request, *self.transactions.get(transaction_id, self.retrieve)
+            )
+        if request.method == "GET" and path == "/api/transactions/":
+            order_code = self.query(request)["ordercode"][0]
+            return _response(
+                request, *self.by_order_code.get(order_code, (200, {}))
             )
         if request.method == "DELETE" and path.startswith("/api/transactions/"):
             return _response(request, *self.cancel)

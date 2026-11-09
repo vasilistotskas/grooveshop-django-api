@@ -4,8 +4,8 @@
 Before this a refund was an amount, and its credit document spread it over
 the receipt's rates in proportion, so returning one 13% item of a 24%/13%
 order credited both rates. A refund by lines
-(``OrderService.refund_order(lines=..., include_shipping=...)``) keeps the
-lines on its refund attempts and the credit follows them. A bare amount is
+(``OrderService.refund_order(lines=..., include_shipping=...)``) stores the
+lines as its own credit allocation rows and the credit follows them. A bare amount is
 a goodwill refund and stays in proportion.
 
 Only the boundaries are faked: AADE (``FakeAade``), Stripe
@@ -15,6 +15,7 @@ Only the boundaries are faked: AADE (``FakeAade``), Stripe
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -28,7 +29,9 @@ from djmoney.money import Money
 
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
+from order import credit_allocation
 from order.admin import OrderAdmin, ReturnOrderForm
+from order.credit_allocation import Piece, split_over_shares
 from order.credit_documents import CreditExceedsReceiptError, credit_breakdown
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -37,20 +40,15 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.invoicing import generate_invoice
-from order.models import Invoice, Order, RetailCredit
+from order.models import CreditAllocation, Invoice, Order, RetailCredit
 from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
-    RefundAttemptLine,
     RefundAttemptStatus,
     RefundReason,
 )
 from order.payment_ledger import PaymentLedger
-from order.refund_lines import (
-    RefundPiece,
-    held_values,
-    split_over_attempts,
-)
+from order.refund_lines import held_values
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
 from order.taxation import ChargeKind
@@ -165,6 +163,12 @@ def _order(
 
 def _item(order, rate: str):
     return order.items.get(vat_rate=Decimal(rate))
+
+
+def _line_rows():
+    """The allocation rows of refunds by lines (a goodwill refund has none
+    for a line)."""
+    return CreditAllocation.objects.filter(item__isnull=False)
 
 
 def _receipt(order) -> Invoice:
@@ -396,7 +400,7 @@ class TestARetryUnderTheSameKey:
         [attempt] = order.refund_attempts.all()
         assert attempt.pk == pending.pk
         assert stripe_api.keys == [f"refund-{pending.idempotency_key}"]
-        assert attempt.lines.count() == 1
+        assert attempt.allocations.count() == 1
         [credit] = aade.credits
         assert _rates(credit) == {CAT_13: Decimal("40.00")}
 
@@ -548,7 +552,7 @@ class TestTheCumulativeCapPerRate:
 
         assert len(api.calls) == 2
         assert order.refund_attempts.count() == 2
-        assert not RefundAttemptLine.objects.exists()
+        assert not _line_rows().exists()
         assert len(aade.credits) == 2
 
     def test_pending_line_allocations_count_against_the_receipt(self):
@@ -568,16 +572,24 @@ class TestTheCumulativeCapPerRate:
         assert len(api.calls) == 1
         assert len(aade.credits) == 1
 
-    def test_before_the_receipt_exists_nothing_is_refused(self):
+    def test_before_the_receipt_the_order_lines_are_the_headroom(self):
         order = _order()
 
-        with FakeStripeRefunds():
+        with FakeStripeRefunds() as api:
+            # A goodwill 50.00 takes 30.00 of the 24% and 20.00 of the 13%.
             OrderService.refund_order(order, amount=_eur("50.00"))
-            result = OrderService.refund_order(
-                order, lines=[(_item(order, "13"), 1)]
-            )
+            # The 13% item (40.00) no longer fits what its rate holds, with
+            # no receipt either: the order's own VAT lines are the room.
+            with pytest.raises(PaymentError, match="holds only"):
+                OrderService.refund_order(
+                    order, lines=[(_item(order, "13"), 1)]
+                )
+            # The goodwill route the message names still works.
+            result = OrderService.refund_order(order, amount=_eur("40.00"))
 
         assert result.complete
+        assert len(api.calls) == 2
+        assert not _line_rows().exists()
 
     def test_credit_breakdown_refuses_a_rate_past_what_it_holds(self):
         receipt = [
@@ -681,7 +693,7 @@ class TestGiftCardsAndPointsFollowTheRefundedLines:
         with FakeStripeRefunds():
             OrderService.refund_order(order, lines=[(item, 2)])
 
-        rows = RefundAttemptLine.objects.filter(attempt__order=order)
+        rows = _line_rows().filter(order=order)
         assert sorted(row.amount.amount for row in rows) == [
             Decimal("40.00"),
             Decimal("60.00"),
@@ -689,24 +701,24 @@ class TestGiftCardsAndPointsFollowTheRefundedLines:
         assert {row.quantity for row in rows} == {2}
 
 
-class TestSplitOverAttempts:
+class TestSplitOverShares:
     def test_a_piece_is_cut_where_a_share_ends_and_both_parts_name_the_request(
         self,
     ):
-        piece = RefundPiece(
+        piece = Piece(
             kind=ChargeKind.GOODS,
             rate=Decimal("13.00"),
             amount=Decimal("30.00"),
             item_pk=1,
             quantity=3,
         )
-        ship = RefundPiece(
+        ship = Piece(
             kind=ChargeKind.SHIPPING,
             rate=Decimal("24.00"),
             amount=Decimal("5.00"),
         )
 
-        first, second = split_over_attempts(
+        first, second = split_over_shares(
             [piece, ship], [Decimal("20.00"), Decimal("15.00")]
         )
 
@@ -903,7 +915,7 @@ class TestTheReturnDialog:
             order_admin.refund_payment(request, object_id=order.pk)
 
         assert stripe_api.amounts == [1200]
-        assert not RefundAttemptLine.objects.exists()
+        assert not _line_rows().exists()
 
     def test_the_dialog_offers_only_units_still_to_refund(self, staff):
         order = _order(lines=(("13", "10.00", 3),))
@@ -1038,7 +1050,9 @@ class TestAValueIsHeldNotACountOfUnits:
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.REFUNDED
         # Nothing is held twice.
-        rows = RefundAttemptLine.objects.holding().filter(attempt__order=order)
+        rows = CreditAllocation.objects.counting().filter(
+            order=order, item__isnull=False
+        )
         assert sum(r.amount.amount for r in rows) == Decimal("100.00")
 
     def test_card_pending_and_gift_card_declined_retries_the_card_only(self):
@@ -1299,7 +1313,7 @@ class TestLinesWorthNothing:
         assert api.calls == []
         gift.refresh_from_db()
         assert gift.refunded_quantity == 1
-        assert not RefundAttemptLine.objects.exists()
+        assert not _line_rows().exists()
 
     def test_without_the_restock_there_is_nothing_to_do(
         self, order_admin, staff
@@ -1337,11 +1351,11 @@ class TestAStoredShareThatReturnedLess:
         with FakeStripeRefunds():
             OrderService.refund_order(order, lines=[(item, 1)])
         stored = order.refund_attempts.get(kind="STORED_VALUE")
-        assert stored.lines.get().amount == _eur("60.00")
+        assert stored.allocations.get().amount == _eur("60.00")
 
-        OrderService._scale_lines_to(stored, Decimal("50.00"))
+        credit_allocation.scale(Decimal("50.00"), refund_attempt=stored)
 
-        assert stored.lines.get().amount == _eur("50.00")
+        assert stored.allocations.get().amount == _eur("50.00")
         # The unreturned 10.00 is refundable again, not held.
         assert held_values(order).goods[item.pk] == Decimal("90.00")
 
@@ -1351,6 +1365,69 @@ class TestAStoredShareThatReturnedLess:
             OrderService.refund_order(order, lines=[(_item(order, "13"), 1)])
         stored = order.refund_attempts.get(kind="STORED_VALUE")
 
-        OrderService._scale_lines_to(stored, Decimal(0))
+        credit_allocation.scale(Decimal(0), refund_attempt=stored)
 
-        assert not stored.lines.exists()
+        assert not stored.allocations.filter(amount__gt=0).exists()
+
+
+class TestTheLinesWriteTheirOwnAllocation:
+    """What the rework to credit allocations (PR 530) fixed for lines: the
+    room is stored at the claim, so no later credit and no clock changes
+    what a refund holds."""
+
+    def test_a_declined_attempt_frees_its_units_and_a_pending_one_never_lets_go(
+        self,
+    ):
+        order = _order(lines=(("13", "20.00", 2),))
+        item = _item(order, "13")
+
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, lines=[(item, 2)])
+        [pending] = order.refund_attempts.all()
+        # Two hours later the claim still holds its lines: there is no timer.
+        RefundAttempt.objects.filter(pk=pending.pk).update(
+            created_at=pending.created_at - timedelta(hours=2)
+        )
+        with (
+            FakeStripeRefunds(),
+            pytest.raises(PaymentError, match="paid back"),
+        ):
+            OrderService.refund_order(order, lines=[(item, 1)])
+        assert held_values(order).goods == {item.pk: Decimal("40.00")}
+
+        # Declined, its units are on offer again at once.
+        RefundAttempt.objects.filter(pk=pending.pk).update(
+            status=RefundAttemptStatus.DECLINED
+        )
+        assert held_values(order).goods == {}
+        with FakeStripeRefunds():
+            result = OrderService.refund_order(order, lines=[(item, 2)])
+        assert result.complete
+
+    def test_lines_credit_only_their_own_rates_after_an_earlier_goodwill_refund(
+        self,
+    ):
+        order = _order(lines=(("24", "60.00", 1), ("13", "20.00", 2)))
+        item = _item(order, "13")
+
+        with mydata_enabled(), FakeAade() as aade, FakeStripeRefunds() as api:
+            _receipt(order)
+            # A goodwill 20.00 is claimed first and its answer is lost: it
+            # holds 12.00 of the 24% and 8.00 of the 13% on the receipt.
+            api.fail_with = stripe.APIConnectionError("x")
+            OrderService.refund_order(order, amount=_eur("20.00"))
+            api.fail_with = None
+            # The lines settle first, so their credit is issued first.
+            OrderService.refund_order(order, lines=[(item, 1)])
+            # The goodwill claim settles after; its credit is the split it
+            # was allocated, not what the lines left behind.
+            OrderService.refund_order(order, amount=_eur("20.00"))
+
+        goodwill, lines = sorted(aade.credits, key=lambda c: len(_rates(c)))[
+            ::-1
+        ]
+        assert _rates(lines) == {CAT_13: Decimal("20.00")}
+        assert _rates(goodwill) == {
+            CAT_24: Decimal("12.00"),
+            CAT_13: Decimal("8.00"),
+        }

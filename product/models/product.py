@@ -748,10 +748,8 @@ class ProductTranslation(
         prefetch its main image. Without this the enrichment loop runs ~4 DB
         queries per hit on the hottest public endpoint (G0336/G0351).
 
-        The category is prefetched, not joined, so every hit of one category
-        shares ONE category object: parler writes a translation it reads
-        from a prefetch to the cache once per object, and a join gave each
-        hit its own, one cache write per hit.
+        The category and its translations are prefetched: two queries for
+        the whole page of hits, however many hits share a category.
         """
         from django.db.models import Prefetch
 

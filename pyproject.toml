@@ -1,12 +1,12 @@
 [project]
-version = "3.234.2"
+version = "3.237.0"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
 ]
 description = "GrooveShop Django Backend"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 license = "LicenseRef-PolyForm-Strict-1.0.0"
 license-files = ["LICENSE.md"]
 classifiers = [
@@ -16,7 +16,7 @@ classifiers = [
 dependencies = [
   "channels==4.3.2",
   "channels-redis==4.3.0",
-  "django==6.0.9",
+  "django==6.1.3",
   "django-allauth[idp-oidc]==65.21.1",
   "django-extra-settings==0.15.0",
   "django-celery-results==2.6.0",
@@ -115,9 +115,9 @@ branch = true
 parallel = true
 # ``sysmon`` uses sys.monitoring (PEP 669) instead of the C tracer —
 # drastically lower measurement overhead. Branch coverage under sysmon
-# requires Python 3.14+; on older interpreters coverage falls back with
-# a warning. Validated 2026-08-25 on coverage 7.14.0 / Python 3.14.7:
-# identical totals to ctrace, branch arcs recorded.
+# needs Python 3.14 or later, which requires-python guarantees.
+# Validated 2026-08-25 on coverage 7.14.0 / Python 3.14.7: identical
+# totals to ctrace, branch arcs recorded.
 core = "sysmon"
 concurrency = ["multiprocessing", "thread"]
 omit = [
@@ -274,13 +274,17 @@ markers = [
 ]
 
 # ─────────────────────────────────────────────────────────
-# uv configuration — transitive-dependency overrides for
-# CVEs found by Trivy. Both packages are indirect deps but
-# their fixed versions are drop-in compatible.
+# uv configuration — version floors for transitive dependencies
+# with CVEs found by Trivy. Constraints, not overrides: a
+# constraint only narrows the versions of a package something
+# already requires, and keeps that requirement's environment
+# marker. An override replaces the requirement, marker and all,
+# which installed the PyPy-only brotlicffi on CPython (built from
+# source in every image) until 2026-11-08.
 # ─────────────────────────────────────────────────────────
 [tool.uv]
 required-version = ">=0.13.7"
-override-dependencies = [
+constraint-dependencies = [
     # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
@@ -296,8 +300,8 @@ override-dependencies = [
     # GHSA-9v8h-qqgm-4m35 (CRITICAL) — out-of-bounds write in the Brotli
     # decoder ("Node2Shell"); fixed in 1.2.1. Transitive via
     # weasyprint[woff] > fonttools[woff], which decodes WOFF2 fonts while
-    # rendering invoice PDFs. brotlicffi is its non-CPython twin (never
-    # installed here, but locked, and scanned).
+    # rendering invoice PDFs. brotlicffi is its non-CPython twin (not
+    # installed on CPython, but locked, and scanned).
     "brotli>=1.2.1",
     "brotlicffi>=1.2.1.0",
 ]
@@ -312,7 +316,7 @@ django_settings_module = "settings"
 # Ruff configuration
 # ─────────────────────────────────────────────────────────
 [tool.ruff]
-target-version = "py314"
+target-version = "py315"
 line-length = 80
 exclude = ["**/migrations/**"]
 
@@ -441,7 +445,7 @@ max-positional-args = 6
 # ty type checker configuration
 # ─────────────────────────────────────────────────────────
 [tool.ty.environment]
-python-version = "3.14"
+python-version = "3.15"
 
 [tool.ty.rules]
 # Django ORM metaclass: reverse relations, FK _id accessors,

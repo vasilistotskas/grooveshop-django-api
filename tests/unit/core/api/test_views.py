@@ -126,6 +126,9 @@ class PaginationModelViewSetTestCase(TestCase):
         request = self.factory.get("/api/test/?pagination=false")
         django_request = Request(request)
         mock_queryset = Mock()
+        # Only an action the view opts in returns the whole list.
+        self.viewset.action = "list"
+        self.viewset.unpaginated_actions = frozenset({"list"})
 
         result = self.viewset.paginate_and_serialize(
             mock_queryset, django_request
@@ -133,6 +136,33 @@ class PaginationModelViewSetTestCase(TestCase):
 
         self.assertEqual(result.status_code, status.HTTP_200_OK)
         self.assertEqual(result.data, [{"id": 1}, {"id": 2}])
+
+    @patch.object(PaginationModelViewSet, "get_paginated_response")
+    @patch.object(PaginationModelViewSet, "paginate_queryset")
+    @patch.object(PaginationModelViewSet, "get_serializer_class")
+    @patch.object(PaginationModelViewSet, "get_serializer_context")
+    def test_pagination_false_is_ignored_where_the_view_has_not_opted_in(
+        self,
+        mock_get_context,
+        mock_get_serializer_class,
+        mock_paginate_queryset,
+        mock_get_paginated_response,
+    ):
+        mock_serializer_class = Mock()
+        mock_serializer_class.return_value.data = [{"id": 1}]
+        mock_get_serializer_class.return_value = mock_serializer_class
+        mock_get_context.return_value = {}
+        mock_paginate_queryset.return_value = ["one row"]
+        mock_get_paginated_response.return_value = "the paginated envelope"
+        django_request = Request(
+            self.factory.get("/api/test/?pagination=false")
+        )
+        self.viewset.action = "list"
+
+        result = self.viewset.paginate_and_serialize(Mock(), django_request)
+
+        assert result == "the paginated envelope"
+        mock_paginate_queryset.assert_called_once()
 
 
 class BaseModelViewSetTestCase(TestCase):

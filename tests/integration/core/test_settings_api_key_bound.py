@@ -30,7 +30,7 @@ pytestmark = pytest.mark.django_db
 # Names that exist in `settings.py` and must never be reachable.
 FORBIDDEN = [
     "SECRET_KEY",
-    "EMAIL_HOST_PASSWORD",
+    "MAILERS",
     "RESEND_API_KEY",
     "DATABASES",
     "REDIS_URL",

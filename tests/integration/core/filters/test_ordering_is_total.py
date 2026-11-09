@@ -2,7 +2,7 @@
 
 Rows equal on every requested key came back in plan order, which can
 differ between two pages of one listing. ``CamelCaseOrderingFilter``
-now ends every ordering with the primary key.
+ends every ordering that is not already total with the primary key.
 """
 
 from __future__ import annotations
@@ -11,9 +11,12 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from rest_framework.test import APIClient
+from rest_framework.request import Request
+from rest_framework.test import APIClient, APIRequestFactory
 
+from core.filters.camel_case_ordering import CamelCaseOrderingFilter
 from product.factories.product import ProductFactory
+from product.models.product import Product
 
 pytestmark = pytest.mark.django_db
 
@@ -55,3 +58,51 @@ def test_the_order_ends_with_the_primary_key():
         .strip()
         .endswith('"product_product"."id" ASC')
     )
+
+
+@pytest.mark.parametrize(
+    ("ordering", "expected"),
+    [
+        # A unique, non-null key is already total: no tiebreak is added.
+        (["sku"], ("sku",)),
+        (["-sku"], ("-sku",)),
+        (["view_count"], ("view_count", "pk")),
+        (["-view_count", "id"], ("-view_count", "id")),
+    ],
+)
+def test_the_primary_key_is_added_only_when_the_order_is_not_total(
+    monkeypatch, ordering, expected
+):
+    monkeypatch.setattr(
+        CamelCaseOrderingFilter,
+        "get_ordering",
+        lambda self, request, queryset, view: ordering,
+    )
+    request = Request(APIRequestFactory().get("/"))
+
+    queryset = CamelCaseOrderingFilter().filter_queryset(
+        request, Product.objects.all(), view=None
+    )
+
+    assert queryset.query.order_by == expected
+
+
+def test_a_translated_key_still_gets_the_primary_key(monkeypatch):
+    """A ``translations__`` key orders by an expression (the value in the
+    request's language), which ``totally_ordered`` cannot count as
+    unique, so the primary key still ends the order."""
+    monkeypatch.setattr(
+        CamelCaseOrderingFilter,
+        "get_ordering",
+        lambda self, request, queryset, view: ["translations__name"],
+    )
+    request = Request(APIRequestFactory().get("/"))
+
+    queryset = CamelCaseOrderingFilter().filter_queryset(
+        request, Product.objects.all(), view=None
+    )
+
+    *keys, last = queryset.query.order_by
+    assert len(keys) == 1
+    assert not isinstance(keys[0], str)
+    assert last == "pk"

@@ -55,6 +55,8 @@ from admin.displays import (
 from admin.features import RETAIL_DOCUMENTS, Gate
 from admin.filters import AcquisitionSourceFilter, RelatedDropdownFilter
 from admin.mixins import FeatureInline, IsSuperuserOnlyModelAdmin
+from core.forms.choices import BLANK_CHOICE_LABEL
+from order import credit_allocation, refund_reconciliation
 from order.attribution import source_label
 from order.chargebacks import (
     ChargebackDecisionError,
@@ -87,7 +89,7 @@ from order.models.item import RESTOCK_REASON_MAX_LENGTH, OrderItem
 from order.models.legal_acceptance import OrderLegalAcceptance
 from order.models.order import Order
 from order.models.payment_transaction import PaymentTransaction
-from order.models.refund_attempt import RefundReason
+from order.models.refund_attempt import RefundAttempt, RefundReason
 from order.models.retail_credit import CreditCounter, RetailCredit
 from order.models.stock_log import StockLog
 from order.models.viva_webhook_event import VivaWebhookEvent
@@ -256,6 +258,32 @@ class OverchargedFilter(DropdownFilter):
     def queryset(self, request, queryset):
         if self.value() == "yes":
             return queryset.overcharged()
+        return queryset
+
+
+class BooksFilter(DropdownFilter):
+    """Orders whose refund books need a person: a receipt waiting for a
+    refund to be settled (``metadata["receipt_deferred"]``), or refunded
+    money past what the receipt could credit
+    (``CreditAllocation.uncovered``). The store dashboard alerts link
+    here."""
+
+    title = _("Refund books")
+    parameter_name = "books"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("receipt_waiting", _("Receipt waiting for a refund")),
+            ("beyond_receipt", _("Beyond or short of the receipt")),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "receipt_waiting":
+            return queryset.filter(metadata__receipt_deferred=True)
+        if self.value() == "beyond_receipt":
+            return queryset.filter(
+                pk__in=credit_allocation.uncovered_orders().values("order_id")
+            )
         return queryset
 
 
@@ -687,6 +715,68 @@ class ReturnOrderForm(BaseDialogForm):
         return cleaned
 
 
+class RecordRefundOutcomeForm(BaseDialogForm):
+    """The "Record refund outcome" dialog of an order.
+
+    Offers the order's provider refunds still PENDING past the point where
+    the automatic lookup is due (``RefundAttempt.objects.overdue()``): the
+    provider was asked about them and could not decide, so staff look at the
+    provider's dashboard and say what became of each. The service
+    (``order.refund_reconciliation.record_outcome``) checks it all again
+    under the order lock.
+    """
+
+    OUTCOME_SETTLED = "settled"
+    OUTCOME_FAILED = "failed"
+
+    attempt = forms.ModelChoiceField(
+        label=_("Refund"),
+        queryset=RefundAttempt.objects.none(),
+        widget=UnfoldAdminSelectWidget,
+    )
+    outcome = forms.ChoiceField(
+        label=_("What happened"),
+        choices=[
+            (OUTCOME_SETTLED, _("The refund was made")),
+            (OUTCOME_FAILED, _("The refund was not made")),
+        ],
+        widget=UnfoldAdminSelectWidget,
+    )
+    reference = forms.CharField(
+        label=_("Reference"),
+        max_length=REPAYMENT_REFERENCE_MAX_LENGTH,
+        required=False,
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_(
+            "The payment provider's id of the refund, or for cash paid back "
+            "by you the bank transfer id. Required when the refund was made."
+        ),
+    )
+
+    def __init__(self, request, object_id=None, *args, **kwargs):
+        super().__init__(request, object_id, *args, **kwargs)
+        self.fields["attempt"].queryset = (
+            RefundAttempt.objects.overdue()
+            .filter(order_id=object_id)
+            .order_by("created_at", "id")
+        )
+        self.fields["attempt"].label_from_instance = lambda attempt: (
+            f"{money(attempt.amount.amount)} "
+            f"({attempt.created_at:%Y-%m-%d %H:%M})"
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("outcome") == self.OUTCOME_SETTLED and not cleaned.get(
+            "reference"
+        ):
+            self.add_error(
+                "reference",
+                _("Enter the reference of the refund that was made."),
+            )
+        return cleaned
+
+
 class ConfirmPaymentForm(BaseDialogForm):
     """The "Confirm payment received" dialog of a bank-transfer order."""
 
@@ -792,7 +882,7 @@ class ChargebackDecisionForm(BaseDialogForm):
     outcome = forms.ChoiceField(
         label=_("What became of the goods?"),
         choices=[
-            ("", "---------"),
+            ("", BLANK_CHOICE_LABEL),
             (OUTCOME_RETURNED, _("The product was returned or not delivered")),
             (OUTCOME_KEPT, _("The customer kept the product")),
         ],
@@ -1207,6 +1297,7 @@ class OrderAdmin(BaseModelAdmin):
         WholesaleOrderFilter,
         RefundOwedFilter,
         OverchargedFilter,
+        BooksFilter,
         ChargebackDecisionFilter,
         FollowUpFilter,
         RecentOrdersFilter,
@@ -1462,6 +1553,8 @@ class OrderAdmin(BaseModelAdmin):
     actions_detail = [
         "confirm_offline_payment",
         "refund_payment",
+        "record_refund_outcome",
+        "acknowledge_uncovered",
         "restock_returned",
         "decide_chargeback",
         "download_shipping_voucher",
@@ -2299,6 +2392,106 @@ class OrderAdmin(BaseModelAdmin):
         return order is not None and PaymentLedger.refund_open(order)
 
     @action(
+        description=_("Record refund outcome"),
+        icon="fact_check",
+        permissions=["change", "record_refund_outcome"],
+        dialog=ActionDialog(
+            title=_("Record refund outcome"),
+            description=_(
+                "A refund was sent to the payment provider and its result "
+                "is still not known after the automatic lookup. Check the "
+                "provider's dashboard and record whether it was made. It "
+                "holds its money until you do."
+            ),
+            form_class=RecordRefundOutcomeForm,
+        ),
+    )
+    def record_refund_outcome(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        attempt = form.cleaned_data["attempt"]
+        settled = (
+            form.cleaned_data["outcome"]
+            == RecordRefundOutcomeForm.OUTCOME_SETTLED
+        )
+        try:
+            refund_reconciliation.record_outcome(
+                attempt,
+                user=request.user,
+                settled=settled,
+                reference=form.cleaned_data["reference"],
+            )
+        except PaymentError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.log_change(
+                request,
+                attempt.order,
+                f"Recorded the refund of {attempt.amount} as "
+                f"{'made' if settled else 'not made'}",
+            )
+            self.message_user(
+                request,
+                _("The refund outcome is recorded."),
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:order_order_change", args=[object_id]
+                ),
+            }
+        )
+
+    def has_record_refund_outcome_permission(self, request, object_id=None):
+        """Offered where a provider refund is overdue: the automatic lookup
+        had its turn and could not decide."""
+        return (
+            object_id is not None
+            and RefundAttempt.objects.overdue()
+            .filter(order_id=object_id)
+            .exists()
+        )
+
+    @action(
+        description=_("Acknowledge receipt differences"),
+        icon="task_alt",
+        permissions=["change", "acknowledge_uncovered"],
+    )
+    def acknowledge_uncovered(self, request, object_id):
+        """Clear the dashboard alerts for money refunded past the receipt
+        and for a receipt short of goods the customer kept: staff looked at
+        the order's history and settled it with the accountant. Recorded in
+        the order's history with who did it."""
+        order = Order.objects.get(pk=object_id)
+        with transaction.atomic():
+            Order.objects.select_for_update().get(pk=order.pk)
+            credit_allocation.acknowledge_uncovered(order, user=request.user)
+        self.log_change(
+            request,
+            order,
+            "Acknowledged the money beyond, or goods short of, the receipt",
+        )
+        messages.success(
+            request,
+            _(
+                "The money beyond the receipt and the goods short of it "
+                "are acknowledged."
+            ),
+        )
+        return self._redirect_to_order_change(object_id)
+
+    def has_acknowledge_uncovered_permission(self, request, object_id=None):
+        """Offered while the order has refunded money past its receipt,
+        or a receipt short of goods, that nobody acknowledged."""
+        return (
+            object_id is not None
+            and credit_allocation.uncovered_orders()
+            .filter(order_id=object_id)
+            .exists()
+        )
+
+    @action(
         description=_("Settle chargeback (goods)"),
         icon="gavel",
         permissions=["change", "decide_chargeback"],
@@ -2610,6 +2803,32 @@ class OrderAdmin(BaseModelAdmin):
                 },
             )
             return self._redirect_to_order_change(object_id)
+
+        if not Invoice.objects.filter(order=order).exists():
+            # The receipt would wait for a refund claim still PENDING
+            # (``ReceiptDeferred``): say so now, and leave it to the
+            # periodic task, rather than "Scheduled" for nothing.
+            with transaction.atomic():
+                locked = Order.objects.select_for_update().get(pk=order.pk)
+                credit_allocation.allocate_order(locked)
+                waiting = credit_allocation.undecided(locked)
+            if waiting:
+                from order.tasks import _set_receipt_deferred
+
+                _set_receipt_deferred(order.id, True)
+                messages.warning(
+                    request,
+                    _(
+                        "The receipt of order #%(order_id)s is deferred: it "
+                        "waits for %(blockers)s to be settled, and is "
+                        "issued by itself once it is."
+                    )
+                    % {
+                        "order_id": order.id,
+                        "blockers": credit_allocation.describe_blockers(order),
+                    },
+                )
+                return self._redirect_to_order_change(object_id)
 
         generate_order_invoice.delay(order.id)
         messages.success(
@@ -2996,7 +3215,6 @@ class OrderItemAdmin(BaseModelAdmin):
                     "price",
                     "vat_rate",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -3007,7 +3225,6 @@ class OrderItemAdmin(BaseModelAdmin):
                     "refunded_quantity",
                     "original_quantity",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

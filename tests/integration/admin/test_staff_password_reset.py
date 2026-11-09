@@ -204,7 +204,9 @@ class TestRateLimits:
     def test_a_cache_that_cannot_count_closes_the_form(self):
         user = _staff()
 
-        with patch("admin.password_reset.cache.incr", side_effect=OSError):
+        with patch(
+            "admin.password_reset.cache.count_in_window", side_effect=OSError
+        ):
             response = _ask(user.email)
 
         assert response.status_code == 429

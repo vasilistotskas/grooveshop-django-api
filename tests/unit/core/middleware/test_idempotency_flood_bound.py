@@ -19,7 +19,7 @@ from __future__ import annotations
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
 from django.http import JsonResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 
 from core.middleware.idempotency import (
     IDEMPOTENCY_HEADER,
@@ -29,15 +29,7 @@ from core.middleware.idempotency import (
 )
 from tests.utils.idempotency import enter
 
-_LOCMEM = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "idempotency-flood-test",
-    }
-}
 
-
-@override_settings(CACHES=_LOCMEM)
 class IdempotencyFloodBoundTest(TestCase):
     def setUp(self):
         caches["default"].clear()

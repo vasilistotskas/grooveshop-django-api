@@ -32,7 +32,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
 from admin.forms import PlatformAdminAuthenticationForm
-from admin.mixins import AdminFooterMixin, AdminSiteLoginNextMixin
+from admin.mixins import AdminFooterMixin
 from admin.password_reset import StaffPasswordResetMixin
 from admin.search import CommandSearchMixin
 
@@ -101,7 +101,6 @@ class PlatformAdminSite(
     StaffPasswordResetMixin,
     CommandSearchMixin,
     AdminFooterMixin,
-    AdminSiteLoginNextMixin,
     UnfoldAdminSite,
 ):
     """Control-plane admin, served only on the PUBLIC schema."""

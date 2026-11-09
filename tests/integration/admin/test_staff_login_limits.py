@@ -229,6 +229,18 @@ class TestAddressLimit:
             _admin_login(_staff().email, PASSWORD, ip="10.6.6.6")
         )
 
+    def test_successful_sign_ins_never_spend_the_address_budget(self):
+        """An office's staff signing in from one address are not guesses."""
+        team = [_staff() for _ in range(PER_IP + 2)]
+        for member in team:
+            assert _admin_signed_in(
+                _admin_login(member.email, PASSWORD, ip="10.4.4.4")
+            )
+
+        assert _admin_signed_in(
+            _admin_login(team[0].email, PASSWORD, ip="10.4.4.4")
+        )
+
     def test_an_ipv6_allocation_is_counted_as_its_64(self):
         user = _staff()
         for _attempt in range(PAIR):
@@ -362,7 +374,7 @@ class TestCacheDown:
         from redis.exceptions import ConnectionError as RedisConnectionError
 
         with patch(
-            "tenant.staff_login_limits.cache.incr",
+            "tenant.staff_login_limits.cache.count_in_window",
             side_effect=RedisConnectionError("down"),
         ):
             yield
@@ -410,16 +422,18 @@ class TestCacheDown:
         user = _staff(is_superuser=True)
         with schema_context("public"):
             TOTP.activate(user, generate_totp_secret())
-        real_incr = __import__(
+        real_count = __import__(
             "django.core.cache", fromlist=["cache"]
-        ).cache.incr
+        ).cache.count_in_window
 
-        def incr(key, *args, **kwargs):
+        def count(key, *args, **kwargs):
             if "staff_mfa" in key:
                 raise RedisConnectionError("down")
-            return real_incr(key, *args, **kwargs)
+            return real_count(key, *args, **kwargs)
 
-        with patch("tenant.staff_login_limits.cache.incr", side_effect=incr):
+        with patch(
+            "tenant.staff_login_limits.cache.count_in_window", side_effect=count
+        ):
             response = APIClient(**_edge("10.0.0.1")).post(
                 TOKEN_LOGIN,
                 {"email": user.email, "password": PASSWORD, "code": "123456"},

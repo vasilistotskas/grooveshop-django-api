@@ -225,9 +225,7 @@ def _webhook_get_rate_limit(request) -> bool:
     ip = client_ip_or_peer(request)
     key = "viva_wh_get:" + hashlib.sha256(ip.encode()).hexdigest()[:24]
     try:
-        cache.add(key, 0, 3600)
-        count = cache.incr(key)
-        return count > 10
+        return cache.count_in_window(key, 3600) > 10
     except Exception:
         logger.warning("viva_webhook GET rate-limit: cache error, failing open")
         return False
@@ -1714,7 +1712,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
 def _handle_reversal_created(order, event_data, transaction_id):
     """Book a refund Viva made against one of this order's payments.
 
-    Mirrors ``handle_stripe_charge_refunded``: the refund becomes a
+    Mirrors ``handle_stripe_refund_made``: the refund becomes a
     ``PaymentTransaction`` row, ``PaymentLedger.record_refund`` derives
     ``payment_status`` from the ledger's sums, and ``order_refunded`` fires
     so the refund email, live WS toast, and Meta CAPI Refund event all run.

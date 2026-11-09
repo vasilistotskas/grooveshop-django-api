@@ -487,7 +487,9 @@ def _returns(
     ]
     totals: dict[date | None, tuple[Decimal, Decimal]] = {}
     # One round trip for all four: they share one shape.
-    for moment, net, gross in sources[0].union(*sources[1:], all=True):
+    for moment, net, gross in (
+        sources[0].union(*sources[1:], all=True).order_by()
+    ):
         period = None if moment is None else local_date(moment)
         was_net, was_gross = totals.get(period, (_ZERO, _ZERO))
         totals[period] = (

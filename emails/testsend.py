@@ -38,8 +38,9 @@ def _spend(user: Any) -> None:
     """One test send of the hour's allowance. Counts the attempt, not the
     outcome, so a failing send cannot be retried in a loop."""
     key = THROTTLE_KEY.format(staff=user.pk)
-    cache.add(key, 0, THROTTLE_SECONDS)
-    if cache.incr(key) > settings.EMAIL_TEST_SENDS_PER_HOUR:
+    if cache.count_in_window(key, THROTTLE_SECONDS) > (
+        settings.EMAIL_TEST_SENDS_PER_HOUR
+    ):
         raise Throttled
 
 

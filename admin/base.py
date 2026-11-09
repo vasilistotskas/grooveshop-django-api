@@ -195,6 +195,21 @@ class BaseModelAdmin(
             queryset = queryset.prefetch_related(*lookups)
         return queryset
 
+    def serves_changelist(self, request) -> bool:
+        """Whether *request* is this model's changelist.
+
+        ``get_queryset`` also loads the object the change form edits and
+        saves, so a column subset (``.only()``) chosen for the list
+        belongs behind this check: an edited instance with deferred
+        columns loads each one with its own query as ``save()`` and its
+        signals read it.
+        """
+        match = getattr(request, "resolver_match", None)
+        opts = self.model._meta
+        return match is not None and match.url_name == (
+            f"{opts.app_label}_{opts.model_name}_changelist"
+        )
+
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True

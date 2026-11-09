@@ -69,15 +69,6 @@ PAGINATION_TYPE_PARAMETER = OpenApiParameter(
     default="pageNumber",
 )
 
-PAGINATION_PARAMETER = OpenApiParameter(
-    name="pagination",
-    description=_("Enable or disable pagination"),
-    required=False,
-    type=str,
-    enum=["true", "false"],
-    default="true",
-)
-
 PAGE_SIZE_PARAMETER = OpenApiParameter(
     name="page_size",
     description=_("Number of results to return per page"),
@@ -297,6 +288,11 @@ class Metadata(SimpleMetadata):
 
 
 class PaginationModelViewSet(ModelViewSet):
+    #: The actions that honour ``?pagination=false`` with the whole list.
+    #: Only for a short list a client needs in full; document the parameter
+    #: on that operation with ``PAGINATION_PARAMETER``.
+    unpaginated_actions: frozenset[str] = frozenset()
+
     @property
     def paginator(self):
         if not hasattr(self, "_paginator"):
@@ -334,7 +330,15 @@ class PaginationModelViewSet(ModelViewSet):
         ):
             serializer_class = self.get_response_serializer()
 
-        if pagination_param == "false":
+        # The whole queryset in one response only where a view opts in for
+        # this action (a short, bounded list a client needs in full).
+        # Everywhere else the parameter is ignored: it bypassed the
+        # paginator's max page size on every list, the public product list
+        # included.
+        if (
+            pagination_param == "false"
+            and getattr(self, "action", None) in self.unpaginated_actions
+        ):
             serializer = serializer_class(
                 queryset, many=many, context=self.get_serializer_context()
             )
@@ -426,7 +430,6 @@ class RouterActionOverridesMixin:
         parameters=[
             LANGUAGE_PARAMETER,
             PAGINATION_TYPE_PARAMETER,
-            PAGINATION_PARAMETER,
             PAGE_SIZE_PARAMETER,
             CURSOR_PARAMETER,
         ]

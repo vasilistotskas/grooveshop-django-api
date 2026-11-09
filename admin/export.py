@@ -54,6 +54,28 @@ class ExportActionMixin:
             and field.name not in excluded
         ]
 
+    def _export_queryset(self, queryset: QuerySet, fields: list) -> QuerySet:
+        """The rows an export writes, read in a fixed number of queries.
+
+        A changelist may load only the columns it lists (``.only()``), and
+        an export writes every field, the related rows behind its foreign
+        keys and every language's translation. Read per row, that was one
+        query per deferred column, per foreign key and per language.
+        """
+        relations = [f for f in fields if f.many_to_one and f.concrete]
+        lookups = [
+            f"{f.name}__translations"
+            for f in relations
+            if issubclass(f.related_model, TranslatableModel)
+        ]
+        if issubclass(self.model, TranslatableModel):
+            lookups.append("translations")
+        return (
+            queryset.defer(None)
+            .select_related(*(f.name for f in relations))
+            .prefetch_related(*lookups)
+        )
+
     @action(description=_("Export selected to CSV"), permissions=["view"])
     def export_csv(self, request: HttpRequest, queryset: QuerySet):
         MAX_EXPORT_ROWS = 10_000
@@ -74,6 +96,7 @@ class ExportActionMixin:
         writer = csv.writer(response)
 
         base_fields = self._get_exportable_fields(opts)
+        queryset = self._export_queryset(queryset, base_fields)
         header = [str(field.verbose_name) for field in base_fields]
 
         translated_field_names = []
@@ -256,6 +279,7 @@ class ExportActionMixin:
             root_tag_name = model_verbose_name_str + "s"
 
             base_fields = self._get_exportable_fields(opts)
+            queryset = self._export_queryset(queryset, base_fields)
 
             translated_field_names = []
             is_translatable = (

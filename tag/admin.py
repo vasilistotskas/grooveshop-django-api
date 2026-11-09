@@ -137,9 +137,9 @@ class TagAdmin(BaseTranslatableAdmin):
     fieldsets = (
         (
             _("Tag Information"),
-            {"fields": ("label", "active"), "classes": ("wide",)},
+            {"fields": ("label", "active")},
         ),
-        (_("Organization"), {"fields": ("sort_order",), "classes": ("wide",)}),
+        (_("Organization"), {"fields": ("sort_order",)}),
         (
             _("System Information"),
             {
@@ -236,7 +236,6 @@ class TaggedItemAdmin(BaseModelAdmin):
                     "object_id",
                     "content_object",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

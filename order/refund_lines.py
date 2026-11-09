@@ -9,58 +9,41 @@ cumulatively (the value of the first *k* units is the line's value x k / n,
 to the cent, the last unit taking what is left), so refunding a line in
 several steps adds up to exactly the line and never a cent more.
 
-**What a line has had back is measured in VALUE, never in units.** A line
-split over two refund shares (two charges, or a card and a gift card) can
-have one share paid and the other not; the value its holding shares carry
-(settled, or pending and not abandoned) against its discounted gross is
-what is left, and the units still on offer are the ones that value has not
-covered. Shipping is measured the same way, per VAT rate.
+**What a line has had back is measured in VALUE, never in units**, and is
+read from the credit allocations the lines' own claims stored
+(``order.credit_allocation``: rows with an ``item``, or of kind shipping).
+A source that holds room holds its lines too: a claim still PENDING (however
+old), a settled one; a declined one frees them (``CreditAllocation.counting``,
+no timer). A line split over two refund shares (two charges, or a card and a
+gift card) can have one share paid and the other not; the value its rows
+carry against its discounted gross is what is left, and the units still on
+offer are the ones that value has not covered. Shipping is measured the same
+way, per VAT rate.
 
 Shipping is split over the rates the way the receipt splits it
 (``order.taxation.order_vat_lines``: value apportionment, largest
 remainder), one piece per rate.
 
-:func:`plan_pieces` returns the *pieces* (one per goods line or per
-shipping rate); :func:`split_over_attempts` lays them over the shares a
-refund is paid in (the provider's charges first, then gift cards and
-points), cutting a piece where a share ends.
+:func:`plan_pieces` returns the *pieces* (``credit_allocation.Piece``: one
+per goods line or per shipping rate); ``OrderService`` lays them over the
+shares a refund is paid in and stores them as the shares' allocation.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.utils.translation import gettext_lazy as _
 
+from order.credit_allocation import Piece
 from order.discounts import CENT, discounted_line_gross
 from order.exceptions import PaymentError
-from order.models import Order, OrderItem
-from order.models.refund_attempt import (
-    RefundAttempt,
-    RefundAttemptLine,
-    RefundAttemptStatus,
-)
+from order.models import CreditAllocation, Order, OrderItem
+from order.models.refund_attempt import RefundAttempt, RefundAttemptStatus
 from order.taxation import ChargeKind, order_vat_lines
-
-
-@dataclass(frozen=True)
-class RefundPiece:
-    """A part of a refund that belongs to one VAT rate.
-
-    ``quantity`` is the units the refund asked for on the line; a piece cut
-    over two shares carries it on each part. It identifies the request (a
-    retry compares it) and is never summed: what a line has had back is
-    its value.
-    """
-
-    kind: ChargeKind
-    rate: Decimal
-    amount: Decimal
-    item_pk: int | None = None
-    quantity: int = 0
 
 
 @dataclass(frozen=True)
@@ -77,11 +60,12 @@ class HeldValues:
 
 
 def held_values(order: Order) -> HeldValues:
-    """The value each line, and the shipping, has had back from refund
-    shares that hold their money (settled, or pending and not abandoned)."""
+    """The value each line, and the shipping, has had back from the sources
+    that hold their room (``CreditAllocation.counting``): settled or still
+    PENDING, never declined. A goodwill refund (no line) is in neither."""
     goods: dict[int, Decimal] = defaultdict(Decimal)
     shipping: dict[Decimal, Decimal] = defaultdict(Decimal)
-    for row in RefundAttemptLine.objects.holding().filter(attempt__order=order):
+    for row in CreditAllocation.objects.counting().filter(order=order):
         if row.kind == ChargeKind.SHIPPING:
             shipping[row.rate] += Decimal(row.amount.amount)
         elif row.item_id is not None:
@@ -119,7 +103,7 @@ def plan_pieces(
     include_shipping: bool,
     lock: bool = False,
     allow_empty: bool = False,
-) -> list[RefundPiece]:
+) -> list[Piece]:
     """The pieces of a refund of ``requested`` (order line pk to units) and,
     when asked, the shipping that has not been refunded yet.
 
@@ -145,7 +129,7 @@ def plan_pieces(
     except ValueError as exc:
         raise PaymentError(str(exc)) from exc
 
-    pieces: list[RefundPiece] = []
+    pieces: list[Piece] = []
     for pk in sorted(requested):
         units = requested[pk]
         item = by_pk.get(pk)
@@ -171,7 +155,7 @@ def plan_pieces(
         value = _units_value(gross[pk], item.quantity, done + units) - paid
         if value > 0:
             pieces.append(
-                RefundPiece(
+                Piece(
                     kind=ChargeKind.GOODS,
                     rate=Decimal(item.vat_rate),
                     amount=value,
@@ -198,7 +182,7 @@ def plan_pieces(
                 _("The shipping of this order was already refunded.")
             )
         pieces.extend(
-            RefundPiece(kind=ChargeKind.SHIPPING, rate=rate, amount=amount)
+            Piece(kind=ChargeKind.SHIPPING, rate=rate, amount=amount)
             for rate, amount in left
         )
 
@@ -212,47 +196,6 @@ def plan_pieces(
     return pieces
 
 
-def split_over_attempts(
-    pieces: Sequence[RefundPiece], shares: Sequence[Decimal]
-) -> list[list[RefundPiece]]:
-    """Lay ``pieces`` over ``shares`` in order. The two must total the same.
-
-    A piece cut by the end of a share becomes two parts of the same line
-    and rate, each carrying the piece's ``quantity`` (the request) and its
-    own value."""
-    remaining = list(pieces)
-    out: list[list[RefundPiece]] = []
-    for share in shares:
-        take: list[RefundPiece] = []
-        left = share
-        while left > 0 and remaining:
-            piece = remaining[0]
-            if piece.amount <= left:
-                take.append(piece)
-                left -= piece.amount
-                remaining.pop(0)
-                continue
-            take.append(
-                RefundPiece(
-                    kind=piece.kind,
-                    rate=piece.rate,
-                    amount=left,
-                    item_pk=piece.item_pk,
-                    quantity=piece.quantity,
-                )
-            )
-            remaining[0] = RefundPiece(
-                kind=piece.kind,
-                rate=piece.rate,
-                amount=piece.amount - left,
-                item_pk=piece.item_pk,
-                quantity=piece.quantity,
-            )
-            left = Decimal(0)
-        out.append(take)
-    return out
-
-
 @dataclass(frozen=True)
 class LineRequest:
     """What a refund by lines asked for: units per order line pk and
@@ -262,7 +205,7 @@ class LineRequest:
     include_shipping: bool
 
 
-def request_of(rows: Iterable[RefundAttemptLine]) -> LineRequest:
+def request_of(rows: Iterable[CreditAllocation]) -> LineRequest:
     """The request the rows of one refund (all its shares) were made for."""
     units: dict[int, int] = {}
     shipping = False
@@ -308,7 +251,7 @@ def pending_request(order: Order) -> PendingRequest | None:
     for request_id, shares in request_groups(order).items():
         if request_id not in live_ids:
             continue
-        rows = RefundAttemptLine.objects.filter(attempt__in=shares)
+        rows = CreditAllocation.objects.filter(refund_attempt__in=shares)
         best = PendingRequest(
             request_id=request_id,
             request=request_of(rows),

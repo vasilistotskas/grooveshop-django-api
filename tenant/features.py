@@ -109,6 +109,7 @@ STORE_PREFERENCES: dict[str, str] = {
     "recently_viewed": "RECENTLY_VIEWED_ENABLED",
     "product_assurances": "PRODUCT_ASSURANCES_ENABLED",
     "demo_account": "DEMO_ACCOUNT_ENABLED",
+    "external_links_new_tab": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
 }
 
 

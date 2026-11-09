@@ -2486,6 +2486,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Open every link to another site in a new tab, in the rich "
+            "text of posts, pages and products. Links to the store's own "
+            "pages keep what the editor chose. A store UI preference, "
+            "served in TenantConfig.preferences."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,

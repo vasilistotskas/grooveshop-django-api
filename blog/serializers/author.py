@@ -5,7 +5,11 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from blog.models.author import BlogAuthor
+from blog.models.author import (
+    PROFILE_URL_MAX_LENGTH,
+    PROFILE_URL_VALIDATOR,
+    BlogAuthor,
+)
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from user.serializers.account import UserPublicSerializer
@@ -23,6 +27,17 @@ class BlogAuthorSerializer(
     user = PrimaryKeyRelatedField(read_only=True)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogAuthor)
     website = serializers.SerializerMethodField()
+    # Read-only here so the schema states it on every author read: the
+    # list is always there, empty when the author has none.
+    same_as = serializers.ListField(
+        child=serializers.URLField(max_length=PROFILE_URL_MAX_LENGTH),
+        read_only=True,
+        help_text=_(
+            "Links to the author's public profiles on other sites, such as"
+            " LinkedIn, X or Instagram. Search engines use them to tell"
+            " who wrote the article."
+        ),
+    )
 
     @extend_schema_field(
         {
@@ -43,6 +58,7 @@ class BlogAuthorSerializer(
             "uuid",
             "user",
             "website",
+            "same_as",
             "created_at",
             "updated_at",
             "number_of_posts",
@@ -122,6 +138,16 @@ class BlogAuthorWriteSerializer(
     # owns each author profile. (Mass-assignment is not a risk here because
     # only admins reach the write path.)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogAuthor)
+    # Declared, not generated: DRF maps the array's items to its own
+    # URLField, which accepts ``ftp:`` and leaves the model's scheme
+    # validator behind.
+    same_as = serializers.ListField(
+        child=serializers.URLField(
+            max_length=PROFILE_URL_MAX_LENGTH,
+            validators=[PROFILE_URL_VALIDATOR],
+        ),
+        required=False,
+    )
 
     class Meta:
         model = BlogAuthor
@@ -129,6 +155,7 @@ class BlogAuthorWriteSerializer(
             "translations",
             "user",
             "website",
+            "same_as",
         )
 
     def validate_website(self, value: str) -> str:

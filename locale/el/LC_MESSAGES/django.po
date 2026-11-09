@@ -7956,6 +7956,9 @@ msgstr "URL εταιρικής σελίδας LinkedIn. Πρέπει να χρη
 msgid "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
 msgstr "Συνδέει αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ. το ίδιο είδος σε άλλα χρώματα). Τα μέλη μοιράζονται επιλογείς παραλλαγής στο κατάστημα."
 
+msgid "Links to the author's public profiles on other sites, such as LinkedIn, X or Instagram. Search engines use them to tell who wrote the article."
+msgstr "Σύνδεσμοι προς τα δημόσια προφίλ του συντάκτη σε άλλους ιστότοπους, όπως LinkedIn, X ή Instagram. Οι μηχανές αναζήτησης τους χρησιμοποιούν για να αναγνωρίσουν ποιος έγραψε το άρθρο."
+
 #, python-format
 msgid "List %(name)s"
 msgstr "Λίστα %(name)s"
@@ -11201,6 +11204,9 @@ msgstr "Το webhook Stripe ρυθμίστηκε"
 
 msgid "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
 msgstr "Δημόσιο email επικοινωνίας που εμφανίζεται στο footer και στη σελίδα επικοινωνίας του storefront, και τα εισερχόμενα για τις υποβολές της φόρμας επικοινωνίας. Κενό σημαίνει ότι το κατάστημα δεν έχει διεύθυνση επικοινωνίας: οι υποβολές δεν παραδίδονται και τα εξερχόμενα μηνύματα δεν έχουν Reply-To."
+
+msgid "Public profiles"
+msgstr "Δημόσια προφίλ"
 
 msgid "Publish"
 msgstr "Δημοσίευση"

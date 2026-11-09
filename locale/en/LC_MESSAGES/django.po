@@ -7948,6 +7948,9 @@ msgstr "LinkedIn company page URL. Must use https://. Empty → link hidden in s
 msgid "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
 msgstr "Links this product to its sibling variations (e.g. the same item in other colours). Members share variant selectors on the storefront."
 
+msgid "Links to the author's public profiles on other sites, such as LinkedIn, X or Instagram. Search engines use them to tell who wrote the article."
+msgstr "Links to the author's public profiles on other sites, such as LinkedIn, X or Instagram. Search engines use them to tell who wrote the article."
+
 #, python-format
 msgid "List %(name)s"
 msgstr "List %(name)s"
@@ -11194,6 +11197,9 @@ msgstr "Provisioned Stripe webhook"
 
 msgid "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
 msgstr "Public contact email shown in storefront footer and contact page, and the inbox for contact-form submissions. Empty means the store has no contact address: submissions are not delivered and outbound mail carries no Reply-To."
+
+msgid "Public profiles"
+msgstr "Public profiles"
 
 msgid "Publish"
 msgstr "Publish"

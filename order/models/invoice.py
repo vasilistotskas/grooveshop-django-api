@@ -33,6 +33,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
+from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from tenant.storage import (
     TenantPrivateFileSystemStorage,
@@ -216,7 +217,7 @@ class MyDataRegistration(models.Model):
             "provider channels (kept for forward compatibility)."
         ),
     )
-    mydata_qr_url = models.URLField(
+    mydata_qr_url = WebURLField(
         _("myDATA QR URL"),
         max_length=500,
         blank=True,

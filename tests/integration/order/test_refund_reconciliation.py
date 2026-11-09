@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 import stripe
@@ -61,6 +62,13 @@ def _age(order, hours=2):
     )
 
 
+def _looked_up(order):
+    """The automatic lookup asked the provider and could not decide."""
+    RefundAttempt.objects.filter(order=order).update(
+        looked_up_at=timezone.now()
+    )
+
+
 def _only_attempt(order) -> RefundAttempt:
     return order.refund_attempts.get()
 
@@ -83,13 +91,21 @@ def _viva_unknown(order, amount="40.00"):
     assert result.declined["outcome_unknown"] is True
 
 
-def _viva_row(refund_id, amount, *, status="F", type_id=7, parent=VIVA_PAYMENT):
+def _viva_type(type_id: int, name: str) -> dict:
+    """``TransactionType`` as ``GET /api/transactions/?ordercode=`` nests
+    it (seen on a demo refund, 2026-11-08): there is no top-level
+    ``TransactionTypeId`` on these rows."""
+    return {"Name": name, "TransactionTypeId": type_id}
+
+
+def _viva_row(refund_id, amount, *, status="F", type_id=4, parent=VIVA_PAYMENT):
     return {
         "TransactionId": refund_id,
         "ParentId": parent,
         "Amount": -amount,
+        "OriginalAmount": -amount,
         "StatusId": status,
-        "TransactionTypeId": type_id,
+        "TransactionType": _viva_type(type_id, "CardRefund"),
     }
 
 
@@ -98,8 +114,9 @@ def _viva_listing(*rows):
         "TransactionId": VIVA_PAYMENT,
         "ParentId": None,
         "Amount": 100.0,
-        "StatusId": "F",
-        "TransactionTypeId": 5,
+        "OriginalAmount": 100.0,
+        "StatusId": "R",
+        "TransactionType": _viva_type(5, "CardCharge"),
     }
     return {str(ORDER_CODE): (200, {"Transactions": [charge, *rows]})}
 
@@ -191,7 +208,10 @@ class TestStripeLookup:
             counts = reconcile_pending_refunds()
 
         assert counts == {"settled": 0, "declined": 0, "unresolved": 1}
-        assert _only_attempt(order).status == RefundAttemptStatus.PENDING
+        attempt = _only_attempt(order)
+        assert attempt.status == RefundAttemptStatus.PENDING
+        # Staff are told from now on, not before the lookup had its turn.
+        assert attempt.looked_up_at is not None
         assert PaymentLedger.refundable(order) == Decimal("60.00")
 
     def test_a_provider_error_stays_pending(self):
@@ -215,6 +235,7 @@ class TestStripeLookup:
 
         assert counts == {"settled": 0, "declined": 0, "unresolved": 0}
         assert stripe_api.list_calls == []
+        assert _only_attempt(order).looked_up_at is None
 
     def test_a_refund_booked_for_another_attempt_settles_without_booking_twice(
         self,
@@ -378,6 +399,7 @@ class TestRecordRefundOutcomeAction:
         with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
             OrderService.refund_order(order, amount=_eur("40.00"))
         _age(order)
+        _looked_up(order)
         return order, _only_attempt(order)
 
     def _overdue_order_stripe_made(self):
@@ -385,6 +407,7 @@ class TestRecordRefundOutcomeAction:
         order = _order()
         stripe_api = _stripe_unknown(order)
         _age(order)
+        _looked_up(order)
         return order, _only_attempt(order), stripe_api
 
     def test_it_is_a_detail_action(self, order_admin):
@@ -552,6 +575,7 @@ class TestRecordRefundOutcomeAction:
         order = _viva_order()
         _viva_unknown(order)
         _age(order)
+        _looked_up(order)
         attempt = _only_attempt(order)
         request = _post(
             staff_user,
@@ -576,6 +600,7 @@ class TestRecordRefundOutcomeAction:
         order = _viva_order()
         _viva_unknown(order)
         _age(order)
+        _looked_up(order)
         attempt = _only_attempt(order)
         PaymentTransactionFactory(
             order=order,
@@ -622,8 +647,72 @@ class TestRecordRefundOutcomeAction:
             )
         attempt.refresh_from_db()
         assert attempt.status == RefundAttemptStatus.PENDING
-        with pytest.raises(PaymentError, match="not overdue yet"):
+        with pytest.raises(PaymentError, match="not been asked"):
             record_outcome(attempt, user=staff_user, settled=False)
+
+    def test_a_lookup_that_fails_still_hands_it_to_staff(self, order_admin):
+        """A lookup that raises (a credential that no longer decrypts, a
+        bug) decided nothing: staff are told, as for an empty answer."""
+        order = _order()
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, amount=_eur("40.00"))
+        _age(order, hours=1.5)
+
+        with mock.patch(
+            "order.refund_reconciliation._found",
+            side_effect=RuntimeError("cannot read the credential"),
+        ):
+            counts = reconcile_pending_refunds()
+
+        assert counts["unresolved"] == 1
+        assert _only_attempt(order).looked_up_at is not None
+        assert order_admin.has_record_refund_outcome_permission(
+            RequestFactory().get("/"), object_id=order.pk
+        )
+
+    def test_a_lookup_that_never_runs_hands_it_over_in_the_end(
+        self, order_admin
+    ):
+        """With the lookup switched off nothing is ever stamped: once an
+        attempt is overdue for a second window, staff are told anyway."""
+        order = _order()
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, amount=_eur("40.00"))
+
+        _age(order, hours=1.5)
+        assert not order_admin.has_record_refund_outcome_permission(
+            RequestFactory().get("/"), object_id=order.pk
+        )
+        _age(order, hours=3)
+        assert order_admin.has_record_refund_outcome_permission(
+            RequestFactory().get("/"), object_id=order.pk
+        )
+
+    def test_it_waits_for_the_lookup_once_overdue(
+        self, order_admin, staff_user
+    ):
+        """Overdue is when the lookup is due, not when it ran: until it
+        asked the provider and could not decide, the provider may still
+        answer, so staff are not asked."""
+        order = _order()
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, amount=_eur("40.00"))
+        # Overdue, but not yet for a second window.
+        _age(order, hours=1.5)
+        attempt = _only_attempt(order)
+
+        assert not order_admin.has_record_refund_outcome_permission(
+            RequestFactory().get("/"), object_id=order.pk
+        )
+        with pytest.raises(PaymentError, match="not been asked"):
+            record_outcome(attempt, user=staff_user, settled=False)
+
+        with FakeStripeRefunds():
+            reconcile_pending_refunds()
+
+        assert order_admin.has_record_refund_outcome_permission(
+            RequestFactory().get("/"), object_id=order.pk
+        )
 
     def test_it_is_offered_where_a_refund_is_overdue(self, order_admin):
         order, _attempt = self._overdue_order()
@@ -665,6 +754,7 @@ class TestRecordRefundOutcomeAction:
             order=order, charge=collection, amount=_eur("20.00")
         )
         _age(order)
+        _looked_up(order)
 
         order_admin.record_refund_outcome(
             _post(
@@ -695,7 +785,12 @@ class TestTheDashboardAlert:
         _stripe_unknown(order)
         assert "Refunds with an unknown outcome" not in self._titles()
 
-        _age(order)
+        _age(order, hours=1.5)
+        # Overdue, but the lookup has not asked the provider yet.
+        assert "Refunds with an unknown outcome" not in self._titles()
+
+        with FakeStripeRefunds():
+            reconcile_pending_refunds()
 
         assert "Refunds with an unknown outcome" in self._titles()
 
@@ -703,6 +798,7 @@ class TestTheDashboardAlert:
         order = _order()
         _stripe_unknown(order)
         _age(order)
+        _looked_up(order)
         RefundAttempt.objects.filter(order=order).update(
             status=RefundAttemptStatus.DECLINED
         )

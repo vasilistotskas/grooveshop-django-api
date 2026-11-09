@@ -3,6 +3,40 @@
 
 
 
+## v3.237.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(order): find Viva refunds in the lookup and ask staff only after it failed (#541)
+
+Viva refund lookup reads the nested TransactionType; the unknown-refund alert and Record refund outcome wait for the lookup (looked_up_at, awaiting_staff) and never lose an attempt; a stalled gift card and points share stays finishable from the order; the resume dialog asks for no cash reference; reservation-time texts name the setting; OrderItemFactory.is_refunded defaults False; the internal agent order endpoint declares its header and 404. ([`74b6688`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74b6688de7799029493abb8e7b0682e216c57029))
+
+## v3.237.1 (2026-11-08)
+
+### Bug fixes
+
+* fix(core): report a broker failure as celery false on the health check (#540)
+
+/api/v1/health answered 500 whenever the broker failed, instead of
+the per-service booleans it documents. It caught only CeleryError
+around celery_app.control.ping, and a broker failure is not one:
+- with the broker down, kombu raises its own OperationalError
+  (measured: after 8.8 s with our broker settings);
+- after a broker restart, the first ping on the pooled connection
+  raised ConnectionResetError (seen on the local stack after a
+  RabbitMQ upgrade).
+
+The check now also catches kombu's OperationalError and the broker
+connection's own connection_errors and channel_errors (the amqp
+transport's ConnectionError and ChannelError, and OSError), so a down,
+reset, timed-out or login-refused broker reads celery: false. A
+programming error still raises.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`772dbe4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/772dbe4569b341dc70a2aae9d0b7dcc50c561d97))
+
 ## v3.237.0 (2026-11-08)
 
 ### Features

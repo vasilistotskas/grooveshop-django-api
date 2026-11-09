@@ -3920,19 +3920,15 @@ class OrderService:
             )
 
     @staticmethod
-    def _attempts_to_resume(
-        order: Order, amount: Money | None
-    ) -> list[RefundAttempt]:
-        """The live attempts a bare-amount request is a repeat of: the one
-        for the same amount, or all of them when together they are the
-        amount, or, for a refund of everything, all of them once they hold
-        everything that was left. Cash shares are never resumed: their
-        reference is their own idempotency key. Shares of a refund by lines
-        are never matched by amount (``request_id`` is set on them)."""
-        pending = list(
+    def _resumable(order: Order):
+        """The live attempts of *order* a repeated request may resume, oldest
+        first. Cash shares are never resumed: their reference is their own
+        idempotency key, and the shares of a refund by lines (``request_id``
+        is set) are never matched by amount: only a named retry resumes
+        them."""
+        return (
             RefundAttempt.objects.live()
             .select_related("charge")
-            .select_for_update(of=("self",))
             .filter(order=order, request_id__isnull=True)
             .exclude(
                 charge__kind__in=(
@@ -3942,6 +3938,48 @@ class OrderService:
             )
             .order_by("created_at", "id")
         )
+
+    @classmethod
+    def resumes_a_refund(
+        cls,
+        order: Order,
+        amount: Money | None,
+        *,
+        retry_request_id: UUID | None = None,
+    ) -> bool:
+        """Whether a refund would resume live attempts rather than make a
+        new refund (read without the lock, and answering as the locked path
+        does): the retry of a named request by lines resumes its live shares
+        (:meth:`_pending_request_shares`), a bare *amount* matches the
+        attempts of :meth:`_attempts_to_resume`. The refund dialog asks
+        nothing a resume does not need, such as how cash was paid back."""
+        if retry_request_id is not None:
+            return (
+                RefundAttempt.objects.live()
+                .filter(order=order, request_id=retry_request_id)
+                .exists()
+            )
+        return bool(
+            cls._match_resumable(order, list(cls._resumable(order)), amount)
+        )
+
+    @classmethod
+    def _attempts_to_resume(
+        cls, order: Order, amount: Money | None
+    ) -> list[RefundAttempt]:
+        """The live attempts a request is a repeat of: the one for the same
+        amount, or all of them when together they are the amount, or, for a
+        refund of everything, all of them once they hold everything that was
+        left."""
+        pending = list(cls._resumable(order).select_for_update(of=("self",)))
+        return cls._match_resumable(order, pending, amount)
+
+    @staticmethod
+    def _match_resumable(
+        order: Order, pending: list[RefundAttempt], amount: Money | None
+    ) -> list[RefundAttempt]:
+        """Which of *pending* a request for *amount* repeats (see
+        :meth:`_attempts_to_resume`)."""
         if not pending:
             return []
         if amount is None:
@@ -4004,9 +4042,9 @@ class OrderService:
                         "A refund of this amount was sent to the "
                         "payment provider a while ago and its result is "
                         "still not known. It is looked up automatically; "
-                        "if it stays unknown, record its outcome from "
-                        "the order's refund attempts before trying "
-                        "again."
+                        "if it stays unknown, record its outcome with "
+                        "Record refund outcome on the order before "
+                        "trying again."
                     )
                 )
 

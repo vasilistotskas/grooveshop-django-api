@@ -1512,3 +1512,20 @@ class TestTheLinesWriteTheirOwnAllocation:
                 pytest.raises(PaymentError, match="holds only"),
             ):
                 OrderService.refund_order(order, amount=_eur("10.00"))
+
+    def test_the_dialog_reads_a_lines_retry_as_the_locked_path_does(self):
+        order = _order()
+        item = _item(order, "13")
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, lines=[(item, 1)])
+        [pending] = order.refund_attempts.all()
+
+        # The named retry resumes the lines refund; a bare amount of the
+        # same value never does (its shares carry a request id).
+        assert OrderService.resumes_a_refund(
+            order, None, retry_request_id=pending.request_id
+        )
+        assert not OrderService.resumes_a_refund(order, _eur("40.00"))
+        assert not OrderService.resumes_a_refund(
+            order, None, retry_request_id=uuid.uuid4()
+        )

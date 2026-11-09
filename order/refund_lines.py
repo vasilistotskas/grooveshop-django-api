@@ -35,6 +35,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
+from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
 
@@ -225,16 +226,16 @@ def request_of(rows: Iterable[CreditAllocation]) -> LineRequest:
 class PendingRequest:
     """A refund by lines whose provider call has an unknown outcome."""
 
-    request_id: object
+    request_id: UUID
     request: LineRequest
     amount: Decimal
     shares: tuple[RefundAttempt, ...]
 
 
-def request_groups(order: Order) -> dict[object, list[RefundAttempt]]:
+def request_groups(order: Order) -> dict[UUID, list[RefundAttempt]]:
     """Every refund-by-lines request of the order (all statuses), by its
     ``request_id``, shares oldest first."""
-    groups: dict[object, list[RefundAttempt]] = defaultdict(list)
+    groups: dict[UUID, list[RefundAttempt]] = defaultdict(list)
     for attempt in RefundAttempt.objects.filter(
         order=order, request_id__isnull=False
     ).order_by("created_at", "id"):

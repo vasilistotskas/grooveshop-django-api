@@ -868,8 +868,8 @@ msgstr "Μια επιστροφή %(amount)s στάλθηκε στον πάρο�
 msgid "A refund of this amount was already sent to the payment provider and its result is not known yet. It is recorded when the provider confirms it; check the provider's dashboard before trying again."
 msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
 
-msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome from the order's refund attempts before trying again."
-msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της από τις προσπάθειες επιστροφής της παραγγελίας πριν ξαναδοκιμάσετε."
+msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome with Record refund outcome on the order before trying again."
+msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της με την «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία πριν ξαναδοκιμάσετε."
 
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
@@ -898,6 +898,10 @@ msgstr "Η απόδειξη λιανικής εκδίδεται για παρα�
 
 msgid "A retry repeats exactly what was asked: give no lines, shipping or amount with it."
 msgstr "Η επανάληψη επαναλαμβάνει ακριβώς ό,τι ζητήθηκε: μη δώσετε γραμμές, μεταφορικά ή ποσό μαζί της."
+
+#, python-format
+msgid "A return of %(amount)s onto gift cards and loyalty points stopped before it finished. Refunding this amount finishes it; nothing is given back twice."
+msgstr "Μια επιστροφή %(amount)s σε δωροκάρτες και πόντους επιβράβευσης σταμάτησε πριν ολοκληρωθεί. Η επιστροφή αυτού του ποσού την ολοκληρώνει· τίποτα δεν επιστρέφεται δύο φορές."
 
 msgid "A review is waiting for approval"
 msgstr "Μια κριτική περιμένει έγκριση"
@@ -8120,6 +8124,9 @@ msgstr "Γεωγραφικό μήκος (συμβολοσειρά όπως επ�
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Αναζήτηση παραγγελίας από τις παραμέτρους ανακατεύθυνσης μετά την πληρωμή του Viva Wallet"
 
+msgid "Looked up at"
+msgstr "Αναζητήθηκε στις"
+
 msgid "Looking forward to seeing you again!"
 msgstr "Ανυπομονούμε να σας ξαναδούμε!"
 
@@ -11954,8 +11961,8 @@ msgstr "Κατάσταση δέσμευσης"
 msgid "Reserve"
 msgstr "Δέσμευση"
 
-msgid "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations with 15-minute TTL. Returns list of reservation IDs to be used during order creation."
-msgstr "Δέσμευση αποθέματος για όλα τα είδη του καλαθιού κατά την ολοκλήρωση αγοράς. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος με διάρκεια ζωής 15 λεπτών. Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά τη δημιουργία της παραγγελίας."
+msgid "Reserve stock for all items in the cart during checkout. Creates temporary stock reservations that last the store's reservation time. Returns list of reservation IDs to be used during order creation."
+msgstr "Δέσμευση αποθέματος για όλα τα είδη του καλαθιού κατά την ολοκλήρωση αγοράς. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος που διαρκούν όσο ο χρόνος δέσμευσης του καταστήματος. Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά τη δημιουργία της παραγγελίας."
 
 msgid "Reserve stock for cart items"
 msgstr "Δέσμευση αποθέματος για αντικείμενα καλαθιού"
@@ -14453,6 +14460,9 @@ msgstr "Η αντικαταβολή δεν έχει εισπραχθεί ακό�
 msgid "The payment provider cannot be reached to check this reference."
 msgstr "Ο πάροχος πληρωμών δεν είναι προσβάσιμος για να ελεγχθεί αυτός ο κωδικός."
 
+msgid "The payment provider has not been asked about this refund yet: it is looked up automatically first."
+msgstr "Ο πάροχος πληρωμών δεν έχει ερωτηθεί ακόμη γι' αυτή την επιστροφή: πρώτα αναζητείται αυτόματα."
+
 msgid "The payment provider holds no refund with this reference for this payment and amount, or could not be read. Check the reference in the provider's dashboard."
 msgstr "Ο πάροχος πληρωμών δεν έχει επιστροφή με αυτόν τον κωδικό για αυτήν την πληρωμή και αυτό το ποσό, ή δεν μπόρεσε να διαβαστεί. Ελέγξτε τον κωδικό στον πίνακα ελέγχου του παρόχου."
 
@@ -15022,9 +15032,6 @@ msgstr "Αυτή η απόδειξη αποδεικνύει την αγορά σ
 msgid "This refund has already been resolved."
 msgstr "Αυτή η επιστροφή έχει ήδη επιλυθεί."
 
-msgid "This refund is not overdue yet: the payment provider is asked about it automatically first."
-msgstr "Αυτή η επιστροφή δεν έχει καθυστερήσει ακόμη: ο πάροχος πληρωμών ερωτάται πρώτα αυτόματα γι' αυτήν."
-
 msgid "This schedule has already run or been cancelled."
 msgstr "Αυτός ο προγραμματισμός έχει ήδη εκτελεστεί ή ακυρωθεί."
 
@@ -15170,9 +15177,6 @@ msgstr "Ημερομηνία και ώρα δημιουργίας του φακ�
 
 msgid "Timestamp when GrooveShop received the webhook (separate from event_time)"
 msgstr "Ημερομηνία και ώρα λήψης του webhook από το GrooveShop (διαφορετική από το event_time)"
-
-msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
-msgstr "Ημερομηνία και ώρα λήξης της δέσμευσης (συνήθως 15 λεπτά από τη δημιουργία)"
 
 msgid "Timestamp when the event occurred at BoxNow"
 msgstr "Ημερομηνία και ώρα όταν συνέβη το συμβάν στο BoxNow"
@@ -16359,6 +16363,9 @@ msgstr "Πότε το προσωπικό επιβεβαίωσε την υποτ�
 msgid "When staff recorded that this payout was accounted for. A payout matching no shipment stays counted as needing attention until then."
 msgstr "Πότε κατέγραψε το προσωπικό ότι η απόδοση λογιστικοποιήθηκε. Μια απόδοση χωρίς αντίστοιχη αποστολή μετράει ως εκκρεμότητα μέχρι τότε."
 
+msgid "When the automatic lookup last asked the payment provider about this refund and could not decide it."
+msgstr "Πότε η αυτόματη αναζήτηση ρώτησε τελευταία φορά τον πάροχο πληρωμών γι' αυτή την επιστροφή χωρίς να μπορέσει να αποφασίσει."
+
 msgid "When the current confirmation link was issued. The link expires a week later."
 msgstr "Πότε εκδόθηκε ο τρέχων σύνδεσμος επιβεβαίωσης. Λήγει μία εβδομάδα αργότερα."
 
@@ -16388,6 +16395,9 @@ msgstr "Πότε ξεκίνησε η ισχύουσα μείωση· κενό ό
 
 msgid "When the reminder to review this order's products was settled: sent, or skipped because there was nothing left to ask for or the customer opted out. The reminder is never sent twice."
 msgstr "Πότε διευθετήθηκε η υπενθύμιση για την κριτική των προϊόντων αυτής της παραγγελίας: στάλθηκε, ή παραλείφθηκε επειδή δεν είχε μείνει τίποτε να ζητηθεί ή ο πελάτης είχε κάνει απεγγραφή. Η υπενθύμιση δεν στέλνεται ποτέ δύο φορές."
+
+msgid "When the reservation expires: the store's reservation time after it was created."
+msgstr "Πότε λήγει η δέσμευση: όσο ο χρόνος δέσμευσης του καταστήματος μετά τη δημιουργία της."
 
 msgid "When the retained records were finally erased. Null while retention is still running."
 msgstr "Πότε διαγράφηκαν οριστικά οι διατηρημένες εγγραφές. Null όσο η διατήρηση είναι ακόμη σε ισχύ."
@@ -18789,6 +18799,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Timestamp of the most recent reminder email."
 #~ msgstr "Ημερομηνία και ώρα του πιο πρόσφατου email υπενθύμισης."
+
+#~ msgid "Timestamp when reservation expires (typically 15 minutes from creation)"
+#~ msgstr "Ημερομηνία και ώρα λήξης της δέσμευσης (συνήθως 15 λεπτά από τη δημιουργία)"
 
 #~ msgid "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update."
 #~ msgstr "Για να ολοκληρώσετε την αγορά σας, παρακαλούμε ολοκληρώστε την πληρωμή σας. Αν έχετε ήδη ολοκληρώσει την πληρωμή, παρακαλούμε αγνοήστε αυτό το μήνυμα καθώς μπορεί να χρειαστεί λίγος χρόνος για την ενημέρωση του συστήματός μας."

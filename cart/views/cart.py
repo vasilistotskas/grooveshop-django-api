@@ -159,7 +159,8 @@ serializers_config: SerializersConfig = {
         summary=_("Reserve stock for cart items"),
         description=_(
             "Reserve stock for all items in the cart during checkout. "
-            "Creates temporary stock reservations with 15-minute TTL. "
+            "Creates temporary stock reservations that last the store's "
+            "reservation time. "
             "Returns list of reservation IDs to be used during order creation."
         ),
         tags=["Cart"],
@@ -574,7 +575,8 @@ class CartViewSet(BaseModelViewSet):
         Reserve stock for all cart items during checkout.
 
         This endpoint is called when the customer begins the checkout process.
-        It creates temporary stock reservations (15-minute TTL) for all items
+        It creates temporary stock reservations (the store's
+        STOCK_RESERVATION_TTL_MINUTES) for all items
         in the cart to prevent other customers from purchasing the same items
         while this customer completes payment.
 

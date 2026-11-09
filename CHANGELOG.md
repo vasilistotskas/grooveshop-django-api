@@ -3,6 +3,24 @@
 
 
 
+## v3.240.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(blog): refuse author profile links a URL parser refuses, and bound them (#554)
+
+Django's URLValidator accepts any five-digit port, so an author's
+public profile saved as https://example.com:65536 passed, while the
+storefront's z.url() refuses it: once the storefront reads sameAs, every
+post of that author and the author's page would answer 422.
+
+core.validators.url.WebURLValidator runs URLValidator and then parses
+the port (urlsplit raises past 65535). BlogAuthor.same_as uses it on
+the model and the write serializer, and lists at most PROFILE_URLS_MAX
+(10) profiles. The migration changes state only (no SQL).
+
+Refs #553 ([`70c02dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70c02dd6e86d466022a1206f6f392d5a596a9b28))
+
 ## v3.240.0 (2026-11-09)
 
 ### Bug fixes

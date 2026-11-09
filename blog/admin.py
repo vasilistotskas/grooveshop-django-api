@@ -147,7 +147,7 @@ class BlogAuthorAdmin(BaseTranslatableAdmin):
         (
             _("Basic Information"),
             {
-                "fields": ("user", "website"),
+                "fields": ("user", "website", "same_as"),
             },
         ),
         (

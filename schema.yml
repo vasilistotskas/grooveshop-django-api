@@ -35839,6 +35839,16 @@ components:
           maxLength: 200
           description: Σύνδεσμος URL ή κενή τιμή
           readOnly: true
+        sameAs:
+          type: array
+          items:
+            type: string
+            format: uri
+            maxLength: 500
+          readOnly: true
+          description: Σύνδεσμοι προς τα δημόσια προφίλ του συντάκτη σε άλλους ιστότοπους,
+            όπως LinkedIn, X ή Instagram. Οι μηχανές αναζήτησης τους χρησιμοποιούν
+            για να αναγνωρίσουν ποιος έγραψε το άρθρο.
         createdAt:
           type: string
           format: date-time
@@ -35859,6 +35869,7 @@ components:
       - createdAt
       - id
       - numberOfPosts
+      - sameAs
       - totalLikesReceived
       - translations
       - updatedAt
@@ -35899,6 +35910,16 @@ components:
           maxLength: 200
           description: Σύνδεσμος URL ή κενή τιμή
           readOnly: true
+        sameAs:
+          type: array
+          items:
+            type: string
+            format: uri
+            maxLength: 500
+          readOnly: true
+          description: Σύνδεσμοι προς τα δημόσια προφίλ του συντάκτη σε άλλους ιστότοπους,
+            όπως LinkedIn, X ή Instagram. Οι μηχανές αναζήτησης τους χρησιμοποιούν
+            για να αναγνωρίσουν ποιος έγραψε το άρθρο.
         createdAt:
           type: string
           format: date-time
@@ -35930,6 +35951,7 @@ components:
       - id
       - numberOfPosts
       - recentPosts
+      - sameAs
       - topPosts
       - totalLikesReceived
       - translations
@@ -35965,6 +35987,13 @@ components:
             maxLength: 200
           - type: string
             maxLength: 0
+        sameAs:
+          type: array
+          items:
+            type: string
+            format: uri
+            minLength: 1
+            maxLength: 500
       required:
       - translations
       - user
@@ -44911,6 +44940,13 @@ components:
             maxLength: 200
           - type: string
             maxLength: 0
+        sameAs:
+          type: array
+          items:
+            type: string
+            format: uri
+            minLength: 1
+            maxLength: 500
     PatchedBlogCategoryWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

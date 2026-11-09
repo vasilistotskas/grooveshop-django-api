@@ -4636,8 +4636,14 @@ BLOG_COMMENT_AUTO_APPROVE = (
     getenv("BLOG_COMMENT_AUTO_APPROVE", "True") == "True"
 )
 
-# Related Posts Strategies Configuration
+# Related Posts Strategies Configuration. In order of closeness: the posts
+# of the same category on the same topic (the words they share), then the rest
+# of the category, then posts sharing a tag.
 RELATED_POSTS_STRATEGIES = [
+    {
+        "strategy": "blog.strategies.shared_terms_related_posts_strategy.SharedTermsRelatedPostsStrategy",
+        "weight": 1.0,
+    },
     {
         "strategy": "blog.strategies.default_related_posts_strategy.DefaultRelatedPostsStrategy",
         "weight": 0.6,
@@ -4648,6 +4654,14 @@ RELATED_POSTS_STRATEGIES = [
     },
 ]
 RELATED_POSTS_LIMIT = 8
+# How many of a category's newest posts the shared-words strategy compares.
+RELATED_POSTS_CANDIDATES = int(getenv("RELATED_POSTS_CANDIDATES", "500"))
+
+# Postgres text search configuration per language (lower case, accents
+# off, stemming), for comparing texts in the database; a language with no
+# configuration of its own is only lower-cased and split ("simple").
+TEXT_SEARCH_CONFIGS = {"el": "greek", "en": "english"}
+TEXT_SEARCH_DEFAULT_CONFIG = "simple"
 # The most posts the RSS feed endpoint (``/blog/post/feed``) returns.
 BLOG_FEED_LIMIT = 50
 

@@ -20,6 +20,7 @@ from collections.abc import Callable
 from functools import wraps
 
 from django.contrib.admin.utils import get_fields_from_path
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from parler.models import TranslatableModel
@@ -33,6 +34,7 @@ from unfold.contrib.filters.admin import (
     RangeDateFilter,
     RangeDateTimeFilter,
 )
+from unfold.contrib.forms.widgets import ArrayWidget
 from unfold.fields import UnfoldAdminJSONSchemaField
 from unfold.mixins import FormFieldModelAdminMixin
 from unfold.widgets import UnfoldAdminJSONSchemaWidget
@@ -231,6 +233,9 @@ class BaseModelAdmin(
     # that inherits this base.
     formfield_overrides = {
         HTMLField: {"widget": AdminTinyMCE},
+        # One input per item, with add and remove, instead of Django's
+        # comma-separated text box (unfold docs, widgets/array).
+        ArrayField: {"widget": ArrayWidget},
     }
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):

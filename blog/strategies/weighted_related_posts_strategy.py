@@ -1,3 +1,5 @@
+from django.db.models import Case, IntegerField, Value, When
+
 from blog.models.post import BlogPost
 from blog.strategies.related_posts_strategy import RelatedPostsStrategy
 
@@ -48,9 +50,22 @@ class WeightedRelatedPostsStrategy(RelatedPostsStrategy):
 
         # ``for_list``, because the serializer reads each post's author,
         # translations, tags and the three counts: a bare queryset made
-        # that six queries per post.
+        # that six queries per post. In the order the strategies found
+        # them: the first strategy is the closest match (the lexical one
+        # ranks by likeness), and re-sorting by date threw that away.
+        ranked = [p.pk for p in collected_posts]
+        if not ranked:
+            return BlogPost.objects.for_list().none()
         return (
             BlogPost.objects.for_list()
-            .filter(pk__in=[p.pk for p in collected_posts])
-            .order_by("-published_at")
+            .filter(pk__in=ranked)
+            .order_by(
+                Case(
+                    *(
+                        When(pk=pk, then=Value(i))
+                        for i, pk in enumerate(ranked)
+                    ),
+                    output_field=IntegerField(),
+                )
+            )
         )

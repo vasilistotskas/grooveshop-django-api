@@ -19,6 +19,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
 
+from django.db import connection
+from django_tenants.utils import schema_context
+
 from tenant.celery import dispatch_on_commit
 
 # Documents one ``meili.index_documents`` task adds or removes: a task holds
@@ -26,7 +29,10 @@ from tenant.celery import dispatch_on_commit
 # is smaller than a sync command's page (``MEILISEARCH["DEFAULT_BATCH_SIZE"]``).
 INDEX_TASK_BATCH_SIZE = 500
 
-type DocumentKey = tuple[str, str]
+#: ``(schema, app_label, model_name)``: the store the row belongs to is
+#: pinned when it is collected, because the flush runs wherever the block
+#: ends and ``dispatch_on_commit`` pins the schema it is called in.
+type DocumentKey = tuple[str, str, str]
 
 _collector: ContextVar[dict[DocumentKey, set[Any]] | None] = ContextVar(
     "meili_reindex_collector", default=None
@@ -67,8 +73,12 @@ def collect_if_active(
     collected = _collector.get()
     if collected is None:
         return False
-    collected[app_label, model_name].update(pks)
+    collected[_current_schema(), app_label, model_name].update(pks)
     return True
+
+
+def _current_schema() -> str:
+    return getattr(connection, "schema_name", "public")
 
 
 @contextmanager
@@ -77,7 +87,9 @@ def collect_reindex() -> Generator[None]:
 
     The flush runs when the block raises too: rows saved before the error
     are committed, and their documents must not stay stale. Nested, the
-    inner block joins the outer one, which flushes.
+    inner block joins the outer one, which flushes. Each document is
+    queued in the schema it was collected in, even when the block ends
+    in another.
     """
     if _collector.get() is not None:
         yield
@@ -88,5 +100,6 @@ def collect_reindex() -> Generator[None]:
         yield
     finally:
         _collector.reset(token)
-        for (app_label, model_name), pks in collected.items():
-            queue_documents(app_label, model_name, sorted(pks))
+        for (schema, app_label, model_name), pks in collected.items():
+            with schema_context(schema):
+                queue_documents(app_label, model_name, sorted(pks))

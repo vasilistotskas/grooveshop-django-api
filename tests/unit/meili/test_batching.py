@@ -239,3 +239,76 @@ class TestIndexDocumentsTask:
             pytest.raises(MeiliTaskFailed),
         ):
             index_documents_task("product", "producttranslation", pks)
+
+    @pytest.mark.parametrize(
+        "add_failure",
+        [
+            MagicMock(status="failed", error="bad document"),
+            TimeoutError("engine busy"),
+        ],
+    )
+    def test_the_delete_is_submitted_even_when_the_add_fails(self, add_failure):
+        from meili.exceptions import MeiliTaskFailed
+
+        live = ProductFactory(active=True, num_images=0, num_reviews=0)
+        dead = ProductFactory(active=False, num_images=0, num_reviews=0)
+        pks = list(
+            ProductTranslation.objects.filter(
+                master_id__in=[live.pk, dead.pk]
+            ).values_list("pk", flat=True)
+        )
+        mock_client, _mock_index = self._client()
+        outcomes = [add_failure, MagicMock(status="succeeded")]
+
+        def wait(task_uid):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, BaseException):
+                raise outcome
+            return outcome
+
+        mock_client.wait_for_task.side_effect = wait
+
+        with (
+            patch("meili._client.client", mock_client),
+            pytest.raises((MeiliTaskFailed, TimeoutError)),
+        ):
+            index_documents_task("product", "producttranslation", pks)
+
+        mock_client.delete_documents_by_primary_key.assert_called_once()
+        assert mock_client.wait_for_task.call_count == 2
+
+
+def test_documents_are_queued_in_the_schema_they_were_collected_in():
+    from contextlib import contextmanager
+
+    from meili.batching import collect_if_active
+
+    active: list[str] = []
+    queued: list[tuple[str | None, list[int]]] = []
+
+    @contextmanager
+    def fake_schema_context(schema):
+        active.append(schema)
+        try:
+            yield
+        finally:
+            active.pop()
+
+    def fake_dispatch(task, kwargs):
+        queued.append((active[-1] if active else None, kwargs["pks"]))
+
+    schemas = iter(["store_a", "store_b", "store_a"])
+    with (
+        patch("meili.batching._current_schema", lambda: next(schemas)),
+        patch("meili.batching.schema_context", fake_schema_context),
+        patch("meili.batching.dispatch_on_commit", fake_dispatch),
+    ):
+        with collect_reindex():
+            collect_if_active("product", "producttranslation", [1])
+            collect_if_active("product", "producttranslation", [1])
+            collect_if_active("product", "producttranslation", [2])
+        # The block ended outside every schema, yet each id went out in
+        # its own: the same pk in two stores is two documents.
+        assert active == []
+
+    assert sorted(queued) == [("store_a", [1, 2]), ("store_b", [1])]

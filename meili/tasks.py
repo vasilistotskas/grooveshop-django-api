@@ -208,22 +208,39 @@ def index_documents_task(
         else:
             removed.append(_get_document_pk(instance))
 
+    # Both calls are attempted whatever the first one does: a bad
+    # document in the add must not leave the deactivated products of the
+    # same batch searchable. The first failure is raised afterwards (so
+    # ``MeiliTask`` decides on a retry); the batch is idempotent.
+    failures: list[Exception] = []
     if documents:
-        finished = _client.wait_for_task(
-            index.add_documents(documents).task_uid
-        )
-        if finished.status == "failed":
-            raise MeiliTaskFailed(finished.error, operation="index")
+        try:
+            finished = _client.wait_for_task(
+                index.add_documents(documents).task_uid
+            )
+            if finished.status == "failed":
+                raise MeiliTaskFailed(finished.error, operation="index")
+        except Exception as exc:
+            failures.append(exc)
     if removed:
-        finished = _client.wait_for_task(
-            _client.delete_documents_by_primary_key(
-                model_class.get_meili_index_name(),
-                model_class._meilisearch["primary_key"],
-                removed,
-            ).task_uid
-        )
-        if finished.status == "failed":
-            raise MeiliTaskFailed(finished.error, operation="delete")
+        try:
+            finished = _client.wait_for_task(
+                _client.delete_documents_by_primary_key(
+                    model_class.get_meili_index_name(),
+                    model_class._meilisearch["primary_key"],
+                    removed,
+                ).task_uid
+            )
+            if finished.status == "failed":
+                raise MeiliTaskFailed(finished.error, operation="delete")
+        except Exception as exc:
+            failures.append(exc)
+    if failures:
+        for extra in failures[1:]:
+            logger.error(
+                f"Also failed on {app_label}.{model_name} batch: {extra}"
+            )
+        raise failures[0]
 
     skipped = len(pks) - len(documents) - len(removed)
     logger.info(

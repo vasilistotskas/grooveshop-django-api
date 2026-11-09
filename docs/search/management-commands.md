@@ -79,7 +79,10 @@ instead, which queues `meili.index_documents` tasks of `INDEX_TASK_BATCH_SIZE`
 `get_meilisearch_queryset()`, adds the ones that pass `meili_filter()` in ONE
 `add_documents` call and removes the ones that no longer do in ONE delete by
 filter (`meili._client.Client.delete_documents_by_primary_key`), so N documents
-cost ⌈N/500⌉ tasks and two engine calls each. A pk with no row is skipped. The wait is `MEILISEARCH["TASK_TIMEOUT_MS"]`;
+cost ⌈N/500⌉ tasks and two engine calls each. Both calls are attempted whatever the first does (one bad document in the
+add must not leave the batch's deactivated products searchable); the first
+failure is raised afterwards, so the retry rules apply to the whole batch.
+A pk with no row is skipped. The wait is `MEILISEARCH["TASK_TIMEOUT_MS"]`;
 a timeout is retried with backoff (`SEARCH_TRANSIENT_ERRORS`), and a task the
 engine marks `failed` is not. `product.signals.reindex_products_by_pk` is the
 entry point for products, so bulk activate, the price sweeps, `offer_sync`,
@@ -109,7 +112,10 @@ While it is open the product post-save signal, the product-attribute signal and
 the generic `IndexMixin` save handler hand their documents to the collector
 instead of queueing a task, and the block queues the deduplicated set once on
 exit (also when it raises: the rows saved before the error are committed). A
-nested block joins the outer one. The synchronous DEBUG path is not collected.
+nested block joins the outer one. Each document is collected with the
+schema it was saved in and queued inside `schema_context` of that schema, so
+a block that ends in another schema (or saves in several) still queues each
+store's documents for that store. The synchronous DEBUG path is not collected.
 
 ## `meilisearch_update_index_settings`
 

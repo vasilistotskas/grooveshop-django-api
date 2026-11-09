@@ -34,9 +34,15 @@ DEFINITIONS = {
 EXCLUDED_PARTS = {".venv", "migrations", "tests", "tests_mt", "node_modules"}
 
 
+def _names_url_field(node: ast.expr) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr == "URLField") or (
+        isinstance(node, ast.Name) and node.id == "URLField"
+    )
+
+
 def _bare_url_fields() -> list[str]:
-    """``models.URLField(`` / ``serializers.URLField(`` / ``forms.URLField(``
-    calls outside the two definitions."""
+    """Every URLField call or subclass outside the two definitions, however
+    it is imported (``models.URLField(``, a bare ``URLField(``)."""
     found = []
     for path in ROOT.rglob("*.py"):
         if EXCLUDED_PARTS & set(path.relative_to(ROOT).parts):
@@ -45,11 +51,16 @@ def _bare_url_fields() -> list[str]:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "URLField"
-            ):
+            # A call (`models.URLField(...)`, or a bare `URLField(...)` after
+            # `from ... import URLField`) or a subclass of one.
+            named = (
+                [node.func]
+                if isinstance(node, ast.Call)
+                else node.bases
+                if isinstance(node, ast.ClassDef)
+                else []
+            )
+            if any(_names_url_field(name) for name in named):
                 found.append(f"{path.relative_to(ROOT)}:{node.lineno}")
     return found
 
@@ -132,6 +143,7 @@ def test_a_narrower_web_url_validator_stands_in_for_the_default():
     assert [v for v in field.validators if isinstance(v, URLValidator)] == [
         narrow
     ]
+    assert field.run_validation(FINE) == FINE
     with pytest.raises(serializers.ValidationError) as refused:
         field.run_validation("ftp://example.com/x")
     assert len(refused.value.detail) == 1

@@ -4545,11 +4545,28 @@ TINYMCE_DEFAULT_CONFIG = {
     "plugins": "advlist,autolink,lists,link,image,charmap,preview,anchor,"
     "searchreplace,visualblocks,code,fullscreen,insertdatetime,media,table,"
     "code,help,wordcount,accordion",
-    "toolbar": "undo redo | bold italic underline strikethrough | fontselect fontsizeselect formatselect | alignleft "
-    "aligncenter alignright alignjustify | outdent indent |  numlist bullist checklist | forecolor "
-    "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
-    "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample accordion | "
-    "a11ycheck ltr rtl | showcomments addcomment code",
+    # TinyMCE 7 names, each one registered by the core or a plugin above
+    # (the bundle is 7.8). The 5.x ``fontselect fontsizeselect
+    # formatselect`` and the premium or unloaded items that stood here
+    # rendered nothing; ``blocks`` is what ``formatselect`` became.
+    "toolbar": "undo redo | blocks | bold italic underline strikethrough | "
+    "alignleft aligncenter alignright alignjustify | outdent indent | "
+    "numlist bullist | forecolor backcolor removeformat | charmap | "
+    "image media link anchor accordion | fullscreen preview code",
+    # The default Format menu of 7.8 without ``fontfamily fontsize``: a
+    # store's typeface and type size are its theme's (``docs/rich-text.md``).
+    "menu": {
+        "format": {
+            "title": "Format",
+            "items": "bold italic underline strikethrough superscript "
+            "subscript codeformat | styles blocks align lineheight | "
+            "forecolor backcolor | language | removeformat",
+        },
+    },
+    # The same declarations the save drops (``core/utils/sanitize.py``),
+    # stripped by the editor too, so a paste shows the author what will
+    # be stored.
+    "invalid_styles": "font font-family font-size",
     # Custom upload handler instead of `images_upload_url`. The built-in
     # uploader sends FormData with cookies (via `images_upload_credentials`)
     # but never attaches an `X-CSRFToken` header, so Django's

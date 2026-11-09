@@ -164,19 +164,77 @@ def is_allowed_embed_url(src: str) -> bool:
     return f"{parts.scheme}://{parts.netloc.lower()}" in EMBED_IFRAME_ORIGINS
 
 
-# A CSS custom property declaration inside a ``style`` attribute. An
-# author never writes one: it is the residue of a browser extension (Dark
-# Reader's ``--darkreader-inline-color``, on most of webside's blog
-# posts) that was running when the text was copied into the editor, and
-# it stays in the stored HTML for no reader but that extension.
-_CUSTOM_PROPERTY = re.compile(r"(^|;)\s*--[\w-]+\s*:[^;]*")
+# Declarations a stored ``style`` never keeps:
+# - a CSS custom property (``--name: ...``): an author never writes one.
+#   It is the residue of a browser extension (Dark Reader's
+#   ``--darkreader-inline-color``, on most of webside's blog posts) that
+#   was running when the text was copied into the editor.
+# - the typeface and the type size (``font``, ``font-family``,
+#   ``font-size``): a store's typography is its theme's. Text pasted from
+#   Word or a web page arrives as ``font-family: arial; font-size: 14pt``,
+#   which drew webside's post 82 at 18.7 px against the store's 20 px and
+#   downloads another face mid-render.
+# - Word's ``mso-*`` properties, which no browser reads.
+# Colour, alignment and spacing are the author's and stay.
+_DROPPED_PROPERTY = re.compile(
+    r"--[\w-]+|font|font-family|font-size|mso-[\w-]+", re.IGNORECASE
+)
+
+# Word's paragraph and comment classes (``MsoNormal``, ``msocomanchor``).
+_WORD_CLASS = re.compile(r"mso", re.IGNORECASE)
 
 
-def _without_custom_properties(style: str) -> str | None:
-    if "--" not in style:
+def _declarations(style: str) -> list[str]:
+    """The declarations of an inline ``style``, split on the semicolons
+    that end one: not those inside a string or a ``url(...)``."""
+    declarations: list[str] = []
+    depth = 0
+    quote = ""
+    start = 0
+    escaped = False
+    for index, char in enumerate(style):
+        if escaped:
+            escaped = False
+        elif quote:
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(0, depth - 1)
+        elif char == ";" and depth == 0:
+            declarations.append(style[start:index])
+            start = index + 1
+    declarations.append(style[start:])
+    return [d.strip() for d in declarations if d.strip()]
+
+
+def _clean_style(style: str) -> str | None:
+    """``style`` without the declarations ``_DROPPED_PROPERTY`` names. A
+    style with nothing to drop stays exactly as written; one left empty
+    is dropped with its attribute."""
+    declarations = _declarations(style)
+    kept = [
+        declaration
+        for declaration in declarations
+        if not _DROPPED_PROPERTY.fullmatch(declaration.split(":", 1)[0].strip())
+    ]
+    if len(kept) == len(declarations):
         return style
-    cleaned = _CUSTOM_PROPERTY.sub("", style).strip(" ;")
-    return f"{cleaned};" if cleaned else None
+    return f"{'; '.join(kept)};" if kept else None
+
+
+def _clean_class(classes: str) -> str | None:
+    """``classes`` without Word's; an attribute left empty is dropped."""
+    names = classes.split()
+    kept = [name for name in names if not _WORD_CLASS.match(name)]
+    if len(kept) == len(names):
+        return classes
+    return " ".join(kept) or None
 
 
 def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
@@ -186,7 +244,9 @@ def _filter_attribute(tag: str, attr: str, value: str) -> str | None:
     if tag == "iframe" and attr == "src" and not is_allowed_embed_url(value):
         return None
     if attr == "style":
-        return _without_custom_properties(value)
+        return _clean_style(value)
+    if attr == "class":
+        return _clean_class(value)
     return value
 
 

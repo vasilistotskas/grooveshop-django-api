@@ -11,7 +11,8 @@ admin, DRF, a shell, a command), in this order:
 2. **Sanitise.** `sanitize_html` reduces the markup to the allowlist in
    `core/utils/sanitize.py`. Residue no reader sees (`data-*`, event
    handlers, CSS custom properties such as Dark Reader's
-   `--darkreader-inline-color` in a `style`) is dropped without refusing.
+   `--darkreader-inline-color` in a `style`) is dropped without refusing,
+   and so is the text's own typography (next section).
 3. **Drop empty headings.** `core.utils.sanitize.drop_empty_headings`: the
    editor leaves `<h2 id="..."></h2>` behind when a heading's text is moved.
    A screen reader announces it and it is a hole in the page's outline. Not
@@ -21,6 +22,28 @@ admin, DRF, a shell, a command), in this order:
 
 The storefront re-sanitises the same markup on render, so it can only ever
 show less than what is stored.
+
+## Typography belongs to the theme
+
+A store's typeface and type size are its theme's. Text pasted from Word or a
+web page carries its own (`font-family: arial; font-size: 14pt` drew a
+webside post's body at 18.7 px against the store's 20 px, and a named face
+is downloaded mid-render), so the policy drops, from every `style`:
+
+- `font`, `font-family` and `font-size`;
+- Word's `mso-*` properties, which no browser reads;
+- CSS custom properties (`--name: ...`, browser-extension residue);
+
+and Word's classes (`MsoNormal`, `msocomanchor`) from every `class`. Colour,
+alignment, spacing, weight and style stay: they are the author's. A `style`
+or `class` left empty goes with its attribute. None of this is lost content,
+so a save is never refused for it.
+
+The editor agrees: `TINYMCE_DEFAULT_CONFIG` names no font family or size
+control (the Format menu is TinyMCE 7.8's default without `fontfamily
+fontsize`) and sets `invalid_styles` to `font font-family font-size`, so a
+paste already shows what will be stored. Rows saved before are brought in
+line by `normalise_rich_text` (below), which applies the same policy.
 
 ## Image sizes
 

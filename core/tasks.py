@@ -218,6 +218,20 @@ def invalidate_cache_surfaces_task():
     return {"status": "success", "surfaces": surfaces}
 
 
+@celery_app.task(base=MonitoredTask)
+def release_due_publications_task():
+    """Act on the current store's rows whose publish date just passed.
+
+    Nothing is saved when ``published_at`` passes, so no signal fires;
+    this beat task is what notices (``core.publication``). No retry: the
+    cursor moves only after a run succeeds, so the next minute's run
+    repeats the window.
+    """
+    from core.publication import release_due_publications
+
+    return {"released": release_due_publications()}
+
+
 @celery_app.task(
     base=MonitoredTask,
     max_retries=5,

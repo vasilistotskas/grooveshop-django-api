@@ -239,6 +239,11 @@ def fanout_reindex_offer_window_changes():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_release_due_publications():
+    return run_for_all_tenants("core.tasks.release_due_publications_task")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_reevaluate_price_episodes():
     return run_for_all_tenants("product.tasks.reevaluate_price_episodes")
 

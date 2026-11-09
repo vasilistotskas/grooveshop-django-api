@@ -401,6 +401,14 @@ class PublishableModel(models.Model):
             self.published_at = timezone.now()
         super().save(*args, **kwargs)
 
+    @property
+    def is_live(self) -> bool:
+        """Whether ``published()`` serves this row now: published, and its
+        date not in the future."""
+        return self.is_published and (
+            self.published_at is None or self.published_at <= timezone.now()
+        )
+
 
 class MetaDataModel(models.Model):
     """

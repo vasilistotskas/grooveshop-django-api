@@ -16591,8 +16591,8 @@ msgstr "Στάλθηκε λάθος προϊόν"
 msgid "XML export successful."
 msgstr "Η εξαγωγή XML ολοκληρώθηκε επιτυχώς."
 
-msgid "XML sitemap, RSS, llms.txt and the OG image cache. Cheap to regenerate; purge after publishing content that should appear immediately."
-msgstr "XML sitemap, RSS, llms.txt και η cache εικόνων OG. Φθηνό στην αναδημιουργία· εκκαθαρίστε μετά τη δημοσίευση περιεχομένου που πρέπει να εμφανιστεί άμεσα."
+msgid "XML sitemap, RSS, llms.txt and the OG image cache. Purged when a post, product, category or content page changes or goes live."
+msgstr "XML sitemap, RSS, llms.txt και η cache εικόνων OG. Καθαρίζει όταν αλλάζει ή δημοσιεύεται ένα άρθρο, προϊόν, κατηγορία ή σελίδα περιεχομένου."
 
 msgid "Xpress Point"
 msgstr "Xpress Point"

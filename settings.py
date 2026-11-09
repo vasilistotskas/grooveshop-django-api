@@ -1402,6 +1402,16 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["every_5_minute"],
             "options": {"queue": "celery", "expires": 240},
         },
+        "release-due-publications": {
+            # Fanout: blog posts, content pages and reviews are
+            # per-tenant; beat fires in public. A row dated in the future
+            # goes live with no save, so no signal purges the surfaces
+            # that render it or announces it to IndexNow; this sweep
+            # does, per tenant, every minute (core/publication.py).
+            "task": "tenant.tasks.fanout_release_due_publications",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
+            "options": {"queue": "celery", "expires": 50},
+        },
         "anonymize-old-search-queries": {
             # Fanout: SearchQuery is per-tenant; beat fires in public.
             # kwargs (days=90) live in the wrapper body, not here.

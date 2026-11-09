@@ -1,11 +1,15 @@
 """Queue the storefront pages whose content changed.
 
 A product or a blog post is on the storefront while it is published
-(``active`` and not deleted; ``is_published``). A save of a published page
-queues its path, so does the save that unpublishes it, so does the removal
-of the row, and a save of one of its translations. Everything else (a draft
-edited, a product no one can see) queues nothing: the page does not exist
-for a search engine, and a draft's address must not leave the store.
+(``active`` and not deleted; a post is ``is_live``: published, its date not
+in the future). A save of a published page queues its path, so does the save
+that unpublishes it, so does the removal of the row, and a save of one of its
+translations. Everything else (a draft edited, a product no one can see, a
+post dated in the future) queues nothing: the page does not exist for a
+search engine, and its address must not leave the store early.
+
+A post dated in the future is queued when its date passes, by
+``core.publication``'s sweep (``went_live``): nothing is saved then.
 
 A save writes the queue row in its own transaction, so a change that rolls
 back is never announced. ``queryset.update()`` emits no signal and is
@@ -22,6 +26,7 @@ from django.db import DatabaseError, transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 
 from blog.models.post import BlogPost, BlogPostTranslation
+from core.publication import went_live
 from indexnow.service import is_enabled, queue
 from product.models.product import Product, ProductTranslation
 
@@ -30,20 +35,16 @@ logger = logging.getLogger(__name__)
 #: A save that touches only these is bookkeeping, not a change of the page.
 _BOOKKEEPING_FIELDS = frozenset({"view_count", "updated_at"})
 
-#: The stored values that put a row on the storefront.
-_PUBLISHED: dict[type, dict[str, bool]] = {
-    Product: {"active": True, "is_deleted": False},
-    BlogPost: {"is_published": True},
-}
+_PAGES: tuple[type, ...] = (Product, BlogPost)
 
 _WAS_PUBLISHED = "_indexnow_was_published"
 
 
 def _is_published(page: Product | BlogPost) -> bool:
-    return all(
-        getattr(page, field) == value
-        for field, value in _PUBLISHED[type(page)].items()
-    )
+    """Whether the storefront serves *page* now."""
+    if isinstance(page, BlogPost):
+        return page.is_live
+    return page.active and not page.is_deleted
 
 
 def _queue(page: Product | BlogPost) -> None:
@@ -65,12 +66,11 @@ def _remember_publication(sender: type, instance: Any, **kwargs) -> None:
     setattr(instance, _WAS_PUBLISHED, False)
     if instance._state.adding or _is_published(instance) or not is_enabled():
         return
+    stored = sender._base_manager.filter(pk=instance.pk).first()
     setattr(
         instance,
         _WAS_PUBLISHED,
-        sender._base_manager.filter(
-            pk=instance.pk, **_PUBLISHED[sender]
-        ).exists(),
+        stored is not None and _is_published(stored),
     )
 
 
@@ -95,7 +95,15 @@ def _queue_saved_translation(sender: type, instance: Any, **kwargs) -> None:
         _queue(instance.master)
 
 
-for _page in (Product, BlogPost):
+def _queue_went_live(sender: type, instance: Any, **kwargs) -> None:
+    """A page dated in the future whose date just passed."""
+    if sender in _PAGES and is_enabled() and _is_published(instance):
+        _queue(instance)
+
+
+went_live.connect(_queue_went_live, dispatch_uid="indexnow.went_live")
+
+for _page in _PAGES:
     _name = _page.__name__.lower()
     pre_save.connect(
         _remember_publication,

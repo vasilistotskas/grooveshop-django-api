@@ -4654,7 +4654,10 @@ RELATED_POSTS_STRATEGIES = [
     },
 ]
 RELATED_POSTS_LIMIT = 8
-# How many of a category's newest posts the shared-words strategy compares.
+# How many of the store's newest published posts, of every category, the
+# shared-words strategy reads: a word's rarity is measured over them, and
+# the candidates are those of the post's category
+# (docs/blog-related-posts.md).
 RELATED_POSTS_CANDIDATES = int(getenv("RELATED_POSTS_CANDIDATES", "500"))
 
 # Postgres text search configuration per language (lower case, accents

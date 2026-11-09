@@ -3,6 +3,47 @@
 
 
 
+## v3.239.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(order): keep the refund dialog while any refund of the order is pending (#545)
+
+refund_open stays true while any refund attempt is PENDING; the REFUNDED refusal reports what has not gone back (PaymentLedger.outstanding); Greek label and overdue-retry wording fixed; docs match. ([`3c7e4ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3c7e4ee5cd17a2d02ddd51c815c883dcab5d3aa2))
+
+### Chores
+
+* chore(claude): guard the Tailwind npm lockfile and match guarded paths in any letter case (#544) ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): guard the npm lockfile of the Tailwind build
+
+package-lock.json is written by npm for the Tailwind CSS build (the
+Dockerfile runs npm ci), so a hand edit is refused like uv.lock. A
+session started in this repository had no rule for it, and the
+workspace root refused it with a message meant for the pnpm repos.
+
+The workspace root's guard now runs this file for edits made from a
+root session, so this rule applies there too. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): match guarded paths in any letter case
+
+Windows disks ignore case, so an Edit of UV.LOCK writes the real
+uv.lock, and the same holds for .ENV, CHANGELOG.MD or an UNTRACKED/
+folder. The guard compared names exactly and let every such spelling
+through. It now matches the lower-cased path, with every rule written
+in lower case; the reason it prints still shows the path as given.
+
+The same one-line change goes into each repository's copy, which are
+kept structurally identical. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): keep the .env.example exception to its exact spelling
+
+With the path matched in lower case, .env.EXAMPLE also matched the
+.env.example exception. On a case-sensitive disk that is a different
+file, which the guard refused before and must keep refusing. Protected
+paths still match in any case; only the exact spelling .env.example is
+let through. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
 ## v3.239.0 (2026-11-09)
 
 ### Features

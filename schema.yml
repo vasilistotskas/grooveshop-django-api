@@ -52524,6 +52524,10 @@ components:
           allOf:
           - $ref: '#/components/schemas/FeatureState'
           readOnly: true
+        staffAiAccess:
+          allOf:
+          - $ref: '#/components/schemas/FeatureState'
+          readOnly: true
         catalogue:
           allOf:
           - $ref: '#/components/schemas/FeatureState'
@@ -52551,6 +52555,7 @@ components:
       - productReviews
       - productSuggestions
       - promotions
+      - staffAiAccess
       - wholesale
     StoreFeatures:
       type: object

@@ -68,11 +68,16 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
         )
 
     def awaiting_staff(self):
-        """Overdue attempts the automatic lookup asked the provider about
-        and could not decide (``looked_up_at``): what staff are told about
-        and may record the outcome of. Until the lookup has had its turn
-        the provider may still answer on its own."""
-        return self.overdue().filter(looked_up_at__isnull=False)
+        """Overdue attempts staff are told about and may record the
+        outcome of: the automatic lookup asked the provider and could not
+        decide (``looked_up_at``), or it has not reached the attempt for a
+        second :func:`reconcile_after` (the lookup is switched off or
+        keeps failing before it can stamp). Until then the provider may
+        still answer on its own."""
+        return self.overdue().filter(
+            models.Q(looked_up_at__isnull=False)
+            | models.Q(created_at__lte=timezone.now() - 2 * reconcile_after())
+        )
 
     def stalled(self):
         """Gift card and points returns still PENDING after
@@ -226,4 +231,7 @@ class RefundAttempt(models.Model):
     def is_awaiting_staff(self) -> bool:
         """Whether staff may record this attempt's outcome
         (:meth:`RefundAttemptQuerySet.awaiting_staff`)."""
-        return self.is_overdue and self.looked_up_at is not None
+        return self.is_overdue and (
+            self.looked_up_at is not None
+            or self.created_at <= timezone.now() - 2 * reconcile_after()
+        )

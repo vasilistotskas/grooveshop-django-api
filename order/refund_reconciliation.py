@@ -121,9 +121,7 @@ def reconcile(attempt: RefundAttempt) -> Resolution:
     ``looked_up_at``: from then on staff are told and may record it."""
     refund = _found(attempt)
     if refund is None:
-        RefundAttempt.objects.filter(
-            pk=attempt.pk, status=RefundAttemptStatus.PENDING
-        ).update(looked_up_at=timezone.now())
+        _stamp_looked_up(attempt)
         return Resolution.UNRESOLVED
     charge = attempt.charge
     if refund.made:
@@ -150,6 +148,14 @@ def reconcile(attempt: RefundAttempt) -> Resolution:
     return Resolution.DECLINED if declined else Resolution.UNRESOLVED
 
 
+def _stamp_looked_up(attempt: RefundAttempt) -> None:
+    """Record that the lookup asked about *attempt* and could not decide
+    it (an attempt resolved meanwhile is left alone)."""
+    RefundAttempt.objects.filter(
+        pk=attempt.pk, status=RefundAttemptStatus.PENDING
+    ).update(looked_up_at=timezone.now())
+
+
 def reconcile_overdue() -> dict[str, int]:
     """:func:`reconcile` every overdue attempt of the current store. One
     that fails does not stop the others."""
@@ -162,6 +168,9 @@ def reconcile_overdue() -> dict[str, int]:
             logger.exception(
                 "Refund attempt %s could not be reconciled", attempt.pk
             )
+            # The lookup ran and could not decide: staff are told, as for
+            # an answer that decided nothing.
+            _stamp_looked_up(attempt)
             counts[Resolution.UNRESOLVED] += 1
     return {resolution.value: n for resolution, n in counts.items()}
 

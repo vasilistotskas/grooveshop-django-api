@@ -892,7 +892,8 @@ class StockManager:
         # Calculate sum of active reservation quantities
         # Active reservations are those that are:
         # 1. Not consumed (consumed=False) - not yet converted to actual sale
-        # 2. Not expired (expires_at > now) - still within 15-minute TTL
+        # 2. Not expired (expires_at > now) - still within the store's
+        #    STOCK_RESERVATION_TTL_MINUTES
         active_reservations = StockReservation.objects.filter(
             product=product, consumed=False, expires_at__gt=now
         )

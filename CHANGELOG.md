@@ -3,6 +3,60 @@
 
 
 
+## v3.242.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(user): subscription admin actions work from the changelist and end a subscription through unsubscribe() (#601)
+
+The changelist hands an action a queryset that joins
+list_select_related ("user", "topic"). "user" is nullable (a guest
+subscription), and PostgreSQL refuses FOR UPDATE on the nullable side
+of an outer join, so "Resend confirmation" answered 500 for every
+selection. The lock now names the subscription rows only.
+
+"Deactivate selected subscriptions" wrote status and unsubscribed_at
+with a queryset update, which left updated_at at its old value. It now
+locks the rows and calls UserSubscription.unsubscribe(), the rule the
+customer's own unsubscribe uses.
+
+Tests run both actions through the changelist, and pin that
+deactivating a topic subscription is not a marketing opt-out and that
+a loyalty adjustment moves the balance and leaves XP alone. ([`0e3b0d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e3b0d1fbd5e86da1534235c5b27782ce3f1aeb5))
+
+### Chores
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check (#602) ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check
+
+A task's name is its address: queued messages, the beat schedule and
+DeferredDispatch rows hold it, and a deploy runs two releases side by
+side. The 200 first-party task names are now a committed list, and a
+task that leaves its module without name="<old name>" fails a test.
+
+import-linter checks three boundaries in CI: core imports no domain app
+(tenant excepted), the two carrier apps do not import each other, and a
+carrier app is reached only through shipping. Each contract lists the
+imports that break it today; the lists only shrink.
+
+A test holds every backticked repo path in CLAUDE.md, README.md, docs/
+and .claude/ to a file that exists, and refuses a citation of a Claude
+memory note, which is in no repository.
+
+refactor commits now cut a patch release, so moved code ships and is
+verified as its own release. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+### Testing
+
+* test(docs): keep a package checked after it moves under a source root
+
+The doc-reference check decided "is this a path of this repository" by
+the first segment being an entry at the repository root. Once a package
+moves into src/, its name is no longer at the root, so every stale
+reference to it would have been read as another repository's path and
+skipped. The entries of src/ now count as first-party roots too. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
 ## v3.242.0 (2026-11-09)
 
 ### Bug fixes

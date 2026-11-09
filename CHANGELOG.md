@@ -3,6 +3,14 @@
 
 
 
+## v3.239.0 (2026-11-09)
+
+### Features
+
+* feat(order): refund by lines with an exact VAT split in one dialog (#527)
+
+A refund by order lines writes its own CreditAllocation rows (exact VAT rates, points kept as value back), checked per rate at claim time; one Return and refund dialog with reasons, restock and safe retries; waiting refusals for shortages a pending claim causes. ([`cf7fd9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf7fd9a94ee5322d46b6e5e6aa7f3619247a17bd))
+
 ## v3.238.0 (2026-11-09)
 
 ### Bug fixes

@@ -35,16 +35,26 @@ from order.taxation import ChargeKind
 
 
 class CreditAllocationQuerySet(models.QuerySet["CreditAllocation"]):
-    def counting(self):
-        """Rows that hold room on the receipt: those of a source that was
-        not declined, and of a decision that the goods came back."""
+    def _live(self):
         from order.models.refund_attempt import RefundAttemptStatus
 
-        return (
-            self.filter(amount__gt=0)
-            .exclude(refund_attempt__status=RefundAttemptStatus.DECLINED)
-            .exclude(decision__goods_returned=False)
-        )
+        return self.exclude(
+            refund_attempt__status=RefundAttemptStatus.DECLINED
+        ).exclude(decision__goods_returned=False)
+
+    def counting(self):
+        """Rows that hold room on the receipt: those of a source that was
+        not declined, and of a decision that the goods came back. The
+        ``points`` part of a row is no room (:meth:`holding`)."""
+        return self.filter(amount__gt=0)._live()
+
+    def holding(self):
+        """Rows that hold their line's value: :meth:`counting`, plus the
+        rows of a refund by lines that are only points (a discount the
+        receipt never held, so no room, but value the line has had back)."""
+        return self.filter(
+            models.Q(amount__gt=0) | models.Q(points__gt=0)
+        )._live()
 
 
 class CreditAllocation(models.Model):
@@ -132,6 +142,18 @@ class CreditAllocation(models.Model):
         max_digits=11,
         decimal_places=2,
         help_text=_("Gross, VAT included."),
+    )
+    points = models.DecimalField(
+        _("Points"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=0,
+        help_text=_(
+            "Of a refund by lines, the part of the line's value that went "
+            "back as loyalty points: a discount, so no room on the receipt "
+            "and no credit, but value the line has had back."
+        ),
     )
     moved_at = models.DateTimeField(
         _("Moved at"),

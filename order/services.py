@@ -3814,6 +3814,20 @@ class OrderService:
         )
         held = sum(allocation.values(), Decimal(0))
         if held < total:
+            if blockers := credit_allocation.room_blockers(
+                order,
+                lambda **held_by: (
+                    sum(
+                        credit_allocation.allocate_pro_rata(
+                            order, total, **held_by
+                        ).values(),
+                        Decimal(0),
+                    )
+                    < total
+                ),
+                exclude=ids,
+            ):
+                raise OrderService._waiting_error(order, blockers)
             raise PaymentError(
                 _(
                     "The receipt of this order holds only %(left)s more "
@@ -3875,6 +3889,17 @@ class OrderService:
         )
         short = credit_allocation.first_short_rate(order, wanted)
         if short is not None:
+            # A claim still PENDING may hold the room: the refusal is then
+            # "wait", never the final "the receipt holds only".
+            if blockers := credit_allocation.room_blockers(
+                order,
+                lambda **held: (
+                    credit_allocation.first_short_rate(order, wanted, **held)
+                    is not None
+                ),
+                exclude=[a.pk for a in attempts],
+            ):
+                raise OrderService._waiting_error(order, blockers)
             rate, left = short
             raise PaymentError(
                 _(
@@ -4180,6 +4205,9 @@ class OrderService:
             # Only the gift cards are payment the receipt holds: points are
             # a discount and owe no credit document.
             credit_allocation.scale(gift_card, refund_attempt=settled)
+            credit_allocation.scale_points(
+                Decimal(returned.amount) - gift_card, refund_attempt=settled
+            )
             credit_allocation.mark_moved(timezone.now(), refund_attempt=settled)
             order_stored_value_returned.send(
                 sender=cls,

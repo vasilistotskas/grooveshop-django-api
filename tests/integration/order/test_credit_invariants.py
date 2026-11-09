@@ -40,7 +40,9 @@ ledger in time order and says what the books should hold. The invariants:
 5. at rest no receipt is deferred and no source (claim or chargeback) is
    undecided;
 6. a refund by lines is credited at exactly the rates of its own lines (never
-   a rate it did not pay for), and no line is held for more than its value.
+   a rate it did not pay for), and no line is held for more than its value;
+7. a line that has had its whole value back (loyalty points included, which
+   owe no credit but are value returned) is never offered for refund again.
 
 The oracle encodes the product rules of ``docs/order-system.md`` §7 from
 first principles, never through the code's formulas (see ``Oracle``). The
@@ -988,6 +990,17 @@ class State:
                 self.viol.append(
                     ("inv6", f"{where}: line {pk} held {value} > {gross[pk]}")
                 )
+        # A line that has had its whole value back is never offered again
+        # (points included: value back, though no credit).
+        for item in OrderItem.objects.filter(order=order):
+            value = held.goods.get(item.pk, ZERO)
+            if (
+                value >= gross[item.pk] > 0
+                and covered_units(gross[item.pk], item.quantity, value)
+                < item.quantity
+            ):
+                said = f"{where}: line {item.pk} fully held ({value}), offered"
+                self.viol.append(("inv7", said))
         for att in RefundAttempt.objects.filter(order=order):
             if (
                 CreditAllocation.objects.filter(refund_attempt=att).exists()

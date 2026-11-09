@@ -13,7 +13,7 @@ several steps adds up to exactly the line and never a cent more.
 read from the credit allocations the lines' own claims stored
 (``order.credit_allocation``: rows with an ``item``, or of kind shipping).
 A source that holds room holds its lines too: a claim still PENDING (however
-old), a settled one; a declined one frees them (``CreditAllocation.counting``,
+old), a settled one; a declined one frees them (``CreditAllocation.holding``,
 no timer). A line split over two refund shares (two charges, or a card and a
 gift card) can have one share paid and the other not; the value its rows
 carry against its discounted gross is what is left, and the units still on
@@ -61,15 +61,19 @@ class HeldValues:
 
 def held_values(order: Order) -> HeldValues:
     """The value each line, and the shipping, has had back from the sources
-    that hold their room (``CreditAllocation.counting``): settled or still
-    PENDING, never declined. A goodwill refund (no line) is in neither."""
+    that hold their lines (``CreditAllocation.holding``): settled or still
+    PENDING, never declined. The value counts whole: the part of a share
+    that went back as loyalty points is no room on the receipt but is value
+    the line has had back (``CreditAllocation.points``). A goodwill refund
+    (no line) is in neither."""
     goods: dict[int, Decimal] = defaultdict(Decimal)
     shipping: dict[Decimal, Decimal] = defaultdict(Decimal)
-    for row in CreditAllocation.objects.counting().filter(order=order):
+    for row in CreditAllocation.objects.holding().filter(order=order):
+        value = Decimal(row.amount.amount) + row.points
         if row.kind == ChargeKind.SHIPPING:
-            shipping[row.rate] += Decimal(row.amount.amount)
+            shipping[row.rate] += value
         elif row.item_id is not None:
-            goods[row.item_id] += Decimal(row.amount.amount)
+            goods[row.item_id] += value
     return HeldValues(goods=dict(goods), shipping=dict(shipping))
 
 

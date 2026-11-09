@@ -9289,6 +9289,9 @@ msgstr "Object ID"
 msgid "Occurred at"
 msgstr "Occurred at"
 
+msgid "Of a refund by lines, the part of the line's value that went back as loyalty points: a discount, so no room on the receipt and no credit, but value the line has had back."
+msgstr "Of a refund by lines, the part of the line's value that went back as loyalty points: a discount, so no room on the receipt and no credit, but value the line has had back."
+
 msgid "Off"
 msgstr "Off"
 

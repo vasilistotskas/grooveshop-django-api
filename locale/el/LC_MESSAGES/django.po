@@ -9295,6 +9295,9 @@ msgstr "ID αντικειμένου"
 msgid "Occurred at"
 msgstr "Συνέβη στις"
 
+msgid "Of a refund by lines, the part of the line's value that went back as loyalty points: a discount, so no room on the receipt and no credit, but value the line has had back."
+msgstr "Σε επιστροφή ανά γραμμές, το μέρος της αξίας της γραμμής που επέστρεψε ως πόντοι πιστότητας: έκπτωση, άρα δεν καταλαμβάνει χώρο στην απόδειξη και δεν πιστώνεται, αλλά είναι αξία που η γραμμή έχει πάρει πίσω."
+
 msgid "Off"
 msgstr "Ανενεργό"
 

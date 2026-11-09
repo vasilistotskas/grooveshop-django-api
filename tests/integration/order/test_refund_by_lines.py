@@ -24,11 +24,14 @@ import stripe
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db.models import Sum
 from django.test import RequestFactory
 from djmoney.money import Money
 
 from giftcard.factories import GiftCardFactory
 from giftcard.models import GiftCardTransaction, GiftCardTransactionKind
+from loyalty.enum import TransactionType
+from loyalty.models.transaction import PointsTransaction
 from order import credit_allocation
 from order.admin import OrderAdmin, ReturnOrderForm
 from order.credit_allocation import Piece, split_over_shares
@@ -40,7 +43,13 @@ from order.exceptions import PaymentError
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.factories.item import OrderItemFactory
 from order.invoicing import generate_invoice
-from order.models import CreditAllocation, Invoice, Order, RetailCredit
+from order.models import (
+    CreditAllocation,
+    Invoice,
+    Order,
+    OrderItem,
+    RetailCredit,
+)
 from order.models.invoice import MyDataStatus
 from order.models.refund_attempt import (
     RefundAttempt,
@@ -566,8 +575,9 @@ class TestTheCumulativeCapPerRate:
             with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
                 OrderService.refund_order(order, lines=[(item, 1)])
             # The 13% holds 60.00; 10.00 credited and 20.00 pending leave
-            # 30.00, which two more units (40.00) do not fit.
-            with pytest.raises(PaymentError, match="holds only"):
+            # 30.00, which two more units (40.00) do not fit. They would
+            # fit were the claim in flight released: the refund waits.
+            with pytest.raises(PaymentError, match="waiting for"):
                 OrderService.refund_order(order, lines=[(item, 2)])
         assert len(api.calls) == 1
         assert len(aade.credits) == 1
@@ -1431,3 +1441,74 @@ class TestTheLinesWriteTheirOwnAllocation:
             CAT_24: Decimal("12.00"),
             CAT_13: Decimal("8.00"),
         }
+
+    def test_a_line_paid_partly_with_points_cannot_be_refunded_again(self):
+        # A 100.00 line, 10.00 of it paid with points (a discount: the
+        # receipt holds 90.00), 40.00 with a gift card, 50.00 by card.
+        user = UserAccountFactory(num_addresses=0)
+        order = _order(lines=(("13", "100.00", 1),), gift="40.00", user=user)
+        item = _item(order, "13")
+        OrderItem.objects.filter(pk=item.pk).update(
+            discount_allocation=_eur("10.00")
+        )
+        Order.objects.filter(pk=order.pk).update(
+            loyalty_discount=_eur("10.00"), amount_due=_eur("50.00")
+        )
+        order.payment_transactions.update(amount=_eur("50.00"))
+        PointsTransaction.objects.create(
+            user=user, points=10_000, transaction_type=TransactionType.EARN
+        )
+        PointsTransaction.objects.create(
+            user=user,
+            points=-1000,
+            transaction_type=TransactionType.REDEEM,
+            reference_order=order,
+        )
+        order.refresh_from_db()
+
+        with FakeStripeRefunds():
+            result = OrderService.refund_order(order, lines=[(item, 1)])
+            assert result.complete
+            # 50.00 by card, then 40.00 split over the gift card (32.00) and
+            # the points (8.00): only the first 82.00 is room on the receipt.
+            room = CreditAllocation.objects.counting().filter(order=order)
+            assert room.aggregate(total=Sum("amount"))["total"] == Decimal(
+                "82.00"
+            )
+            # The line has had its whole 90.00 back, points included.
+            assert held_values(order).goods == {item.pk: Decimal("90.00")}
+            with pytest.raises(PaymentError, match="paid back"):
+                OrderService.refund_order(order, lines=[(item, 1)])
+
+    def test_a_goodwill_amount_waits_for_the_claim_that_holds_its_room(self):
+        order = _order(lines=(("24", "60.00", 1), ("13", "40.00", 1)))
+        real = credit_allocation.allocate_pro_rata
+
+        def short_unless_released(order, amount, **kwargs):
+            if kwargs.get("settled_only") or kwargs.get("released"):
+                return real(order, amount, **kwargs)
+            return {}
+
+        with FakeStripeRefunds() as api:
+            api.fail_with = stripe.APIConnectionError("x")
+            OrderService.refund_order(order, amount=_eur("20.00"))
+            api.fail_with = None
+            with (
+                patch.object(
+                    credit_allocation,
+                    "allocate_pro_rata",
+                    short_unless_released,
+                ),
+                pytest.raises(PaymentError, match="waiting for"),
+            ):
+                OrderService.refund_order(order, amount=_eur("10.00"))
+            # Short with every claim released too: a final refusal.
+            with (
+                patch.object(
+                    credit_allocation,
+                    "allocate_pro_rata",
+                    lambda *_a, **_k: {},
+                ),
+                pytest.raises(PaymentError, match="holds only"),
+            ):
+                OrderService.refund_order(order, amount=_eur("10.00"))

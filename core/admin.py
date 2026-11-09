@@ -165,7 +165,10 @@ SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
             "EMAIL_LOG_",
         ),
     ),
-    (gettext_noop("Agent Commerce"), ("AGENT_", "PRODUCT_FEEDS_")),
+    (
+        gettext_noop("Agent Commerce"),
+        ("AGENT_", "PRODUCT_FEEDS_", "STAFF_AI_"),
+    ),
     (gettext_noop("Analytics"), ("META_CAPI_",)),
     (gettext_noop("Search"), ("SEARCH_",)),
     (gettext_noop("Admin History"), ("ADMIN_LOG_",)),

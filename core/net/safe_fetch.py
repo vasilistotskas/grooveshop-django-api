@@ -13,14 +13,16 @@ download such a URL:
 - the connection goes to that checked address, never to the name again, so
   DNS cannot answer differently between the check and the connect
   (rebinding). The ``Host`` header, the TLS SNI and the certificate check
-  keep the hostname (urllib3's ``server_hostname`` and ``assert_hostname``,
-  https://urllib3.readthedocs.io/en/stable/advanced-usage.html, "Custom SNI
+  keep the hostname, converted once to ASCII (IDNA): urllib3's
+  ``server_hostname`` alone, which ``ssl`` checks the certificate against
+  (https://urllib3.readthedocs.io/en/stable/advanced-usage.html, "Custom SNI
   Hostname");
 - at most :data:`MAX_REDIRECTS` redirects, each target checked like the
   first URL;
 - :data:`CONNECT_TIMEOUT` to connect, :data:`READ_TIMEOUT` for each read,
-  :data:`TOTAL_TIMEOUT` for the whole fetch, and a byte cap the caller gives,
-  counted on the bytes as they stream in.
+  :data:`TOTAL_TIMEOUT` for the whole fetch (the DNS lookup and a watchdog
+  on the socket enforce it), and a byte cap the caller gives, counted on the
+  bytes as they stream in.
 
 Failures are typed for the retry rules of ``core.retry``: a refused URL, a
 4xx and an oversize body are permanent (:class:`FetchError`); a refused
@@ -62,6 +64,17 @@ MAX_REDIRECTS = 3
 CONNECT_TIMEOUT = 5.0
 READ_TIMEOUT = 15.0
 TOTAL_TIMEOUT = 30.0
+NAT64_WELL_KNOWN = ipaddress.IPv6Network("64:ff9b::/96")
+#: Forms that carry an IPv4 address in the low 32 bits and that
+#: ``ipaddress`` still calls global: the IPv4-compatible ``::/96`` (RFC 4291
+#: 2.5.5.1, deprecated) and the IPv4-translated ``::ffff:0:0:0/96`` (RFC
+#: 2765, obsoleted by RFC 7915). Nothing legitimate is served from either.
+#: The other embeddings (6to4 ``2002::/16``, Teredo ``2001::/32``, the
+#: local-use NAT64 ``64:ff9b:1::/48``) are already not ``is_global``.
+OBSOLETE_EMBEDDINGS = (
+    ipaddress.IPv6Network("::/96"),
+    ipaddress.IPv6Network("::ffff:0:0:0/96"),
+)
 CHUNK_BYTES = 64 * 1024
 #: What stays as written in a request target: the reserved characters of
 #: RFC 3986 and ``%`` (an escape already there). Anything else, such as a
@@ -129,8 +142,17 @@ def is_public_address(address: str) -> bool:
         ip = ipaddress.ip_address(address)
     except ValueError:
         return False
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return is_public_address(str(ip.ipv4_mapped))
+        if ip in NAT64_WELL_KNOWN:
+            # RFC 6052: the IPv4 address is the last 32 bits, and the
+            # NAT64 gateway forwards to it, so it is the one that counts.
+            return is_public_address(
+                str(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF))
+            )
+        if any(ip in network for network in OBSOLETE_EMBEDDINGS):
+            return False
     return ip.is_global and not ip.is_multicast
 
 
@@ -158,14 +180,11 @@ def _request(
     url: str, deadline: float, max_bytes: int
 ) -> tuple[FetchedResponse | str, str]:
     """One hop: the response, or the redirect target to follow."""
-    parts = _validate_url(url)
-    hostname = parts.hostname or ""
+    parts, hostname = _validate_url(url)
     port = parts.port or DEFAULT_PORTS[parts.scheme]
-    addresses = _resolve(hostname, port)
-    target = quote(
-        parts._replace(scheme="", netloc="", fragment="").geturl() or "/",
-        safe=TARGET_SAFE,
-    )
+    addresses = _resolve(hostname, port, deadline)
+    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+    target = quote(path, safe=TARGET_SAFE)
     last_error: FetchError | None = None
     for address in addresses:
         try:
@@ -188,7 +207,13 @@ def _request(
     raise last_error
 
 
-def _validate_url(url: str) -> SplitResult:
+def _validate_url(url: str) -> tuple[SplitResult, str]:
+    """The parsed URL and its host name as ASCII (IDNA).
+
+    The one ASCII name is what is resolved, sent as SNI, checked against
+    the certificate and written in ``Host``: a certificate carries the
+    ``xn--`` form, and http.client sends ASCII only.
+    """
     try:
         parts = urlsplit(url)
         port = parts.port
@@ -201,19 +226,58 @@ def _validate_url(url: str) -> SplitResult:
     if any(ord(char) <= 0x20 or ord(char) == 0x7F for char in parts.hostname):
         # A NUL or a space ends a name for some resolvers and not others.
         raise UnsafeUrlError("The host name has a control character")
+    try:
+        hostname = parts.hostname.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        # An empty label (``a..b``), a label over 63 characters.
+        raise UnsafeUrlError(
+            f"Not a valid host name: {parts.hostname!r}"
+        ) from exc
     if parts.username is not None or parts.password is not None:
         raise UnsafeUrlError("The URL must not carry credentials")
     if (port or DEFAULT_PORTS[parts.scheme]) not in ALLOWED_PORTS:
         raise UnsafeUrlError(f"Port {port} is not allowed")
-    return parts
+    return parts, hostname
 
 
-def _resolve(hostname: str, port: int) -> list[str]:
+def _lookup(hostname: str, port: int, deadline: float) -> list:
+    """``getaddrinfo`` that gives up when the deadline comes.
+
+    The resolver has no timeout of its own and runs before the watchdog
+    can arm, so it runs on a thread that is waited for no longer than the
+    time left. A lookup still running then is abandoned (it ends by
+    itself); only its answer is lost.
+    """
+    answers: list[list] = []
+    failures: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            answers.append(
+                socket.getaddrinfo(
+                    hostname,
+                    port,
+                    type=socket.SOCK_STREAM,
+                    proto=socket.IPPROTO_TCP,
+                )
+            )
+        except BaseException as exc:
+            failures.append(exc)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(_remaining(deadline))
+    if thread.is_alive():
+        raise FetchTimeoutError(f"Resolving {hostname} took too long")
+    if failures:
+        raise failures[0]
+    return answers[0]
+
+
+def _resolve(hostname: str, port: int, deadline: float) -> list[str]:
     """Every address of ``hostname``, each one checked, in answer order."""
     try:
-        infos = socket.getaddrinfo(
-            hostname, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
-        )
+        infos = _lookup(hostname, port, deadline)
     except socket.gaierror as exc:
         if exc.errno == socket.EAI_AGAIN:
             raise FetchTemporaryError(
@@ -260,7 +324,6 @@ def _get(
             timeout=connect_timeout,
             cert_reqs="CERT_REQUIRED",
             server_hostname=hostname,
-            assert_hostname=hostname,
         )
     else:
         conn = HTTPConnection(address, port, timeout=connect_timeout)

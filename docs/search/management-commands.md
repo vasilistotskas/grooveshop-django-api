@@ -107,6 +107,17 @@ until `meilisearch_apply_settings` is run. The engine's payload limit
 (100 MB by default) is the only documented bound on the filter, so ids are not
 chunked.
 
+**Rollout window.** `meili.index_documents` is a new task name. While a release
+rolls, a new web pod can publish it to the `meilisearch` queue (routed by the
+`meili.*` pattern in `CELERY_TASK_ROUTES`) before every old worker is gone, and
+an old worker answers a name it does not register with "unregistered task" and
+drops the message: those documents stay as they were until the next full sync.
+The repo has no earlier rule for this, so the heal is the daily
+`sync-meilisearch-indexes` beat entry (02:00, every store), which upserts every
+qualifying document and prunes the stale ones. Run `meilisearch_sync_index`
+(or `meilisearch_sync_all_indexes`) once after the rollout of a release that
+adds a task name to close the window at once.
+
 A writer that saves many rows wraps them in `meili.batching.collect_reindex()`.
 While it is open the product post-save signal, the product-attribute signal and
 the generic `IndexMixin` save handler hand their documents to the collector

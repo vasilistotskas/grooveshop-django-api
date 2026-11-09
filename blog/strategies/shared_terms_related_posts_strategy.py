@@ -37,7 +37,7 @@ from collections import Counter
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.search import SearchVector
-from django.db.models import Case, Func, IntegerField, TextField, Value, When
+from django.db.models import Func, TextField
 from django.utils.translation import get_language
 
 from blog.models.post import BlogPost, BlogPostTranslation
@@ -45,23 +45,10 @@ from blog.strategies.related_posts_strategy import RelatedPostsStrategy
 
 
 class SharedTermsRelatedPostsStrategy(RelatedPostsStrategy):
-    def get_related_posts(self, post: BlogPost):
-        ranked = ranked_by_shared_terms(post)
-        if not ranked:
-            return BlogPost.objects.none()
-        return (
-            BlogPost.objects.filter(pk__in=ranked)
-            .published()
-            .order_by(
-                Case(
-                    *(
-                        When(pk=pk, then=Value(i))
-                        for i, pk in enumerate(ranked)
-                    ),
-                    output_field=IntegerField(),
-                )
-            )
-        )
+    def related_ids(self, post: BlogPost, limit: int) -> list[int]:
+        # The candidates are the store's live posts already, so the ranking
+        # is the answer: no query of its own.
+        return ranked_by_shared_terms(post)[:limit]
 
 
 def ranked_by_shared_terms(post: BlogPost) -> list[int]:

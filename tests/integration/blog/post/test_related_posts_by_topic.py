@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
-from blog.models.post import BlogPost, BlogPostTranslation
+from blog.models.post import BlogPostTranslation
 from blog.strategies.shared_terms_related_posts_strategy import (
     SharedTermsRelatedPostsStrategy,
     ranked_by_shared_terms,
@@ -109,7 +109,7 @@ def test_inflected_and_accented_forms_are_one_word():
 def test_a_post_without_a_category_has_no_topic_neighbours():
     post = post_in(None, "Οπτική ίνα")
 
-    assert list(SharedTermsRelatedPostsStrategy().get_related_posts(post)) == []
+    assert SharedTermsRelatedPostsStrategy().related_ids(post, 8) == []
 
 
 def test_drafts_are_never_related():
@@ -127,12 +127,10 @@ def test_the_block_keeps_the_order_the_strategies_found():
     category = BlogCategoryFactory()
     post = post_in(category, "Οπτική ίνα")
     older, newer = (post_in(category, title) for title in ("Α", "Β"))
-    first = BlogPost.objects.filter(pk__in=[older.pk])
-
     # The shared-words strategy ranks the older post first: it stays
     # first, ahead of a newer post the category strategy adds after it.
     with patch.object(
-        SharedTermsRelatedPostsStrategy, "get_related_posts", return_value=first
+        SharedTermsRelatedPostsStrategy, "related_ids", return_value=[older.pk]
     ):
         ids = related_ids(post)
 

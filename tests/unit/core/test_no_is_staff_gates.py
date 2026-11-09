@@ -26,6 +26,9 @@ ALLOWED = {
     # Trades a single-use ticket for a builder PlatformStaffToken: it reads
     # the PUBLIC identity, like tenant/staff_api.py when it mints one.
     "builder/staff_session.py",
+    # Authenticates the staff issuer's tokens against the PUBLIC schema, and
+    # re-checks the flag on every call as tenant/api_tokens.py does.
+    "agent/staff_auth.py",
     "user/admin.py",
     "user/managers/account.py",
     "core/rosetta_access.py",

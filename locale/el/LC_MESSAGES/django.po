@@ -83,6 +83,10 @@ msgid "%(client_name)s wants to access your %(site_name)s account."
 msgstr "Η εφαρμογή %(client_name)s θέλει πρόσβαση στο λογαριασμό σας %(site_name)s."
 
 #, python-format
+msgid "%(client_name)s wants to read the %(store)s admin as you (%(role)s). It can only view, never change anything."
+msgstr "Η εφαρμογή %(client_name)s ζητά να διαβάζει τη διαχείριση του %(store)s ως εσείς (%(role)s). Μπορεί μόνο να βλέπει, ποτέ να αλλάζει κάτι."
+
+#, python-format
 msgid "%(code)s on cart %(cart)s"
 msgstr "%(code)s στο καλάθι %(cart)s"
 
@@ -1748,6 +1752,9 @@ msgstr "Όπως το εμφανίζει ο φυλλομετρητής, σε px.
 msgid "Ask for a new link"
 msgstr "Ζητήστε νέο σύνδεσμο"
 
+msgid "Ask the store's owner to add you to the team, or sign in with another account."
+msgstr "Ζητήστε από τον ιδιοκτήτη του καταστήματος να σας προσθέσει στην ομάδα ή συνδεθείτε με άλλον λογαριασμό."
+
 msgid "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
 msgstr "Αναθέστε μια ομάδα παραλλαγών για να συνδέσετε αυτό το προϊόν με τις αδερφές παραλλαγές του (π.χ. άλλα χρώματα). Επισημάνετε τα σχετικά χαρακτηριστικά (Χρώμα, Μνήμη) ως άξονες παραλλαγής στα Χαρακτηριστικά ώστε να εμφανίζονται ως επιλογείς στο κατάστημα."
 
@@ -2696,6 +2703,9 @@ msgstr "Δεν είναι δυνατή η ανάθεση τιμής σε ανε�
 msgid "Cannot check more than 100 comments at once."
 msgstr "Δεν είναι δυνατός ο έλεγχος περισσότερων από 100 σχολίων ταυτόχρονα."
 
+msgid "Cannot connect"
+msgstr "Δεν είναι δυνατή η σύνδεση"
+
 #, python-format
 msgid "Cannot refund more than the ordered quantity. Ordered quantity: %(ordered)s, Refunded quantity: %(refunded)s, Refund quantity: %(requested)s"
 msgstr "Δεν είναι δυνατή η επιστροφή ποσότητας μεγαλύτερης από την παραγγελθείσα. Παραγγελθείσα ποσότητα: %(ordered)s, Επιστραφείσα ποσότητα: %(refunded)s, Ποσότητα προς επιστροφή: %(requested)s"
@@ -3120,6 +3130,9 @@ msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για δη�
 
 msgid "Choose at least one document to share."
 msgstr "Επίλεξε τουλάχιστον ένα έγγραφο για κοινοποίηση."
+
+msgid "Choose at least one thing the app may view."
+msgstr "Επιλέξτε τουλάχιστον ένα πράγμα που μπορεί να βλέπει η εφαρμογή."
 
 msgid "Choose lines to refund, or enter a goodwill amount, not both."
 msgstr "Επιλέξτε γραμμές προς επιστροφή ή εισάγετε ποσό καλής θελήσεως, όχι και τα δύο."
@@ -3880,6 +3893,9 @@ msgstr "Παραγγελίες πελάτη"
 # Greek translations added by fill_admin_greek_translations.py
 msgid "Customers"
 msgstr "Πελάτες"
+
+msgid "Customers' names, emails, orders and messages it reads are sent to the app's provider. Approve only an app your store has agreed to use."
+msgstr "Τα ονόματα, τα email, οι παραγγελίες και τα μηνύματα πελατών που διαβάζει στέλνονται στον πάροχο της εφαρμογής. Εγκρίνετε μόνο εφαρμογή που το κατάστημά σας έχει αποφασίσει να χρησιμοποιεί."
 
 msgid "DELIVERY ADDRESS"
 msgstr "ΔΙΕΥΘΥΝΣΗ ΠΑΡΑΔΟΣΗΣ"
@@ -4664,6 +4680,10 @@ msgstr "Εισαγάγετε μόνο το όνομα host, χωρίς πρωτ�
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Εισαγάγετε τον κωδικό κατά την ολοκλήρωση της αγοράς για να χρησιμοποιήσετε το υπόλοιπό σας — μπορείτε να το ξοδέψετε σε πολλές παραγγελίες μέχρι να εξαντληθεί."
+
+#, python-format
+msgid "Enter the code from your authenticator app for %(account)s, or one of your recovery codes."
+msgstr "Πληκτρολογήστε τον κωδικό της εφαρμογής ελέγχου ταυτότητας για τον λογαριασμό %(account)s ή έναν από τους κωδικούς ανάκτησης."
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Εισαγάγετε τον κωδικό από την εφαρμογή ταυτοποίησης. Αν δεν έχετε πια το κινητό σας, χρησιμοποιήστε έναν από τους κωδικούς ανάκτησης."
@@ -6878,6 +6898,9 @@ msgstr "Η Google ενημερώνεται για τους όρους επιστ
 
 msgid "Google site verification"
 msgstr "Επαλήθευση ιστότοπου Google"
+
+msgid "Grant permissions"
+msgstr "Παραχώρηση δικαιωμάτων"
 
 msgid "Grants wholesale pricing for the chosen group and emails the customer."
 msgstr "Παρέχει τιμές χονδρικής για την επιλεγμένη ομάδα και ενημερώνει τον πελάτη με email."
@@ -12164,6 +12187,9 @@ msgstr "Επιστρέφει τα μεταδεδομένα της απόδειξ
 msgid "Return to my cart"
 msgstr "Επιστροφή στο καλάθι"
 
+msgid "Return to your AI app and connect your store from there."
+msgstr "Επιστρέψτε στην εφαρμογή AI και συνδέστε το κατάστημά σας από εκεί."
+
 msgid "Return to your cart:"
 msgstr "Επιστροφή στο καλάθι:"
 
@@ -12896,6 +12922,9 @@ msgstr "Ρυθμίστε εφαρμογή ταυτοποίησης συνδεό�
 msgid "Set up your authenticator app"
 msgstr "Ρυθμίστε την εφαρμογή ταυτοποίησης"
 
+msgid "Set up your authenticator app in the admin first, then connect again."
+msgstr "Ρυθμίστε πρώτα την εφαρμογή ελέγχου ταυτότητας στη διαχείριση και μετά συνδεθείτε ξανά."
+
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Ορίζεται όταν ο πελάτης απεγγράφηκε από κάθε διαφημιστικό email (με τον σύνδεσμο ενός κλικ σε διαφημιστικό email). Όσο ισχύει, καμία αποστολή marketing δεν στέλνεται στον λογαριασμό."
 
@@ -13091,6 +13120,12 @@ msgstr "Αποσύνδεση"
 
 msgid "Sign Up"
 msgstr "Εγγραφή"
+
+msgid "Sign in"
+msgstr "Σύνδεση"
+
+msgid "Sign in to connect your AI app"
+msgstr "Συνδεθείτε για να συνδέσετε την εφαρμογή AI"
 
 msgid "Sign-in code"
 msgstr "Κωδικός σύνδεσης"
@@ -13407,6 +13442,9 @@ msgstr "Αναγνωριστικό κατάστασης"
 
 msgid "Status Updated At"
 msgstr "Κατάσταση ενημερώθηκε στις"
+
+msgid "Stay connected until you disconnect"
+msgstr "Παραμονή σε σύνδεση μέχρι να την αποσυνδέσετε"
 
 #, python-format
 msgid "Step %(current)s of %(total)s"
@@ -14893,6 +14931,9 @@ msgstr "Αυτήν την εβδομάδα"
 msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
 msgstr "Αυτή η διεύθυνση έχει απεγγραφεί από αυτά τα email, επομένως η ειδοποίηση δεν μπορεί να παραδοθεί."
 
+msgid "This app did not name a store you can connect it to."
+msgstr "Η εφαρμογή δεν όρισε κατάστημα στο οποίο μπορείτε να τη συνδέσετε."
+
 msgid "This attachment is withheld pending its scan result."
 msgstr "Αυτό το συνημμένο παρακρατείται μέχρι το αποτέλεσμα της σάρωσής του."
 
@@ -15101,6 +15142,9 @@ msgstr "Το κατάστημα δεν έχει διαπιστευτήρια γ�
 
 msgid "This store has no newsletter to subscribe to."
 msgstr "Αυτό το κατάστημα δεν διαθέτει ενημερωτικό δελτίο."
+
+msgid "This store has not turned on AI app access for its team."
+msgstr "Αυτό το κατάστημα δεν έχει ενεργοποιήσει την πρόσβαση εφαρμογών AI για την ομάδα του."
 
 msgid "This store is temporarily unavailable. Please contact the store owner."
 msgstr "Αυτό το κατάστημα δεν είναι προσωρινά διαθέσιμο. Επικοινωνήστε με τον ιδιοκτήτη του καταστήματος."
@@ -15800,6 +15844,10 @@ msgstr "Χρησιμοποιήστε μόνο σύνταξη κανονικής 
 msgid "Use only when the merchant confirms the cash on delivery reached them by a route ACS never reported. It stops the unremitted-COD alert for this parcel and marks the order paid if it is not already. ACS's own payout records are not touched."
 msgstr "Χρησιμοποιήστε το μόνο όταν ο έμπορος επιβεβαιώνει ότι η αντικαταβολή του έφτασε με τρόπο που η ACS δεν ανέφερε ποτέ. Σταματά την ειδοποίηση μη αποδοθείσας αντικαταβολής για αυτό το δέμα και σημειώνει την παραγγελία ως πληρωμένη, αν δεν είναι ήδη. Οι δικές της εγγραφές αποδόσεων της ACS δεν αλλάζουν."
 
+#, python-format
+msgid "Use the account you sign in to the %(store)s admin with."
+msgstr "Χρησιμοποιήστε τον λογαριασμό με τον οποίο μπαίνετε στη διαχείριση του %(store)s."
+
 msgid "Use the code at checkout before it expires — any unused balance is lost after the expiry date."
 msgstr "Χρησιμοποιήστε τον κωδικό κατά την ολοκλήρωση της αγοράς πριν λήξει — τυχόν αχρησιμοποίητο υπόλοιπο χάνεται μετά την ημερομηνία λήξης."
 
@@ -16083,18 +16131,39 @@ msgstr "Δείτε τις ενεργές δεσμεύσεις αποθέματο
 msgid "View all"
 msgstr "Προβολή όλων"
 
+msgid "View contact messages"
+msgstr "Προβολή μηνυμάτων επικοινωνίας"
+
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr "Ο μετρητής προβολών μηδενίστηκε για %(count)d άρθρα."
 
+msgid "View customers"
+msgstr "Προβολή πελατών"
+
 msgid "View on the storefront"
 msgstr "Προβολή στο κατάστημα"
+
+msgid "View product reviews"
+msgstr "Προβολή αξιολογήσεων προϊόντων"
+
+msgid "View products, prices and stock"
+msgstr "Προβολή προϊόντων, τιμών και αποθέματος"
 
 msgid "View store"
 msgstr "Προβολή καταστήματος"
 
 msgid "View the product"
 msgstr "Δείτε το προϊόν"
+
+msgid "View the store's orders"
+msgstr "Προβολή των παραγγελιών του καταστήματος"
+
+msgid "View the store's profit and costs"
+msgstr "Προβολή του κέρδους και του κόστους του καταστήματος"
+
+msgid "View the store's sales and turnover"
+msgstr "Προβολή των πωλήσεων και του τζίρου του καταστήματος"
 
 msgid "View your favourite products"
 msgstr "Προβολή των αγαπημένων σας προϊόντων"
@@ -16702,6 +16771,9 @@ msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάπ
 msgid "You are receiving this email because you, or someone else, tried to sign up for an account using the email address %(email)s. However, an account using that email address already exists."
 msgstr "Λαμβάνετε αυτό το email επειδή εσείς ή κάποιος άλλος προσπάθησε να εγγραφεί με τη διεύθυνση email %(email)s. Ωστόσο, υπάρχει ήδη λογαριασμός με αυτή τη διεύθυνση email."
 
+msgid "You are signed in"
+msgstr "Έχετε συνδεθεί"
+
 msgid "You can only delete your own account."
 msgstr "Μπορείτε να διαγράψετε μόνο τον δικό σας λογαριασμό."
 
@@ -16832,6 +16904,9 @@ msgstr "Ο λογαριασμός σας δεν έχει διεύθυνση emai
 
 msgid "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
 msgstr "Ο λογαριασμός σας διαγράφεται. Θα αποσυνδεθείτε σύντομα. Οι παραγγελίες διατηρούνται σε ανωνυμοποιημένη μορφή για φορολογικούς/λογιστικούς λόγους."
+
+msgid "Your account is not on this store's team."
+msgstr "Ο λογαριασμός σας δεν ανήκει στην ομάδα αυτού του καταστήματος."
 
 msgid "Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!"
 msgstr "Ο λογαριασμός σας παραμένει ενεργός και όλα τα δεδομένα σας βρίσκονται ακριβώς εκεί που τα αφήσατε. Τα κρατάμε ασφαλή και έτοιμα για την επιστροφή σας!"
@@ -16998,6 +17073,9 @@ msgstr "Η επιστροφή χρημάτων βρίσκεται καθ' οδό
 
 msgid "Your return has been received and is being processed."
 msgstr "Η επιστροφή σας έχει ληφθεί και είναι υπό επεξεργασία."
+
+msgid "Your role in this store cannot view anything through an AI app."
+msgstr "Ο ρόλος σας σε αυτό το κατάστημα δεν επιτρέπει την προβολή τίποτα μέσω εφαρμογής AI."
 
 msgid "Your sign-in code"
 msgstr "Ο κωδικός σύνδεσής σας"

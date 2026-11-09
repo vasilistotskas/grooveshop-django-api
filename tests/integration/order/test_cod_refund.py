@@ -467,6 +467,29 @@ class TestTheStaffAction:
 
         assert form.is_valid(), form.errors
 
+    def test_finishing_a_stalled_gift_card_share_needs_no_reference(
+        self, staff_user
+    ):
+        """A repeat that resumes a gift card and points share already
+        claimed pays no cash, so it is not asked how cash was paid back,
+        although cash is still refundable on the order."""
+        from order.models.refund_attempt import RefundAttempt
+
+        order = _cod_order("50.00")
+        RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=_eur("15.00"),
+        )
+
+        resume = _form(staff_user, order, {"amount": "15.00", "reason": "R"})
+        new = _form(staff_user, order, {"amount": "20.00", "reason": "R"})
+
+        assert resume.is_valid(), resume.errors
+        assert not new.is_valid()
+        assert "repayment_reference" in new.errors
+
     def test_a_refund_inside_the_provider_payment_needs_no_reference(
         self, staff_user
     ):

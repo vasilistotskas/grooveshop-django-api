@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from order.enum.payment_transaction import PaymentTransactionKind
@@ -116,9 +117,11 @@ def _found(attempt: RefundAttempt) -> ProviderRefund | None:
 
 def reconcile(attempt: RefundAttempt) -> Resolution:
     """Ask the provider what became of *attempt* and settle or decline it
-    when the answer is unambiguous."""
+    when the answer is unambiguous. An attempt left undecided is stamped
+    ``looked_up_at``: from then on staff are told and may record it."""
     refund = _found(attempt)
     if refund is None:
+        _stamp_looked_up(attempt)
         return Resolution.UNRESOLVED
     charge = attempt.charge
     if refund.made:
@@ -145,6 +148,14 @@ def reconcile(attempt: RefundAttempt) -> Resolution:
     return Resolution.DECLINED if declined else Resolution.UNRESOLVED
 
 
+def _stamp_looked_up(attempt: RefundAttempt) -> None:
+    """Record that the lookup asked about *attempt* and could not decide
+    it (an attempt resolved meanwhile is left alone)."""
+    RefundAttempt.objects.filter(
+        pk=attempt.pk, status=RefundAttemptStatus.PENDING
+    ).update(looked_up_at=timezone.now())
+
+
 def reconcile_overdue() -> dict[str, int]:
     """:func:`reconcile` every overdue attempt of the current store. One
     that fails does not stop the others."""
@@ -157,6 +168,9 @@ def reconcile_overdue() -> dict[str, int]:
             logger.exception(
                 "Refund attempt %s could not be reconciled", attempt.pk
             )
+            # The lookup ran and could not decide: staff are told, as for
+            # an answer that decided nothing.
+            _stamp_looked_up(attempt)
             counts[Resolution.UNRESOLVED] += 1
     return {resolution.value: n for resolution, n in counts.items()}
 
@@ -172,17 +186,18 @@ def record_outcome(
     (*reference* is the provider's id of it, or how the cash was paid back)
     or it was not.
 
-    Refused unless the attempt is still PENDING and overdue (before that
-    the automatic lookup decides), and a reference already in the ledger
+    Refused unless the attempt is still PENDING, overdue, and the
+    automatic lookup could not decide it (before that the provider may
+    still answer), and a reference already in the ledger
     cannot be claimed a second time. Goes through the same paths as an
     automatic resolution and leaves the user in the order's history.
     """
     reference = reference.strip()
-    if not attempt.is_overdue:
+    if not attempt.is_awaiting_staff:
         raise PaymentError(
             _(
-                "This refund is not overdue yet: the payment provider is "
-                "asked about it automatically first."
+                "The payment provider has not been asked about this refund "
+                "yet: it is looked up automatically first."
             )
         )
     if settled:

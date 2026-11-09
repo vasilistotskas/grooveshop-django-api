@@ -3,6 +3,14 @@
 
 
 
+## v3.237.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(order): find Viva refunds in the lookup and ask staff only after it failed (#541)
+
+Viva refund lookup reads the nested TransactionType; the unknown-refund alert and Record refund outcome wait for the lookup (looked_up_at, awaiting_staff) and never lose an attempt; a stalled gift card and points share stays finishable from the order; the resume dialog asks for no cash reference; reservation-time texts name the setting; OrderItemFactory.is_refunded defaults False; the internal agent order endpoint declares its header and 404. ([`74b6688`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74b6688de7799029493abb8e7b0682e216c57029))
+
 ## v3.237.1 (2026-11-08)
 
 ### Bug fixes

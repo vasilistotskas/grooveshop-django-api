@@ -413,6 +413,24 @@ class RefundOrderForm(BaseDialogForm):
                 else _("Up to %(refundable)s can still be refunded.")
                 % {"refundable": money(provider)}
             )
+        stalled = (
+            RefundAttempt.objects.stalled()
+            .filter(order=self.order)
+            .order_by("created_at", "id")
+            .first()
+            if self.order
+            else None
+        )
+        if stalled is not None:
+            # The amount that finishes it is the stopped share's own, not
+            # the refund it was part of (``_attempts_to_resume``).
+            amount = self.fields["amount"]
+            amount.initial = stalled.amount.amount
+            amount.help_text = _(
+                "A return of %(amount)s onto gift cards and loyalty points "
+                "stopped before it finished. Refunding this amount finishes "
+                "it; nothing is given back twice."
+            ) % {"amount": money(stalled.amount.amount)}
         # Asked only where cash a courier collected can be paid back: there
         # is no provider to refund it, so staff say how they did.
         if not self._has_refundable_cash():
@@ -432,6 +450,11 @@ class RefundOrderForm(BaseDialogForm):
             and amount is not None
             and "repayment_reference" in self.fields
             and not cleaned.get("repayment_reference")
+            # A repeat that resumes a refund already claimed pays no new
+            # cash share: it needs no word on how cash was paid back.
+            and not OrderService.resumes_a_refund(
+                self.order, Money(amount, self.order.amount_due.currency)
+            )
             and any(
                 is_cash_collection(charge)
                 for charge, _share in PaymentLedger.plan_refund(
@@ -456,8 +479,8 @@ class RefundOrderForm(BaseDialogForm):
 class RecordRefundOutcomeForm(BaseDialogForm):
     """The "Record refund outcome" dialog of an order.
 
-    Offers the order's provider refunds still PENDING past the point where
-    the automatic lookup is due (``RefundAttempt.objects.overdue()``): the
+    Offers the order's provider refunds still PENDING that the automatic
+    lookup could not decide (``RefundAttempt.objects.awaiting_staff()``): the
     provider was asked about them and could not decide, so staff look at the
     provider's dashboard and say what became of each. The service
     (``order.refund_reconciliation.record_outcome``) checks it all again
@@ -494,7 +517,7 @@ class RecordRefundOutcomeForm(BaseDialogForm):
     def __init__(self, request, object_id=None, *args, **kwargs):
         super().__init__(request, object_id, *args, **kwargs)
         self.fields["attempt"].queryset = (
-            RefundAttempt.objects.overdue()
+            RefundAttempt.objects.awaiting_staff()
             .filter(order_id=object_id)
             .order_by("created_at", "id")
         )
@@ -2122,11 +2145,11 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     def has_record_refund_outcome_permission(self, request, object_id=None):
-        """Offered where a provider refund is overdue: the automatic lookup
-        had its turn and could not decide."""
+        """Offered where the automatic lookup asked the provider about an
+        overdue refund and could not decide it."""
         return (
             object_id is not None
-            and RefundAttempt.objects.overdue()
+            and RefundAttempt.objects.awaiting_staff()
             .filter(order_id=object_id)
             .exists()
         )

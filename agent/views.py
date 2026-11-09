@@ -12,7 +12,8 @@ from allauth.idp.oidc.internal.oauthlib.utils import (
     get_validator_context,
 )
 from allauth.idp.oidc.internal.resources import is_resources_subset
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import AuthenticationFailed, NotFound
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -25,6 +26,7 @@ from agent.oidc import (
     store_mcp_resource,
 )
 from agent.serializers import AgentFavouriteSerializer, AgentProfileSerializer
+from core.api.serializers import ErrorResponseSerializer
 from loyalty.serializers.loyalty import LoyaltySummarySerializer
 from loyalty.services import LoyaltyService
 from order.models.order import Order
@@ -102,7 +104,21 @@ class AgentInternalOrderView(APIView):
 
     @extend_schema(
         operation_id="getAgentInternalOrder",
-        responses=OrderDetailSerializer,
+        parameters=[
+            OpenApiParameter(
+                name="X-Internal-Token",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                description=(
+                    "The agent gateway's shared secret. A request without "
+                    "it is answered 404, like an unknown order."
+                ),
+            )
+        ],
+        responses={
+            200: OrderDetailSerializer,
+            404: ErrorResponseSerializer,
+        },
         summary="Read an order (agent gateway only)",
         description=(
             "An order the agent gateway placed. Requires the gateway's "

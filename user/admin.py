@@ -8,7 +8,6 @@ from django.db.models import Count, Q
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponse
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.html import format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
@@ -242,6 +241,13 @@ class UserSubscriptionInline(FeatureInline, TabularInline):
 @admin.register(Group)
 class GroupAdmin(BaseGroupAdmin, BaseModelAdmin):
     pass
+
+
+def _locked(queryset):
+    """*queryset* with its own rows locked. A changelist action's queryset
+    joins ``list_select_related``, and PostgreSQL refuses ``FOR UPDATE`` on
+    the nullable side of that join (a guest subscription has no user)."""
+    return queryset.select_for_update(of=("self",))
 
 
 class AdjustLoyaltyPointsForm(BaseDialogForm):
@@ -1209,7 +1215,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
 
         sent = 0
         with transaction.atomic():
-            for subscription in queryset.select_for_update().filter(
+            for subscription in _locked(queryset).filter(
                 status=UserSubscription.SubscriptionStatus.PENDING
             ):
                 subscription.arm_confirmation()
@@ -1237,15 +1243,15 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def deactivate_subscriptions(self, request, queryset):
-        # Bulk update is intentional here: no per-instance signals fire
-        # on UserSubscription.save(), so .update() is safe and efficient.
+        # ``unsubscribe`` is the one rule for ending a subscription; a
+        # queryset update would leave ``updated_at`` where it was.
+        updated = 0
         with transaction.atomic():
-            updated = queryset.filter(
+            for subscription in _locked(queryset).filter(
                 status=UserSubscription.SubscriptionStatus.ACTIVE
-            ).update(
-                status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
-                unsubscribed_at=timezone.now(),
-            )
+            ):
+                subscription.unsubscribe()
+                updated += 1
         self.message_user(
             request,
             _("%(count)d subscriptions were deactivated.") % {"count": updated},

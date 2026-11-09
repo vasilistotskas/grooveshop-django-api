@@ -15141,6 +15141,9 @@ msgstr "This store has no credentials for the payment provider, so the payment c
 msgid "This store has no newsletter to subscribe to."
 msgstr "This store has no newsletter to subscribe to."
 
+msgid "This store has not turned on AI app access for its team."
+msgstr "This store has not turned on AI app access for its team."
+
 msgid "This store is temporarily unavailable. Please contact the store owner."
 msgstr "This store is temporarily unavailable. Please contact the store owner."
 

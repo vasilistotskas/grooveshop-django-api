@@ -52610,6 +52610,9 @@ components:
         chatWidget:
           type: boolean
           readOnly: true
+        staffAiAccess:
+          type: boolean
+          readOnly: true
         catalogue:
           type: boolean
           readOnly: true
@@ -52635,6 +52638,7 @@ components:
       - productReviews
       - productSuggestions
       - promotions
+      - staffAiAccess
       - wholesale
     StoreOffice:
       type: object

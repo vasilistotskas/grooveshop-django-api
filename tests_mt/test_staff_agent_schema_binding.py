@@ -54,6 +54,21 @@ STAFF_ENDPOINTS = (
 )
 
 
+def _allow(tenant, on: bool = True) -> None:
+    """The store's own switch for its team's AI apps (off by default)."""
+    from tests.utils.store_settings import switch_store_settings
+
+    with tenant_context(tenant):
+        switch_store_settings(STAFF_AI_ACCESS_ENABLED=on)
+
+
+@pytest.fixture(autouse=True)
+def _stores_allow_staff_ai_access(request):
+    for name in ("mt_tenant", "mt_tenant_b"):
+        if name in request.fixturenames:
+            _allow(request.getfixturevalue(name))
+
+
 def _resource(tenant) -> str:
     return f"https://{tenant.get_primary_domain().domain}/mcp/admin"
 
@@ -257,6 +272,22 @@ def _register(client: HttpClient) -> str:
     return response.json()["client_id"]
 
 
+def _staff_client() -> str:
+    """A public staff client as DCR leaves it, made directly: allauth limits
+    registration per address, and only the end-to-end test needs to prove
+    DCR itself."""
+    from allauth.idp.oidc.models import Client
+
+    with schema_context(get_public_schema_name()):
+        client = Client(name="MT staff app", type=Client.Type.PUBLIC)
+        client.set_redirect_uris([REDIRECT_URI])
+        client.set_grant_types(["authorization_code", "refresh_token"])
+        client.set_response_types(["code"])
+        client.set_scopes([*ALL_READ, "offline_access"])
+        client.save()
+    return client.id
+
+
 def _authorize_query(client_id: str, resource: str, challenge: str) -> str:
     return urlencode(
         {
@@ -367,7 +398,7 @@ def test_someone_off_the_team_is_refused_at_consent(
         "mt-staff-outsider@example.com", mt_tenant_b, "owner"
     )
     client = _connect_client()
-    client_id = _register(client)
+    client_id = _staff_client()
     _verifier, challenge = _pkce()
     authorize = "/identity/o/authorize?" + _authorize_query(
         client_id, _resource(mt_tenant), challenge
@@ -386,7 +417,7 @@ def test_an_unknown_store_is_refused_before_consent(
 ):
     owner = _staff_member("mt-staff-unknown@example.com", mt_tenant, "owner")
     client = _connect_client()
-    client_id = _register(client)
+    client_id = _staff_client()
     _verifier, challenge = _pkce()
     authorize = "/identity/o/authorize?" + _authorize_query(
         client_id, "https://not-a-store.test/mcp/admin", challenge
@@ -396,3 +427,25 @@ def test_an_unknown_store_is_refused_before_consent(
     response = client.get(authorize, secure=True)
 
     assert response.status_code == 400
+
+
+@override_settings(STAFF_CONNECT_HOST=CONNECT_HOST)
+def test_a_store_that_turns_it_off_refuses_consent_and_connected_apps(
+    mt_public_tenant, mt_tenant
+):
+    owner = _staff_member("mt-staff-switch@example.com", mt_tenant, "owner")
+    token = _staff_token(owner, mt_tenant, ALL_READ)
+    client = _connect_client()
+    client_id = _staff_client()
+    _verifier, challenge = _pkce()
+    authorize = "/identity/o/authorize?" + _authorize_query(
+        client_id, _resource(mt_tenant), challenge
+    )
+    _sign_in(client, owner.email, authorize)
+    assert client.get(authorize, secure=True).status_code == 200
+
+    _allow(mt_tenant, on=False)
+
+    assert client.get(authorize, secure=True).status_code == 403
+    for name in STAFF_ENDPOINTS:
+        assert _get(mt_tenant, name, token).status_code == 404, name

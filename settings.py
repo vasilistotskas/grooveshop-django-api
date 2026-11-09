@@ -2689,6 +2689,20 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "STAFF_AI_ACCESS_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Lets the store's team connect their own AI app (Claude, "
+            "ChatGPT and others) to read the store through the store-admin "
+            "MCP server, /mcp/admin: orders, products and stock, customers, "
+            "reviews, contact messages and, by role, sales and profit. What "
+            "the app reads is sent to its provider, so it stays off until "
+            "the store turns it on. Off: no one can connect, and an app "
+            "already connected is refused at its next call."
+        ),
+    },
+    {
         "name": "AGENT_HOSTED_PAYMENT_ENABLED",
         "type": "bool",
         "value": True,

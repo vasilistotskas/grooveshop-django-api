@@ -65,6 +65,7 @@ from product.models.product import Product
 from product.models.review import ProductReview
 from tenant.membership import get_current_tenant, get_membership
 from tenant.models import TenantMembershipRole
+from tenant.permissions import IsStaffAiAccessEnabled
 from user.models import UserAccount
 
 _TAGS = ["Agent staff"]
@@ -103,10 +104,14 @@ _SEARCH_PARAM = OpenApiParameter(name="search", type=OpenApiTypes.STR)
 
 
 class StaffAgentAPIView(APIView):
-    """A store-admin view: a platform-issued staff token, one scope."""
+    """A store-admin view: a platform-issued staff token, one scope.
+
+    Every view first needs the store's ``staff_ai_access`` switch: off,
+    the whole surface answers 404, connected apps included.
+    """
 
     authentication_classes = [StaffAgentTokenAuthentication]
-    permission_classes = [HasStaffScope]
+    permission_classes = [IsStaffAiAccessEnabled, HasStaffScope]
     throttle_classes = [StaffAgentThrottle]
     staff_scope: str = ""
 
@@ -118,7 +123,7 @@ class StaffAgentMeView(StaffAgentAPIView):
     it to verify a token, as it reads ``agent/me`` for a shopper's.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsStaffAiAccessEnabled, IsAuthenticated]
 
     @extend_schema(
         operation_id="getAgentStaffProfile",

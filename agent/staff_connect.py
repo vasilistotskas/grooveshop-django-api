@@ -47,6 +47,7 @@ from agent.staff import (
 )
 from core.templatetags.store_brand import store_brand
 from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
+from tenant.features import feature_on
 from tenant.membership import get_membership
 from tenant.models import TenantMembershipRole
 
@@ -225,6 +226,14 @@ class StaffAuthorizationView(AuthorizationView):
         store = _named_store(self._request_info.get("resources") or [])
         user = self.request.user
         with tenant_context(store):
+            if not feature_on("staff_ai_access"):
+                raise StaffConnectRefused(
+                    _(
+                        "This store has not turned on AI app access for "
+                        "its team."
+                    ),
+                    store,
+                )
             membership = get_membership(user, store)
             allowed = frozenset(scopes_for_role(user)) if membership else None
         if membership is None:

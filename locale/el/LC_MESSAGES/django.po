@@ -15143,6 +15143,9 @@ msgstr "Το κατάστημα δεν έχει διαπιστευτήρια γ�
 msgid "This store has no newsletter to subscribe to."
 msgstr "Αυτό το κατάστημα δεν διαθέτει ενημερωτικό δελτίο."
 
+msgid "This store has not turned on AI app access for its team."
+msgstr "Αυτό το κατάστημα δεν έχει ενεργοποιήσει την πρόσβαση εφαρμογών AI για την ομάδα του."
+
 msgid "This store is temporarily unavailable. Please contact the store owner."
 msgstr "Αυτό το κατάστημα δεν είναι προσωρινά διαθέσιμο. Επικοινωνήστε με τον ιδιοκτήτη του καταστήματος."
 

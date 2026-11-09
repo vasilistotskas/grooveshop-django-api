@@ -30,6 +30,7 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
+from tests.utils.store_settings import switch_store_settings
 from user.factories.account import UserAccountFactory
 
 ALL_READ = list(STAFF_SCOPE_PERMISSIONS)
@@ -77,6 +78,8 @@ class StaffAgentAPITestCase(APITestCase):
         cls.oidc_client = Client.objects.create(name="Staff agent")
         cls.oidc_client.set_scopes(list(STAFF_CLIENT_SCOPES))
         cls.oidc_client.save()
+        # The store has let its team connect an AI app.
+        switch_store_settings(STAFF_AI_ACCESS_ENABLED=True)
 
     def setUp(self) -> None:
         # set_tenant() keeps connection.tenant and schema_name in step;
@@ -132,6 +135,18 @@ class StaffAgentAPITestCase(APITestCase):
         )
 
     # ── refusals ───────────────────────────────────────────────────
+
+    def test_a_store_that_has_not_turned_it_on_serves_nothing(self) -> None:
+        """Off is a bare 404 on the whole surface, a connected app's valid
+        token included, and ``me``, which the gateway verifies against."""
+        switch_store_settings(STAFF_AI_ACCESS_ENABLED=False)
+        owner = self._member(TenantMembershipRole.OWNER)
+        self._bearer(owner)
+        for name in ["agent-staff-me", *ENDPOINTS]:
+            response = self.client.get(reverse(name))
+            self.assertEqual(
+                response.status_code, status.HTTP_404_NOT_FOUND, name
+            )
 
     def test_anonymous_is_challenged_everywhere(self) -> None:
         for name in ["agent-staff-me", *ENDPOINTS]:

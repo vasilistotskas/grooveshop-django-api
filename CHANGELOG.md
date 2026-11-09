@@ -3,6 +3,14 @@
 
 
 
+## v3.241.0 (2026-11-09)
+
+### Features
+
+* feat(tenant): a store preference to open external links in a new tab (#555)
+
+Closes #550. ([`4348765`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4348765f6b292e72d3e13e6ca559d8ea8a6460c9))
+
 ## v3.240.1 (2026-11-09)
 
 ### Bug fixes

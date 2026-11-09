@@ -2641,7 +2641,8 @@ class OrderAdmin(BaseModelAdmin):
                     request,
                     _(
                         "Order %(order_id)s skipped: refund its payment "
-                        "first, %(amount)s can still be refunded."
+                        "first. %(amount)s paid for it has not gone back "
+                        "yet, counting refunds still waiting for an answer."
                     )
                     % {"order_id": order.id, "amount": money(e.refundable)}
                     if e.refundable > 0

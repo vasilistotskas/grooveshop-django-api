@@ -9639,12 +9639,12 @@ msgid "Order %(order_id)s skipped: %(reason)s"
 msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: %(reason)s"
 
 #, python-format
-msgid "Order %(order_id)s skipped: refund its payment first, %(amount)s can still be refunded."
-msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της, μπορούν ακόμη να επιστραφούν %(amount)s."
-
-#, python-format
 msgid "Order %(order_id)s skipped: refund its payment first."
 msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της."
+
+#, python-format
+msgid "Order %(order_id)s skipped: refund its payment first. %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
+msgstr "Η παραγγελία %(order_id)s παραλείφθηκε: επιστρέψτε πρώτα την πληρωμή της. %(amount)s από όσα πληρώθηκαν δεν έχουν επιστραφεί ακόμη, μαζί με επιστροφές που περιμένουν ακόμη απάντηση."
 
 #, python-format
 msgid "Order %(order_id)s was canceled but its payment was not refunded; see the order history."
@@ -11716,8 +11716,8 @@ msgid "Refund this order's payment first."
 msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας."
 
 #, python-format
-msgid "Refund this order's payment first: %(amount)s can still be refunded."
-msgstr "Επιστρέψτε πρώτα τα χρήματα της παραγγελίας: μπορούν ακόμη να επιστραφούν %(amount)s."
+msgid "Refund this order's payment first: %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
+msgstr "Επιστρέψτε πρώτα την πληρωμή αυτής της παραγγελίας: %(amount)s από όσα πληρώθηκαν δεν έχουν επιστραφεί ακόμη, μαζί με επιστροφές που περιμένουν ακόμη απάντηση."
 
 msgid "Refunded"
 msgstr "Επιστράφηκαν τα χρήματα"

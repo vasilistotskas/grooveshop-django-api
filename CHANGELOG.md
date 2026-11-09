@@ -3,6 +3,114 @@
 
 
 
+## v3.240.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(blog): ask each related-posts strategy once, for ids, so the query count does not follow the data
+
+The chain asked its strategies again to fill what was left, and the
+shared-words strategy ran a query only when it found something: the
+number of queries depended on the posts' titles, and the query-cost test
+failed in CI on random factory titles (22 against 20).
+
+Each chain member now returns ranked ids (related_ids), asked once; the
+shared-words strategy's ranking needs no query of its own (its
+candidates are already the store's live posts); the chain merges the
+lists by weight and returns the one queryset the view serializes. A
+query-cost test where every title shares words covers the case. ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+* fix(blog): act when a scheduled publication goes live, and purge the feeds on content changes (#551) ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(blog): act when a scheduled publication goes live, and purge the feeds on content changes
+
+A row saved with a future published_at is served from that date with no
+write, so nothing reacted: its cache surfaces kept the pre-publication
+answer (Django's 2 h view cache, then the storefront's), IndexNow
+announced it at save while it still answered 404 and never at go-live,
+and blog search indexed it before its date.
+
+- core.publication: a per-store sweep (beat release-due-publications,
+  every minute) finds the published rows of every PublishableModel whose
+  date passed since its cursor and that were saved before it, marks stale
+  every surface that declares the model, and sends went_live. The cursor
+  moves only after a run succeeds.
+- PublishableModel.is_live: the published() rule for one row.
+- IndexNow announces a post only when it is live; went_live queues it.
+- Blog search indexes live posts only; went_live indexes the post. The
+  save receiver collects translation pks with a plain query, without the
+  likes join get_meilisearch_queryset carries.
+- The sitemap_seo surface declares the models the sitemap and the feeds
+  list and names the feed's own cached functions, so a change reaches
+  /rss.xml and the sitemap instead of waiting for a manual purge.
+
+Closes #546 ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(core): keep sweep cursors in Postgres, and fail the go-live sweep on a failed IndexNow queue write
+
+The publication sweep and the promotion window sweep kept their cursor in
+the cache, which fails open: with Redis unreachable a read is a miss and
+a write is dropped, and a flush loses it. Each run then fell back to a
+fixed one-day window, missing anything older and repeating everything
+newer every minute.
+
+- core.SweepCursor (public, one row per store and sweep) and core.sweeps
+  (sweep_start, advance_sweep) hold the position; both sweeps use them.
+- The go-live IndexNow receiver lets a failed queue write fail the sweep,
+  which then repeats its window instead of moving past an unannounced
+  page. A save keeps treating the queue as optional. ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(core): purge what a publication made stale before the sweep moves on, and keep bulk edits' modification time
+
+From the independent review of the go-live sweep:
+
+- The sweep purges its surfaces through CacheService.purge and fails
+  the run when a surface fails to purge, so the window is repeated. The
+  batched save-time queue it used lives in the cache, which fails open,
+  and swallows its own errors.
+- A post going live reaches the page builder's pages that list its
+  category (builder.data_purge), as its save does.
+- A sweep cursor never moves backwards when an earlier run ends last.
+- admin.bulk.update_each also writes auto_now fields: a bulk publish
+  left updated_at, and with it the sitemap's lastmod and the feed's
+  atom:updated, behind.
+- promotion 0007 drops the window sweep's old cache cursor, written with
+  no expiry. ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+### Documentation
+
+* docs(blog): describe the related posts chain
+
+New docs/blog-related-posts.md: the strategy order and weights, how the
+weighted chain merges ids, the shared-words ranking and the measurements
+behind it, and why no strategy declines. RELATED_POSTS_CANDIDATES counts
+the store's newest posts of every category, not one category's. ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+### Features
+
+* feat(blog): authors' public profile links, and related posts on the same topic (#552) ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+* feat(blog): authors' public profile links, and related posts on the same topic
+
+- BlogAuthor.same_as: links to the author's public profiles (http/https
+  only, one validator shared by the model and the write serializer),
+  served on every author read and inside a post, read-only and so always
+  present. The storefront's schema.org Person sameAs. Edited in the
+  admin one per input (Unfold's ArrayWidget, set for every ArrayField in
+  BaseModelAdmin).
+- Related posts lead with the category's posts whose titles share the
+  most distinctive words with the post's (BM25 inverse document
+  frequency over the store's newest posts, words normalised by the
+  language's Postgres text search configuration). Measured on webside's
+  81 posts first: for its Instagram post, three of the first four are
+  the category's Instagram posts, where the newest-first category list
+  had two of eight.
+- The weighted chain keeps the order its strategies found, instead of
+  re-sorting by date.
+
+Closes #547
+Closes #548 ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
 ## v3.239.1 (2026-11-09)
 
 ### Bug fixes

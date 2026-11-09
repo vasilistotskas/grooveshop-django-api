@@ -1,0 +1,11 @@
+{% extends "agent/staff_connect/base.html" %}
+{% load i18n %}
+{% comment %}Why the staff issuer will not connect this person (agent/staff_connect.py: StaffConnectRefused).{% endcomment %}
+{% block head_title %}{% translate "Cannot connect" %}{% endblock head_title %}
+{% block content %}
+    <h1>{% translate "Cannot connect" %}</h1>
+    <p>{{ message }}</p>
+    {% if store %}
+        <p>{% translate "Ask the store's owner to add you to the team, or sign in with another account." %}</p>
+    {% endif %}
+{% endblock content %}

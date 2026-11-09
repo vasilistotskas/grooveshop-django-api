@@ -68,6 +68,7 @@ class StoreFeaturesSerializer(serializers.Serializer):
     price_history = serializers.BooleanField(read_only=True)
     contact_attachments = serializers.BooleanField(read_only=True)
     chat_widget = serializers.BooleanField(read_only=True)
+    staff_ai_access = serializers.BooleanField(read_only=True)
     catalogue = serializers.BooleanField(read_only=True)
     cart = serializers.BooleanField(read_only=True)
 

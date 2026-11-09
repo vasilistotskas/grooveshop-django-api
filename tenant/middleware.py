@@ -7,7 +7,10 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware
+from django.urls import set_urlconf
 from django.utils.translation import gettext_lazy as _
+from django_tenants.middleware.main import TenantMainMiddleware
+from django_tenants.utils import get_public_schema_name
 
 from tenant.cache import tenant_domains_key
 
@@ -267,3 +270,40 @@ class TenantAwareUserSessionsMiddleware:
             else:
                 UserSession.objects.create_from_request(request)
         return self.get_response(request)
+
+
+STAFF_CONNECT_URLCONF = "agent.urls_connect"
+
+
+def is_staff_connect_host(hostname: str) -> bool:
+    """True for the platform's staff connect host (``agent/staff_connect.py``)."""
+    return bool(settings.STAFF_CONNECT_HOST) and (
+        hostname == settings.STAFF_CONNECT_HOST
+    )
+
+
+class PlatformTenantMainMiddleware(TenantMainMiddleware):
+    """django-tenants' host routing, plus the staff connect host.
+
+    The connect host is the platform's (public schema) but serves only
+    the staff issuer, through its own URLconf, instead of the platform
+    host's ``tenant.urls_public``. It is named by a setting rather than a
+    ``TenantDomain`` row: its URLconf is chosen by host, and a row would
+    let the same host name be given to a store as well.
+    """
+
+    def get_tenant(self, domain_model, hostname):
+        if is_staff_connect_host(hostname):
+            from tenant.models import Tenant
+
+            return Tenant.objects.get(schema_name=get_public_schema_name())
+        return super().get_tenant(domain_model, hostname)
+
+    def process_request(self, request):
+        response = super().process_request(request)
+        if response is None and is_staff_connect_host(
+            getattr(getattr(request, "tenant", None), "domain_url", "")
+        ):
+            request.urlconf = STAFF_CONNECT_URLCONF
+            set_urlconf(STAFF_CONNECT_URLCONF)
+        return response

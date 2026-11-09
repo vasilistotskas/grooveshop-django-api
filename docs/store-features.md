@@ -102,6 +102,7 @@ consumed by tasks and integrations.
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
 | `CART_ENABLED` | (a) `cart` | needs `catalogue` |
+| `STAFF_AI_ACCESS_ENABLED` | (a) `staff_ai_access` | fails closed: off until the store chooses to let its team's AI apps read it, since what they read goes to the app's provider |
 | `CATALOGUE_ENABLED` | (a) `catalogue` | `favourites`, `gift_cards`, `product_alerts`, `product_suggestions` and `cart` need it |
 | `B2B_INVOICING_ENABLED` | (a) `b2b_invoicing` | no plan flag; refused by order validation (400, `invoicing_disabled`), not a 404 gate |
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
@@ -140,6 +141,7 @@ settings.
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
 | `catalogue` | | `CATALOGUE_ENABLED` | `product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
+| `staff_ai_access` | | `STAFF_AI_ACCESS_ENABLED` | `agent/staff_views.py` (all of `/api/v1/agent/staff/*`, a connected app's token included), and the staff consent on the connect host (`agent/staff_connect.py`); the gateway refuses `/mcp/admin` on the same answer |
 | `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `cart/views/` (every cart and cart-item action but the staff `cart/list`), `order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
 
 `chat_widget` is the one feature whose consumer endpoint is not Django's:

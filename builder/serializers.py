@@ -224,6 +224,7 @@ class StoreFeatureStatesSerializer(serializers.Serializer):
     price_history = FeatureStateSerializer(read_only=True)
     contact_attachments = FeatureStateSerializer(read_only=True)
     chat_widget = FeatureStateSerializer(read_only=True)
+    staff_ai_access = FeatureStateSerializer(read_only=True)
     catalogue = FeatureStateSerializer(read_only=True)
     cart = FeatureStateSerializer(read_only=True)
 

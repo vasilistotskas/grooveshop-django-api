@@ -78,6 +78,10 @@ msgid "%(client_name)s wants to access your %(site_name)s account."
 msgstr "%(client_name)s wants to access your %(site_name)s account."
 
 #, python-format
+msgid "%(client_name)s wants to read the %(store)s admin as you (%(role)s). It can only view, never change anything."
+msgstr "%(client_name)s wants to read the %(store)s admin as you (%(role)s). It can only view, never change anything."
+
+#, python-format
 msgid "%(code)s on cart %(cart)s"
 msgstr "%(code)s on cart %(cart)s"
 
@@ -1743,6 +1747,9 @@ msgstr "As a browser shows it, in px."
 msgid "Ask for a new link"
 msgstr "Ask for a new link"
 
+msgid "Ask the store's owner to add you to the team, or sign in with another account."
+msgstr "Ask the store's owner to add you to the team, or sign in with another account."
+
 msgid "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
 msgstr "Assign a variant group to link this product with its sibling variations (e.g. other colours). Flag the relevant attributes (Colour, Memory) as variant axes under Attributes for them to render as storefront selectors."
 
@@ -2690,6 +2697,9 @@ msgstr "Cannot assign value to inactive attribute."
 msgid "Cannot check more than 100 comments at once."
 msgstr "Cannot check more than 100 comments at once."
 
+msgid "Cannot connect"
+msgstr "Cannot connect"
+
 #, python-format
 msgid "Cannot refund more than the ordered quantity. Ordered quantity: %(ordered)s, Refunded quantity: %(refunded)s, Refund quantity: %(requested)s"
 msgstr "Cannot refund more than the ordered quantity. Ordered quantity: %(ordered)s, Refunded quantity: %(refunded)s, Refund quantity: %(requested)s"
@@ -3113,6 +3123,9 @@ msgstr "Choose at least one document to publish."
 
 msgid "Choose at least one document to share."
 msgstr "Choose at least one document to share."
+
+msgid "Choose at least one thing the app may view."
+msgstr "Choose at least one thing the app may view."
 
 msgid "Choose lines to refund, or enter a goodwill amount, not both."
 msgstr "Choose lines to refund, or enter a goodwill amount, not both."
@@ -3875,6 +3888,9 @@ msgstr "Customer's orders"
 
 msgid "Customers"
 msgstr "Customers"
+
+msgid "Customers' names, emails, orders and messages it reads are sent to the app's provider. Approve only an app your store has agreed to use."
+msgstr "Customers' names, emails, orders and messages it reads are sent to the app's provider. Approve only an app your store has agreed to use."
 
 msgid "DELIVERY ADDRESS"
 msgstr "DELIVERY ADDRESS"
@@ -4659,6 +4675,10 @@ msgstr "Enter the bare host name, without a scheme or a path."
 
 msgid "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
 msgstr "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out."
+
+#, python-format
+msgid "Enter the code from your authenticator app for %(account)s, or one of your recovery codes."
+msgstr "Enter the code from your authenticator app for %(account)s, or one of your recovery codes."
 
 msgid "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
 msgstr "Enter the code from your authenticator app. If you no longer have your phone, use one of your recovery codes instead."
@@ -6872,6 +6892,9 @@ msgstr "Google is told your return terms from Store Settings, not from this page
 
 msgid "Google site verification"
 msgstr "Google site verification"
+
+msgid "Grant permissions"
+msgstr "Grant permissions"
 
 msgid "Grants wholesale pricing for the chosen group and emails the customer."
 msgstr "Grants wholesale pricing for the chosen group and emails the customer."
@@ -12158,6 +12181,9 @@ msgstr "Return the order's retail receipt metadata and an absolute URL to the st
 msgid "Return to my cart"
 msgstr "Return to my cart"
 
+msgid "Return to your AI app and connect your store from there."
+msgstr "Return to your AI app and connect your store from there."
+
 msgid "Return to your cart:"
 msgstr "Return to your cart:"
 
@@ -12890,6 +12916,9 @@ msgstr "Set up an authenticator by signing in to the admin once, then try again.
 msgid "Set up your authenticator app"
 msgstr "Set up your authenticator app"
 
+msgid "Set up your authenticator app in the admin first, then connect again."
+msgstr "Set up your authenticator app in the admin first, then connect again."
+
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 
@@ -13085,6 +13114,12 @@ msgstr "Sign Out"
 
 msgid "Sign Up"
 msgstr "Sign Up"
+
+msgid "Sign in"
+msgstr "Sign in"
+
+msgid "Sign in to connect your AI app"
+msgstr "Sign in to connect your AI app"
 
 msgid "Sign-in code"
 msgstr "Sign-in code"
@@ -13401,6 +13436,9 @@ msgstr "Status ID"
 
 msgid "Status Updated At"
 msgstr "Status Updated At"
+
+msgid "Stay connected until you disconnect"
+msgstr "Stay connected until you disconnect"
 
 #, python-format
 msgid "Step %(current)s of %(total)s"
@@ -14891,6 +14929,9 @@ msgstr "This Week"
 msgid "This address has unsubscribed from these emails, so the alert could not be delivered."
 msgstr "This address has unsubscribed from these emails, so the alert could not be delivered."
 
+msgid "This app did not name a store you can connect it to."
+msgstr "This app did not name a store you can connect it to."
+
 msgid "This attachment is withheld pending its scan result."
 msgstr "This attachment is withheld pending its scan result."
 
@@ -15099,6 +15140,9 @@ msgstr "This store has no credentials for the payment provider, so the payment c
 
 msgid "This store has no newsletter to subscribe to."
 msgstr "This store has no newsletter to subscribe to."
+
+msgid "This store has not turned on AI app access for its team."
+msgstr "This store has not turned on AI app access for its team."
 
 msgid "This store is temporarily unavailable. Please contact the store owner."
 msgstr "This store is temporarily unavailable. Please contact the store owner."
@@ -15798,6 +15842,10 @@ msgstr "Use only regular-expression syntax the storefront reads the same way: �
 msgid "Use only when the merchant confirms the cash on delivery reached them by a route ACS never reported. It stops the unremitted-COD alert for this parcel and marks the order paid if it is not already. ACS's own payout records are not touched."
 msgstr "Use only when the merchant confirms the cash on delivery reached them by a route ACS never reported. It stops the unremitted-COD alert for this parcel and marks the order paid if it is not already. ACS's own payout records are not touched."
 
+#, python-format
+msgid "Use the account you sign in to the %(store)s admin with."
+msgstr "Use the account you sign in to the %(store)s admin with."
+
 msgid "Use the code at checkout before it expires — any unused balance is lost after the expiry date."
 msgstr "Use the code at checkout before it expires — any unused balance is lost after the expiry date."
 
@@ -16081,18 +16129,39 @@ msgstr "View active stock reservations and recent stock operations for this prod
 msgid "View all"
 msgstr "View all"
 
+msgid "View contact messages"
+msgstr "View contact messages"
+
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr "View count reset to zero for %(count)d posts."
 
+msgid "View customers"
+msgstr "View customers"
+
 msgid "View on the storefront"
 msgstr "View on the storefront"
+
+msgid "View product reviews"
+msgstr "View product reviews"
+
+msgid "View products, prices and stock"
+msgstr "View products, prices and stock"
 
 msgid "View store"
 msgstr "View store"
 
 msgid "View the product"
 msgstr "View the product"
+
+msgid "View the store's orders"
+msgstr "View the store's orders"
+
+msgid "View the store's profit and costs"
+msgstr "View the store's profit and costs"
+
+msgid "View the store's sales and turnover"
+msgstr "View the store's sales and turnover"
 
 msgid "View your favourite products"
 msgstr "View your favourite products"
@@ -16700,6 +16769,9 @@ msgstr "You are receiving this email because you, or someone else, tried to acce
 msgid "You are receiving this email because you, or someone else, tried to sign up for an account using the email address %(email)s. However, an account using that email address already exists."
 msgstr "You are receiving this email because you, or someone else, tried to sign up for an account using the email address %(email)s. However, an account using that email address already exists."
 
+msgid "You are signed in"
+msgstr "You are signed in"
+
 msgid "You can only delete your own account."
 msgstr "You can only delete your own account."
 
@@ -16830,6 +16902,9 @@ msgstr "Your account has no email address to send it to."
 
 msgid "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
 msgstr "Your account is being deleted. You will be logged out shortly. Orders are retained in anonymised form for tax/accounting purposes."
+
+msgid "Your account is not on this store's team."
+msgstr "Your account is not on this store's team."
 
 msgid "Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!"
 msgstr "Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!"
@@ -16996,6 +17071,9 @@ msgstr "Your refund is on its way back to the original payment method. It can ta
 
 msgid "Your return has been received and is being processed."
 msgstr "Your return has been received and is being processed."
+
+msgid "Your role in this store cannot view anything through an AI app."
+msgstr "Your role in this store cannot view anything through an AI app."
 
 msgid "Your sign-in code"
 msgstr "Your sign-in code"

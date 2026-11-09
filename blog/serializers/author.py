@@ -8,6 +8,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from blog.models.author import (
     PROFILE_URL_MAX_LENGTH,
     PROFILE_URL_VALIDATOR,
+    PROFILE_URLS_MAX,
     BlogAuthor,
 )
 from core.api.schema import generate_schema_multi_lang
@@ -146,6 +147,7 @@ class BlogAuthorWriteSerializer(
             max_length=PROFILE_URL_MAX_LENGTH,
             validators=[PROFILE_URL_VALIDATOR],
         ),
+        max_length=PROFILE_URLS_MAX,
         required=False,
     )
 

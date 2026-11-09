@@ -2495,8 +2495,9 @@ class OrderViewSet(BaseModelViewSet):
         except RefundOutstandingError as e:
             raise RefundOutstanding(
                 _(
-                    "Refund this order's payment first: %(amount)s can still "
-                    "be refunded."
+                    "Refund this order's payment first: %(amount)s paid for "
+                    "it has not gone back yet, counting refunds still "
+                    "waiting for an answer."
                 )
                 % {"amount": e.refundable}
                 if e.refundable > 0

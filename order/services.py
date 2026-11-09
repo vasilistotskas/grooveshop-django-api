@@ -2629,7 +2629,7 @@ class OrderService:
         if new_status == OrderStatus.REFUNDED and PaymentLedger.refund_open(
             order
         ):
-            raise RefundOutstandingError(PaymentLedger.refundable(order))
+            raise RefundOutstandingError(PaymentLedger.outstanding(order))
 
         old_status = order.status
 

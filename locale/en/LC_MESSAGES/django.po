@@ -9632,12 +9632,12 @@ msgid "Order %(order_id)s skipped: %(reason)s"
 msgstr "Order %(order_id)s skipped: %(reason)s"
 
 #, python-format
-msgid "Order %(order_id)s skipped: refund its payment first, %(amount)s can still be refunded."
-msgstr "Order %(order_id)s skipped: refund its payment first, %(amount)s can still be refunded."
-
-#, python-format
 msgid "Order %(order_id)s skipped: refund its payment first."
 msgstr "Order %(order_id)s skipped: refund its payment first."
+
+#, python-format
+msgid "Order %(order_id)s skipped: refund its payment first. %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
+msgstr "Order %(order_id)s skipped: refund its payment first. %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
 
 #, python-format
 msgid "Order %(order_id)s was canceled but its payment was not refunded; see the order history."
@@ -11709,8 +11709,8 @@ msgid "Refund this order's payment first."
 msgstr "Refund this order's payment first."
 
 #, python-format
-msgid "Refund this order's payment first: %(amount)s can still be refunded."
-msgstr "Refund this order's payment first: %(amount)s can still be refunded."
+msgid "Refund this order's payment first: %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
+msgstr "Refund this order's payment first: %(amount)s paid for it has not gone back yet, counting refunds still waiting for an answer."
 
 msgid "Refunded"
 msgstr "Refunded"

@@ -1551,10 +1551,32 @@ class TestTheDialogAnswersAsTheLockedPathDoes:
         return RefundAttempt.objects.create(
             order=order,
             charge=charge,
-            amount=_eur("40.00"),
+            amount=fields.pop("amount", _eur("40.00")),
             request_id=uuid.uuid4(),
             **fields,
         )
+
+    def test_a_pending_share_that_holds_everything_keeps_the_dialog(
+        self, order_admin, staff
+    ):
+        """A full return by lines timed out at the provider: its PENDING
+        share holds everything that was left, so nothing is refundable,
+        yet the dialog must stay on the order (its retry, or the way to
+        Record refund outcome), and the order cannot close as REFUNDED
+        while that money has not gone back."""
+        from order.exceptions import RefundOutstandingError
+
+        order = _order(status=OrderStatus.RETURNED)
+        self._lines_attempt(order, amount=_eur("100.00"))
+        assert PaymentLedger.refundable_value(order) == 0
+
+        assert PaymentLedger.refund_open(order) is True
+        assert order_admin.has_refund_permission(
+            _request(staff, {}), object_id=order.pk
+        )
+        with pytest.raises(RefundOutstandingError) as excinfo:
+            OrderService.update_order_status(order, OrderStatus.REFUNDED)
+        assert excinfo.value.refundable == Decimal("100.00")
 
     def test_the_retry_is_offered_while_the_locked_path_would_resume_it(
         self, staff

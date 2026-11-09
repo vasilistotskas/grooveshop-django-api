@@ -33,20 +33,24 @@ See ``docs/safe-fetch.md``.
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import socket
+import ssl
+import threading
 import time
 from dataclasses import dataclass
 from http import HTTPStatus
-from urllib.parse import SplitResult, urljoin, urlsplit
+from http.client import HTTPException
+from urllib.parse import SplitResult, quote, urljoin, urlsplit
 
 import urllib3
+from urllib3.connection import HTTPConnection, HTTPSConnection
 from urllib3.exceptions import (
     ConnectTimeoutError,
     HTTPError,
     NewConnectionError,
     ReadTimeoutError,
-    SSLError,
 )
 
 from core.retry import is_permanent_http_status
@@ -59,6 +63,10 @@ CONNECT_TIMEOUT = 5.0
 READ_TIMEOUT = 15.0
 TOTAL_TIMEOUT = 30.0
 CHUNK_BYTES = 64 * 1024
+#: What stays as written in a request target: the reserved characters of
+#: RFC 3986 and ``%`` (an escape already there). Anything else, such as a
+#: Greek file name, is percent-encoded, as http.client sends ASCII only.
+TARGET_SAFE = "/?&=%:@!$'()*+,;~-._[]"
 REDIRECT_STATUSES = frozenset(
     {
         HTTPStatus.MOVED_PERMANENTLY,
@@ -154,7 +162,10 @@ def _request(
     hostname = parts.hostname or ""
     port = parts.port or DEFAULT_PORTS[parts.scheme]
     addresses = _resolve(hostname, port)
-    target = parts._replace(scheme="", netloc="", fragment="").geturl() or "/"
+    target = quote(
+        parts._replace(scheme="", netloc="", fragment="").geturl() or "/",
+        safe=TARGET_SAFE,
+    )
     last_error: FetchError | None = None
     for address in addresses:
         try:
@@ -187,6 +198,9 @@ def _validate_url(url: str) -> SplitResult:
         raise UnsafeUrlError(f"Scheme {parts.scheme!r} is not allowed")
     if not parts.hostname:
         raise UnsafeUrlError("The URL has no host")
+    if any(ord(char) <= 0x20 or ord(char) == 0x7F for char in parts.hostname):
+        # A NUL or a space ends a name for some resolvers and not others.
+        raise UnsafeUrlError("The host name has a control character")
     if parts.username is not None or parts.password is not None:
         raise UnsafeUrlError("The URL must not carry credentials")
     if (port or DEFAULT_PORTS[parts.scheme]) not in ALLOWED_PORTS:
@@ -206,6 +220,10 @@ def _resolve(hostname: str, port: int) -> list[str]:
                 f"Could not resolve {hostname}: {exc}"
             ) from exc
         raise FetchError(f"Could not resolve {hostname}: {exc}") from exc
+    except ValueError as exc:
+        # ``UnicodeError`` (a bad IDNA label: empty, over 63 characters)
+        # and an embedded NUL are the caller's URL, not the network.
+        raise UnsafeUrlError(f"Not a valid host name: {hostname!r}") from exc
     addresses: list[str] = []
     for info in infos:
         address = str(info[4][0])
@@ -228,48 +246,83 @@ def _get(
     deadline: float,
     max_bytes: int,
 ) -> FetchedResponse | str:
-    """GET ``target`` from ``address``; the body, or the redirect target."""
-    timeout = urllib3.Timeout(
-        connect=min(CONNECT_TIMEOUT, _remaining(deadline)),
-        read=min(READ_TIMEOUT, _remaining(deadline)),
-    )
+    """GET ``target`` from ``address``; the body, or the redirect target.
+
+    The whole exchange, TLS and headers included, is held to ``deadline``
+    by :class:`_Watchdog`: a socket timeout limits one ``recv``, so a host
+    that sends a byte every few seconds would otherwise never trip it.
+    """
+    connect_timeout = min(CONNECT_TIMEOUT, _remaining(deadline))
     if parts.scheme == "https":
-        pool = urllib3.HTTPSConnectionPool(
+        conn: HTTPConnection = HTTPSConnection(
             address,
             port,
-            timeout=timeout,
-            retries=False,
+            timeout=connect_timeout,
             cert_reqs="CERT_REQUIRED",
             server_hostname=hostname,
             assert_hostname=hostname,
         )
     else:
-        pool = urllib3.HTTPConnectionPool(
-            address, port, timeout=timeout, retries=False
-        )
+        conn = HTTPConnection(address, port, timeout=connect_timeout)
     host_header = f"[{hostname}]" if ":" in hostname else hostname
     if parts.port is not None:
         host_header = f"{host_header}:{port}"
-    with pool:
-        try:
-            response = pool.urlopen(
-                "GET",
-                target,
-                headers={"Host": host_header},
-                redirect=False,
-                assert_same_host=False,
-                preload_content=False,
-                retries=False,
-            )
-        except HTTPError as exc:
-            raise _classify(exc, hostname) from exc
-        try:
-            return _read(response, parts, deadline, max_bytes)
-        except (ReadTimeoutError, HTTPError) as exc:
-            raise _classify(exc, hostname) from exc
-        finally:
-            response.release_conn()
-            response.close()
+    watchdog = _Watchdog()
+    try:
+        conn.connect()
+        sock = conn.sock
+        assert sock is not None
+        sock.settimeout(min(READ_TIMEOUT, _remaining(deadline)))
+        watchdog.start(sock, _remaining(deadline))
+        conn.request(
+            "GET",
+            target,
+            headers={"Host": host_header},
+            preload_content=False,
+        )
+        response = conn.getresponse()
+        result = _read(response, parts, deadline, max_bytes)
+        if watchdog.fired:
+            raise FetchTimeoutError(f"{hostname} took over {TOTAL_TIMEOUT}s")
+        return result
+    except FetchError:
+        raise
+    except (OSError, HTTPException, HTTPError) as exc:
+        if watchdog.fired or time.monotonic() >= deadline:
+            raise FetchTimeoutError(
+                f"{hostname} took over {TOTAL_TIMEOUT}s"
+            ) from exc
+        raise _classify(exc, hostname) from exc
+    finally:
+        watchdog.cancel()
+        conn.close()
+
+
+class _Watchdog:
+    """Shuts a socket down when the deadline comes, whatever it is doing.
+
+    Thread-based because nothing else interrupts a blocked ``recv``:
+    ``shutdown`` makes it return at once (end of stream or an error).
+    ``fired`` tells the caller that a short body is a cut-off one.
+    """
+
+    def __init__(self) -> None:
+        self.fired = False
+        self._timer: threading.Timer | None = None
+
+    def start(self, sock: socket.socket, seconds: float) -> None:
+        def stop() -> None:
+            self.fired = True
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
+
+        self._timer = threading.Timer(seconds, stop)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def cancel(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
 
 
 def _read(
@@ -313,17 +366,30 @@ def _remaining(deadline: float) -> float:
     return remaining
 
 
-def _classify(exc: HTTPError, hostname: str) -> FetchError:
-    """The typed error for a urllib3 failure.
+def _certificate_failure(exc: BaseException | None) -> bool:
+    """Whether a certificate check is somewhere in ``exc``'s cause chain."""
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        if isinstance(exc, ssl.SSLCertVerificationError):
+            return True
+        seen.add(id(exc))
+        exc = exc.__cause__ or exc.__context__
+    return False
 
-    A certificate that does not match the hostname is permanent; the
-    other failures (refused, reset, timed out) are worth another try.
+
+def _classify(exc: BaseException, hostname: str) -> FetchError:
+    """The typed error for a connection failure.
+
+    Only a failed certificate check is permanent: the same host presents
+    the same certificate next time. Every other failure (refused, reset,
+    a TLS handshake that broke off, a malformed answer) is worth another
+    try.
     """
-    if isinstance(exc, SSLError):
+    if _certificate_failure(exc):
         return FetchError(f"{hostname} failed TLS verification: {exc}")
     # First: urllib3's NewConnectionError is a ConnectTimeoutError.
     if isinstance(exc, NewConnectionError):
         return FetchTemporaryError(f"Could not connect to {hostname}")
-    if isinstance(exc, ConnectTimeoutError | ReadTimeoutError):
+    if isinstance(exc, ConnectTimeoutError | ReadTimeoutError | TimeoutError):
         return FetchTimeoutError(f"{hostname} timed out")
     return FetchTemporaryError(f"{hostname}: {exc}")

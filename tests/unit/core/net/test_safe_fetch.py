@@ -10,9 +10,11 @@ connection goes to the checked IP and not to the name.
 from __future__ import annotations
 
 import socket
+import ssl
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import urllib3
@@ -64,6 +66,15 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b"x" * 5_000)
+        elif self.path == "/trickle-body":
+            # No Content-Length: a cut-off body would look complete.
+            self.send_response(200)
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self._trickle(b"x" * 200, 0.2)
+        elif self.path == "/trickle-headers":
+            self.wfile.write(b"HTTP/1.1 200 OK\r\n")
+            self._trickle(b"X-Slow: " + b"y" * 500, 0.2)
         elif self.path == "/missing":
             self._send(404, b"nope")
         elif self.path == "/down":
@@ -72,6 +83,15 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(429, b"slow down")
         else:
             self._send(200, b"other")
+
+    def _trickle(self, data: bytes, delay: float) -> None:
+        try:
+            for byte in data:
+                self.wfile.write(bytes([byte]))
+                self.wfile.flush()
+                time.sleep(delay)
+        except OSError:
+            pass  # the client hung up, as it should
 
     def _send(self, status: int, body: bytes, headers=None) -> None:
         self.send_response(status)
@@ -417,41 +437,128 @@ def test_the_timeouts_are_five_fifteen_thirty():
     assert module.TOTAL_TIMEOUT == 30
 
 
+def _https_connection(error: BaseException):
+    """Patch ``HTTPSConnection``: ``connect`` raises ``error``."""
+    patcher = patch("core.net.safe_fetch.HTTPSConnection")
+    connection_class = patcher.start()
+    connection_class.return_value.connect.side_effect = error
+    return patcher, connection_class
+
+
 def test_https_connects_to_the_ip_and_verifies_the_hostname(dns):
-    pool = MagicMock()
-    pool.__enter__.return_value = pool
-    pool.urlopen.side_effect = urllib3.exceptions.ProtocolError("stop here")
+    patcher, connection_class = _https_connection(
+        urllib3.exceptions.ProtocolError("stop here")
+    )
+    try:
+        with pytest.raises(FetchTemporaryError):
+            safe_fetch(f"https://{HOST}/a.png", max_bytes=MAX_BYTES)
+    finally:
+        patcher.stop()
 
-    with (
-        patch("core.net.safe_fetch.urllib3.HTTPSConnectionPool") as pool_class,
-        pytest.raises(FetchTemporaryError),
-    ):
-        pool_class.return_value = pool
-        safe_fetch(f"https://{HOST}/a.png", max_bytes=MAX_BYTES)
-
-    args, kwargs = pool_class.call_args
+    args, kwargs = connection_class.call_args
     assert args == (PUBLIC_IP, 443)
     assert kwargs["server_hostname"] == HOST
     assert kwargs["assert_hostname"] == HOST
     assert kwargs["cert_reqs"] == "CERT_REQUIRED"
-    assert kwargs["timeout"].connect_timeout <= module.CONNECT_TIMEOUT
-    assert kwargs["timeout"].read_timeout <= module.READ_TIMEOUT
-    request = pool.urlopen.call_args.kwargs
-    assert request["headers"] == {"Host": HOST}
-    assert request["assert_same_host"] is False
-    assert request["redirect"] is False
+    assert kwargs["timeout"] <= module.CONNECT_TIMEOUT
 
 
-def test_a_certificate_for_another_host_is_permanent(dns):
-    pool = MagicMock()
-    pool.__enter__.return_value = pool
-    pool.urlopen.side_effect = urllib3.exceptions.SSLError("hostname mismatch")
-
-    with (
-        patch("core.net.safe_fetch.urllib3.HTTPSConnectionPool") as pool_class,
-        pytest.raises(FetchError) as caught,
-    ):
-        pool_class.return_value = pool
-        safe_fetch(f"https://{HOST}/a.png", max_bytes=MAX_BYTES)
+@pytest.mark.parametrize(
+    "error",
+    [
+        ssl.SSLCertVerificationError("hostname mismatch"),
+        urllib3.exceptions.SSLError("wrapped"),
+    ],
+)
+def test_a_failed_certificate_check_is_permanent(error, dns):
+    if isinstance(error, urllib3.exceptions.SSLError):
+        error.__cause__ = ssl.SSLCertVerificationError("expired")
+    patcher, _class = _https_connection(error)
+    try:
+        with pytest.raises(FetchError) as caught:
+            safe_fetch(f"https://{HOST}/a.png", max_bytes=MAX_BYTES)
+    finally:
+        patcher.stop()
 
     assert not isinstance(caught.value, ConnectionError)
+    assert not isinstance(caught.value, TimeoutError)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ssl.SSLEOFError("EOF occurred in violation of protocol"),
+        ssl.SSLError("tlsv1 alert internal error"),
+        urllib3.exceptions.SSLError("handshake failed"),
+    ],
+)
+def test_any_other_tls_failure_is_retryable(error, dns):
+    patcher, _class = _https_connection(error)
+    try:
+        with pytest.raises(FetchTemporaryError) as caught:
+            safe_fetch(f"https://{HOST}/a.png", max_bytes=MAX_BYTES)
+    finally:
+        patcher.stop()
+
+    assert isinstance(caught.value, ConnectionError)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://a..b/x.png",
+        "http://" + "a" * 64 + ".example.com/x.png",
+        "http://exa\x00mple.com/x.png",
+    ],
+)
+def test_a_host_name_the_resolver_cannot_encode_is_refused(url, no_connection):
+    with pytest.raises(UnsafeUrlError):
+        safe_fetch(url, max_bytes=MAX_BYTES)
+
+
+@pytest.mark.parametrize("error", [UnicodeError("label"), ValueError("nul")])
+def test_a_resolver_value_error_is_a_refused_url(error, no_connection):
+    with (
+        patch("core.net.safe_fetch.socket.getaddrinfo", side_effect=error),
+        pytest.raises(UnsafeUrlError),
+    ):
+        safe_fetch(f"http://{HOST}/a.png", max_bytes=MAX_BYTES)
+
+
+def _fast_limits():
+    """A one-second fetch whose reads (2 s) outlast the server's pauses."""
+    return (
+        patch.object(module, "TOTAL_TIMEOUT", 1.0),
+        patch.object(module, "READ_TIMEOUT", 2.0),
+    )
+
+
+@pytest.mark.parametrize("path", ["/trickle-body", "/trickle-headers"])
+def test_a_host_that_trickles_cannot_outlast_the_total_deadline(
+    path, server, dns, connections
+):
+    total, read = _fast_limits()
+    started = time.monotonic()
+
+    with total, read, pytest.raises(FetchTimeoutError):
+        safe_fetch(f"http://{HOST}{path}", max_bytes=10_000)
+
+    # 200 bytes at 0.2 s each take 40 s; the deadline stops it at about 1 s.
+    assert time.monotonic() - started < 4
+
+
+def test_a_cut_off_body_is_never_returned_as_complete(server, dns, connections):
+    total, read = _fast_limits()
+
+    with total, read:
+        with pytest.raises(FetchTimeoutError):
+            safe_fetch(f"http://{HOST}/trickle-body", max_bytes=10_000)
+
+
+def test_a_non_ascii_path_is_percent_encoded(server, dns, connections):
+    safe_fetch(
+        f"http://{HOST}/\u03c6\u03c9\u03c4\u03bf.png?q=\u03b1",
+        max_bytes=MAX_BYTES,
+    )
+
+    assert _Handler.seen[0]["path"] == "/%CF%86%CF%89%CF%84%CE%BF.png?q=%CE%B1"

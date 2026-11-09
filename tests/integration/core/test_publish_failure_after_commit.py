@@ -24,7 +24,7 @@ from core.cache import edge, invalidation
 from core.tasks import invalidate_cache_surfaces_task, purge_edge_cache_task
 from loyalty.signals import notify_tier_up_live
 from loyalty.tasks import notify_loyalty_tier_up_live
-from meili.tasks import index_document_task
+from meili.tasks import index_document_task, index_documents_task
 from product.factories.product import ProductFactory
 from product.factories.product_attribute import ProductAttributeFactory
 from product.models.product import ProductTranslation
@@ -105,12 +105,12 @@ def test_a_product_reindex_keeps_every_document_when_the_broker_is_down():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        broker_down(index_document_task),
+        broker_down(index_documents_task),
     ):
         assert reindex_products_by_pk([product.pk]) == len(expected)
 
-    rows = DeferredDispatch.objects.filter(task_name=index_document_task.name)
-    assert {row.kwargs["pk"] for row in rows} == expected
+    rows = DeferredDispatch.objects.filter(task_name=index_documents_task.name)
+    assert {pk for row in rows for pk in row.kwargs["pks"]} == expected
 
 
 def test_a_tier_up_notification_is_kept_with_the_schema_of_the_change():

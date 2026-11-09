@@ -11,6 +11,7 @@ from django.db.models.signals import (
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
+from meili.batching import collect_if_active, queue_documents
 from order.enum.stock_log_reason import StockLogReason
 from product.enum.search_text import SearchTextSource
 from product.models.attribute import Attribute
@@ -151,7 +152,12 @@ def reindex_products_by_pk(product_ids) -> int:
     fully searchable and buyable until the nightly sync. The admin
     reported success either way.
 
-    Returns the number of translation documents dispatched.
+    The documents go out in ``meili.index_documents`` batches
+    (``meili.batching.queue_documents``), or join the set of an open
+    ``collect_reindex()``.
+
+    Returns the number of translation documents dispatched (0 while
+    collecting: they are queued when the block exits).
     """
     if settings.MEILISEARCH.get("OFFLINE", False):
         return 0
@@ -159,8 +165,6 @@ def reindex_products_by_pk(product_ids) -> int:
     product_ids = list(product_ids)
     if not product_ids:
         return 0
-
-    from meili.tasks import index_document_task
 
     translation_pks = list(
         ProductTranslation.objects.filter(
@@ -170,19 +174,9 @@ def reindex_products_by_pk(product_ids) -> int:
     if not translation_pks:
         return 0
 
-    # Same dispatch shape as ``reindex_product_translations`` below —
-    # on commit, by pk, with the task re-loading each row. The schema is
-    # pinned here, at registration, not read when the hooks fire.
-    for pk in translation_pks:
-        dispatch_on_commit(
-            index_document_task,
-            kwargs={
-                "app_label": "product",
-                "model_name": "producttranslation",
-                "pk": pk,
-            },
-        )
-    return len(translation_pks)
+    # On commit, by pk, with the task re-loading each row. The schema is
+    # pinned at registration, not read when the hooks fire.
+    return queue_documents("product", "producttranslation", translation_pks)
 
 
 @receiver(
@@ -228,6 +222,8 @@ def reindex_product_translations(sender, instance, **kwargs):
             return
         logger.debug("Reindexing ProductTranslation Async")
 
+        if collect_if_active("product", "producttranslation", translation_pks):
+            return
         for pk in translation_pks:
             dispatch_on_commit(
                 index_document_task,
@@ -380,6 +376,8 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
 
+        if collect_if_active("product", "producttranslation", translation_pks):
+            return
         for pk in translation_pks:
             dispatch_on_commit(
                 index_document_task,

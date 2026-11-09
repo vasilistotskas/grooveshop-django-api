@@ -72,7 +72,7 @@ def _make_product(**kwargs):
 def test_duplicating_a_product_does_not_500(
     product_admin, request_factory, operator
 ):
-    original = _make_product(active=True)
+    original = _make_product(active=True, external_reference="woo:5")
     request = _with_messages(request_factory.get("/admin/"))
     request.user = operator
 
@@ -84,6 +84,7 @@ def test_duplicating_a_product_does_not_500(
     assert clone.uuid is not None
     assert clone.uuid != original.uuid, "the clone reused the original's uuid"
     assert clone.active is False, "a duplicate must start as a draft"
+    assert clone.external_reference is None, "the reference is unique"
 
 
 def test_the_discount_form_uses_the_posted_selection_not_the_session(

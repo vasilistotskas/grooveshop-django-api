@@ -45,7 +45,6 @@ from __future__ import annotations
 
 import secrets
 import string
-import warnings
 from collections import defaultdict
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Self
@@ -127,7 +126,7 @@ class LiveSearchIndex:
 
     def __init__(self) -> None:
         self._first_id = 0
-        self._added: dict[str, list[str]] = defaultdict(list)
+        self._added: dict[tuple[str, str], list[str]] = defaultdict(list)
 
     def __enter__(self) -> Self:
         self._first_id = _ID_FLOOR + secrets.randbelow(_ID_SPAN)
@@ -149,18 +148,15 @@ class LiveSearchIndex:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        # The SDK deprecates deleting by ids in favour of a filter, but
-        # ``id`` is not filterable and the filterable ``master_id``
-        # collides across workers - a filter would delete their documents.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            for index_uid, document_ids in self._added.items():
-                meili_client.get_index(index_uid).delete_documents(document_ids)
+        for (index_uid, primary_key), document_ids in self._added.items():
+            meili_client.delete_documents_by_primary_key(
+                index_uid, primary_key, document_ids
+            )
         self._added.clear()
 
     def add(self, *instances: IndexMixin) -> None:
         """Index ``instances`` and wait until the engine serves them."""
-        batches: dict[str, list[dict]] = defaultdict(list)
+        batches: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for instance in instances:
             if instance.pk < self._first_id:
                 raise AssertionError(
@@ -168,15 +164,18 @@ class LiveSearchIndex:
                     "entered, so its document id can collide with another "
                     "worker's. Create the rows inside the context."
                 )
-            batches[type(instance).get_meili_index_name()].append(
-                build_document(instance)
-            )
+            model = type(instance)
+            batches[
+                model.get_meili_index_name(), model._meilisearch["primary_key"]
+            ].append(build_document(instance))
 
         task_uids = []
-        for index_uid, documents in batches.items():
+        for (index_uid, primary_key), documents in batches.items():
             task = meili_client.get_index(index_uid).add_documents(documents)
             # Recorded before waiting, so a failed wait still cleans up.
-            self._added[index_uid].extend(doc["id"] for doc in documents)
+            self._added[index_uid, primary_key].extend(
+                doc[primary_key] for doc in documents
+            )
             task_uids.append(task.task_uid)
 
         for task_uid in task_uids:

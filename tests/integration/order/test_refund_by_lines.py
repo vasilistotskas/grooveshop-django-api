@@ -57,7 +57,7 @@ from order.models.refund_attempt import (
     RefundReason,
 )
 from order.payment_ledger import PaymentLedger
-from order.refund_lines import held_values
+from order.refund_lines import held_values, plan_pieces
 from order.services import OrderService
 from order.tasks import send_invoice_to_mydata
 from order.taxation import ChargeKind
@@ -1529,3 +1529,119 @@ class TestTheLinesWriteTheirOwnAllocation:
         assert not OrderService.resumes_a_refund(
             order, None, retry_request_id=uuid.uuid4()
         )
+
+
+class TestTheDialogAnswersAsTheLockedPathDoes:
+    def test_a_lines_request_never_resumes_a_bare_pending_claim(self):
+        order = _order()
+        with FakeStripeRefunds(fail_with=stripe.APIConnectionError("drop")):
+            OrderService.refund_order(order, amount=_eur("40.00"))
+
+        # A bare repeat of the amount resumes the claim; the same value
+        # asked by lines is planned fresh (the locked path never resumes).
+        assert OrderService.resumes_a_refund(order, _eur("40.00"))
+        assert not OrderService.resumes_a_refund(
+            order, _eur("40.00"), by_lines=True
+        )
+
+    def _lines_attempt(self, order, **fields):
+        charge = order.payment_transactions.get(
+            kind=PaymentTransactionKind.CHARGE
+        )
+        return RefundAttempt.objects.create(
+            order=order,
+            charge=charge,
+            amount=_eur("40.00"),
+            request_id=uuid.uuid4(),
+            **fields,
+        )
+
+    def test_the_retry_is_offered_while_the_locked_path_would_resume_it(
+        self, staff
+    ):
+        order = _order()
+        self._lines_attempt(order)
+
+        form = ReturnOrderForm(_request(staff, {}), order.pk)
+
+        assert not form.fields["retry_pending"].disabled
+
+    def test_a_provider_that_forgets_keys_is_pointed_to_the_outcome_action(
+        self, staff
+    ):
+        order = _order(provider="viva")
+        self._lines_attempt(order)
+
+        form = ReturnOrderForm(
+            _request(staff, {"retry_pending": "on"}), order.pk
+        )
+
+        retry = form.fields["retry_pending"]
+        assert retry.disabled
+        assert "not known yet" in str(retry.help_text)
+        # A disabled retry is never read as one.
+        assert form.is_valid() is False
+        assert not form.retrying()
+
+    def test_an_overdue_attempt_is_pointed_to_the_outcome_action(self, staff):
+        order = _order()
+        attempt = self._lines_attempt(order)
+        RefundAttempt.objects.filter(pk=attempt.pk).update(
+            created_at=attempt.created_at - timedelta(days=2)
+        )
+
+        form = ReturnOrderForm(_request(staff, {}), order.pk)
+
+        assert form.fields["retry_pending"].disabled
+        assert "Record refund outcome" in str(
+            form.fields["retry_pending"].help_text
+        )
+
+    def test_cash_is_never_repeated_and_says_so(self, staff):
+        order = _order(paid_online=False)
+        collection = order.payment_transactions.get(
+            kind=PaymentTransactionKind.COD_COLLECTION
+        )
+        RefundAttempt.objects.create(
+            order=order,
+            charge=collection,
+            amount=_eur("10.00"),
+            request_id=uuid.uuid4(),
+        )
+
+        form = ReturnOrderForm(_request(staff, {}), order.pk)
+
+        retry = form.fields["retry_pending"]
+        assert retry.disabled
+        assert "paid back in cash" in str(retry.help_text)
+        assert "payment provider" not in str(retry.help_text)
+
+    def test_a_refund_that_lands_meanwhile_is_a_message_not_a_server_error(
+        self, order_admin, staff
+    ):
+        order = _order()
+        item = _item(order, "13")
+        request = _request(
+            staff,
+            {f"quantity_{item.pk}": "1", "reason": RefundReason.RETURNED},
+        )
+        real = plan_pieces
+        calls = []
+
+        def quote_then_lose_the_line(*args, **kwargs):
+            calls.append(1)
+            if len(calls) > 1:
+                raise PaymentError("A refund landed first.")
+            return real(*args, **kwargs)
+
+        with (
+            patch("order.admin.plan_pieces", quote_then_lose_the_line),
+            FakeStripeRefunds() as api,
+        ):
+            response = order_admin.refund_payment(request, object_id=order.pk)
+
+        assert response.status_code == 200
+        assert api.calls == []
+        assert "A refund landed first." in [
+            str(m) for m in get_messages(request)
+        ]

@@ -3393,9 +3393,9 @@ class OrderService:
         ``vat_rate`` of the units, the shipping split over the rates as the
         receipt splits it) and ``amount`` must not be given. No line can be
         refunded past what was sold less what earlier line refunds paid
-        back. Each share keeps the lines it pays for
-        (``RefundAttemptLine``), so its credit document (myDATA 11.4)
-        carries exactly their VAT rates. A bare ``amount`` is a goodwill
+        back. Each share stores the lines it pays for as its own
+        ``CreditAllocation`` rows (``_allocate_lines_claim``), so its credit
+        document (myDATA 11.4) carries exactly their VAT rates. A bare ``amount`` is a goodwill
         refund and is credited in proportion over the receipt's rates.
         ``reason_code`` is a ``RefundReason`` and ``reason`` the note that
         goes with it. A request by lines is always planned fresh; the only
@@ -3946,19 +3946,24 @@ class OrderService:
         amount: Money | None,
         *,
         retry_request_id: UUID | None = None,
+        by_lines: bool = False,
     ) -> bool:
         """Whether a refund would resume live attempts rather than make a
         new refund (read without the lock, and answering as the locked path
         does): the retry of a named request by lines resumes its live shares
         (:meth:`_pending_request_shares`), a bare *amount* matches the
-        attempts of :meth:`_attempts_to_resume`. The refund dialog asks
-        nothing a resume does not need, such as how cash was paid back."""
+        attempts of :meth:`_attempts_to_resume`, and a request *by_lines*
+        that is no retry is always planned fresh, never a resume. The refund
+        dialog asks nothing a resume does not need, such as how cash was
+        paid back."""
         if retry_request_id is not None:
             return (
                 RefundAttempt.objects.live()
                 .filter(order=order, request_id=retry_request_id)
                 .exists()
             )
+        if by_lines:
+            return False
         return bool(
             cls._match_resumable(order, list(cls._resumable(order)), amount)
         )
@@ -4017,17 +4022,31 @@ class OrderService:
         )
 
     @staticmethod
-    def _require_resumable(shares: Sequence[RefundAttempt]) -> None:
-        """Shares the provider may already have made are only called again
+    def unresumable_reason(shares: Iterable[RefundAttempt]) -> str | None:
+        """Why *shares* may not be called again, or ``None`` when they may.
+        Shares the provider may already have made are only called again
         under their own key, and only while that is safe: the provider must
         remember keys, and the attempt must not be overdue (the provider may
         have forgotten the key by then, and the refund is looked up by the
-        reconciliation or recorded by staff instead)."""
+        reconciliation or recorded by staff instead). A cash share has no
+        provider to ask: its reference is its own key, and staff record how
+        it was paid back. The one rule of the locked path
+        (:meth:`_require_resumable`) and of what the dialog offers."""
         for attempt in shares:
-            if attempt.charge is not None and not provider_supports(
-                attempt.charge.provider, "idempotent_refunds"
+            charge = attempt.charge
+            if charge is not None and is_cash_collection(charge):
+                return str(
+                    _(
+                        "Part of this refund was paid back in cash and its "
+                        "outcome is not recorded yet. Cash is never "
+                        "repeated: record how it was paid back with Record "
+                        "refund outcome on the order."
+                    )
+                )
+            if charge is not None and not provider_supports(
+                charge.provider, "idempotent_refunds"
             ):
-                raise PaymentError(
+                return str(
                     _(
                         "A refund of this amount was already sent to the "
                         "payment provider and its result is not known "
@@ -4037,7 +4056,7 @@ class OrderService:
                     )
                 )
             if attempt.is_overdue:
-                raise PaymentError(
+                return str(
                     _(
                         "A refund of this amount was sent to the "
                         "payment provider a while ago and its result is "
@@ -4047,6 +4066,14 @@ class OrderService:
                         "trying again."
                     )
                 )
+        return None
+
+    @classmethod
+    def _require_resumable(cls, shares: Sequence[RefundAttempt]) -> None:
+        """Refuse to call *shares* again when :meth:`unresumable_reason`
+        says so."""
+        if reason := cls.unresumable_reason(shares):
+            raise PaymentError(reason)
 
     @classmethod
     def _make_refund(

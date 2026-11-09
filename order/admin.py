@@ -501,7 +501,16 @@ class ReturnOrderForm(BaseDialogForm):
         if self.pending is None:
             del self.fields["retry_pending"]
             return
-        self.fields["retry_pending"].help_text = _(
+        # Offered only where the locked path would resume it: a provider
+        # that forgets keys, an overdue attempt and cash are never called
+        # again, so staff are pointed to the reason instead.
+        why = OrderService.unresumable_reason(self.pending.shares)
+        retry = self.fields["retry_pending"]
+        if why is not None:
+            retry.disabled = True
+            retry.help_text = why
+            return
+        retry.help_text = _(
             "A refund of %(amount)s was sent to the payment provider and "
             "its result is not known yet. Retry it with the same key: the "
             "provider hands back the refund it already made instead of "
@@ -579,7 +588,9 @@ class ReturnOrderForm(BaseDialogForm):
 
     def retrying(self) -> bool:
         return bool(
-            self.pending is not None and self.cleaned_data.get("retry_pending")
+            self.pending is not None
+            and not self.fields["retry_pending"].disabled
+            and self.cleaned_data.get("retry_pending")
         )
 
     def units(self) -> dict[int, int]:
@@ -727,6 +738,7 @@ class ReturnOrderForm(BaseDialogForm):
                 retry_request_id=(
                     self.pending.request_id if self.retrying() else None
                 ),
+                by_lines=by_lines,
             )
             and any(
                 is_cash_collection(charge)
@@ -2192,36 +2204,31 @@ class OrderAdmin(BaseModelAdmin):
         reason_code = form.cleaned_data["reason"]
         note = form.cleaned_data["note"]
         retrying = form.retrying()
-        if by_lines and form.requested_amount() == 0:
-            # Lines worth nothing (a free gift): no money to pay back, only
-            # the shelf (the form refuses this without the restock option).
-            self._restock(
-                request,
-                order.pk,
-                form.units(),
-                OrderService._reason_text(reason_code, note),
-            )
-            return HttpResponse(
-                headers={
-                    "HX-Redirect": reverse(
-                        "admin:order_order_change", args=[object_id]
-                    ),
-                }
-            )
+        free_lines = False
         try:
-            requested = Money(form.requested_amount(), currency)
-            result = OrderService.refund_order(
-                order,
-                amount=None if by_lines else requested,
-                reason=note,
-                reason_code=reason_code,
-                repayment_reference=form.cleaned_data.get(
-                    "repayment_reference", ""
-                ),
-                lines=() if retrying else form.lines(),
-                include_shipping=False if retrying else include_shipping,
-                retry_request_id=form.pending.request_id if retrying else None,
-            )
+            # Quoted once, here: a refund that lands meanwhile changes what
+            # the lines are worth, and the service says so (a PaymentError),
+            # never a server error.
+            value = form.requested_amount()
+            # Lines worth nothing (a free gift) move no money, only the
+            # shelf (the form refuses this without the restock option).
+            free_lines = by_lines and value == 0
+            if not free_lines:
+                requested = Money(value, currency)
+                result = OrderService.refund_order(
+                    order,
+                    amount=None if by_lines else requested,
+                    reason=note,
+                    reason_code=reason_code,
+                    repayment_reference=form.cleaned_data.get(
+                        "repayment_reference", ""
+                    ),
+                    lines=() if retrying else form.lines(),
+                    include_shipping=False if retrying else include_shipping,
+                    retry_request_id=(
+                        form.pending.request_id if retrying else None
+                    ),
+                )
         except PaymentError as exc:
             # The service names the exact reason (nothing left to refund,
             # more than the remainder, a line refunded past what was sold,
@@ -2229,6 +2236,15 @@ class OrderAdmin(BaseModelAdmin):
             self.message_user(request, str(exc), messages.ERROR)
         else:
             reason = OrderService._reason_text(reason_code, note)
+            if free_lines:
+                self._restock(request, order.pk, form.units(), reason)
+                return HttpResponse(
+                    headers={
+                        "HX-Redirect": reverse(
+                            "admin:order_order_change", args=[object_id]
+                        ),
+                    }
+                )
             if result.paid_something:
                 # Money moved, so staff are on record for it even when the
                 # rest was declined.

@@ -495,8 +495,8 @@ def scale_points(returned: Decimal, **source) -> None:
     """Make the points a source's rows carry total *returned* (less than
     they do), in proportion: what was claimed as points and not returned is
     not held back for its lines any more. A row left with neither room nor
-    points is deleted, unless it is the source's last (it keeps the source
-    decided)."""
+    points is deleted; a source left with no row at all keeps one row of
+    amount zero, so that it stays decided and owes nothing."""
     rows = list(
         CreditAllocation.objects.filter(points__gt=0, **source).order_by("pk")
     )
@@ -516,6 +516,16 @@ def scale_points(returned: Decimal, **source) -> None:
         amount=0, points=0, **source
     ).exclude(item__isnull=True):
         row.delete()
+    if not CreditAllocation.objects.filter(**source).exists():
+        first = rows[0]
+        store(
+            first.order,
+            [],
+            moved_at=first.moved_at,
+            nothing_owed=True,
+            goods=_ZERO,
+            **source,
+        )
 
 
 def allocate_source(

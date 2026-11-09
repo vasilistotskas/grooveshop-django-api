@@ -10069,6 +10069,9 @@ msgstr "Parent comment must belong to the same post."
 msgid "Part of the order's discount this line carries, fixed when the order was created. Invoices and myDATA use it to split the VAT of what was actually charged."
 msgstr "Part of the order's discount this line carries, fixed when the order was created. Invoices and myDATA use it to split the VAT of what was actually charged."
 
+msgid "Part of this refund was paid back in cash and its outcome is not recorded yet. Cash is never repeated: record how it was paid back with Record refund outcome on the order."
+msgstr "Part of this refund was paid back in cash and its outcome is not recorded yet. Cash is never repeated: record how it was paid back with Record refund outcome on the order."
+
 msgid "Partial"
 msgstr "Partial"
 

@@ -10076,6 +10076,9 @@ msgstr "Το γονικό σχόλιο πρέπει να ανήκει στο ί�
 msgid "Part of the order's discount this line carries, fixed when the order was created. Invoices and myDATA use it to split the VAT of what was actually charged."
 msgstr "Μέρος της έκπτωσης της παραγγελίας που αναλογεί σε αυτή τη γραμμή, καθορισμένο κατά τη δημιουργία της παραγγελίας. Τιμολόγια και myDATA το χρησιμοποιούν για να διαχωρίσουν τον ΦΠΑ αυτού που πράγματι χρεώθηκε."
 
+msgid "Part of this refund was paid back in cash and its outcome is not recorded yet. Cash is never repeated: record how it was paid back with Record refund outcome on the order."
+msgstr "Μέρος αυτής της επιστροφής επιστράφηκε σε μετρητά και το αποτέλεσμά του δεν έχει καταχωρηθεί ακόμη. Τα μετρητά δεν επαναλαμβάνονται ποτέ: καταχωρίστε πώς επιστράφηκαν με την ενέργεια «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία."
+
 msgid "Partial"
 msgstr "Μερικό"
 

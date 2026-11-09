@@ -39,10 +39,18 @@ ledger in time order and says what the books should hold. The invariants:
    claims or allocated both through its claim and itself;
 5. at rest no receipt is deferred and no source (claim or chargeback) is
    undecided;
-6. a refund by lines is credited at exactly the rates of its own lines (never
-   a rate it did not pay for), and no line is held for more than its value;
-7. a line that has had its whole value back (loyalty points included, which
-   owe no credit but are value returned) is never offered for refund again.
+6. a refund by lines is credited at exactly the rates of its own lines, which
+   the oracle takes from the lines asked for (each item's VAT rate, the
+   order's shipping rates), never from the rows the code wrote; and no line
+   is held for more than its value (price x units less its discount);
+7. a refund by lines is worth what the oracle prices it at: price x units
+   less the line's discount allocation, priced cumulatively (the first k
+   units are worth gross x k / n, half up, the last taking the rest), the
+   shipping once; the allocation rows of a request (room plus loyalty
+   points) add up to exactly that;
+8. a line the oracle has asked every unit of, in requests that hold in full,
+   is never offered for refund again (points included: value back, though no
+   credit).
 
 The oracle encodes the product rules of ``docs/order-system.md`` §7 from
 first principles, never through the code's formulas (see ``Oracle``). The
@@ -75,7 +83,7 @@ import random
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from unittest import mock
 
 import pytest
@@ -117,6 +125,7 @@ from order.tasks import (
     generate_order_invoice,
     send_invoice_to_mydata,
 )
+from order.taxation import ChargeKind, order_vat_lines
 from tests.integration.order.test_credit_allocation import (  # noqa: F401
     _render_and_site,
 )
@@ -566,8 +575,10 @@ class State:
         #: The provider's money the order is for, and what the receipt holds.
         self.total = goods - points - gift
         self.receipt_sale = goods - points
-        #: lines-refund attempt pk -> the VAT rates of its own pieces
+        #: lines-refund attempt pk -> the VAT rates its lines asked for
         self.line_rates: dict[int, set[Decimal]] = {}
+        #: request id -> units asked per order line pk, and the shipping
+        self.requests: dict[object, tuple[dict[int, int], bool]] = {}
         assert self.order.calculate_order_total_amount().amount == self.total
         self.oracle = Oracle(self.order, self.total, self.receipt_sale)
         self.shipped = False
@@ -751,6 +762,96 @@ class State:
             ids = create_pending_credits(order.id)
             self.log.append(f"credits created {len(ids)}")
 
+    # -- refunds by lines: what the oracle expects ------------------------
+    @staticmethod
+    def line_gross(item) -> Decimal:
+        """What a line is worth: price x units less its discount."""
+        return Decimal(item.price.amount) * item.quantity - Decimal(
+            item.discount_allocation.amount
+        )
+
+    @staticmethod
+    def cumulative(gross: Decimal, quantity: int, units: int) -> Decimal:
+        """The value of the first *units* of *quantity*: gross x k / n to
+        the cent, half up; the last unit takes what is left."""
+        if units >= quantity:
+            return gross
+        return (gross * units / quantity).quantize(CENT, rounding=ROUND_HALF_UP)
+
+    def request_state(self, rid) -> str:
+        """``full``: every share holds what it claimed; ``none``: every
+        share was declined; ``mixed``: anything else (a share declined, a
+        refund reversed, a stored share that returned less than it
+        claimed), where what a line has had back is a value, not units."""
+        atts = list(RefundAttempt.objects.filter(request_id=rid))
+        declined = [a.status == RefundAttemptStatus.DECLINED for a in atts]
+        if all(declined):
+            return "none"
+        if any(declined):
+            return "mixed"
+        reversed_refs = set(
+            PaymentTransaction.objects.filter(
+                order=self.order, kind=PaymentTransactionKind.REFUND_REVERSAL
+            ).values_list("provider_reference", flat=True)
+        )
+        for att in atts:
+            if att.refund_id and att.refund.provider_reference in reversed_refs:
+                return "mixed"
+            if (
+                att.kind == RefundAttemptKind.STORED_VALUE
+                and att.status == RefundAttemptStatus.SETTLED
+                and PaymentLedger.stored_returned_by(self.order, att).amount
+                < att.amount.amount
+            ):
+                return "mixed"
+        return "full"
+
+    def done(self, item_pk=None):
+        """Units of a line (or, with no line, whether the shipping) already
+        asked in requests that hold in full; ``None`` when a request that
+        touches it holds only in part."""
+        units, shipped = 0, False
+        for rid, (asked, ship) in self.requests.items():
+            touches = ship if item_pk is None else item_pk in asked
+            if not touches:
+                continue
+            state = self.request_state(rid)
+            if state == "mixed":
+                return None
+            if state == "full":
+                if item_pk is None:
+                    shipped = True
+                else:
+                    units += asked[item_pk]
+        return shipped if item_pk is None else units
+
+    def expect_lines(self, order, chosen, include):
+        """The value the oracle puts on each line asked for and on the
+        shipping (``None``: not knowable, a request holds only in part),
+        and the VAT rates the request is credited at."""
+        goods: dict[int, Decimal | None] = {}
+        rates: set[Decimal] = set()
+        for item, units in chosen:
+            rates.add(Decimal(item.vat_rate))
+            done = self.done(item.pk)
+            if done is None:
+                goods[item.pk] = None
+                continue
+            gross = self.line_gross(item)
+            goods[item.pk] = self.cumulative(
+                gross, item.quantity, done + units
+            ) - self.cumulative(gross, item.quantity, done)
+        shipping = None
+        if include:
+            rates |= {
+                line.rate
+                for line in order_vat_lines(order)
+                if line.kind == ChargeKind.SHIPPING
+            }
+            if self.done() is False:
+                shipping = self.shipping
+        return goods, shipping, rates
+
     def refund_lines(self, order, ev, a, b):
         """A refund by lines: one or two lines with some of their units, and
         the shipping now and then; or the retry of the pending one."""
@@ -763,20 +864,52 @@ class State:
                 "pk", flat=True
             )
         )
+        self.asked = None
         try:
             self._refund_lines(order, ev, a, b)
         finally:
             self.fake.fail_with = None
             self.fake.lose_answer = False
-            for att in RefundAttempt.objects.filter(
-                order=order, request_id__isnull=False
-            ).exclude(pk__in=before):
-                self.line_rates[att.pk] = {
-                    row.rate
-                    for row in CreditAllocation.objects.filter(
-                        refund_attempt=att, amount__gt=0
-                    )
-                }
+            new = list(
+                RefundAttempt.objects.filter(
+                    order=order, request_id__isnull=False
+                ).exclude(pk__in=before)
+            )
+            if new and self.asked is not None:
+                self.check_request(new, *self.asked)
+
+    def check_request(self, new, chosen, include, expected):
+        goods, shipping, rates = expected
+        rid = new[0].request_id
+        self.requests[rid] = ({i.pk: u for i, u in chosen}, include)
+        for att in new:
+            self.line_rates[att.pk] = rates
+        rows = CreditAllocation.objects.filter(refund_attempt__in=new)
+        for item, _units in chosen:
+            want = goods[item.pk]
+            got = sum(
+                (
+                    Decimal(r.amount.amount) + r.points
+                    for r in rows
+                    if r.item_id == item.pk
+                ),
+                ZERO,
+            )
+            if want is not None and got != want:
+                said = f"line {item.pk} priced {got}, the oracle says {want}"
+                self.viol.append(("inv7", said))
+        if include:
+            got = sum(
+                (
+                    Decimal(r.amount.amount) + r.points
+                    for r in rows
+                    if r.kind == ChargeKind.SHIPPING
+                ),
+                ZERO,
+            )
+            if shipping is not None and got != shipping:
+                said = f"shipping priced {got}, the oracle says {shipping}"
+                self.viol.append(("inv7", said))
 
     def _refund_lines(self, order, ev, a, b):
         try:
@@ -817,6 +950,11 @@ class State:
                     item, left = options[i]
                     chosen.append((item, 1 + int(a * 100) % left))
             include = shipping and (not chosen or a > 0.5)
+            self.asked = (
+                chosen,
+                include,
+                self.expect_lines(order, chosen, include),
+            )
             res = OrderService.refund_order(
                 order, lines=chosen, include_shipping=include
             )
@@ -995,23 +1133,24 @@ class State:
                 said = f"{where}: credit for lines at {own} carries {rates}"
                 self.viol.append(("inv6", said))
         held = held_values(order)
-        gross = discounted_line_gross(order, None)
+        items = {i.pk: i for i in OrderItem.objects.filter(order=order)}
         for pk, value in held.goods.items():
-            if value > gross[pk]:
-                self.viol.append(
-                    ("inv6", f"{where}: line {pk} held {value} > {gross[pk]}")
+            worth = self.line_gross(items[pk])
+            if value > worth:
+                said = f"{where}: line {pk} held {value} > {worth}"
+                self.viol.append(("inv6", said))
+        # A line the oracle has asked every unit of, in requests that hold
+        # in full, is never offered again (points included).
+        for pk, item in items.items():
+            if self.done(pk) == item.quantity and self.line_gross(item) > 0:
+                offered = item.quantity - covered_units(
+                    discounted_line_gross(order, None)[pk],
+                    item.quantity,
+                    held.goods.get(pk, ZERO),
                 )
-        # A line that has had its whole value back is never offered again
-        # (points included: value back, though no credit).
-        for item in OrderItem.objects.filter(order=order):
-            value = held.goods.get(item.pk, ZERO)
-            if (
-                value >= gross[item.pk] > 0
-                and covered_units(gross[item.pk], item.quantity, value)
-                < item.quantity
-            ):
-                said = f"{where}: line {item.pk} fully held ({value}), offered"
-                self.viol.append(("inv7", said))
+                if offered > 0:
+                    said = f"{where}: line {pk} fully asked, {offered} offered"
+                    self.viol.append(("inv8", said))
         for att in RefundAttempt.objects.filter(order=order):
             if (
                 CreditAllocation.objects.filter(refund_attempt=att).exists()

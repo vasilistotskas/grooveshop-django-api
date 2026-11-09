@@ -3,6 +3,20 @@
 
 
 
+## v3.238.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(turnover): count only the goods part of a refund as a return (#543)
+
+A refund counts min(goods_claimed, moved); a reversal takes the duplicate part first; past months never move. ([`6c096ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c096ab75d8305ae4b57357bdbfeaac5dbdf2465))
+
+### Features
+
+* feat(product): catalogue import foundations: batched reindex, safe fetch, external reference and set_stock (#542)
+
+Batched Meilisearch reindex with collect_reindex and filter deletes on the primary key; core.net.safe_fetch (SSRF-safe, IDNA, total deadline, cert check via ssl) with the social avatar moved onto it; Product.external_reference, ProductImage.source_*, StockLogReason.CATALOGUE_IMPORT and StockManager.set_stock. ([`37d1ae1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37d1ae16f7a13d743e7558f482d1aec28d6110d9))
+
 ## v3.237.2 (2026-11-09)
 
 ### Bug fixes

@@ -1616,6 +1616,39 @@ class TestTheDialogAnswersAsTheLockedPathDoes:
         assert "paid back in cash" in str(retry.help_text)
         assert "payment provider" not in str(retry.help_text)
 
+    @pytest.mark.parametrize(
+        "cash_status",
+        [RefundAttemptStatus.SETTLED, RefundAttemptStatus.DECLINED],
+    )
+    def test_a_resolved_cash_share_does_not_block_the_card_retry(
+        self, staff, cash_status
+    ):
+        """A lines refund across a card charge and cash collected on
+        delivery: the cash share is already booked or declined, the card
+        share is PENDING. The locked path resumes the card share alone,
+        so the dialog offers the retry."""
+        order = _order()
+        collection = PaymentTransactionFactory(
+            order=order,
+            kind=PaymentTransactionKind.COD_COLLECTION,
+            provider="acs_cod",
+            provider_reference="VOUCHER-MIX",
+            amount=_eur("20.00"),
+        )
+        card = self._lines_attempt(order)
+        RefundAttempt.objects.create(
+            order=order,
+            charge=collection,
+            amount=_eur("10.00"),
+            request_id=card.request_id,
+            status=cash_status,
+        )
+
+        form = ReturnOrderForm(_request(staff, {}), order.pk)
+
+        assert not form.fields["retry_pending"].disabled
+        assert OrderService.unresumable_reason([card]) is None
+
     def test_a_refund_that_lands_meanwhile_is_a_message_not_a_server_error(
         self, order_admin, staff
     ):

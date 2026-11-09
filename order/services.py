@@ -4031,8 +4031,12 @@ class OrderService:
         reconciliation or recorded by staff instead). A cash share has no
         provider to ask: its reference is its own key, and staff record how
         it was paid back. The one rule of the locked path
-        (:meth:`_require_resumable`) and of what the dialog offers."""
+        (:meth:`_require_resumable`) and of what the dialog offers. Only
+        shares still PENDING are judged: a settled or declined share of
+        the request is never called again, whatever its kind."""
         for attempt in shares:
+            if attempt.status != RefundAttemptStatus.PENDING:
+                continue
             charge = attempt.charge
             if charge is not None and is_cash_collection(charge):
                 return str(

@@ -450,6 +450,11 @@ class RefundOrderForm(BaseDialogForm):
             and amount is not None
             and "repayment_reference" in self.fields
             and not cleaned.get("repayment_reference")
+            # A repeat that resumes a refund already claimed pays no new
+            # cash share: it needs no word on how cash was paid back.
+            and not OrderService.resumes_a_refund(
+                self.order, Money(amount, self.order.amount_due.currency)
+            )
             and any(
                 is_cash_collection(charge)
                 for charge, _share in PaymentLedger.plan_refund(

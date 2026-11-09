@@ -3750,18 +3750,13 @@ class OrderService:
             )
 
     @staticmethod
-    def _attempts_to_resume(
-        order: Order, amount: Money | None
-    ) -> list[RefundAttempt]:
-        """The live attempts a request is a repeat of: the one for the same
-        amount, or all of them when together they are the amount, or, for a
-        refund of everything, all of them once they hold everything that was
-        left. Cash shares are never resumed: their reference is their own
+    def _resumable(order: Order):
+        """The live attempts of *order* a repeated request may resume, oldest
+        first. Cash shares are never resumed: their reference is their own
         idempotency key."""
-        pending = list(
+        return (
             RefundAttempt.objects.live()
             .select_related("charge")
-            .select_for_update(of=("self",))
             .filter(order=order)
             .exclude(
                 charge__kind__in=(
@@ -3771,6 +3766,34 @@ class OrderService:
             )
             .order_by("created_at", "id")
         )
+
+    @classmethod
+    def resumes_a_refund(cls, order: Order, amount: Money | None) -> bool:
+        """Whether a refund of *amount* would resume live attempts rather
+        than make a new refund (:meth:`_attempts_to_resume`, read without
+        the lock): the refund dialog asks nothing a resume does not need,
+        such as how cash was paid back."""
+        return bool(
+            cls._match_resumable(order, list(cls._resumable(order)), amount)
+        )
+
+    @classmethod
+    def _attempts_to_resume(
+        cls, order: Order, amount: Money | None
+    ) -> list[RefundAttempt]:
+        """The live attempts a request is a repeat of: the one for the same
+        amount, or all of them when together they are the amount, or, for a
+        refund of everything, all of them once they hold everything that was
+        left."""
+        pending = list(cls._resumable(order).select_for_update(of=("self",)))
+        return cls._match_resumable(order, pending, amount)
+
+    @staticmethod
+    def _match_resumable(
+        order: Order, pending: list[RefundAttempt], amount: Money | None
+    ) -> list[RefundAttempt]:
+        """Which of *pending* a request for *amount* repeats (see
+        :meth:`_attempts_to_resume`)."""
         if not pending:
             return []
         if amount is None:

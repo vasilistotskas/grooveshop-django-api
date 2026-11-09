@@ -1723,18 +1723,20 @@ class BoxNowService:
         """
         Advance the Order's status based on the BoxNow parcel event.
 
-        Uses ``OrderService.update_order_status`` for all transitions so
-        signals and history logging fire correctly.  Swallows
-        ``InvalidStatusTransitionError`` with a warning so that an
-        out-of-order or duplicate webhook event cannot roll back the
-        already-recorded ``BoxNowParcelEvent``.
+        Uses ``OrderService.update_order_status`` for every transition
+        but a cancel so signals and history logging fire correctly, and
+        ``OrderService.cancel_for_dead_shipment`` for a ``canceled``
+        parcel, because a cancel is more than a status.  Swallows
+        ``InvalidStatusTransitionError`` and ``OrderCancellationError``
+        with a warning so that an out-of-order or duplicate webhook event
+        cannot roll back the already-recorded ``BoxNowParcelEvent``.
 
         Safety rules:
         - Never move a terminal order (DELIVERED, COMPLETED, CANCELED,
           RETURNED, REFUNDED) backwards.
-        - Only advance to SHIPPED if the order is still PENDING or
-          PROCESSING.
-        - Only advance to DELIVERED/CANCELED/RETURNED from non-terminal
+        - Only advance to SHIPPED, and only cancel, if the order is still
+          PENDING or PROCESSING.
+        - Only advance to DELIVERED/RETURNED from non-terminal
           states (or states before the target).
 
         Args:
@@ -1744,7 +1746,10 @@ class BoxNowService:
                           unknown events).
         """
         # Lazy imports avoid circular dependencies at startup.
-        from order.exceptions import InvalidStatusTransitionError
+        from order.exceptions import (
+            InvalidStatusTransitionError,
+            OrderCancellationError,
+        )
         from order.services import OrderService
 
         order: Order = shipment.order
@@ -1785,6 +1790,32 @@ class BoxNowService:
         # new / in-depot / pending-creation events → no order status change.
 
         if new_status is None or new_status == current_status:
+            return
+
+        if new_status == "CANCELED":
+            # A parcel can only be canceled before BoxNow collects it, so
+            # the order behind it is canceled as a whole (stock back,
+            # payment settled, cancellation recorded), never relabeled.
+            # An order that already shipped keeps its status.
+            if current_status not in _PRE_SHIPPED_STATUSES:
+                logger.warning(
+                    "BoxNow: parcel canceled for order=%s in status %r — "
+                    "ignoring",
+                    order.id,
+                    current_status,
+                )
+                return
+            try:
+                OrderService.cancel_for_dead_shipment(
+                    order, carrier="BoxNow", silent_for_customer=False
+                )
+            except OrderCancellationError as exc:
+                logger.warning(
+                    "BoxNow: order=%s was not canceled for its canceled "
+                    "parcel: %s",
+                    order.id,
+                    exc,
+                )
             return
 
         # BoxNow can deliver a parcel between two polls / webhook

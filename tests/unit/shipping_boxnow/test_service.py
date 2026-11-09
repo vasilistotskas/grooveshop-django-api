@@ -580,6 +580,76 @@ class TestApplyWebhookEvent:
             meta.get(f"suppress_status_ws_{OrderStatus.RETURNED.value}") is None
         )
 
+    def test_canceled_parcel_cancels_the_order_and_returns_its_stock(self):
+        """A ``canceled`` parcel event wrote the CANCELED label through
+        ``update_order_status``: the stock stayed held and nothing was
+        recorded. It is a cancellation, so it goes through
+        ``cancel_order``; the refund is left to staff."""
+        from order.models import OrderItem
+        from order.stock import StockManager
+        from product.factories import ProductFactory
+
+        product = ProductFactory(stock=10)
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            num_order_items=0,
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=3,
+            price=product.price,
+            sort_order=1,
+        )
+        StockManager.decrement_stock(
+            product_id=product.id,
+            quantity=3,
+            order_id=order.id,
+            reason="test: order created",
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.NEW,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.apply_webhook_event(
+                _build_envelope(parcel_id=shipment.parcel_id, event="canceled")
+            )
+
+        order.refresh_from_db()
+        product.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert product.stock == 10
+        cancellation = order.metadata["cancellation"]
+        assert cancellation["reason"] == (
+            "BoxNow shipment canceled before dispatch"
+        )
+        assert cancellation["previous_status"] == OrderStatus.PROCESSING
+        # Nobody asked for this cancel: the money stays until staff refund.
+        assert order.payment_status == PaymentStatus.COMPLETED
+        # The parcel is already canceled at BoxNow: it is not asked again.
+        mock_client.return_value.cancel_parcel.assert_not_called()
+
+    def test_canceled_parcel_leaves_a_shipped_order_alone(self):
+        order = OrderFactory(status=OrderStatus.SHIPPED)
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.FINAL_DESTINATION,
+        )
+
+        BoxNowService.apply_webhook_event(
+            _build_envelope(parcel_id=shipment.parcel_id, event="canceled")
+        )
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.SHIPPED
+        assert "cancellation" not in (order.metadata or {})
+
 
 # ---------------------------------------------------------------------------
 # cancel_shipment

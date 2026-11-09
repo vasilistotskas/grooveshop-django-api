@@ -219,7 +219,10 @@ serializers_config: SerializersConfig = {
         response=OrderDetailSerializer,
         operation_id="updateOrderStatus",
         summary=_("Update the status of an order"),
-        description=_("Update the status of an existing order"),
+        description=_(
+            "Update the status of an existing order. CANCELED is refused: "
+            "cancel an order through its cancel action."
+        ),
         tags=["Orders"],
     ),
     "create_payment_intent": ActionConfig(
@@ -2505,6 +2508,17 @@ class OrderViewSet(BaseModelViewSet):
             ) from e
         except InvalidStatusTransitionError as e:
             logger.warning("Invalid status transition: %s", e)
+            if e.new_status == OrderStatus.CANCELED:
+                raise ValidationError(
+                    {
+                        "detail": _(
+                            "An order is canceled through its cancel "
+                            "action, which releases its stock and refunds "
+                            "its payment."
+                        )
+                    },
+                    code="cancel_through_cancel_action",
+                ) from e
             raise ValidationError(
                 {
                     "detail": _("Invalid status transition."),

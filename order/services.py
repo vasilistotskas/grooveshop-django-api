@@ -2565,6 +2565,11 @@ class OrderService:
         transitions — e.g. the carrier bridge that walks PROCESSING →
         SHIPPED → RETURNED must not tell the customer "your order is on
         the way" moments before the return notification.
+
+        CANCELED is not a transition of this table: a cancel releases
+        stock, settles or refunds the payment and records why, and
+        :meth:`cancel_order` is the one path that does. Asking for it
+        here raises ``InvalidStatusTransitionError``.
         """
         if not new_status:
             raise ValueError("New status cannot be empty")
@@ -2586,14 +2591,8 @@ class OrderService:
             return order
 
         allowed_transitions = {
-            OrderStatus.PENDING: [
-                OrderStatus.PROCESSING,
-                OrderStatus.CANCELED,
-            ],
-            OrderStatus.PROCESSING: [
-                OrderStatus.SHIPPED,
-                OrderStatus.CANCELED,
-            ],
+            OrderStatus.PENDING: [OrderStatus.PROCESSING],
+            OrderStatus.PROCESSING: [OrderStatus.SHIPPED],
             OrderStatus.SHIPPED: [
                 OrderStatus.DELIVERED,
                 OrderStatus.RETURNED,
@@ -3278,8 +3277,7 @@ class OrderService:
             if shipment_cancel is not None:
                 # The courier already confirmed (a customer cancel asks it
                 # first). Recording the outcome here is also what stops
-                # the cascade below, and the ``order_canceled`` signal's
-                # safety net, from asking the carrier a second time.
+                # the cascade below from asking the carrier a second time.
                 order.metadata["cancellation"]["shipment_cancel"] = (
                     shipment_cancel
                 )
@@ -3298,14 +3296,9 @@ class OrderService:
                 old_status,
             )
 
-            # Cascade to the courier voucher synchronously here so the
-            # existing programmatic API contract (cancel-order callers
-            # see ``metadata.cancellation.shipment_cancel`` populated
-            # before this method returns) is preserved. The signal-side
-            # cascade in ``handle_order_canceled`` covers paths that
-            # bypass this method (admin form save) — it short-circuits
-            # when ``shipment_cancel`` is already on the metadata, so
-            # we don't double-fire from this entry point.
+            # Cascade to the courier voucher before returning, so every
+            # caller reads ``metadata.cancellation.shipment_cancel`` on
+            # the order it gets back.
             cls.cancel_attached_shipment(order, reason)
 
             return order
@@ -4648,17 +4641,49 @@ class OrderService:
         return out
 
     @classmethod
+    def cancel_for_dead_shipment(
+        cls, order: Order, *, carrier: str, silent_for_customer: bool
+    ) -> None:
+        """Cancel an order whose shipment was canceled before it left.
+
+        A carrier sync that finds the shipment CANCELED (ACS: the admin
+        retire action or a voucher cancel; BoxNow: a ``canceled`` parcel
+        event) is looking at a parcel that never shipped. Such an order
+        is not "status CANCELED", it is a cancellation: stock goes back
+        on the shelf, the reservation is released, the payment settled,
+        the history and signals fired — everything :meth:`cancel_order`
+        owns. A bare status write flipped the label and stranded the
+        stock (prod order 248, retired 2026-09-13, still PROCESSING a
+        week later with its unit still counted as sold).
+
+        The refund is left to a human: nobody asked for this cancel, and
+        on a replay the event is historic — moving money without someone
+        looking is worse than one WARNING.
+        """
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.CANCELED.value
+            )
+        if order.is_paid:
+            logger.warning(
+                "%s shipment canceled for a PAID order=%s — canceling "
+                "without a refund; refund it by hand.",
+                carrier,
+                order.id,
+            )
+        cls.cancel_order(
+            order,
+            reason=f"{carrier} shipment canceled before dispatch",
+            refund_payment=False,
+            customer_initiated=False,
+        )
+
+    @classmethod
     def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
         """Best-effort: cancel the courier voucher when the order is canceled.
 
-        Called from ``handle_order_canceled`` so the cascade fires for
-        every code path that produces ``order.status = CANCELED`` —
-        including admin form saves that go straight to ``Order.save()``
-        without touching :meth:`OrderService.cancel_order`. Verified
-        against prod order 60 on 2026-05-16: the admin status dropdown
-        was set to CANCELED via the change form, leaving voucher
-        9771614856 alive at ACS because the cascade lived only inside
-        ``cancel_order``.
+        Called by :meth:`cancel_order`, the only path that cancels an
+        order, so every cancel reaches the carrier.
 
         Routed through ``ShippingService.cancel_shipment`` so each
         carrier enforces its own cancellability rules. Common
@@ -4678,14 +4703,8 @@ class OrderService:
         """
         from shipping.services import ShippingService
 
-        # Idempotency: short-circuit when the cascade has already run for
-        # this order. The two entry points (programmatic ``cancel_order``
-        # explicit call AND the ``order_canceled`` signal-side safety
-        # net) can otherwise double-fire — with the test
-        # ``on_commit``-immediate fixture, the signal cascade lands
-        # synchronously during the first ``order.save()`` inside
-        # ``cancel_order``, then the explicit call inside the same
-        # method would run again.
+        # A customer cancel asked the courier before the order moved and
+        # recorded the answer: the courier is not asked a second time.
         existing_cancellation = (order.metadata or {}).get("cancellation") or {}
         if "shipment_cancel" in existing_cancellation:
             return
@@ -4721,15 +4740,8 @@ class OrderService:
         cancellation = order.metadata.setdefault("cancellation", {})
         cancellation["shipment_cancel"] = info
 
-        # ``.update(...)`` bypasses ``Order.save()`` and its post_save
-        # signal cascade — important because this method runs INSIDE
-        # the ``order_canceled`` signal handler, which itself fires
-        # from inside ``Order.save()``'s post_save chain. A nested
-        # ``order.save()`` would see a stale ``_original_status``
-        # (refreshed only AFTER the outer ``super().save()`` returns)
-        # and re-fire ``order_status_changed``, causing infinite
-        # recursion or duplicate-signal failures (verified in CI on
-        # 2026-05-16).
+        # ``.update(...)`` writes the one column that changed and runs no
+        # ``post_save`` receiver.
         Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
 
         if "error" in info:

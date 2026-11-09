@@ -1,0 +1,17 @@
+{% extends "agent/staff_connect/base.html" %}
+{% load i18n %}
+{% comment %}The consent of the staff issuer (agent/staff_connect.py: StaffAuthorizationView): which store, as whom, and only the views the role opens.{% endcomment %}
+{% block head_title %}{% translate "Authorize" %}{% endblock head_title %}
+{% block content %}
+    <h1>{% translate "Authorize" %} {{ client.name }}</h1>
+    <p>{% blocktranslate with client_name=client.name store=brand.name role=role_display %}{{ client_name }} wants to read the {{ store }} admin as you ({{ role }}). It can only view, never change anything.{% endblocktranslate %}</p>
+    <p>{% translate "Customers' names, emails, orders and messages it reads are sent to the app's provider. Approve only an app your store has agreed to use." %}</p>
+    <form method="post" action="{% url 'idp:oidc:authorization' %}">
+        {% csrf_token %}
+        {{ form }}
+        <div class="account-actions">
+            <button type="submit" name="action" value="grant" class="account-btn account-btn-primary">{% translate "Authorize" %}</button>
+            <button type="submit" name="action" value="cancel" class="account-btn account-btn-outline">{% translate "Cancel" %}</button>
+        </div>
+    </form>
+{% endblock content %}

@@ -6,6 +6,14 @@ from allauth.idp.oidc.models import Client
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from agent.staff import (
+    STAFF_CLIENT_GRANT_TYPES,
+    STAFF_CLIENT_SCOPES,
+    STAFF_SCOPE_DISPLAY,
+    on_platform_issuer,
+    store_for_staff_resource,
+)
+
 # Scopes AI agents may request when linking a shopper's account. The
 # per-client granted set lives on each ``allauth.idp.oidc.Client`` row;
 # this list is what the agent-facing API enforces (see agent/views.py)
@@ -45,20 +53,34 @@ def store_mcp_resource() -> str:
 
 
 class AgentOIDCAdapter(DefaultOIDCAdapter):
-    """Adds the commerce scopes to the consent screen's display copy."""
+    """The two issuers this API runs: a store's, and the platform's.
+
+    On a store host (the store's schema) the issuer links that store's
+    CUSTOMERS to an AI agent, for the shopper tools on ``/mcp``. On the
+    platform host (the public schema) it connects a store's STAFF, for
+    the store-admin tools on ``/mcp/admin`` (``agent/staff.py``). Each
+    hook answers for the issuer serving the request.
+    """
 
     scope_display = {
         **DefaultOIDCAdapter.scope_display,
         SCOPE_ORDERS_READ: _("View your orders and their status"),
         SCOPE_LOYALTY_READ: _("View your loyalty points and tier"),
         SCOPE_FAVOURITES_READ: _("View your favourite products"),
+        **STAFF_SCOPE_DISPLAY,
     }
 
     def populate_server_metadata(
         self, data: dict[str, str | list[str]]
     ) -> None:
-        """Name the commerce scopes, which allauth's own list leaves out."""
+        """Name the scopes this issuer offers, which allauth's list omits."""
         super().populate_server_metadata(data)
+        if on_platform_issuer():
+            data["scopes_supported"] = list(STAFF_CLIENT_SCOPES)
+            data["grant_types_supported"] = sorted(STAFF_CLIENT_GRANT_TYPES)
+            # The device flow's routes are not served on this issuer.
+            data.pop("device_authorization_endpoint", None)
+            return
         data["scopes_supported"] = list(LINKING_SCOPES)
 
     def validate_client_registration(
@@ -75,11 +97,38 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
         super().validate_client_registration(
             client=client, client_metadata=client_metadata, **kwargs
         )
+        if on_platform_issuer():
+            self._register_staff_client(client)
+            return
         if not client_metadata.get("scope"):
             client.set_scopes(list(LINKING_SCOPES))
 
+    @staticmethod
+    def _register_staff_client(client: Client) -> None:
+        """Hold a staff client to the staff scopes and the code flow.
+
+        A client may ask for none of the scopes (registration may omit
+        ``scope``) or for others: it gets every staff scope, since the
+        consent page and the person's role decide what a token holds.
+        """
+        grant_types = set(client.get_grant_types())
+        if not grant_types <= STAFF_CLIENT_GRANT_TYPES:
+            raise ValidationError(
+                "Only the authorization code flow is offered here."
+            )
+        client.set_scopes(list(STAFF_CLIENT_SCOPES))
+
     def validate_resource_uris(self, *, uris: list[str], **kwargs: Any) -> None:
         """Refuse at issue a token the agent API would refuse in use."""
+        if on_platform_issuer():
+            # A staff token binds exactly one store's staff MCP server;
+            # whether the person may connect it is decided at consent,
+            # where the person is known (``agent.staff_connect``).
+            if len(uris) != 1 or store_for_staff_resource(uris[0]) is None:
+                raise ValidationError(
+                    "Resource is not a store's staff MCP server."
+                )
+            return
         store_resource = store_mcp_resource()
         for uri in uris:
             if not is_resources_subset([store_resource], [uri]):

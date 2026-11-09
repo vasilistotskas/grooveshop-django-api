@@ -233,6 +233,13 @@ SHARED_APPS = [
     # user row lives, which for platform staff is the public schema. Also
     # in TENANT_APPS for customers' own authenticators.
     "allauth.mfa",
+    # The staff issuer: on the public schema the OIDC provider connects a
+    # store's STAFF (platform identities) to an AI app, for the store-admin
+    # tools on ``/mcp/admin``; its clients and tokens live where those users
+    # do. Also in TENANT_APPS, where each store's own issuer links its
+    # CUSTOMERS. Two token tables, so neither kind is ever found where the
+    # other is checked (``agent/staff.py``).
+    "allauth.idp.oidc",
 ]
 
 TENANT_APPS = [
@@ -358,7 +365,8 @@ MIDDLEWARE = [
     # dialing backend-service directly (no resolvable tenant Host) —
     # must answer BEFORE tenant resolution.
     "tenant.internal.InternalDomainsMiddleware",
-    "django_tenants.middleware.main.TenantMainMiddleware",
+    # django-tenants' host routing, plus the staff connect host.
+    "tenant.middleware.PlatformTenantMainMiddleware",
     # Immediately after tenant resolution and before anything that
     # serves data: django_tenants resolves a host without looking at
     # ``is_active``, so a SUSPENDED store kept answering its API in full.
@@ -597,6 +605,9 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         # Each mint hands out a credential for the shopper's cart.
         "cart_agent_token": None if DEBUG else "10/minute",
+        # The store-admin agent surface, per staff member and store. An AI
+        # app answering one question may call several tools in a row.
+        "agent_staff": None if DEBUG else "120/minute",
         # Order creation moves stock, can mint a courier voucher and can
         # open a provider payment session — and guest checkout means the
         # anonymous budget is the one that matters.
@@ -2486,6 +2497,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Open every link to another site in a new tab, in the rich "
+            "text of posts, pages and products. Links to the store's own "
+            "pages keep what the editor chose. A store UI preference, "
+            "served in TenantConfig.preferences."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,
@@ -2675,6 +2697,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "MCP/UCP/ACP, feeds and the chatbot. Cached with the "
             "tenant-resolve payload — changes take effect on cache "
             "invalidation (automatic on save)."
+        ),
+    },
+    {
+        "name": "STAFF_AI_ACCESS_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Lets the store's team connect their own AI app (Claude, "
+            "ChatGPT and others) to read the store through the store-admin "
+            "MCP server, /mcp/admin: orders, products and stock, customers, "
+            "reviews, contact messages and, by role, sales and profit. What "
+            "the app reads is sent to its provider, so it stays off until "
+            "the store turns it on. Off: no one can connect, and an app "
+            "already connected is refused at its next call."
         ),
     },
     {
@@ -5218,3 +5254,16 @@ IDP_OIDC_DCR_REQUIRES_INITIAL_ACCESS_TOKEN = False
 # opaque access tokens without it); provisioned via sealed secret.
 IDP_OIDC_PRIVATE_KEY = getenv("IDP_OIDC_PRIVATE_KEY", "")
 IDP_OIDC_ADAPTER = "agent.oidc.AgentOIDCAdapter"
+
+# ---------- Store-admin tools over MCP (agent/staff.py) --------------------
+# The host a store's staff connect an AI app on: the staff issuer of the
+# public schema, served alone through ``agent.urls_connect``
+# (``tenant.middleware.PlatformTenantMainMiddleware``) and outside the
+# platform host's basic-auth. Empty turns the host off.
+STAFF_CONNECT_HOST = getenv("STAFF_CONNECT_HOST", "")
+# The most rows one list on ``/api/v1/agent/staff/*`` returns.
+STAFF_AGENT_LIST_LIMIT = int(getenv("STAFF_AGENT_LIST_LIMIT", "50"))
+# The days a sales or profit report covers when no start is given.
+STAFF_AGENT_REPORT_DEFAULT_DAYS = int(
+    getenv("STAFF_AGENT_REPORT_DEFAULT_DAYS", "30")
+)

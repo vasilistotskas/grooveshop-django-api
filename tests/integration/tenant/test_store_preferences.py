@@ -67,3 +67,12 @@ def test_resolve_serves_them_under_preferences():
     assert data["preferences"]["sticky_add_to_cart"] is False
     assert data["preferences"]["mobile_bottom_nav"] is True
     assert set(data["preferences"]) == set(STORE_PREFERENCES)
+
+
+@pytest.mark.parametrize("on", [True, False])
+def test_resolve_serves_each_preference_as_the_store_set_it(on):
+    switch_store_settings(**dict.fromkeys(STORE_PREFERENCES.values(), on))
+
+    data = TenantConfigSerializer(store_tenant("preference_store")).data
+
+    assert data["preferences"] == dict.fromkeys(STORE_PREFERENCES, on)

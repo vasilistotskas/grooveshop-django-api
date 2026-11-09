@@ -259,11 +259,12 @@ settings.DATABASES["default"]["OPTIONS"] = _test_db_options
 # tests don't need per-schema separation.
 settings.DATABASE_ROUTERS = []
 
-# Remove TenantMainMiddleware so tests don't need a TenantDomain for "testserver"
+# Remove the tenant routing middleware so tests don't need a TenantDomain
+# for "testserver"
 settings.MIDDLEWARE = [
     m
     for m in settings.MIDDLEWARE
-    if m != "django_tenants.middleware.main.TenantMainMiddleware"
+    if m != "tenant.middleware.PlatformTenantMainMiddleware"
 ]
 
 # Use ROOT_URLCONF directly (not PUBLIC_SCHEMA_URLCONF) for tests

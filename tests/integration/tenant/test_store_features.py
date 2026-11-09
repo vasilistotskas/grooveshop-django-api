@@ -53,6 +53,7 @@ EVERY_SWITCH = {
     "CHAT_WIDGET_ENABLED": True,
     "CATALOGUE_ENABLED": True,
     "CART_ENABLED": True,
+    "STAFF_AI_ACCESS_ENABLED": True,
 }
 
 
@@ -172,6 +173,9 @@ SERVED_BY = [
     ("contact_attachments", "contact-attachment", "post", False),
     ("catalogue", "product-list", "get", False),
     ("cart", "cart-item-list", "get", False),
+    # Off, the store-admin surface is a bare 404; on, an anonymous call
+    # gets the 401 challenge.
+    ("staff_ai_access", "agent-staff-orders", "get", False),
 ]
 
 

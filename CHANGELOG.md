@@ -3,6 +3,96 @@
 
 
 
+## v3.242.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(agent): canonical staff resource only, and text search for non-ASCII digits
+
+A resource whose host differed only in case passed issuance (urlsplit
+lowercases the host) but never matched the store's resource on use, so
+its token was refused on every call. And a search like "²" passed
+isdigit() and made int() raise a 500. ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Features
+
+* feat(agent): store-admin read surface for AI apps over MCP (#556) ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(agent): store-admin read surface for AI apps over MCP
+
+A store's owner and staff can connect their AI app to the store-admin
+MCP server (/mcp/admin, served by the agent gateway) and read orders,
+sales, profit, products and stock, customers, reviews and contact
+messages, by their role in the store. Read only.
+
+- Staff issuer: allauth.idp.oidc is now in SHARED_APPS too. On the
+  public schema it issues tokens to platform identities (staff); each
+  store's schema keeps issuing to its customers. A customer token is
+  never found where staff tokens are looked up, and the other way round.
+- Connect host (STAFF_CONNECT_HOST): PlatformTenantMainMiddleware maps
+  it to the public schema with its own URLconf (agent.urls_connect),
+  which serves only the staff issuer, so the platform host stays behind
+  its basic-auth. Sign-in reuses the admin's form (staff lockouts and the
+  superuser second factor); the consent requires one store's /mcp/admin
+  resource and a membership there, offers only the scopes the role
+  opens, and wears that store's brand. No device flow; DCR clients get
+  the staff scopes and the code flow only.
+- The IdP routes leave the platform host: they are served on store
+  hosts (customers) and the connect host (staff) alone.
+- /api/v1/agent/staff/*: StaffAgentTokenAuthentication looks tokens up
+  in public only and requires the store's resource, an active staff
+  account and an active membership on every call; HasStaffScope needs
+  the scope AND the role's permission, read from
+  TenantRolePermissionBackend so a superuser gets the store role only.
+  Figures come from order/turnover.py and order/profit.py; no street or
+  phone leaves; throttled per staff member and store (agent_staff).
+- The allauth frame resolves its account links with {% url ... as %},
+  so a host without account routes renders allauth's error page.
+
+The public schema already holds the IdP tables at the current shape
+(checked on staging and production), so no migration is needed. ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(agent): a store switch for its team's AI apps, off by default
+
+What a team member's AI app reads (customers, orders, messages) goes to
+the app's provider, and the store, as controller, decides whether its
+customers' data goes there at all. STAFF_AI_ACCESS_ENABLED is a new store
+feature, staff_ai_access, declared off: until a store turns it on, no one
+can connect (the consent refuses), and every /api/v1/agent/staff/* route
+answers a bare 404, a connected app's token included. Turning it off
+cuts connected apps at their next call. It is served in
+TenantConfig.features as staffAiAccess, so the gateway can refuse
+/mcp/admin on the same answer.
+
+Also: StaffAgentThrottle is classified fail-open (authenticated reads),
+and agent/staff_auth.py joins the modules that may read is_staff (it
+authenticates against the public schema and re-checks the flag). ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(admin): list STAFF_AI_ACCESS_ENABLED under Agent Commerce ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(builder): name staff_ai_access in the editor's feature states ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Performance improvements
+
+* perf(agent): read order totals from the list's annotation
+
+The staff orders list computed each row's total with its own aggregate
+query; it now reads with_total_amounts(), so the list costs the same for
+one order or fifty. The order detail no longer joins the country it
+serves only the key of (Country.alpha_2, the ISO code). ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Refactoring
+
+* refactor(agent): import ReviewStatus at module level ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+## v3.241.0 (2026-11-09)
+
+### Features
+
+* feat(tenant): a store preference to open external links in a new tab (#555)
+
+Closes #550. ([`4348765`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4348765f6b292e72d3e13e6ca559d8ea8a6460c9))
+
 ## v3.240.1 (2026-11-09)
 
 ### Bug fixes

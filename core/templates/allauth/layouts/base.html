@@ -31,14 +31,16 @@ the styles are the account-* components in tailwind/input.css.
                 </a>
             </header>
             {% comment %}Who is signed in, and the way out: on the OAuth consent a shopper must see which account an AI app gets, and be able to switch.{% endcomment %}
+            {% comment %}Resolved with "as", which yields nothing instead of failing: the staff connect host (agent.urls_connect) serves allauth's OAuth error page but none of its account pages.{% endcomment %}
+            {% url 'account_logout' as logout_url %}{% url 'account_login' as login_url %}
             {% if user.is_authenticated %}
                 <p class="account-session">
                     {% blocktranslate with email=user.email %}Signed in as {{ email }}{% endblocktranslate %}
                     {% comment %}Back to this page after signing out, so a shopper who switches account on the consent carries on with it.{% endcomment %}
-                    · <a href="{% url 'account_logout' %}?next={{ request.get_full_path|urlencode }}">{% translate "Sign Out" %}</a>
+                    {% if logout_url %}· <a href="{{ logout_url }}?next={{ request.get_full_path|urlencode }}">{% translate "Sign Out" %}</a>{% endif %}
                 </p>
-            {% elif request.resolver_match.url_name != "account_login" %}
-                <p class="account-session"><a href="{% url 'account_login' %}">{% translate "Sign In" %}</a></p>
+            {% elif login_url and request.resolver_match.url_name != "account_login" %}
+                <p class="account-session"><a href="{{ login_url }}">{% translate "Sign In" %}</a></p>
             {% endif %}
             {% block nav %}{% endblock nav %}
             <main class="account-card">

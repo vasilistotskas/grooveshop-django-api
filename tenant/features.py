@@ -46,6 +46,7 @@ from tenant.permissions import (
     IsRecommendationsEnabled,
     IsRecommendationsRuntimeEnabled,
     IsSettingEnabled,
+    IsStaffAiAccessEnabled,
     IsTenantFeatureEnabled,
 )
 
@@ -95,6 +96,10 @@ STORE_FEATURES: dict[str, StoreFeature] = {
         IsAgentCommerceEnabled,
         (IsAgentCommerceRuntimeEnabled, IsChatWidgetEnabled),
     ),
+    # The store's team reading the store from their own AI app
+    # (/mcp/admin): the store decides whether its customers' data may go to
+    # an AI provider at all.
+    "staff_ai_access": StoreFeature(None, (IsStaffAiAccessEnabled,)),
     "catalogue": StoreFeature(None, (IsCatalogueEnabled,)),
     # Nothing can be put in a cart from a catalogue that is not served.
     "cart": StoreFeature(None, (IsCatalogueEnabled, IsCartEnabled)),
@@ -109,6 +114,7 @@ STORE_PREFERENCES: dict[str, str] = {
     "recently_viewed": "RECENTLY_VIEWED_ENABLED",
     "product_assurances": "PRODUCT_ASSURANCES_ENABLED",
     "demo_account": "DEMO_ACCOUNT_ENABLED",
+    "external_links_new_tab": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
 }
 
 

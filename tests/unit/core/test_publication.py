@@ -13,6 +13,7 @@ from django.utils import timezone
 from blog.factories.post import BlogPostFactory
 from blog.models.post import BlogPost
 from core import publication
+from core.cache.service import PurgeReport, SurfaceResult
 from core.models import SweepCursor
 from core.sweeps import advance_sweep
 
@@ -33,8 +34,18 @@ def cursor():
 
 @pytest.fixture
 def stale():
-    with patch.object(publication, "mark_surface_stale") as marked:
-        yield marked
+    """``CacheService.purge`` answering that every surface was purged."""
+    with patch(
+        "core.cache.service.CacheService.purge",
+        side_effect=lambda codes, **kwargs: PurgeReport(
+            surfaces=[SurfaceResult(code=code) for code in codes]
+        ),
+    ) as purge:
+        yield purge
+
+
+def purged(purge) -> set[str]:
+    return {code for call in purge.call_args_list for code in call.args[0]}
 
 
 @pytest.fixture
@@ -68,8 +79,7 @@ class TestReleaseDuePublications:
 
         assert released == 1
         assert live == [(BlogPost, post)]
-        marked = {call.args[0] for call in stale.call_args_list}
-        assert {"blog", "sitemap_seo"} <= marked
+        assert {"blog", "sitemap_seo"} <= purged(stale)
 
     def test_a_date_still_ahead_waits(self, stale, live):
         post = scheduled()
@@ -126,18 +136,27 @@ class TestReleaseDuePublications:
         assert released == 0
         assert live == []
 
-    def test_a_failed_run_repeats_its_window(self, stale, live):
+    def test_a_failed_purge_fails_the_run_and_repeats_its_window(
+        self, stale, live
+    ):
         post = scheduled()
         start = timezone.now()
         start_cursor_at(start)
         after = post.published_at + timedelta(seconds=30)
-        stale.side_effect = RuntimeError("purge queue unavailable")
+        stale.side_effect = lambda codes, **kwargs: PurgeReport(
+            surfaces=[
+                SurfaceResult(code=code, nuxt_error="storefront down")
+                for code in codes
+            ]
+        )
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(publication.PublicationPurgeFailed):
             publication.release_due_publications(now=after)
 
         assert cursor() == start
-        stale.side_effect = None
+        stale.side_effect = lambda codes, **kwargs: PurgeReport(
+            surfaces=[SurfaceResult(code=code) for code in codes]
+        )
         assert publication.release_due_publications(now=after) == 1
 
     def test_the_cursor_survives_the_cache(self, stale, live):
@@ -178,3 +197,13 @@ def test_every_publishable_model_is_swept():
         "page_config.ContentPage",
         "product.ProductReview",
     } <= labels
+
+
+def test_the_cursor_never_moves_backwards():
+    now = timezone.now()
+    advance_sweep(publication.SWEEP_NAME, now)
+
+    # A slower run that started earlier finishes last.
+    advance_sweep(publication.SWEEP_NAME, now - timedelta(minutes=1))
+
+    assert cursor() == now

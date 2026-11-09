@@ -34,6 +34,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 
 from builder.data_sources import ANY
 from builder.models import BuilderReference, ReferenceKind
+from core.publication import went_live
 
 logger = logging.getLogger(__name__)
 
@@ -324,6 +325,12 @@ def connect(*, force: bool = False) -> None:
     def deleted_post(sender, instance, **kwargs):
         _later(lambda: _post_documents(instance.pk, [instance.category_id]))
 
+    def post_went_live(sender, instance, **kwargs):
+        # A post dated in the future reached its date: nothing was saved,
+        # so the receivers above never ran (``core.publication``).
+        if sender is post:
+            _later(lambda: _post_documents(instance.pk, [instance.category_id]))
+
     def post_translation(sender, instance, **kwargs):
         if _skip(kwargs):
             return
@@ -406,6 +413,7 @@ def connect(*, force: bool = False) -> None:
             sender,
             f"builder-data:{'save' if signal is post_save else 'delete'}:{uid}",
         )
+    _connect(went_live, post_went_live, None, "builder-data:went-live:post")
 
 
 def disconnect() -> None:

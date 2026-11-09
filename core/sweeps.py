@@ -32,10 +32,14 @@ def sweep_start(name: str, now: datetime, first_window: timedelta) -> datetime:
 def advance_sweep(name: str, now: datetime) -> None:
     """Record that sweep ``name`` of the current store acted up to ``now``.
 
-    Call it only after the work succeeded."""
+    Call it only after the work succeeded. Never moves backwards: a slow
+    run that ends after a later one leaves the later position."""
 
-    SweepCursor.objects.update_or_create(
-        schema_name=connection.schema_name,
-        name=name,
-        defaults={"position": now},
-    )
+    schema_name = connection.schema_name
+    moved = SweepCursor.objects.filter(
+        schema_name=schema_name, name=name, position__lt=now
+    ).update(position=now)
+    if not moved:
+        SweepCursor.objects.get_or_create(
+            schema_name=schema_name, name=name, defaults={"position": now}
+        )

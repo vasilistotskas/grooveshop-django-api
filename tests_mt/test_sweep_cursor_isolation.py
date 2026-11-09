@@ -55,6 +55,7 @@ def test_each_store_resumes_from_its_own_position(two_stores):
 def test_a_post_goes_live_in_its_own_store_only(two_stores):
     from blog.factories.post import BlogPostFactory
     from core import publication
+    from core.cache.service import PurgeReport, SurfaceResult
 
     with_post, without = two_stores
     now = timezone.now()
@@ -67,7 +68,12 @@ def test_a_post_goes_live_in_its_own_store_only(two_stores):
         )
 
     released: dict[str, int] = {}
-    with patch.object(publication, "mark_surface_stale"):
+    with patch(
+        "core.cache.service.CacheService.purge",
+        side_effect=lambda codes, **kwargs: PurgeReport(
+            surfaces=[SurfaceResult(code=code) for code in codes]
+        ),
+    ):
         for tenant in two_stores:
             with tenant_context(tenant):
                 released[tenant.schema_name] = (

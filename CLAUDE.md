@@ -86,7 +86,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 - **builder/** — The storefront page builder: versioned documents (theme, section groups, templates, pages), immutable releases, the staff API and the public read of the current release; the block catalogue is the storefront's
 - **meta_capi/** — Meta Conversions API event dispatch
 - **indexnow/** — IndexNow notifications: a published product or blog post that changes is queued and sent to search engines in one batched POST per store
-- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway
+- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway: the shopper tools (`/mcp`, the store's own issuer and customers) and the store-admin tools (`/agent/staff/*` behind `/mcp/admin`, read only). Staff tokens come from the platform's staff issuer on `STAFF_CONNECT_HOST` (`agent/staff.py`, `agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc` is in SHARED_APPS too, so staff tokens live in `public` and customers' in each store's schema
 - **search/** — Meilisearch product and blog search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)

@@ -673,6 +673,7 @@ def tls_server(tls_material, monkeypatch):
     _Handler.seen = []
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(tls_material["cert"], tls_material["key"])
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)

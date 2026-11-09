@@ -511,6 +511,14 @@ class PaymentLedger:
         return cls.refundable(order) + cls.stored_value_refundable(order)
 
     @classmethod
+    def outstanding(cls, order: Order) -> Decimal:
+        """What paid for *order* has not gone back yet: what can still be
+        refunded, plus what refunds still PENDING hold."""
+        return cls.refundable_value(order) + _total(
+            RefundAttempt.objects.live().filter(order=order)
+        )
+
+    @classmethod
     def refund_open(cls, order: Order) -> bool:
         """Whether money paid for *order* can still be refunded.
 
@@ -524,20 +532,17 @@ class PaymentLedger:
         (cash, gift cards, points) is not open: nothing can be refunded
         through one.
 
-        A gift card and points return still PENDING keeps it open too: its
-        value has not gone back, and repeating the refund of its amount is
-        the only way to finish it (``OrderService._attempts_to_resume``),
-        even when it holds everything that was left.
+        A refund still PENDING keeps it open too, whatever its kind, even
+        when it holds everything that was left: its money has not gone back,
+        and the order's refund dialog is where it is finished (a gift card
+        and points share by repeating its amount, a lines refund by its
+        retry) or pointed to Record refund outcome.
         """
         from order.payment import registered_provider_codes
 
         if cls.refundable_value(order) > 0:
             return True
-        if (
-            RefundAttempt.objects.live()
-            .filter(order=order, kind=RefundAttemptKind.STORED_VALUE)
-            .exists()
-        ):
+        if RefundAttempt.objects.live().filter(order=order).exists():
             return True
         pay_way = order.pay_way
         return bool(

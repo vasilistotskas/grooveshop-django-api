@@ -869,7 +869,7 @@ msgid "A refund of this amount was already sent to the payment provider and its 
 msgstr "Μια επιστροφή αυτού του ποσού έχει ήδη σταλεί στον πάροχο πληρωμών και το αποτέλεσμά της δεν είναι ακόμη γνωστό. Καταχωρείται όταν την επιβεβαιώσει ο πάροχος· ελέγξτε τον πίνακα ελέγχου του παρόχου πριν δοκιμάσετε ξανά."
 
 msgid "A refund of this amount was sent to the payment provider a while ago and its result is still not known. It is looked up automatically; if it stays unknown, record its outcome with Record refund outcome on the order before trying again."
-msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από λίγο και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της με την «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία πριν ξαναδοκιμάσετε."
+msgstr "Μια επιστροφή αυτού του ποσού στάλθηκε στον πάροχο πληρωμών πριν από αρκετή ώρα και το αποτέλεσμά της παραμένει άγνωστο. Αναζητείται αυτόματα· αν παραμείνει άγνωστο, καταγράψτε το αποτέλεσμά της με την «Καταγραφή αποτελέσματος επιστροφής» στην παραγγελία πριν ξαναδοκιμάσετε."
 
 msgid "A refund the provider accepted failed"
 msgstr "Απέτυχε επιστροφή που είχε δεχτεί ο πάροχος"
@@ -11267,7 +11267,7 @@ msgid "Puts returned units of an order line back into stock and records them on 
 msgstr "Επιστρέφει στο απόθεμα τα επιστρεφόμενα τεμάχια μιας γραμμής παραγγελίας και τα καταγράφει στη γραμμή. Δεν μετακινεί χρήματα: επιστρέψτε την πληρωμή με την ενέργεια επιστροφής της παραγγελίας."
 
 msgid "Puts the units that came back on the shelf and records them on the order's lines, each in its own product (a variant is a product). Only units not put back yet can be entered. Pays nothing back: use \"Return and refund\" for the money, which can restock in the same step."
-msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (η παραλλαγή είναι προϊόν). Μπορούν να δηλωθούν μόνο τεμάχια που δεν έχουν επανέλθει ακόμη. Δεν επιστρέφει χρήματα: χρησιμοποιήστε το «Επιστροφή και επιστροφή χρημάτων» για τα χρήματα, που μπορεί να κάνει επαναφορά αποθέματος στο ίδιο βήμα."
+msgstr "Επαναφέρει στο απόθεμα τα τεμάχια που επιστράφηκαν και τα καταγράφει στις γραμμές της παραγγελίας, το καθένα στο δικό του προϊόν (η παραλλαγή είναι προϊόν). Μπορούν να δηλωθούν μόνο τεμάχια που δεν έχουν επανέλθει ακόμη. Δεν επιστρέφει χρήματα: χρησιμοποιήστε την «Επιστροφή προϊόντων και χρημάτων» για τα χρήματα, που μπορεί να κάνει επαναφορά αποθέματος στο ίδιο βήμα."
 
 #, python-format
 msgid "Q%(quarter)s %(year)s"
@@ -12146,7 +12146,7 @@ msgid "Return Label"
 msgstr "Ετικέτα επιστροφής"
 
 msgid "Return and refund"
-msgstr "Επιστροφή και επιστροφή χρημάτων"
+msgstr "Επιστροφή προϊόντων και χρημάτων"
 
 msgid "Return the most popular search queries from the last 24 hours, suitable for surfacing in the search modal empty state. Cached for 5 minutes per (language_code, content_type, limit)."
 msgstr "Επιστρέφει τα πιο δημοφιλή ερωτήματα αναζήτησης των τελευταίων 24 ωρών, κατάλληλα για εμφάνιση στην κενή κατάσταση του modal αναζήτησης. Αποθηκεύεται σε cache για 5 λεπτά ανά (language_code, content_type, limit)."

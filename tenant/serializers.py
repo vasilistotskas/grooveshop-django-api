@@ -87,6 +87,7 @@ class StorePreferencesSerializer(serializers.Serializer):
     recently_viewed = serializers.BooleanField(read_only=True)
     product_assurances = serializers.BooleanField(read_only=True)
     demo_account = serializers.BooleanField(read_only=True)
+    external_links_new_tab = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:
         from tenant.features import effective_preferences

@@ -143,6 +143,12 @@ def store_for_staff_resource(uri: str) -> Any | None:
     )
     if domain is None or domain.tenant.schema_name == get_public_schema_name():
         return None
+    # Byte for byte the form the store host compares a token's resource
+    # with (``store_staff_mcp_resource``): ``hostname`` above is lowercased,
+    # so ``https://Shop.example/mcp/admin`` would otherwise be issued a
+    # token no call could ever use.
+    if uri != staff_mcp_resource(domain.domain):
+        return None
     return domain.tenant
 
 

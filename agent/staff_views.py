@@ -250,7 +250,7 @@ class StaffAgentOrdersView(StaffAgentAPIView):
                 | Q(first_name__icontains=search)
                 | Q(last_name__icontains=search)
             )
-            if search.isdigit():
+            if search.isascii() and search.isdigit():
                 match |= Q(id=int(search))
             orders = orders.filter(match)
         rows = orders.prefetch_related("items").order_by("-created_at")[
@@ -470,7 +470,7 @@ class StaffAgentProductsView(StaffAgentAPIView):
             match = Q(translations__name__icontains=search) | Q(
                 sku__icontains=search
             )
-            if search.isdigit():
+            if search.isascii() and search.isdigit():
                 match |= Q(id=int(search))
             products = products.filter(match).distinct()
         if request.query_params.get("low_stock") in {"true", "1"}:

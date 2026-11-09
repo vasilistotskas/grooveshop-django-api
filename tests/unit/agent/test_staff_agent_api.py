@@ -289,6 +289,13 @@ class StaffAgentAPITestCase(APITestCase):
         body = detail.content.decode()
         self.assertNotIn(order.street, body)
 
+    def test_a_non_ascii_digit_search_is_a_text_search(self) -> None:
+        staff = self._member(TenantMembershipRole.STAFF)
+        self._bearer(staff, ["admin:orders:read", "admin:catalog:read"])
+        for name in ("agent-staff-orders", "agent-staff-products"):
+            response = self.client.get(reverse(name), {"search": "²"})
+            self.assertEqual(response.status_code, status.HTTP_200_OK, name)
+
     def test_orders_refuse_an_unknown_status_and_a_bad_range(self) -> None:
         staff = self._member(TenantMembershipRole.STAFF)
         self._bearer(staff, ["admin:orders:read"])
@@ -406,6 +413,8 @@ class StaffIssuerAdapterTestCase(APITestCase):
             ["https://alias-store.example/mcp/admin"],
             ["http://issuer-store.example/mcp/admin"],
             ["https://issuer-store.example:8443/mcp/admin"],
+            # Not the canonical form a call is compared with.
+            ["https://Issuer-Store.example/mcp/admin"],
             ["https://unknown.example/mcp/admin"],
             [
                 "https://issuer-store.example/mcp/admin",

@@ -1,6 +1,6 @@
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import BTreeIndex
-from django.core.validators import URLValidator
+from django.contrib.postgres.validators import ArrayMaxLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -9,12 +9,17 @@ from parler.models import TranslatableModel, TranslatedFields
 from blog.managers.author import BlogAuthorManager
 from core.fields.rich_text import RichTextField
 from core.models import TimeStampMixinModel, UUIDModel
+from core.validators.url import WebURLValidator
 
 #: A public profile is a web page: no ``ftp:``, ``mailto:`` or script URL.
-PROFILE_URL_VALIDATOR = URLValidator(schemes=["http", "https"])
+PROFILE_URL_VALIDATOR = WebURLValidator(schemes=["http", "https"])
 
 #: The longest profile URL kept.
 PROFILE_URL_MAX_LENGTH = 500
+
+#: The most public profiles an author lists: a Person's ``sameAs`` names
+#: a few profiles, not a link directory.
+PROFILE_URLS_MAX = 10
 
 
 class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
@@ -34,6 +39,7 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         blank=True,
         default=list,
         db_default=[],
+        validators=[ArrayMaxLengthValidator(PROFILE_URLS_MAX)],
         verbose_name=_("Public profiles"),
         help_text=_(
             "Links to the author's public profiles on other sites, such as"

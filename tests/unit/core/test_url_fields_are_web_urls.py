@@ -14,11 +14,13 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import models
 from rest_framework import serializers
 
 from core.api.url_field import WebURLField as WebURLSerializerField
 from core.fields.url import WebURLField
+from core.validators.url import WebURLValidator
 from tenant.models import Tenant
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -114,3 +116,22 @@ def test_a_declared_serializer_field_refuses_it():
     assert field.run_validation(FINE) == FINE
     with pytest.raises(serializers.ValidationError):
         field.run_validation(OUT_OF_RANGE)
+
+
+def test_a_bad_url_gets_one_error_not_one_per_validator():
+    with pytest.raises(serializers.ValidationError) as refused:
+        WebURLSerializerField().run_validation("notaurl")
+
+    assert len(refused.value.detail) == 1
+
+
+def test_a_narrower_web_url_validator_stands_in_for_the_default():
+    narrow = WebURLValidator(schemes=["https"])
+    field = WebURLSerializerField(validators=[narrow])
+
+    assert [v for v in field.validators if isinstance(v, URLValidator)] == [
+        narrow
+    ]
+    with pytest.raises(serializers.ValidationError) as refused:
+        field.run_validation("ftp://example.com/x")
+    assert len(refused.value.detail) == 1

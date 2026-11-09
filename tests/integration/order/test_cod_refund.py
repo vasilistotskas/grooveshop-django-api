@@ -485,8 +485,12 @@ class TestTheStaffAction:
             amount=_eur("15.00"),
         )
 
-        resume = _form(staff_user, order, {"amount": "15.00", "reason": "R"})
-        new = _form(staff_user, order, {"amount": "20.00", "reason": "R"})
+        resume = _form(
+            staff_user, order, {"amount": "15.00", "reason": "RETURNED"}
+        )
+        new = _form(
+            staff_user, order, {"amount": "20.00", "reason": "RETURNED"}
+        )
 
         assert resume.is_valid(), resume.errors
         assert not new.is_valid()

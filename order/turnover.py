@@ -42,7 +42,8 @@ What a sale is worth
 Returns
     Money that went back, in the month it went back (a return belongs to
     the month it happened, not to the sale it reverses): ledger REFUND
-    rows less REFUND_REVERSAL rows, value returned onto gift cards
+    rows (their goods part: a duplicate payment given back is no return)
+    less REFUND_REVERSAL rows, value returned onto gift cards
     (``REFUND_CREDIT``), a chargeback staff decided was for returned
     goods (in the month of the decision), and an order that closed unpaid
     after shipping (in the month it closed). Points restored are not
@@ -89,6 +90,8 @@ from django.db.models import (
 )
 from django.db.models.functions import (
     Coalesce,
+    Greatest,
+    Least,
     NullIf,
     Round,
     TruncDay,
@@ -422,6 +425,94 @@ def _returned(
     )
 
 
+def _ledger_goods(rows: QuerySet) -> QuerySet:
+    """``rows`` (provider ``REFUND`` and ``REFUND_REVERSAL`` ledger rows)
+    annotated with ``goods``: the part of each that is a return of the
+    sale, gross, before its sign.
+
+    A refund pays a duplicate payment back first, and that part is no
+    return: it owes no credit document and takes no room on the receipt
+    (``docs/order-system.md`` section 7). What the refund returned of
+    goods is ``CreditAllocation.goods_claimed``, written once when the
+    money was claimed or booked and never scaled afterwards, capped to
+    what the refund really moved. A refund with no allocation at all (not
+    decided yet, or from before allocations) counts whole.
+
+    A provider reversal takes the duplicate part back first, then the
+    goods, exactly as ``credit_allocation.goods_returned`` does: after
+    reversals totalling ``c`` the refund stands for
+    ``max(min(goods, paid - c), 0)`` of goods, and its one reversal (the
+    ledger holds one per provider reference, ``unique_payment_transaction_
+    reference``) counts the drop. Every figure is read from append-only
+    ledger rows and the fixed ``goods_claimed``, so a past month never
+    moves: the allocation rows themselves are rewritten
+    in place when a refund is reversed (``credit_allocation.scale``) and
+    are never read per month. A reversal with no refund row to belong to
+    counts whole."""
+    from order.models import CreditAllocation, PaymentTransaction
+
+    refund_pk = Case(
+        When(kind=PaymentTransactionKind.REFUND, then=F("pk")),
+        default=Subquery(
+            PaymentTransaction.objects.filter(
+                kind=PaymentTransactionKind.REFUND,
+                order=OuterRef("order_id"),
+                provider=OuterRef("provider"),
+                provider_reference=OuterRef("provider_reference"),
+            )
+            .order_by("pk")
+            .values("pk")[:1]
+        ),
+    )
+    paid = Subquery(
+        PaymentTransaction.objects.filter(pk=OuterRef("refund_pk")).values(
+            "amount"
+        )[:1],
+        output_field=_MONEY,
+    )
+    claimed = Subquery(
+        CreditAllocation.objects.filter(
+            Q(refund=OuterRef("refund_pk"))
+            | Q(refund_attempt__refund=OuterRef("refund_pk"))
+        )
+        .order_by()
+        .values("order")
+        .annotate(goods=Sum("goods_claimed"))
+        .values("goods"),
+        output_field=_MONEY,
+    )
+
+    def standing(reversed_: Any) -> Any:
+        return Greatest(
+            Least(F("goods_paid"), F("paid") - reversed_, output_field=_MONEY),
+            _ZERO,
+            output_field=_MONEY,
+        )
+
+    return (
+        rows.annotate(refund_pk=refund_pk)
+        .annotate(paid=paid, claimed=claimed)
+        .annotate(
+            goods_paid=Least(
+                Coalesce(F("claimed"), F("paid"), output_field=_MONEY),
+                F("paid"),
+                output_field=_MONEY,
+            )
+        )
+        .annotate(
+            goods=Case(
+                When(refund_pk__isnull=True, then=F("amount")),
+                When(kind=PaymentTransactionKind.REFUND, then=standing(_ZERO)),
+                default=ExpressionWrapper(
+                    F("goods_paid") - standing(F("amount")),
+                    output_field=_MONEY,
+                ),
+                output_field=_MONEY,
+            )
+        )
+    )
+
+
 def _returns(
     start: datetime, end: datetime, bucket: Bucket | None
 ) -> dict[date | None, tuple[Decimal, Decimal]]:
@@ -431,15 +522,17 @@ def _returns(
 
     sources = [
         _returned(
-            PaymentTransaction.objects.filter(
-                kind__in=(
-                    PaymentTransactionKind.REFUND,
-                    PaymentTransactionKind.REFUND_REVERSAL,
-                ),
-                created_at__gte=start,
-                created_at__lt=end,
+            _ledger_goods(
+                PaymentTransaction.objects.filter(
+                    kind__in=(
+                        PaymentTransactionKind.REFUND,
+                        PaymentTransactionKind.REFUND_REVERSAL,
+                    ),
+                    created_at__gte=start,
+                    created_at__lt=end,
+                )
             ),
-            amount="amount",
+            amount="goods",
             when="created_at",
             bucket=bucket,
         ),

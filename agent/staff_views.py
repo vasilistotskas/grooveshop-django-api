@@ -61,6 +61,7 @@ from core.api.throttling import StaffAgentThrottle
 from order import profit, turnover
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
+from product.enum.review import ReviewStatus
 from product.models.product import Product
 from product.models.review import ProductReview
 from tenant.membership import get_current_tenant, get_membership
@@ -566,8 +567,6 @@ class StaffAgentReviewsView(StaffAgentAPIView):
         tags=_TAGS,
     )
     def get(self, request: Request) -> Response:
-        from product.enum.review import ReviewStatus
-
         reviews = ProductReview.objects.select_related(
             "product"
         ).prefetch_related("translations", "product__translations")

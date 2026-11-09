@@ -1496,7 +1496,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
         the order's codes (``GET /api/transactions/?ordercode=``, Basic
         auth, the same call Viva documents for the ISV API) and keeps those
         whose ``ParentId`` is the payment, of a refund or void
-        ``TransactionTypeId``, for exactly *amount* (a refund's amount is
+        ``TransactionType.TransactionTypeId`` (this listing nests the type:
+        ``{"Name": "CardRefund", "TransactionTypeId": 4}``, unlike Retrieve
+        Transaction's flat ``transactionTypeId``; seen on a demo refund
+        2026-11-08), for exactly *amount* (a refund's amount is
         signed, so its absolute value is read). ``StatusId`` ``F`` is a
         refund made, ``E`` one that failed; any other status is not a
         decision. ``None`` when Viva could not be read.
@@ -1554,7 +1557,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
         """*row* as a refund of *amount* on *payment_id*, or ``None``."""
         if str(row.get("ParentId") or "").lower() != payment_id.lower():
             return None
-        if row.get("TransactionTypeId") not in VIVA_REFUND_TRANSACTION_TYPE_IDS:
+        transaction_type = row.get("TransactionType") or {}
+        if (
+            transaction_type.get("TransactionTypeId")
+            not in VIVA_REFUND_TRANSACTION_TYPE_IDS
+        ):
             return None
         status_id = row.get("StatusId")
         if status_id not in {VIVA_STATUS_FINISHED, VIVA_STATUS_ERROR}:

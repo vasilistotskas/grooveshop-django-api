@@ -67,6 +67,18 @@ class RefundAttemptQuerySet(models.QuerySet["RefundAttempt"]):
             created_at__lte=timezone.now() - reconcile_after(),
         )
 
+    def awaiting_staff(self):
+        """Overdue attempts staff are told about and may record the
+        outcome of: the automatic lookup asked the provider and could not
+        decide (``looked_up_at``), or it has not reached the attempt for a
+        second :func:`reconcile_after` (the lookup is switched off or
+        keeps failing before it can stamp). Until then the provider may
+        still answer on its own."""
+        return self.overdue().filter(
+            models.Q(looked_up_at__isnull=False)
+            | models.Q(created_at__lte=timezone.now() - 2 * reconcile_after())
+        )
+
     def stalled(self):
         """Gift card and points returns still PENDING after
         :func:`reconcile_after`: a crash left them unfinished. No provider
@@ -166,6 +178,15 @@ class RefundAttempt(models.Model):
         help_text=_("The ledger refund this attempt produced."),
     )
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
+    looked_up_at = models.DateTimeField(
+        _("Looked up at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the automatic lookup last asked the payment provider "
+            "about this refund and could not decide it."
+        ),
+    )
 
     objects = RefundAttemptQuerySet.as_manager()
 
@@ -204,4 +225,13 @@ class RefundAttempt(models.Model):
             self.status == RefundAttemptStatus.PENDING
             and self.kind == RefundAttemptKind.PROVIDER
             and self.created_at <= timezone.now() - reconcile_after()
+        )
+
+    @property
+    def is_awaiting_staff(self) -> bool:
+        """Whether staff may record this attempt's outcome
+        (:meth:`RefundAttemptQuerySet.awaiting_staff`)."""
+        return self.is_overdue and (
+            self.looked_up_at is not None
+            or self.created_at <= timezone.now() - 2 * reconcile_after()
         )

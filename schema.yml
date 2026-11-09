@@ -11,6 +11,12 @@ paths:
         secret in `X-Internal-Token`; any other caller or order gets 404.
       summary: Read an order (agent gateway only)
       parameters:
+      - in: header
+        name: X-Internal-Token
+        schema:
+          type: string
+        description: The agent gateway's shared secret. A request without it is answered
+          404, like an unknown order.
       - in: path
         name: uuid
         schema:
@@ -25,6 +31,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/agent/me:
     get:
@@ -12370,8 +12382,9 @@ paths:
     post:
       operationId: reserveCartStock
       description: Δέσμευση αποθέματος για όλα τα είδη του καλαθιού κατά την ολοκλήρωση
-        αγοράς. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος με διάρκεια ζωής 15 λεπτών.
-        Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά τη δημιουργία της παραγγελίας.
+        αγοράς. Δημιουργεί προσωρινές δεσμεύσεις αποθέματος που διαρκούν όσο ο χρόνος
+        δέσμευσης του καταστήματος. Επιστρέφει λίστα ID δεσμεύσεων για χρήση κατά
+        τη δημιουργία της παραγγελίας.
       summary: Δέσμευση αποθέματος για αντικείμενα καλαθιού
       parameters:
       - in: header

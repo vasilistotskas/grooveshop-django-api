@@ -523,10 +523,21 @@ class PaymentLedger:
         order may be closed as REFUNDED. An order paid without a provider
         (cash, gift cards, points) is not open: nothing can be refunded
         through one.
+
+        A gift card and points return still PENDING keeps it open too: its
+        value has not gone back, and repeating the refund of its amount is
+        the only way to finish it (``OrderService._attempts_to_resume``),
+        even when it holds everything that was left.
         """
         from order.payment import registered_provider_codes
 
         if cls.refundable_value(order) > 0:
+            return True
+        if (
+            RefundAttempt.objects.live()
+            .filter(order=order, kind=RefundAttemptKind.STORED_VALUE)
+            .exists()
+        ):
             return True
         pay_way = order.pay_way
         return bool(

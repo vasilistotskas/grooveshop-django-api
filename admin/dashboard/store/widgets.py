@@ -1119,7 +1119,7 @@ class StoreAlerts(DashboardWidget):
         the refund away."""
         from order.models.refund_attempt import RefundAttempt
 
-        overdue = RefundAttempt.objects.overdue()
+        overdue = RefundAttempt.objects.awaiting_staff()
         count = overdue.count()
         if not count:
             return []

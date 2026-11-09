@@ -1,7 +1,7 @@
 import logging
-from tempfile import NamedTemporaryFile
 
-from django.core.files import File
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from core import celery_app
 from core.net.safe_fetch import FetchError, safe_fetch
@@ -11,7 +11,7 @@ from core.retry import (
     is_recipient_refused,
 )
 from core.tasks import MonitoredTask
-from core.uploads import image_limits
+from core.uploads import image_limits, prepare_servable_image
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +44,28 @@ def download_social_avatar_task(self, user_id: int, picture_url: str):
         logger.error("Failed to retrieve image from %s: %s", picture_url, e)
         raise
 
-    with NamedTemporaryFile(delete=True) as img_temp:
-        img_temp.write(fetched.content)
-        img_temp.flush()
-        img_temp.seek(0)
-        image_filename = (
-            f"image_{user.first_name}_{user.last_name}_{user.pk}.jpg"
+    # The same rule as every other image path: the format and pixel
+    # caps, and no GPS position in what is stored. A provider's file that
+    # fails it is dropped, and nothing about it will change on a retry.
+    upload = SimpleUploadedFile(
+        "avatar", fetched.content, content_type=fetched.content_type
+    )
+    try:
+        upload, source = prepare_servable_image(upload, allow_svg=False)
+    except ValidationError as e:
+        logger.warning(
+            "Avatar from %s refused for user %s: %s",
+            picture_url,
+            user_id,
+            "; ".join(e.messages),
         )
-        user.image.save(image_filename, File(img_temp))
+        return
+
+    extension = "jpg" if source.format == "jpeg" else source.format
+    image_filename = (
+        f"image_{user.first_name}_{user.last_name}_{user.pk}.{extension}"
+    )
+    user.image.save(image_filename, upload)
 
 
 @celery_app.task(

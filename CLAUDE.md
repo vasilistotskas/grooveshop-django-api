@@ -31,6 +31,10 @@ uv run ruff format
 # Type check (required before commit; not covered by pre-commit)
 uv run ty check
 
+# Import contracts between apps ([tool.importlinter] in pyproject.toml).
+# A contract's ignore_imports only shrinks: fix the import, delete its line.
+uv run lint-imports
+
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
 
@@ -298,7 +302,13 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
   Exempt in `tests/`: pytest injects fixtures positionally and
   `@mock.patch` passes each mock as a positional argument.
 - Migrations are excluded from linting (`**/migrations/**`)
-- Semantic release: `feat` → minor, `fix`/`perf` → patch
+- **Moving code.** A Celery task that changes module keeps its name with
+  `name="<the name it has today>"`: queued messages, the beat schedule and
+  `DeferredDispatch` rows address it by that string, and
+  `tests/unit/core/test_celery_task_names_are_locked.py` fails otherwise. A
+  doc, rule or skill that names a moved file changes in the same PR
+  (`tests/unit/test_doc_references.py`).
+- Semantic release: `feat` → minor, `fix`/`perf`/`refactor` → patch (a `refactor` moves code that runs in production, so it ships and is verified as its own release)
 
 ## MCP servers
 

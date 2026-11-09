@@ -13,6 +13,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
 from core.fields.image import ImageAndSvgField
+from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from user.managers.account import UserAccountManager
 from user.models.subscription import UserSubscription
@@ -103,25 +104,23 @@ class UserAccount(
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)
     birth_date = models.DateField(_("Birth Date"), blank=True, null=True)
-    twitter = models.URLField(
+    twitter = WebURLField(
         _("Twitter Profile"), blank=True, null=True, default=""
     )
-    linkedin = models.URLField(
+    linkedin = WebURLField(
         _("LinkedIn Profile"), blank=True, null=True, default=""
     )
-    facebook = models.URLField(
+    facebook = WebURLField(
         _("Facebook Profile"), blank=True, null=True, default=""
     )
-    instagram = models.URLField(
+    instagram = WebURLField(
         _("Instagram Profile"), blank=True, null=True, default=""
     )
-    website = models.URLField(_("Website"), blank=True, null=True, default="")
-    youtube = models.URLField(
+    website = WebURLField(_("Website"), blank=True, null=True, default="")
+    youtube = WebURLField(
         _("Youtube Profile"), blank=True, null=True, default=""
     )
-    github = models.URLField(
-        _("Github Profile"), blank=True, null=True, default=""
-    )
+    github = WebURLField(_("Github Profile"), blank=True, null=True, default="")
     bio = models.TextField(_("Bio"), blank=True, default="")
     total_xp = models.PositiveBigIntegerField(_("Total XP"), default=0)
     reengagement_email_count = models.PositiveSmallIntegerField(

@@ -149,8 +149,10 @@ class TestIndexDocumentsTask:
     def _client(self):
         mock_index = MagicMock()
         mock_index.add_documents.return_value = MagicMock(task_uid=1)
-        mock_index.delete_documents.return_value = MagicMock(task_uid=2)
         mock_client = MagicMock()
+        mock_client.delete_documents_by_primary_key.return_value = MagicMock(
+            task_uid=2
+        )
         mock_client.get_index.return_value = mock_index
         mock_client.wait_for_task.return_value = MagicMock(status="succeeded")
         return mock_client, mock_index
@@ -188,8 +190,14 @@ class TestIndexDocumentsTask:
         mock_index.add_documents.assert_called_once()
         added = mock_index.add_documents.call_args.args[0]
         assert {doc["id"] for doc in added} == live_pks
-        mock_index.delete_documents.assert_called_once()
-        assert set(mock_index.delete_documents.call_args.args[0]) == dead_pks
+        mock_client.delete_documents_by_primary_key.assert_called_once()
+        _name, primary_key, ids = (
+            mock_client.delete_documents_by_primary_key.call_args.args
+        )
+        assert primary_key == "pk"
+        assert set(ids) == dead_pks
+        # The deprecated delete-by-ids call is gone.
+        mock_index.delete_documents.assert_not_called()
         assert result == {
             "status": "success",
             "added": len(live_pks),
@@ -210,7 +218,7 @@ class TestIndexDocumentsTask:
             index_documents_task("product", "producttranslation", pks)
 
         mock_index.add_documents.assert_called_once()
-        mock_index.delete_documents.assert_not_called()
+        mock_client.delete_documents_by_primary_key.assert_not_called()
 
     def test_a_failed_engine_task_is_not_retried(self):
         from meili.exceptions import MeiliTaskFailed

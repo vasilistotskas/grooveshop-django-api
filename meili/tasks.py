@@ -176,7 +176,8 @@ def index_documents_task(
     The batch form of ``index_document_task``: each row is loaded from the
     model's indexing queryset, the ones that qualify (``meili_filter()``)
     are added in ONE ``add_documents`` call and the ones that no longer
-    qualify are removed in ONE ``delete_documents`` call, so N documents
+    qualify are removed in ONE delete-by-filter call on the primary key
+    (``delete_documents_by_primary_key``), so N documents
     cost two engine tasks instead of N. A pk with no row is skipped, as in
     the single-document task.
 
@@ -215,7 +216,11 @@ def index_documents_task(
             raise MeiliTaskFailed(finished.error, operation="index")
     if removed:
         finished = _client.wait_for_task(
-            index.delete_documents(removed).task_uid
+            _client.delete_documents_by_primary_key(
+                model_class.get_meili_index_name(),
+                model_class._meilisearch["primary_key"],
+                removed,
+            ).task_uid
         )
         if finished.status == "failed":
             raise MeiliTaskFailed(finished.error, operation="delete")

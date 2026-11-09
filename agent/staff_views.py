@@ -206,7 +206,8 @@ class StaffAgentOrdersView(StaffAgentAPIView):
     )
     def get(self, request: Request) -> Response:
         params = request.query_params
-        orders = Order.objects.all()
+        # Annotated, so each row's total is read, not aggregated per row.
+        orders = Order.objects.with_total_amounts()
         status = params.get("status")
         if status:
             if status not in OrderStatus.values:
@@ -253,9 +254,7 @@ class StaffAgentOrdersView(StaffAgentAPIView):
             if search.isascii() and search.isdigit():
                 match |= Q(id=int(search))
             orders = orders.filter(match)
-        rows = orders.prefetch_related("items").order_by("-created_at")[
-            : _limit(request)
-        ]
+        rows = orders.order_by("-created_at")[: _limit(request)]
         return Response(
             StaffOrderSerializer([_order_row(o) for o in rows], many=True).data
         )
@@ -281,7 +280,7 @@ class StaffAgentOrderDetailView(StaffAgentAPIView):
     )
     def get(self, request: Request, pk: int) -> Response:
         order = get_object_or_404(
-            Order.objects.prefetch_related("items").select_related("country"),
+            Order.objects.prefetch_related("items"),
             pk=pk,
         )
         lines = [
@@ -306,6 +305,7 @@ class StaffAgentOrderDetailView(StaffAgentAPIView):
             "shipping_carrier": order.shipping_carrier or "",
             "tracking_number": order.tracking_number or "",
             "city": order.city,
+            # The country's key is its ISO code (``Country.alpha_2``).
             "country": order.country_id,
             "customer_notes": order.customer_notes or "",
             "lines": lines,

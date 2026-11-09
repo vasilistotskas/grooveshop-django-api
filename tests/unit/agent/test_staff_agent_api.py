@@ -296,6 +296,23 @@ class StaffAgentAPITestCase(APITestCase):
             response = self.client.get(reverse(name), {"search": "²"})
             self.assertEqual(response.status_code, status.HTTP_200_OK, name)
 
+    def test_listing_orders_costs_the_same_for_one_or_many(self) -> None:
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        staff = self._member(TenantMembershipRole.STAFF)
+        self._bearer(staff, ["admin:orders:read"])
+        url = reverse("agent-staff-orders")
+        OrderFactory(num_order_items=2)
+        with CaptureQueriesContext(connection) as one:
+            self.client.get(url)
+        OrderFactory.create_batch(4, num_order_items=2)
+        with CaptureQueriesContext(connection) as many:
+            response = self.client.get(url)
+
+        self.assertEqual(len(response.data), 5)
+        self.assertEqual(len(many), len(one))
+
     def test_orders_refuse_an_unknown_status_and_a_bad_range(self) -> None:
         staff = self._member(TenantMembershipRole.STAFF)
         self._bearer(staff, ["admin:orders:read"])

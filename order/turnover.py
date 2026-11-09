@@ -483,6 +483,8 @@ def _ledger_goods(rows: QuerySet) -> QuerySet:
     )
 
     def standing(reversed_: Any) -> Any:
+        """The goods that stand once *reversed_* of the refund came back:
+        the duplicate part goes first (``goods_returned``'s rule)."""
         return Greatest(
             Least(F("goods_paid"), F("paid") - reversed_, output_field=_MONEY),
             _ZERO,

@@ -28,6 +28,7 @@ D = Decimal
 
 
 def _at(month: int, day: int = 15) -> datetime:
+    """Noon on *day* of *month*, 2026."""
     return datetime(2026, month, day, 12, tzinfo=UTC)
 
 
@@ -38,12 +39,14 @@ def _shipped_order(gross="124.00"):
 
 
 def _move(reference: str, kind: str, when: datetime) -> None:
+    """Date the ledger row *reference* of *kind* at *when*."""
     PaymentTransaction.objects.filter(
         provider_reference=reference, kind=kind
     ).update(created_at=when)
 
 
 def _refund(order, charge, amount: str, reference: str, when: datetime):
+    """Book a refund of *amount* on *charge*, dated *when*."""
     PaymentLedger.record_refund(
         order, charge=charge, amount=_eur(amount), reference=reference
     )
@@ -51,6 +54,7 @@ def _refund(order, charge, amount: str, reference: str, when: datetime):
 
 
 def _reverse(order, charge, amount: str, reference: str, when: datetime):
+    """Book the provider's reversal of a refund, dated *when*."""
     PaymentLedger.record_refund_reversal(
         order, charge=charge, amount=_eur(amount), reference=reference
     )
@@ -58,10 +62,12 @@ def _reverse(order, charge, amount: str, reference: str, when: datetime):
 
 
 def _months() -> list:
+    """The 2026 turnover figures, one per month."""
     return figures(date(2026, 1, 1), date(2026, 12, 31), Bucket.MONTH)
 
 
 def _duplicate(order, amount):
+    """A second payment of *amount* for *order*: a duplicate."""
     charge, _ = PaymentLedger.record_charge(
         order, amount=_eur(amount), provider="stripe", reference="pi_dup"
     )
@@ -69,6 +75,8 @@ def _duplicate(order, amount):
 
 
 class TestADuplicatePaymentIsNotAReturn:
+    """Giving back a duplicate payment does not undo the sale."""
+
     def test_a_duplicate_given_back_keeps_the_full_turnover(self):
         order = _shipped_order()
         dup = _duplicate(order, "124.00")
@@ -98,6 +106,8 @@ class TestADuplicatePaymentIsNotAReturn:
 
 
 class TestAPastMonthNeverMoves:
+    """A reversal belongs to its own month; a closed month never moves."""
+
     def test_a_reversal_is_booked_in_its_own_month(self):
         order = _shipped_order()
         charge = order.payment_transactions.get(

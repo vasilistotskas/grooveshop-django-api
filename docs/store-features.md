@@ -110,6 +110,7 @@ consumed by tasks and integrations.
 | `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
 | `PRODUCT_ASSURANCES_ENABLED` | (b) `product_assurances` | the product page's delivery / payment / returns box; each row hides itself without data |
 | `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
+| `EXTERNAL_LINKS_NEW_TAB_ENABLED` | (b) `external_links_new_tab` | off by default; rich-text links to another host open in a new tab, the store's own keep the editor's choice |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
 | `INDEXNOW_ENABLED` | (s) | the batched IndexNow notification (`docs/indexnow.md`); only its key is read by the storefront, from `TenantConfig.indexnowKey`, empty while off |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |

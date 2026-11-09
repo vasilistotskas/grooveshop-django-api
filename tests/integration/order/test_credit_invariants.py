@@ -577,8 +577,11 @@ class State:
         self.receipt_sale = goods - points
         #: lines-refund attempt pk -> the VAT rates its lines asked for
         self.line_rates: dict[int, set[Decimal]] = {}
-        #: request id -> units asked per order line pk, and the shipping
-        self.requests: dict[object, tuple[dict[int, int], bool]] = {}
+        #: request id -> units asked per order line pk, whether the shipping,
+        #: and whether the oracle could price it in full when it was made
+        #: (a request planned while an earlier one held only part of a line
+        #: is worth the remainder: what it holds is a value, not its units)
+        self.requests: dict[object, tuple[dict[int, int], bool, bool]] = {}
         assert self.order.calculate_order_total_amount().amount == self.total
         self.oracle = Oracle(self.order, self.total, self.receipt_sale)
         self.shipped = False
@@ -811,12 +814,12 @@ class State:
         asked in requests that hold in full; ``None`` when a request that
         touches it holds only in part."""
         units, shipped = 0, False
-        for rid, (asked, ship) in self.requests.items():
+        for rid, (asked, ship, priced) in self.requests.items():
             touches = ship if item_pk is None else item_pk in asked
             if not touches:
                 continue
             state = self.request_state(rid)
-            if state == "mixed":
+            if state == "mixed" or not priced:
                 return None
             if state == "full":
                 if item_pk is None:
@@ -881,7 +884,10 @@ class State:
     def check_request(self, new, chosen, include, expected):
         goods, shipping, rates = expected
         rid = new[0].request_id
-        self.requests[rid] = ({i.pk: u for i, u in chosen}, include)
+        priced = all(v is not None for v in goods.values()) and (
+            not include or shipping is not None
+        )
+        self.requests[rid] = ({i.pk: u for i, u in chosen}, include, priced)
         for att in new:
             self.line_rates[att.pk] = rates
         rows = CreditAllocation.objects.filter(refund_attempt__in=new)

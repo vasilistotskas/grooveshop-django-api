@@ -7,6 +7,7 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.url_field import WebURLField
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.utils.email import is_disposable_domain
 from core.validators import address as address_rules
@@ -1725,7 +1726,7 @@ class CreatePaymentIntentRequestSerializer(serializers.Serializer):
         max_length=255,
         help_text=_("Provider customer id to attach the payment to"),
     )
-    return_url = serializers.URLField(
+    return_url = WebURLField(
         required=False,
         allow_blank=True,
         max_length=500,
@@ -1787,8 +1788,8 @@ class CreatePaymentIntentResponseSerializer(serializers.Serializer):
 
 
 class CreateCheckoutSessionRequestSerializer(serializers.Serializer):
-    success_url = serializers.URLField(required=True)
-    cancel_url = serializers.URLField(required=True)
+    success_url = WebURLField(required=True)
+    cancel_url = WebURLField(required=True)
     customer_email = serializers.EmailField(required=False)
     customer_id = serializers.CharField(required=False)
     description = serializers.CharField(required=False, max_length=500)
@@ -1796,7 +1797,7 @@ class CreateCheckoutSessionRequestSerializer(serializers.Serializer):
 
 class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
     session_id = serializers.CharField()
-    checkout_url = serializers.URLField()
+    checkout_url = WebURLField()
     status = serializers.CharField()
     amount = serializers.CharField()
     currency = serializers.CharField()

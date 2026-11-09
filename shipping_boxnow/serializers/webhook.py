@@ -1,6 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from core.api.url_field import WebURLField
+
 
 class BoxNowEventLocationSerializer(serializers.Serializer):
     """
@@ -112,7 +114,7 @@ class BoxNowWebhookEnvelopeSerializer(serializers.Serializer):
     type = serializers.CharField(
         help_text=_("Event type (expected: 'gr.boxnow.parcel_event_change')"),
     )
-    source: serializers.URLField = serializers.URLField(
+    source: WebURLField = WebURLField(
         help_text=_("Origin URL of the event source"),
     )
     subject = serializers.CharField(

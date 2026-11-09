@@ -8,6 +8,7 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from blog.managers.author import BlogAuthorManager
 from core.fields.rich_text import RichTextField
+from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from core.validators.url import WebURLValidator
 
@@ -27,12 +28,12 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
     user = models.OneToOneField(
         "user.UserAccount", on_delete=models.PROTECT, verbose_name=_("User")
     )
-    website = models.URLField(_("Website"), blank=True, default="")
+    website = WebURLField(_("Website"), blank=True, default="")
     # The author's public profiles elsewhere (LinkedIn, X, Instagram...):
     # the storefront's schema.org Person ``sameAs``. Not the account's
     # social fields, which a customer filled in for their account.
     same_as = ArrayField(
-        models.URLField(
+        WebURLField(
             max_length=PROFILE_URL_MAX_LENGTH,
             validators=[PROFILE_URL_VALIDATOR],
         ),

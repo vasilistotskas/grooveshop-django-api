@@ -24,11 +24,18 @@ class CoreConfig(AppConfig):
 
         import core.signals.rosetta  # noqa: F401
         from core.api.image_field import ServableImageField
+        from core.api.url_field import WebURLField as WebURLSerializerField
         from core.fields.image import ImageAndSvgField
+        from core.fields.url import WebURLField
 
         serializers.ModelSerializer.serializer_field_mapping[
             ImageAndSvgField
         ] = ServableImageField
+        # Every URL a ModelSerializer takes is one the storefront's
+        # ``z.url()`` can parse (``core/fields/url.py``).
+        serializers.ModelSerializer.serializer_field_mapping[WebURLField] = (
+            WebURLSerializerField
+        )
         from core.admin import override_third_party_admins
         from core.tasks import validate_task_configuration
 

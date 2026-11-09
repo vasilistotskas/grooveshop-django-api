@@ -3,6 +3,54 @@
 
 
 
+## v3.242.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read (#598) ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read
+
+Django's and DRF's URLField accept a port past 65535 (`:65536`), which
+the storefront's z.url() refuses: one such value saved would fail the
+storefront's parse, with a 422, on every response that carries it.
+
+- core.fields.url.WebURLField (model) and core.api.url_field.WebURLField
+  (serializer) validate with WebURLValidator. CoreConfig.ready maps the
+  model field to the serializer field for every ModelSerializer.
+- Every model and serializer URL field uses them (blog, builder, order,
+  product, shipping_boxnow, tenant, user). The migrations only record
+  the field class: no SQL.
+- tests/unit/core/test_url_fields_are_web_urls.py fails on a bare
+  Django/DRF URLField in the source or a plain URLField on a project
+  model, and checks the model, a generated serializer field and a
+  declared one refuse the port.
+
+Production checked read-only first: 741 URL values in 4 schemas, none
+refused.
+
+Closes #553 ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): one URL check per value, so a bad URL gets one error
+
+DRF's URLField appends a plain URLValidator, which WebURLValidator
+already runs first, so an invalid URL got the same error twice. The
+serializer WebURLField drops that one and adds WebURLValidator only when
+the caller passed none (the author sameAs field passes one narrowed to
+http/https). ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Chores
+
+* chore(cache): purge the storefront feeds by their rss: function names only
+
+The storefront's feeds read through functions named rss:<what> since
+storefront #433; RssFeed, cachedBlogPostFeed, cachedBlogCategory and
+cachedProductCategoryDetail name no cache any more. ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Testing
+
+* test(core): the URL-field rule catches bare and subclassed URLFields ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
 ## v3.242.1 (2026-11-09)
 
 ### Bug fixes

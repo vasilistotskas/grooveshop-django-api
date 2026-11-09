@@ -694,8 +694,8 @@ def register_default_surfaces() -> None:
             label=_("Sitemap & SEO"),
             description=_(
                 "XML sitemap, RSS, llms.txt and the OG image cache."
-                " Cheap to regenerate; purge after publishing"
-                " content that should appear immediately."
+                " Purged when a post, product, category or content page"
+                " changes or goes live."
             ),
             django_patterns=(),
             # These are cached FUNCTIONS, not routes: the sitemap source
@@ -710,9 +710,37 @@ def register_default_surfaces() -> None:
             # keyed per host): @nuxtjs/sitemap's own cache lived in each
             # pod's memory, where no purge reached it, so the storefront
             # turned it off and caches the response in Redis instead.
-            nuxt_patterns=_nuxt_functions("sitemap", "rss", "RssFeed")
+            #
+            # The feed's own reads (``cachedBlogPostFeed``,
+            # ``cachedBlogCategory``, ``cachedProductCategoryDetail``) are
+            # functions of their own name: without them a purge left the
+            # feed rebuilt from the posts it cached before the change.
+            nuxt_patterns=_nuxt_functions(
+                "sitemap",
+                "rss",
+                "RssFeed",
+                "cachedBlogPostFeed",
+                "cachedBlogCategory",
+                "cachedProductCategoryDetail",
+            )
             + _nuxt_routes("/sitemap.xml")
             + _nuxt("nuxt-ai-ready"),
+            # What the sitemap and the feeds list. A row that goes live at
+            # its publish date is reported by ``core.publication``.
+            invalidated_by=(
+                "blog.BlogPost",
+                "blog.BlogPostTranslation",
+                "blog.BlogCategory",
+                "blog.BlogCategoryTranslation",
+                "product.Product",
+                "product.ProductTranslation",
+                "product.ProductCategory",
+                "product.ProductCategoryTranslation",
+                "page_config.ContentPage",
+                "page_config.ContentPageTranslation",
+            ),
+            # Each order's stock decrement, as on the products surface.
+            ignored_update_fields=frozenset({"stock", "updated_at"}),
             icon="map",
             group="content",
         )

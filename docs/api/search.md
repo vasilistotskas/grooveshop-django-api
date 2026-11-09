@@ -121,8 +121,9 @@ products:
 - `reindex_offer_window_changes_task` (beat, every 5 minutes, fanned out per
   tenant by `fanout_reindex_offer_window_changes`) reindexes the products of
   promotions whose `starts_at` / `ends_at` passed since the last run. The
-  cursor lives in the tenant's cache and only moves after the reindex was
-  dispatched; a missing cursor falls back to a one-day window.
+  cursor is a `core.SweepCursor` row (`core/sweeps.py`, durable, unlike the
+  cache, which fails open) and only moves after the reindex was dispatched; a
+  store's very first run looks back one day.
 
 Flipping promotions off or on (the store's `PROMOTIONS_ENABLED` or the plan's
 `promotions_enabled`) queues the store's whole price sweep at once

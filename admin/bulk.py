@@ -24,7 +24,15 @@ def update_each(queryset: QuerySet, **values: Any) -> int:
     two bulk edits (or a checkout) over shared rows lock in the same order.
     Returns the number of rows changed.
     """
-    fields = list(values)
+    # ``auto_now`` fields (``updated_at``) are written only when named in
+    # ``update_fields``: without them a bulk publish left the row's
+    # modification time behind, and with it the sitemap's lastmod and the
+    # feed's ``atom:updated``.
+    fields = list(values) + [
+        field.name
+        for field in queryset.model._meta.concrete_fields
+        if getattr(field, "auto_now", False) and field.name not in values
+    ]
     changed = 0
     with transaction.atomic():
         for obj in queryset.exclude(**values).order_by("pk"):

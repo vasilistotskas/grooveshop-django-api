@@ -13810,6 +13810,18 @@ msgstr "Suspended via platform admin"
 msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 msgstr "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
 
+msgid "Sweep"
+msgstr "Sweep"
+
+msgid "Sweep cursor"
+msgstr "Sweep cursor"
+
+msgid "Sweep cursors"
+msgstr "Sweep cursors"
+
+msgid "Swept up to"
+msgstr "Swept up to"
+
 msgid "Switch off"
 msgstr "Switch off"
 
@@ -16589,8 +16601,8 @@ msgstr "Wrong item sent"
 msgid "XML export successful."
 msgstr "XML export successful."
 
-msgid "XML sitemap, RSS, llms.txt and the OG image cache. Cheap to regenerate; purge after publishing content that should appear immediately."
-msgstr "XML sitemap, RSS, llms.txt and the OG image cache. Cheap to regenerate; purge after publishing content that should appear immediately."
+msgid "XML sitemap, RSS, llms.txt and the OG image cache. Purged when a post, product, category or content page changes or goes live."
+msgstr "XML sitemap, RSS, llms.txt and the OG image cache. Purged when a post, product, category or content page changes or goes live."
 
 msgid "Xpress Point"
 msgstr "Xpress Point"

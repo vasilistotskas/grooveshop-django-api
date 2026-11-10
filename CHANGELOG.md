@@ -3,6 +3,39 @@
 
 
 
+## v3.242.12 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone (#617) ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone
+
+order_status_for_shipment_state mapped a CANCELED shipment to order status
+CANCELED for every non-terminal order. For an order that had already shipped,
+OrderService.cancel_for_dead_shipment raised OrderNotCancelableError, so
+reconcile_acs_order_status listed the pair as drift on every run and failed it
+every time. A voucher retired after the parcel left is a fact about the
+voucher: the mapping now returns CANCELED only for an order not yet shipped,
+and _apply_order_status_transition logs one warning for the other case. A
+cancel that failed on the way still propagates. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): report a retired voucher on a shipped order instead of logging it
+
+The warning in _apply_order_status_transition had no caller: the replay skips
+a None mapping, the poll never produces CANCELED, and the retire and voucher
+cancel paths never call the transition. reconcile_acs_order_status now lists
+such a pair as its own informational line, in the dry run and under --apply,
+asking AcsService.voucher_retired_on_shipped_order so the rule stays in the
+service. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+### Testing
+
+* test(shipping_acs): cover the PROCESSING branch and every summary of the replay
+
+reconcile_acs_order_status now prints a header for the retired vouchers it
+leaves alone and a summary that is true whether or not any order drifted. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
 ## v3.242.11 (2026-11-10)
 
 ### Bug fixes

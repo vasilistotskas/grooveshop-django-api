@@ -17,16 +17,60 @@ from shipping_boxnow.exceptions import (
 
 logger = logging.getLogger("shipping_boxnow.client")
 
-# urllib3 Retry configuration shared by all BoxNowClient instances.
-# Retries 3 times on connection errors and 5xx responses using exponential
-# back-off (0.5 s, 1 s, 2 s).  Only safe / idempotent methods are retried
-# automatically; POST retries are handled at the application level via
-# BoxNowRetryableError + Celery autoretry.
+# What the HTTP layer may send a second time (the same rule as
+# ``shipping_acs/client.py``, by method because BoxNow has GETs):
+#
+# - a request that never connected is sent again, whatever its method:
+#   nothing reached BoxNow;
+# - a GET is also sent again after a 5xx or a lost answer (read timeout,
+#   connection reset): it changes nothing at BoxNow;
+# - a POST or PUT is never sent again once it may have reached BoxNow.
+#   The 5xx or the timeout becomes ``BoxNowRetryableError`` and the
+#   caller decides. For the parcel creation the caller is
+#   ``create_boxnow_shipment_for_order``: ``autoretry_for`` re-runs it
+#   on ``BoxNowRetryableError``, and ``create_shipment_for_order``
+#   releases its mint claim on any error, so the re-run sends the same
+#   ``orderNumber`` again. If the first request did create the parcel,
+#   BoxNow answers P410 and the task reports a business error; finding
+#   the parcel in that case is issue #606.
+#
+# Why, from the BoxNow API Manual v7.2 (Partner API 1.65):
+#
+# - ``POST /delivery-requests``: ``orderNumber`` "must be unique for each
+#   request" (§3.4, p. 10) and a second one answers P410, "Order number
+#   conflict. You are trying to create a delivery request for order ID
+#   that has already been created" (§5, p. 21). So a creation whose
+#   answer was lost cannot succeed when sent again: it answers P410, a
+#   400, and this client would report a refusal for a parcel that
+#   exists. The manual does not say what two overlapping creations do
+#   (the second sent while the first is still being processed, which is
+#   what a re-send after a read timeout is).
+# - ``POST /parcels/{id}:cancel``: "Canceling a canceled parcel has no
+#   effect" (§3.7, p. 15; §6.5.2, p. 44). Sending it again would be
+#   safe; it follows the rule for its method all the same.
+# - ``POST /auth-sessions``, ``POST
+#   /api/v2/delivery-requests:checkAddressDelivery`` (a lookup) and
+#   ``PUT /delivery-requests/{id}``: the manual does not say whether
+#   they may be repeated.
+# - The manual has no retry guidance, no idempotency key and no 5xx
+#   semantics for any of these.
+#
+# urllib3 sorts an error by when it happened. A connect error (a connect
+# timeout or a refused connection) means the request never reached
+# BoxNow and is retried for any method. A read error (a read timeout or
+# a dropped connection) means it may have, so ``allowed_methods`` decides
+# and a POST or PUT is never sent again. Every other error (a TLS
+# failure, say) is retried for any method unless ``other`` is 0, because
+# urllib3 does not check the method for it: ``other=0`` stops it, and a
+# GET therefore gets no retry after such an error either. A 5xx is
+# retried only for a method in ``allowed_methods``. Back-off between
+# attempts: 0 s, 1 s, 2 s.
 _RETRY_CONFIG = Retry(
     total=3,
+    other=0,
     backoff_factor=0.5,
     status_forcelist=[500, 502, 503, 504],
-    allowed_methods=["GET", "POST", "PUT", "DELETE"],
+    allowed_methods=["GET"],
     raise_on_status=False,  # we inspect status ourselves
 )
 
@@ -246,6 +290,9 @@ class BoxNowClient:
                 message=f"BoxNow connection error: {exc}",
             ) from exc
         except requests.Timeout as exc:
+            # A read timeout means the request MAY have been processed.
+            # The HTTP layer did not send a POST or PUT again (see
+            # ``_RETRY_CONFIG``); the caller decides what a retry means.
             raise BoxNowRetryableError(
                 0,
                 message=f"BoxNow timeout after {self.timeout}s: {exc}",

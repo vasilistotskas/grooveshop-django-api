@@ -3,6 +3,194 @@
 
 
 
+## v3.242.12 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone (#617) ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone
+
+order_status_for_shipment_state mapped a CANCELED shipment to order status
+CANCELED for every non-terminal order. For an order that had already shipped,
+OrderService.cancel_for_dead_shipment raised OrderNotCancelableError, so
+reconcile_acs_order_status listed the pair as drift on every run and failed it
+every time. A voucher retired after the parcel left is a fact about the
+voucher: the mapping now returns CANCELED only for an order not yet shipped,
+and _apply_order_status_transition logs one warning for the other case. A
+cancel that failed on the way still propagates. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): report a retired voucher on a shipped order instead of logging it
+
+The warning in _apply_order_status_transition had no caller: the replay skips
+a None mapping, the poll never produces CANCELED, and the retire and voucher
+cancel paths never call the transition. reconcile_acs_order_status now lists
+such a pair as its own informational line, in the dry run and under --apply,
+asking AcsService.voucher_retired_on_shipped_order so the rule stays in the
+service. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+### Testing
+
+* test(shipping_acs): cover the PROCESSING branch and every summary of the replay
+
+reconcile_acs_order_status now prints a header for the retired vouchers it
+leaves alone and a summary that is true whether or not any order drifted. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+## v3.242.11 (2026-11-10)
+
+### Bug fixes
+
+* fix(cleanup): remove dead code and guards that cannot fire (#619) ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+* fix(cleanup): remove dead code and guards that cannot fire
+
+Removes the order_returned signal and its receiver (never sent),
+PaymentLedger.reserved_on (test-only), the stale __all__ in
+order/services.py, meta_capi's default_app_config, an except around
+str(amount) in the invoice serializer, core.cache.gateway.is_configured
+(test-only) and the write-only settings_key of custom_seeding.
+
+First-party imports wrapped in a catch-all except are removed from
+core/cache/service.py, core/rosetta_storage.py, core/rosetta_views.py and
+shipping_acs/config.py; test_no_impossible_import_guards now fails for any
+such guard. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+### Testing
+
+* test(cleanup): prove the first-party import guard detector can fail
+
+Feed the detector a seeded offender and legitimate code, so the guard is
+shown to flag the pattern it forbids and nothing else. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+## v3.242.10 (2026-11-10)
+
+### Bug fixes
+
+* fix(settings): remove settings nothing reads, state repeated blocks once, move seed data beside its factories (#609) ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+* fix(settings): drop settings nothing reads, one copy of each repeated block, seed data beside its factories
+
+No remaining setting changes value in dev, ci, staging or production,
+and the beat schedule keeps every entry, task, timing and option.
+
+Removed, each read by nothing under this configuration:
+- SESSION_FILE_PATH: only the file session engine reads it, the engine
+  is cached_db, and None is Django's default.
+- CELERY_CACHE_BACKEND: read only by Celery's and django-celery-results'
+  cache result backends; the result backend is the database one.
+- CELERY_RESULT_PERSISTENT: read only by the rpc result backend.
+- CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS: its retry_policy is read only
+  by the Redis result backend.
+- CELERY_TASK_TRACK_STARTED = False: Celery's default.
+- the bimonthly_4am schedule preset, which no entry used.
+
+Collapsed:
+- get_celery_beat_schedule: hourly_under_debug() replaces 47 copies of
+  "X if not DEBUG else every_hour", and the development log sweep follows
+  IS_DOCKER / IS_KUBERNETES instead of probing the container a second
+  time. The three IS_* flags move up beside DEBUG.
+- LOGGING: the shared line format, filter classes and loggers are named
+  once; each environment states only its formatters, filters and
+  handlers.
+- Static and media files: MEDIA_URL and STORAGES are stated once; the
+  DEBUG branch keeps what differs.
+
+Moved:
+- LANGUAGE_COUNTRY_MAPPING to country/seed_data.py and
+  COUNTRY_REGIONS_MAPPING to region/seed_data.py; their factories were
+  the only readers.
+- The control plane's sidebar to admin.navigation.platform_sidebar,
+  beside store_sidebar. UNFOLD_PLATFORM names it by dotted path, as
+  UNFOLD names the store's. Built per request, it reverses against the
+  request's own URLconf, so the pinned urlconf of the settings literal
+  is gone. The tests that read the literal call the function. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+### Testing
+
+* test(scheduler): the whole-schedule test sets the flag the schedule reads
+
+get_celery_beat_schedule now decides the Docker-only entry from
+IS_DOCKER and IS_KUBERNETES, read once at import. The test still set
+KUBERNETES_SERVICE_HOST in the environment, which the function no longer
+looks at, so on a Docker host it ran with the development log sweep it
+says it excludes. It patches IS_KUBERNETES instead. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+## v3.242.9 (2026-11-10)
+
+### Bug fixes
+
+* fix(blog): bulk publish leaves scheduled posts scheduled (#616)
+
+The "Publish selected posts" action set published_at to now on every
+selected post, which discarded the future date of a scheduled post and
+re-dated posts already live. It now publishes drafts only and reports how
+many scheduled posts it left alone.
+
+Adds BlogPostQuerySet.scheduled() (published, dated in the future), used
+by the action and the Publish Status filter.
+
+Closes #596 ([`b0c6b9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0c6b9ad2feb254cc6869b7a635c0d0b7dd97b9c))
+
+## v3.242.8 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping): the carrier HTTP layers never send a POST or PUT a second time (#607) ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping_boxnow): the HTTP layer never sends a POST or PUT a second time
+
+The client's urllib3 retry sent every method again after a 500, 502, 503
+or 504 and after a read timeout, although its own comment said only
+idempotent methods were. A parcel creation whose answer was lost was
+sent again in the same call.
+
+BoxNow's API manual v7.2 says orderNumber "must be unique for each
+request" (3.4, p. 10) and answers a second one with P410 (5, p. 21), so
+the second creation could not succeed: it returned a 400 and the client
+reported a refusal for a parcel that exists. The manual does not say
+what two overlapping creations do, has no idempotency key and no retry
+guidance.
+
+allowed_methods is now GET only. urllib3 applies it to read errors and
+to status_forcelist, never to connection errors, so a request that never
+connected is still sent again whatever its method, a GET is still sent
+again after a 5xx or a lost answer, and a write surfaces as
+BoxNowRetryableError for its caller (Celery's autoretry_for over the
+mint claim, for the creation). The same rule as shipping_acs/client.py.
+
+Closes #582 ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping): never re-send a BoxNow or ACS write after an error of unknown timing
+
+urllib3 retries an error that is neither a connect nor a read error for any
+method unless other=0, so a POST or PUT could be sent twice after a TLS
+failure. Set other=0 on both clients and cover it with tests. ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+### Documentation
+
+* docs(shipping): state what the carrier retry comments and order-system 5.2 really cover
+
+The BoxNow and ACS comments over _RETRY_CONFIG read as if the mint claim
+guards the Celery retry. It is released on any error, so the task re-sends
+the request; for BoxNow a parcel that exists answers P410 (issue 606). ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+## v3.242.7 (2026-11-10)
+
+### Bug fixes
+
+* fix(builder): a page setting can be translated before its default language has one (#618) ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a page setting can be translated before its default language has one
+
+A page or template draft with no root settings refused an @document
+translation as unknown_node at /i18n/<locale>/@document, a path the
+editor maps to no field, so writing the English SEO title or heading
+first failed the save with nothing marked. The overlay is now checked
+against the root's schema over no settings, and the public read answers
+the translation alone. A kind with no root still refuses it. ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a root translated before the draft has settings answers to the whole root schema ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
 ## v3.242.6 (2026-11-10)
 
 ### Bug fixes

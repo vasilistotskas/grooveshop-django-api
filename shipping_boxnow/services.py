@@ -1869,9 +1869,11 @@ class BoxNowService:
             except OrderNotCancelableError as exc:
                 # The order moved on between the read above and the
                 # cancel's own lock. A cancel that FAILED is not caught:
-                # it rolls this event back, so the redelivery or the next
-                # poll cancels the order instead of leaving it active
-                # with its stock held.
+                # it rolls this event and the shipment's state back, so
+                # the tracking poll, which keeps reading a shipment that
+                # is not in a final state, applies it on a later run
+                # instead of the order staying active with its stock
+                # held.
                 logger.warning(
                     "BoxNow: order=%s was not canceled for its canceled "
                     "parcel: %s",

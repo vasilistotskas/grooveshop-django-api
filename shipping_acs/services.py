@@ -2546,8 +2546,11 @@ class AcsService:
 
         ``None`` means "leave the order alone": it is already in a
         terminal status, already where this state would put it, or the
-        state carries no order-level meaning (``new``, and an in-transit
-        state for an order that is already past SHIPPED).
+        state carries no order-level meaning (``new``, an in-transit
+        state for an order that is already past SHIPPED, and a
+        ``canceled`` shipment for an order that already shipped: a
+        voucher retired after the parcel left is a fact about the
+        voucher, and a shipped order can no longer be canceled).
 
         Public and side-effect free because two callers need the same
         answer — the live poll, which then performs the transition, and
@@ -2570,7 +2573,10 @@ class AcsService:
             AcsShipmentState.LOST,
         ):
             new_status = "RETURNED"
-        elif mapped_state == AcsShipmentState.CANCELED:
+        elif (
+            mapped_state == AcsShipmentState.CANCELED
+            and current_status in _PRE_SHIPPED_ORDER_STATUSES
+        ):
             new_status = "CANCELED"
 
         if new_status == current_status:
@@ -2604,11 +2610,21 @@ class AcsService:
             mapped_state, current_status
         )
         if new_status is None:
+            if mapped_state == AcsShipmentState.CANCELED and (
+                current_status not in TERMINAL_ORDER_STATUSES
+            ):
+                logger.warning(
+                    "ACS: voucher retired for order=%s in status %r — "
+                    "leaving the order alone",
+                    order.id,
+                    current_status,
+                )
             return
 
         if new_status == "CANCELED":
             # Never produced by ACS tracking: the admin retire action or
-            # a voucher cancel, i.e. a parcel that never left.
+            # a voucher cancel, i.e. a parcel that never left (the
+            # mapping returns it only for an order not yet shipped).
             OrderService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=silent_for_customer
             )

@@ -801,6 +801,97 @@ class TestALateAnswerAfterStaffAdopted:
         assert shipment.metadata["orphan_vouchers"] == [V2]
 
 
+class TestALateAnswerAfterStaffResolvedTheCheck:
+    """Worker A's request outlives its claim; another worker records the
+    outcome as unknown; staff resolve the check (request again, or close
+    for a canceled order), possibly after deleting A's voucher in the ACS
+    portal; then A's answer arrives. The check is over, so the answer must
+    not become the shipment's voucher: it may be dead at ACS, and a
+    request-again mint is about to bring the voucher the order uses."""
+
+    def _late_answer(self, acs, monkeypatch, resolve):
+        acs.first_error = None
+        shipment = _shipment()
+
+        def answer_after_staff_resolved(self, params):
+            _Acs.creates.append(params)
+            # Worker B found A's claim expired: unknown outcome.
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_request_unknown_at=timezone.now(), metadata={}
+            )
+            resolve(shipment)
+            return {"Voucher_No": V1, "Error_Message": ""}
+
+        monkeypatch.setattr(_Acs, "create_voucher", answer_after_staff_resolved)
+        AcsService.create_voucher_for_order(shipment.order)
+        shipment.refresh_from_db()
+        return shipment
+
+    def test_after_request_again_the_late_voucher_is_not_saved(
+        self, acs, sent, monkeypatch
+    ):
+        c_claim = {}
+
+        def request_again(shipment):
+            with patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ):
+                AcsService.request_voucher_again(
+                    shipment, user=None, note="Nothing in the ACS portal."
+                )
+            # Mint C (the new request) has claimed the shipment.
+            c_claim["mint_started_at"] = timezone.now().isoformat()
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                metadata=dict(c_claim)
+            )
+
+        shipment = self._late_answer(acs, monkeypatch, request_again)
+
+        assert shipment.voucher_no is None
+        assert acs.deleted == [V1]
+        # C's claim is C's: A's answer must not release it.
+        assert (
+            shipment.metadata["mint_started_at"] == (c_claim["mint_started_at"])
+        )
+
+    def test_after_close_a_voucher_acs_will_not_delete_is_an_orphan(
+        self, acs, sent, monkeypatch
+    ):
+        """Staff deleted V1 in the portal, then closed the check for the
+        canceled order: ACS refuses the delete of a dead voucher."""
+        from order.enum.status import OrderStatus
+        from order.models.order import Order
+
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="not found"
+        )
+
+        def close(shipment):
+            Order.objects.filter(pk=shipment.order_id).update(
+                status=OrderStatus.CANCELED
+            )
+            AcsService.close_voucher_request(
+                shipment, user=None, note="Deleted it in the ACS portal."
+            )
+
+        shipment = self._late_answer(acs, monkeypatch, close)
+
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is None
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+
+    def test_while_still_unknown_the_late_answer_resolves_it(
+        self, acs, sent, monkeypatch
+    ):
+        """Unchanged: nobody resolved the check, so the answer is the
+        outcome (TestALateAnswer)."""
+        shipment = self._late_answer(acs, monkeypatch, lambda shipment: None)
+
+        assert shipment.voucher_no == V1
+        assert shipment.voucher_request_unknown_at is None
+        assert acs.deleted == []
+
+
 class TestALateWorkerAndARequestAgain:
     """Second review, finding 3: late worker A saves first and pops the
     claim of mint C (a "request again"); a pickup-list run then records

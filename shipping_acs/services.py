@@ -585,17 +585,32 @@ class AcsService:
                 )
 
         # ----- Phase 3: persist (fresh atomic, race-checked) -----
+        # The claim this request was sent under (stamped in Phase 1).
+        our_claim = (shipment.metadata or {}).get("mint_started_at")
         with transaction.atomic():
             shipment = (
                 AcsShipment.objects.select_for_update()
                 .select_related("order")
                 .get(pk=shipment.pk)
             )
-            if shipment.voucher_no and shipment.voucher_no != voucher_no:
-                # Another worker won the race. Our voucher is the dupe.
+            # Our claim was taken (expired, recorded as unknown) and staff
+            # have since resolved the check: requested again, so another
+            # mint brings the voucher the order uses, or closed it for an
+            # order that needs none. They may also have deleted this very
+            # voucher in the ACS portal. The answer is stale either way,
+            # so it is discarded like a duplicate; while the check is
+            # still open, it IS the outcome and is saved below.
+            resolved_meanwhile = (shipment.metadata or {}).get(
+                "mint_started_at"
+            ) != our_claim and shipment.voucher_request_unknown_at is None
+            if (shipment.voucher_no and shipment.voucher_no != voucher_no) or (
+                not shipment.voucher_no and resolved_meanwhile
+            ):
+                # Another worker won the race, or staff resolved the
+                # check while this answer was out. Our voucher is unused.
                 logger.warning(
-                    "Concurrent voucher mint for order=%s: DB saved %s, "
-                    "we minted %s — attempting cancel.",
+                    "Unused voucher from a voucher request for order=%s: "
+                    "saved voucher %s, our answer %s — attempting cancel.",
                     order.id,
                     shipment.voucher_no,
                     voucher_no,
@@ -605,8 +620,8 @@ class AcsService:
                     cls._settle_unrecognised_vouchers(
                         [voucher_no],
                         AcsUnrecognisedVoucherResolution.DELETED,
-                        note="Deleted at ACS by the voucher mint as a "
-                        "duplicate of the saved voucher.",
+                        note="Deleted at ACS by the voucher mint: an "
+                        "answer no shipment uses.",
                     )
                 except AcsAPIError as exc:
                     logger.error(

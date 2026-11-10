@@ -16467,6 +16467,10 @@ msgid "Voucher %(voucher)s is already resolved."
 msgstr "Voucher %(voucher)s is already resolved."
 
 #, python-format
+msgid "Voucher %(voucher)s is our own unused voucher for this order that ACS would not delete, and ACS's tracking has nothing to compare. If the ACS portal shows it for this order, adopt it again and write how you confirmed it."
+msgstr "Voucher %(voucher)s is our own unused voucher for this order that ACS would not delete, and ACS's tracking has nothing to compare. If the ACS portal shows it for this order, adopt it again and write how you confirmed it."
+
+#, python-format
 msgid "Voucher %(voucher)s marked as checked."
 msgstr "Voucher %(voucher)s marked as checked."
 

@@ -529,6 +529,10 @@ class AcsService:
             },
         )
 
+        # The claim this request was sent under (stamped in Phase 1): what
+        # it may release, turn into an unknown state, or save under.
+        our_claim = (shipment.metadata or {}).get("mint_started_at")
+
         # ----- Phase 2: API call (no DB lock held) -----
         try:
             params = cls._build_create_voucher_params(order, shipment, client)
@@ -538,18 +542,18 @@ class AcsService:
             # reads ACS's own rejections, and release the claim so
             # "Issue ACS voucher now" works the moment the order is fixed.
             cls._record_last_error(shipment, {}, exc)
-            cls._release_mint_claim(shipment)
+            cls._release_mint_claim(shipment, our_claim)
             raise
         try:
             result = client.create_voucher(params)
         except Exception as exc:
             cls._record_last_error(shipment, params, exc)
             if not cls._outcome_is_known(exc):
-                cls._voucher_request_lost(order, shipment, exc)
+                cls._voucher_request_lost(order, shipment, exc, our_claim)
             # Known outcome: the request never reached ACS (a connection
             # never made, the request cap) or ACS refused it. Release the
             # claim so the retry, or staff, can send it again.
-            cls._release_mint_claim(shipment)
+            cls._release_mint_claim(shipment, our_claim)
             logger.warning(
                 "create_voucher_for_order: API call failed for order=%s "
                 "shipment=%s — released mint claim. Error: %s",
@@ -579,8 +583,8 @@ class AcsService:
             if not refusal:
                 # A success envelope without a number or a reason: ACS
                 # executed the call and nothing says it made no voucher.
-                cls._voucher_request_lost(order, shipment, api_error)
-            cls._release_mint_claim(shipment)
+                cls._voucher_request_lost(order, shipment, api_error, our_claim)
+            cls._release_mint_claim(shipment, our_claim)
             raise api_error
 
         children: list[str] = []
@@ -595,8 +599,6 @@ class AcsService:
                 )
 
         # ----- Phase 3: persist (fresh atomic, race-checked) -----
-        # The claim this request was sent under (stamped in Phase 1).
-        our_claim = (shipment.metadata or {}).get("mint_started_at")
         unused_answer = False
         refused_delete = False
         with transaction.atomic():
@@ -864,8 +866,15 @@ class AcsService:
             )
 
     @classmethod
-    def _release_mint_claim(cls, shipment: AcsShipment) -> None:
-        """Drop the ``mint_started_at`` flag so a retry can proceed.
+    def _release_mint_claim(
+        cls, shipment: AcsShipment, claim: str | None
+    ) -> None:
+        """Drop this request's own claim so a retry can proceed.
+
+        Only ``claim``, the one this request took: when the row holds
+        another request's (ours expired, staff requested again), that
+        claim is the other request's and stays, or its on-time answer
+        would look stale and be deleted at ACS.
 
         Best effort — a failure here just means the next retry has to
         wait for the TTL to expire.
@@ -883,9 +892,21 @@ class AcsService:
                     pk=shipment.pk
                 )
                 metadata = fresh.metadata or {}
-                if metadata.pop("mint_started_at", None) is not None:
+                if metadata.get("mint_started_at") == claim:
+                    metadata.pop("mint_started_at", None)
                     fresh.metadata = metadata
                     fresh.save(update_fields=["metadata"])
+                elif metadata.get("mint_started_at") is not None:
+                    logger.info(
+                        "Not releasing another request's mint claim on "
+                        "shipment=%s",
+                        shipment.pk,
+                        extra={
+                            "shipment_pk": shipment.pk,
+                            "carrier": "acs",
+                            "phase": "phase2_stale_request_failed",
+                        },
+                    )
         except Exception:
             logger.warning(
                 "Failed to release mint claim for shipment=%s — next retry "
@@ -1007,18 +1028,52 @@ class AcsService:
 
     @classmethod
     def _voucher_request_lost(
-        cls, order: Order, shipment: AcsShipment, exc: Exception
+        cls,
+        order: Order,
+        shipment: AcsShipment,
+        exc: Exception,
+        claim: str | None,
     ) -> NoReturn:
         """Turn a voucher request of unknown outcome into the shipment's
-        durable state, tell staff once, and stop the caller."""
+        durable state, tell staff once, and stop the caller.
+
+        Only while the row still holds this request's own claim. When its
+        claim was taken (it expired and was already recorded as unknown,
+        and staff may have resolved that or requested again), this
+        request's outcome was already put to staff once: marking the row
+        unknown again would hang a later request's claim on it, or
+        re-open a check staff closed. Its possible voucher surfaces as one
+        matching no order if a pickup list names it. Logged at ERROR.
+        """
         with transaction.atomic():
             fresh = AcsShipment.objects.select_for_update().get(pk=shipment.pk)
+            ours = (fresh.metadata or {}).get("mint_started_at") == claim
             entered = (
-                fresh.voucher_request_unknown_at is None
+                ours
+                and fresh.voucher_request_unknown_at is None
                 and not fresh.voucher_no
             )
             if entered:
                 cls._set_voucher_request_unknown(fresh)
+        if not ours:
+            logger.error(
+                "create_voucher_for_order: a voucher request for order=%s "
+                "whose claim was already taken ended with an unknown "
+                "outcome; its state was already recorded, the shipment is "
+                "left as it is. Error: %s",
+                order.id,
+                exc,
+                extra={
+                    "order_id": order.id,
+                    "shipment_pk": shipment.pk,
+                    "carrier": "acs",
+                    "phase": "phase2_stale_request_lost",
+                },
+            )
+            raise AcsVoucherRequestUnknownError(
+                f"The voucher request for order {order.id} has an unknown "
+                f"outcome: {exc}"
+            ) from exc
         logger.error(
             "create_voucher_for_order: the voucher request for order=%s "
             "shipment=%s has an unknown outcome — ACS may hold a voucher; "
@@ -1605,6 +1660,30 @@ class AcsService:
             resolved_at__isnull=True,
             source=AcsUnrecognisedVoucherSource.PICKUP_LIST,
         ).exists()
+        # Our own unused voucher from THIS shipment that ACS would not
+        # delete: our record says ACS holds it even when its tracking
+        # summary has nothing, but nothing compares its recipient, so
+        # staff confirm it by hand. For any other number the refusal
+        # below stands.
+        our_undeletable = AcsUnrecognisedVoucher.objects.filter(
+            voucher_no=voucher_no,
+            resolved_at__isnull=True,
+            source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
+            duplicate_of=shipment,
+        ).exists()
+        if not summary and our_undeletable:
+            if confirmed_by_hand.strip():
+                return "staff"
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "Voucher %(voucher)s is our own unused voucher for this "
+                    "order that ACS would not delete, and ACS's tracking "
+                    "has nothing to compare. If the ACS portal shows it for "
+                    "this order, adopt it again and write how you confirmed "
+                    "it."
+                )
+                % {"voucher": voucher_no}
+            )
         if not summary and not named_by_acs:
             raise AcsVoucherResolutionError(
                 gettext(

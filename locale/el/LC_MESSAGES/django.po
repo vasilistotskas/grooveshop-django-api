@@ -16469,6 +16469,10 @@ msgid "Voucher %(voucher)s is already resolved."
 msgstr "Το voucher %(voucher)s έχει ήδη διευθετηθεί."
 
 #, python-format
+msgid "Voucher %(voucher)s is our own unused voucher for this order that ACS would not delete, and ACS's tracking has nothing to compare. If the ACS portal shows it for this order, adopt it again and write how you confirmed it."
+msgstr "Το voucher %(voucher)s είναι δικό μας αχρησιμοποίητο voucher για αυτή την παραγγελία που η ACS δεν διέγραψε, και η παρακολούθηση της ACS δεν δίνει τίποτα για σύγκριση. Αν η πύλη της ACS το δείχνει για αυτή την παραγγελία, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
+
+#, python-format
 msgid "Voucher %(voucher)s marked as checked."
 msgstr "Το voucher %(voucher)s σημειώθηκε ως ελεγμένο."
 

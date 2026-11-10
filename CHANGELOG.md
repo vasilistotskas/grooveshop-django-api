@@ -3,6 +3,24 @@
 
 
 
+## v3.242.18 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): the generic label route answers 404 until a label exists (#633)
+
+GET /order/{id}/shipment_label fetched the label of any shipment row,
+so before the carrier had booked it ACS raised AcsAPIError and BoxNow
+read the cache and called the API with an empty parcel id.
+
+The carrier adapter now says whether a label exists (has_label), and
+ShippingService.fetch_label_bytes returns None unless it does; the
+route and the order admin's download button both ask it.
+BoxNowService.fetch_label_bytes refuses an empty parcel id itself, as
+AcsService.fetch_label_bytes refuses an empty voucher.
+
+Closes #630 ([`11a611c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11a611cc808f253dada9f721398f5ec342510fe9))
+
 ## v3.242.17 (2026-11-10)
 
 ### Bug fixes

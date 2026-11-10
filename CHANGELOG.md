@@ -3,6 +3,22 @@
 
 
 
+## v3.242.9 (2026-11-10)
+
+### Bug fixes
+
+* fix(blog): bulk publish leaves scheduled posts scheduled (#616)
+
+The "Publish selected posts" action set published_at to now on every
+selected post, which discarded the future date of a scheduled post and
+re-dated posts already live. It now publishes drafts only and reports how
+many scheduled posts it left alone.
+
+Adds BlogPostQuerySet.scheduled() (published, dated in the future), used
+by the action and the Publish Status filter.
+
+Closes #596 ([`b0c6b9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0c6b9ad2feb254cc6869b7a635c0d0b7dd97b9c))
+
 ## v3.242.8 (2026-11-10)
 
 ### Bug fixes

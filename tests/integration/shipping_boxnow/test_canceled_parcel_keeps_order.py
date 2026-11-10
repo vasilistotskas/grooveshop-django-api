@@ -18,24 +18,28 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.utils import timezone
+from djmoney.money import Money
 
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
-from order.factories import OrderFactory
+from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderItem, PaymentTransaction
 from order.models.order import Order
 from order.services import OrderService
 from order.stock import StockManager
+from pay_way.factories import PayWayFactory
 from product.factories import ProductFactory
 from shipping.models import ShippingProvider
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.factories import BoxNowShipmentFactory
 from shipping_boxnow.models import BoxNowParcelEvent, BoxNowShipment
 from shipping_boxnow.services import BoxNowService
+from tests.utils.stripe_refunds import FakeStripeRefunds
 
 pytestmark = pytest.mark.django_db
 
@@ -184,6 +188,46 @@ class TestAnOpenOrder:
         product.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
         assert product.stock == STOCK
+        assert not _needs_follow_up(order)
+
+
+class TestAPaidOrderCanceledByItsCustomer:
+    def test_is_refunded_once_and_boxnow_is_not_asked_again(self, deliver):
+        """The refund path #600's race cost: a paid order whose parcel the
+        event already canceled is still canceled AND refunded by the
+        customer's own cancel, and the canceled parcel is not canceled
+        twice."""
+        order, product, shipment = _paid_order_holding_stock()
+        order.pay_way = PayWayFactory.create_online_payment()
+        order.payment_id = "pi_canceled_parcel"
+        order.amount_due = Money(Decimal("100.00"), "EUR")
+        order.save(update_fields=["pay_way", "payment_id", "amount_due"])
+        PaymentTransactionFactory(
+            order=order,
+            amount=Money(Decimal("100.00"), "EUR"),
+            provider_reference="pi_canceled_parcel",
+        )
+        deliver(shipment)
+
+        with (
+            patch("shipping_boxnow.services.BoxNowClient") as client,
+            FakeStripeRefunds() as stripe_api,
+        ):
+            OrderService.cancel_order(
+                order, reason="changed my mind", customer_initiated=True
+            )
+
+        client.return_value.cancel_parcel.assert_not_called()
+        order.refresh_from_db()
+        product.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert product.stock == STOCK
+        assert stripe_api.amounts == [10000]
+        [refund] = PaymentTransaction.objects.filter(
+            order=order, kind=PaymentTransactionKind.REFUND
+        )
+        assert refund.amount == Money(Decimal("100.00"), "EUR")
+        assert order.payment_status == PaymentStatus.REFUNDED
         assert not _needs_follow_up(order)
 
 

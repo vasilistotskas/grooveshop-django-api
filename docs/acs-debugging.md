@@ -107,7 +107,14 @@ the request may have reached ACS (`AcsClient._exchange`):
 | `ReadTimeout`, any other `ConnectionError` (urllib3's `ProtocolError`, a connection dropped after the body left, arrives as a plain `ConnectionError`), any 5xx, a non-JSON 200 | `AcsOutcomeUnknownError` | **unknown** |
 | an exception the client does not classify; a 200 with neither `Voucher_No` nor `Error_Message`; a claim older than `_MINT_CLAIM_TTL_SECONDS` (a worker stopped between the request and the save) | | **unknown** |
 
-Unknown sets `AcsShipment.voucher_request_unknown_at`, drops the claim,
+Unknown sets `AcsShipment.voucher_request_unknown_at`, drops the claim
+and keeps the claim's value as `metadata["unknown_request"]`: which request
+the unknown state belongs to. A late answer saves its voucher only when
+that is its own request; once staff have resolved the check, or a later
+request is the one in question, the answer is deleted at ACS (or recorded
+as our own unused voucher). A state with no recorded request (set before
+the identity existed) is treated as not the answer's. Every resolution
+removes the key with the flag. Entering the state
 notes the order, sends `ops.acs_voucher_request_unknown` once, and every
 later call of `create_voucher_for_order` (the task, its retries, a
 re-dispatch, "Issue ACS voucher now") raises

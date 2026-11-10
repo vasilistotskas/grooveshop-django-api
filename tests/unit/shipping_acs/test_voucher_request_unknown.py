@@ -327,6 +327,16 @@ def _as_acs_prints_it(order) -> str:
     )
 
 
+def _worker_b_finds_the_claim_expired(shipment) -> None:
+    """Another worker records the outcome of the request holding the
+    claim as unknown, through the code that does it."""
+    from django.db import transaction
+
+    with transaction.atomic():
+        locked = AcsShipment.objects.select_for_update().get(pk=shipment.pk)
+        AcsService._set_voucher_request_unknown(locked)
+
+
 def _unknown_shipment(acs):
     shipment = _shipment()
     with pytest.raises(AcsVoucherRequestUnknownError):
@@ -500,9 +510,7 @@ class TestALateAnswer:
 
         def answer_after_worker_b_gave_up(self, params):
             _Acs.creates.append(params)
-            AcsShipment.objects.filter(pk=shipment.pk).update(
-                voucher_request_unknown_at=timezone.now(), metadata={}
-            )
+            _worker_b_finds_the_claim_expired(shipment)
             return {"Voucher_No": V1, "Error_Message": ""}
 
         monkeypatch.setattr(
@@ -767,9 +775,7 @@ class TestALateAnswerAfterStaffAdopted:
 
         def answer_after_staff_adopted(self, params):
             _Acs.creates.append(params)
-            AcsShipment.objects.filter(pk=shipment.pk).update(
-                voucher_request_unknown_at=timezone.now(), metadata={}
-            )
+            _worker_b_finds_the_claim_expired(shipment)
             _Acs.summaries[V1] = {
                 "voucher_no": V1,
                 "recipient": _as_acs_prints_it(shipment.order),
@@ -816,9 +822,7 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         def answer_after_staff_resolved(self, params):
             _Acs.creates.append(params)
             # Worker B found A's claim expired: unknown outcome.
-            AcsShipment.objects.filter(pk=shipment.pk).update(
-                voucher_request_unknown_at=timezone.now(), metadata={}
-            )
+            _worker_b_finds_the_claim_expired(shipment)
             resolve(shipment)
             return {"Voucher_No": V1, "Error_Message": ""}
 
@@ -1015,6 +1019,118 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         assert shipment.voucher_no == V1
         assert shipment.voucher_request_unknown_at is None
         assert acs.deleted == []
+
+
+class TestTheUnknownStateBelongsToARequest:
+    """CodeRabbit on the docs PR of #634. R1 is lost (unknown); staff
+    request again; R2 is lost too (unknown again); then R1's late answer
+    V1 arrives. The unknown state is R2's: V1 must not be saved over it,
+    nor clear it, or R2's possible voucher V2 is never checked and the
+    order may hold V1 that staff deleted in the portal."""
+
+    def _r1_answers_after_r2_was_lost(self, acs, monkeypatch):
+        helper = TestALateAnswerAfterStaffResolvedTheCheck()
+        stamps = {}
+
+        def r2_is_lost_too(shipment):
+            helper._request_again(shipment)
+            stamps["r2"] = helper._mint_c_claims(shipment)
+            _worker_b_finds_the_claim_expired(shipment)
+
+        shipment = helper._late_answer(acs, monkeypatch, r2_is_lost_too)
+        return shipment, stamps["r2"]
+
+    def test_a_late_answer_never_resolves_a_later_requests_unknown_state(
+        self, acs, sent, monkeypatch
+    ):
+        shipment, r2_claim = self._r1_answers_after_r2_was_lost(
+            acs, monkeypatch
+        )
+
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is not None
+        assert shipment.metadata["unknown_request"] == r2_claim
+        assert acs.deleted == [V1]
+
+    def test_an_unknown_state_records_the_request_it_belongs_to(
+        self, acs, sent
+    ):
+        shipment = _shipment()
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.create_voucher_for_order(shipment.order)
+
+        shipment.refresh_from_db()
+        sent_under = acs.creates and shipment.metadata["unknown_request"]
+        assert sent_under
+        assert "mint_started_at" not in shipment.metadata
+
+    @pytest.mark.parametrize("resolve", ["request_again", "close", "adopt"])
+    def test_resolving_the_check_forgets_whose_it_was(self, acs, sent, resolve):
+        from order.enum.status import OrderStatus
+        from order.models.order import Order
+
+        shipment = _unknown_shipment(acs)
+        if resolve == "request_again":
+            with patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ):
+                AcsService.request_voucher_again(shipment, user=None, note="x")
+        elif resolve == "close":
+            Order.objects.filter(pk=shipment.order_id).update(
+                status=OrderStatus.CANCELED
+            )
+            AcsService.close_voucher_request(shipment, user=None, note="x")
+        else:
+            acs.summaries[V1] = {
+                "voucher_no": V1,
+                "recipient": _as_acs_prints_it(shipment.order),
+            }
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_request_unknown_at is None
+        assert "unknown_request" not in shipment.metadata
+
+    def test_an_unknown_state_without_a_recorded_request_is_not_taken(
+        self, acs, sent, monkeypatch
+    ):
+        """Recorded before requests carried an identity: nothing proves
+        the late answer is that request's, so it is treated as stale."""
+        helper = TestALateAnswerAfterStaffResolvedTheCheck()
+
+        def legacy_unknown(shipment):
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_request_unknown_at=timezone.now(), metadata={}
+            )
+
+        shipment = helper._late_answer(acs, monkeypatch, legacy_unknown)
+
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is not None
+        assert acs.deleted == [V1]
+
+    def test_our_own_recorded_duplicate_is_no_evidence_acs_holds_it(
+        self, acs, sent
+    ):
+        """A row WE recorded because ACS refused our delete says nothing
+        about what ACS holds; only a row ACS named on a pickup list does."""
+        from shipping_acs.models.unrecognised_voucher import (
+            AcsUnrecognisedVoucherSource,
+        )
+
+        shipment = _unknown_shipment(acs)
+        AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+            source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
+        )
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(
+                shipment, V1, user=None, confirmed_by_hand="Seen in portal."
+            )
 
 
 class TestARefusedDeleteMeetsAnExistingRow:

@@ -9175,6 +9175,9 @@ msgstr "Χωρίς πάροχο"
 msgid "No readable voucher"
 msgstr "Χωρίς αναγνώσιμο voucher"
 
+msgid "No request waits: the next one goes alone"
+msgstr "Κανένα αίτημα σε αναμονή: το επόμενο θα σταλεί μόνο του"
+
 msgid "No sales in the same period last year"
 msgstr "Καμία πώληση την ίδια περίοδο πέρυσι"
 

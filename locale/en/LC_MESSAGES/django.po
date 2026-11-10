@@ -9168,6 +9168,9 @@ msgstr "No provider"
 msgid "No readable voucher"
 msgstr "No readable voucher"
 
+msgid "No request waits: the next one goes alone"
+msgstr "No request waits: the next one goes alone"
+
 msgid "No sales in the same period last year"
 msgstr "No sales in the same period last year"
 

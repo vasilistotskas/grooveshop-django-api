@@ -47,6 +47,7 @@ from shipping_acs.attention import (
     voucher_request_held_q,
     voucher_request_unknown,
     voucher_request_unknown_q,
+    voucher_requests_held,
 )
 from shipping_acs.diagnostics import shipment_timeline
 from shipping_acs.enum.shipment_state import TERMINAL_STATES, AcsShipmentState
@@ -1351,7 +1352,9 @@ class AcsVoucherHoldAdmin(BaseModelAdmin):
             return str(_("Ended: ACS answered"))
         if obj.trial_allowed_at is None:
             return str(_("Held: nothing is sent"))
-        return str(_("One request first"))
+        if voucher_requests_held().exists():
+            return str(_("One request first"))
+        return str(_("No request waits: the next one goes alone"))
 
     @admin.display(description=_("ACS is asked again after"))
     def asked_again_after(self, obj: AcsVoucherHold) -> str:

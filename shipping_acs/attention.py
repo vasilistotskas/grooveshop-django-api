@@ -169,6 +169,20 @@ def voucher_holds_in_force() -> QuerySet[AcsVoucherHold]:
     return AcsVoucherHold.objects.filter(voucher_hold_in_force_q())
 
 
+def voucher_holds_holding_requests() -> QuerySet[AcsVoucherHold]:
+    """The hold in force while it is something for staff to know: it is
+    closed (ACS has not answered again), or requests wait behind it.
+
+    What the dashboard counts. A hold that allowed one request first and
+    has nothing left to send (the orders were canceled, or ACS refused
+    them) stays in force, so the next order's request goes alone, but
+    asks nobody for anything.
+    """
+    return voucher_holds_in_force().filter(
+        Q(trial_allowed_at__isnull=True) | Exists(voucher_requests_held())
+    )
+
+
 def voucher_request_held_q() -> Q:
     """Shipments whose voucher request was held, as a ``Q``: nothing was
     sent to ACS for them, and no voucher was saved since."""

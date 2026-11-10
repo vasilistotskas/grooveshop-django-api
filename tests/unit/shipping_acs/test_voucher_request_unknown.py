@@ -27,6 +27,7 @@ from shipping_acs.exceptions import (
     AcsAPIError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
+    AcsVoucherRequestHeldError,
     AcsVoucherRequestUnknownError,
     AcsVoucherResolutionError,
 )
@@ -1031,6 +1032,71 @@ class TestTypedNotesReachStagingReplaced:
             self.TYPED in (row.history_change_reason or "")
             for row in shipment.history.all()
         )
+
+
+class TestTwoLostAnswersWithTheHoldInForce:
+    """Two requests were in flight when ACS failed, so both are of unknown
+    outcome and the voucher hold (#631) the first one began is in force
+    while staff resolve them: nothing here ends it by hand."""
+
+    def test_both_are_checked_by_staff_while_everything_else_waits(
+        self, acs, sent, monkeypatch
+    ):
+        first, second = _shipment(), _shipment()
+
+        def lose_both(self, params):
+            _Acs.creates.append(params)
+            if len(_Acs.creates) == 1:
+                # The second request is out as well when this one's
+                # answer is lost; its own answer is lost first.
+                with pytest.raises(AcsVoucherRequestUnknownError):
+                    AcsService.create_voucher_for_order(second.order)
+            raise _lost_answer()
+
+        monkeypatch.setattr(_Acs, "create_voucher", lose_both)
+        with pytest.raises(AcsVoucherRequestUnknownError):
+            AcsService.create_voucher_for_order(first.order)
+
+        hold = AcsVoucherHold.objects.get()
+        assert hold.ended_at is None
+        assert hold.trial_allowed_at is None
+        # Two lost answers of one failure, not a failed first request.
+        assert hold.failed_trials == 0
+        for shipment in (first, second):
+            shipment.refresh_from_db()
+            assert shipment.voucher_request_unknown_at is not None
+            assert shipment.voucher_request_held_at is None
+        assert _types(sent).count("ops.acs_voucher_request_unknown") == 2
+
+        # A third order waits: nothing is sent for it.
+        third = _shipment()
+        with pytest.raises(AcsVoucherRequestHeldError):
+            AcsService.create_voucher_for_order(third.order)
+        assert len(acs.creates) == 2
+
+        # Staff resolve both checks with the hold in force. An adopt
+        # sends no create; a request-again waits like every request.
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(first.order),
+        }
+        AcsService.adopt_voucher(first, V1, user=None)
+        with patch(
+            "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+        ):
+            AcsService.request_voucher_again(
+                second, user=None, note="Checked the ACS portal: none."
+            )
+        held = create_acs_voucher_for_order.run(second.order_id)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.voucher_no == V1
+        assert held["status"] == "voucher_request_held"
+        assert second.voucher_request_unknown_at is None
+        assert second.voucher_request_held_at is not None
+        assert len(acs.creates) == 2
+        assert AcsVoucherHold.objects.filter(ended_at__isnull=True).count() == 1
 
 
 class TestRequestAgain:

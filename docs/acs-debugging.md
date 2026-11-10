@@ -171,19 +171,23 @@ An unknown outcome of a create the store sent begins an `AcsVoucherHold`
 While it is in force no `ACS_Create_Voucher` is sent for the store: the
 task returns `{"status": "voucher_request_held"}`, the shipment carries
 `voucher_request_held_at` (shipment list, `attention=voucher_held`) and
-ACS API Calls shows no create for it, or one whose error starts with
-"Not sent" (a request stopped at its slot, with no HTTP status). A held
-order needs nothing from
+ACS API Calls shows no create for it: a request that was not sent is not
+a call, so the creates listed during an outage are the ones that left. A
+held order needs nothing from
 staff. Only the orders whose request was really sent and lost are "ACS
 voucher requests to check".
 
-To see why a hold has not ended, read its row: `reason` is the last lost
-answer, `failed_trials` how many times the one request sent first lost
-its answer too, and "ACS is asked again after" the next time
+To see why a hold has not ended, read its row: `reason` is the last
+failure (a lost answer, or an HTTP 4xx that was not ACS's own answer),
+`failed_trials` how many times the one request sent first failed that
+way, and "ACS is asked again after" the next time
 `issue_held_acs_vouchers` asks ACS a read (`ACS_Get_Pickup_Lists` in ACS
 API Calls, every tick after that time until one is answered). If ACS is
 known to answer, press **ACS answers again: send one request** on the
-hold.
+hold. Only a voucher ends a hold: a refusal by ACS sends the next held
+order next. A hold whose state reads "No request waits: the next one goes
+alone" is waiting for an order, not for staff, and is not on the
+dashboard.
 
 LogsQL: `"ACS voucher hold"` or `"ACS voucher requests are held"`.
 

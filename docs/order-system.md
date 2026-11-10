@@ -1251,7 +1251,16 @@ accepting Cyprus orders at the Greek flat rate.
     because a request can wait `ACS_SLOT_WAIT_SECONDS` for its slot behind
     the request that fails. So a failing ACS costs the requests in flight
     (`ACS_MAX_CONCURRENT_REQUESTS`), not the queue behind them. A hold
-    that cannot be read sends nothing either (`AcsRetryableError`).
+    that cannot be read sends nothing either
+    (`AcsVoucherRequestNotSentError`, retried by Celery). A request
+    stopped at its slot is not a call to ACS: it leaves no `AcsApiCall`
+    row and no call log line, so the history of an outage shows only the
+    creates that left.
+  - **The stamp.** `voucher_request_held_at` goes only when ACS answers
+    the request (a voucher, a refusal, an HTTP 4xx) or its outcome becomes
+    unknown. A request that was let through and never reached ACS (a
+    connection never made, the request cap, 403/406) keeps it, so the
+    sweep still sends the order after the task's retries are spent.
   - **Asking again.** `issue_held_acs_vouchers` (beat
     `issue-held-acs-vouchers`, every 5 minutes, per store) is the one
     retry. Closed: once `ACS_VOUCHER_HOLD_RETRY_SECONDS` (300) have passed
@@ -1264,28 +1273,48 @@ accepting Cyprus orders at the Greek flat rate.
     (a row lock on the hold picks it across workers; it holds the turn
     for `client.worst_case_request_seconds`, so a dead worker does not
     block the next).
-  - **Ending.** A read cannot prove a create works, so only an answered
-    create ends the hold: a voucher, or a refusal by ACS. The rest of the
-    held orders follow on the next tick, oldest first, spaced by
-    `ACS_POLL_DISPATCH_SPACING_SECONDS`. An unknown outcome of that one
-    request closes the hold again and doubles the wait
-    (`AcsVoucherHold.retry_after`, capped by
-    `ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS`, 3600): that order alone joins
-    the ones to check. A request that never reached ACS changes nothing.
+  - **What ends it, by what each answer proves** (the table in
+    `shipping_acs/voucher_hold.py` is the rule):
+
+    | Outcome of the one request | The order | The hold |
+    |---|---|---|
+    | ACS returns a voucher | saved | **ends**: creating a voucher works. The rest follow on the next tick, oldest first, spaced by `ACS_POLL_DISPATCH_SPACING_SECONDS` |
+    | ACS refuses in its own envelope (`ACSExecution_HasError`, a value-row `Error_Message`) | rejected as before (`ops.shipment_rejected`), no longer held | stays "one request first", the turn free at once: ACS executed a create, nothing shows one succeeds. The next held order goes next |
+    | an HTTP 4xx that is not ACS's envelope (the manual has 200, 403, 406 only: a proxy's 429, a gateway's 404) | rejected as before, no longer held | **closes again, wait doubled**: it says nothing about ACS. Without a hold it begins none |
+    | unknown outcome | #626's state, no longer held | closes again, wait doubled (`AcsVoucherHold.retry_after`, capped by `ACS_VOUCHER_HOLD_RETRY_MAX_SECONDS`, 3600) |
+    | never reached ACS | still held | unchanged; the turn ends with its lease |
+
+    A refused or rejected order leaves the held requests, so it is never
+    the one request sent first twice.
   - **Staff see one state.** The dashboard row "ACS voucher requests are
     held" (since when; `in_force=yes` on the hold list) and the shipment
     filter `attention=voucher_held`; there is no email and no order note
-    per held order. An order canceled while it waits is not sent
-    (`attention.voucher_requests_held`). "Issue ACS voucher now" says the
-    request waits.
+    per held order. The row is drawn while the hold is closed or requests
+    wait behind it (`attention.voucher_holds_holding_requests`). A hold
+    that allowed one request first and has nothing left to send (the
+    orders were canceled, or ACS refused them) stays in force, so the
+    next order's request goes alone and its voucher ends the hold, but it
+    is no row: nobody has anything to do. An order canceled while it
+    waits is not sent (`attention.voucher_requests_held`). "Issue ACS
+    voucher now" says the request waits.
+  - **A release reverted while orders are stamped.** The previous release
+    does not know the column or the table: to it a stamped shipment is a
+    `pending_creation` one with no claim and no unknown flag. Nothing
+    sends it by itself (the sweep is gone with the release), it is listed
+    as a stranded mint after 24 hours, and "Issue ACS voucher now" sends
+    it, once, like any other. Deployed again, the sweep sends what is
+    still stamped and has no voucher.
 
   ```
   no hold ──unknown outcome of a create we sent──► HELD (nothing sent)
      ▲                                               │ wait over + ACS answers a read,
      │                                               │ or staff say it answers again
      │                                               ▼
-     └──ACS answers a create──── ONE REQUEST FIRST ──unknown outcome──► HELD, wait doubled
-                                  └ never reached ACS: the next request may go
+     └──ACS returns a voucher──── ONE REQUEST FIRST ──► HELD, wait doubled:
+                                   │                     unknown outcome, or an HTTP 4xx
+                                   │                     that is not ACS's envelope
+                                   ├ ACS refuses: the next held order goes next
+                                   └ never reached ACS: the same order goes again
   ```
 - **Vouchers ACS names that match no shipment.** A refused
   `ACS_Issue_Pickup_List` names every unprinted voucher of the account

@@ -494,6 +494,28 @@ class TestAcsVoucherHold:
 
         assert "ACS voucher requests are held" not in _rows()
 
+    def test_a_hold_with_nothing_left_to_send_stops_asking_for_attention(
+        self,
+    ):
+        """ACS answered a read and no request waits (staff canceled the
+        orders, or ACS refused them): the hold stays in force so the next
+        order's request goes alone, but nothing is held and nobody has
+        anything to do, so it is not a row."""
+        self._hold(trial_allowed_at=timezone.now())
+
+        assert _counts()["acs_voucher_holds"] == 0
+        assert "ACS voucher requests are held" not in _rows()
+
+        _shipment(
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            order=courier_cash_order(status=OrderStatus.PENDING),
+            voucher_request_held_at=timezone.now(),
+        )
+
+        assert _counts()["acs_voucher_holds"] == 1
+        assert "ACS voucher requests are held" in _rows()
+
     def test_the_lists_show_exactly_what_was_counted(self, client):
         hold = self._hold()
         self._hold(ended_at=timezone.now())

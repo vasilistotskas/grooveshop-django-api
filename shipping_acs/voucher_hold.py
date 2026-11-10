@@ -13,19 +13,51 @@ ACS, a known outcome), the shipment is marked as held, and
 ::
 
     no hold ──an unknown outcome of a create we sent──► HELD
-                                                          │ nothing is sent
-          the wait is over and ACS answers a read, ───────┤
-          or staff say ACS answers again                  ▼
-    no hold ◄──ACS answers a create── ONE REQUEST FIRST ──an unknown outcome──► HELD
-                                       │ one at a time             (the wait doubles)
-                                       └ never reached ACS: the next one may go
+       ▲                                                  │ nothing is sent
+       │  the wait is over and ACS answers a read, ───────┤
+       │  or staff say ACS answers again                  ▼
+       └────── ACS returns a voucher ──── ONE REQUEST FIRST ──► HELD, the wait doubled:
+                                           │ one at a time       an unknown outcome, or an
+                                           │                     HTTP 4xx that is not ACS's
+                                           ├ ACS refuses: the next held order goes next
+                                           └ never reached ACS: the same order goes again
+
+**What each outcome of a voucher request does**, by what it proves. This
+table is the rule; ``AcsService.create_voucher_for_order`` only reports
+which row happened.
+
+==========================================  =====================  ==========================
+Outcome                                     The order              The hold
+==========================================  =====================  ==========================
+ACS returns a voucher                       saved                  ends, if one request was
+(:func:`record_voucher`)                                           allowed first. Creating a
+                                                                   voucher works.
+ACS refuses in its own envelope             rejected, staff's to   stays "one request first";
+(``ACSExecution_HasError``, a value-row     fix (#626); no longer  the turn is free at once.
+``Error_Message``; :func:`record_refusal`)  held                   ACS executed a create, but
+                                                                   nothing shows one succeeds.
+An HTTP 4xx that is not ACS's envelope      rejected (#626); no    closes again, the wait
+(the manual has 200, 403 and 406 only, so   longer held            doubled, if one request was
+a 400/401/404/429 is a proxy's or a                                allowed first. It says
+gateway's; :func:`record_no_answer`)                               nothing about ACS. Begins
+                                                                   no hold.
+Unknown (a lost answer;                     unknown outcome        begins, or closes again
+:func:`record_unknown_outcome`)             (#626); no longer      with the wait doubled.
+                                            held
+Never reached ACS (a connection never       stays held if it was   unchanged; the turn ends
+made, the request cap, 403/406, a hold                             with its lease.
+that could not be read)
+==========================================  =====================  ==========================
+
+A refused or rejected order leaves the held requests, so it is never the
+one request sent first twice: the next oldest held order is.
 
 The state is a row in the store's schema, not a cache key: a cache flush
 or an unreachable Redis must not reopen it (the request slots of
 ``shipping_acs.concurrency`` are skipped then), staff read it in the
 admin, and each span stays as a record. A row that is lost only costs
 what one more lost answer costs; a row that stays is ended by the first
-answered request, which the sweep keeps asking for.
+voucher ACS returns, which the sweep keeps asking for.
 
 Every function is one short transaction on the hold's row
 (``select_for_update``), so "one request first" holds across workers:
@@ -102,71 +134,24 @@ def admit(*, lease_seconds: float) -> None:
     )
 
 
-def record_unknown_outcome(error: str) -> None:
-    """A voucher request this store sent ended with an unknown outcome:
-    begin a hold, or close the one in force again.
-
-    Never raises: the caller is recording that order's own unknown
-    outcome, which must not be lost to a failure here.
-    """
-    try:
-        with transaction.atomic():
-            _begin_or_close_again(error)
-    except Exception:
-        logger.exception("Could not record the ACS voucher hold")
-
-
-def _begin_or_close_again(error: str) -> None:
-    now = timezone.now()
-    hold = _locked()
-    if hold is None:
-        try:
-            with transaction.atomic():
-                AcsVoucherHold.objects.create(
-                    started_at=now, last_failure_at=now, reason=error
-                )
-        except IntegrityError:
-            # Another worker's lost answer began it in the same instant.
-            hold = _locked()
-        else:
-            logger.error(
-                "ACS voucher requests are held: a voucher request has an "
-                "unknown outcome (%s). Nothing more is sent until ACS "
-                "answers again.",
-                error,
-            )
-            return
-    if hold is None:
-        return
-    if hold.trial_allowed_at is not None:
-        # The one request sent first lost its answer too.
-        hold.failed_trials += 1
-        logger.error(
-            "ACS voucher hold since %s closed again: the request sent "
-            "first has an unknown outcome (%s)",
-            hold.started_at.isoformat(),
-            error,
-        )
-    hold.trial_allowed_at = None
-    hold.trial_until = None
-    hold.last_failure_at = now
-    hold.reason = error
-    hold.save(
-        update_fields=[
-            "failed_trials",
-            "trial_allowed_at",
-            "trial_until",
-            "last_failure_at",
-            "reason",
-        ]
-    )
+def allow_trial() -> bool:
+    """Let one request go first: ACS answered a read, or staff said it
+    answers again. Returns whether a closed hold changed."""
+    with transaction.atomic():
+        hold = _locked()
+        if hold is None or hold.trial_allowed_at is not None:
+            return False
+        hold.trial_allowed_at = timezone.now()
+        hold.trial_until = None
+        hold.save(update_fields=["trial_allowed_at", "trial_until"])
+    return True
 
 
-def record_answer() -> None:
-    """ACS answered a voucher request (a voucher, or a refusal): a hold
-    that had allowed one request first is over.
+def record_voucher() -> None:
+    """ACS returned a voucher: a hold that had allowed one request first
+    is over.
 
-    An answer while the hold is closed changes nothing: that request was
+    A voucher while the hold is closed changes nothing: that request was
     in flight before the hold began, so it says nothing newer than the
     lost answer does. Never raises: the caller holds a voucher number it
     has yet to save.
@@ -183,19 +168,102 @@ def record_answer() -> None:
         logger.exception("Could not end the ACS voucher hold")
         return
     logger.warning(
-        "ACS voucher hold since %s ended: ACS answered a voucher request",
+        "ACS voucher hold since %s ended: ACS returned a voucher",
         hold.started_at.isoformat(),
     )
 
 
-def allow_trial() -> bool:
-    """Let one request go first: ACS answered a read, or staff said it
-    answers again. Returns whether a closed hold changed."""
-    with transaction.atomic():
-        hold = _locked()
-        if hold is None or hold.trial_allowed_at is not None:
-            return False
-        hold.trial_allowed_at = timezone.now()
-        hold.trial_until = None
-        hold.save(update_fields=["trial_allowed_at", "trial_until"])
-    return True
+def record_refusal() -> None:
+    """ACS refused a voucher request in its own envelope: the turn of
+    the one request is over, so the next held order can go at once.
+
+    The hold itself stays as it is. Never raises: the caller is
+    reporting that order's refusal.
+    """
+    try:
+        with transaction.atomic():
+            hold = _locked()
+            if hold is None or hold.trial_until is None:
+                return
+            hold.trial_until = None
+            hold.save(update_fields=["trial_until"])
+    except Exception:
+        logger.exception("Could not free the turn of the ACS voucher hold")
+
+
+def record_no_answer(error: str) -> None:
+    """A voucher request got an HTTP 4xx that is not ACS's envelope: a
+    hold that had allowed one request first closes again.
+
+    Without a hold it begins none, and a hold that is already closed is
+    left as it is: the 4xx is a known outcome for its order and says
+    nothing new about ACS. Never raises.
+    """
+    try:
+        with transaction.atomic():
+            hold = _locked()
+            if hold is not None and hold.trial_allowed_at is not None:
+                _close_again(hold, error)
+    except Exception:
+        logger.exception("Could not close the ACS voucher hold again")
+
+
+def record_unknown_outcome(error: str) -> None:
+    """A voucher request this store sent ended with an unknown outcome:
+    begin a hold, or close the one in force again.
+
+    Never raises: the caller is recording that order's own unknown
+    outcome, which must not be lost to a failure here.
+    """
+    try:
+        with transaction.atomic():
+            hold = _locked() or _begin(error)
+            if hold is not None:
+                _close_again(hold, error)
+    except Exception:
+        logger.exception("Could not record the ACS voucher hold")
+
+
+def _begin(error: str) -> AcsVoucherHold | None:
+    """Begin a hold; the one another worker began in the same instant is
+    returned instead, to be closed again like any hold in force."""
+    now = timezone.now()
+    try:
+        with transaction.atomic():
+            AcsVoucherHold.objects.create(
+                started_at=now, last_failure_at=now, reason=error
+            )
+    except IntegrityError:
+        return _locked()
+    logger.error(
+        "ACS voucher requests are held: a voucher request has an unknown "
+        "outcome (%s). Nothing more is sent until ACS answers again.",
+        error,
+    )
+    return None
+
+
+def _close_again(hold: AcsVoucherHold, error: str) -> None:
+    """Record a failure on a hold in force, on a row the caller holds
+    locked: nothing is sent, and a failed first request doubles the wait."""
+    if hold.trial_allowed_at is not None:
+        hold.failed_trials += 1
+        logger.error(
+            "ACS voucher hold since %s closed again: the request sent "
+            "first did not get a voucher (%s)",
+            hold.started_at.isoformat(),
+            error,
+        )
+    hold.trial_allowed_at = None
+    hold.trial_until = None
+    hold.last_failure_at = timezone.now()
+    hold.reason = error
+    hold.save(
+        update_fields=[
+            "failed_trials",
+            "trial_allowed_at",
+            "trial_until",
+            "last_failure_at",
+            "reason",
+        ]
+    )

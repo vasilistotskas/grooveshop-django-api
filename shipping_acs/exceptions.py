@@ -91,7 +91,18 @@ class AcsOutcomeUnknownError(AcsRetryableError):
     """
 
 
-class AcsVoucherRequestHeldError(AcsRetryableError):
+class AcsVoucherRequestNotSentError(AcsRetryableError):
+    """The voucher request was stopped at its request slot, before the
+    POST: nothing reached ACS.
+
+    Raised as itself when the store's voucher hold could not be read
+    (Celery retries), and as :class:`AcsVoucherRequestHeldError` when a
+    hold is in force. Not a call to ACS, so ``AcsClient._call`` writes no
+    ``AcsApiCall`` row and no call log line for it.
+    """
+
+
+class AcsVoucherRequestHeldError(AcsVoucherRequestNotSentError):
     """The voucher request was not sent: an ``AcsVoucherHold`` is in force.
 
     ACS just left a voucher request of this store with an unknown outcome,

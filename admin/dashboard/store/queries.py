@@ -421,14 +421,14 @@ def recent_orders() -> list[dict[str, Any]]:
 @dashboard_query(
     "store:acs-voucher-hold:v1",
     ttl=60,
-    depends_on=("shipping_acs.AcsVoucherHold",),
+    depends_on=("shipping_acs.AcsVoucherHold", "shipping_acs.AcsShipment"),
 )
 def acs_voucher_hold_since() -> datetime | None:
     """Since when the store's ACS voucher requests are held, or None."""
     from shipping_acs import attention as acs
 
     return (
-        acs.voucher_holds_in_force()
+        acs.voucher_holds_holding_requests()
         .values_list("started_at", flat=True)
         .first()
     )
@@ -486,7 +486,7 @@ def attention_counts() -> dict[str, int]:
         "acs_unrecognised_vouchers": acs.unrecognised_vouchers().count(),
         # One state, however many orders wait behind it: voucher requests
         # held while ACS is failing (``shipping_acs.voucher_hold``).
-        "acs_voucher_holds": acs.voucher_holds_in_force().count(),
+        "acs_voucher_holds": acs.voucher_holds_holding_requests().count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
         "unattributed_cod_payouts": acs.unattributed_payouts().count(),
         "canceled_still_paid": model("order.Order")

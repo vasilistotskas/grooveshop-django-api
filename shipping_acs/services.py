@@ -43,6 +43,7 @@ from shipping_acs.exceptions import (
     AcsRetryableError,
     AcsUnprintedVouchersError,
     AcsVoucherRequestHeldError,
+    AcsVoucherRequestNotSentError,
     AcsVoucherRequestUnknownError,
     AcsVoucherResolutionError,
 )
@@ -437,7 +438,12 @@ class AcsService:
         :class:`AcsVoucherRequestHeldError` is raised, before the claim
         or, for a request that waited for a slot while the hold began,
         from the slot itself with the claim released.
-        ``issue_held_acs_vouchers`` sends it once ACS answers again.
+        ``issue_held_acs_vouchers`` sends it once ACS answers again. The
+        stamp goes only when ACS answers the request (a voucher, a
+        refusal, an HTTP 4xx) or its outcome becomes unknown; a request
+        that never reached ACS keeps it, so the sweep still owns it when
+        the task's retries are spent. What each outcome does to the hold
+        is the table in ``shipping_acs.voucher_hold``.
         """
         client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
@@ -547,28 +553,40 @@ class AcsService:
             # failed building the request: record it where the admin
             # reads ACS's own rejections, and release the claim so
             # "Issue ACS voucher now" works the moment the order is fixed.
+            # It no longer waits for ACS either: sent again unchanged it
+            # would fail the same way on every sweep.
             cls._record_last_error(shipment, {}, exc)
-            cls._release_mint_claim(shipment)
+            cls._release_mint_claim(shipment, held=False)
             raise
         try:
             result = client.create_voucher(params)
-        except AcsVoucherRequestHeldError:
-            # The hold began while this request waited for its slot, so
-            # the client did not send it. Not an ACS error to record.
-            cls._release_mint_claim(shipment, held=True)
+        except AcsVoucherRequestNotSentError as exc:
+            # Stopped at its slot: the hold began while this request
+            # waited for it (stamp it as held), or the hold could not be
+            # read (Celery retries). The client sent nothing either way,
+            # so there is no ACS error to record.
+            cls._release_mint_claim(
+                shipment,
+                held=True
+                if isinstance(exc, AcsVoucherRequestHeldError)
+                else None,
+            )
             raise
         except Exception as exc:
             cls._record_last_error(shipment, params, exc)
             if not cls._outcome_is_known(exc):
                 cls._voucher_request_lost(order, shipment, exc)
-            if not isinstance(exc, AcsRetryableError):
-                # ACS refused it: an answer, which ends a hold that had
-                # let this request go first.
-                voucher_hold.record_answer()
             # Known outcome: the request never reached ACS (a connection
-            # never made, the request cap) or ACS refused it. Release the
-            # claim so the retry, or staff, can send it again.
-            cls._release_mint_claim(shipment)
+            # never made, the request cap) or it was answered with an
+            # error. Release the claim so the retry, or staff, can send it
+            # again. Only an answer ends its wait for ACS: a request that
+            # never got there keeps its stamp and the sweep sends it.
+            answered = isinstance(exc, AcsAPIError) and not isinstance(
+                exc, AcsRetryableError
+            )
+            if answered:
+                cls._report_error_answer(exc)
+            cls._release_mint_claim(shipment, held=False if answered else None)
             logger.warning(
                 "create_voucher_for_order: API call failed for order=%s "
                 "shipment=%s — released mint claim. Error: %s",
@@ -599,10 +617,10 @@ class AcsService:
                 # A success envelope without a number or a reason: ACS
                 # executed the call and nothing says it made no voucher.
                 cls._voucher_request_lost(order, shipment, api_error)
-            voucher_hold.record_answer()
-            cls._release_mint_claim(shipment)
+            cls._report_error_answer(api_error)
+            cls._release_mint_claim(shipment, held=False)
             raise api_error
-        voucher_hold.record_answer()
+        voucher_hold.record_voucher()
 
         children: list[str] = []
         if shipment.item_quantity > 1:
@@ -682,12 +700,14 @@ class AcsService:
             shipment.voucher_no = voucher_no
             shipment.shipment_state = AcsShipmentState.NEW
             shipment.voucher_request_unknown_at = None
+            shipment.voucher_request_held_at = None
             shipment.metadata = metadata
             shipment.save(
                 update_fields=[
                     "voucher_no",
                     "shipment_state",
                     "voucher_request_unknown_at",
+                    "voucher_request_held_at",
                     "metadata",
                 ]
             )
@@ -797,14 +817,35 @@ class AcsService:
             shipment._change_reason = "Voucher request held: ACS is failing"
             shipment.save(update_fields=["voucher_request_held_at"])
 
+    @staticmethod
+    def _report_error_answer(exc: AcsAPIError) -> None:
+        """Tell the store's voucher hold which error answered a create.
+
+        ``raw`` is set only for an answer in ACS's own envelope
+        (``ACSExecution_HasError``, or the value row this service read an
+        ``Error_Message`` from): ACS executed the create and refused it.
+        Without it the answer is a bare HTTP 4xx, which the manual does
+        not list for ACS (200, 403 and 406 only, p. 1-2): a proxy's or a
+        gateway's, saying nothing about ACS. The same line
+        ``observability._classify`` draws between a business error and an
+        unexpected one.
+        """
+        if exc.raw:
+            voucher_hold.record_refusal()
+        else:
+            voucher_hold.record_no_answer(str(exc))
+
     @classmethod
     def _release_mint_claim(
-        cls, shipment: AcsShipment, *, held: bool = False
+        cls, shipment: AcsShipment, *, held: bool | None = None
     ) -> None:
         """Drop the ``mint_started_at`` flag so a retry can proceed.
 
-        ``held`` also stamps the request as held by the voucher hold, in
-        the same save.
+        ``held`` settles the voucher hold's stamp in the same
+        transaction: True for a request the hold kept from ACS, False
+        for one that was answered or refused (it no longer waits for
+        ACS). None leaves the stamp as it is: the request never reached
+        ACS, so an order that was waiting still is.
 
         Best effort — a failure here just means the next retry has to
         wait for the TTL to expire.
@@ -827,6 +868,10 @@ class AcsService:
                     fresh.save(update_fields=["metadata"])
                 if held:
                     cls._mark_voucher_request_held(fresh)
+                elif held is False and fresh.voucher_request_held_at:
+                    fresh.voucher_request_held_at = None
+                    fresh._change_reason = "Held voucher request answered"
+                    fresh.save(update_fields=["voucher_request_held_at"])
         except Exception:
             logger.warning(
                 "Failed to release mint claim for shipment=%s — next retry "
@@ -870,12 +915,6 @@ class AcsService:
         update_fields = ["metadata"]
         metadata["mint_started_at"] = timezone.now().isoformat()
         shipment.metadata = metadata
-        if shipment.voucher_request_held_at is not None:
-            # The hold let it through: from here it is a request like
-            # any other, with its own outcome.
-            shipment.voucher_request_held_at = None
-            shipment._change_reason = "Held voucher request sent"
-            update_fields.append("voucher_request_held_at")
 
         # The contract is COD-only, so the carrier sets
         # ``charge_type=COD`` for every voucher regardless of how the
@@ -931,8 +970,16 @@ class AcsService:
         metadata.pop("mint_started_at", None)
         shipment.metadata = metadata
         shipment.voucher_request_unknown_at = timezone.now()
+        # Staff's to resolve from here, never the sweep's to send.
+        shipment.voucher_request_held_at = None
         shipment._change_reason = "Voucher request outcome unknown"
-        shipment.save(update_fields=["voucher_request_unknown_at", "metadata"])
+        shipment.save(
+            update_fields=[
+                "voucher_request_unknown_at",
+                "voucher_request_held_at",
+                "metadata",
+            ]
+        )
 
     @classmethod
     def _voucher_request_lost(
@@ -1020,6 +1067,12 @@ class AcsService:
         answer shows the endpoint, the key and the dispatcher work; it
         cannot show that ``ACS_Create_Voucher`` does, which is why the
         voucher hold then sends one request first.
+
+        A day with no pickup list is an answer too, not an
+        ``ACSExecution_HasError``: read from production on 2026-11-10
+        (the real store, read only), the call returned OK with an empty
+        list for that day, the day before, a Sunday and a date in the
+        future. So a healthy ACS is never kept held by an empty day.
         """
         try:
             AcsClient().get_pickup_lists(

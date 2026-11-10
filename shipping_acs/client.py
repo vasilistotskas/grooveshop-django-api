@@ -33,6 +33,7 @@ from shipping_acs.exceptions import (
     AcsOutcomeUnknownError,
     AcsRetryableError,
     AcsVoucherRequestHeldError,
+    AcsVoucherRequestNotSentError,
 )
 from shipping_acs.observability import Exchange, observe_call
 
@@ -215,12 +216,17 @@ class AcsClient:
         Every alias passes through here, so this is the one place a call
         is logged and written to ``AcsApiCall`` (see
         ``shipping_acs.observability``); observing never alters the
-        result or the exception.
+        result or the exception. A voucher request the store's voucher
+        hold stopped at the slot was not sent, so it is not a call and
+        leaves neither: the history of an outage must not show failed
+        creates that never left.
         """
         started = time.monotonic()
         exchange = Exchange()
         try:
             envelope = self._exchange(alias, params, background, exchange)
+        except AcsVoucherRequestNotSentError:
+            raise
         except Exception as exc:
             observe_call(
                 alias=alias,
@@ -386,7 +392,7 @@ class AcsClient:
         except AcsVoucherRequestHeldError:
             raise
         except Exception as exc:
-            raise AcsRetryableError(
+            raise AcsVoucherRequestNotSentError(
                 alias=voucher_hold.HELD_ALIAS,
                 error_message=(
                     f"Not sent: the ACS voucher hold could not be read: {exc}"

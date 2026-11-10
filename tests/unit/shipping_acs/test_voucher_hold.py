@@ -39,7 +39,7 @@ from shipping_acs.exceptions import (
     AcsVoucherRequestUnknownError,
 )
 from shipping_acs.factories import AcsShipmentFactory
-from shipping_acs.models import AcsShipment, AcsVoucherHold
+from shipping_acs.models import AcsApiCall, AcsShipment, AcsVoucherHold
 from shipping_acs.services import AcsService
 from shipping_acs.tasks import (
     create_acs_voucher_for_order,
@@ -279,6 +279,8 @@ class TestWhileHeldNothingIsSent:
         assert not AcsService._mint_in_flight()
         # No per-order alert for a held order.
         sent.assert_not_called()
+        # The call history holds the one create that was sent and lost.
+        assert AcsApiCall.objects.filter(alias=CREATE).count() == 1
 
     def test_the_service_says_it_was_held_as_a_retryable_known_outcome(
         self, acs, sent
@@ -327,6 +329,8 @@ class TestWhileHeldNothingIsSent:
         assert not AcsService._mint_in_flight()
         assert "last_error" not in waiting.metadata
         sent.assert_not_called()
+        # Not a call to ACS, so the call history shows no failed create.
+        assert not AcsApiCall.objects.filter(alias=CREATE).exists()
 
     def test_a_hold_that_cannot_be_read_sends_nothing_and_is_retried(
         self, acs, sent
@@ -344,6 +348,7 @@ class TestWhileHeldNothingIsSent:
 
         asked.assert_called_once()
         assert acs.posts == []
+        assert not AcsApiCall.objects.filter(alias=CREATE).exists()
         waiting.refresh_from_db()
         assert waiting.voucher_request_unknown_at is None
         assert "mint_started_at" not in waiting.metadata
@@ -555,26 +560,12 @@ class TestAskingAcsAgain:
         assert result["status"] == "ok"
         assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
 
-    def test_a_refusal_by_acs_is_an_answer_and_ends_the_hold(self, acs, sent):
-        _lose_one_answer(acs)
-        refused = _shipment()
-        _wait_is_over()
-        assert voucher_hold.allow_trial()
-        acs.create.append(
-            _answer({"Voucher_No": None, "Error_Message": "Λάθος ΤΚ"})
-        )
-
-        result = create_acs_voucher_for_order.run(refused.order_id)
-
-        assert result["status"] == "acs_api_error"
-        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
-
     def test_an_answer_while_closed_does_not_end_the_hold(self, acs, sent):
         """A request already in flight when the hold began: its answer
         came from before ACS was asked again, so the wait stands."""
         _lose_one_answer(acs)
 
-        voucher_hold.record_answer()
+        voucher_hold.record_voucher()
 
         assert _hold().trial_allowed_at is None
 
@@ -593,6 +584,152 @@ class TestAskingAcsAgain:
         hold = _hold()
         assert hold.trial_allowed_at is not None
         assert hold.failed_trials == 0
+
+    def test_a_request_let_through_that_never_connects_stays_held(
+        self, acs, sent
+    ):
+        """Let through as the one request first, and the connection is
+        never made, on every attempt the task has. Nothing reached ACS,
+        so the order still waits and the sweep is still its retry."""
+        _lose_one_answer(acs)
+        waiting = _shipment()
+        create_acs_voucher_for_order.run(waiting.order_id)
+        waiting.refresh_from_db()
+        held_since = waiting.voucher_request_held_at
+        _wait_is_over()
+        assert voucher_hold.allow_trial()
+
+        for _attempt in range(create_acs_voucher_for_order.max_retries + 1):
+            # Each retry comes after the turn of the one before it ended.
+            AcsVoucherHold.objects.update(trial_until=None)
+            acs.create.append(requests.ConnectTimeout("connect timed out"))
+            with pytest.raises(AcsRetryableError):
+                create_acs_voucher_for_order.run(waiting.order_id)
+
+        waiting.refresh_from_db()
+        assert waiting.voucher_request_held_at == held_since
+        assert waiting.voucher_request_unknown_at is None
+        assert "mint_started_at" not in waiting.metadata
+        assert set(
+            attention.voucher_requests_held().values_list("pk", flat=True)
+        ) == {waiting.pk}
+
+        AcsVoucherHold.objects.update(trial_until=None)
+        issue_held_acs_vouchers.run()
+
+        waiting.refresh_from_db()
+        assert waiting.voucher_no
+        assert waiting.voucher_request_held_at is None
+        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
+
+
+class TestWhatEndsAHold:
+    """Only a voucher shows that creating one works again.
+
+    A refusal in ACS's own envelope shows ACS executed a create, not that
+    one succeeds: the hold stays "one request first", the refused order
+    leaves the queue (it is staff's to fix, as before) and the next held
+    order goes next. An HTTP 4xx that is not ACS's envelope (a proxy's
+    429, a gateway's 404) shows nothing about ACS: like a first request
+    that lost its answer, it closes the hold again and doubles the wait.
+    """
+
+    @staticmethod
+    def _one_request_first(acs):
+        _lose_one_answer(acs)
+        first, second = _shipment(), _shipment()
+        for shipment in (first, second):
+            create_acs_voucher_for_order.run(shipment.order_id)
+        _wait_is_over()
+        return first, second
+
+    @pytest.mark.parametrize(
+        "refusal",
+        [
+            lambda: _answer({"Voucher_No": None, "Error_Message": "Λάθος ΤΚ"}),
+            lambda: _response(
+                200,
+                {
+                    "ACSExecution_HasError": True,
+                    "ACSExecutionErrorMessage": "Error fill data error",
+                },
+            ),
+        ],
+        ids=["value-row-message", "execution-error"],
+    )
+    def test_a_refusal_by_acs_keeps_the_hold_and_the_next_order_goes_next(
+        self, acs, sent, refusal
+    ):
+        refused, next_one = self._one_request_first(acs)
+        acs.create.append(refusal())
+
+        result = issue_held_acs_vouchers.run()
+
+        assert result == {"status": "one_request_first", "dispatched": 1}
+        hold = _hold()
+        assert hold.trial_allowed_at is not None
+        assert hold.failed_trials == 0
+        # ACS answered, so the turn is free at once, not after its lease.
+        assert hold.trial_until is None
+        refused.refresh_from_db()
+        assert refused.voucher_request_held_at is None
+        assert refused.voucher_request_unknown_at is None
+
+        result = issue_held_acs_vouchers.run()
+
+        # The next held order, never the refused one again.
+        assert result == {"status": "one_request_first", "dispatched": 1}
+        assert acs.orders_requested().count(str(refused.order_id)) == 1
+        assert acs.orders_requested()[-1] == str(next_one.order_id)
+        next_one.refresh_from_db()
+        assert next_one.voucher_no
+        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
+
+    @pytest.mark.parametrize("status", [400, 401, 404, 429])
+    def test_an_http_error_that_is_not_acs_answering_closes_it_again(
+        self, acs, sent, status
+    ):
+        first, second = self._one_request_first(acs)
+        acs.create.append(_response(status, text="<html>proxy</html>"))
+
+        result = issue_held_acs_vouchers.run()
+
+        assert result == {"status": "one_request_first", "dispatched": 1}
+        hold = _hold()
+        assert hold.trial_allowed_at is None
+        assert hold.failed_trials == 1
+        assert str(status) in hold.reason
+        first.refresh_from_db()
+        second.refresh_from_db()
+        # A 4xx is a known outcome (#626): that order is rejected, staff's
+        # to re-issue, and is not the next request sent first.
+        assert first.voucher_request_unknown_at is None
+        assert first.voucher_request_held_at is None
+        assert second.voucher_request_held_at is not None
+        # The other held orders are not sent into it.
+        assert issue_held_acs_vouchers.run() == {
+            "status": "held",
+            "dispatched": 0,
+        }
+        assert acs.orders_requested().count(str(second.order_id)) == 0
+
+    def test_an_http_error_without_a_hold_begins_none(self, acs, sent):
+        acs.create.append(_response(429, text="<html>proxy</html>"))
+        shipment = _shipment()
+
+        result = create_acs_voucher_for_order.run(shipment.order_id)
+
+        assert result["status"] == "acs_api_error"
+        assert not AcsVoucherHold.objects.exists()
+
+    def test_an_http_error_while_closed_is_not_a_failed_first_request(
+        self, acs, sent
+    ):
+        _lose_one_answer(acs)
+
+        voucher_hold.record_no_answer("ACS HTTP 429")
+
+        assert _hold().failed_trials == 0
 
 
 class TestHeldPastTheRetryBudget:
@@ -739,6 +876,22 @@ class TestStaffSayAcsAnswersAgain:
 
         assert "no longer" in str(told.call_args.args[1])
         assert not LogEntry.objects.exists()
+
+    def test_the_list_says_which_state_a_hold_is_in(self, acs, sent, admin):
+        _lose_one_answer(acs)
+        assert admin.state(_hold()) == "Held: nothing is sent"
+
+        waiting = _shipment()
+        create_acs_voucher_for_order.run(waiting.order_id)
+        assert voucher_hold.allow_trial()
+        assert admin.state(_hold()) == "One request first"
+
+        AcsShipment.objects.filter(pk=waiting.pk).update(
+            voucher_request_held_at=None
+        )
+        assert (
+            admin.state(_hold()) == "No request waits: the next one goes alone"
+        )
 
     def test_holds_are_not_added_edited_or_deleted_by_hand(self, admin, staff):
         request = RequestFactory().get("/")

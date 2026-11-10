@@ -520,11 +520,15 @@ jobs:
         # within 0.7% of each other and they ran 9-16 minutes on CI.
         # Tests missing from the file are assumed average, so drift
         # costs balance, never correctness. Four shards, not more:
-        # each shard pays about 4.5 minutes before its tests (setup,
-        # then the migration replay above), and the longest shards are
-        # bound by single files that ``loadfile`` keeps on one worker
-        # (tests/unit/devtools/test_demo_store.py alone was 354 s on
-        # 2026-11-10), so extra shards mostly buy overhead.
+        # each shard pays about 5 minutes before its tests (setup, the
+        # migration replay above, collection), and a shard cannot be
+        # shorter than its longest file, which ``loadfile`` keeps on one
+        # worker: tests/unit/devtools/test_demo_store.py took 267 s on
+        # 2026-11-10 (run 42883125945), so its shard stays near 9.5
+        # minutes however many shards there are, and four balanced
+        # shards are already there. ``--durations`` prints the slowest
+        # setups, tests and teardowns of the shard, for the day one of
+        # them becomes the bound.
         # One worker per vCPU (``XDIST_WORKERS``), not the ``-n auto``
         # of ``addopts``: with psutil installed ``auto`` counts PHYSICAL
         # cores, and a standard runner has 4 vCPUs on 2 cores, so
@@ -547,6 +551,7 @@ jobs:
           --splits 4 --group ${{ matrix.group }}
           --durations-path test-durations-shard-${{ matrix.group }}.json
           --store-durations --clean-durations
+          --durations=15 --durations-min=10
         timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci

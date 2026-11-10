@@ -3,6 +3,64 @@
 
 
 
+## v3.242.19 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): order history records the visitor's address, not the proxy's (#632) ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* fix(tests): give SubscriptionTopicFactory a distinct slug per row
+
+The factory gets-or-creates on the slug and drew it at random, so two
+collisions returned one row and a test asking for N topics got fewer.
+Use a sequence, as the account, brand and contact factories do. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* fix(order): order history records the visitor address, not the proxy
+
+The five history recorders stored REMOTE_ADDR, which behind Traefik is the
+proxy. They now use client_ip_or_peer. The helper only returns a forwarded
+hop or edge header that is a valid IP address, because the value is stored
+in a GenericIPAddressField (a garbage hop raised ValueError on save) and
+used as a limit key. Tests cover the edge-proven visitor, the peer without
+proof, and a garbage hop. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+### Chores
+
+* chore(pre-commit): leave the golden email fixtures byte-exact
+
+end-of-file-fixer and trailing-whitespace rewrote 200 files under
+tests/integration/emails/golden/ on every --all-files run. The fixtures
+are the render bytes (tests/utils/golden.py writes them with
+write_bytes), so exclude the directory from both hooks. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+### Testing
+
+* test(settings): write no shared log file during a pytest run
+
+tests/settings.py pins DEBUG on, so settings.py takes its development
+branch and adds a RotatingFileHandler on one file every xdist worker
+opens. On Windows the rotation fails in one worker while the others hold
+the file, and logging prints the error to stderr. Keep only the console
+handler for the test run. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): guard that a caller address is read only through core.client_ip
+
+An AST test fails for any module outside core/client_ip.py that reads
+REMOTE_ADDR, X-Forwarded-For or X-Real-IP from META or headers. Three
+modules keep a read with a named reason (viva webhook diagnostic logs,
+meta_capi believing X-Real-IP, the search middleware peer rule). The
+order history now takes its address from client_ip_or_peer instead of the
+proxy-facing REMOTE_ADDR. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): tighten the client-IP guard
+
+Key the allowlist by the exact reads (enclosing function, header, count)
+instead of by file, add CF-Connecting-IP, resolve module-level header
+name constants, and document what the walk cannot see. Add a history
+save test for IPv6 hops, including a zone id. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): type the async branch of the client-IP guard visitor ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
 ## v3.242.18 (2026-11-10)
 
 ### Bug fixes

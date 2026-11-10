@@ -9,7 +9,6 @@ be canceled, and the cancel raised ``OrderNotCancelableError`` every time
 
 from __future__ import annotations
 
-import logging
 from unittest.mock import patch
 
 import pytest
@@ -63,28 +62,10 @@ def test_a_canceled_shipment_cancels_only_an_order_that_has_not_shipped(
     )
 
 
-def test_a_retired_voucher_leaves_a_shipped_order_alone(caplog):
-    order = OrderFactory(status=OrderStatus.SHIPPED)
-
-    with caplog.at_level(logging.WARNING, logger="shipping_acs.services"):
-        AcsService._apply_order_status_transition(
-            order, AcsShipmentState.CANCELED
-        )
-
-    order.refresh_from_db()
-    assert order.status == OrderStatus.SHIPPED
-    warnings = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.WARNING and r.name == "shipping_acs.services"
-    ]
-    assert len(warnings) == 1
-    assert str(order.id) in warnings[0].getMessage()
-
-
-def test_the_replay_treats_a_retired_voucher_on_a_shipped_order_as_agreed(
-    capsys,
-):
+@pytest.mark.parametrize("apply", [False, True], ids=["dry-run", "apply"])
+def test_the_replay_reports_a_retired_voucher_on_a_shipped_order(apply, capsys):
+    """Not drift to repair, but a fact a person should see: the order is
+    left alone and the pair is listed in the dry run and under --apply."""
     order = OrderFactory(status=OrderStatus.SHIPPED)
     AcsShipmentFactory(
         order=order,
@@ -92,13 +73,32 @@ def test_the_replay_treats_a_retired_voucher_on_a_shipped_order_as_agreed(
         shipment_state=AcsShipmentState.CANCELED,
     )
 
-    _run_replay(orders=[order.id], apply=True)
+    _run_replay(orders=[order.id], apply=apply)
 
     order.refresh_from_db()
     captured = capsys.readouterr()
     assert order.status == OrderStatus.SHIPPED
-    assert "agrees with its order status" in captured.out
+    assert f"order {order.id}: SHIPPED, but shipment 9800000612" in captured.out
+    assert "left alone" in captured.out
+    assert "-> " not in captured.out, "nothing was transitioned"
     assert captured.err == ""
+
+
+def test_the_replay_does_not_report_a_retired_voucher_on_an_unshipped_order(
+    capsys,
+):
+    """A PROCESSING order is canceled properly instead (drift to repair);
+    a DELIVERED one has nothing to look at."""
+    delivered = OrderFactory(status=OrderStatus.DELIVERED)
+    AcsShipmentFactory(
+        order=delivered,
+        voucher_no="9800000613",
+        shipment_state=AcsShipmentState.CANCELED,
+    )
+
+    _run_replay(orders=[delivered.id])
+
+    assert "left alone" not in capsys.readouterr().out
 
 
 def test_a_cancel_that_failed_on_the_way_still_propagates():

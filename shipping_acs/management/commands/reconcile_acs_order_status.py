@@ -102,6 +102,7 @@ class Command(TenantCommandMixin, BaseCommand):
             queryset = queryset.filter(order_id__in=only_orders)
 
         drifted = []
+        retired_on_shipped = []
         for shipment in queryset.order_by("order_id"):
             order = shipment.order
             before = order.status
@@ -112,8 +113,26 @@ class Command(TenantCommandMixin, BaseCommand):
                 shipment.shipment_state, before
             )
             if expected is None:
+                if AcsService.voucher_retired_on_shipped_order(
+                    shipment.shipment_state, before
+                ):
+                    retired_on_shipped.append((shipment, order))
                 continue
             drifted.append((shipment, order, before, expected))
+
+        # Not drift: a shipped order is never canceled for a voucher
+        # retired after the fact. Listed (in the dry run and under
+        # ``--apply``) because someone should look at it.
+        for shipment, order in retired_on_shipped:
+            self.stdout.write(
+                self.style.NOTICE(
+                    f"  order {order.id}: {order.status}, but shipment "
+                    f"{shipment.voucher_no or '-'} is "
+                    f"{shipment.shipment_state}. The order is left alone; "
+                    "check that the parcel was not on its way when the "
+                    "voucher was retired."
+                )
+            )
 
         if not drifted:
             self.stdout.write(

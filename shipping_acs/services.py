@@ -2584,6 +2584,27 @@ class AcsService:
         return new_status
 
     @classmethod
+    def voucher_retired_on_shipped_order(
+        cls, mapped_state: AcsShipmentState, current_status: str
+    ) -> bool:
+        """Whether a canceled shipment sits on an order that already shipped.
+
+        :meth:`order_status_for_shipment_state` leaves that order alone, so
+        the pair is not drift to repair. It is still worth a person's
+        attention (a voucher retired while the parcel was in transit), and
+        ``manage.py reconcile_acs_order_status`` reports it. Answered from
+        the mapping, so the rule has one home.
+        """
+        return (
+            mapped_state == AcsShipmentState.CANCELED
+            and current_status not in TERMINAL_ORDER_STATUSES
+            and cls.order_status_for_shipment_state(
+                mapped_state, current_status
+            )
+            is None
+        )
+
+    @classmethod
     def _apply_order_status_transition(
         cls,
         order: Order,
@@ -2610,15 +2631,6 @@ class AcsService:
             mapped_state, current_status
         )
         if new_status is None:
-            if mapped_state == AcsShipmentState.CANCELED and (
-                current_status not in TERMINAL_ORDER_STATUSES
-            ):
-                logger.warning(
-                    "ACS: voucher retired for order=%s in status %r — "
-                    "leaving the order alone",
-                    order.id,
-                    current_status,
-                )
             return
 
         if new_status == "CANCELED":

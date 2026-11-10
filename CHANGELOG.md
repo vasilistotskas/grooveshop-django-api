@@ -3,6 +3,78 @@
 
 
 
+## v3.242.6 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): CANCELED is reached only through cancel_order, never a status change (#604) ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): CANCELED is reached only through cancel_order
+
+The staff endpoint POST /order/{id}/update_status accepted CANCELED and
+wrote it through OrderService.update_order_status, whose transition table
+allowed PENDING/PROCESSING -> CANCELED. Only the status changed: the stock
+stayed held, a paid order kept the customer's money and no refund was
+made. A BoxNow `canceled` parcel event took the same path.
+
+- update_order_status no longer has CANCELED in its table, so it raises
+  InvalidStatusTransitionError for every caller. A cancel takes a reason,
+  a refund decision and an actor, returns the refund outcome and must not
+  hold a transaction open across the provider call, so it stays its own
+  operation instead of a branch of the status change.
+- The endpoint answers CANCELED with 400 `cancel_through_cancel_action`.
+  The request schema is unchanged: its enum is the status vocabulary, the
+  table decides what is reachable.
+- OrderService.cancel_for_dead_shipment replaces
+  AcsService._cancel_order_for_dead_shipment and is what BoxNow calls for
+  a `canceled` parcel on a PENDING/PROCESSING order (cancel_order without
+  a refund; a shipped order is left alone).
+- handle_order_canceled is removed. It backfilled metadata['cancellation']
+  and canceled the voucher for a CANCELED written outside cancel_order;
+  no such writer is left (the admin form and the write serializer keep
+  status read-only). order_canceled still fires for the gift-card credit
+  and the loyalty reversal.
+
+Closes #579 ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): a dead-shipment cancel does not call the courier, and a failed one is retried
+
+A tracking sync that finds its shipment canceled cancels the order
+while holding the shipment's row lock. cancel_order then cascaded to
+the courier from inside that transaction, for a shipment that is
+already canceled. cancel_for_dead_shipment now records the shipment as
+already canceled (SHIPMENT_ALREADY_CANCELED), so the cascade is skipped.
+
+BoxNow's sync swallowed every OrderCancellationError. A cancel that
+failed on the way (a lock timeout) was dropped with the parcel event
+committed, so nothing delivered it again and the order stayed active
+with its stock held. The status refusal is now its own class,
+OrderNotCancelableError, and is the only one the sync drops; any other
+failure rolls the event back for the redelivery or the next poll.
+
+The test for "the courier is not asked again" asserted on a client that
+an order with no shipping provider never reaches. It now asserts on
+ShippingService.cancel_shipment and on the recorded outcome. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): a dead-shipment cancel that does not happen leaves no voucher note
+
+cancel_order wrote "the customer asked to cancel and the shipment was
+canceled, create a new voucher" and logged an ERROR whenever a cancel
+failed after the courier had canceled the voucher. It decided that from
+the recorded outcome alone, so a dead-shipment cancel, whose outcome
+says the shipment is canceled, took the same branch: a false staff note
+and an alert for a cancel nobody asked for. The note is now written only
+when this cancel asked the courier itself. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+### Documentation
+
+* docs(order): say exactly how a failed dead-shipment cancel is recovered
+
+BoxNow does not redeliver a webhook the endpoint already answered 200
+to. The event and the shipment's state roll back, the operators are
+alerted, and the tracking poll applies the event on a later run while
+the shipment is not in a final state. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
 ## v3.242.5 (2026-11-10)
 
 ### Bug fixes

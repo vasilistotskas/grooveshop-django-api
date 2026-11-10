@@ -1661,6 +1661,9 @@ msgstr "Παρουσιάστηκε σφάλμα κατά την επαναφορ
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "Μια παραγγελία είναι πώληση στην περίοδο που έφυγε από το κατάστημα, όποιος κι αν είναι ο τρόπος πληρωμής: η αντικαταβολή μετράει όταν αποστέλλεται το δέμα, όχι όταν την αποδίδει ο courier. Ό,τι οφείλει ακόμη ο πελάτης στις αποσταλμένες παραγγελίες εμφανίζεται ως «Αναμένεται είσπραξη». Ένα δέμα που ο πελάτης αρνήθηκε αφαιρείται στην περίοδο που επέστρεψε."
 
+msgid "An order is canceled through its cancel action, which releases its stock and refunds its payment."
+msgstr "Μια παραγγελία ακυρώνεται μέσω της ενέργειας ακύρωσης, η οποία αποδεσμεύει το απόθεμά της και επιστρέφει την πληρωμή της."
+
 msgid "An unexpected error occurred"
 msgstr "Παρουσιάστηκε απρόσμενο σφάλμα"
 
@@ -15787,8 +15790,8 @@ msgstr "Ενημέρωση πολλαπλών εικόνων κατηγορία�
 msgid "Update on your business account application"
 msgstr "Ενημέρωση για την αίτηση εταιρικού λογαριασμού"
 
-msgid "Update the status of an existing order"
-msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας"
+msgid "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
+msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας. Η κατάσταση CANCELED απορρίπτεται: η ακύρωση παραγγελίας γίνεται μέσω της ενέργειας ακύρωσης."
 
 msgid "Update the status of an order"
 msgstr "Ενημέρωση κατάστασης παραγγελίας"
@@ -18955,6 +18958,9 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "Unused"
 #~ msgstr "Δεν χρησιμοποιείται"
+
+#~ msgid "Update the status of an existing order"
+#~ msgstr "Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας"
 
 #, python-format
 #~ msgid "Updated sort order for %(count)d countries."

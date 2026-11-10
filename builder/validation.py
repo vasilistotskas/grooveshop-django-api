@@ -483,10 +483,18 @@ def _check_shape(data: Any, walk: _Walk) -> bool:
 def _check_root(walk: _Walk, data: dict[str, Any]) -> None:
     """The document's own settings (a page's SEO fields), against what the
     catalogue declares for this kind of document. They are optional; a
-    kind the catalogue gives no root settings takes none."""
-    if "settings" not in data:
-        return
+    kind the catalogue gives no root settings takes none.
+
+    A kind that has them can be translated before its default language
+    says anything: the editor drops an empty ``settings``, and a store may
+    write the English title first. Its overlay is then checked against no
+    settings (``_check_node_overlay``) rather than refused as a node the
+    document does not have."""
     root = walk.catalogue.roots.get(walk.kind.value)
+    if "settings" not in data:
+        if root is not None:
+            walk.nodes[DOCUMENT_NODE] = (root, ("settings",))
+        return
     if root is None:
         walk.add(
             "/settings",
@@ -572,7 +580,13 @@ def _check_node_overlay(
         walk.add(where, "invalid_i18n", _("Must be an object."))
         return
     definition, settings_path = known
-    base_settings = pointers.get(data, settings_path)
+    # The document's root settings are optional (``_check_root``); a
+    # block's always exist.
+    base_settings = (
+        data.get("settings", {})
+        if node_id == DOCUMENT_NODE
+        else pointers.get(data, settings_path)
+    )
     patterns = [pointers.parse(p) for p in definition.translatable]
     rich = [pointers.parse(p) for p in definition.rich_text]
     merged = copy.deepcopy(base_settings)

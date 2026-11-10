@@ -2607,8 +2607,10 @@ class AcsService:
             return
 
         if new_status == "CANCELED":
-            cls._cancel_order_for_dead_shipment(
-                order, silent_for_customer=silent_for_customer
+            # Never produced by ACS tracking: the admin retire action or
+            # a voucher cancel, i.e. a parcel that never left.
+            OrderService.cancel_for_dead_shipment(
+                order, carrier="ACS", silent_for_customer=silent_for_customer
             )
             return
 
@@ -2697,46 +2699,6 @@ class AcsService:
             OrderService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
-
-    @staticmethod
-    def _cancel_order_for_dead_shipment(
-        order: Order, *, silent_for_customer: bool
-    ) -> None:
-        """Close an order whose voucher was retired before it shipped.
-
-        A CANCELED shipment state is never produced by ACS tracking; it
-        comes from the admin retire action or a voucher cancel, i.e. a
-        parcel that never left. Such an order is not "status CANCELED",
-        it is a cancellation: stock must go back on the shelf, the
-        reservation released, the payment settled, the history and
-        signals fired — everything ``OrderService.cancel_order`` owns.
-        A bare ``update_order_status`` would flip the label and strand
-        the stock (prod order 248, retired 2026-09-13, still PROCESSING
-        a week later with its unit still counted as sold).
-
-        The refund is left to a human: a paid order in this situation is
-        rare (the retire path is COD's), and the replay this runs from is
-        historic — moving money without someone looking is worse than
-        one WARNING.
-        """
-        from order.services import OrderService
-
-        if silent_for_customer:
-            OrderService._suppress_customer_status_notifications(
-                order, "CANCELED"
-            )
-        if order.is_paid:
-            logger.warning(
-                "ACS shipment canceled for a PAID order=%s — canceling "
-                "without a refund; refund it by hand.",
-                order.id,
-            )
-        OrderService.cancel_order(
-            order,
-            reason="ACS shipment canceled before dispatch",
-            refund_payment=False,
-            customer_initiated=False,
-        )
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

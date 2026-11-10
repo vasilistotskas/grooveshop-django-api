@@ -1652,6 +1652,9 @@ msgstr "An error occurred while restocking the item. Please try again later."
 msgid "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 msgstr "An order is a sale in the period it left the store, whatever the payment method: cash on delivery is counted when the parcel ships, not when the courier pays out. What the customer still owes on shipped orders is shown as awaiting collection. A parcel the customer refused is taken out in the period it came back."
 
+msgid "An order is canceled through its cancel action, which releases its stock and refunds its payment."
+msgstr "An order is canceled through its cancel action, which releases its stock and refunds its payment."
+
 msgid "An unexpected error occurred"
 msgstr "An unexpected error occurred"
 
@@ -15781,8 +15784,8 @@ msgstr "Update multiple category images at once. Can update active status and so
 msgid "Update on your business account application"
 msgstr "Update on your business account application"
 
-msgid "Update the status of an existing order"
-msgstr "Update the status of an existing order"
+msgid "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
+msgstr "Update the status of an existing order. CANCELED is refused: cancel an order through its cancel action."
 
 msgid "Update the status of an order"
 msgstr "Update the status of an order"
@@ -18210,6 +18213,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Unused"
 #~ msgstr "Unused"
+
+#~ msgid "Update the status of an existing order"
+#~ msgstr "Update the status of an existing order"
 
 #~ msgid "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
 #~ msgstr "Upload a valid image. The file you uploaded was either not an image or a corrupted image."

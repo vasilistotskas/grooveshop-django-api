@@ -58,6 +58,18 @@ def _columns() -> dict[str, tuple[str, str | None, int | None]]:
 
 
 class TestPaidAmountContract(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """Walk back from the latest migration once, for the whole class.
+
+        Unapplying everything that came after ``BEFORE`` is most of what
+        a test here costs, and it grows with every migration added since.
+        The class transaction holds the result and each test's savepoint
+        returns to it, so a test still starts at ``BEFORE`` and runs the
+        migration under test itself.
+        """
+        _migrate_to(BEFORE)
+
     def _served_by_the_previous_release(self, paid, currency="EUR"):
         """An order its INSERT wrote: ``paid_amount`` set, ``amount_due``
         left at the database default."""

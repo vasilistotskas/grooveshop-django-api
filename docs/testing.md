@@ -35,3 +35,12 @@ On Windows with Docker Desktop a fresh connection to `localhost` can stall 1-30 
 Building the schemas is nearly all of the lane's time: each is a full migration replay. The test database is created with the public schema only; the session fixture `mt_store_schemas` then creates the two tenants' rows and empty schemas and migrates them and the seeded `webside` at the same time with django-tenants' `subprocess` executor (one `manage.py migrate_schemas --schema <name>` process per store). Those processes get `DB_NAME` set to the test database and do not see what `tests_mt/conftest.py` assigns to `settings`, so a migration that needs such a setting must get it from the environment (`MEILI_OFFLINE` is passed that way). Run the lane from the repository root: the executor starts `manage.py` from the working directory.
 
 **What to run before pushing.** A small PR runs the static gates (`ruff check`, `ruff format`, `ty check`, `lint-imports`) and the tests of the code it touched; CI runs the full suite on the pull request. A full local run is for a wide change (settings, a `conftest.py`, a shared base class, moved code) or for when CI is unavailable, and it needs its own `DB_NAME` beside any other session (above).
+
+**Refreshing `.test_durations`.** pytest-split cuts the suite into the CI shards from the committed `.test_durations`, and a test missing from it is weighted at the average. The timings come from CI, never from a local run (a developer machine balanced the shards within 0.7% on paper and they ran 9 to 16 minutes): each shard records the tests it ran and uploads `test-durations-shard-<n>`, and the Coverage Gate job merges them into one artifact, `test-durations`. To refresh, take a green pull_request run of the code as it is now and commit its file:
+
+```bash
+gh run download <run id> --name test-durations --dir /tmp/durations
+cp /tmp/durations/test-durations.json .test_durations
+```
+
+(`python .github/scripts/merge_test_durations.py --run-id <run id>` does the same from the per-shard artifacts.) Refresh after a change that moves every test's cost (the worker count, how the database is built, the shard count: the same PR changes `--splits`, the matrix and `--shards`), and when the "Run Tests (shard)" steps of one run differ by more than about 20%. A shard cannot be shorter than its longest file, since `--dist loadfile` keeps a file on one worker: when one shard stays slow after a refresh, look at that file, not at the split.

@@ -17,13 +17,14 @@ on:
       - '.editorconfig'
   workflow_dispatch:
 
-# A new push to a pull request cancels the run it supersedes. A run on
-# main is never cancelled in progress: it may be in the middle of a
-# release (a version commit pushed, its tag not yet). Runs on main wait
-# for each other instead, and GitHub keeps only the newest waiting one,
-# whose tree holds every commit before it.
+# A new push to a pull request cancels the run it supersedes: those runs
+# share a group named after the branch. Every other run (a push to main,
+# a dispatch) is a group of its own, so it is never cancelled and never
+# waits: a cancelled run on main could be in the middle of a release (a
+# version commit pushed, its tag not yet). Releases still happen one at
+# a time (``concurrency: release`` on that job).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -720,6 +721,31 @@ jobs:
           uv run coverage combine coverage-shard-*
           uv run coverage report
 
+      - name: Download shard durations
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-durations-shard-*
+          path: shard-durations
+
+      - name: Merge shard durations
+        # What ``.test_durations`` would be if it were refreshed from
+        # this run: every test's time on a runner, under this run's
+        # coverage and xdist load. Nothing reads it here. To refresh,
+        # download this artifact from a green pull_request run and
+        # commit it (docs/testing.md says when).
+        run: >
+          python .github/scripts/merge_test_durations.py
+          --from-dir shard-durations --shards 4
+          --output test-durations.json
+
+      - name: Upload merged durations
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations
+          path: test-durations.json
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     needs:
       [tested-in-pr, quality, migrations, testing, test-mt, coverage, security-scan]
@@ -774,7 +800,10 @@ jobs:
         # Runs on main are not cancelled, so this one may have tested a
         # commit that is no longer the tip. A version commit made on it
         # could not be pushed. The run on the newer commit releases both:
-        # semantic-release reads every commit since the last tag.
+        # semantic-release reads every commit since the last release tag
+        # and takes the highest bump among them
+        # (``semantic_release/version/algorithm.py``). If that newer run
+        # fails, nothing is released until main is green again.
         id: tip
         run: |
           tip="$(git ls-remote origin refs/heads/main | cut -f1)"

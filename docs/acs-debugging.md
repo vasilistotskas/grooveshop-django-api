@@ -26,7 +26,8 @@ Levels: INFO for `ok`; WARNING for `business_error` (ACS refused, in the
 envelope or in the value row), `auth` (403/406), `retryable` (5xx) and
 `transport` (connection error or timeout); ERROR only for `unexpected` (a
 non-JSON body, an HTTP 4xx other than 403/406, or an exception that is not an
-ACS one). Credentials (`Company_ID`, `Company_Password`, `User_ID`,
+ACS one). The outcome says how the call failed, not whether ACS executed it:
+see "A voucher request with an unknown outcome" below. Credentials (`Company_ID`, `Company_Password`, `User_ID`,
 `User_Password`, `AcsApiKey`) never reach the log or the database.
 
 **A persisted call history**, `AcsApiCall` (admin: ACS API Calls, platform
@@ -88,6 +89,61 @@ candidate and whether ACS or the local flag called it unprinted. To ask ACS:
 ACS API Calls, search the voucher, alias `ACS_Pickup_List_Display_Voucher`.
 
 LogsQL: `voucher_no:7227891111 | sort by (_time)`
+
+## A voucher request with an unknown outcome
+
+`ACS_Create_Voucher` has no idempotency key and no duplicate error, and no
+ACS call finds a voucher by our reference before it is on a pickup list
+(`ACS_POD_FROM_REFERENCE_NO` needs a finalised voucher; manual, April 2026,
+p. 7-9 and 21-22). A second request for one order mints a second voucher
+(stage order 682, 2026-04-29). So the client sorts every failure by whether
+the request may have reached ACS (`AcsClient._exchange`):
+
+| Failure | Class | Mint |
+|---|---|---|
+| `ConnectTimeout`; `ConnectionError` wrapping a `MaxRetryError` whose reason is `NewConnectionError` / `NameResolutionError`; the request cap (`ACS request cap: ...`) | `AcsRetryableError` | never reached ACS: claim released, Celery retries |
+| 403 / 406 | `AcsAuthError` | the manual's rejections (p. 1-2): claim released, Celery retries |
+| `ACSExecution_HasError`, a value row `Error_Message`, any other 4xx | `AcsAPIError` | ACS refused: claim released, `ops.shipment_rejected` |
+| `ReadTimeout`, any other `ConnectionError` (urllib3's `ProtocolError`, a connection dropped after the body left, arrives as a plain `ConnectionError`), any 5xx, a non-JSON 200 | `AcsOutcomeUnknownError` | **unknown** |
+| an exception the client does not classify; a 200 with neither `Voucher_No` nor `Error_Message`; a claim older than `_MINT_CLAIM_TTL_SECONDS` (a worker stopped between the request and the save) | | **unknown** |
+
+Unknown sets `AcsShipment.voucher_request_unknown_at`, drops the claim,
+notes the order, sends `ops.acs_voucher_request_unknown` once, and every
+later call of `create_voucher_for_order` (the task, its retries, a
+re-dispatch, "Issue ACS voucher now") raises
+`AcsVoucherRequestUnknownError` without calling ACS. The task returns
+`{"status": "voucher_request_unknown"}`. The dashboard counts the shipments
+("ACS voucher requests to check", `attention=voucher_unknown` on the ACS
+shipment list) whatever the email switch says.
+
+To resolve: look in the ACS portal for a voucher with `Reference_Key1` =
+the order id, created around `voucher_request_unknown_at`. The call itself
+is ACS API Calls, alias `ACS_Create_Voucher`, the order id (outcome
+`transport`, `retryable` or `unexpected`, no response). Then, on the
+shipment:
+
+- **Adopt ACS voucher** (number): accepted only when ACS confirms it, a row
+  from `ACS_Trackingsummary` (p. 18-19) or ACS having named it for the
+  account on a refused pickup list. Saves the voucher, fetches multipart
+  children, never calls `ACS_Create_Voucher`.
+- **No voucher at ACS: request again** (a note on how you checked): clears
+  the state and queues the mint once.
+
+LogsQL: `phase:phase2_outcome_unknown` or `phase:phase1_stale_claim`.
+
+## A voucher ACS names that matches no order
+
+A refused `ACS_Issue_Pickup_List` names every unprinted voucher of the
+account (p. 14). One that is no shipment's voucher nor a multipart child
+is kept as an `AcsUnrecognisedVoucher` (admin: ACS vouchers matching no
+order), `ops.acs_unrecognised_vouchers` is sent the first time it is
+named, and the dashboard counts it until staff resolve it: adopt it from
+the order's shipment, **Delete at ACS** (`ACS_Delete_Voucher`, only while
+it is on no pickup list, p. 11-12), or **Mark as checked** (made in the ACS
+portal, for example). It may be the lost answer of a voucher request, a
+duplicate, or a portal voucher: nothing documented ties it to an order, so
+nothing is deleted or adopted automatically. Only a day with candidates
+calls ACS, so a lone orphan surfaces on the next day that has one.
 
 ## What did ACS answer for call Y?
 

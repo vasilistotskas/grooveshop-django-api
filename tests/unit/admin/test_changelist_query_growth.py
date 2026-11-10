@@ -296,6 +296,18 @@ BUILDERS: dict[str, Callable[[], object]] = {
     ).AcsApiCall.objects.create(
         alias="ACS_Test", duration_ms=1, outcome="ok", voucher_no=_uid()
     ),
+    "shipping_acs.AcsUnrecognisedVoucher": lambda: __import__(
+        "shipping_acs.models", fromlist=["AcsUnrecognisedVoucher"]
+    ).AcsUnrecognisedVoucher.objects.create(
+        voucher_no=_uid()[:20],
+        pickup_date=__import__("datetime").date.today(),
+        first_seen_at=__import__(
+            "django.utils.timezone", fromlist=["now"]
+        ).now(),
+        last_seen_at=__import__(
+            "django.utils.timezone", fromlist=["now"]
+        ).now(),
+    ),
     "shipping_acs.AcsPickupListRun": lambda: __import__(
         "shipping_acs.models", fromlist=["AcsPickupListRun"]
     ).AcsPickupListRun.objects.create(

@@ -13,5 +13,4 @@ docs/order-system.md: project_order_state_machine_invariants.md
 docs/order-system.md: project_schema_regen.md
 docs/order-system.md: project_shipping_dispatch_on_commit.md
 order/views/order.py: project_order_state_machine_invariants.md
-shipping_acs/client.py: project_acs_voucher_orphan_prevention.md
 tests/unit/shipping_acs/test_dynamic_pricing.py: project_test_suite_stability.md

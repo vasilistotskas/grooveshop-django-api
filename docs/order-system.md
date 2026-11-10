@@ -1177,7 +1177,40 @@ accepting Cyprus orders at the Greek flat rate.
 - Voucher mint: 3-phase `claim → API → persist` design in
   `AcsService.create_voucher_for_order`. Survives
   `idle_in_transaction_session_timeout` — see
-  `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6).
+  `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6). The
+  claim keeps two workers from minting at once; it was never designed
+  against a lost answer.
+- **A voucher request of unknown outcome is never sent again** (#622).
+  ACS's manual gives `ACS_Create_Voucher` no idempotency key and no
+  duplicate error, and no call finds a voucher by our reference before it
+  is on a pickup list (April 2026 edition, p. 7-9, 21-22); stage order 682
+  got two vouchers from two requests. The client raises
+  `AcsOutcomeUnknownError` for every failure after the request may have
+  left (a read timeout, a connection dropped after the body was sent, which
+  `requests` reports as a plain `ConnectionError`, a 5xx, a non-JSON 200);
+  only a connection never made (`ConnectTimeout`, `NewConnectionError`,
+  `NameResolutionError`), the request cap, a 403/406 and an ACS refusal
+  release the claim for a retry. An unknown outcome, an exception the
+  client does not classify, a success with neither `Voucher_No` nor
+  `Error_Message`, and a claim past its TTL (a worker stopped before the
+  save) all set `AcsShipment.voucher_request_unknown_at`: the order is
+  noted, `ops.acs_voucher_request_unknown` is sent once, and every caller
+  (the task, its retries, a re-dispatch, "Issue ACS voucher now") is
+  refused with `AcsVoucherRequestUnknownError` until staff use **Adopt ACS
+  voucher** (the number must be confirmed by `ACS_Trackingsummary` or have
+  been named by ACS on a refused pickup list; no create is sent) or **No
+  voucher at ACS: request again** (a note is required; queues the mint
+  once). Nothing is automatic: no documented call ties a voucher to our
+  `Reference_Key1` before the pickup list. `docs/acs-debugging.md` has the
+  error table.
+- **Vouchers ACS names that match no shipment.** A refused
+  `ACS_Issue_Pickup_List` names every unprinted voucher of the account
+  (p. 14). `_issue_pickup_list_unlocked` keeps each one that is no
+  shipment's voucher nor a multipart child as an `AcsUnrecognisedVoucher`,
+  sends `ops.acs_unrecognised_vouchers` the first time it is named, and the
+  task result lists them under `unrecognised`. Staff adopt it from the
+  order's shipment, delete it at ACS (`ACS_Delete_Voucher`, only before a
+  pickup list) or mark it as checked (a note is required).
   `_build_create_voucher_params` uses `order.country_id` verbatim as
   `Recipient_Country` (no lookup — `Country.pk` IS the alpha-2 code)
   and refuses with `AcsAPIError` if it is missing, rather than
@@ -1347,7 +1380,9 @@ accepting Cyprus orders at the Greek flat rate.
   unexplained and stays an ERROR log plus `AcsAPIError`; that case failed
   the infrastructure's production smoke gate when it was misclassified. The `warn-unprinted-acs-vouchers` beat entry is retired.
 - The stale digest's "stranded mint" class (`pending_creation` > 24 h)
-  excludes orders awaiting their online payment — the auto-cancel owns
+  excludes shipments whose voucher request has an unknown outcome (their
+  own alert and counter; its remedy, "Issue ACS voucher now", is what they
+  must not get) and orders awaiting their online payment — the auto-cancel owns
   those, and listing them invited an "Issue ACS voucher now" for unpaid
   goods. The exclusion is `awaiting_online_payment_q("order__")`, the
   same rule as `OrderQuerySet.awaiting_online_payment()` and the
@@ -1517,6 +1552,8 @@ is the whole list:
 | `ops.stale_shipments` | `check_stale_acs_shipments` digest, 09:00 | Dashboard "Stale ACS shipments" (`shipping_acs.attention.stale_shipment_q`) |
 | `ops.unremitted_cod` | `alert_unremitted_cod_payouts`, 03:00 | "COD cash ACS has not paid out" (`unremitted_cod_shipments`) |
 | `ops.unattributable_cod_payouts` | `AcsService._alert_admins_unmatched_payouts` | "ACS payouts matching no shipment" (`unattributed_payouts`: every payout with no shipment and no reconciliation, no time window) |
+| `ops.acs_voucher_request_unknown` | `AcsService._alert_voucher_request_unknown`, once when the state begins | "ACS voucher requests to check" (`voucher_requests_unknown`), until staff adopt or request again; plus the order note |
+| `ops.acs_unrecognised_vouchers` | `AcsService._raise_unrecognised_vouchers`, the first time ACS names each voucher | "ACS vouchers matching no order" (`unrecognised_vouchers`), until staff adopt, delete or mark it checked |
 | `ops.shipment_rejected` | `alert_admins_shipment_creation_failed` | An `OrderHistory` note on the order, written whether or not the email is on |
 | `ops.webhook_failed` | `alert_admins_webhook_processing_failed` | The ERROR log only |
 | `ops.payment_after_cancel` | `OrderService.record_payment_after_cancel` | "Canceled orders to refund" (`OrderQuerySet.refund_owed`), until refunded; plus the order note |
@@ -1541,8 +1578,9 @@ is the whole list:
   digest after the email is switched back on. The money alerts and the
   stale digest may be switched off only because the same rule feeds a counter in
   `attention_counts()` (`admin.dashboard.store.queries`); each counter
-  opens the list through a filter (`attention=stale|unremitted_cod` on the
-  ACS shipment list, `unattributed=yes` on the payout list,
+  opens the list through a filter (`attention=stale|voucher_unknown|unremitted_cod`
+  on the ACS shipment list, `resolved=no` on the ACS vouchers matching no
+  order, `unattributed=yes` on the payout list,
   `refund_owed=yes` on the order list). The payout counter and its
   `unattributed=yes` filter share one `Q` (`unattributed_payout_q`), so
   the list shows exactly what was counted. Payout rows ACS reported with
@@ -2093,7 +2131,7 @@ the linked memory note or the originating PR's commit message.
 | A confirmed charge settles an order only for its own total: Stripe's collected amount and Viva's amount AND currency are compared (a missing one refuses), a mismatch is booked, flagged (`AMOUNT_MISMATCH_FLAG`), alerted and never auto-canceled | §4.1, §4.3 |
 | A reversal of a gift-card purchase's payment (refund, claim, chargeback, Stripe or Viva) voids the unspent card and records the spent part | §4.2.1 |
 | `Order.payment_status` / `payment_id` are read-only in the admin, and the owner PATCH/PUT cannot change a priced order's country or region | §7 |
-| ACS voucher mint uses 3-phase claim → API → persist with 300s TTL | `project_acs_voucher_orphan_prevention.md` |
+| ACS voucher mint uses 3-phase claim → API → persist with 300s TTL, and a voucher request of unknown outcome (lost answer, unclassified error, expired claim) is never sent again: `voucher_request_unknown_at` holds every caller until staff adopt the voucher or request again | §5.1 above, `docs/acs-debugging.md` |
 | `Order.objects.filter(pk=...).values(...).first()` — NOT `refresh_from_db(fields=...)` | `project_order_state_machine_invariants.md` |
 | `_suppress_customer_status_notifications` on chained transitions | `project_order_state_machine_invariants.md` |
 | Webhook payment_status writes never regress a SETTLED state (`SETTLED_PAYMENT_STATUSES` = COMPLETED/REFUNDED/PARTIALLY_REFUNDED/CANCELED). Stripe/Viva events are unordered + may duplicate, so `handle_payment_failed`/`_handle_payment_failed` skip when already settled, and `handle_payment_succeeded`/`_handle_payment_created` skip when already REFUNDED/PARTIALLY_REFUNDED/CANCELED. Reversal (COMPLETED→REFUNDED) is left intact. | `order/enum/status.py` `SETTLED_PAYMENT_STATUSES` |

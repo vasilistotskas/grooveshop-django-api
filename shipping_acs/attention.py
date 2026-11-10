@@ -19,7 +19,11 @@ from django.utils import timezone
 from order.managers.order import awaiting_online_payment_q
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.models import AcsCodPayout, AcsShipment
+from shipping_acs.models import (
+    AcsCodPayout,
+    AcsShipment,
+    AcsUnrecognisedVoucher,
+)
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -77,11 +81,45 @@ def stale_shipment_q(
             | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
         )
     )
-    stranded_mint = Q(
-        shipment_state=AcsShipmentState.PENDING_CREATION,
-        created_at__lt=now - STRANDED_MINT_AFTER,
-    ) & ~awaiting_online_payment_q("order__")
+    stranded_mint = (
+        Q(
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            created_at__lt=now - STRANDED_MINT_AFTER,
+        )
+        & ~awaiting_online_payment_q("order__")
+        & ~voucher_request_unknown_q()
+    )
     return stale_tracking | stranded_mint
+
+
+def voucher_request_unknown_q() -> Q:
+    """Shipments whose voucher request has an unknown outcome, as a ``Q``.
+
+    ACS may hold a voucher for the order, so no new request is sent until
+    staff adopt the voucher or request again. They are their own alert
+    (``ops.acs_voucher_request_unknown``), so the stale digest's
+    "stranded mint" class leaves them out: its remedy, "Issue ACS voucher
+    now", is exactly what must not happen to them.
+    """
+    return Q(voucher_request_unknown_at__isnull=False, voucher_no__isnull=True)
+
+
+def voucher_requests_unknown() -> QuerySet[AcsShipment]:
+    """Every shipment waiting for staff to check its voucher at ACS."""
+    return AcsShipment.objects.real().filter(voucher_request_unknown_q())
+
+
+def unresolved_unrecognised_voucher_q() -> Q:
+    """Vouchers ACS named that match no shipment and nobody resolved."""
+    return Q(resolved_at__isnull=True)
+
+
+def unrecognised_vouchers() -> QuerySet[AcsUnrecognisedVoucher]:
+    """Every voucher ACS holds for the store that matches no shipment and
+    that staff have not adopted, deleted at ACS or marked as checked."""
+    return AcsUnrecognisedVoucher.objects.filter(
+        unresolved_unrecognised_voucher_q()
+    )
 
 
 def stale_shipments(now: datetime | None = None) -> QuerySet[AcsShipment]:

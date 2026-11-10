@@ -12,7 +12,9 @@ ACS error semantics (per PDF):
   ACS answers 406 to overlapping calls from one account (bounded by
   ``shipping_acs.concurrency``), so Celery retries it. A *persistent*
   403/406 means a wrong AcsApiKey or a de-listed calling IP.
-* HTTP 5xx                                      → transient; Celery retries.
+* HTTP 5xx, a lost answer, a non-JSON 200       → outcome unknown
+  (:class:`AcsOutcomeUnknownError`): a read is retried, a voucher
+  request is never sent again.
 * Other 4xx                                     → permanent; surface to admin.
 """
 
@@ -63,9 +65,47 @@ class AcsAPIError(AcsError):
 
 
 class AcsRetryableError(AcsAPIError, CarrierUnavailableError):
-    """Raised on HTTP 5xx, connection errors and a full request cap.
+    """Raised when a retry may succeed: a connection never established,
+    a full request cap, an auth-layer rejection, and (as the subclass
+    :class:`AcsOutcomeUnknownError`) every failure after the request may
+    have reached ACS.
 
     Celery autoretries.
+    """
+
+
+class AcsOutcomeUnknownError(AcsRetryableError):
+    """The request may have been executed at ACS, but its answer is lost.
+
+    A read timeout, a connection dropped after the request was sent
+    (urllib3's ``ProtocolError``, which ``requests`` re-raises as a plain
+    ``ConnectionError``), any other transport failure not proven to have
+    happened before the connection was made, an HTTP 5xx, or a 200 whose
+    body is not JSON. The manual says the server answers 200, 403 or 406
+    and says nothing of the rest (April 2026 edition, p. 1-2).
+
+    Retrying a read is harmless, so this stays retryable. A write that is
+    not idempotent must not be re-sent: ``ACS_Create_Voucher`` has no
+    idempotency key, and ``AcsService.create_voucher_for_order`` turns
+    this error into a voucher request of unknown outcome instead.
+    """
+
+
+class AcsVoucherRequestUnknownError(AcsError):
+    """The shipment's voucher request has an unknown outcome.
+
+    Raised by ``AcsService.create_voucher_for_order`` when it records the
+    state (``AcsShipment.voucher_request_unknown_at``) and every time a
+    caller asks for a voucher while it holds. Not retryable: only staff
+    end it, by adopting the voucher ACS holds or by requesting again.
+    """
+
+
+class AcsVoucherResolutionError(AcsError):
+    """Staff cannot resolve a voucher check this way.
+
+    Raised by the adopt / request-again / delete / mark-checked services
+    with a message an operator can act on (the admin shows it verbatim).
     """
 
 

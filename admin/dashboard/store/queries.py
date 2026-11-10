@@ -423,7 +423,7 @@ def recent_orders() -> list[dict[str, Any]]:
 
 
 @dashboard_query(
-    "store:attention:v1",
+    "store:attention:v2",
     ttl=60,
     depends_on=(
         "order.Order",
@@ -435,6 +435,7 @@ def recent_orders() -> list[dict[str, Any]]:
         "b2b.BusinessProfile",
         "shipping_acs.AcsShipment",
         "shipping_acs.AcsCodPayout",
+        "shipping_acs.AcsUnrecognisedVoucher",
         # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
         "extra_settings.Setting",
     ),
@@ -466,6 +467,8 @@ def attention_counts() -> dict[str, int]:
         # store may switch an email off, so each kind that carries money or
         # a stuck parcel is counted here by the very rule the email uses.
         "stale_shipments": acs.stale_shipments(now).count(),
+        "acs_voucher_requests_unknown": acs.voucher_requests_unknown().count(),
+        "acs_unrecognised_vouchers": acs.unrecognised_vouchers().count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
         "unattributed_cod_payouts": acs.unattributed_payouts().count(),
         "canceled_still_paid": model("order.Order")

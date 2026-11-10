@@ -1,0 +1,11 @@
+{% load i18n %}{% trans "ACS VOUCHERS MATCHING NO ORDER" %}
+
+{% blocktrans with date=pickup_date|date:"Y-m-d" count counter=n %}Refusing the pickup list of {{ date }}, ACS named {{ counter }} unprinted voucher that none of the store's shipments carries:{% plural %}Refusing the pickup list of {{ date }}, ACS named {{ counter }} unprinted vouchers that none of the store's shipments carries:{% endblocktrans %}
+{% for voucher in vouchers %}
+- {{ voucher }}{% endfor %}
+
+{% trans "Such a voucher can be the lost answer of a voucher request, a second voucher for an order that already has one, or a voucher made in the ACS portal. While it stays unprinted ACS refuses the pickup list. Open the admin list “ACS vouchers matching no order”: adopt it from the order's ACS shipment if it belongs to an order whose voucher request has an unknown outcome, delete it at ACS if it is not needed, or mark it as checked." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

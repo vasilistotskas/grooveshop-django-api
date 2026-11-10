@@ -183,6 +183,21 @@ class TestAcsAlerts:
 
         assert_sent("ops_unattributable_cod_payouts", language)
 
+    def test_voucher_request_unknown(self, language):
+        AcsService._alert_voucher_request_unknown(
+            1234,
+            "ACS [ACS_Create_Voucher]: ACS timeout after 15s: Read timed out.",
+        )
+
+        assert_sent("ops_acs_voucher_request_unknown", language)
+
+    def test_unrecognised_vouchers(self, language):
+        AcsService._raise_unrecognised_vouchers(
+            ["7401573174", "7401573175"], date(2026, 3, 13)
+        )
+
+        assert_sent("ops_acs_unrecognised_vouchers", language)
+
 
 class TestPaymentAlerts:
     def _canceled_order(self):

@@ -825,6 +825,9 @@ msgstr "A new security key has been added."
 msgid "A new set of Two-Factor Authentication recovery codes has been generated."
 msgstr "A new set of Two-Factor Authentication recovery codes has been generated."
 
+msgid "A new voucher request was queued."
+msgstr "A new voucher request was queued."
+
 msgid "A note is required."
 msgstr "A note is required."
 
@@ -993,6 +996,10 @@ msgstr "A valid ΑΦΜ is required when requesting an invoice (document_type=INV
 msgid "A verified %(carrier)s webhook could not be applied."
 msgstr "A verified %(carrier)s webhook could not be applied."
 
+#, python-format
+msgid "A voucher request for order #%(order_id)s may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check."
+msgstr "A voucher request for order #%(order_id)s may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check."
+
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 
@@ -1084,6 +1091,9 @@ msgstr "ACS User ID"
 msgid "ACS User Password"
 msgstr "ACS User Password"
 
+msgid "ACS VOUCHERS MATCHING NO ORDER"
+msgstr "ACS VOUCHERS MATCHING NO ORDER"
+
 msgid "ACS alias"
 msgstr "ACS alias"
 
@@ -1116,8 +1126,15 @@ msgstr "ACS customer code"
 msgid "ACS did not issue the pickup list: %(err)s"
 msgstr "ACS did not issue the pickup list: %(err)s"
 
+#, python-format
+msgid "ACS does not report voucher %(voucher)s for this store. Check the number in the ACS portal."
+msgstr "ACS does not report voucher %(voucher)s for this store. Check the number in the ACS portal."
+
 msgid "ACS error message"
 msgstr "ACS error message"
+
+msgid "ACS may hold a voucher: adopt it or request again"
+msgstr "ACS may hold a voucher: adopt it or request again"
 
 msgid "ACS message"
 msgstr "ACS message"
@@ -1178,8 +1195,20 @@ msgstr "ACS tracking event"
 msgid "ACS tracking events"
 msgstr "ACS tracking events"
 
+msgid "ACS voucher matching no order"
+msgstr "ACS voucher matching no order"
+
 msgid "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
 msgstr "ACS voucher number — links back to AcsShipment.voucher_no without a hard FK so historic rows survive shipment deletions. Empty when ACS reported the row with no readable voucher."
+
+msgid "ACS voucher request with an unknown outcome"
+msgstr "ACS voucher request with an unknown outcome"
+
+msgid "ACS voucher requests to check"
+msgstr "ACS voucher requests to check"
+
+msgid "ACS vouchers matching no order"
+msgstr "ACS vouchers matching no order"
 
 msgid "ACSExecutionErrorMessage, or the Error_Message of the value row."
 msgstr "ACSExecutionErrorMessage, or the Error_Message of the value row."
@@ -1491,6 +1520,18 @@ msgstr "Admin-only. Provider-agnostic cancellation: looks up the order's shippin
 
 msgid "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
 msgstr "Admin-only. Requests parcel cancellation via the BoxNow API. Only valid when the parcel state is NEW (BoxNow error P420 otherwise). Accepts an optional ``reason`` field in the request body."
+
+msgid "Adopt ACS voucher"
+msgstr "Adopt ACS voucher"
+
+msgid "Adopt the voucher ACS holds for this order"
+msgstr "Adopt the voucher ACS holds for this order"
+
+msgid "Adopted by a shipment"
+msgstr "Adopted by a shipment"
+
+msgid "Adopted by shipment"
+msgstr "Adopted by shipment"
 
 msgid "Affordable (€20-€50)"
 msgstr "Affordable (€20-€50)"
@@ -2482,6 +2523,9 @@ msgstr "By"
 msgid "Bytes."
 msgstr "Bytes."
 
+msgid "CHECK THE ACS VOUCHER OF AN ORDER"
+msgstr "CHECK THE ACS VOUCHER OF AN ORDER"
+
 msgid "CI"
 msgstr "CI"
 
@@ -3046,6 +3090,9 @@ msgstr "Check bulk like status"
 msgid "Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). A “Pending creation” row means the voucher mint failed — fix the order's address/destination and use the admin action “Issue ACS voucher now”. If a voucher is dead, use “Retire selected shipments” to stop polling it."
 msgstr "Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). A “Pending creation” row means the voucher mint failed — fix the order's address/destination and use the admin action “Issue ACS voucher now”. If a voucher is dead, use “Retire selected shipments” to stop polling it."
 
+msgid "Check the ACS voucher of an order"
+msgstr "Check the ACS voucher of an order"
+
 msgid "Check the health status of database, Redis, and Celery"
 msgstr "Check the health status of database, Redis, and Celery"
 
@@ -3066,6 +3113,9 @@ msgstr "Check your email"
 
 msgid "Check your inbox for a link to confirm your alert."
 msgstr "Check your inbox for a link to confirm your alert."
+
+msgid "Checked by staff"
+msgstr "Checked by staff"
 
 msgid "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
 msgstr "Checked on every checkout and saved address. Seeded from Google's Address Data Service."
@@ -4051,14 +4101,26 @@ msgstr "Delete a cart. For guest users, include X-Cart-Id header to maintain car
 msgid "Delete account (GDPR right-to-erasure)"
 msgstr "Delete account (GDPR right-to-erasure)"
 
+msgid "Delete at ACS"
+msgstr "Delete at ACS"
+
 msgid "Delete cart"
 msgstr "Delete cart"
+
+msgid "Delete this voucher at ACS"
+msgstr "Delete this voucher at ACS"
 
 msgid "Deleted At"
 msgstr "Deleted At"
 
+msgid "Deleted at ACS"
+msgstr "Deleted at ACS"
+
 msgid "Deleted product"
 msgstr "Deleted product"
+
+msgid "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. Do not use it for a voucher that belongs to an order whose voucher request has an unknown outcome: adopt it from that order's ACS shipment instead."
+msgstr "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. Do not use it for a voucher that belongs to an order whose voucher request has an unknown outcome: adopt it from that order's ACS shipment instead."
 
 msgid "Deliver At"
 msgstr "Deliver At"
@@ -6219,6 +6281,9 @@ msgstr "First accepted at"
 msgid "First name"
 msgstr "First name"
 
+msgid "First named by ACS at"
+msgstr "First named by ACS at"
+
 msgid "Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting."
 msgstr "Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting."
 
@@ -7159,6 +7224,9 @@ msgstr "How the payout was accounted for (the off-system sale, the invoice, the 
 msgid "How to complete your payment"
 msgstr "How to complete your payment"
 
+msgid "How you checked"
+msgstr "How you checked"
+
 msgid "Human-readable label for the event_type choice"
 msgstr "Human-readable label for the event_type choice"
 
@@ -7833,6 +7901,9 @@ msgstr "Last movement"
 msgid "Last name"
 msgstr "Last name"
 
+msgid "Last named by ACS at"
+msgstr "Last named by ACS at"
+
 msgid "Last order"
 msgstr "Last order"
 
@@ -8060,6 +8131,9 @@ msgstr "Lists the ACS parcels that have shown no tracking movement for several d
 msgid "Lists the delivered COD parcels ACS has not paid out, with their voucher numbers to chase."
 msgstr "Lists the delivered COD parcels ACS has not paid out, with their voucher numbers to chase."
 
+msgid "Lists the vouchers ACS reported for the store that match none of its shipments, to adopt, delete at ACS or mark as checked."
+msgstr "Lists the vouchers ACS reported for the store that match none of its shipments, to adopt, delete at ACS or mark as checked."
+
 msgid "Live"
 msgstr "Live"
 
@@ -8144,6 +8218,10 @@ msgstr "Longitude"
 
 msgid "Longitude (string as returned by BoxNow)"
 msgstr "Longitude (string as returned by BoxNow)"
+
+#, python-format
+msgid "Look in the ACS portal for a voucher of order #%(order_id)s (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”."
+msgstr "Look in the ACS portal for a voucher of order #%(order_id)s (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”."
 
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Look up an order from Viva Wallet's post-payment redirect params"
@@ -8338,6 +8416,9 @@ msgstr "Mark all of the authenticated user's notifications as seen."
 msgid "Mark all of the authenticated user's notifications as unseen."
 msgstr "Mark all of the authenticated user's notifications as unseen."
 
+msgid "Mark as checked"
+msgstr "Mark as checked"
+
 msgid "Mark as reconciled"
 msgstr "Mark as reconciled"
 
@@ -8382,6 +8463,9 @@ msgstr "Mark specific notifications as unseen"
 
 msgid "Mark specific notifications as unseen for the authenticated user."
 msgstr "Mark specific notifications as unseen for the authenticated user."
+
+msgid "Mark this voucher as checked"
+msgstr "Mark this voucher as checked"
 
 msgid "Marked as spam"
 msgstr "Marked as spam"
@@ -8713,6 +8797,9 @@ msgstr "Name must be at least 2 characters long."
 
 msgid "Name of the content type"
 msgstr "Name of the content type"
+
+msgid "Named by ACS on a refused pickup list"
+msgstr "Named by ACS on a refused pickup list"
 
 msgid "Named save"
 msgstr "Named save"
@@ -9089,6 +9176,9 @@ msgstr "No tracking"
 msgid "No tracking movement, or the voucher was never created"
 msgstr "No tracking movement, or the voucher was never created"
 
+msgid "No voucher at ACS: request again"
+msgstr "No voucher at ACS: request again"
+
 #, python-format
 msgid "No voucher available for order #%(order_id)s — the %(carrier)s shipment is in state '%(state)s'. The carrier has not yet assigned a voucher number."
 msgstr "No voucher available for order #%(order_id)s — the %(carrier)s shipment is in state '%(state)s'. The carrier has not yet assigned a voucher number."
@@ -9155,6 +9245,9 @@ msgstr "Not printed"
 
 msgid "Not reconciled"
 msgstr "Not reconciled"
+
+msgid "Not resolved"
+msgstr "Not resolved"
 
 msgid "Not scanned"
 msgstr "Not scanned"
@@ -9389,6 +9482,9 @@ msgstr "Only a failed schedule needs acknowledging."
 msgid "Only a page can be deleted."
 msgstr "Only a page can be deleted."
 
+msgid "Only a shipment whose voucher request has an unknown outcome can be resolved this way."
+msgstr "Only a shipment whose voucher request has an unknown outcome can be resolved this way."
+
 msgid "Only for goods that are fit to sell again. Recorded on the stock log with your name."
 msgstr "Only for goods that are fit to sell again. Recorded on the stock log with your name."
 
@@ -9478,6 +9574,9 @@ msgstr "Operator who reconciled the payout. Id of a platform staff account (publ
 
 msgid "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 msgstr "Operator who recorded the settlement. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+
+msgid "Operator who resolved the voucher. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
+msgstr "Operator who resolved the voucher. Id of a platform staff account (public schema), not a store user. Read it through the matching accessor."
 
 msgid "Optional ISO 3166-1 alpha-2 filter applied against each provider's ``metadata['supported_countries']`` list."
 msgstr "Optional ISO 3166-1 alpha-2 filter applied against each provider's ``metadata['supported_countries']`` list."
@@ -11774,6 +11873,12 @@ msgstr "Refused silently: unprinted labels"
 msgid "Refused: unprinted labels"
 msgstr "Refused: unprinted labels"
 
+#, python-format
+msgid "Refusing the pickup list of %(date)s, ACS named %(counter)s unprinted voucher that none of the store's shipments carries:"
+msgid_plural "Refusing the pickup list of %(date)s, ACS named %(counter)s unprinted vouchers that none of the store's shipments carries:"
+msgstr[0] "Refusing the pickup list of %(date)s, ACS named %(counter)s unprinted voucher that none of the store's shipments carries:"
+msgstr[1] "Refusing the pickup list of %(date)s, ACS named %(counter)s unprinted vouchers that none of the store's shipments carries:"
+
 msgid "Reg. No."
 msgstr "Reg. No."
 
@@ -11946,6 +12051,9 @@ msgstr "Request Headers"
 msgid "Request Meta"
 msgstr "Request Meta"
 
+msgid "Request a voucher again"
+msgstr "Request a voucher again"
+
 msgid "Request parameters"
 msgstr "Request parameters"
 
@@ -12028,8 +12136,23 @@ msgstr "Reset view count to zero"
 msgid "Reset your password"
 msgstr "Reset your password"
 
+msgid "Resolution"
+msgstr "Resolution"
+
+msgid "Resolution note"
+msgstr "Resolution note"
+
+msgid "Resolved"
+msgstr "Resolved"
+
+msgid "Resolved at"
+msgstr "Resolved at"
+
 msgid "Resolved at upsert time when the matching AcsShipment row exists. Null for orphan rows (parcels paid via ACS before they were minted through this system, or rows where the shipment has been hard-deleted)."
 msgstr "Resolved at upsert time when the matching AcsShipment row exists. Null for orphan rows (parcels paid via ACS before they were minted through this system, or rows where the shipment has been hard-deleted)."
+
+msgid "Resolved by"
+msgstr "Resolved by"
 
 msgid "Response"
 msgstr "Response"
@@ -12922,6 +13045,9 @@ msgstr "Set up your authenticator app"
 msgid "Set up your authenticator app in the admin first, then connect again."
 msgstr "Set up your authenticator app in the admin first, then connect again."
 
+msgid "Set when a voucher request was sent to ACS and its answer was lost (a timeout, a dropped connection, a server error, or a worker that stopped before saving). ACS may hold a voucher for this order, so no new request is sent while this is set. Staff clear it with “Adopt ACS voucher” or “No voucher at ACS: request again”."
+msgstr "Set when a voucher request was sent to ACS and its answer was lost (a timeout, a dropped connection, a server error, or a worker that stopped before saving). ACS may hold a voucher for this order, so no new request is sent while this is set. Staff clear it with “Adopt ACS voucher” or “No voucher at ACS: request again”."
+
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 
@@ -13793,6 +13919,9 @@ msgstr "Success message for username update"
 msgid "Successfully unsubscribed."
 msgstr "Successfully unsubscribed."
 
+msgid "Such a voucher can be the lost answer of a voucher request, a second voucher for an order that already has one, or a voucher made in the ACS portal. While it stays unprinted ACS refuses the pickup list. Open the admin list “ACS vouchers matching no order”: adopt it from the order's ACS shipment if it belongs to an order whose voucher request has an unknown outcome, delete it at ACS if it is not needed, or mark it as checked."
+msgstr "Such a voucher can be the lost answer of a voucher request, a second voucher for an order that already has one, or a voucher made in the ACS portal. While it stays unprinted ACS refuses the pickup list. Open the admin list “ACS vouchers matching no order”: adopt it from the order's ACS shipment if it belongs to an order whose voucher request has an unknown outcome, delete it at ACS if it is not needed, or mark it as checked."
+
 msgid "Suggested age"
 msgstr "Suggested age"
 
@@ -14028,6 +14157,9 @@ msgstr "Tells the store's staff that a refund failed after the provider accepted
 
 msgid "Tells the store's staff that a verified carrier webhook could not be applied, so a parcel update may have been missed."
 msgstr "Tells the store's staff that a verified carrier webhook could not be applied, so a parcel update may have been missed."
+
+msgid "Tells the store's staff that a voucher request for an order may have reached ACS without an answer, so they check whether ACS holds a voucher before another one is requested."
+msgstr "Tells the store's staff that a voucher request for an order may have reached ACS without an answer, so they check whether ACS holds a voucher before another one is requested."
 
 msgid "Tells the store's staff that an application awaits review."
 msgstr "Tells the store's staff that an application awaits review."
@@ -14440,6 +14572,10 @@ msgstr "The language the visitor subscribed in, which their alert email is writt
 msgid "The last digit of this GTIN does not match the others."
 msgstr "The last digit of this GTIN does not match the others."
 
+#, python-format
+msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."
+msgstr "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -14552,6 +14688,9 @@ msgstr "The payment provider's result for the failed call."
 
 msgid "The payment this share is refunded against; none for gift cards and points."
 msgstr "The payment this share is refunded against; none for gift cards and points."
+
+msgid "The pickup list run that first named the voucher."
+msgstr "The pickup list run that first named the voucher."
 
 msgid "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
 msgstr "The platform added the text below to its own version of this document. Your page was not changed automatically, because its text (or a translation of it) is yours. Add the text to every language your store serves, adjusting it if your store works differently, then select this page in the list and run \"Mark platform legal update as reviewed\"."
@@ -14842,6 +14981,9 @@ msgstr "The visitor ticked the consent box. Must be true."
 
 msgid "The voucher is already cancelled."
 msgstr "The voucher is already cancelled."
+
+msgid "The voucher number as the ACS portal shows it."
+msgstr "The voucher number as the ACS portal shows it."
 
 msgid "The wholesale pricing tier this business gets"
 msgstr "The wholesale pricing tier this business gets"
@@ -15835,12 +15977,21 @@ msgstr "Usage limit per code"
 msgid "Use another account"
 msgstr "Use another account"
 
+msgid "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
+msgstr "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
+
 msgid "Use once this payout has been accounted for although no shipment of the store explains it. It stops counting as needing attention on the dashboard. The payout itself is kept unchanged."
 msgstr "Use once this payout has been accounted for although no shipment of the store explains it. It stops counting as needing attention on the dashboard. The payout itself is kept unchanged."
 
 #, python-format
 msgid "Use only regular-expression syntax the storefront reads the same way: “%(construct)s” is not supported."
 msgstr "Use only regular-expression syntax the storefront reads the same way: “%(construct)s” is not supported."
+
+msgid "Use only when the last voucher request has an unknown outcome and the ACS portal shows no voucher for this order. If ACS did make one, this creates a second voucher."
+msgstr "Use only when the last voucher request has an unknown outcome and the ACS portal shows no voucher for this order. If ACS did make one, this creates a second voucher."
+
+msgid "Use only when the last voucher request has an unknown outcome and you found its voucher in the ACS portal. ACS must confirm the number; no new voucher is requested."
+msgstr "Use only when the last voucher request has an unknown outcome and you found its voucher in the ACS portal. ACS must confirm the number; no new voucher is requested."
 
 msgid "Use only when the merchant confirms the cash on delivery reached them by a route ACS never reported. It stops the unremitted-COD alert for this parcel and marks the order paid if it is not already. ACS's own payout records are not touched."
 msgstr "Use only when the merchant confirms the cash on delivery reached them by a route ACS never reported. It stops the unremitted-COD alert for this parcel and marks the order paid if it is not already. ACS's own payout records are not touched."
@@ -16262,6 +16413,30 @@ msgstr "Viva's Smart Checkout redirects to a static success URL configured in th
 msgid "Voucher"
 msgstr "Voucher"
 
+#, python-format
+msgid "Voucher %(voucher)s adopted."
+msgstr "Voucher %(voucher)s adopted."
+
+#, python-format
+msgid "Voucher %(voucher)s already belongs to another shipment."
+msgstr "Voucher %(voucher)s already belongs to another shipment."
+
+#, python-format
+msgid "Voucher %(voucher)s is already resolved."
+msgstr "Voucher %(voucher)s is already resolved."
+
+#, python-format
+msgid "Voucher %(voucher)s marked as checked."
+msgstr "Voucher %(voucher)s marked as checked."
+
+#, python-format
+msgid "Voucher %(voucher)s now belongs to a shipment: cancel it from that shipment instead."
+msgstr "Voucher %(voucher)s now belongs to a shipment: cancel it from that shipment instead."
+
+#, python-format
+msgid "Voucher %(voucher)s was deleted at ACS."
+msgstr "Voucher %(voucher)s was deleted at ACS."
+
 msgid "Voucher count"
 msgstr "Voucher count"
 
@@ -16270,6 +16445,12 @@ msgstr "Voucher creation task dispatched."
 
 msgid "Voucher number"
 msgstr "Voucher number"
+
+msgid "Voucher request outcome unknown since"
+msgstr "Voucher request outcome unknown since"
+
+msgid "Voucher request with an unknown outcome"
+msgstr "Voucher request with an unknown outcome"
 
 #, python-format
 msgid "WE MISS YOU! - %(site_name)s"
@@ -16430,6 +16611,9 @@ msgstr "What the store sells. Selects the recommendation preset the store starts
 msgid "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 msgstr "What the store sold, without VAT, shipping and fees included, in the period each order left the store, less the money that went back in the period it went back."
 
+msgid "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
+msgstr "What the voucher is (made in the ACS portal, handled at an ACS store, ...). Kept on the voucher."
+
 msgid "What to do"
 msgstr "What to do"
 
@@ -16540,6 +16724,9 @@ msgstr "Where the subscription was made."
 
 msgid "Where things are used"
 msgstr "Where things are used"
+
+msgid "Where you looked for a voucher of this order at ACS. Kept on the order."
+msgstr "Where you looked for a voucher of this order at ACS. Kept on the order."
 
 msgid "Whether a live promotion waives the shipping cost"
 msgstr "Whether a live promotion waives the shipping cost"
@@ -17158,6 +17345,14 @@ msgstr "[{site}] ACS COD reconcile: {total} unattributable payout row(s)"
 #, python-brace-format
 msgid "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
 msgstr "[{site}] ACS COD: {n} delivered parcel(s) never remitted"
+
+#, python-brace-format
+msgid "[{site}] ACS: check whether order {order_id} has a voucher"
+msgstr "[{site}] ACS: check whether order {order_id} has a voucher"
+
+#, python-brace-format
+msgid "[{site}] ACS: {n} voucher(s) matching no order"
+msgstr "[{site}] ACS: {n} voucher(s) matching no order"
 
 #, python-brace-format
 msgid "[{site}] ALERT: Scheduled Database Backup Failed"

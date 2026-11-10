@@ -18,13 +18,14 @@ on:
   workflow_dispatch:
 
 # A new push to a pull request cancels the run it supersedes: those runs
-# share a group named after the branch. Every other run (a push to main,
+# share a group named after the pull request's number (not its branch:
+# two forks may both send a branch called ``main``). Every other run (a push to main,
 # a dispatch) is a group of its own, so it is never cancelled and never
 # waits: a cancelled run on main could be in the middle of a release (a
 # version commit pushed, its tag not yet). Releases still happen one at
 # a time (``concurrency: release`` on that job).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -737,6 +738,8 @@ jobs:
           uv run coverage report
 
       - name: Download shard durations
+        id: durations-download
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           pattern: test-durations-shard-*
@@ -747,13 +750,25 @@ jobs:
         # this run: every test's time on a runner, under this run's
         # coverage and xdist load. Nothing reads it here. To refresh,
         # download this artifact from a green pull_request run and
-        # commit it (docs/testing.md says when).
+        # commit it (docs/testing.md says when). The artifact is optional
+        # and the release needs this job, so these three steps never fail
+        # it: a merge the script refuses (a missing shard, a test two
+        # shards claim) leaves a warning and no artifact.
+        id: durations
+        if: steps.durations-download.outcome == 'success'
+        continue-on-error: true
         run: >
           python .github/scripts/merge_test_durations.py
           --from-dir shard-durations --shards 4
           --output test-durations.json
 
+      - name: Warn when the durations were not merged
+        if: steps.durations.outcome != 'success'
+        run: echo "::warning::The shard durations were not merged, so this run has no test-durations artifact. See the two steps above."
+
       - name: Upload merged durations
+        if: steps.durations.outcome == 'success'
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: test-durations
@@ -779,12 +794,19 @@ jobs:
           || !contains(needs.*.result, 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # One release job at a time; a second waits. GitHub keeps one waiting
+    # job per group, so a third cancels the second, whose run then shows
+    # as cancelled. release_target.sh covers that: the job that takes its
+    # place releases from the tip, or fails when the cancelled run was
+    # the one that had to release.
     concurrency: release
     environment: release
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      # release_target.sh reads the run of a newer commit.
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -811,29 +833,31 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
-      - name: Still the tip of main
+      - name: Decide what to release
         # Runs on main are not cancelled, so this one may have tested a
-        # commit that is no longer the tip. A version commit made on it
-        # could not be pushed. The run on the newer commit releases both:
-        # semantic-release reads every commit since the last release tag
-        # and takes the highest bump among them
-        # (``semantic_release/version/algorithm.py``). If that newer run
-        # fails, nothing is released until main is green again.
-        id: tip
-        run: |
-          tip="$(git ls-remote origin refs/heads/main | cut -f1)"
-          if [ -z "$tip" ]; then
-            echo "::error::could not read the tip of main"
-            exit 1
-          fi
-          if [ "$tip" = "$GITHUB_SHA" ]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::main moved to $tip. The run on that commit releases this one too."
-          fi
+        # commit that is no longer the tip, and semantic-release can only
+        # push a version commit onto the tip. The script holds the rule
+        # and its table of cases. In short: at the tip, release; behind
+        # commits that start no run (docs, the bot's version commit),
+        # release from the tip; behind a code commit, leave the release
+        # to that commit's run, with a warning while that run is alive
+        # and a failed job when it is not. A release that does not
+        # happen is never a quiet green job.
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/release_target.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Move to the tip of main
+        # Only over commits the script found to start no run, so the tree
+        # differs from the tested one in ignored files and the bot's own.
+        if: steps.target.outputs.release == 'true' && steps.target.outputs.ref != github.sha
+        env:
+          TIP: ${{ steps.target.outputs.ref }}
+        run: git merge --ff-only "$TIP"
 
       - name: Python Semantic Release
-        if: steps.tip.outputs.current == 'true'
+        if: steps.target.outputs.release == 'true'
         # Inline instead of the python-semantic-release ACTION: its
         # Docker image pip-installs dependencies UNPINNED at workflow
         # runtime, so a transitive release can break every run at once

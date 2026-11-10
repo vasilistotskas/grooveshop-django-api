@@ -1855,6 +1855,10 @@ class TestTwoLostAnswersWithTheHoldInForce:
             shipment.refresh_from_db()
             assert shipment.voucher_request_unknown_at is not None
             assert shipment.voucher_request_held_at is None
+            # Each unknown state is its own request's: the claim that
+            # request took, kept as its identity.
+            assert shipment.metadata["unknown_request"]
+            assert "mint_started_at" not in shipment.metadata
         assert _types(sent).count("ops.acs_voucher_request_unknown") == 2
 
         # A third order waits: nothing is sent for it.
@@ -1881,6 +1885,8 @@ class TestTwoLostAnswersWithTheHoldInForce:
         first.refresh_from_db()
         second.refresh_from_db()
         assert first.voucher_no == V1
+        # Both checks are resolved, so neither state names a request.
+        assert "unknown_request" not in first.metadata
         assert held["status"] == "voucher_request_held"
         assert second.voucher_request_unknown_at is None
         assert second.voucher_request_held_at is not None

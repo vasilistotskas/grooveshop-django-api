@@ -1261,7 +1261,14 @@ accepting Cyprus orders at the Greek flat rate.
     the request (a voucher, a refusal, an HTTP 4xx) or its outcome becomes
     unknown. A request that was let through and never reached ACS (a
     connection never made, the request cap, 403/406) keeps it, so the
-    sweep still sends the order after the task's retries are spent.
+    sweep still sends the order after the task's retries are spent. Like
+    the claim (#647), the stamp is a request's to settle only while the
+    row holds that request's claim: a stale answer (its claim expired,
+    staff requested again, and that later request is held) is deleted at
+    ACS or refused without touching the stamp, which is the later
+    request's; Phase 3 clears it only together with the voucher it saves.
+    A held request takes no claim, so no unknown state
+    (`metadata["unknown_request"]`) can ever name it.
   - **Asking again.** `issue_held_acs_vouchers` (beat
     `issue-held-acs-vouchers`, every 5 minutes, per store) is the one
     retry. Closed: once `ACS_VOUCHER_HOLD_RETRY_SECONDS` (300) have passed

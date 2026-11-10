@@ -51,6 +51,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
 CREATE = "ACS_Create_Voucher"
 PROBE = "ACS_Get_Pickup_Lists"
+DELETE = "ACS_Delete_Voucher"
 
 
 def _response(status_code: int, body=None, *, text: str | None = None):
@@ -93,6 +94,8 @@ class _Acs:
         alias = json["ACSAlias"]
         if alias == PROBE:
             return self._give(self.probe)
+        if alias == DELETE:
+            return _answer()
         assert alias == CREATE, alias
         if self.create:
             return self._give(self.create.pop(0))
@@ -732,6 +735,196 @@ class TestWhatEndsAHold:
         voucher_hold.record_no_answer("ACS HTTP 429")
 
         assert _hold().failed_trials == 0
+
+
+class TestARequestOwnsItsClaim:
+    """The hold beside the rule that an unknown state belongs to one
+    request (#647): the request sent first is a mint like any other, with
+    its own claim; a held request has none, so it can own nothing."""
+
+    @staticmethod
+    def _one_request_first(acs):
+        _lose_one_answer(acs)
+        probe = _shipment()
+        create_acs_voucher_for_order.run(probe.order_id)
+        _wait_is_over()
+        assert voucher_hold.allow_trial()
+        return probe
+
+    def test_the_request_sent_first_owns_its_unknown_outcome(self, acs, sent):
+        probe = self._one_request_first(acs)
+        seen = {}
+
+        def lose_it():
+            seen["claim"] = AcsShipment.objects.get(pk=probe.pk).metadata[
+                "mint_started_at"
+            ]
+            raise _read_timeout()
+
+        acs.create.append(lose_it)
+
+        result = create_acs_voucher_for_order.run(probe.order_id)
+
+        assert result["status"] == "voucher_request_unknown"
+        probe.refresh_from_db()
+        assert probe.voucher_request_unknown_at is not None
+        assert probe.metadata["unknown_request"] == seen["claim"]
+        assert "mint_started_at" not in probe.metadata
+        assert probe.voucher_request_held_at is None
+        assert _hold().failed_trials == 1
+
+    def test_its_own_late_answer_is_saved_and_ends_the_hold(self, acs, sent):
+        probe = self._one_request_first(acs)
+        seen = {}
+
+        def answer_late():
+            # Its claim outlived the TTL and another worker recorded the
+            # outcome as unknown, as the next mint or a pickup-list run
+            # does with an expired claim. Then the answer arrives.
+            fresh = AcsShipment.objects.get(pk=probe.pk)
+            seen["claim"] = fresh.metadata["mint_started_at"]
+            AcsService._set_voucher_request_unknown(fresh)
+            seen["unknown_request"] = fresh.metadata["unknown_request"]
+            return _answer({"Voucher_No": "7401579998"})
+
+        acs.create.append(answer_late)
+
+        result = create_acs_voucher_for_order.run(probe.order_id)
+
+        assert result["status"] == "ok"
+        assert seen["unknown_request"] == seen["claim"]
+        probe.refresh_from_db()
+        assert probe.voucher_no == "7401579998"
+        assert probe.voucher_request_unknown_at is None
+        assert "unknown_request" not in probe.metadata
+        assert probe.voucher_request_held_at is None
+        assert not AcsVoucherHold.objects.filter(ended_at__isnull=True).exists()
+
+    def test_a_held_request_takes_no_claim_and_releases_none(self, acs, sent):
+        _lose_one_answer(acs)
+        waiting = _shipment()
+
+        with (
+            patch.object(AcsService, "_release_mint_claim") as released,
+            patch.object(AcsService, "_voucher_request_lost") as lost,
+        ):
+            result = create_acs_voucher_for_order.run(waiting.order_id)
+
+        assert result["status"] == "voucher_request_held"
+        released.assert_not_called()
+        lost.assert_not_called()
+        waiting.refresh_from_db()
+        assert "mint_started_at" not in (waiting.metadata or {})
+        assert "unknown_request" not in (waiting.metadata or {})
+
+    def test_a_request_stopped_at_its_slot_releases_its_own_claim_only(
+        self, acs, sent, monkeypatch
+    ):
+        from shipping_acs import client as client_module
+
+        real_slot = client_module.acs_request_slot
+        real_release = AcsService._release_mint_claim
+        releases = []
+
+        @contextmanager
+        def slot_freed_by_the_failed_request(**kwargs):
+            voucher_hold.record_unknown_outcome("ACS server error 502")
+            with real_slot(**kwargs):
+                yield
+
+        def release(shipment, claim, **kwargs):
+            on_the_row = AcsShipment.objects.get(pk=shipment.pk).metadata.get(
+                "mint_started_at"
+            )
+            releases.append((on_the_row, claim, kwargs))
+            return real_release(shipment, claim, **kwargs)
+
+        monkeypatch.setattr(
+            client_module, "acs_request_slot", slot_freed_by_the_failed_request
+        )
+        monkeypatch.setattr(AcsService, "_release_mint_claim", release)
+        waiting = _shipment()
+
+        with patch.object(AcsService, "_voucher_request_lost") as lost:
+            result = create_acs_voucher_for_order.run(waiting.order_id)
+
+        assert result["status"] == "voucher_request_held"
+        lost.assert_not_called()
+        [(on_the_row, claim, kwargs)] = releases
+        assert claim is not None
+        assert claim == on_the_row
+        assert kwargs == {"held": True}
+        waiting.refresh_from_db()
+        assert "mint_started_at" not in waiting.metadata
+        assert "unknown_request" not in waiting.metadata
+
+    @staticmethod
+    def _later_request_is_held_while_the_first_is_out(acs, answer):
+        """Request A is out. Its claim expires and is recorded as unknown;
+        staff find no voucher at ACS and request again; that request is
+        held, because ACS is failing. Then A is answered with ``answer``."""
+        shipment = _shipment()
+        later = {}
+
+        def answered_late():
+            fresh = AcsShipment.objects.get(pk=shipment.pk)
+            AcsService._set_voucher_request_unknown(fresh)
+            voucher_hold.record_unknown_outcome("ACS server error 502")
+            with patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ):
+                AcsService.request_voucher_again(
+                    fresh, user=None, note="Checked the ACS portal: none."
+                )
+            later["result"] = create_acs_voucher_for_order.run(
+                shipment.order_id
+            )
+            return answer
+
+        acs.create.append(answered_late)
+        result = create_acs_voucher_for_order.run(shipment.order_id)
+        assert later["result"]["status"] == "voucher_request_held"
+        shipment.refresh_from_db()
+        return shipment, result
+
+    def test_a_stale_voucher_is_deleted_and_the_later_held_request_still_waits(
+        self, acs, sent
+    ):
+        """Phase 3 clears the held stamp only with the voucher it saves.
+        A stale answer is deleted at ACS and saves nothing, and the stamp
+        on the row is the later request's: the sweep must still send it."""
+        shipment, _result = self._later_request_is_held_while_the_first_is_out(
+            acs, _answer({"Voucher_No": "7401579997"})
+        )
+
+        assert acs.aliases() == [CREATE, DELETE]
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is None
+        assert shipment.voucher_request_held_at is not None
+        assert set(
+            attention.voucher_requests_held().values_list("pk", flat=True)
+        ) == {shipment.pk}
+
+        _wait_is_over()
+        issue_held_acs_vouchers.run()
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no
+        assert shipment.voucher_no != "7401579997"
+        assert shipment.voucher_request_held_at is None
+
+    def test_a_stale_refusal_leaves_the_later_held_request_waiting(
+        self, acs, sent
+    ):
+        shipment, result = self._later_request_is_held_while_the_first_is_out(
+            acs, _answer({"Voucher_No": None, "Error_Message": "Λάθος ΤΚ"})
+        )
+
+        assert result["status"] == "acs_api_error"
+        assert shipment.voucher_request_held_at is not None
+        assert set(
+            attention.voucher_requests_held().values_list("pk", flat=True)
+        ) == {shipment.pk}
 
 
 class TestHeldPastTheRetryBudget:

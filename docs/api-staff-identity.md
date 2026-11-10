@@ -356,7 +356,7 @@ no second copy.
   proven address.
 - **Per proven address** (`MAX_FAILURES_PER_IP`, 20): a run of guesses across
   accounts. A success does not clear it, or one valid login of the attacker's
-  own would reset a guessing run. An address is `trusted_client_ip` (the
+  own would reset a guessing run. An address is `edge_client_ip` (the
   request carried our edge's `X-Origin-Verify`); IPv6 counts on its /64, IPv4
   on the full address. Without the proof (a domain outside our Cloudflare
   zones, a missing or rotated secret, a direct call to a node) the only

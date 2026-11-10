@@ -29,7 +29,7 @@ Three counters, each with its own budget (``settings.STAFF_LOGIN_LIMITS``):
   does NOT clear the counter, or one valid login of the attacker's own would
   reset the run.
 
-An address is ``trusted_client_ip`` (the request carried our edge's
+An address is ``edge_client_ip`` (the request carried our edge's
 ``X-Origin-Verify``), IPv6 reduced to its /64 so one allocation cannot rotate
 freely. Without the proof (a domain outside our Cloudflare zones, a missing
 or rotated secret, a direct call to a node) the only address known is the
@@ -59,7 +59,7 @@ from django.core.cache import cache
 from django.http import HttpRequest
 
 from core.caches import REDIS_UNAVAILABLE, STRICT_NAMESPACE
-from core.client_ip import trusted_client_ip
+from core.client_ip import edge_client_ip
 from tenant.cache import GLOBAL_CACHE_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ def _network(address: str) -> str:
 def _proven_network(request: HttpRequest | None) -> str | None:
     if request is None:
         return None
-    address = trusted_client_ip(request)
+    address = edge_client_ip(request)
     return None if address is None else _network(address)
 
 

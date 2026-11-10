@@ -26,7 +26,7 @@ from uuid import uuid4
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
-from core.client_ip import trusted_client_ip
+from core.client_ip import edge_client_ip
 from core.sessions import persisted_session_key
 
 logger = logging.getLogger(__name__)
@@ -224,7 +224,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         Extract client IP address from request.
 
-        Prefers ``trusted_client_ip`` (the visitor Cloudflare vouched
+        Prefers ``edge_client_ip`` (the visitor Cloudflare vouched
         for). Otherwise: the app runs behind a single trusted reverse
         proxy (Traefik in K8s). REMOTE_ADDR is the proxy address (a
         private/loopback IP), so we use the *rightmost* entry in
@@ -244,7 +244,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         # (before externalTrafficPolicy: Local) the internal 10.42.x.x SNAT
         # address — so rows share it and the field says little about who
         # searched.
-        edge_ip = trusted_client_ip(request)
+        edge_ip = edge_client_ip(request)
         if edge_ip:
             return edge_ip
 

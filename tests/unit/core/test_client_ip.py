@@ -222,3 +222,25 @@ def test_viva_handshake_budget_does_not_follow_a_forged_x_real_ip(rf, settings):
         for n in range(11)
     ]
     assert results == [False] * 10 + [True]
+
+
+@pytest.mark.parametrize(
+    "garbage", ["not-an-ip", "1.2.3.4, garbage", "999.1.1.1"]
+)
+def test_or_peer_never_returns_a_hop_that_is_not_an_address(
+    rf, settings, garbage
+):
+    """The result is stored in ``GenericIPAddressField``s and keyed on, so a
+    caller-chosen hop that is not an address (no Traefik in front to replace
+    the header) falls back to the peer."""
+    settings.ORIGIN_VERIFY_SECRET = SECRET
+    request = _req(rf, HTTP_X_FORWARDED_FOR=garbage)
+    assert client_ip_or_peer(request) == "10.42.1.0"
+
+
+def test_edge_ip_that_is_not_an_address_is_not_an_answer(rf, settings):
+    settings.ORIGIN_VERIFY_SECRET = SECRET
+    request = _req(
+        rf, HTTP_X_ORIGIN_VERIFY=SECRET, HTTP_CF_CONNECTING_IP="garbage"
+    )
+    assert edge_client_ip(request) is None

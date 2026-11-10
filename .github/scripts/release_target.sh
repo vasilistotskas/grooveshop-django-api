@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Decides what the release job does with the commit its run tested, when
-# main may have moved since. Prints ``release=true|false`` and ``ref=<sha
-# to release from>`` for $GITHUB_OUTPUT; the reason goes to stderr.
+# main may have moved since. Writes ``release=true|false`` and ``ref=<sha
+# to release from>`` to $GITHUB_OUTPUT (to stdout when that is unset).
+# ``::warning::`` and ``::error::`` go to stdout, where the runner reads
+# workflow commands; the plain reason goes to stderr.
 #
 #   release_target.sh <tested sha>
 #
@@ -22,8 +24,9 @@
 #   only commits that start no run:      | releases FROM THE TIP. The tree
 #   path-ignored files (docs), and the   | differs from the tested one only
 #   bot's ``[skip ci]`` version commits  | in files the workflow ignores or
-#                                        | the bot writes; no later run
-#                                        | exists to do it
+#   (its subject, its three files, and   | the bot writes; no later run
+#   semantic-release as author and       | exists to do it
+#   committer)                           |
 #   a later code commit whose run is     | skips, with a warning naming the
 #   queued, running or green             | run: that run tested a tree that
 #                                        | holds this commit and releases
@@ -56,9 +59,16 @@ workflow_path=${workflow_path%%@*}
 IGNORED=('**.md' 'docs/**' 'LICENSE' '.editorconfig')
 RELEASE_FILES=('pyproject.toml' 'uv.lock' 'CHANGELOG.md')
 RELEASE_SUBJECT='^chore\(release\): release version [0-9]+\.[0-9]+\.[0-9]+ \[skip ci\]$'
+# Who semantic-release commits as: its default ``commit_author``, which
+# pyproject.toml does not override. The same test pins it.
+RELEASE_BOT='semantic-release <semantic-release>'
+
+output() {
+  echo "$1" >> "${GITHUB_OUTPUT:-/dev/stdout}"
+}
 
 fail() {
-  echo "::error::$1" >&2
+  echo "::error::$1"
   exit 1
 }
 
@@ -83,7 +93,7 @@ release_file() {
 # changed behaviour: only ignored paths, or the bot's version commit.
 starts_no_run() {
   local commit=$1 file is_release=false
-  if [[ $(git log -1 --format=%s "$commit") =~ $RELEASE_SUBJECT ]]; then
+  if [[ $(git log -1 --format=%s "$commit") =~ $RELEASE_SUBJECT ]]     && [[ $(git log -1 --format='%an <%ae>' "$commit") == "$RELEASE_BOT" ]]     && [[ $(git log -1 --format='%cn <%ce>' "$commit") == "$RELEASE_BOT" ]]; then
     is_release=true
   fi
   while IFS= read -r file; do
@@ -91,7 +101,9 @@ starts_no_run() {
     ignored_path "$file" && continue
     $is_release && release_file "$file" && continue
     return 1
-  done < <(git diff --name-only "$commit^1" "$commit")
+  # ``--no-renames``: a file moved into an ignored path is listed under
+  # its old path too, the one that made GitHub start a run.
+  done < <(git diff --no-renames --name-only "$commit^1" "$commit")
   return 0
 }
 
@@ -100,8 +112,8 @@ tip=$(git rev-parse FETCH_HEAD)
 
 if [[ $tip == "$sha" ]]; then
   echo "the tested commit is the tip of main" >&2
-  echo "release=true"
-  echo "ref=$sha"
+  output "release=true"
+  output "ref=$sha"
   exit 0
 fi
 
@@ -120,10 +132,10 @@ if [[ -z $newest_code ]]; then
     [[ -z $file ]] && continue
     ignored_path "$file" || release_file "$file" \
       || fail "$file changed between $sha and $tip without a run"
-  done < <(git diff --name-only "$sha" "$tip")
+  done < <(git diff --no-renames --name-only "$sha" "$tip")
   echo "main moved to $tip by commits that start no run; releasing from it" >&2
-  echo "release=true"
-  echo "ref=$tip"
+  output "release=true"
+  output "ref=$tip"
   exit 0
 fi
 
@@ -152,9 +164,9 @@ if [[ $status != completed ]]; then
   esac
 fi
 if [[ $status != completed || $conclusion == success ]]; then
-  echo "::warning::Not released from this run: main moved on, and $url (commit $newest_code, $status) tested a tree that holds this commit and releases it too." >&2
-  echo "release=false"
-  echo "ref=$sha"
+  echo "::warning::Not released from this run: main moved on, and $url (commit $newest_code, $status) tested a tree that holds this commit and releases it too."
+  output "release=false"
+  output "ref=$sha"
   exit 0
 fi
 fail "main moved on, and the run that has to release $sha ended $conclusion: $url. Nothing is released until main is green; then re-run its release job."

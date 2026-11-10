@@ -846,7 +846,7 @@ jobs:
         id: target
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/release_target.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/release_target.sh "$GITHUB_SHA"
 
       - name: Move to the tip of main
         # Only over commits the script found to start no run, so the tree

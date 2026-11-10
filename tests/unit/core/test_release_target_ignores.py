@@ -11,9 +11,11 @@ tree no run tested.
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 import yaml
+from semantic_release.const import DEFAULT_COMMIT_AUTHOR
 
 _GITHUB = Path(__file__).resolve().parents[3] / ".github"
 _SCRIPT = (_GITHUB / "scripts" / "release_target.sh").read_text(
@@ -52,3 +54,23 @@ def test_every_ignored_pattern_has_its_case_in_the_matcher():
     assert cases == [
         pattern.replace("**", "*") for pattern in _script_patterns()
     ]
+
+
+def test_the_script_knows_the_identity_semantic_release_commits_with():
+    """Its version commit is recognised by author and committer too.
+
+    The identity is semantic-release's default ``commit_author``; setting
+    one in ``pyproject.toml`` or through ``GIT_COMMIT_AUTHOR`` in the
+    workflow would make the script take every version commit for code.
+    """
+    declared = re.search(r"^RELEASE_BOT='([^']+)'$", _SCRIPT, re.MULTILINE)
+    assert declared is not None
+
+    assert declared.group(1) == DEFAULT_COMMIT_AUTHOR
+    project = tomllib.loads(
+        (_GITHUB.parent / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    assert "commit_author" not in project["tool"]["semantic_release"]
+    assert "GIT_COMMIT_AUTHOR" not in (
+        _GITHUB / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")

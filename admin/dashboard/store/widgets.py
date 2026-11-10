@@ -402,7 +402,10 @@ class StoreAttention(DashboardWidget):
                 "inventory_2",
                 "warning",
                 _("Running low on stock"),
-                _("Active products at or below their low-stock threshold"),
+                _(
+                    "Active products still in stock but at or below their "
+                    "low-stock threshold"
+                ),
                 "product.Product",
                 urlencode(
                     {"active__exact": 1, "stock_status": StockState.LOW_STOCK}

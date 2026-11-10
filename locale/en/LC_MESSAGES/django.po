@@ -1372,8 +1372,8 @@ msgstr "Active Tags"
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 msgstr "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 
-msgid "Active products at or below their low-stock threshold"
-msgstr "Active products at or below their low-stock threshold"
+msgid "Active products still in stock but at or below their low-stock threshold"
+msgstr "Active products still in stock but at or below their low-stock threshold"
 
 msgid "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
 msgstr "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."

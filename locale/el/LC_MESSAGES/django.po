@@ -1377,8 +1377,8 @@ msgstr "Ενεργές ετικέτες"
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 msgstr "Ενεργές μέθοδοι πληρωμής που μπορεί να εξοφλήσει αυτός ο συνδυασμός (provider, kind), με τους ίδιους κανόνες που εφαρμόζει η ολοκλήρωση αγοράς όταν τον επιλέγει ο αγοραστής. Δηλώνεται ως γεγονός ανά επιλογή και όχι ως 'αποκλειστικό σε αυτή τη γραμμή': το storefront συγχωνεύει πολλούς μεταφορείς σε μία κάρτα παράδοσης στο σπίτι, οπότε μόνο αυτό γνωρίζει ποιες γραμμές εμφανίζει πραγματικά και μπορεί να υπολογίσει τι ξεκλειδώνει αποκλειστικά μια συγκεκριμένη επιλογή. Επιτρέπει στο βήμα παράδοσης να προβάλλει ένα προϊόν αποκλειστικό του μεταφορέα — η BOX NOW Αντικαταβολή είναι διαθέσιμη ΜΟΝΟ μέσω locker BoxNow, και ένας αγοραστής που δεν επιλέγει ποτέ locker δεν έχει τρόπο να ανακαλύψει ότι υπάρχει."
 
-msgid "Active products at or below their low-stock threshold"
-msgstr "Ενεργά προϊόντα στο όριο χαμηλού αποθέματος ή κάτω από αυτό"
+msgid "Active products still in stock but at or below their low-stock threshold"
+msgstr "Ενεργά προϊόντα που έχουν ακόμη απόθεμα, αλλά στο όριο χαμηλού αποθέματος ή κάτω από αυτό"
 
 msgid "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
 msgstr "Ενεργά προϊόντα με όλα τα χαρακτηριστικά και τις εικόνες τους, για τα feeds του καταλόγου. Φιλτράρονται, ταξινομούνται και σελιδοποιούνται όπως η λίστα προϊόντων."

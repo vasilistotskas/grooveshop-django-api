@@ -16,13 +16,15 @@ from django.contrib.admin.sites import AdminSite
 from django.core import mail
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from django.utils.translation import gettext
 
-from admin.dashboard.store import queries
+from admin.dashboard.store import queries, widgets
 from product.admin import ProductAdmin, StockStatusFilter
 from product.enum.stock import StockState
 from product.factories.product import ProductFactory
 from product.models.product import Product
 from product.tasks import check_low_stock_products
+from tests.utils.staff import stamp_platform_identity
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -109,15 +111,22 @@ def test_the_admin_filter_offers_the_states_and_agrees(products):
 
 
 def test_the_dashboard_link_opens_the_filtered_changelist(products):
+    admin = UserAccountFactory(admin=True)
+    request = RequestFactory().get("/admin/")
+    request.user = stamp_platform_identity(admin)
+    [row] = [
+        row
+        for row in widgets.StoreAttention(request=request).get_context_data()[
+            "rows"
+        ]
+        if str(row["label"]) == gettext("Running low on stock")
+    ]
+
     client = Client()
     client.force_login(
-        UserAccountFactory(admin=True),
-        backend="tenant.auth_backends.PlatformStaffBackend",
+        admin, backend="tenant.auth_backends.PlatformStaffBackend"
     )
-    response = client.get(
-        reverse("admin:product_product_changelist"),
-        {"active__exact": 1, "stock_status": LOW},
-    )
+    response = client.get(row["href"])
     assert response.status_code == 200
     assert {p.pk for p in response.context["cl"].result_list} == {
         products[k].pk for k, s in MATRIX.items() if s == LOW

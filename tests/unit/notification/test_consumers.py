@@ -209,6 +209,16 @@ class TestNotificationConsumer(SimpleTestCase):
         mock_logger.debug.assert_called_with(f"Sending notification: {event}")
         consumer.send.assert_called_with(text_data=json.dumps(event))
 
+    async def test_receive_answers_the_heartbeat_ping_with_pong(self):
+        """The storefront closes a socket that does not answer its ping
+        within 5 seconds, so the answer is what keeps the socket open."""
+        consumer = NotificationConsumer()
+        consumer.send = AsyncMock()
+
+        await consumer.receive(text_data="ping")
+
+        consumer.send.assert_awaited_once_with(text_data="pong")
+
     @patch("notification.consumers.logger")
     async def test_receive_discards_message_and_logs(self, mock_logger):
         consumer = NotificationConsumer()

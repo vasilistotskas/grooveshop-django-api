@@ -21,6 +21,7 @@ from rest_framework.test import APIClient
 from order.factories.order import OrderFactory
 from shipping.models import ShippingProvider
 from shipping_acs.factories import AcsShipmentFactory
+from shipping_boxnow.factories import BoxNowShipmentFactory
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.django_db
@@ -65,6 +66,91 @@ def test_shipment_label_dispatches_to_acs_adapter():
     assert response.status_code == status.HTTP_200_OK
     assert response["Content-Type"] == "application/pdf"
     assert mock_fetch.called
+
+
+PDF = b"%PDF-1.7 fake bytes"
+
+
+def _attach_boxnow_shipment(order, **shipment):
+    order.shipping_provider = ShippingProvider.objects.get(code="boxnow")
+    order.shipping_kind = "pickup_point"
+    order.save(update_fields=["shipping_provider", "shipping_kind"])
+    return BoxNowShipmentFactory(order=order, **shipment)
+
+
+def _get_label(order):
+    client = APIClient()
+    client.force_authenticate(user=order.user)
+    return client.get(
+        reverse("order-shipment-label", kwargs={"pk": order.id}),
+        HTTP_ACCEPT_LANGUAGE="en",
+    )
+
+
+def _assert_no_label_yet(response):
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {
+        "detail": "No carrier shipment found for this order.",
+        "code": "shipment_missing",
+    }
+
+
+def test_shipment_label_404_until_acs_mints_the_voucher():
+    order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
+    _attach_acs_shipment(order, voucher_no=None)
+
+    with patch("shipping_acs.services.AcsClient") as acs_client:
+        response = _get_label(order)
+
+    _assert_no_label_yet(response)
+    acs_client.assert_not_called()
+
+
+def test_shipment_label_404_until_boxnow_assigns_the_parcel():
+    order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
+    _attach_boxnow_shipment(order, parcel_id=None)
+
+    with (
+        patch("shipping_boxnow.services.BoxNowClient") as boxnow_client,
+        patch("shipping_boxnow.services.cache") as label_cache,
+    ):
+        response = _get_label(order)
+
+    _assert_no_label_yet(response)
+    label_cache.get.assert_not_called()
+    boxnow_client.assert_not_called()
+
+
+def test_shipment_label_streams_the_acs_voucher():
+    order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
+    shipment = _attach_acs_shipment(order, voucher_no="7227895630")
+
+    with patch("shipping_acs.services.AcsClient") as acs_client:
+        acs_client.return_value.print_voucher.return_value = PDF
+        response = _get_label(order)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response["Content-Type"] == "application/pdf"
+    assert b"".join(response.streaming_content) == PDF
+    assert acs_client.return_value.print_voucher.call_args.args == (
+        shipment.voucher_no,
+    )
+
+
+def test_shipment_label_streams_the_boxnow_voucher():
+    order = OrderFactory(user=UserAccountFactory(), num_order_items=0)
+    shipment = _attach_boxnow_shipment(order, parcel_id="9200005630")
+
+    with patch("shipping_boxnow.services.BoxNowClient") as boxnow_client:
+        boxnow_client.return_value.fetch_parcel_label.return_value = PDF
+        response = _get_label(order)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response["Content-Type"] == "application/pdf"
+    assert b"".join(response.streaming_content) == PDF
+    boxnow_client.return_value.fetch_parcel_label.assert_called_once_with(
+        shipment.parcel_id
+    )
 
 
 def test_shipment_cancel_admin_only():

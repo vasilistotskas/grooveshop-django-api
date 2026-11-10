@@ -1629,7 +1629,7 @@ accepting Cyprus orders at the Greek flat rate.
 
 1. Create `shipping_<provider>/` Django app.
 2. Implement `ShippingCarrierInterface` (`shipping/interfaces.py`):
-   - The abstract methods: `create_shipment`, `cancel_shipment`, `fetch_label_bytes`,
+   - The abstract methods: `create_shipment`, `cancel_shipment`, `has_label`, `fetch_label_bytes`,
      `fetch_tracking_events` (return `[]` when events arrive by webhook), `shipment_for_order`,
      `serialize_shipment`, `validate_order_payload`.
    - `dispatch_create_shipment_task(self, order, *, schema_name: str | None = None)` — enqueues the

@@ -3,6 +3,116 @@
 
 
 
+## v3.242.18 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): the generic label route answers 404 until a label exists (#633)
+
+GET /order/{id}/shipment_label fetched the label of any shipment row,
+so before the carrier had booked it ACS raised AcsAPIError and BoxNow
+read the cache and called the API with an empty parcel id.
+
+The carrier adapter now says whether a label exists (has_label), and
+ShippingService.fetch_label_bytes returns None unless it does; the
+route and the order admin's download button both ask it.
+BoxNowService.fetch_label_bytes refuses an empty parcel id itself, as
+AcsService.fetch_label_bytes refuses an empty voucher.
+
+Closes #630 ([`11a611c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11a611cc808f253dada9f721398f5ec342510fe9))
+
+## v3.242.17 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a voucher request with an unknown outcome is never sent again (#626) ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): a voucher request with an unknown outcome is never sent again
+
+ACS_Create_Voucher has no idempotency key and no duplicate error, and no
+documented call finds a voucher by our reference before it is on a pickup
+list. A create whose answer was lost (read timeout, a connection dropped
+after the request, a 5xx, a worker that stopped before saving) released
+the mint claim, so the Celery retry and "Issue ACS voucher now" sent it
+again and ACS could mint a second voucher.
+
+The client now raises AcsOutcomeUnknownError (a retryable subclass) for
+every failure after the request may have left; only a connection never
+made, the request cap and 403/406 stay plain AcsRetryableError. The mint
+turns an unknown outcome, an unclassified exception, a success with
+neither Voucher_No nor Error_Message, and an expired claim into
+AcsShipment.voucher_request_unknown_at: the order is noted, the new
+ops.acs_voucher_request_unknown alert is sent once, and every caller is
+refused with AcsVoucherRequestUnknownError until staff use "Adopt ACS
+voucher" (confirmed by ACS_Trackingsummary or a pickup-list refusal) or
+"No voucher at ACS: request again".
+
+The pickup-list run no longer drops the vouchers ACS names that match no
+shipment: they are kept as AcsUnrecognisedVoucher, raised once through
+ops.acs_unrecognised_vouchers, counted on the dashboard, and staff delete
+them at ACS or mark them checked.
+
+Tests that asserted a release of the claim on any error, and a re-mint of
+an expired claim, encoded the old design and now assert the new state.
+
+Closes #622 ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): keep the timestamp indexes on the unrecognised voucher table ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): close the review gaps of the voucher request checks
+
+- A late answer (a worker whose request outlived its claim while another
+  recorded the outcome as unknown) is saved and clears the flag, with a
+  history reason and an order note. Resetting a canceled shipment clears
+  a flag left beside a real voucher and keeps one on a shipment with none.
+- Adopt refuses a number any shipment carries (voucher, multipart child,
+  previous or duplicate voucher), requires the ACS_Trackingsummary
+  recipient to be the order's Recipient_Name or an open pickup-list
+  refusal row, repeats its checks under the row lock and answers a
+  concurrent adopt with the same refusal instead of an IntegrityError.
+- A pickup-list refusal naming numbers while a mint is in flight records
+  nothing; a shipment that saves a number resolves its row.
+- Delete at ACS re-checks under the row lock and is refused while a mint
+  is in flight or any order waits in the unknown state. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): give the voucher checks a lifecycle and keep every note
+
+- A shipment of unknown outcome whose order no longer needs a voucher
+  (retired shipment, canceled or refunded order) stays counted, cannot be
+  adopted onto or minted for, no longer blocks deleting vouchers matching
+  no order, and is closed with "No voucher needed: close" (a note).
+- Adopt compares ACS's recipient with the Recipient_Name the lost request
+  sent; the manual documents no format for that field, so a mismatch
+  needs a written hand confirmation, recorded on the order. ACS must
+  still hold the number.
+- A duplicate the mint deletes at ACS resolves its row; claims past their
+  TTL become the unknown state before a voucher is judged or deleted; a
+  recorded duplicate can be deleted from the list; "Delete at ACS" keeps
+  its note. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): only an exact, unambiguous recipient match adopts a voucher by itself
+
+A voucher known only from a refused pickup list, a missing or masked
+recipient, or a name another waiting order shares now needs a written
+hand confirmation. "Issue ACS voucher now" and the mint read the flag
+through the shared rule and point a shipment that needs no voucher to
+"No voucher needed: close". ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): give the unrecognised voucher table index names within the limit
+
+The inherited %(class)s names (acsunrecognisedvoucher_created_at_ix, 36
+characters) failed models.E034 when the tenant migration ran its
+database checks. Explicit short names, as pay_way and variant_group do;
+migration 0016 has not shipped, so it carries the names itself. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): keep typed staff notes where staging replaces them
+
+resolution_note is free text a person typed, so the anonymiser replaces
+it whole. The close and request-again notes no longer go into the
+shipment history reason (a Kind.TEXT varchar(100), where a long note
+also failed the save); they stay in the order note, whose note key the
+anonymiser replaces. The late-answer reason fits any voucher number. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
 ## v3.242.16 (2026-11-10)
 
 ### Bug fixes

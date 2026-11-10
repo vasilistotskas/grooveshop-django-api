@@ -99,8 +99,21 @@ class ShippingCarrierInterface(ABC):
         return None
 
     @abstractmethod
+    def has_label(self, shipment: Any) -> bool:
+        """Whether the carrier has a label for ``shipment`` yet.
+
+        Judged from local data only, never a carrier call. A shipment
+        row exists from checkout, but its label exists only once the
+        carrier has booked it (an ACS voucher, a BoxNow parcel), so a
+        caller asks this before :meth:`fetch_label_bytes`.
+        """
+
+    @abstractmethod
     def fetch_label_bytes(self, shipment: Any) -> bytes:
-        """Return the raw label PDF bytes (provider-format may vary)."""
+        """Return the raw label PDF bytes (provider-format may vary).
+
+        Raises when :meth:`has_label` is false.
+        """
 
     @abstractmethod
     def fetch_tracking_events(self, shipment: Any) -> list[dict[str, Any]]:

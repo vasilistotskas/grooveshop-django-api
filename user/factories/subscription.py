@@ -15,7 +15,10 @@ class SubscriptionTopicFactory(factory.django.DjangoModelFactory):
         django_get_or_create = ("slug",)
         skip_postgeneration_save = True
 
-    slug = factory.LazyAttribute(lambda _: fake.slug())
+    # A sequence, not ``fake.slug()``: ``django_get_or_create`` is on the
+    # slug, so two random slugs that collided handed back the SAME row and a
+    # test asking for N distinct topics got fewer.
+    slug = factory.Sequence(lambda n: f"topic-{n}")
     category = fuzzy.FuzzyChoice(
         SubscriptionTopic.TopicCategory.choices, getter=lambda x: x[0]
     )

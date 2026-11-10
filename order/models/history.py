@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
+from core.client_ip import client_ip_or_peer
 from core.models import TimeStampMixinModel, UUIDModel
 from order.managers.history import OrderHistoryManager, OrderItemHistoryManager
 
@@ -111,7 +112,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         user_agent = ""
 
         if request:
-            ip_address = request.META.get("REMOTE_ADDR")
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         return cls.objects.create(
@@ -133,7 +134,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         user_agent = ""
 
         if request:
-            ip_address = request.META.get("REMOTE_ADDR")
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         if isinstance(previous_value, dict):
@@ -175,7 +176,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         user_agent = ""
 
         if request:
-            ip_address = request.META.get("REMOTE_ADDR")
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         return cls.objects.create(
@@ -195,7 +196,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         user_agent = ""
 
         if request:
-            ip_address = request.META.get("REMOTE_ADDR")
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         return cls.objects.create(
@@ -214,7 +215,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         user_agent = ""
 
         if request:
-            ip_address = request.META.get("REMOTE_ADDR")
+            ip_address = client_ip_or_peer(request) or None
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         return cls.objects.create(

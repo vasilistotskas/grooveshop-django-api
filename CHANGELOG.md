@@ -3,6 +3,32 @@
 
 
 
+## v3.242.11 (2026-11-10)
+
+### Bug fixes
+
+* fix(cleanup): remove dead code and guards that cannot fire (#619) ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+* fix(cleanup): remove dead code and guards that cannot fire
+
+Removes the order_returned signal and its receiver (never sent),
+PaymentLedger.reserved_on (test-only), the stale __all__ in
+order/services.py, meta_capi's default_app_config, an except around
+str(amount) in the invoice serializer, core.cache.gateway.is_configured
+(test-only) and the write-only settings_key of custom_seeding.
+
+First-party imports wrapped in a catch-all except are removed from
+core/cache/service.py, core/rosetta_storage.py, core/rosetta_views.py and
+shipping_acs/config.py; test_no_impossible_import_guards now fails for any
+such guard. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+### Testing
+
+* test(cleanup): prove the first-party import guard detector can fail
+
+Feed the detector a seeded offender and legitimate code, so the guard is
+shown to flag the pattern it forbids and nothing else. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
 ## v3.242.10 (2026-11-10)
 
 ### Bug fixes

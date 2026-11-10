@@ -13,6 +13,7 @@ from shipping_acs.exceptions import (
     AcsError,
     AcsRetryableError,
     AcsUnprintedVouchersError,
+    AcsVoucherRequestUnknownError,
 )
 from shipping_acs.factories import (
     AcsPickupListFactory,
@@ -1700,9 +1701,49 @@ class TestLastErrorPersisted:
         # stuck waiting for the 300s TTL.
         assert "mint_started_at" not in shipment.metadata
 
-    def test_writes_request_and_error_to_metadata_when_client_raises(
+    def test_a_request_that_never_reached_acs_releases_the_claim(
         self, monkeypatch
     ):
+        """A connection never made (``AcsRetryableError``, not its
+        unknown-outcome subclass): nothing reached ACS, so the claim is
+        released for the retry."""
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping_acs import services
+
+        class _UnreachableClient:
+            billing_code = "X"
+
+            def create_voucher(self, params):
+                raise AcsRetryableError(
+                    alias="ACS_Create_Voucher",
+                    error_message="ACS connection error: host unreachable",
+                )
+
+        monkeypatch.setattr(services, "AcsClient", _UnreachableClient)
+        order = courier_cash_order(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(AcsRetryableError):
+            AcsService.create_voucher_for_order(order)
+
+        shipment.refresh_from_db()
+        last_error = shipment.metadata.get("last_error")
+        assert last_error is not None
+        assert "host unreachable" in last_error["error"]
+        assert last_error["request_params"]["Billing_Code"] == "X"
+        assert "mint_started_at" not in shipment.metadata
+        assert shipment.voucher_request_unknown_at is None
+
+    def test_an_error_the_client_does_not_classify_keeps_the_request_unknown(
+        self, monkeypatch
+    ):
+        """Until #622 this test asserted that ANY client error released
+        the claim, so the retry sent a second voucher request. An
+        exception the client does not classify escaped after the request
+        may have left: the error is recorded and the request has an
+        unknown outcome."""
         from order.enum.status import OrderStatus, PaymentStatus
         from shipping_acs import services
 
@@ -1718,15 +1759,15 @@ class TestLastErrorPersisted:
         )
         shipment = AcsShipmentFactory(order=order)
 
-        with pytest.raises(ConnectionError):
+        with pytest.raises(AcsVoucherRequestUnknownError):
             AcsService.create_voucher_for_order(order)
 
         shipment.refresh_from_db()
         last_error = shipment.metadata.get("last_error")
-        assert last_error is not None
         assert "ACS host unreachable" in last_error["error"]
         assert last_error["request_params"]["Billing_Code"] == "X"
         assert "mint_started_at" not in shipment.metadata
+        assert shipment.voucher_request_unknown_at is not None
 
 
 # ---------------------------------------------------------------------------

@@ -178,7 +178,7 @@ check.
 
 ### Operational alerts (`ops.*`)
 
-Ten mails to the store's own staff, for work that needs a person. They were
+Fourteen mails to the store's own staff, for work that needs a person. They were
 `OpsAlertKind` and `send_ops_alert` (`shipping/alerts.py`); each is now an
 email type declared with `staff_email(..., area="ops")`, so the store's
 `EmailSwitch`, the gates and `store_operators()` apply. All are switchable,
@@ -194,6 +194,8 @@ the order note, whatever the switch says.
 | `ops.stale_shipments` | a `StaleShipments` (the `AcsShipment` rows, threshold, clock) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.unremitted_cod` | an `UnremittedCod` (the rows of `_unremitted_cod_rows`) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.unattributable_cod_payouts` | an `UnattributablePayouts` (counts, payment date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.acs_voucher_request_unknown` | a `VoucherRequestUnknown` (order id, how the request ended) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
+| `ops.acs_unrecognised_vouchers` | an `UnrecognisedVouchers` (the voucher numbers ACS named for the first time, the pickup date) | `shipping_acs/emails.py` | `CarrierGate("acs")` |
 | `ops.payment_after_cancel` | a `PaymentAfterCancel` | `order/emails.py` | |
 | `ops.payment_mismatch` | a `PaymentMismatch` | `order/emails.py` | |
 | `ops.overcharged` | an `Overcharged` (order, the payment that tipped it, the excess) | `order/emails.py` | |
@@ -213,8 +215,11 @@ A task treats a skip by what it protects. The stale digest claims its rows
 (switched off, nobody to write to, ACS off): the parcels are in the first
 digest after the store turns it back on. The order-bound alerts
 (`payment_after_cancel`, `payment_mismatch`, `overcharged`, `refund_failed`,
-`shipment_rejected`) write their `OrderHistory` note first, whatever the
-switch. Every sender is best-effort: a mail failure never fails the task or
+`shipment_rejected`, `acs_voucher_request_unknown`) write their
+`OrderHistory` note first, whatever the switch. The two ACS voucher checks
+are sent once, when the state begins (`voucher_request_unknown_at`) or the
+voucher is first recorded (`AcsUnrecognisedVoucher`), and stay counted on
+the dashboard until staff resolve them. Every sender is best-effort: a mail failure never fails the task or
 masks the error it reports.
 
 Each store's old `OPS_ALERT_<KIND>_ENABLED` setting that was OFF became its

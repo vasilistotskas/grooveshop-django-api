@@ -445,6 +445,13 @@ def store_sidebar(request: Any) -> list[Item]:
             if acs
             else None,
             page(
+                "shipping_acs.AcsUnrecognisedVoucher",
+                _("ACS vouchers matching no order"),
+                "qr_code",
+            )
+            if acs
+            else None,
+            page(
                 "shipping_boxnow.BoxNowShipment",
                 _("BoxNow Shipments"),
                 "package_2",

@@ -42,6 +42,7 @@ from shipping_acs.exceptions import (
     AcsConfigError,
     AcsRetryableError,
     AcsUnprintedVouchersError,
+    AcsVoucherRequestUnknownError,
 )
 from tenant.celery import TenantTask
 
@@ -154,11 +155,28 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
             "order_id": order_id,
             "message": str(exc),
         }
+    except AcsVoucherRequestUnknownError as exc:
+        # The request may have reached ACS and its answer was lost, now
+        # or earlier: ACS may hold a voucher. The service alerted staff
+        # when the state began; nothing here may send another request.
+        logger.warning(
+            "ACS voucher request for order %s has an unknown outcome: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        return {
+            "status": "voucher_request_unknown",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except AcsRetryableError:
-        # Transient (HTTP 5xx / 403 / 406 / connection). Re-raise so Celery's
-        # autoretry_for handles it — AcsRetryableError subclasses AcsAPIError,
-        # so the broader handler below would otherwise swallow it as a
-        # permanent business error and the retry policy would be dead code.
+        # Never reached ACS (a connection never made, the request cap,
+        # 403 / 406). Re-raise so Celery's autoretry_for handles it —
+        # AcsRetryableError subclasses AcsAPIError, so the broader
+        # handler below would otherwise swallow it as a permanent
+        # business error. A lost answer never gets here: the service
+        # turns it into AcsVoucherRequestUnknownError.
         raise
     except AcsAPIError as exc:
         # Business error (bad address, unacceptable destination
@@ -407,12 +425,18 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
         # status and an order note, never an email or a failed task.
         # Every other refusal is an ``AcsAPIError`` and still
         # propagates to Celery as a failure.
-        rows = _unprinted_rows((exc.raw or {}).get("Unprinted_Vouchers"))
+        named = (exc.raw or {}).get("Unprinted_Vouchers")
+        rows = _unprinted_rows(named)
         _note_unprinted_on_orders(rows, acs_message=exc.error_message)
         return {
             "status": "blocked_unprinted",
             "unprinted": [row["voucher_no"] for row in rows],
             "order_ids": [row["order_id"] for row in rows],
+            # Named by ACS, matching no shipment: recorded and raised to
+            # staff by the service (``AcsUnrecognisedVoucher``).
+            "unrecognised": AcsService.vouchers_matching_no_shipment(
+                named or []
+            ),
             "acs_message": exc.error_message,
         }
 

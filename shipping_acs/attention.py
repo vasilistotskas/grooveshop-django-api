@@ -16,10 +16,15 @@ from django.conf import settings
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
+from order.enum.status import OrderStatus
 from order.managers.order import awaiting_online_payment_q
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.models import AcsCodPayout, AcsShipment
+from shipping_acs.models import (
+    AcsCodPayout,
+    AcsShipment,
+    AcsUnrecognisedVoucher,
+)
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -77,11 +82,90 @@ def stale_shipment_q(
             | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
         )
     )
-    stranded_mint = Q(
-        shipment_state=AcsShipmentState.PENDING_CREATION,
-        created_at__lt=now - STRANDED_MINT_AFTER,
-    ) & ~awaiting_online_payment_q("order__")
+    stranded_mint = (
+        Q(
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            created_at__lt=now - STRANDED_MINT_AFTER,
+        )
+        & ~awaiting_online_payment_q("order__")
+        & ~voucher_request_unknown_q()
+    )
     return stale_tracking | stranded_mint
+
+
+def voucher_request_unknown_q() -> Q:
+    """Shipments whose voucher request has an unknown outcome, as a ``Q``.
+
+    ACS may hold a voucher for the order, so no new request is sent until
+    staff adopt the voucher or request again. They are their own alert
+    (``ops.acs_voucher_request_unknown``), so the stale digest's
+    "stranded mint" class leaves them out: its remedy, "Issue ACS voucher
+    now", is exactly what must not happen to them.
+    """
+    return Q(voucher_request_unknown_at__isnull=False, voucher_no__isnull=True)
+
+
+def voucher_request_unknown(shipment: AcsShipment) -> bool:
+    """:func:`voucher_request_unknown_q` for one loaded shipment."""
+    return (
+        shipment.voucher_request_unknown_at is not None
+        and not shipment.voucher_no
+    )
+
+
+def voucher_requests_unknown() -> QuerySet[AcsShipment]:
+    """Every shipment with a voucher request staff must still check.
+
+    All of them, the ones whose order no longer needs a voucher included:
+    ACS may hold a billed voucher for those too, so they stay counted
+    until staff adopt, request again or close.
+    """
+    return AcsShipment.objects.real().filter(voucher_request_unknown_q())
+
+
+#: Order statuses in which an order needs no voucher any more.
+ORDER_STATUSES_NEEDING_NO_VOUCHER: frozenset[str] = frozenset(
+    {OrderStatus.CANCELED, OrderStatus.REFUNDED}
+)
+
+
+def needs_no_voucher_q() -> Q:
+    """Shipments that need no voucher any more: retired (CANCELED) or
+    whose order was canceled or refunded."""
+    return Q(shipment_state=AcsShipmentState.CANCELED) | Q(
+        order__status__in=ORDER_STATUSES_NEEDING_NO_VOUCHER
+    )
+
+
+def needs_no_voucher(shipment: AcsShipment) -> bool:
+    """:func:`needs_no_voucher_q` for one loaded shipment."""
+    return (
+        shipment.shipment_state == AcsShipmentState.CANCELED
+        or shipment.order.status in ORDER_STATUSES_NEEDING_NO_VOUCHER
+    )
+
+
+def voucher_requests_waiting() -> QuerySet[AcsShipment]:
+    """Shipments of unknown outcome whose order still needs its voucher.
+
+    Only these can adopt a voucher or request one again, and only these
+    hold back deleting a voucher that matches no order: it may be theirs.
+    The others are closed by staff (``AcsService.close_voucher_request``).
+    """
+    return voucher_requests_unknown().exclude(needs_no_voucher_q())
+
+
+def unresolved_unrecognised_voucher_q() -> Q:
+    """Vouchers ACS named that match no shipment and nobody resolved."""
+    return Q(resolved_at__isnull=True)
+
+
+def unrecognised_vouchers() -> QuerySet[AcsUnrecognisedVoucher]:
+    """Every voucher ACS holds for the store that matches no shipment and
+    that staff have not adopted, deleted at ACS or marked as checked."""
+    return AcsUnrecognisedVoucher.objects.filter(
+        unresolved_unrecognised_voucher_q()
+    )
 
 
 def stale_shipments(now: datetime | None = None) -> QuerySet[AcsShipment]:

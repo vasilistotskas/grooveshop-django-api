@@ -144,12 +144,20 @@ def _classify(
     if isinstance(exc, AcsAuthError):
         return AcsApiCallOutcome.AUTH, exc.error_message, logging.WARNING
     if isinstance(exc, AcsRetryableError):
-        outcome = (
-            AcsApiCallOutcome.RETRYABLE
-            if exc.http_status is not None
-            else AcsApiCallOutcome.TRANSPORT
-        )
-        return outcome, exc.error_message, logging.WARNING
+        if exc.http_status is None:
+            return (
+                AcsApiCallOutcome.TRANSPORT,
+                exc.error_message,
+                logging.WARNING,
+            )
+        if exc.http_status >= 500:
+            return (
+                AcsApiCallOutcome.RETRYABLE,
+                exc.error_message,
+                logging.WARNING,
+            )
+        # A 200 whose body is not JSON (``AcsOutcomeUnknownError``).
+        return AcsApiCallOutcome.UNEXPECTED, exc.error_message, logging.ERROR
     if isinstance(exc, AcsAPIError):
         # ``raw`` is set only for ACSExecution_HasError: ACS refusing in
         # its own words. A bare 4xx or a non-JSON body is unexpected.

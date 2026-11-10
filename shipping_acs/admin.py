@@ -26,16 +26,23 @@ from unfold.dataclasses import ActionDialog
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 from unfold.forms import BaseDialogForm
-from unfold.widgets import UnfoldAdminTextareaWidget
+from unfold.widgets import (
+    UnfoldAdminTextareaWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.models.order import Order
 from shipping_acs.attention import (
+    needs_no_voucher,
     stale_shipment_q,
     unattributed_payout_q,
     unremitted_cod_shipments,
+    unresolved_unrecognised_voucher_q,
+    voucher_request_unknown,
+    voucher_request_unknown_q,
 )
 from shipping_acs.diagnostics import shipment_timeline
 from shipping_acs.enum.shipment_state import TERMINAL_STATES, AcsShipmentState
@@ -47,6 +54,7 @@ from shipping_acs.models import (
     AcsShipment,
     AcsStation,
     AcsTrackingEvent,
+    AcsUnrecognisedVoucher,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,6 +99,47 @@ class CancelVoucherForm(BaseDialogForm):
         help_text=_(
             "Why the voucher is cancelled (for example a corrected "
             "address). Kept on the shipment."
+        ),
+    )
+
+
+class AdoptVoucherForm(BaseDialogForm):
+    voucher_no = forms.CharField(
+        label=_("Voucher number"),
+        max_length=20,
+        widget=UnfoldAdminTextInputWidget(),
+        help_text=_("The voucher number as the ACS portal shows it."),
+    )
+    confirmed_by_hand = forms.CharField(
+        label=_("Confirmed by hand"),
+        required=False,
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "Only when ACS spells the recipient differently from the voucher "
+            "request: how you confirmed in the ACS portal that this is the "
+            "order's parcel. Kept on the order."
+        ),
+    )
+
+
+class RequestVoucherAgainForm(BaseDialogForm):
+    note = forms.CharField(
+        label=_("How you checked"),
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "Where you looked for a voucher of this order at ACS. Kept on "
+            "the order."
+        ),
+    )
+
+
+class ResolveUnrecognisedVoucherForm(BaseDialogForm):
+    note = forms.CharField(
+        label=_("Note"),
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "What the voucher is (made in the ACS portal, handled at an "
+            "ACS store, ...). Kept on the voucher."
         ),
     )
 
@@ -245,6 +294,10 @@ class NeedsAttentionFilter(DropdownFilter):
     def lookups(self, request, model_admin):
         return [
             ("stale", _("Stale: no tracking movement or never created")),
+            (
+                "voucher_unknown",
+                _("Voucher request with an unknown outcome"),
+            ),
             ("unremitted_cod", _("Delivered COD never paid out by ACS")),
         ]
 
@@ -252,6 +305,8 @@ class NeedsAttentionFilter(DropdownFilter):
         match self.value():
             case "stale":
                 return queryset.filter(stale_shipment_q())
+            case "voucher_unknown":
+                return queryset.filter(voucher_request_unknown_q())
             case "unremitted_cod":
                 return queryset.filter(
                     pk__in=unremitted_cod_shipments().values("pk")
@@ -321,6 +376,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     autocomplete_fields = ("order",)
     readonly_fields = (
         "voucher_no",
+        "voucher_request_unknown_at",
         "shipment_state",
         "label_printed_at",
         "last_polled_at",
@@ -346,6 +402,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
                 "fields": (
                     "order",
                     "voucher_no",
+                    "voucher_request_unknown_at",
                     "shipment_state",
                     "delivery_kind",
                     "pickup_list",
@@ -419,6 +476,9 @@ class AcsShipmentAdmin(BaseModelAdmin):
     actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
     actions_detail = [
+        "adopt_voucher",
+        "request_voucher_again",
+        "close_voucher_request",
         "record_cod_received_outside_acs",
         "cancel_voucher_only",
     ]
@@ -748,6 +808,123 @@ class AcsShipmentAdmin(BaseModelAdmin):
             }
         )
 
+    @staticmethod
+    def _back_to_shipment(object_id) -> HttpResponse:
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acsshipment_change",
+                    args=[object_id],
+                ),
+            }
+        )
+
+    @action(
+        description=_("Adopt ACS voucher"),
+        icon="link",
+        dialog=ActionDialog(
+            title=_("Adopt the voucher ACS holds for this order"),
+            description=_(
+                "Use only when the last voucher request has an unknown "
+                "outcome and you found its voucher in the ACS portal. ACS "
+                "must confirm the number; no new voucher is requested."
+            ),
+            form_class=AdoptVoucherForm,
+        ),
+    )
+    def adopt_voucher(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        try:
+            AcsService.adopt_voucher(
+                shipment,
+                form.cleaned_data["voucher_no"],
+                user=request.user,
+                confirmed_by_hand=form.cleaned_data["confirmed_by_hand"],
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                _("Voucher %(voucher)s adopted.")
+                % {"voucher": form.cleaned_data["voucher_no"]},
+                messages.SUCCESS,
+            )
+        return self._back_to_shipment(object_id)
+
+    @action(
+        description=_("No voucher at ACS: request again"),
+        icon="refresh",
+        variant=ActionVariant.WARNING,
+        dialog=ActionDialog(
+            title=_("Request a voucher again"),
+            description=_(
+                "Use only when the last voucher request has an unknown "
+                "outcome and the ACS portal shows no voucher for this "
+                "order. If ACS did make one, this creates a second "
+                "voucher."
+            ),
+            form_class=RequestVoucherAgainForm,
+        ),
+    )
+    def request_voucher_again(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        try:
+            AcsService.request_voucher_again(
+                shipment, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                _("A new voucher request was queued."),
+                messages.SUCCESS,
+            )
+        return self._back_to_shipment(object_id)
+
+    @action(
+        description=_("No voucher needed: close"),
+        icon="block",
+        dialog=ActionDialog(
+            title=_("Close the voucher check"),
+            description=_(
+                "Use it when the order no longer needs a voucher (the order "
+                "or its shipment is canceled). Nothing is sent to ACS. If "
+                "ACS holds the lost voucher, delete it there and say so."
+            ),
+            form_class=RequestVoucherAgainForm,
+        ),
+    )
+    def close_voucher_request(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        try:
+            AcsService.close_voucher_request(
+                shipment, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request, _("The voucher check was closed."), messages.SUCCESS
+            )
+        return self._back_to_shipment(object_id)
+
     @action(
         description=_("Issue ACS voucher now"),
         variant=ActionVariant.PRIMARY,
@@ -777,6 +954,32 @@ class AcsShipmentAdmin(BaseModelAdmin):
                     "Order #%(order)s has not been paid yet — the voucher "
                     "is issued automatically once the online payment is "
                     "confirmed."
+                )
+                % {"order": shipment.order_id},
+            )
+            return _back_to_changelist(self)
+
+        # The mint refuses it too (``AcsVoucherRequestUnknownError``), but
+        # in a Celery task whose refusal never reaches this page.
+        if voucher_request_unknown(shipment):
+            messages.error(
+                request,
+                (
+                    _(
+                        "The last voucher request for order #%(order)s may "
+                        "have reached ACS without an answer, and the order "
+                        "no longer needs a voucher. If ACS holds one, delete "
+                        "it there, then use “No voucher needed: close” on the "
+                        "shipment."
+                    )
+                    if needs_no_voucher(shipment)
+                    else _(
+                        "The last voucher request for order #%(order)s may "
+                        "have reached ACS without an answer, so ACS may "
+                        "already hold a voucher for it. Check the ACS portal, "
+                        "then use “Adopt ACS voucher” or “No voucher at ACS: "
+                        "request again” on the shipment."
+                    )
                 )
                 % {"order": shipment.order_id},
             )
@@ -900,6 +1103,153 @@ class AcsPickupListRunAdmin(BaseModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class UnrecognisedVoucherResolvedFilter(DropdownFilter):
+    """Open vouchers are what the dashboard counter counts, by the same
+    ``Q`` (:func:`shipping_acs.attention.unresolved_unrecognised_voucher_q`)."""
+
+    title = _("Resolution")
+    parameter_name = "resolved"
+
+    def lookups(self, request, model_admin):
+        return [("no", _("Not resolved")), ("yes", _("Resolved"))]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "no":
+                return queryset.filter(unresolved_unrecognised_voucher_q())
+            case "yes":
+                return queryset.exclude(unresolved_unrecognised_voucher_q())
+            case _:
+                return queryset
+
+
+@admin.register(AcsUnrecognisedVoucher)
+class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
+    """Vouchers ACS named on a refused pickup list that match no shipment.
+
+    Readable by the store staff who work the ACS shipments: the rows hold
+    voucher numbers and staff notes. A voucher is adopted from the
+    shipment it belongs to ("Adopt ACS voucher"), deleted at ACS while it
+    is on no pickup list, or marked as checked.
+    """
+
+    staff_actor_fields = ("resolved_by",)
+    list_display = (
+        "voucher_no",
+        "pickup_date",
+        "first_seen_at",
+        "last_seen_at",
+        "resolution",
+        "resolved_at",
+    )
+    list_filter = (UnrecognisedVoucherResolvedFilter, "resolution")
+    search_fields = ("voucher_no",)
+    readonly_fields = (
+        "voucher_no",
+        "pickup_date",
+        "first_seen_at",
+        "last_seen_at",
+        "resolution",
+        "resolved_at",
+        "resolved_by",
+        "resolution_note",
+        "shipment",
+        "created_at",
+        "updated_at",
+    )
+    exclude = ("resolved_by_id",)
+    actions_detail = ["delete_at_acs", "mark_checked"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @staticmethod
+    def _back_to_voucher(object_id) -> HttpResponse:
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acsunrecognisedvoucher_change",
+                    args=[object_id],
+                ),
+            }
+        )
+
+    @action(
+        description=_("Delete at ACS"),
+        icon="delete",
+        variant=ActionVariant.DANGER,
+        dialog=ActionDialog(
+            title=_("Delete this voucher at ACS"),
+            description=_(
+                "Deletes the voucher at ACS. ACS allows it only while the "
+                "voucher is on no pickup list. It is refused while an order "
+                "waits for a voucher whose request had an unknown outcome, "
+                "because this may be that order's voucher."
+            ),
+            form_class=ResolveUnrecognisedVoucherForm,
+        ),
+    )
+    def delete_at_acs(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        row = AcsUnrecognisedVoucher.objects.get(pk=object_id)
+        try:
+            AcsService.delete_unrecognised_voucher(
+                row, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                _("Voucher %(voucher)s was deleted at ACS.")
+                % {"voucher": row.voucher_no},
+                messages.SUCCESS,
+            )
+        return self._back_to_voucher(object_id)
+
+    @action(
+        description=_("Mark as checked"),
+        icon="task_alt",
+        dialog=ActionDialog(
+            title=_("Mark this voucher as checked"),
+            description=_(
+                "Use it when you know the voucher (made in the ACS portal, "
+                "handled at an ACS store). It stops being counted; nothing "
+                "is sent to ACS."
+            ),
+            form_class=ResolveUnrecognisedVoucherForm,
+        ),
+    )
+    def mark_checked(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        row = AcsUnrecognisedVoucher.objects.get(pk=object_id)
+        try:
+            AcsService.mark_unrecognised_voucher_checked(
+                row, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                _("Voucher %(voucher)s marked as checked.")
+                % {"voucher": row.voucher_no},
+                messages.SUCCESS,
+            )
+        return self._back_to_voucher(object_id)
 
 
 @admin.register(AcsApiCall)

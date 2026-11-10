@@ -31,7 +31,11 @@ from pay_way.factories import PayWayFactory
 from shipping_acs.enum.charge_type import AcsChargeType
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.factories import AcsShipmentFactory
-from shipping_acs.models import AcsCodPayout, AcsShipment
+from shipping_acs.models import (
+    AcsCodPayout,
+    AcsShipment,
+    AcsUnrecognisedVoucher,
+)
 from shipping_acs.tasks import (
     _unremitted_cod_rows,
     alert_unremitted_cod_payouts,
@@ -219,6 +223,49 @@ class TestUnattributedPayouts:
         assert _counts()["unattributed_cod_payouts"] == 1
 
 
+class TestAcsVoucherChecks:
+    """Both ACS voucher alerts are sent once; the counters keep the work
+    in sight until staff resolve it, whatever the email switch says."""
+
+    def test_a_voucher_request_of_unknown_outcome_is_counted(self):
+        unknown, stranded = (
+            _shipment(
+                order=courier_cash_order(),
+                voucher_no=None,
+                shipment_state=AcsShipmentState.PENDING_CREATION,
+            )
+            for _ in range(2)
+        )
+        AcsShipment.objects.filter(pk__in=[unknown.pk, stranded.pk]).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        AcsShipment.objects.filter(pk=unknown.pk).update(
+            voucher_request_unknown_at=timezone.now()
+        )
+
+        counts = _counts()
+
+        assert counts["acs_voucher_requests_unknown"] == 1
+        # Not also a "stranded mint": its remedy would re-send it.
+        assert counts["stale_shipments"] == 1
+
+    def test_an_unrecognised_voucher_is_counted_until_resolved(self):
+        now = timezone.now()
+        for voucher, resolved_at in (
+            ("7401573174", None),
+            ("7401573175", now),
+        ):
+            AcsUnrecognisedVoucher.objects.create(
+                voucher_no=voucher,
+                pickup_date=timezone.localdate(),
+                first_seen_at=now,
+                last_seen_at=now,
+                resolved_at=resolved_at,
+            )
+
+        assert _counts()["acs_unrecognised_vouchers"] == 1
+
+
 class TestCanceledStillPaid:
     def _order(self, **fields):
         return OrderFactory(num_order_items=0, **fields)
@@ -341,6 +388,34 @@ class TestTheListsTheRowsOpen:
         assert _listed(client, changelist, "attention=unremitted_cod") == {
             unremitted.pk
         }
+
+    def test_the_lists_of_voucher_checks_show_exactly_what_was_counted(
+        self, client
+    ):
+        unknown = _shipment(
+            voucher_no=None, shipment_state=AcsShipmentState.PENDING_CREATION
+        )
+        AcsShipment.objects.filter(pk=unknown.pk).update(
+            voucher_request_unknown_at=timezone.now()
+        )
+        now = timezone.now()
+        open_voucher = AcsUnrecognisedVoucher.objects.create(
+            voucher_no="7401573174",
+            pickup_date=timezone.localdate(),
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+
+        assert _listed(
+            client,
+            "admin:shipping_acs_acsshipment_changelist",
+            "attention=voucher_unknown",
+        ) == {unknown.pk}
+        assert _listed(
+            client,
+            "admin:shipping_acs_acsunrecognisedvoucher_changelist",
+            "resolved=no",
+        ) == {open_voucher.pk}
 
     def test_the_payout_list_shows_exactly_what_was_counted(self, client):
         unknown = _payout("2431665832")

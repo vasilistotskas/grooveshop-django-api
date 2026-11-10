@@ -1,8 +1,10 @@
 """The ACS operational alerts: their types, builders and samples.
 
-Three mails to the store's own staff about a parcel or COD money that needs
-a person: shipments that stopped moving, delivered COD parcels ACS never
-paid out, and payout rows that match no shipment. Each is off while the
+Five mails to the store's own staff about a parcel, a voucher or COD money
+that needs a person: shipments that stopped moving, a voucher request whose
+answer was lost, vouchers ACS holds that match no shipment, delivered COD
+parcels ACS never paid out, and payout rows that match no shipment. Each is
+off while the
 store has no active ACS carrier. ``emails.EmailsConfig`` imports this module
 at boot; ``shipping_acs.tasks`` and ``shipping_acs.services`` choose WHEN to
 send and keep the claims and counters.
@@ -50,6 +52,26 @@ class UnremittedCod:
 
     rows: Sequence[Mapping[str, Any]]
     older_than_days: int
+
+
+@dataclass(frozen=True, slots=True)
+class VoucherRequestUnknown:
+    """A voucher request reached ACS, or may have, and its answer was lost.
+
+    ``error`` is what the request ended with (a timeout, a dropped
+    connection, a server error, or a claim left by a stopped worker)."""
+
+    order_id: int
+    error: str
+
+
+@dataclass(frozen=True, slots=True)
+class UnrecognisedVouchers:
+    """Vouchers ACS named on a refused pickup list that match no shipment,
+    the first time each was named."""
+
+    vouchers: Sequence[str]
+    pickup_date: date
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +123,27 @@ def _unattributable_payouts(
         "unmatched": report.unmatched,
         "skipped": report.skipped,
         "cod_payment_date": report.cod_payment_date,
+    }
+
+
+def _voucher_request_unknown(
+    alert: VoucherRequestUnknown, env: RenderEnv
+) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "order_id": alert.order_id,
+        "error": alert.error,
+    }
+
+
+def _unrecognised_vouchers(
+    report: UnrecognisedVouchers, env: RenderEnv
+) -> dict[str, Any]:
+    return {
+        "site": tenant_site_name(),
+        "n": len(report.vouchers),
+        "vouchers": report.vouchers,
+        "pickup_date": report.pickup_date,
     }
 
 
@@ -176,6 +219,41 @@ staff_email(
     ),
     build_context=_unremitted_cod,
     sample=_sample_unremitted_cod,
+    gates=(_acs,),
+)
+staff_email(
+    "ops.acs_voucher_request_unknown",
+    area="ops",
+    title=_("ACS voucher request with an unknown outcome"),
+    description=_(
+        "Tells the store's staff that a voucher request for an order may "
+        "have reached ACS without an answer, so they check whether ACS "
+        "holds a voucher before another one is requested."
+    ),
+    templates=f"{TEMPLATE_DIR}/voucher_request_unknown_alert",
+    subject=gettext_noop(
+        "[{site}] ACS: check whether order {order_id} has a voucher"
+    ),
+    build_context=_voucher_request_unknown,
+    sample=lambda env: VoucherRequestUnknown(
+        order_id=1201, error="ACS timeout after 15s: Read timed out."
+    ),
+    gates=(_acs,),
+)
+staff_email(
+    "ops.acs_unrecognised_vouchers",
+    area="ops",
+    title=_("ACS vouchers matching no order"),
+    description=_(
+        "Lists the vouchers ACS reported for the store that match none of "
+        "its shipments, to adopt, delete at ACS or mark as checked."
+    ),
+    templates=f"{TEMPLATE_DIR}/unrecognised_vouchers_alert",
+    subject=gettext_noop("[{site}] ACS: {n} voucher(s) matching no order"),
+    build_context=_unrecognised_vouchers,
+    sample=lambda env: UnrecognisedVouchers(
+        vouchers=["7401573174"], pickup_date=date(2026, 10, 29)
+    ),
     gates=(_acs,),
 )
 staff_email(

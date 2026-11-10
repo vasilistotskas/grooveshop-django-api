@@ -32,9 +32,11 @@ pytestmark = pytest.mark.django_db
 # query each; 70 cold on 2026-10-19: the lost-dispute counter is one more
 # count; 79 cold on 2026-10-30: revenue is the turnover of ``order.turnover``,
 # three queries each for this period, the one before and the chart's
-# buckets); re-measure before raising.
+# buckets; 81 cold on 2026-11-10: the ACS voucher requests to check and
+# the ACS vouchers matching no order are a count each); re-measure before
+# raising.
 WARM_BUDGET = 39
-COLD_BUDGET = 79
+COLD_BUDGET = 81
 
 
 @pytest.fixture

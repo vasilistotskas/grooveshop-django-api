@@ -309,3 +309,18 @@ class TestOrderHistoryRecordsTheVisitorAddress:
         )
         row = record(OrderFactory(num_order_items=0), request)
         assert row.ip_address == "10.42.1.0"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "hop", ["fe80::1%eth0", "::ffff:203.0.113.9", "2001:db8::1"]
+)
+def test_an_ipv6_hop_saves_on_the_history_row(hop, rf):
+    """``ipaddress.ip_address`` accepts a zone id; the field stores the
+    address without it. Neither may make the history save raise."""
+    request = rf.get("/", REMOTE_ADDR="10.42.1.0", HTTP_X_FORWARDED_FOR=hop)
+    row = OrderHistory.log_note(
+        order=OrderFactory(num_order_items=0), note="n", request=request
+    )
+    row.refresh_from_db()
+    assert row.ip_address == hop.split("%")[0]

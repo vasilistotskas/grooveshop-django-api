@@ -103,6 +103,19 @@ CACHES = {
     },
 }
 
+# No shared log file. ``DEBUG`` is pinned True above, so ``settings.py``
+# takes its development branch and adds ``app_file``, a
+# ``RotatingFileHandler`` on ``logs/grooveshop_<host>.log`` that every xdist
+# worker opens. Once it reaches ``maxBytes`` one worker renames it while the
+# others hold it open; Windows refuses the rename and ``logging`` prints the
+# handler error to stderr, failing the tests that assert an empty stderr.
+# The console handler is all a test run needs.
+LOGGING = {
+    **LOGGING,  # noqa: F405
+    "handlers": {"console": LOGGING["handlers"]["console"]},  # noqa: F405
+    "root": {**LOGGING["root"], "handlers": ["console"]},  # noqa: F405
+}
+
 # Uploads go to a per-worker tree under the OS temp directory, emptied
 # whenever a worker starts. ``settings.py`` points MEDIA_ROOT at the
 # repository's ``mediafiles/``, the tree the development server serves,

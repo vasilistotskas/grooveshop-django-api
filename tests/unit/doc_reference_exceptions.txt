@@ -3,7 +3,7 @@
 docs/client-ip.md: docs/edge-trust-boundary.md
 docs/image-uploads.md: docs/image-limits.md
 docs/staging-anonymise.md: docs/staging.md
-core/fields/measurement.py: project_settings_update_or_create_flake.md
+src/core/fields/measurement.py: project_settings_update_or_create_flake.md
 docs/order-system.md: feedback_no_local_schema_overrides.md
 docs/order-system.md: feedback_no_shared_imports.md
 docs/order-system.md: project_acs_cod_locale.md
@@ -12,5 +12,5 @@ docs/order-system.md: project_db_pool.md
 docs/order-system.md: project_order_state_machine_invariants.md
 docs/order-system.md: project_schema_regen.md
 docs/order-system.md: project_shipping_dispatch_on_commit.md
-order/views/order.py: project_order_state_machine_invariants.md
+src/order/views/order.py: project_order_state_machine_invariants.md
 tests/unit/shipping_acs/test_dynamic_pricing.py: project_test_suite_stability.md

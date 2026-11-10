@@ -22,7 +22,7 @@ uv run pytest tests/unit/path/to/test_file.py
 uv run pytest tests/unit/path/to/test_file.py::test_function_name
 
 # Run tests with coverage (must disable parallel with -n0)
-uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
+uv run pytest --cov=src --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
 
 # Lint and format
 uv run ruff check --fix
@@ -33,7 +33,8 @@ uv run ty check
 
 # Import contracts between apps ([tool.importlinter] in pyproject.toml).
 # A contract's ignore_imports only shrinks: fix the import, delete its line.
-uv run lint-imports
+# lint-imports puts only the working directory on the path, hence PYTHONPATH.
+PYTHONPATH=src uv run lint-imports
 
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
@@ -41,7 +42,7 @@ uv run pre-commit run --all-files
 # Django management
 uv run python manage.py makemigrations
 uv run python manage.py migrate
-uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
+PYTHONPATH=src uv run uvicorn asgi:application --reload   # dev server: HTTP + WebSocket, serves /static and /media in DEBUG
 # `manage.py runserver` is not the dev server: it serves plain HTTP through
 # Django's default WSGI handler but no WebSocket (ws/notifications/)
 uv run python manage.py seed_all
@@ -74,11 +75,11 @@ docker compose up -d --build
 
 ### Settings
 
-Single `src/settings.py` at the project root (not inside any app). Uses `SYSTEM_ENV` env var (`dev`, `production`, `ci`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
+Single `src/settings.py` (not inside any app). `SRC_DIR` is `src/`, for what Django loads from the source (`src/core/templates`, `src/locale`, `src/locale_vendor`, `src/static`); `BASE_DIR` is the repository root (`/home/app` in the image), for `.env`, `pyproject.toml` and what is written at run time (`logs`, `backups`, `mediafiles`, `staticfiles`). Uses `SYSTEM_ENV` env var (`dev`, `production`, `ci`) for environment-specific behavior. All config via `.env` file loaded with python-dotenv. The `DJANGO_SETTINGS_MODULE` is just `"settings"`.
 
 ### Django Apps
 
-All apps live at the project root (flat structure, no `src/` directory):
+Every app, the settings module (`src/settings.py`) and the `asgi` package live in `src/`, and `src/` is on the Python path, so an import names the app and never `src` (`from order.services import ...`, `DJANGO_SETTINGS_MODULE=settings`, `celery -A core`, `asgi:application`). A file is named by its path (`src/order/services.py`), a module by its dotted name (`order.services`). What puts `src/` on the path: `manage.py` and `gunicorn.conf.py` add it themselves, pytest reads `pythonpath` in `pyproject.toml`, and both images set `PYTHONPATH`. Any other command run on a checkout needs `PYTHONPATH=src` (`lint-imports`, `uvicorn`, `celery`). The repository root keeps the entry points, the tooling and its configuration, `tests/`, `tests_mt/`, `docs/`, and the folders written at run time. The apps:
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `src/core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
 - **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain` (a domain is a bare lowercase host name: `tenant.validators.validate_store_hostname` runs in the form and in `save()`, because routing matches the text exactly), provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`src/tenant/credentials.py` — no platform-wide fallback for money/secrets; the secrets are Fernet-encrypted at rest, key setup and rotation in `docs/secret-encryption.md`). Read a per-tenant field through `tenant.membership.bound_tenant()`, never `connection.tenant`: under `schema_context` that is a bare `FakeTenant` with no fields, and `bound_tenant` returns the real row

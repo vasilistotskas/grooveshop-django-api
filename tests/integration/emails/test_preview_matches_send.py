@@ -216,7 +216,7 @@ class TestThePreviewRendersTheRealContext:
         on_disk = {
             path.stem
             for path in (
-                Path(settings.BASE_DIR) / "core/templates/emails/order"
+                Path(settings.SRC_DIR) / "core/templates/emails/order"
             ).glob("*.html")
         }
 

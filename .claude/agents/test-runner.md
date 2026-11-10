@@ -13,7 +13,7 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 
 ## App-to-Test Mapping
 
-A modified app `<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>/`
+A modified app `src/<app>/` maps to `tests/unit/<app>/` and `tests/integration/<app>/`
 (not every app has both): `uv run pytest tests/unit/<app>/ tests/integration/<app>/`.
 Exceptions:
 
@@ -51,7 +51,7 @@ Exceptions:
 - **Show local variables on failure**: add `-l` flag
 - **Run tests matching a pattern**: `uv run pytest -k "test_list" tests/unit/product/`
 - **Skip Meilisearch tests**: they auto-skip when offline (via `requires_meilisearch` marker)
-- **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=product --cov-report=term -n0`
+- **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=src/product --cov-report=term -n0`
 
 ## Two concurrent pytest runs need different `DB_NAME`s
 

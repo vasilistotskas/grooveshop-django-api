@@ -20,12 +20,16 @@ ARG POSTGRES_MAJOR=18
 # .python-version that differs from PYTHON_VERSION then fails the build
 # instead of uv downloading a second Python into $HOME, which the dev
 # stack's bind mount hides at run time.
+# PYTHONPATH: the apps, ``settings`` and ``asgi`` live in ``src/`` and
+# are imported by their bare names (``uvicorn asgi:application``,
+# ``celery --app core``).
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PYTHON_DOWNLOADS=0 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    HOME=${APP_PATH}
+    HOME=${APP_PATH} \
+    PYTHONPATH=${APP_PATH}/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates gnupg \

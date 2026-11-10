@@ -15,21 +15,21 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
-BASE_DIR = Path(settings.BASE_DIR)
+SRC_DIR = Path(settings.SRC_DIR)
 
 ADMIN_FILES = (
     sorted(
         p
-        for p in BASE_DIR.glob("*/admin.py")
+        for p in SRC_DIR.glob("*/admin.py")
         if ".venv" not in p.parts and "node_modules" not in p.parts
     )
-    + sorted((BASE_DIR / "admin").rglob("*.py"))
+    + sorted((SRC_DIR / "admin").rglob("*.py"))
     # Every admin template: pages are built from Unfold's components,
     # never from hand-rolled markup that drifts from the theme.
-    + sorted((BASE_DIR / "core/templates/admin").rglob("*.html"))
-    + sorted((BASE_DIR / "core/templates/unfold").rglob("*.html"))
-    + sorted((BASE_DIR / "texts/templates/admin").rglob("*.html"))
-    + sorted((BASE_DIR / "emails/templates/admin").rglob("*.html"))
+    + sorted((SRC_DIR / "core/templates/admin").rglob("*.html"))
+    + sorted((SRC_DIR / "core/templates/unfold").rglob("*.html"))
+    + sorted((SRC_DIR / "texts/templates/admin").rglob("*.html"))
+    + sorted((SRC_DIR / "emails/templates/admin").rglob("*.html"))
 )
 
 # Pictographs, dingbats, transport, supplemental symbols — the emoji
@@ -72,7 +72,7 @@ _BANNED = {
 
 
 @pytest.mark.parametrize(
-    "path", ADMIN_FILES, ids=lambda p: str(p.relative_to(BASE_DIR))
+    "path", ADMIN_FILES, ids=lambda p: str(p.relative_to(SRC_DIR))
 )
 def test_admin_file_uses_unfold_vocabulary(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
@@ -117,7 +117,7 @@ def test_the_admin_stylesheet_leaves_unfolds_icons_alone() -> None:
     rules outranks Unfold's layered utilities. A ``display`` there on
     ``.material-symbols-outlined`` showed every icon Unfold hides with
     ``hidden``: the ⌘K palette's spinner turned forever."""
-    css = (BASE_DIR / "static/css/admin.css").read_text(encoding="utf-8")
+    css = (SRC_DIR / "static/css/admin.css").read_text(encoding="utf-8")
     rules = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
     assert ".material-symbols-outlined" not in rules
 
@@ -141,7 +141,7 @@ _ONE_COLUMN = re.compile(r"(?<![\w:-])grid-cols-1(?![\w-])")
 
 
 @pytest.mark.parametrize(
-    "path", ADMIN_FILES, ids=lambda p: str(p.relative_to(BASE_DIR))
+    "path", ADMIN_FILES, ids=lambda p: str(p.relative_to(SRC_DIR))
 )
 def test_a_responsive_grid_is_not_overridden_by_unfolds_stylesheet(
     path: Path,

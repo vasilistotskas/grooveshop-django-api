@@ -12,6 +12,12 @@ stays the single source of truth for per-pod capacity.
 """
 
 import os
+from pathlib import Path
+
+# ``asgi:application`` and everything it imports live in ``src/``.
+# Gunicorn adds these directories to ``sys.path`` before it loads the
+# app, so this file does not depend on the image's ``PYTHONPATH``.
+pythonpath = str(Path(__file__).resolve().parent / "src")
 
 bind = "0.0.0.0:8000"
 workers = int(os.environ.get("WEB_CONCURRENCY", "2"))

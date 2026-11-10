@@ -2,8 +2,8 @@
   "name": "django-deps",
   "private": true,
   "scripts": {
-    "build": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./static/css/styles.css --minify",
-    "dev": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./static/css/styles.css --watch"
+    "build": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./src/static/css/styles.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./src/static/css/styles.css --watch"
   },
   "devDependencies": {
     "tailwindcss": "^4.3.5",

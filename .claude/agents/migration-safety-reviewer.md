@@ -4,7 +4,7 @@ description: >
   Review Django migrations for backwards-compatibility under the Argo CD
   PreSync hook deploy model — schema lands BEFORE new code rolls out.
   Use after generating any migration, when reviewing PRs that touch
-  `*/migrations/*.py`, or whenever model changes are about to ship.
+  `src/*/migrations/*.py`, or whenever model changes are about to ship.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -37,7 +37,7 @@ git diff --name-only --diff-filter=AM | grep migrations/
 ```
 
 Read every changed migration file in full. Cross-reference against the
-corresponding `<app>/models.py` to understand the model shape before and
+corresponding `src/<app>/models.py` to understand the model shape before and
 after.
 
 ### 2. Classify each operation

@@ -28,7 +28,7 @@ SENDERS = frozenset(
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-TRANSPORT = ROOT / "emails" / "transport.py"
+TRANSPORT = ROOT / "src" / "emails" / "transport.py"
 #: Not the project's modules: dependencies, and the tests, which read the
 #: outbox and may build a message to assert on. Every virtualenv in the
 #: checkout is skipped too, at any depth and whatever its name

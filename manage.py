@@ -3,6 +3,14 @@
 
 import os
 import sys
+from pathlib import Path
+
+# The apps, ``settings`` and ``asgi`` live in ``src/`` and are imported by
+# their bare names, so that directory has to be on the Python path. The
+# images also set ``PYTHONPATH`` (for ``celery -A core`` and gunicorn,
+# which never run this file); this line is what a bare
+# ``python manage.py ...`` on a checkout relies on.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 
 def main():

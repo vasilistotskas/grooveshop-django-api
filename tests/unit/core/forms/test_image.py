@@ -21,7 +21,7 @@ class ImageAndSvgFieldTest(TestCase):
 
     def get_static_file(self, filename):
         static_path = os.path.join(
-            settings.BASE_DIR, "static", "images", "test", filename
+            settings.SRC_DIR, "static", "images", "test", filename
         )
         if os.path.exists(static_path):
             with open(static_path, "rb") as f:

@@ -51,13 +51,13 @@ from tests.utils.staff import (
     unbind_store_tenant,
 )
 
-EMAIL_TEMPLATE_ROOT = Path(settings.BASE_DIR) / "core" / "templates" / "emails"
+EMAIL_TEMPLATE_ROOT = Path(settings.SRC_DIR) / "core" / "templates" / "emails"
 # django-allauth emails (login code, password reset, email confirmation,
 # security notices, MFA and social-account notices) live in allauth's own
 # template-lookup trees (``account/``, ``mfa/``, ``socialaccount/``) but
 # must be no less themed than the rest of transactional mail, so the sweep
 # covers all of them.
-TEMPLATES = Path(settings.BASE_DIR) / "core" / "templates"
+TEMPLATES = Path(settings.SRC_DIR) / "core" / "templates"
 SWEPT_ROOTS = (
     EMAIL_TEMPLATE_ROOT,
     TEMPLATES / "account",

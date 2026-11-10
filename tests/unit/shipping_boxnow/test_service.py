@@ -363,6 +363,8 @@ class TestApplyWebhookEvent:
         assert BoxNowParcelEvent.objects.count() == int(applied)
 
     def test_the_replay_window_must_end_before_the_guard_rows_are_swept(self):
+        from django.conf import settings
+
         env = {
             **os.environ,
             "BOXNOW_WEBHOOK_MAX_EVENT_AGE_DAYS": "730",
@@ -371,6 +373,7 @@ class TestApplyWebhookEvent:
 
         run = subprocess.run(
             [sys.executable, "-c", "import settings"],
+            cwd=settings.SRC_DIR,
             env=env,
             capture_output=True,
             text=True,

@@ -17,7 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_FILE = ROOT / "schema.yml"
-SETTINGS_FILE = ROOT / "settings.py"
+SETTINGS_FILE = ROOT / "src" / "settings.py"
 
 
 def test_the_committed_schema_info_is_what_the_code_generates(openapi_schema):

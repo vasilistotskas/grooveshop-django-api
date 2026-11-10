@@ -163,24 +163,24 @@ class TestEmailHelperCallSites:
     EXPECTED_CALLERS = (
         # path inside grooveshop-django-api / required helpers
         # The ``mailto:`` unsubscribe carries the store's contact address.
-        ("emails/headers.py", ("tenant_contact_email",)),
+        ("src/emails/headers.py", ("tenant_contact_email",)),
         # Every mail sent through ``emails.send_email`` takes its
         # envelope from here.
-        ("emails/sender.py", ("from_address", "store_reply_to")),
+        ("src/emails/sender.py", ("from_address", "store_reply_to")),
     )
 
     #: Modules whose mail goes through ``emails.send_email`` only.
     PIPELINE_CALLERS = (
-        "order/tasks.py",
-        "shipping/alerts.py",
-        "shipping_acs/tasks.py",
-        "shipping_boxnow/tasks.py",
-        "product/tasks.py",
-        "giftcard/tasks.py",
-        "b2b/tasks.py",
-        "contact/tasks.py",
-        "user/tasks.py",
-        "user/utils/subscription.py",
+        "src/order/tasks.py",
+        "src/shipping/alerts.py",
+        "src/shipping_acs/tasks.py",
+        "src/shipping_boxnow/tasks.py",
+        "src/product/tasks.py",
+        "src/giftcard/tasks.py",
+        "src/b2b/tasks.py",
+        "src/contact/tasks.py",
+        "src/user/tasks.py",
+        "src/user/utils/subscription.py",
     )
 
     def test_outbound_email_paths_use_tenant_helpers(self) -> None:

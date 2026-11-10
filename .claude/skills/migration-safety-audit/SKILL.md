@@ -4,7 +4,7 @@ description: >
   Audit Django migrations for backwards-compatibility under the Argo CD PreSync
   hook deploy model (schema lands BEFORE new code rolls out). Use after
   generating a migration, before committing one, when reviewing a PR that
-  touches `*/migrations/*.py`, or when the user says "is this migration safe",
+  touches `src/*/migrations/*.py`, or when the user says "is this migration safe",
   "audit migration", "check migration safety", "will this break prod".
 ---
 

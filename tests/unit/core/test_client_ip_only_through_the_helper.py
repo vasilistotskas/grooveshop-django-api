@@ -27,7 +27,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-CLIENT_IP_MODULE = "core/client_ip.py"
+CLIENT_IP_MODULE = "src/core/client_ip.py"
 
 # The META and header spellings of the four client-address inputs,
 # compared after normalising ``-`` and ``HTTP_`` and the case.
@@ -43,7 +43,7 @@ ALLOWED: dict[str, tuple[str, Counter[tuple[str, str]]]] = {
     # Every read is an argument to ``logger.info`` / ``logger.warning``
     # (they print REMOTE_ADDR, X-Forwarded-For and X-Real-IP); none feeds
     # a decision. The decisions in this module use ``client_ip_or_peer``.
-    "order/views/viva_webhook.py": (
+    "src/order/views/viva_webhook.py": (
         "log lines only, decides nothing",
         Counter(
             {
@@ -57,7 +57,7 @@ ALLOWED: dict[str, tuple[str, Counter[tuple[str, str]]]] = {
     ),
     # Believes X-Real-IP without the edge proof, which the helper refuses.
     # A potential defect, not a decision: issue #638.
-    "meta_capi/signals.py": (
+    "src/meta_capi/signals.py": (
         "believes X-Real-IP; issue #638",
         Counter(
             {
@@ -68,7 +68,7 @@ ALLOWED: dict[str, tuple[str, Counter[tuple[str, str]]]] = {
     ),
     # Its own copy of the peer rule, storing an unchecked forwarded hop in
     # a GenericIPAddressField: issue #639.
-    "search/middleware.py": (
+    "src/search/middleware.py": (
         "own copy of the peer rule; issue #639",
         Counter(
             {

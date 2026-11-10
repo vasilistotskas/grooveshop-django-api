@@ -90,6 +90,7 @@ class TestRecommendationEventRetention:
 
         run = subprocess.run(
             [sys.executable, "-c", "import settings"],
+            cwd=settings.SRC_DIR,
             env=env,
             capture_output=True,
             text=True,

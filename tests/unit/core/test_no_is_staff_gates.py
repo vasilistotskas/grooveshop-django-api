@@ -19,21 +19,21 @@ from django.conf import settings
 # PUBLIC schema (admin login, staff tokens), render admin chrome, or
 # manage the flag itself.
 ALLOWED = {
-    "admin",
-    "tenant/auth_backends.py",
-    "tenant/api_tokens.py",
-    "tenant/staff_api.py",
+    "src/admin",
+    "src/tenant/auth_backends.py",
+    "src/tenant/api_tokens.py",
+    "src/tenant/staff_api.py",
     # Trades a single-use ticket for a builder PlatformStaffToken: it reads
     # the PUBLIC identity, like tenant/staff_api.py when it mints one.
-    "builder/staff_session.py",
+    "src/builder/staff_session.py",
     # Authenticates the staff issuer's tokens against the PUBLIC schema, and
     # re-checks the flag on every call as tenant/api_tokens.py does.
-    "agent/staff_auth.py",
-    "user/admin.py",
-    "user/managers/account.py",
-    "core/rosetta_access.py",
-    "core/context_processors.py",
-    "devtools",
+    "src/agent/staff_auth.py",
+    "src/user/admin.py",
+    "src/user/managers/account.py",
+    "src/core/rosetta_access.py",
+    "src/core/context_processors.py",
+    "src/devtools",
 }
 # .claude/worktrees holds other checkouts of this repository.
 SKIP_DIRS = {
@@ -56,7 +56,7 @@ def _app_modules():
         rel = path.relative_to(root).as_posix()
         if any(part in SKIP_DIRS for part in path.relative_to(root).parts):
             continue
-        if rel in {"settings.py", "manage.py"}:
+        if rel in {"src/settings.py", "manage.py"}:
             continue
         yield rel, path
 

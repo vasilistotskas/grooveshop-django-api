@@ -26,7 +26,7 @@ from admin.environment import (
     environment_title_prefix_callback,
 )
 
-SETTINGS_FILE = Path(__file__).resolve().parents[3] / "settings.py"
+SETTINGS_FILE = Path(__file__).resolve().parents[3] / "src" / "settings.py"
 
 
 @pytest.mark.parametrize(

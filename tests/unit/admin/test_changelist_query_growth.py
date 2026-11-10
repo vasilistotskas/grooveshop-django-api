@@ -40,7 +40,7 @@ pytestmark = pytest.mark.django_db
 
 FIRST_PARTY = {
     path.name
-    for path in Path(settings.BASE_DIR).iterdir()
+    for path in Path(settings.SRC_DIR).iterdir()
     if (path / "__init__.py").exists()
 }
 

@@ -50,7 +50,7 @@ pytestmark = [
     pytest.mark.usefixtures("tenant", "open_email_gates"),
 ]
 
-REPO = Path(settings.BASE_DIR)
+REPO = Path(settings.SRC_DIR)
 OPERATOR = "owner@store.test"
 
 #: What ``OPS_ALERT_<KIND>_ENABLED`` became, one for one.

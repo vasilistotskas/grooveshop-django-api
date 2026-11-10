@@ -40,7 +40,7 @@ equal (see Tests).
 
 `emails` is in both `SHARED_APPS` and `TENANT_APPS`: a store's switches and
 opt-outs live in its schema, the platform's own in `public`. It imports no
-domain app: each app declares its types in `<app>/emails.py`, next to the
+domain app: each app declares its types in `src/<app>/emails.py`, next to the
 data its builder reads. `EmailsConfig.ready` imports every app's `emails`
 module (`autodiscover_modules`), then freezes the registry.
 
@@ -1044,7 +1044,7 @@ tables (`src/devtools/anonymise/rules.py`).
   `test_import_ops_alert_switches.py` runs `emails/0003` over the settings a
   store is in.
 - `tests/integration/emails/test_every_type.py` is parametrised over
-  `registry.all_types()`, so a type added to any `<app>/emails.py` is covered
+  `registry.all_types()`, so a type added to any `src/<app>/emails.py` is covered
   without editing a test: its sample sends, a closed gate stops it with the
   gate's label, a store's switch stops a switchable one and refuses a
   required one, the headers are exactly those of its audience and kind, an

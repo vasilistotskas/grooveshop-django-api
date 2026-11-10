@@ -209,9 +209,9 @@ class TestTheGuardsSeeTheirTarget:
 #: error a shopper's client reads.
 UNCODED_RESPONSE_MODULES = frozenset(
     {
-        "order/views/viva_webhook.py",
-        "shipping_boxnow/views/webhook.py",
-        "core/middleware/allauth_ratelimit.py",
+        "src/order/views/viva_webhook.py",
+        "src/shipping_boxnow/views/webhook.py",
+        "src/core/middleware/allauth_ratelimit.py",
     }
 )
 

@@ -529,6 +529,15 @@ jobs:
         # shards are already there. ``--durations`` prints the slowest
         # setups, tests and teardowns of the shard, for the day one of
         # them becomes the bound.
+        # ``--no-loadscope-reorder``: by default xdist hands out files
+        # by their number of tests, largest first
+        # (``xdist/scheduler/loadscope.py``), so a file with few tests
+        # and a long class setup starts last and the shard waits for it
+        # with three workers idle. tests/integration/core/
+        # test_migration_seo_into_translations.py (5 tests, 160 to 214 s
+        # of setup) held shard 1 that way for 3.5 minutes in run
+        # 42885630670. Without the reorder files start in collection
+        # order.
         # One worker per vCPU (``XDIST_WORKERS``), not the ``-n auto``
         # of ``addopts``: with psutil installed ``auto`` counts PHYSICAL
         # cores, and a standard runner has 4 vCPUs on 2 cores, so
@@ -548,6 +557,7 @@ jobs:
           cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
           uv run pytest --cov=. --cov-append --cov-report= --cov-fail-under=0
           --cov-config=pyproject.toml -n "$XDIST_WORKERS" --dist loadfile
+          --no-loadscope-reorder
           --splits 4 --group ${{ matrix.group }}
           --durations-path test-durations-shard-${{ matrix.group }}.json
           --store-durations --clean-durations

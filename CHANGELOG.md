@@ -3,6 +3,59 @@
 
 
 
+## v3.242.10 (2026-11-10)
+
+### Bug fixes
+
+* fix(settings): remove settings nothing reads, state repeated blocks once, move seed data beside its factories (#609) ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+* fix(settings): drop settings nothing reads, one copy of each repeated block, seed data beside its factories
+
+No remaining setting changes value in dev, ci, staging or production,
+and the beat schedule keeps every entry, task, timing and option.
+
+Removed, each read by nothing under this configuration:
+- SESSION_FILE_PATH: only the file session engine reads it, the engine
+  is cached_db, and None is Django's default.
+- CELERY_CACHE_BACKEND: read only by Celery's and django-celery-results'
+  cache result backends; the result backend is the database one.
+- CELERY_RESULT_PERSISTENT: read only by the rpc result backend.
+- CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS: its retry_policy is read only
+  by the Redis result backend.
+- CELERY_TASK_TRACK_STARTED = False: Celery's default.
+- the bimonthly_4am schedule preset, which no entry used.
+
+Collapsed:
+- get_celery_beat_schedule: hourly_under_debug() replaces 47 copies of
+  "X if not DEBUG else every_hour", and the development log sweep follows
+  IS_DOCKER / IS_KUBERNETES instead of probing the container a second
+  time. The three IS_* flags move up beside DEBUG.
+- LOGGING: the shared line format, filter classes and loggers are named
+  once; each environment states only its formatters, filters and
+  handlers.
+- Static and media files: MEDIA_URL and STORAGES are stated once; the
+  DEBUG branch keeps what differs.
+
+Moved:
+- LANGUAGE_COUNTRY_MAPPING to country/seed_data.py and
+  COUNTRY_REGIONS_MAPPING to region/seed_data.py; their factories were
+  the only readers.
+- The control plane's sidebar to admin.navigation.platform_sidebar,
+  beside store_sidebar. UNFOLD_PLATFORM names it by dotted path, as
+  UNFOLD names the store's. Built per request, it reverses against the
+  request's own URLconf, so the pinned urlconf of the settings literal
+  is gone. The tests that read the literal call the function. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+### Testing
+
+* test(scheduler): the whole-schedule test sets the flag the schedule reads
+
+get_celery_beat_schedule now decides the Docker-only entry from
+IS_DOCKER and IS_KUBERNETES, read once at import. The test still set
+KUBERNETES_SERVICE_HOST in the environment, which the function no longer
+looks at, so on a Docker host it ran with the development log sweep it
+says it excludes. It patches IS_KUBERNETES instead. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
 ## v3.242.9 (2026-11-10)
 
 ### Bug fixes

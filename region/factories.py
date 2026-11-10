@@ -11,14 +11,13 @@ from devtools.factories import (
     custom_seeding,
 )
 from region.models import Region
+from region.seed_data import COUNTRY_REGIONS_MAPPING
 
 fake = Faker()
 
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
-
-COUNTRY_REGIONS_MAPPING = getattr(settings, "COUNTRY_REGIONS_MAPPING", {})
 
 
 def get_or_create_country():

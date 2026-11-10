@@ -689,7 +689,11 @@ read is cached per release: that is what brings the rewrite to visitors.
 - **It imports nothing.** A value that is no image of the store (it names the
   place), an image not in the library yet, and a document that does not validate
   each stop the store with nothing written. Run `import_builder_media
-  --all-versions` first.
+  --all-versions` first. The images are read before the documents are locked,
+  so a draft saved in between stops the store the same way: run it again.
+- **One store, one transaction.** A stopped store is named with its reasons when
+  the command ends (exit 1) and the other stores are written. Nothing records
+  that a store was stopped: settle the reason and run it again.
 - A new setting already chosen stays and the URL beside it goes. An empty entry
   of a list goes, since a list of references has no empty slot.
 - `--dry-run` does all of that and writes nothing. A second run finds nothing.

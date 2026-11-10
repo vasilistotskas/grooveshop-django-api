@@ -489,9 +489,7 @@ def migrate_document(
                 if ids:
                     node_settings[legacy.target] = ids
             elif isinstance(value, str) and value.strip():
-                node_settings[legacy.target] = _asset_of(
-                    value.strip(), assets
-                )
+                node_settings[legacy.target] = _asset_of(value.strip(), assets)
     return migrated, _without_empties(overlay), moved
 
 

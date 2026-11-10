@@ -1219,7 +1219,8 @@ accepting Cyprus orders at the Greek flat rate.
   (the task, its retries, a re-dispatch, "Issue ACS voucher now") is
   refused with `AcsVoucherRequestUnknownError` until staff use **Adopt ACS
   voucher** (the number may belong to no other shipment; ACS must hold it,
-  and its `ACS_Trackingsummary` recipient must equal the `Recipient_Name`
+  except a number recorded on this shipment as our own voucher ACS refused
+  to delete, which needs a hand confirmation; and its `ACS_Trackingsummary` recipient must equal the `Recipient_Name`
   the lost request sent, with no other waiting order sharing that name;
   anything else, a number known only from a refused pickup list included,
   needs a written hand confirmation, because the manual documents no

@@ -1,0 +1,11 @@
+CHECK THE ACS VOUCHER OF AN ORDER
+
+A voucher request for order #1234 sent before its check was resolved has now ended without an answer. ACS may hold one more voucher for this order that nothing records.
+
+What happened: ACS [ACS_Create_Voucher]: ACS timeout after 15s: Read timed out.
+
+Look in the ACS portal for the vouchers of order #1234 (their reference is the order number). Delete there any voucher the order's ACS shipment does not use.
+
+Acme Gadgets
+owner@store.test
+https://shop.example/en

@@ -3123,19 +3123,12 @@ class OrderAdmin(BaseModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
-        # Carrier-agnostic "voucher minted" check. ACS exposes
-        # ``voucher_no`` once ``ACS_Create_Voucher`` returns, BoxNow
-        # exposes ``parcel_id`` once the delivery-request task lands.
-        # When neither is set the shipment is still in a pre-creation
-        # state (``pending_creation``, ``failed_creation``, etc.) and
-        # hitting the carrier's label endpoint would 404 with an
-        # opaque "code: ?" payload — surfacing the raw API error in
-        # the admin flash bar reads as a regression. Bail early with
-        # a friendly message instead.
-        identifier = getattr(shipment, "voucher_no", None) or getattr(
-            shipment, "parcel_id", None
-        )
-        if not identifier:
+        # The carrier says whether it has booked the shipment
+        # (``has_label``). Until it has, the shipment is still in a
+        # pre-creation state (``pending_creation``, ``failed_creation``,
+        # etc.) and there is no label to fetch: say so instead of
+        # showing the carrier's raw API error in the flash bar.
+        if not adapter.has_label(shipment):
             state_label = getattr(
                 shipment, "get_parcel_state_display", None
             ) or getattr(shipment, "get_shipment_state_display", None)
@@ -3175,6 +3168,9 @@ class OrderAdmin(BaseModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
+        identifier = getattr(shipment, "voucher_no", None) or getattr(
+            shipment, "parcel_id", None
+        )
         filename = f"{adapter.code}-voucher-{identifier}.pdf"
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'

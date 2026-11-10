@@ -2771,20 +2771,13 @@ class OrderViewSet(BaseModelViewSet):
 
         order = self.get_object()
 
-        adapter = ShippingService.adapter_for_order(order)
-        if adapter is None:
-            raise NotFound(
-                _("No carrier shipment found for this order."),
-                code="shipment_missing",
-            )
-        shipment = adapter.shipment_for_order(order)
-        if shipment is None:
+        label_bytes = ShippingService.fetch_label_bytes(order)
+        if label_bytes is None:
             raise NotFound(
                 _("No carrier shipment found for this order."),
                 code="shipment_missing",
             )
 
-        label_bytes: bytes = adapter.fetch_label_bytes(shipment)
         provider_code = order.shipping_provider.code
         return FileResponse(
             BytesIO(label_bytes),

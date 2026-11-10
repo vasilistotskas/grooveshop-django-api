@@ -2902,9 +2902,12 @@ class OrderService:
         history note. The default is the strict one, so a caller that
         forgets to choose is held to the courier's answer.
         """
+        customer_asked_courier = (
+            customer_initiated and not shipment_already_canceled
+        )
         if shipment_already_canceled:
             shipment_cancel = dict(SHIPMENT_ALREADY_CANCELED)
-        elif customer_initiated:
+        elif customer_asked_courier:
             shipment_cancel = cls._ask_courier_to_cancel(order, reason)
         else:
             shipment_cancel = None
@@ -2916,7 +2919,15 @@ class OrderService:
                 shipment_cancel=shipment_cancel,
             )
         except Exception:
-            if shipment_cancel is not None and shipment_cancel["dispatched"]:
+            # The note is for a cancel that asked the courier, got the
+            # voucher canceled and then failed: staff must issue a new
+            # one. A shipment that was dead before this ran has no such
+            # story to tell.
+            if (
+                customer_asked_courier
+                and shipment_cancel is not None
+                and shipment_cancel["dispatched"]
+            ):
                 cls._note_shipment_canceled_without_order(order)
             raise
         # The cancel is committed; the refund is its own claim, call and

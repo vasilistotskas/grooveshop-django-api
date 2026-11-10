@@ -263,3 +263,29 @@ class TestCancelForDeadShipment:
         assert not isinstance(raised.value, OrderNotCancelableError)
         order.refresh_from_db()
         assert order.status == OrderStatus.PROCESSING
+
+    @pytest.mark.parametrize(
+        "status", [OrderStatus.PROCESSING, OrderStatus.SHIPPED]
+    )
+    def test_a_cancel_that_did_not_happen_leaves_no_voucher_note(self, status):
+        """The "its shipment was canceled, create a new voucher" note and
+        its ERROR belong to a customer cancel that asked the courier.
+        Nobody asked here, and the shipment was dead before this ran."""
+        order, _product = _order_holding_stock(status=status)
+
+        with (
+            patch.object(
+                StockManager,
+                "lock_products",
+                side_effect=RuntimeError("lock timeout"),
+            ),
+            patch.object(
+                OrderService, "_note_shipment_canceled_without_order"
+            ) as note,
+            pytest.raises(OrderCancellationError),
+        ):
+            OrderService.cancel_for_dead_shipment(
+                order, carrier="ACS", silent_for_customer=False
+            )
+
+        note.assert_not_called()

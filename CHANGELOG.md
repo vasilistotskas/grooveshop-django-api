@@ -3,6 +3,48 @@
 
 
 
+## v3.242.13 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_boxnow): a canceled parcel no longer cancels its order (#620) ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
+* fix(shipping_boxnow): a canceled parcel no longer cancels its order
+
+BoxNow defines a canceled parcel as "Parcel has been canceled by the
+sender" (Webhook Tracking Guide v1.4.6 p. 2, API Manual v7.2 §6.5.3):
+the sender is the store, so the event reports a decision the store
+already made. The owner decided (2026-11-10) that it must not cancel
+the order, reversing the outcome #604 shipped.
+
+- _apply_order_status_transition: a canceled event (webhook or poll)
+  records the shipment CANCELED and leaves the order, its stock and its
+  payment alone. BoxNow no longer calls cancel_for_dead_shipment; ACS
+  still does.
+- An open (PENDING/PROCESSING) order behind a canceled parcel needs
+  follow-up at once, whatever its age and ORDER_FOLLOW_UP_DAYS: the
+  badge, filter, dashboard counter and change-page line already read
+  OrderQuerySet.needing_follow_up. Each carrier answers through
+  ShippingCarrierInterface.canceled_shipment_q (OR-ed by
+  ShippingService.canceled_shipment_q), so order imports no carrier
+  app. The attention counter now depends on BoxNowShipment.
+- cancel_shipment: a repeat cancel of a CANCELED shipment returns before
+  anything is written, also when it has no parcel_id ("Canceling a
+  canceled parcel has no effect", §3.7), so cancel_requested_at and the
+  cancellations log no longer move (#599).
+docs/order-system.md 2.1, 2.3, 5.2, 5.3, 7.1, 7.1.1 and 8.
+
+Closes #600
+Closes #599 ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
+### Testing
+
+* test(shipping_boxnow): a paid order behind a canceled parcel is refunded by its customer's cancel
+
+Covers the refund path the race in #600 cost: after the canceled event,
+a customer cancel of a paid order cancels it, restocks, refunds once
+and does not ask BoxNow to cancel the parcel again. ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
 ## v3.242.12 (2026-11-10)
 
 ### Bug fixes

@@ -122,12 +122,28 @@ is ACS API Calls, alias `ACS_Create_Voucher`, the order id (outcome
 `transport`, `retryable` or `unexpected`, no response). Then, on the
 shipment:
 
-- **Adopt ACS voucher** (number): accepted only when ACS confirms it, a row
-  from `ACS_Trackingsummary` (p. 18-19) or ACS having named it for the
-  account on a refused pickup list. Saves the voucher, fetches multipart
-  children, never calls `ACS_Create_Voucher`.
+- **Adopt ACS voucher** (number): refused when any shipment carries the
+  number (its voucher, a multipart child, a previous or duplicate voucher).
+  ACS must confirm it is this order's: the `recipient` of its
+  `ACS_Trackingsummary` row (p. 18-19) must equal the order's
+  `Recipient_Name`, compared without accents, case or extra spaces; the
+  summary's `sender`, `recipient_address` and `pickup_date` are not
+  compared, because the manual does not say how ACS spells them. Without a
+  summary naming a recipient, the number must be an open "voucher matching
+  no order" that ACS named on a refused pickup list. The checks run again
+  under the row lock; a concurrent adopt of the same number gets the same
+  refusal. Saves the voucher, fetches multipart children, never calls
+  `ACS_Create_Voucher`.
 - **No voucher at ACS: request again** (a note on how you checked): clears
   the state and queues the mint once.
+
+A late answer settles it too: when a worker's request outlives the claim's
+TTL, another worker records the outcome as unknown, and the first one's
+answer then arrives with a voucher, the save clears the flag (history:
+"A late answer from ACS ... resolved ..."; an order note). Resetting a
+canceled shipment for a re-mint clears a flag left beside a real voucher
+and keeps one on a shipment with no voucher (it was canceled before the
+lost request was resolved; both resolutions still work).
 
 LogsQL: `phase:phase2_outcome_unknown` or `phase:phase1_stale_claim`.
 
@@ -144,6 +160,18 @@ portal, for example). It may be the lost answer of a voucher request, a
 duplicate, or a portal voucher: nothing documented ties it to an order, so
 nothing is deleted or adopted automatically. Only a day with candidates
 calls ACS, so a lone orphan surfaces on the next day that has one.
+
+- While a mint of the store is in flight (a claim younger than its TTL),
+  ACS may be naming the voucher it has just made for us, so the run records
+  nothing and the next run decides.
+- A shipment that saves a number (the mint, or an adopt) resolves the open
+  row for it, children included.
+- **Delete at ACS** re-checks under the row's lock: refused when a
+  shipment carries the number, while a mint is in flight, and while any
+  order waits in the unknown state (the voucher may be that order's lost
+  one, and a deleted voucher cannot be adopted). Resolve the waiting order
+  first, by adopting the voucher or requesting again; then it can be
+  deleted.
 
 ## What did ACS answer for call Y?
 

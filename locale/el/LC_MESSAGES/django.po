@@ -1009,6 +1009,10 @@ msgstr "Ένα επαληθευμένο webhook του %(carrier)s δεν μπό
 msgid "A voucher request for order #%(order_id)s may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check."
 msgstr "Ένα αίτημα voucher για την παραγγελία #%(order_id)s μπορεί να έφτασε στην ACS, αλλά δεν ήρθε απάντηση. Η ACS μπορεί να έχει δημιουργήσει voucher, γι' αυτό δεν στέλνεται νέο αίτημα μέχρι να το ελέγξετε."
 
+#, python-format
+msgid "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
+msgstr "Ένα αίτημα voucher βρίσκεται σε εξέλιξη και το voucher %(voucher)s μπορεί να είναι η απάντησή του. Δοκιμάστε ξανά σε λίγα λεπτά."
+
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "Πεδίο ``aa`` ΑΑΔΕ — αυστηρά αύξων ακέραιος εντός ``(series, year)``. Πρέπει να είναι χωρίς κενά βάσει της ελληνικής φορολογικής νομοθεσίας."
 
@@ -1177,6 +1181,10 @@ msgstr "Απόρριψη από την ACS"
 
 msgid "ACS rejected the cancellation."
 msgstr "Η ACS απέρριψε την ακύρωση."
+
+#, python-format
+msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
+msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», όχι για τον παραλήπτη αυτής της παραγγελίας. Ελέγξτε τον αριθμό στην πύλη της ACS."
 
 msgid "ACS shipment"
 msgstr "Αποστολή ACS"
@@ -4128,8 +4136,8 @@ msgstr "Διαγράφηκε στην ACS"
 msgid "Deleted product"
 msgstr "Διαγραμμένο προϊόν"
 
-msgid "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. Do not use it for a voucher that belongs to an order whose voucher request has an unknown outcome: adopt it from that order's ACS shipment instead."
-msgstr "Διαγράφει το voucher στην ACS. Η ACS το επιτρέπει μόνο όσο το voucher δεν περιλαμβάνεται σε λίστα παραλαβής. Μην το χρησιμοποιείτε για voucher που ανήκει σε παραγγελία της οποίας το αίτημα voucher έχει άγνωστη έκβαση: υιοθετήστε το από την αποστολή ACS εκείνης της παραγγελίας."
+msgid "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. It is refused while an order waits for a voucher whose request had an unknown outcome, because this may be that order's voucher."
+msgstr "Διαγράφει το voucher στην ACS. Η ACS το επιτρέπει μόνο όσο το voucher δεν περιλαμβάνεται σε λίστα παραλαβής. Δεν επιτρέπεται όσο μια παραγγελία περιμένει voucher του οποίου το αίτημα είχε άγνωστη έκβαση, γιατί μπορεί να είναι το voucher εκείνης της παραγγελίας."
 
 msgid "Deliver At"
 msgstr "Παράδοση στις"
@@ -16434,6 +16442,10 @@ msgstr "Το voucher %(voucher)s έχει ήδη διευθετηθεί."
 #, python-format
 msgid "Voucher %(voucher)s marked as checked."
 msgstr "Το voucher %(voucher)s σημειώθηκε ως ελεγμένο."
+
+#, python-format
+msgid "Voucher %(voucher)s may be the lost voucher of order %(orders)s, whose voucher request has an unknown outcome. Resolve that first: adopt the voucher from the order's ACS shipment if it is the order's, or request again if not."
+msgstr "Το voucher %(voucher)s μπορεί να είναι το χαμένο voucher της παραγγελίας %(orders)s, της οποίας το αίτημα voucher έχει άγνωστη έκβαση. Διευθετήστε το πρώτα: υιοθετήστε το voucher από την αποστολή ACS της παραγγελίας αν είναι δικό της, ή υποβάλετε νέο αίτημα αν δεν είναι."
 
 #, python-format
 msgid "Voucher %(voucher)s now belongs to a shipment: cancel it from that shipment instead."

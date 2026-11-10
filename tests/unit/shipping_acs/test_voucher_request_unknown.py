@@ -304,6 +304,19 @@ class TestACrashBeforeTheSave:
         assert acs.creates == []
 
 
+def _as_acs_prints_it(order) -> str:
+    """The recipient as ACS's tracking summary spells it: upper case,
+    without accents (manual p. 19 shows only masked upper-case values)."""
+    import unicodedata
+
+    name = f"{order.first_name} {order.last_name}".upper()
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFD", name)
+        if not unicodedata.combining(c)
+    )
+
+
 def _unknown_shipment(acs):
     shipment = _shipment()
     with pytest.raises(AcsVoucherRequestUnknownError):
@@ -317,7 +330,10 @@ class TestAdoptTheVoucherAcsHolds:
         self, acs, sent
     ):
         shipment = _unknown_shipment(acs)
-        acs.summaries[V1] = {"voucher_no": V1, "recipient": "ΠΑΠΑΔΟΠΟΥΛΟΣ"}
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(shipment.order),
+        }
 
         AcsService.adopt_voucher(shipment, V1, user=None)
 
@@ -374,6 +390,178 @@ class TestAdoptTheVoucherAcsHolds:
 
         with pytest.raises(AcsVoucherResolutionError):
             AcsService.adopt_voucher(shipment, V1, user=None)
+
+
+class TestAdoptConfirmsTheVoucherIsThisOrders:
+    """Review of #626, finding 2."""
+
+    def test_a_voucher_acs_reports_for_another_recipient_is_refused(
+        self, acs, sent
+    ):
+        shipment = _unknown_shipment(acs)
+        acs.summaries[V1] = {"voucher_no": V1, "recipient": "ANOTHER PERSON"}
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+
+    def test_a_voucher_staff_already_deleted_at_acs_is_not_confirmed(
+        self, acs, sent
+    ):
+        shipment = _unknown_shipment(acs)
+        AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+            resolved_at=timezone.now(),
+            resolution=AcsUnrecognisedVoucherResolution.DELETED,
+        )
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            pytest.param({"multipart_vouchers": [V1]}, id="multipart-child"),
+            pytest.param({"previous_vouchers": [V1]}, id="previous-voucher"),
+        ],
+    )
+    def test_a_number_another_shipment_carries_in_its_metadata_is_refused(
+        self, acs, sent, metadata
+    ):
+        AcsShipmentFactory(voucher_no="9700000999", metadata=metadata)
+        shipment = _unknown_shipment(acs)
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(shipment.order),
+        }
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+    def test_a_concurrent_adopt_of_the_same_number_is_a_refusal_not_a_500(
+        self, acs, sent, monkeypatch
+    ):
+        """The other adopt commits between our pre-check and our lock."""
+        rival = _unknown_shipment(acs)
+        acs.creates.clear()  # the next create loses its answer as well
+        shipment = _unknown_shipment(acs)
+
+        def summary_while_the_rival_saves(self, voucher_no):
+            AcsShipment.objects.filter(pk=rival.pk).update(
+                voucher_no=V1, voucher_request_unknown_at=None
+            )
+            return {
+                "voucher_no": V1,
+                "recipient": _as_acs_prints_it(shipment.order),
+            }
+
+        monkeypatch.setattr(
+            _Acs, "tracking_summary", summary_while_the_rival_saves
+        )
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+
+
+class TestALateAnswer:
+    """Review of #626, finding 1: worker A waits on ACS past the claim's
+    TTL, worker B finds the claim expired and records the unknown
+    outcome, then A's answer arrives with the voucher."""
+
+    def test_the_late_voucher_is_saved_and_resolves_the_unknown_outcome(
+        self, acs, sent, monkeypatch
+    ):
+        acs.first_error = None
+        shipment = _shipment()
+
+        def answer_after_worker_b_gave_up(self, params):
+            _Acs.creates.append(params)
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_request_unknown_at=timezone.now(), metadata={}
+            )
+            return {"Voucher_No": V1, "Error_Message": ""}
+
+        monkeypatch.setattr(
+            _Acs, "create_voucher", answer_after_worker_b_gave_up
+        )
+
+        AcsService.create_voucher_for_order(shipment.order)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no == V1
+        assert shipment.voucher_request_unknown_at is None
+        assert "late answer" in shipment.history.first().history_change_reason
+        assert any("late answer" in note for note in _notes(shipment.order_id))
+
+    def test_saving_a_voucher_resolves_the_row_acs_named_for_it(
+        self, acs, sent
+    ):
+        """Review finding 3: ACS named our own voucher while the mint was
+        between its request and its save."""
+        acs.first_error = None
+        AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V2,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+        )
+        shipment = _shipment()
+
+        AcsService.create_voucher_for_order(shipment.order)
+
+        row = AcsUnrecognisedVoucher.objects.get(voucher_no=V2)
+        assert row.resolution == AcsUnrecognisedVoucherResolution.ADOPTED
+        assert row.shipment_id == shipment.pk
+
+
+class TestResetForRemint:
+    """Review of #626, finding 1: a reset never leaves a shipment in a
+    state no action can leave."""
+
+    def test_a_reset_of_a_real_voucher_clears_a_stale_flag(self, acs, sent):
+        shipment = _shipment()
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            voucher_no=V1,
+            shipment_state=AcsShipmentState.CANCELED,
+            voucher_request_unknown_at=timezone.now(),
+        )
+
+        AcsService.reset_shipment_for_remint(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+        assert shipment.voucher_request_unknown_at is None
+
+    def test_a_reset_while_the_lost_request_is_unresolved_keeps_it(
+        self, acs, sent
+    ):
+        """Canceled before staff resolved the lost request: ACS may still
+        hold that voucher, so the flag stays and both resolutions still
+        work."""
+        shipment = _unknown_shipment(acs)
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            shipment_state=AcsShipmentState.CANCELED
+        )
+
+        AcsService.reset_shipment_for_remint(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_request_unknown_at is not None
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(shipment.order),
+        }
+        AcsService.adopt_voucher(shipment, V1, user=None)
+        shipment.refresh_from_db()
+        assert shipment.voucher_no == V1
 
 
 class TestRequestAgain:

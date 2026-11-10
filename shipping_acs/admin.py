@@ -1129,10 +1129,9 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
             title=_("Delete this voucher at ACS"),
             description=_(
                 "Deletes the voucher at ACS. ACS allows it only while the "
-                "voucher is on no pickup list. Do not use it for a voucher "
-                "that belongs to an order whose voucher request has an "
-                "unknown outcome: adopt it from that order's ACS shipment "
-                "instead."
+                "voucher is on no pickup list. It is refused while an order "
+                "waits for a voucher whose request had an unknown outcome, "
+                "because this may be that order's voucher."
             ),
             form_class=ResolveUnrecognisedVoucherForm,
         ),

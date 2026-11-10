@@ -1197,10 +1197,13 @@ accepting Cyprus orders at the Greek flat rate.
   noted, `ops.acs_voucher_request_unknown` is sent once, and every caller
   (the task, its retries, a re-dispatch, "Issue ACS voucher now") is
   refused with `AcsVoucherRequestUnknownError` until staff use **Adopt ACS
-  voucher** (the number must be confirmed by `ACS_Trackingsummary` or have
-  been named by ACS on a refused pickup list; no create is sent) or **No
-  voucher at ACS: request again** (a note is required; queues the mint
-  once). Nothing is automatic: no documented call ties a voucher to our
+  voucher** (the number may belong to no other shipment, and ACS must
+  confirm it is this order's: the `ACS_Trackingsummary` recipient equals
+  the order's `Recipient_Name`, or ACS named it on a refused pickup list
+  and it is still open; no create is sent) or **No voucher at ACS: request
+  again** (a note is required; queues the mint once). A late answer that
+  arrives after another worker recorded the outcome as unknown is saved
+  and clears the state. Nothing is automatic: no documented call ties a voucher to our
   `Reference_Key1` before the pickup list. `docs/acs-debugging.md` has the
   error table.
 - **Vouchers ACS names that match no shipment.** A refused
@@ -1210,7 +1213,10 @@ accepting Cyprus orders at the Greek flat rate.
   sends `ops.acs_unrecognised_vouchers` the first time it is named, and the
   task result lists them under `unrecognised`. Staff adopt it from the
   order's shipment, delete it at ACS (`ACS_Delete_Voucher`, only before a
-  pickup list) or mark it as checked (a note is required).
+  pickup list; refused while a mint is in flight or any order waits in the
+  unknown state, since it may be that order's voucher) or mark it as
+  checked (a note is required). A run during an in-flight mint records
+  nothing, and a shipment that saves a number resolves its row.
   `_build_create_voucher_params` uses `order.country_id` verbatim as
   `Recipient_Country` (no lookup — `Country.pk` IS the alpha-2 code)
   and refuses with `AcsAPIError` if it is missing, rather than

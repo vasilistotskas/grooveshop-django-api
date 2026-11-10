@@ -1004,6 +1004,10 @@ msgstr "A verified %(carrier)s webhook could not be applied."
 msgid "A voucher request for order #%(order_id)s may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check."
 msgstr "A voucher request for order #%(order_id)s may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check."
 
+#, python-format
+msgid "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
+msgstr "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
+
 msgid "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 msgstr "AADE ``aa`` field — strictly-increasing integer within ``(series, year)``. Must be gapless per Greek tax law."
 
@@ -1172,6 +1176,10 @@ msgstr "ACS refused"
 
 msgid "ACS rejected the cancellation."
 msgstr "ACS rejected the cancellation."
+
+#, python-format
+msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
+msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
 
 msgid "ACS shipment"
 msgstr "ACS shipment"
@@ -4123,8 +4131,8 @@ msgstr "Deleted at ACS"
 msgid "Deleted product"
 msgstr "Deleted product"
 
-msgid "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. Do not use it for a voucher that belongs to an order whose voucher request has an unknown outcome: adopt it from that order's ACS shipment instead."
-msgstr "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. Do not use it for a voucher that belongs to an order whose voucher request has an unknown outcome: adopt it from that order's ACS shipment instead."
+msgid "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. It is refused while an order waits for a voucher whose request had an unknown outcome, because this may be that order's voucher."
+msgstr "Deletes the voucher at ACS. ACS allows it only while the voucher is on no pickup list. It is refused while an order waits for a voucher whose request had an unknown outcome, because this may be that order's voucher."
 
 msgid "Deliver At"
 msgstr "Deliver At"
@@ -16432,6 +16440,10 @@ msgstr "Voucher %(voucher)s is already resolved."
 #, python-format
 msgid "Voucher %(voucher)s marked as checked."
 msgstr "Voucher %(voucher)s marked as checked."
+
+#, python-format
+msgid "Voucher %(voucher)s may be the lost voucher of order %(orders)s, whose voucher request has an unknown outcome. Resolve that first: adopt the voucher from the order's ACS shipment if it is the order's, or request again if not."
+msgstr "Voucher %(voucher)s may be the lost voucher of order %(orders)s, whose voucher request has an unknown outcome. Resolve that first: adopt the voucher from the order's ACS shipment if it is the order's, or request again if not."
 
 #, python-format
 msgid "Voucher %(voucher)s now belongs to a shipment: cancel it from that shipment instead."

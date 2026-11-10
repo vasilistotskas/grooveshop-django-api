@@ -109,6 +109,23 @@ class TestThePickupListRun:
         assert row.last_seen_at >= first_seen
         assert sent.call_count == 1
 
+    def test_a_number_named_while_our_own_mint_is_in_flight_is_deferred(
+        self, acs, sent
+    ):
+        """Review of #626, finding 3: ACS may name a voucher it minted for
+        us a moment ago, before the mint saved it."""
+        AcsShipmentFactory(
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            metadata={"mint_started_at": timezone.now().isoformat()},
+        )
+
+        result = issue_daily_acs_pickup_list.run()
+
+        assert result["unrecognised"] == []
+        assert not AcsUnrecognisedVoucher.objects.exists()
+        sent.assert_not_called()
+
     def test_a_day_naming_only_our_vouchers_raises_nothing(self, acs, sent):
         acs.named = [OURS]
 
@@ -148,6 +165,39 @@ class TestResolution:
         with pytest.raises(AcsAPIError):
             AcsService.delete_unrecognised_voucher(row, user=None)
 
+        row.refresh_from_db()
+        assert row.resolved_at is None
+
+    def test_deleting_is_refused_while_a_mint_is_in_flight(self, acs):
+        row = self._row()
+        AcsShipmentFactory(
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            metadata={"mint_started_at": timezone.now().isoformat()},
+        )
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.delete_unrecognised_voucher(row, user=None)
+
+        assert acs.deleted == []
+
+    def test_deleting_is_refused_while_an_order_waits_for_its_lost_voucher(
+        self, acs
+    ):
+        """Review of #626, finding 4: the voucher may be exactly that
+        order's lost one; deleting it would destroy the only copy."""
+        row = self._row()
+        waiting = AcsShipmentFactory(
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            voucher_request_unknown_at=timezone.now(),
+        )
+
+        with pytest.raises(AcsVoucherResolutionError) as exc_info:
+            AcsService.delete_unrecognised_voucher(row, user=None)
+
+        assert f"#{waiting.order_id}" in str(exc_info.value)
+        assert acs.deleted == []
         row.refresh_from_db()
         assert row.resolved_at is None
 

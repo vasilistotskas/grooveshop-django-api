@@ -40,7 +40,6 @@ order_stored_value_returned = Signal()
 # back to the customer, so no refund email, Meta event or gift-card
 # release follows. ``chargeback`` is the ledger row.
 order_charged_back = Signal()
-order_returned = Signal()
 # Dispatched the first time an order gets a tracking number / carrier.
 # Kept distinct from ``order_shipped`` (which fires on status transition
 # to SHIPPED) because admins sometimes add tracking before flipping

@@ -388,8 +388,8 @@ def test_every_store_page_is_reachable(settings_values, carriers):
     assert not missing, f"store pages no menu reaches: {missing}"
 
 
+@override_settings(ROOT_URLCONF="tenant.urls_public")
 def test_every_platform_page_is_in_the_platform_sidebar():
-    from django.conf import settings
     from django.urls import resolve
 
     from admin.platform_site import platform_admin_site
@@ -401,8 +401,10 @@ def test_every_platform_page_is_in_the_platform_sidebar():
             yield from walk(item.get("items", []))
 
     reached = {
-        resolve(link, urlconf="tenant.urls_public").url_name
-        for group in settings.UNFOLD_PLATFORM["SIDEBAR"]["navigation"]
+        resolve(link).url_name
+        for group in navigation.platform_sidebar(
+            RequestFactory().get("/admin/")
+        )
         for link in walk(group["items"])
     }
     missing = sorted(

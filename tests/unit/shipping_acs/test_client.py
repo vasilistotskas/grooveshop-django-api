@@ -8,8 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from urllib3.exceptions import MaxRetryError, NewConnectionError, SSLError
 
-from shipping_acs.client import AcsClient
+from shipping_acs.client import _RETRY_CONFIG, AcsClient
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsAuthError,
@@ -85,6 +86,21 @@ class TestConfig:
 # ---------------------------------------------------------------------------
 # _call envelope handling
 # ---------------------------------------------------------------------------
+
+
+class TestRetryPolicy:
+    def test_a_post_is_not_sent_again_after_an_error_of_unknown_timing(self):
+        # Neither a connect nor a read error: urllib3 retries it for any
+        # method unless ``other`` is 0, and the voucher may have been made.
+        with pytest.raises(MaxRetryError):
+            _RETRY_CONFIG.increment(method="POST", error=SSLError("tls"))
+
+    def test_a_post_is_sent_again_when_the_connection_was_refused(self):
+        after = _RETRY_CONFIG.increment(
+            method="POST", error=NewConnectionError(None, "refused")
+        )
+
+        assert after.total == 2
 
 
 class TestCall:

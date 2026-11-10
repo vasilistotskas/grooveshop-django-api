@@ -1,4 +1,7 @@
-"""The store admin's navigation, built per request.
+"""Both admins' navigation, built per request.
+
+The store admin's is ``store_sidebar``; the control plane's,
+``platform_sidebar``, is at the end of the module.
 
 ``UNFOLD["SIDEBAR"]["navigation"]`` points at ``store_sidebar``: Unfold
 calls it with the request on every admin page. A static list could only
@@ -602,6 +605,128 @@ def store_sidebar(request: Any) -> list[Item]:
     ]
     _mark_active(request, groups)
     return groups
+
+
+def platform_sidebar(request: Any) -> list[Item]:
+    """The control plane's navigation: ``UNFOLD_PLATFORM["SIDEBAR"]``.
+
+    Every entry is listed for every platform operator, so nothing here
+    reads the request. The links reverse against the request's own
+    URLconf: the platform site is mounted only in
+    ``PUBLIC_SCHEMA_URLCONF``.
+    """
+
+    def page(title: str, icon: str, url_name: str) -> Item:
+        return _tool(title, icon, reverse(f"platform_admin:{url_name}"))
+
+    return [
+        {
+            "title": _("Control plane"),
+            "separator": True,
+            "items": [
+                page(_("Dashboard"), "hub", "index"),
+                page(_("Tenants"), "storefront", "tenant_tenant_changelist"),
+                page(_("Plan & Billing"), "payments", "plan_billing"),
+                page(
+                    _("Tenant Domains"), "dns", "tenant_tenantdomain_changelist"
+                ),
+                page(
+                    _("Memberships"),
+                    "badge",
+                    "tenant_usertenantmembership_changelist",
+                ),
+                # What offboarding kept of a destroyed store.
+                page(
+                    _("Tenant Archives"),
+                    "inventory",
+                    "tenant_tenantarchive_changelist",
+                ),
+            ],
+        },
+        {
+            "title": _("Identity"),
+            "separator": True,
+            "items": [
+                page(
+                    _("Platform Staff"),
+                    "manage_accounts",
+                    "user_useraccount_changelist",
+                ),
+                page(_("Groups"), "group", "auth_group_changelist"),
+                # Platform staff's own signed-in sessions (public
+                # schema); each store's are in its own admin.
+                page(
+                    _("User Sessions"),
+                    "devices",
+                    "usersessions_usersession_changelist",
+                ),
+            ],
+        },
+        {
+            "title": _("Platform"),
+            "separator": True,
+            "items": [
+                # extra_settings deliberately NOT here: every knob in
+                # EXTRA_SETTINGS is STORE-scoped and read from the
+                # tenant's own schema — nothing that runs in the public
+                # schema reads Setting at all (verified across beat
+                # tasks and the platform dashboard). Exposing the
+                # section here materialized meaningless public-schema
+                # rows and invited edits that silently change nothing
+                # for any store.
+                page(_("Countries"), "public", "country_country_changelist"),
+                page(_("Regions"), "map", "region_region_changelist"),
+                # One public-schema row per purge, across every store —
+                # platform operations, not one merchant's.
+                page(
+                    _("Cache Purge Log"),
+                    "cleaning_services",
+                    "core_cachepurgelog_changelist",
+                ),
+                # One ``django_site`` row per store domain (public
+                # schema, minted by ``tenant.provisioning.ensure_site``)
+                # — what allauth resolves a per-store SocialApp against.
+                # Platform-global, so managed only here.
+                page(_("Sites"), "language", "sites_site_changelist"),
+                # The platform's own mail (billing notices, staff
+                # password reset, health and backup alerts): what it
+                # sent and what failed, its log and suppression list.
+                page(_("Emails"), "mail", "emails_emailswitch_changelist"),
+                page(_("Email log"), "history", "emails_emaillog_changelist"),
+                page(
+                    _("Suppression list"),
+                    "block",
+                    "emails_emailsuppression_changelist",
+                ),
+            ],
+        },
+        # The Celery beat schedule and the task-result tables live in the
+        # PUBLIC schema and drive every store's fan-out tasks — platform
+        # operations, never a store's. (Task Results holds task failures
+        # only: ``CELERY_TASK_IGNORE_RESULT``.)
+        {
+            "title": _("Background Jobs"),
+            "separator": True,
+            "collapsible": True,
+            "items": [
+                page(
+                    _("Periodic Tasks"),
+                    "task_alt",
+                    "scheduler_periodictask_changelist",
+                ),
+                page(
+                    _("Task Results"),
+                    "checklist",
+                    "django_celery_results_taskresult_changelist",
+                ),
+                page(
+                    _("Group Results"),
+                    "ballot",
+                    "django_celery_results_groupresult_changelist",
+                ),
+            ],
+        },
+    ]
 
 
 def storefront_url(request: Any) -> str:

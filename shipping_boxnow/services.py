@@ -693,8 +693,10 @@ class BoxNowService:
         ``NEW`` state (error P420 otherwise). We mirror that guard
         locally (:meth:`can_cancel_shipment`) so we never make an API
         call that BoxNow would reject, and so the caller gets a clear
-        error message. Cancelling a parcel that is already CANCELED is a
-        no-op, so a retry after a partly failed cancel goes through.
+        error message. Cancelling a shipment that is already CANCELED,
+        sent to BoxNow or not, is a no-op that changes nothing, as BoxNow
+        treats a canceled parcel, so a retry after a partly failed cancel
+        goes through.
 
         Three-phase design — same shape as ``create_shipment_for_order``
         — so the BoxNow API call doesn't happen with a row lock held.
@@ -725,6 +727,18 @@ class BoxNowService:
                 BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
             )
             parcel_id = locked.parcel_id
+
+            # Already canceled (a webhook, an earlier cancel that the
+            # caller then failed to finish, a retried order cancel):
+            # nothing left to do, with or without a parcel_id. BoxNow:
+            # "Canceling a canceled parcel has no effect" (API Manual
+            # v7.2, §3.7). Checked first, or a shipment BoxNow never
+            # received moved ``cancel_requested_at`` and logged one more
+            # cancellation on every repeat, and the state guard below
+            # read CANCELED as "past NEW" and refused a parcel that is
+            # exactly as canceled as asked.
+            if locked.parcel_state == BoxNowParcelState.CANCELED:
+                return
 
             # No parcel_id ⇒ nothing at BoxNow to cancel. This covers
             # the canonical ``pending_creation`` case (online order
@@ -778,13 +792,6 @@ class BoxNowService:
                         "updated_at",
                     ]
                 )
-                return
-
-            # Already canceled (a webhook, an earlier cancel that the
-            # caller then failed to finish): nothing left to do. Without
-            # this the state guard below read CANCELED as "past NEW" and
-            # refused a parcel that is exactly as canceled as asked.
-            if locked.parcel_state == BoxNowParcelState.CANCELED:
                 return
 
             # State guard: parcel_id is set, so a real BoxNow-side
@@ -1780,19 +1787,26 @@ class BoxNowService:
         """
         Advance the Order's status based on the BoxNow parcel event.
 
-        Uses ``OrderService.update_order_status`` for every transition
-        but a cancel so signals and history logging fire correctly, and
-        ``OrderService.cancel_for_dead_shipment`` for a ``canceled``
-        parcel, because a cancel is more than a status.  Swallows
-        ``InvalidStatusTransitionError`` and ``OrderNotCancelableError``
+        Uses ``OrderService.update_order_status`` so signals and history
+        logging fire correctly.  Swallows ``InvalidStatusTransitionError``
         with a warning so that an out-of-order or duplicate webhook event
         cannot roll back the already-recorded ``BoxNowParcelEvent``.
+
+        A ``canceled`` parcel moves no order. BoxNow defines it as
+        "Parcel has been canceled by the sender" (Webhook Tracking Guide
+        v1.4.6, p. 2; API Manual v7.2, §6.5.3), and the sender is the
+        store: a cancel of the order already ran ``cancel_order``, and a
+        parcel canceled while the order is open was canceled on purpose
+        (a wrong locker, a re-issue). The shipment is recorded CANCELED
+        by the caller, and the open order behind it needs follow-up
+        (``order.follow_up``) until staff re-issue the parcel or cancel
+        the order.
 
         Safety rules:
         - Never move a terminal order (DELIVERED, COMPLETED, CANCELED,
           RETURNED, REFUNDED) backwards.
-        - Only advance to SHIPPED, and only cancel, if the order is still
-          PENDING or PROCESSING.
+        - Only advance to SHIPPED if the order is still PENDING or
+          PROCESSING.
         - Only advance to DELIVERED/RETURNED from non-terminal
           states (or states before the target).
 
@@ -1803,10 +1817,7 @@ class BoxNowService:
                           unknown events).
         """
         # Lazy imports avoid circular dependencies at startup.
-        from order.exceptions import (
-            InvalidStatusTransitionError,
-            OrderNotCancelableError,
-        )
+        from order.exceptions import InvalidStatusTransitionError
         from order.services import OrderService
 
         order: Order = shipment.order
@@ -1842,44 +1853,18 @@ class BoxNowService:
             new_status = "RETURNED"
 
         elif mapped_state == BoxNowParcelState.CANCELED:
-            new_status = "CANCELED"
+            # Never the order's status (see the docstring).
+            logger.info(
+                "BoxNow: parcel canceled for order=%s in status %r — the "
+                "order is left as it is",
+                order.id,
+                current_status,
+            )
+            return
 
         # new / in-depot / pending-creation events → no order status change.
 
         if new_status is None or new_status == current_status:
-            return
-
-        if new_status == "CANCELED":
-            # A parcel can only be canceled before BoxNow collects it, so
-            # the order behind it is canceled as a whole (stock back,
-            # payment settled, cancellation recorded), never relabeled.
-            # An order that already shipped keeps its status.
-            if current_status not in _PRE_SHIPPED_STATUSES:
-                logger.warning(
-                    "BoxNow: parcel canceled for order=%s in status %r — "
-                    "ignoring",
-                    order.id,
-                    current_status,
-                )
-                return
-            try:
-                OrderService.cancel_for_dead_shipment(
-                    order, carrier="BoxNow", silent_for_customer=False
-                )
-            except OrderNotCancelableError as exc:
-                # The order moved on between the read above and the
-                # cancel's own lock. A cancel that FAILED is not caught:
-                # it rolls this event and the shipment's state back, so
-                # the tracking poll, which keeps reading a shipment that
-                # is not in a final state, applies it on a later run
-                # instead of the order staying active with its stock
-                # held.
-                logger.warning(
-                    "BoxNow: order=%s was not canceled for its canceled "
-                    "parcel: %s",
-                    order.id,
-                    exc,
-                )
             return
 
         # BoxNow can deliver a parcel between two polls / webhook

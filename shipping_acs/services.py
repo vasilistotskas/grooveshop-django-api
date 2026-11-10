@@ -2546,8 +2546,11 @@ class AcsService:
 
         ``None`` means "leave the order alone": it is already in a
         terminal status, already where this state would put it, or the
-        state carries no order-level meaning (``new``, and an in-transit
-        state for an order that is already past SHIPPED).
+        state carries no order-level meaning (``new``, an in-transit
+        state for an order that is already past SHIPPED, and a
+        ``canceled`` shipment for an order that already shipped: a
+        voucher retired after the parcel left is a fact about the
+        voucher, and a shipped order can no longer be canceled).
 
         Public and side-effect free because two callers need the same
         answer — the live poll, which then performs the transition, and
@@ -2570,12 +2573,36 @@ class AcsService:
             AcsShipmentState.LOST,
         ):
             new_status = "RETURNED"
-        elif mapped_state == AcsShipmentState.CANCELED:
+        elif (
+            mapped_state == AcsShipmentState.CANCELED
+            and current_status in _PRE_SHIPPED_ORDER_STATUSES
+        ):
             new_status = "CANCELED"
 
         if new_status == current_status:
             return None
         return new_status
+
+    @classmethod
+    def voucher_retired_on_shipped_order(
+        cls, mapped_state: AcsShipmentState, current_status: str
+    ) -> bool:
+        """Whether a canceled shipment sits on an order that already shipped.
+
+        :meth:`order_status_for_shipment_state` leaves that order alone, so
+        the pair is not drift to repair. It is still worth a person's
+        attention (a voucher retired while the parcel was in transit), and
+        ``manage.py reconcile_acs_order_status`` reports it. Answered from
+        the mapping, so the rule has one home.
+        """
+        return (
+            mapped_state == AcsShipmentState.CANCELED
+            and current_status not in TERMINAL_ORDER_STATUSES
+            and cls.order_status_for_shipment_state(
+                mapped_state, current_status
+            )
+            is None
+        )
 
     @classmethod
     def _apply_order_status_transition(
@@ -2608,7 +2635,8 @@ class AcsService:
 
         if new_status == "CANCELED":
             # Never produced by ACS tracking: the admin retire action or
-            # a voucher cancel, i.e. a parcel that never left.
+            # a voucher cancel, i.e. a parcel that never left (the
+            # mapping returns it only for an order not yet shipped).
             OrderService.cancel_for_dead_shipment(
                 order, carrier="ACS", silent_for_customer=silent_for_customer
             )

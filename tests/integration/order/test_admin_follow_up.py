@@ -26,6 +26,8 @@ from order.factories import OrderFactory
 from order.follow_up import FOLLOW_UP_DAYS_SETTING
 from order.models.order import Order
 from shipping_acs.factories import AcsShipmentFactory
+from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+from shipping_boxnow.factories import BoxNowShipmentFactory
 from tests.utils.orders import courier_cash_order
 
 User = get_user_model()
@@ -161,6 +163,22 @@ class TestChangePage:
 
         assert "Needs follow-up since" not in self._page(client, order)
 
+    def test_a_canceled_parcel_asks_for_a_decision(self, client):
+        order = _order(days_ago=1)
+        BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.CANCELED,
+            last_event_at=timezone.now(),
+        )
+
+        html = self._page(client, order)
+
+        assert "the parcel was canceled while the order is still open" in html
+        assert "Create a new parcel or cancel the order" in html
+        assert "Needs follow-up since" not in html
+        assert "Last carrier event" in html
+
 
 class TestCounter:
     def test_counts_the_same_orders_the_filter_lists(self):
@@ -181,6 +199,17 @@ class TestCounter:
         )
 
         assert queries.attention_counts.get()["follow_up_orders"] == 0
+
+    def test_a_canceled_parcel_refreshes_the_cached_count(self):
+        shipment = BoxNowShipmentFactory(
+            order=_order(days_ago=1), with_parcel=True
+        )
+        assert queries.attention_counts.get()["follow_up_orders"] == 0
+
+        shipment.parcel_state = BoxNowParcelState.CANCELED
+        shipment.save()
+
+        assert queries.attention_counts.get()["follow_up_orders"] == 1
 
     def test_the_dashboard_row_opens_the_filtered_list(self, client):
         from django.test import RequestFactory

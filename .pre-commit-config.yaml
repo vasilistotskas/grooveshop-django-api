@@ -8,8 +8,13 @@ repos:
         # Generated files, written without a final newline by their
         # generators (the Tailwind build; pytest-split and
         # .github/scripts/merge_test_durations.py), never edited by hand.
-        exclude: ^(static/css/styles\.css|\.test_durations)$
+        exclude: ^(static/css/styles\.css|\.test_durations)$|^tests/integration/emails/golden/
       - id: trailing-whitespace
+        # The golden email fixtures are the render's own bytes
+        # (tests/utils/golden.py writes them with write_bytes), so the
+        # trailing whitespace and final blank line in them are the
+        # expected output.
+        exclude: ^tests/integration/emails/golden/
       - id: fix-byte-order-marker
   # Ruff runs from the project environment so the hook can never drift
   # from the version pinned in pyproject.toml / uv.lock.

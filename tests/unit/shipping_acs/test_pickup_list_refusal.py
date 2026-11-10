@@ -78,6 +78,7 @@ class TestPickupListRefusal:
             "status": "blocked_unprinted",
             "unprinted": ["9800000001"],
             "order_ids": [blocking.order_id],
+            "unrecognised": [],
             "acs_message": "Αδύνατη η έκδοση λίστας παραλαβής.",
         }
         assert [m.subject for m in mailoutbox] == []
@@ -221,6 +222,7 @@ class TestSilentRefusalEndToEnd:
             "status": "blocked_unprinted",
             "unprinted": ["9800000001"],
             "order_ids": [blocking.order_id],
+            "unrecognised": [],
             "acs_message": "",
         }
         [note] = _pickup_list_notes(blocking.order_id)

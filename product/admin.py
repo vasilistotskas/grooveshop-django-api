@@ -57,6 +57,7 @@ from core.units import DistanceUnits, WeightUnits
 from order.models.order import Order
 from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
+from product.enum.stock import StockState
 from product.forms import ApplyDiscountForm
 from product.models.attribute import Attribute
 from product.models.attribute_value import AttributeValue
@@ -88,10 +89,9 @@ from user.models.account import UserAccount
 COMMENT_EXCERPT_CHARS = 80
 
 STOCK_STATUS_VARIANT: dict[str, str] = {
-    "out": "danger",
-    "critical": "warning",
-    "low": "warning",
-    "in_stock": "success",
+    StockState.OUT_OF_STOCK: "danger",
+    StockState.LOW_STOCK: "warning",
+    StockState.IN_STOCK: "success",
 }
 
 STOCK_RESERVATION_STATUS_VARIANT: dict[str, str] = {
@@ -118,32 +118,13 @@ class StockStatusFilter(DropdownFilter):
     parameter_name = "stock_status"
 
     def lookups(self, request, model_admin):
-        return [
-            ("in_stock", _("In Stock (>0)")),
-            ("low_stock", _("Low Stock (1-10)")),
-            ("out_of_stock", _("Out of Stock (0)")),
-            ("high_stock", _("High Stock (>50)")),
-            ("critical_stock", _("Critical Stock (1-5)")),
-        ]
+        return StockState.choices
 
     def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
-            case "in_stock":
-                filter_kwargs = {"stock__gt": 0}
-            case "low_stock":
-                filter_kwargs = {"stock__range": (1, 10)}
-            case "out_of_stock":
-                filter_kwargs = {"stock": 0}
-            case "high_stock":
-                filter_kwargs = {"stock__gt": 50}
-            case "critical_stock":
-                filter_kwargs = {"stock__range": (1, 5)}
-            case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
+        value = self.value()
+        if value not in StockState.values:
+            return queryset
+        return queryset.by_stock_state(StockState(value))
 
 
 class PriceRangeFilter(DropdownFilter):
@@ -386,7 +367,6 @@ class AttributeAdmin(BaseTranslatableAdmin):
             _("Attribute Information"),
             {
                 "fields": ("name", "active", "is_variant", "schema_property"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -526,7 +506,6 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
             _("Value Information"),
             {
                 "fields": ("attribute", "value", "active"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -899,6 +878,7 @@ class ProductAdmin(
     search_fields = [
         "id",
         "sku",
+        "external_reference",
         "translations__name",
         "translations__description",
         "category__translations__name",
@@ -975,6 +955,7 @@ class ProductAdmin(
             {
                 "fields": (
                     "sku",
+                    "external_reference",
                     "category",
                     "variant_group",
                     "brand",
@@ -1194,39 +1175,34 @@ class ProductAdmin(
             queryset=Product.objects.only("id", "variant_group_id"),
         )
 
-        return (
-            qs.select_related("category", "vat", "variant_group")
-            .prefetch_related(
-                main_images,
-                active_reservations,
-                variant_siblings,
-                "variant_group__translations",
-            )
-            .only(
-                # Only load fields we actually display
-                "id",
-                "sku",
-                "active",
-                "price",
-                "price_currency",
-                "discount_percent",
-                "stock",
-                "view_count",
-                "created_at",
-                "updated_at",
-                "category_id",
-                "vat_id",
-                "changed_by_id",
-                "variant_group_id",
-                # django-money reads a deferred amount straight from the
-                # instance dict, so the form of a page that shows the cost
-                # price has to load it up front.
-                *(
-                    COST_PRICE_FIELDS
-                    if request.user.has_perm(COST_PRICE_PERMISSION)
-                    else ()
-                ),
-            )
+        qs = qs.select_related(
+            "category", "vat", "variant_group"
+        ).prefetch_related(
+            main_images,
+            active_reservations,
+            variant_siblings,
+            "variant_group__translations",
+        )
+        if not self.serves_changelist(request):
+            # The change form edits and saves the whole row.
+            return qs
+        return qs.only(
+            # Only load fields the list displays
+            "id",
+            "sku",
+            "active",
+            "price",
+            "price_currency",
+            "discount_percent",
+            "stock",
+            "low_stock_threshold",
+            "view_count",
+            "created_at",
+            "updated_at",
+            "category_id",
+            "vat_id",
+            "changed_by_id",
+            "variant_group_id",
         )
 
     def get_prepopulated_fields(self, request, obj=None):
@@ -1296,14 +1272,11 @@ class ProductAdmin(
         description=_("Stock"), label=STOCK_STATUS_VARIANT, ordering="stock"
     )
     def stock_status(self, obj):
-        stock = obj.stock
-        if stock == 0:
-            return "out", _("Out of stock")
-        if stock <= 5:
-            return "critical", _("Critical (%(stock)s)") % {"stock": stock}
-        if stock <= 10:
-            return "low", _("Low (%(stock)s)") % {"stock": stock}
-        return "in_stock", _("In stock (%(stock)s)") % {"stock": stock}
+        state = obj.stock_state
+        return state, _("%(state)s (%(stock)s)") % {
+            "state": state.label,
+            "stock": obj.stock,
+        }
 
     @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
@@ -1551,6 +1524,8 @@ class ProductAdmin(
         # cleared the row is an insert, and `uuid` already holds the
         # original's value, so it must be reset to a fresh one.
         clone.uuid = uuid4()
+        # Unique per product: the copy is not the other system's product.
+        clone.external_reference = None
         clone.active = False
         clone.stock = 0
         clone.view_count = 0
@@ -1697,12 +1672,7 @@ class ProductAdmin(
             for log in logs
         ]
 
-        if product.stock == 0:
-            stock_state = (_("Out of stock"), "danger")
-        elif 0 < product.stock <= product.low_stock_threshold:
-            stock_state = (_("Low stock"), "warning")
-        else:
-            stock_state = (_("In stock"), "success")
+        stock_state = product.stock_state
 
         context = {
             **self.admin_site.each_context(request),
@@ -1711,6 +1681,7 @@ class ProductAdmin(
             "original": product,
             "product": product,
             "stock_state": stock_state,
+            "stock_tone": STOCK_STATUS_VARIANT[stock_state],
             "window_days": window_days,
             "windows": windows,
             "has_activity": bool(totals),
@@ -1782,14 +1753,12 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
             _("Category Information"),
             {
                 "fields": ("parent", "slug", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("name", "description", "footer_text"),
-                "classes": ("wide",),
             },
         ),
         (
@@ -1956,7 +1925,7 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
         # ``product__translations`` and the main-image prefetch keep
         # ``product_header`` and ``comment_excerpt`` from querying per
         # row; the verified-purchase flag is one annotation.
-        return (
+        qs = (
             qs.select_related("product", "user")
             .prefetch_related(
                 "translations",
@@ -1968,24 +1937,27 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
                 ),
             )
             .with_verified_purchase()
-            .only(
-                # Review fields - minimal set
-                "id",
-                "product_id",
-                "user_id",
-                "rate",
-                "status",
-                "created_at",
-                # Product fields
-                "product__id",
-                "product__slug",
-                # User fields
-                "user__id",
-                "user__email",
-                "user__username",
-                "user__first_name",
-                "user__last_name",
-            )
+        )
+        if not self.serves_changelist(request):
+            # The change form edits and saves the whole row.
+            return qs
+        return qs.only(
+            # Review fields - minimal set
+            "id",
+            "product_id",
+            "user_id",
+            "rate",
+            "status",
+            "created_at",
+            # Product fields
+            "product__id",
+            "product__slug",
+            # User fields
+            "user__id",
+            "user__email",
+            "user__username",
+            "user__first_name",
+            "user__last_name",
         )
 
     fieldsets = (
@@ -1993,14 +1965,12 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
             _("Review Information"),
             {
                 "fields": ("product", "user", "rate", "status"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("comment",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2219,14 +2189,12 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
             _("Image Information"),
             {
                 "fields": ("category", "image", "image_type", "active"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("alt_text",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2294,7 +2262,13 @@ class ProductImageAdmin(BaseTranslatableAdmin):
     ]
     list_select_related = ["product"]
     autocomplete_fields = ("product",)
-    readonly_fields = ("created_at", "updated_at", "uuid")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "uuid",
+        "source_url",
+        "source_sha256",
+    )
     ordering = ["product", "-is_main", "sort_order"]
 
     fieldsets = (
@@ -2302,14 +2276,12 @@ class ProductImageAdmin(BaseTranslatableAdmin):
             _("Image Information"),
             {
                 "fields": ("product", "image", "is_main"),
-                "classes": ("wide",),
             },
         ),
         (
             _("Content"),
             {
                 "fields": ("alt_text",),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2322,7 +2294,13 @@ class ProductImageAdmin(BaseTranslatableAdmin):
         (
             _("System Information"),
             {
-                "fields": ("uuid", "created_at", "updated_at"),
+                "fields": (
+                    "uuid",
+                    "source_url",
+                    "source_sha256",
+                    "created_at",
+                    "updated_at",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -2394,7 +2372,6 @@ class ProductVariantGroupAdmin(BaseTranslatableAdmin):
                     "name",
                     "active",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -2494,7 +2471,6 @@ class BrandAdmin(BaseModelAdmin):
             _("Brand"),
             {
                 "fields": ("name",),
-                "classes": ("wide",),
             },
         ),
         (

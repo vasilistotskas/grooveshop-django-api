@@ -495,7 +495,9 @@ class Command(TenantCommandMixin, BaseCommand):
         self.stdout.write(
             f"  ├─ Pruning {len(stale):,} stale document(s) from {index_name}"
         )
-        task = index.delete_documents(list(stale))
+        task = _client.delete_documents_by_primary_key(
+            index_name, pk_field, sorted(stale)
+        )
         finished = _client.wait_for_task(task.task_uid)
         if finished.status == "failed":
             self.stdout.write(

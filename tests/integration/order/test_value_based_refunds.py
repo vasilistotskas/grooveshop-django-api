@@ -506,6 +506,59 @@ class TestTheLastReturnCompletesTheOrder:
         ]
 
 
+class TestAStalledStoredShareCanBeFinished:
+    """The card share of a full refund went through and the gift card share
+    stopped: it holds everything that was left, so nothing is refundable,
+    yet it must still be finishable from the order."""
+
+    def _stalled(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        order, [card] = _order(status=OrderStatus.RETURNED)
+        with FakeStripeRefunds():
+            OrderService.refund_order(order, amount=_eur("40.00"))
+        attempt = RefundAttempt.objects.create(
+            order=order,
+            charge=None,
+            kind="STORED_VALUE",
+            amount=_eur("60.00"),
+        )
+        RefundAttempt.objects.filter(pk=attempt.pk).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+        assert PaymentLedger.refundable_value(order) == 0
+        return order, card, attempt
+
+    def test_the_refund_stays_open_until_it_is_finished(self):
+        order, card, attempt = self._stalled()
+
+        assert PaymentLedger.refund_open(order) is True
+
+        OrderService.refund_order(order, amount=_eur("60.00"))
+
+        attempt.refresh_from_db()
+        assert attempt.status == RefundAttemptStatus.SETTLED
+        assert card.balance == _eur("60.00")
+        assert PaymentLedger.refund_open(order) is False
+
+    def test_the_dialog_offers_the_share_that_stopped(self):
+        from django.test import RequestFactory
+
+        from order.admin import ReturnOrderForm
+        from user.factories import UserAccountFactory
+
+        order, _card, _attempt = self._stalled()
+        request = RequestFactory().post("/")
+        request.user = UserAccountFactory(is_superuser=True, is_staff=True)
+
+        form = ReturnOrderForm(request, order.pk)
+
+        assert form.fields["amount"].initial == Decimal("60.00")
+        assert "60.00" in str(form.fields["amount"].help_text)
+
+
 class TestAClaimedStoredShareIsHeldBack:
     def test_a_pending_share_cannot_be_refunded_again(self):
         order, _cards = _order(card="0.00", gift="25.00")

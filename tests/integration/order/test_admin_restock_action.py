@@ -436,7 +436,7 @@ class TestRefundOffersRestock:
             provider_reference="pi_restock",
         )
         _item(order, _product())
-        request = _post(staff_user, {"amount": "20.00", "reason": "Return"})
+        request = _post(staff_user, {"amount": "20.00", "reason": "RETURNED"})
 
         with FakeStripeRefunds():
             order_admin.refund_payment(request, object_id=order.pk)

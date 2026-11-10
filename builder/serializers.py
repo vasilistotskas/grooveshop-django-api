@@ -24,6 +24,7 @@ from builder.models import (
     VersionKind,
 )
 from builder.services import release_documents, staff_summary
+from core.api.url_field import WebURLField
 
 
 class StaffSerializer(serializers.Serializer):
@@ -194,7 +195,7 @@ class FeatureStateSerializer(serializers.Serializer):
     on = serializers.BooleanField(
         help_text="Plan flag and every setting it needs are on."
     )
-    turn_on_url = serializers.URLField(
+    turn_on_url = WebURLField(
         allow_null=True,
         help_text=(
             "The store admin page where this person switches it on; null "
@@ -224,6 +225,7 @@ class StoreFeatureStatesSerializer(serializers.Serializer):
     price_history = FeatureStateSerializer(read_only=True)
     contact_attachments = FeatureStateSerializer(read_only=True)
     chat_widget = FeatureStateSerializer(read_only=True)
+    staff_ai_access = FeatureStateSerializer(read_only=True)
     catalogue = FeatureStateSerializer(read_only=True)
     cart = FeatureStateSerializer(read_only=True)
 

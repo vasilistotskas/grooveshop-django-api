@@ -60,6 +60,20 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
         ),
     )
 
+    voucher_request_unknown_at = models.DateTimeField(
+        _("Voucher request outcome unknown since"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Set when a voucher request was sent to ACS and its answer was "
+            "lost (a timeout, a dropped connection, a server error, or a "
+            "worker that stopped before saving). ACS may hold a voucher for "
+            "this order, so no new request is sent while this is set. Staff "
+            "clear it with “Adopt ACS voucher” or “No voucher at ACS: "
+            "request again”."
+        ),
+    )
+
     # ── Pickup list (daily manifest) ────────────────────────────────
     pickup_list = models.ForeignKey(
         "shipping_acs.AcsPickupList",

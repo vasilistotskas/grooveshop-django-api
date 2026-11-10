@@ -61,7 +61,6 @@ class MeiliTask(TenantTask):
     base=MeiliTask,
     bind=True,
     name="meili.index_document",
-    queue="meilisearch",
 )
 def index_document_task(
     self,
@@ -129,21 +128,8 @@ def index_document_task(
             return {"status": "removed", "reason": "filtered_out"}
 
         # Serialize and index
-        serialized = instance.meili_serialize()
-        document_pk = _get_document_pk(instance)
-        geo = (
-            instance.meili_geo()
-            if instance._meilisearch["supports_geo"]
-            else None
-        )
-
-        document = {
-            **serialized,
-            "id": document_pk,
-            "pk": instance._meta.pk.value_to_string(instance),
-        }
-        if geo:
-            document["_geo"] = geo
+        document = _build_document(instance)
+        document_pk = document["id"]
 
         index_name = type(instance).get_meili_index_name()
         task = _client.get_index(index_name).add_documents([document])
@@ -176,8 +162,103 @@ def index_document_task(
 @shared_task(
     base=MeiliTask,
     bind=True,
+    name="meili.index_documents",
+)
+def index_documents_task(
+    self,
+    app_label: str,
+    model_name: str,
+    pks: list[Any],
+) -> dict:
+    """
+    Index a batch of documents with one add and one delete call.
+
+    The batch form of ``index_document_task``: each row is loaded from the
+    model's indexing queryset, the ones that qualify (``meili_filter()``)
+    are added in ONE ``add_documents`` call and the ones that no longer
+    qualify are removed in ONE delete-by-filter call on the primary key
+    (``delete_documents_by_primary_key``), so N documents
+    cost two engine tasks instead of N. A pk with no row is skipped, as in
+    the single-document task.
+
+    Waits for the engine as long as the bulk paths do
+    (``MEILISEARCH["TASK_TIMEOUT_MS"]``): a batch takes longer than one
+    document. A timeout raises, and ``MeiliTask``
+    retries the whole batch: adding and deleting are both idempotent.
+
+    Args:
+        app_label: Django app label (e.g., 'product')
+        model_name: Model name (e.g., 'producttranslation')
+        pks: Primary keys of the model instances
+
+    Returns:
+        Dict with the counts of documents added, removed and skipped
+    """
+    from meili._client import client as _client
+
+    model_class = apps.get_model(app_label, model_name)
+    index = _client.get_index(model_class.get_meili_index_name())
+
+    queryset = model_class.get_meilisearch_queryset().filter(pk__in=pks)
+    documents: list[dict] = []
+    removed: list[str] = []
+    for instance in queryset:
+        if instance.meili_filter():
+            documents.append(_build_document(instance))
+        else:
+            removed.append(_get_document_pk(instance))
+
+    # Both calls are attempted whatever the first one does: a bad
+    # document in the add must not leave the deactivated products of the
+    # same batch searchable. The first failure is raised afterwards (so
+    # ``MeiliTask`` decides on a retry); the batch is idempotent.
+    failures: list[Exception] = []
+    if documents:
+        try:
+            finished = _client.wait_for_task(
+                index.add_documents(documents).task_uid
+            )
+            if finished.status == "failed":
+                raise MeiliTaskFailed(finished.error, operation="index")
+        except Exception as exc:
+            failures.append(exc)
+    if removed:
+        try:
+            finished = _client.wait_for_task(
+                _client.delete_documents_by_primary_key(
+                    model_class.get_meili_index_name(),
+                    model_class._meilisearch["primary_key"],
+                    removed,
+                ).task_uid
+            )
+            if finished.status == "failed":
+                raise MeiliTaskFailed(finished.error, operation="delete")
+        except Exception as exc:
+            failures.append(exc)
+    if failures:
+        for extra in failures[1:]:
+            logger.error(
+                f"Also failed on {app_label}.{model_name} batch: {extra}"
+            )
+        raise failures[0]
+
+    skipped = len(pks) - len(documents) - len(removed)
+    logger.info(
+        f"Indexed {app_label}.{model_name} batch: {len(documents)} added, "
+        f"{len(removed)} removed, {skipped} not found"
+    )
+    return {
+        "status": "success",
+        "added": len(documents),
+        "removed": len(removed),
+        "skipped": skipped,
+    }
+
+
+@shared_task(
+    base=MeiliTask,
+    bind=True,
     name="meili.delete_document",
-    queue="meilisearch",
 )
 def delete_document_task(
     self,
@@ -233,7 +314,6 @@ def delete_document_task(
     base=MeiliTask,
     bind=True,
     name="meili.reindex_model",
-    queue="meilisearch",
     soft_time_limit=7200,  # 2 hours soft limit
     time_limit=7500,  # 2 hours 5 min hard limit
 )
@@ -296,23 +376,7 @@ def reindex_model_task(
                     total_filtered += 1
                     continue
 
-                serialized = instance.meili_serialize()
-                document_pk = _get_document_pk(instance)
-                geo = (
-                    instance.meili_geo()
-                    if instance._meilisearch["supports_geo"]
-                    else None
-                )
-
-                document = {
-                    **serialized,
-                    "id": document_pk,
-                    "pk": instance._meta.pk.value_to_string(instance),
-                }
-                if geo:
-                    document["_geo"] = geo
-
-                documents.append(document)
+                documents.append(_build_document(instance))
 
             if documents:
                 task = _client.get_index(index_name).add_documents(documents)
@@ -380,6 +444,20 @@ def reindex_model_task(
     except Exception as e:
         logger.error(f"Error reindexing {app_label}.{model_name}: {e}")
         raise
+
+
+def _build_document(instance) -> dict:
+    """The document Meilisearch stores for ``instance``."""
+    document = {
+        **instance.meili_serialize(),
+        "id": _get_document_pk(instance),
+        "pk": instance._meta.pk.value_to_string(instance),
+    }
+    if instance._meilisearch["supports_geo"]:
+        geo = instance.meili_geo()
+        if geo:
+            document["_geo"] = geo
+    return document
 
 
 def _get_document_pk(instance) -> str:

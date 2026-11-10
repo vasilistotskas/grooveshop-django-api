@@ -21,6 +21,7 @@ from b2b.factories import BusinessProfileFactory, CustomerGroupFactory
 from cart.factories import CartFactory, CartItemFactory
 from pay_way.enum.settlement import PaySettlement
 from product.factories import ProductFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -39,7 +40,7 @@ def _cart_with_line(user, price="100.00", quantity=1):
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         stock=10,
         active=True,
     )

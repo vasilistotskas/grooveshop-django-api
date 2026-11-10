@@ -1,0 +1,11 @@
+{% load i18n %}{% trans "CHECK THE ACS VOUCHER OF AN ORDER" %}
+
+{% blocktrans %}A voucher request for order #{{ order_id }} may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check.{% endblocktrans %}
+
+{% trans "What happened" %}: {{ error|safe }}
+
+{% blocktrans %}Look in the ACS portal for a voucher of order #{{ order_id }} (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”.{% endblocktrans %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

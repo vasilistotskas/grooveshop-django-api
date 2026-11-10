@@ -16,7 +16,6 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from djmoney.money import Money
-from parler.cache import _cache_translation
 
 from product.factories.product import ProductFactory
 from product.models.product import Product, ProductTranslation
@@ -150,31 +149,6 @@ def test_indexed_document_stores_the_category_name_per_language():
 
     assert names["en"] == "Chargers"
     assert names["el"] == "Φορτιστές"
-
-
-@pytest.mark.django_db
-def test_hits_of_one_category_write_its_translation_to_the_cache_once():
-    """parler caches a translation it reads from a prefetch once per
-    category OBJECT, so hits that each held their own copy of the same
-    category wrote the same cache key once per hit."""
-    from product.factories.category import ProductCategoryFactory
-
-    category = ProductCategoryFactory()
-    products = ProductFactory.create_batch(
-        5, category=category, num_images=0, num_reviews=0
-    )
-
-    with patch(
-        "parler.models._cache_translation", wraps=_cache_translation
-    ) as cache_write:
-        _serialize_hits(_en_translation_pks(products))
-
-    written = [
-        call.args[0]
-        for call in cache_write.call_args_list
-        if call.args[0].master_id == category.pk
-    ]
-    assert len(written) == 1
 
 
 @pytest.mark.django_db

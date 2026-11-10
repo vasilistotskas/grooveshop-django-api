@@ -3,6 +3,1583 @@
 
 
 
+## v3.242.20 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a late answer after staff resolved the voucher check is not saved (#634) ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): a late answer after staff resolved the voucher check is not saved
+
+Phase 3 saved any answer while the shipment had no voucher. After staff
+requested again, a late answer arriving first became the voucher (it may
+have been deleted in the ACS portal) and the new mint then deleted its
+own live voucher as the duplicate; after a close, a dead voucher landed
+on a canceled order's shipment. Phase 3 now compares the claim it was
+sent under: once the claim is gone and the check is resolved, the answer
+takes the duplicate path (deleted at ACS, or kept as an orphan). ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): refuse a reset for re-mint while a voucher request is in flight
+
+A shipment canceled while its request was out and then reset would drop
+the live claim: the answer is then stale and deleted at ACS, and a
+refused re-mint would leave the order with no voucher. The reset now
+waits for a live claim and turns an expired one into the unknown state.
+Adds the arrival-order, orphan, same-number adopt and one-record tests. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): tell a stale late answer apart from a duplicate in the log
+
+The resolved-meanwhile branch logged "saved voucher None". It now has its
+own message (a late answer after staff resolved the check, the voucher,
+what is done with it) and phase "phase3_stale_answer"; the duplicate
+keeps its message with phase "phase3_duplicate". ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): refuse the reset on an unknown outcome and show refused deletes at once
+
+A reset that finds an expired claim records the unknown state (committed,
+alerted once) and refuses with AcsVoucherRequestUnknownError, so "Issue
+ACS voucher now" queues nothing and shows its guard's guidance. A voucher
+ACS would not delete is recorded at once as a voucher matching no order
+(source refused_delete, duplicate_of), counted on the dashboard, instead
+of only in metadata. Migration 0017 adds the two fields. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): a refused delete upgrades an existing voucher record and never fails the mint
+
+When our own refused delete meets a row a pickup list made first, the
+row learns it is our unused voucher and which shipment it came from; a
+row staff had marked checked is reopened. The record runs after Phase 3
+committed, best effort, logged at ERROR with the voucher number. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+## v3.242.19 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): order history records the visitor's address, not the proxy's (#632) ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* fix(tests): give SubscriptionTopicFactory a distinct slug per row
+
+The factory gets-or-creates on the slug and drew it at random, so two
+collisions returned one row and a test asking for N topics got fewer.
+Use a sequence, as the account, brand and contact factories do. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* fix(order): order history records the visitor address, not the proxy
+
+The five history recorders stored REMOTE_ADDR, which behind Traefik is the
+proxy. They now use client_ip_or_peer. The helper only returns a forwarded
+hop or edge header that is a valid IP address, because the value is stored
+in a GenericIPAddressField (a garbage hop raised ValueError on save) and
+used as a limit key. Tests cover the edge-proven visitor, the peer without
+proof, and a garbage hop. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+### Chores
+
+* chore(pre-commit): leave the golden email fixtures byte-exact
+
+end-of-file-fixer and trailing-whitespace rewrote 200 files under
+tests/integration/emails/golden/ on every --all-files run. The fixtures
+are the render bytes (tests/utils/golden.py writes them with
+write_bytes), so exclude the directory from both hooks. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+### Testing
+
+* test(settings): write no shared log file during a pytest run
+
+tests/settings.py pins DEBUG on, so settings.py takes its development
+branch and adds a RotatingFileHandler on one file every xdist worker
+opens. On Windows the rotation fails in one worker while the others hold
+the file, and logging prints the error to stderr. Keep only the console
+handler for the test run. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): guard that a caller address is read only through core.client_ip
+
+An AST test fails for any module outside core/client_ip.py that reads
+REMOTE_ADDR, X-Forwarded-For or X-Real-IP from META or headers. Three
+modules keep a read with a named reason (viva webhook diagnostic logs,
+meta_capi believing X-Real-IP, the search middleware peer rule). The
+order history now takes its address from client_ip_or_peer instead of the
+proxy-facing REMOTE_ADDR. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): tighten the client-IP guard
+
+Key the allowlist by the exact reads (enclosing function, header, count)
+instead of by file, add CF-Connecting-IP, resolve module-level header
+name constants, and document what the walk cannot see. Add a history
+save test for IPv6 hops, including a zone id. ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+* test(core): type the async branch of the client-IP guard visitor ([`423f3b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423f3b43024b0603b51d0f96ecd93e6b8ecead9d))
+
+## v3.242.18 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): the generic label route answers 404 until a label exists (#633)
+
+GET /order/{id}/shipment_label fetched the label of any shipment row,
+so before the carrier had booked it ACS raised AcsAPIError and BoxNow
+read the cache and called the API with an empty parcel id.
+
+The carrier adapter now says whether a label exists (has_label), and
+ShippingService.fetch_label_bytes returns None unless it does; the
+route and the order admin's download button both ask it.
+BoxNowService.fetch_label_bytes refuses an empty parcel id itself, as
+AcsService.fetch_label_bytes refuses an empty voucher.
+
+Closes #630 ([`11a611c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11a611cc808f253dada9f721398f5ec342510fe9))
+
+## v3.242.17 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a voucher request with an unknown outcome is never sent again (#626) ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): a voucher request with an unknown outcome is never sent again
+
+ACS_Create_Voucher has no idempotency key and no duplicate error, and no
+documented call finds a voucher by our reference before it is on a pickup
+list. A create whose answer was lost (read timeout, a connection dropped
+after the request, a 5xx, a worker that stopped before saving) released
+the mint claim, so the Celery retry and "Issue ACS voucher now" sent it
+again and ACS could mint a second voucher.
+
+The client now raises AcsOutcomeUnknownError (a retryable subclass) for
+every failure after the request may have left; only a connection never
+made, the request cap and 403/406 stay plain AcsRetryableError. The mint
+turns an unknown outcome, an unclassified exception, a success with
+neither Voucher_No nor Error_Message, and an expired claim into
+AcsShipment.voucher_request_unknown_at: the order is noted, the new
+ops.acs_voucher_request_unknown alert is sent once, and every caller is
+refused with AcsVoucherRequestUnknownError until staff use "Adopt ACS
+voucher" (confirmed by ACS_Trackingsummary or a pickup-list refusal) or
+"No voucher at ACS: request again".
+
+The pickup-list run no longer drops the vouchers ACS names that match no
+shipment: they are kept as AcsUnrecognisedVoucher, raised once through
+ops.acs_unrecognised_vouchers, counted on the dashboard, and staff delete
+them at ACS or mark them checked.
+
+Tests that asserted a release of the claim on any error, and a re-mint of
+an expired claim, encoded the old design and now assert the new state.
+
+Closes #622 ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): keep the timestamp indexes on the unrecognised voucher table ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): close the review gaps of the voucher request checks
+
+- A late answer (a worker whose request outlived its claim while another
+  recorded the outcome as unknown) is saved and clears the flag, with a
+  history reason and an order note. Resetting a canceled shipment clears
+  a flag left beside a real voucher and keeps one on a shipment with none.
+- Adopt refuses a number any shipment carries (voucher, multipart child,
+  previous or duplicate voucher), requires the ACS_Trackingsummary
+  recipient to be the order's Recipient_Name or an open pickup-list
+  refusal row, repeats its checks under the row lock and answers a
+  concurrent adopt with the same refusal instead of an IntegrityError.
+- A pickup-list refusal naming numbers while a mint is in flight records
+  nothing; a shipment that saves a number resolves its row.
+- Delete at ACS re-checks under the row lock and is refused while a mint
+  is in flight or any order waits in the unknown state. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): give the voucher checks a lifecycle and keep every note
+
+- A shipment of unknown outcome whose order no longer needs a voucher
+  (retired shipment, canceled or refunded order) stays counted, cannot be
+  adopted onto or minted for, no longer blocks deleting vouchers matching
+  no order, and is closed with "No voucher needed: close" (a note).
+- Adopt compares ACS's recipient with the Recipient_Name the lost request
+  sent; the manual documents no format for that field, so a mismatch
+  needs a written hand confirmation, recorded on the order. ACS must
+  still hold the number.
+- A duplicate the mint deletes at ACS resolves its row; claims past their
+  TTL become the unknown state before a voucher is judged or deleted; a
+  recorded duplicate can be deleted from the list; "Delete at ACS" keeps
+  its note. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): only an exact, unambiguous recipient match adopts a voucher by itself
+
+A voucher known only from a refused pickup list, a missing or masked
+recipient, or a name another waiting order shares now needs a written
+hand confirmation. "Issue ACS voucher now" and the mint read the flag
+through the shared rule and point a shipment that needs no voucher to
+"No voucher needed: close". ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): give the unrecognised voucher table index names within the limit
+
+The inherited %(class)s names (acsunrecognisedvoucher_created_at_ix, 36
+characters) failed models.E034 when the tenant migration ran its
+database checks. Explicit short names, as pay_way and variant_group do;
+migration 0016 has not shipped, so it carries the names itself. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+* fix(shipping_acs): keep typed staff notes where staging replaces them
+
+resolution_note is free text a person typed, so the anonymiser replaces
+it whole. The close and request-again notes no longer go into the
+shipment history reason (a Kind.TEXT varchar(100), where a long note
+also failed the save); they stay in the order note, whose note key the
+anonymiser replaces. The late-answer reason fits any voucher number. ([`057e0c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/057e0c7f468e3f8c19c95e76d63a6d7cfd8d9370))
+
+## v3.242.16 (2026-11-10)
+
+### Bug fixes
+
+* fix(security): remove the basis of five CodeQL false positives (#623)
+
+core.client_ip.trusted_client_ip is renamed edge_client_ip, after the
+proof it rests on (request_came_through_edge). CodeQL's sensitive-data
+heuristics treat any function whose name matches "trusted" as a source
+of secrets, so every log line that carried an address resolved through
+it (idempotency budget owner and scope kind, the Viva webhook's
+observed source IP) was a clear-text-logging alert. Callers, tests,
+docs and the agent rules follow the new name; behaviour is unchanged.
+
+The ACS unmatched-payout warning logs the amounts booked on the payout
+row instead of re-reading the raw ACS fields: a lookup keyed by
+"COD_Amount_CreditCard" is a private-data source by its name. The raw
+strings stay in the row's raw_payload, and a test now pins the logged
+amounts. ([`fe78eb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe78eb14d0815d46574cec720bed98d5a55efbd3))
+
+## v3.242.15 (2026-11-10)
+
+### Bug fixes
+
+* fix(product): one stock state from each product's low-stock threshold (#621) ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): one stock state from each product's low-stock threshold
+
+The admin's stock filter and changelist badge used fixed bands (low 1-10,
+critical 1-5, high >50) and the dashboard counter used stock below 10,
+while the low-stock email and the stock-history page compared stock with
+the product's own low_stock_threshold. A product with threshold 20 and 15
+in stock was emailed as low but listed as in stock; one with threshold 0
+(alerts off) and 4 in stock showed "Critical".
+
+StockState is now the one rule: out of stock at 0, low above 0 and at or
+below the threshold (a threshold of 0 is never low), otherwise in stock.
+Product.stock_state decides it for a row and ProductQuerySet.by_stock_state
+(with low_stock() and out_of_stock()) for a queryset. The filter, badge,
+stock-history page, low-stock email task, dashboard counter and sidebar
+badge, and the staff agent's lowStock list all read it. The fixed bands
+and LOW_STOCK_BELOW are removed, and the unused in_stock() queryset
+method, whose meaning contradicted the new state, is deleted.
+
+Closes #589 ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): say the low-stock tile counts in-stock products only
+
+The dashboard tile counts StockState.LOW_STOCK (stock above 0), but its
+description read as if sold-out products at their threshold were counted
+too. The test of its link now follows the href the widget renders rather
+than a query string of its own. ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+## v3.242.14 (2026-11-10)
+
+### Bug fixes
+
+* fix(core): make sanitize_html a fixed point for links (#627)
+
+nh3's link_rel appends rel after dropping any rel the editor typed, and
+ammonia removes an attribute the attribute_filter drops with swap_remove,
+which moves that last attribute into the gap. A link losing its Word
+class or a font style came out as <a rel href> and, on the next pass,
+<a href rel>, so normalise_rich_text needed two runs to settle and such a
+row was rewritten on a save that edited nothing.
+
+rel is now an allowed link attribute whose value set_tag_attribute_values
+overwrites where it stands, with link_rel off. A typed rel is still
+replaced, every link still gets noopener noreferrer, and once placed the
+attribute no longer moves. A hypothesis test asserts that any markup is
+stable after one pass.
+
+Closes #615 ([`6252796`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6252796cfdcc8824a126bdd06df59a0fcd3206b3))
+
+## v3.242.13 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_boxnow): a canceled parcel no longer cancels its order (#620) ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
+* fix(shipping_boxnow): a canceled parcel no longer cancels its order
+
+BoxNow defines a canceled parcel as "Parcel has been canceled by the
+sender" (Webhook Tracking Guide v1.4.6 p. 2, API Manual v7.2 §6.5.3):
+the sender is the store, so the event reports a decision the store
+already made. The owner decided (2026-11-10) that it must not cancel
+the order, reversing the outcome #604 shipped.
+
+- _apply_order_status_transition: a canceled event (webhook or poll)
+  records the shipment CANCELED and leaves the order, its stock and its
+  payment alone. BoxNow no longer calls cancel_for_dead_shipment; ACS
+  still does.
+- An open (PENDING/PROCESSING) order behind a canceled parcel needs
+  follow-up at once, whatever its age and ORDER_FOLLOW_UP_DAYS: the
+  badge, filter, dashboard counter and change-page line already read
+  OrderQuerySet.needing_follow_up. Each carrier answers through
+  ShippingCarrierInterface.canceled_shipment_q (OR-ed by
+  ShippingService.canceled_shipment_q), so order imports no carrier
+  app. The attention counter now depends on BoxNowShipment.
+- cancel_shipment: a repeat cancel of a CANCELED shipment returns before
+  anything is written, also when it has no parcel_id ("Canceling a
+  canceled parcel has no effect", §3.7), so cancel_requested_at and the
+  cancellations log no longer move (#599).
+docs/order-system.md 2.1, 2.3, 5.2, 5.3, 7.1, 7.1.1 and 8.
+
+Closes #600
+Closes #599 ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
+### Testing
+
+* test(shipping_boxnow): a paid order behind a canceled parcel is refunded by its customer's cancel
+
+Covers the refund path the race in #600 cost: after the canceled event,
+a customer cancel of a paid order cancels it, restocks, refunds once
+and does not ask BoxNow to cancel the parcel again. ([`96a661f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96a661f340d446675695cefa6d5a8e4f4f61e8fa))
+
+## v3.242.12 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone (#617) ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): a retired voucher on a shipped order leaves the order alone
+
+order_status_for_shipment_state mapped a CANCELED shipment to order status
+CANCELED for every non-terminal order. For an order that had already shipped,
+OrderService.cancel_for_dead_shipment raised OrderNotCancelableError, so
+reconcile_acs_order_status listed the pair as drift on every run and failed it
+every time. A voucher retired after the parcel left is a fact about the
+voucher: the mapping now returns CANCELED only for an order not yet shipped,
+and _apply_order_status_transition logs one warning for the other case. A
+cancel that failed on the way still propagates. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+* fix(shipping_acs): report a retired voucher on a shipped order instead of logging it
+
+The warning in _apply_order_status_transition had no caller: the replay skips
+a None mapping, the poll never produces CANCELED, and the retire and voucher
+cancel paths never call the transition. reconcile_acs_order_status now lists
+such a pair as its own informational line, in the dry run and under --apply,
+asking AcsService.voucher_retired_on_shipped_order so the rule stays in the
+service. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+### Testing
+
+* test(shipping_acs): cover the PROCESSING branch and every summary of the replay
+
+reconcile_acs_order_status now prints a header for the retired vouchers it
+leaves alone and a summary that is true whether or not any order drifted. ([`ccb0a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccb0a741efd1b39ff39f804bc31419261658a41b))
+
+## v3.242.11 (2026-11-10)
+
+### Bug fixes
+
+* fix(cleanup): remove dead code and guards that cannot fire (#619) ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+* fix(cleanup): remove dead code and guards that cannot fire
+
+Removes the order_returned signal and its receiver (never sent),
+PaymentLedger.reserved_on (test-only), the stale __all__ in
+order/services.py, meta_capi's default_app_config, an except around
+str(amount) in the invoice serializer, core.cache.gateway.is_configured
+(test-only) and the write-only settings_key of custom_seeding.
+
+First-party imports wrapped in a catch-all except are removed from
+core/cache/service.py, core/rosetta_storage.py, core/rosetta_views.py and
+shipping_acs/config.py; test_no_impossible_import_guards now fails for any
+such guard. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+### Testing
+
+* test(cleanup): prove the first-party import guard detector can fail
+
+Feed the detector a seeded offender and legitimate code, so the guard is
+shown to flag the pattern it forbids and nothing else. ([`71881db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71881dbc3c8a0eb3ca2fe7b1c5dc98cc7b1fe4f8))
+
+## v3.242.10 (2026-11-10)
+
+### Bug fixes
+
+* fix(settings): remove settings nothing reads, state repeated blocks once, move seed data beside its factories (#609) ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+* fix(settings): drop settings nothing reads, one copy of each repeated block, seed data beside its factories
+
+No remaining setting changes value in dev, ci, staging or production,
+and the beat schedule keeps every entry, task, timing and option.
+
+Removed, each read by nothing under this configuration:
+- SESSION_FILE_PATH: only the file session engine reads it, the engine
+  is cached_db, and None is Django's default.
+- CELERY_CACHE_BACKEND: read only by Celery's and django-celery-results'
+  cache result backends; the result backend is the database one.
+- CELERY_RESULT_PERSISTENT: read only by the rpc result backend.
+- CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS: its retry_policy is read only
+  by the Redis result backend.
+- CELERY_TASK_TRACK_STARTED = False: Celery's default.
+- the bimonthly_4am schedule preset, which no entry used.
+
+Collapsed:
+- get_celery_beat_schedule: hourly_under_debug() replaces 47 copies of
+  "X if not DEBUG else every_hour", and the development log sweep follows
+  IS_DOCKER / IS_KUBERNETES instead of probing the container a second
+  time. The three IS_* flags move up beside DEBUG.
+- LOGGING: the shared line format, filter classes and loggers are named
+  once; each environment states only its formatters, filters and
+  handlers.
+- Static and media files: MEDIA_URL and STORAGES are stated once; the
+  DEBUG branch keeps what differs.
+
+Moved:
+- LANGUAGE_COUNTRY_MAPPING to country/seed_data.py and
+  COUNTRY_REGIONS_MAPPING to region/seed_data.py; their factories were
+  the only readers.
+- The control plane's sidebar to admin.navigation.platform_sidebar,
+  beside store_sidebar. UNFOLD_PLATFORM names it by dotted path, as
+  UNFOLD names the store's. Built per request, it reverses against the
+  request's own URLconf, so the pinned urlconf of the settings literal
+  is gone. The tests that read the literal call the function. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+### Testing
+
+* test(scheduler): the whole-schedule test sets the flag the schedule reads
+
+get_celery_beat_schedule now decides the Docker-only entry from
+IS_DOCKER and IS_KUBERNETES, read once at import. The test still set
+KUBERNETES_SERVICE_HOST in the environment, which the function no longer
+looks at, so on a Docker host it ran with the development log sweep it
+says it excludes. It patches IS_KUBERNETES instead. ([`7d7f57b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d7f57bfec17b80a5945e7a6e6a45e242f0ca23f))
+
+## v3.242.9 (2026-11-10)
+
+### Bug fixes
+
+* fix(blog): bulk publish leaves scheduled posts scheduled (#616)
+
+The "Publish selected posts" action set published_at to now on every
+selected post, which discarded the future date of a scheduled post and
+re-dated posts already live. It now publishes drafts only and reports how
+many scheduled posts it left alone.
+
+Adds BlogPostQuerySet.scheduled() (published, dated in the future), used
+by the action and the Publish Status filter.
+
+Closes #596 ([`b0c6b9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0c6b9ad2feb254cc6869b7a635c0d0b7dd97b9c))
+
+## v3.242.8 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping): the carrier HTTP layers never send a POST or PUT a second time (#607) ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping_boxnow): the HTTP layer never sends a POST or PUT a second time
+
+The client's urllib3 retry sent every method again after a 500, 502, 503
+or 504 and after a read timeout, although its own comment said only
+idempotent methods were. A parcel creation whose answer was lost was
+sent again in the same call.
+
+BoxNow's API manual v7.2 says orderNumber "must be unique for each
+request" (3.4, p. 10) and answers a second one with P410 (5, p. 21), so
+the second creation could not succeed: it returned a 400 and the client
+reported a refusal for a parcel that exists. The manual does not say
+what two overlapping creations do, has no idempotency key and no retry
+guidance.
+
+allowed_methods is now GET only. urllib3 applies it to read errors and
+to status_forcelist, never to connection errors, so a request that never
+connected is still sent again whatever its method, a GET is still sent
+again after a 5xx or a lost answer, and a write surfaces as
+BoxNowRetryableError for its caller (Celery's autoretry_for over the
+mint claim, for the creation). The same rule as shipping_acs/client.py.
+
+Closes #582 ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping): never re-send a BoxNow or ACS write after an error of unknown timing
+
+urllib3 retries an error that is neither a connect nor a read error for any
+method unless other=0, so a POST or PUT could be sent twice after a TLS
+failure. Set other=0 on both clients and cover it with tests. ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+### Documentation
+
+* docs(shipping): state what the carrier retry comments and order-system 5.2 really cover
+
+The BoxNow and ACS comments over _RETRY_CONFIG read as if the mint claim
+guards the Celery retry. It is released on any error, so the task re-sends
+the request; for BoxNow a parcel that exists answers P410 (issue 606). ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+## v3.242.7 (2026-11-10)
+
+### Bug fixes
+
+* fix(builder): a page setting can be translated before its default language has one (#618) ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a page setting can be translated before its default language has one
+
+A page or template draft with no root settings refused an @document
+translation as unknown_node at /i18n/<locale>/@document, a path the
+editor maps to no field, so writing the English SEO title or heading
+first failed the save with nothing marked. The overlay is now checked
+against the root's schema over no settings, and the public read answers
+the translation alone. A kind with no root still refuses it. ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a root translated before the draft has settings answers to the whole root schema ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+## v3.242.6 (2026-11-10)
+
+### Bug fixes
+
+* fix(order): CANCELED is reached only through cancel_order, never a status change (#604) ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): CANCELED is reached only through cancel_order
+
+The staff endpoint POST /order/{id}/update_status accepted CANCELED and
+wrote it through OrderService.update_order_status, whose transition table
+allowed PENDING/PROCESSING -> CANCELED. Only the status changed: the stock
+stayed held, a paid order kept the customer's money and no refund was
+made. A BoxNow `canceled` parcel event took the same path.
+
+- update_order_status no longer has CANCELED in its table, so it raises
+  InvalidStatusTransitionError for every caller. A cancel takes a reason,
+  a refund decision and an actor, returns the refund outcome and must not
+  hold a transaction open across the provider call, so it stays its own
+  operation instead of a branch of the status change.
+- The endpoint answers CANCELED with 400 `cancel_through_cancel_action`.
+  The request schema is unchanged: its enum is the status vocabulary, the
+  table decides what is reachable.
+- OrderService.cancel_for_dead_shipment replaces
+  AcsService._cancel_order_for_dead_shipment and is what BoxNow calls for
+  a `canceled` parcel on a PENDING/PROCESSING order (cancel_order without
+  a refund; a shipped order is left alone).
+- handle_order_canceled is removed. It backfilled metadata['cancellation']
+  and canceled the voucher for a CANCELED written outside cancel_order;
+  no such writer is left (the admin form and the write serializer keep
+  status read-only). order_canceled still fires for the gift-card credit
+  and the loyalty reversal.
+
+Closes #579 ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): a dead-shipment cancel does not call the courier, and a failed one is retried
+
+A tracking sync that finds its shipment canceled cancels the order
+while holding the shipment's row lock. cancel_order then cascaded to
+the courier from inside that transaction, for a shipment that is
+already canceled. cancel_for_dead_shipment now records the shipment as
+already canceled (SHIPMENT_ALREADY_CANCELED), so the cascade is skipped.
+
+BoxNow's sync swallowed every OrderCancellationError. A cancel that
+failed on the way (a lock timeout) was dropped with the parcel event
+committed, so nothing delivered it again and the order stayed active
+with its stock held. The status refusal is now its own class,
+OrderNotCancelableError, and is the only one the sync drops; any other
+failure rolls the event back for the redelivery or the next poll.
+
+The test for "the courier is not asked again" asserted on a client that
+an order with no shipping provider never reaches. It now asserts on
+ShippingService.cancel_shipment and on the recorded outcome. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+* fix(order): a dead-shipment cancel that does not happen leaves no voucher note
+
+cancel_order wrote "the customer asked to cancel and the shipment was
+canceled, create a new voucher" and logged an ERROR whenever a cancel
+failed after the courier had canceled the voucher. It decided that from
+the recorded outcome alone, so a dead-shipment cancel, whose outcome
+says the shipment is canceled, took the same branch: a false staff note
+and an alert for a cancel nobody asked for. The note is now written only
+when this cancel asked the courier itself. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+### Documentation
+
+* docs(order): say exactly how a failed dead-shipment cancel is recovered
+
+BoxNow does not redeliver a webhook the endpoint already answered 200
+to. The event and the shipment's state roll back, the operators are
+alerted, and the tracking poll applies the event on a later run while
+the shipment is not in a final state. ([`5237d5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5237d5be6492cf66a745b312168518844506d084))
+
+## v3.242.5 (2026-11-10)
+
+### Bug fixes
+
+* fix(core): rich text drops the typeface, the type size and Word's residue at save (#557) ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+* fix(core): rich text drops the typeface, the type size and Word's residue at save
+
+A store's typography is its theme's. The rich-text policy now drops
+`font`, `font-family`, `font-size` and `mso-*` declarations (beside CSS
+custom properties) from every `style`, and Word's `Mso*` classes from
+every `class`, in every RichTextField of every store; colour, alignment,
+spacing, weight and style stay. A style or class left empty goes with
+its attribute. None of it is lost content, so no save is refused.
+
+Declarations are split on top-level semicolons only, so a `;` inside a
+`url(...)` or a string stays part of its value.
+
+TinyMCE: the toolbar names TinyMCE 7 items only (the 5.x fontselect,
+fontsizeselect and formatselect, and premium or unloaded items, rendered
+nothing; `blocks` replaces formatselect), the Format menu is 7.8's
+default without fontfamily/fontsize, and `invalid_styles` strips the same
+declarations in the editor.
+
+Rows saved before are normalised by `normalise_rich_text`.
+
+Closes #549 ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+* fix(core): the rich-text backfill stores what a save does, and a style's comments and escaped names are read as a browser reads them ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+### Chores
+
+* chore(builder): refresh the storefront catalogue copy (page heading root setting, image refs) ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+## v3.242.4 (2026-11-10)
+
+### Bug fixes
+
+* fix(agent): a profit report with any margin serializes (#614)
+
+StaffProfitRowSerializer bounded gross_margin to seven digits, but a percentage of revenue has no bound: a day whose sales were mostly returned leaves cents of revenue against euros of cost, and DRF raised InvalidOperation, a 500 on profit_report for that range every time. The field is now unbounded. ([`67bc91b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67bc91b8cb1ce38d0a57b30b41e1e7d375e48ba1))
+
+## v3.242.3 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_boxnow): the shipment admin follows the service's cancel rule; the service builds the label zip (#603)
+
+The two cancel actions of BoxNowShipmentAdmin tested parcel_state == NEW
+themselves. BoxNowService.can_cancel_shipment is the rule cancel_shipment
+and the order's canBeCanceled read, and it also allows a shipment BoxNow
+never received (no parcel_id), which cancels locally. The admin refused
+that shipment, and a change to the rule would not have reached it. Both
+actions now call can_cancel_shipment.
+
+The bulk voucher zip was assembled inside the admin action. It moves to
+BoxNowService.fetch_labels_zip, the counterpart of
+AcsService.fetch_labels_pdf: it returns the archive and the labels that
+failed, and the action only reports and returns the download. The
+voucher file name has one definition, BoxNowService.label_filename.
+
+shipping_acs: retire_shipments skips TERMINAL_STATES instead of its own
+copy of the four states, and the AcsTrackingEventAdmin docstring no
+longer calls the polled tracking rows webhook deliveries.
+
+Closes #583 ([`563f9fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/563f9fbbcf077cd216715b4a88e0f9e0e2e75809))
+
+### Testing
+
+* test(agent): generate the staff test password at run time (#605)
+
+The literal password in the staff MCP schema-binding test tripped GitGuardian's generic-password detector on every branch that merges main. The test only needs a password it can sign in with, so it now draws one from secrets.token_urlsafe per run. ([`6d13dad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d13dad9ac12a6fca30eb4a64957d66fc49576c5))
+
+## v3.242.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read (#598) ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read
+
+Django's and DRF's URLField accept a port past 65535 (`:65536`), which
+the storefront's z.url() refuses: one such value saved would fail the
+storefront's parse, with a 422, on every response that carries it.
+
+- core.fields.url.WebURLField (model) and core.api.url_field.WebURLField
+  (serializer) validate with WebURLValidator. CoreConfig.ready maps the
+  model field to the serializer field for every ModelSerializer.
+- Every model and serializer URL field uses them (blog, builder, order,
+  product, shipping_boxnow, tenant, user). The migrations only record
+  the field class: no SQL.
+- tests/unit/core/test_url_fields_are_web_urls.py fails on a bare
+  Django/DRF URLField in the source or a plain URLField on a project
+  model, and checks the model, a generated serializer field and a
+  declared one refuse the port.
+
+Production checked read-only first: 741 URL values in 4 schemas, none
+refused.
+
+Closes #553 ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): one URL check per value, so a bad URL gets one error
+
+DRF's URLField appends a plain URLValidator, which WebURLValidator
+already runs first, so an invalid URL got the same error twice. The
+serializer WebURLField drops that one and adds WebURLValidator only when
+the caller passed none (the author sameAs field passes one narrowed to
+http/https). ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Chores
+
+* chore(cache): purge the storefront feeds by their rss: function names only
+
+The storefront's feeds read through functions named rss:<what> since
+storefront #433; RssFeed, cachedBlogPostFeed, cachedBlogCategory and
+cachedProductCategoryDetail name no cache any more. ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Testing
+
+* test(core): the URL-field rule catches bare and subclassed URLFields ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+## v3.242.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(user): subscription admin actions work from the changelist and end a subscription through unsubscribe() (#601)
+
+The changelist hands an action a queryset that joins
+list_select_related ("user", "topic"). "user" is nullable (a guest
+subscription), and PostgreSQL refuses FOR UPDATE on the nullable side
+of an outer join, so "Resend confirmation" answered 500 for every
+selection. The lock now names the subscription rows only.
+
+"Deactivate selected subscriptions" wrote status and unsubscribed_at
+with a queryset update, which left updated_at at its old value. It now
+locks the rows and calls UserSubscription.unsubscribe(), the rule the
+customer's own unsubscribe uses.
+
+Tests run both actions through the changelist, and pin that
+deactivating a topic subscription is not a marketing opt-out and that
+a loyalty adjustment moves the balance and leaves XP alone. ([`0e3b0d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e3b0d1fbd5e86da1534235c5b27782ce3f1aeb5))
+
+### Chores
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check (#602) ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check
+
+A task's name is its address: queued messages, the beat schedule and
+DeferredDispatch rows hold it, and a deploy runs two releases side by
+side. The 200 first-party task names are now a committed list, and a
+task that leaves its module without name="<old name>" fails a test.
+
+import-linter checks three boundaries in CI: core imports no domain app
+(tenant excepted), the two carrier apps do not import each other, and a
+carrier app is reached only through shipping. Each contract lists the
+imports that break it today; the lists only shrink.
+
+A test holds every backticked repo path in CLAUDE.md, README.md, docs/
+and .claude/ to a file that exists, and refuses a citation of a Claude
+memory note, which is in no repository.
+
+refactor commits now cut a patch release, so moved code ships and is
+verified as its own release. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+### Testing
+
+* test(docs): keep a package checked after it moves under a source root
+
+The doc-reference check decided "is this a path of this repository" by
+the first segment being an entry at the repository root. Once a package
+moves into src/, its name is no longer at the root, so every stale
+reference to it would have been read as another repository's path and
+skipped. The entries of src/ now count as first-party roots too. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+## v3.242.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(agent): canonical staff resource only, and text search for non-ASCII digits
+
+A resource whose host differed only in case passed issuance (urlsplit
+lowercases the host) but never matched the store's resource on use, so
+its token was refused on every call. And a search like "²" passed
+isdigit() and made int() raise a 500. ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Features
+
+* feat(agent): store-admin read surface for AI apps over MCP (#556) ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(agent): store-admin read surface for AI apps over MCP
+
+A store's owner and staff can connect their AI app to the store-admin
+MCP server (/mcp/admin, served by the agent gateway) and read orders,
+sales, profit, products and stock, customers, reviews and contact
+messages, by their role in the store. Read only.
+
+- Staff issuer: allauth.idp.oidc is now in SHARED_APPS too. On the
+  public schema it issues tokens to platform identities (staff); each
+  store's schema keeps issuing to its customers. A customer token is
+  never found where staff tokens are looked up, and the other way round.
+- Connect host (STAFF_CONNECT_HOST): PlatformTenantMainMiddleware maps
+  it to the public schema with its own URLconf (agent.urls_connect),
+  which serves only the staff issuer, so the platform host stays behind
+  its basic-auth. Sign-in reuses the admin's form (staff lockouts and the
+  superuser second factor); the consent requires one store's /mcp/admin
+  resource and a membership there, offers only the scopes the role
+  opens, and wears that store's brand. No device flow; DCR clients get
+  the staff scopes and the code flow only.
+- The IdP routes leave the platform host: they are served on store
+  hosts (customers) and the connect host (staff) alone.
+- /api/v1/agent/staff/*: StaffAgentTokenAuthentication looks tokens up
+  in public only and requires the store's resource, an active staff
+  account and an active membership on every call; HasStaffScope needs
+  the scope AND the role's permission, read from
+  TenantRolePermissionBackend so a superuser gets the store role only.
+  Figures come from order/turnover.py and order/profit.py; no street or
+  phone leaves; throttled per staff member and store (agent_staff).
+- The allauth frame resolves its account links with {% url ... as %},
+  so a host without account routes renders allauth's error page.
+
+The public schema already holds the IdP tables at the current shape
+(checked on staging and production), so no migration is needed. ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(agent): a store switch for its team's AI apps, off by default
+
+What a team member's AI app reads (customers, orders, messages) goes to
+the app's provider, and the store, as controller, decides whether its
+customers' data goes there at all. STAFF_AI_ACCESS_ENABLED is a new store
+feature, staff_ai_access, declared off: until a store turns it on, no one
+can connect (the consent refuses), and every /api/v1/agent/staff/* route
+answers a bare 404, a connected app's token included. Turning it off
+cuts connected apps at their next call. It is served in
+TenantConfig.features as staffAiAccess, so the gateway can refuse
+/mcp/admin on the same answer.
+
+Also: StaffAgentThrottle is classified fail-open (authenticated reads),
+and agent/staff_auth.py joins the modules that may read is_staff (it
+authenticates against the public schema and re-checks the flag). ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(admin): list STAFF_AI_ACCESS_ENABLED under Agent Commerce ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+* feat(builder): name staff_ai_access in the editor's feature states ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Performance improvements
+
+* perf(agent): read order totals from the list's annotation
+
+The staff orders list computed each row's total with its own aggregate
+query; it now reads with_total_amounts(), so the list costs the same for
+one order or fifty. The order detail no longer joins the country it
+serves only the key of (Country.alpha_2, the ISO code). ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+### Refactoring
+
+* refactor(agent): import ReviewStatus at module level ([`308bf19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308bf1943772c78f2ee342a6fbd32fcae68c6901))
+
+## v3.241.0 (2026-11-09)
+
+### Features
+
+* feat(tenant): a store preference to open external links in a new tab (#555)
+
+Closes #550. ([`4348765`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4348765f6b292e72d3e13e6ca559d8ea8a6460c9))
+
+## v3.240.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(blog): refuse author profile links a URL parser refuses, and bound them (#554)
+
+Django's URLValidator accepts any five-digit port, so an author's
+public profile saved as https://example.com:65536 passed, while the
+storefront's z.url() refuses it: once the storefront reads sameAs, every
+post of that author and the author's page would answer 422.
+
+core.validators.url.WebURLValidator runs URLValidator and then parses
+the port (urlsplit raises past 65535). BlogAuthor.same_as uses it on
+the model and the write serializer, and lists at most PROFILE_URLS_MAX
+(10) profiles. The migration changes state only (no SQL).
+
+Refs #553 ([`70c02dd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70c02dd6e86d466022a1206f6f392d5a596a9b28))
+
+## v3.240.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(blog): ask each related-posts strategy once, for ids, so the query count does not follow the data
+
+The chain asked its strategies again to fill what was left, and the
+shared-words strategy ran a query only when it found something: the
+number of queries depended on the posts' titles, and the query-cost test
+failed in CI on random factory titles (22 against 20).
+
+Each chain member now returns ranked ids (related_ids), asked once; the
+shared-words strategy's ranking needs no query of its own (its
+candidates are already the store's live posts); the chain merges the
+lists by weight and returns the one queryset the view serializes. A
+query-cost test where every title shares words covers the case. ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+* fix(blog): act when a scheduled publication goes live, and purge the feeds on content changes (#551) ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(blog): act when a scheduled publication goes live, and purge the feeds on content changes
+
+A row saved with a future published_at is served from that date with no
+write, so nothing reacted: its cache surfaces kept the pre-publication
+answer (Django's 2 h view cache, then the storefront's), IndexNow
+announced it at save while it still answered 404 and never at go-live,
+and blog search indexed it before its date.
+
+- core.publication: a per-store sweep (beat release-due-publications,
+  every minute) finds the published rows of every PublishableModel whose
+  date passed since its cursor and that were saved before it, marks stale
+  every surface that declares the model, and sends went_live. The cursor
+  moves only after a run succeeds.
+- PublishableModel.is_live: the published() rule for one row.
+- IndexNow announces a post only when it is live; went_live queues it.
+- Blog search indexes live posts only; went_live indexes the post. The
+  save receiver collects translation pks with a plain query, without the
+  likes join get_meilisearch_queryset carries.
+- The sitemap_seo surface declares the models the sitemap and the feeds
+  list and names the feed's own cached functions, so a change reaches
+  /rss.xml and the sitemap instead of waiting for a manual purge.
+
+Closes #546 ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(core): keep sweep cursors in Postgres, and fail the go-live sweep on a failed IndexNow queue write
+
+The publication sweep and the promotion window sweep kept their cursor in
+the cache, which fails open: with Redis unreachable a read is a miss and
+a write is dropped, and a flush loses it. Each run then fell back to a
+fixed one-day window, missing anything older and repeating everything
+newer every minute.
+
+- core.SweepCursor (public, one row per store and sweep) and core.sweeps
+  (sweep_start, advance_sweep) hold the position; both sweeps use them.
+- The go-live IndexNow receiver lets a failed queue write fail the sweep,
+  which then repeats its window instead of moving past an unannounced
+  page. A save keeps treating the queue as optional. ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+* fix(core): purge what a publication made stale before the sweep moves on, and keep bulk edits' modification time
+
+From the independent review of the go-live sweep:
+
+- The sweep purges its surfaces through CacheService.purge and fails
+  the run when a surface fails to purge, so the window is repeated. The
+  batched save-time queue it used lives in the cache, which fails open,
+  and swallows its own errors.
+- A post going live reaches the page builder's pages that list its
+  category (builder.data_purge), as its save does.
+- A sweep cursor never moves backwards when an earlier run ends last.
+- admin.bulk.update_each also writes auto_now fields: a bulk publish
+  left updated_at, and with it the sitemap's lastmod and the feed's
+  atom:updated, behind.
+- promotion 0007 drops the window sweep's old cache cursor, written with
+  no expiry. ([`d834cfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d834cfd3c956f74f2e519d7f487db77ffabfb42b))
+
+### Documentation
+
+* docs(blog): describe the related posts chain
+
+New docs/blog-related-posts.md: the strategy order and weights, how the
+weighted chain merges ids, the shared-words ranking and the measurements
+behind it, and why no strategy declines. RELATED_POSTS_CANDIDATES counts
+the store's newest posts of every category, not one category's. ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+### Features
+
+* feat(blog): authors' public profile links, and related posts on the same topic (#552) ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+* feat(blog): authors' public profile links, and related posts on the same topic
+
+- BlogAuthor.same_as: links to the author's public profiles (http/https
+  only, one validator shared by the model and the write serializer),
+  served on every author read and inside a post, read-only and so always
+  present. The storefront's schema.org Person sameAs. Edited in the
+  admin one per input (Unfold's ArrayWidget, set for every ArrayField in
+  BaseModelAdmin).
+- Related posts lead with the category's posts whose titles share the
+  most distinctive words with the post's (BM25 inverse document
+  frequency over the store's newest posts, words normalised by the
+  language's Postgres text search configuration). Measured on webside's
+  81 posts first: for its Instagram post, three of the first four are
+  the category's Instagram posts, where the newest-first category list
+  had two of eight.
+- The weighted chain keeps the order its strategies found, instead of
+  re-sorting by date.
+
+Closes #547
+Closes #548 ([`d29202d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29202d28122d782d6fccda54d18ca868da0bcbb))
+
+## v3.239.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(order): keep the refund dialog while any refund of the order is pending (#545)
+
+refund_open stays true while any refund attempt is PENDING; the REFUNDED refusal reports what has not gone back (PaymentLedger.outstanding); Greek label and overdue-retry wording fixed; docs match. ([`3c7e4ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3c7e4ee5cd17a2d02ddd51c815c883dcab5d3aa2))
+
+### Chores
+
+* chore(claude): guard the Tailwind npm lockfile and match guarded paths in any letter case (#544) ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): guard the npm lockfile of the Tailwind build
+
+package-lock.json is written by npm for the Tailwind CSS build (the
+Dockerfile runs npm ci), so a hand edit is refused like uv.lock. A
+session started in this repository had no rule for it, and the
+workspace root refused it with a message meant for the pnpm repos.
+
+The workspace root's guard now runs this file for edits made from a
+root session, so this rule applies there too. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): match guarded paths in any letter case
+
+Windows disks ignore case, so an Edit of UV.LOCK writes the real
+uv.lock, and the same holds for .ENV, CHANGELOG.MD or an UNTRACKED/
+folder. The guard compared names exactly and let every such spelling
+through. It now matches the lower-cased path, with every rule written
+in lower case; the reason it prints still shows the path as given.
+
+The same one-line change goes into each repository's copy, which are
+kept structurally identical. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+* chore(claude): keep the .env.example exception to its exact spelling
+
+With the path matched in lower case, .env.EXAMPLE also matched the
+.env.example exception. On a case-sensitive disk that is a different
+file, which the guard refused before and must keep refusing. Protected
+paths still match in any case; only the exact spelling .env.example is
+let through. ([`abd9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abd9591387d6a53e1af2e2059702cbb2ff377b13))
+
+## v3.239.0 (2026-11-09)
+
+### Features
+
+* feat(order): refund by lines with an exact VAT split in one dialog (#527)
+
+A refund by order lines writes its own CreditAllocation rows (exact VAT rates, points kept as value back), checked per rate at claim time; one Return and refund dialog with reasons, restock and safe retries; waiting refusals for shortages a pending claim causes. ([`cf7fd9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf7fd9a94ee5322d46b6e5e6aa7f3619247a17bd))
+
+## v3.238.0 (2026-11-09)
+
+### Bug fixes
+
+* fix(turnover): count only the goods part of a refund as a return (#543)
+
+A refund counts min(goods_claimed, moved); a reversal takes the duplicate part first; past months never move. ([`6c096ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c096ab75d8305ae4b57357bdbfeaac5dbdf2465))
+
+### Features
+
+* feat(product): catalogue import foundations: batched reindex, safe fetch, external reference and set_stock (#542)
+
+Batched Meilisearch reindex with collect_reindex and filter deletes on the primary key; core.net.safe_fetch (SSRF-safe, IDNA, total deadline, cert check via ssl) with the social avatar moved onto it; Product.external_reference, ProductImage.source_*, StockLogReason.CATALOGUE_IMPORT and StockManager.set_stock. ([`37d1ae1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37d1ae16f7a13d743e7558f482d1aec28d6110d9))
+
+## v3.237.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(order): find Viva refunds in the lookup and ask staff only after it failed (#541)
+
+Viva refund lookup reads the nested TransactionType; the unknown-refund alert and Record refund outcome wait for the lookup (looked_up_at, awaiting_staff) and never lose an attempt; a stalled gift card and points share stays finishable from the order; the resume dialog asks for no cash reference; reservation-time texts name the setting; OrderItemFactory.is_refunded defaults False; the internal agent order endpoint declares its header and 404. ([`74b6688`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74b6688de7799029493abb8e7b0682e216c57029))
+
+## v3.237.1 (2026-11-08)
+
+### Bug fixes
+
+* fix(core): report a broker failure as celery false on the health check (#540)
+
+/api/v1/health answered 500 whenever the broker failed, instead of
+the per-service booleans it documents. It caught only CeleryError
+around celery_app.control.ping, and a broker failure is not one:
+- with the broker down, kombu raises its own OperationalError
+  (measured: after 8.8 s with our broker settings);
+- after a broker restart, the first ping on the pooled connection
+  raised ConnectionResetError (seen on the local stack after a
+  RabbitMQ upgrade).
+
+The check now also catches kombu's OperationalError and the broker
+connection's own connection_errors and channel_errors (the amqp
+transport's ConnectionError and ChannelError, and OSError), so a down,
+reset, timed-out or login-refused broker reads celery: false. A
+programming error still raises.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`772dbe4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/772dbe4569b341dc70a2aae9d0b7dcc50c561d97))
+
+## v3.237.0 (2026-11-08)
+
+### Features
+
+* feat(order): allocate each credit's VAT split when the money moves (#530) ([`2aefd33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2aefd334c59f3e50aab3bfc05b8709ef19aa4fbc))
+
+## v3.236.3 (2026-11-08)
+
+### Bug fixes
+
+* fix(admin): keep a product's edited translation through its save (#539) ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+* fix(admin): keep a product's edited translation through its save
+
+Editing a product's description in the admin saved the product and
+dropped the description. ProductAdmin.get_queryset loads a column subset
+with .only(), and get_queryset also loads the object the change form
+edits. Product.save reads reduction_started_at for the pricing plan,
+Django loads that deferred column with refresh_from_db(fields=[...]),
+and parler's refresh_from_db override clears every cached translation
+on any refresh, so the edit set by the form was gone before parler
+saved the translations.
+
+- core/apps.py: a refresh of named fields keeps the cached translations
+  (it reloads only master columns, which no translation is); a full
+  refresh still clears them. This replaces the save_model workaround
+  that re-wrote the translation with a second upsert after every save.
+- BaseModelAdmin.serves_changelist: ProductAdmin and ProductReviewAdmin
+  apply their .only() column subset to the changelist alone, so the
+  change form loads whole rows. A product save went from 70 queries to
+  50, none of them a deferred-column reload.
+- ExportActionMixin._export_queryset: an export reads whole rows with
+  their foreign keys and translations in a fixed number of queries,
+  instead of one query per deferred column, foreign key and language
+  per row.
+
+Tests drive the real admin change form over HTTP (product description,
+tag label), a deferred read with an unsaved translation, the change
+form's query log, and the export's query count at 2 and 5 rows.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+* fix(pay_way): stop migration 0023 failing on every new schema
+
+pay_way 0023 purged parler cache entries that 0022's queryset update
+left stale. It read the current PayWay model, whose later columns a
+fresh schema does not have at that point, so every new store and every
+test database logged "Could not purge the parler cache". The cache it
+purged is gone: PARLER_ENABLE_CACHING has been off since #359, so the
+migration is emptied, as tenant 0049 was.
+
+The same change left a search test counting calls to parler's cache
+write, which returns at once with caching off, and the docstring of
+ProductTranslation.get_search_result_queryset giving that cache as the
+reason the category is prefetched. The test is removed (the category
+query count stays covered by the two constant-query tests beside it)
+and the docstring states what the prefetch buys now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+### Testing
+
+* test(admin): prove the column-reload pattern matches a real deferred load
+
+The whole-row test asserts no query matches COLUMN_RELOAD, which would
+also pass if a change to the SQL shape left the pattern matching
+nothing. The deferred-read test now asserts the pattern matches the
+query its own deferred load sends.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`15ca306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15ca30692c9718d1190c01c4ac6417a2ad3fd6b8))
+
+## v3.236.2 (2026-11-08)
+
+### Bug fixes
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in (#538) ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(api): return a whole list for ?pagination=false only where a view opts in
+
+Every BaseModelViewSet list honoured ?pagination=false and returned the whole filtered queryset, past the paginator's maximum page size: any caller, an anonymous one on the public product list included, could take a whole table in one response. A view now names the actions that honour it in unpaginated_actions (the country list and a customer's own gift cards, the two the storefront reads in full); every other list ignores it and stays paginated. The parameter is documented only on those two operations: create_schema_view_config(unpaginated_actions=...) adds PAGINATION_PARAMETER, now defined once instead of four times.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(admin): post next from the login form instead of redirecting to add it
+
+Our own core/templates/admin/login.html (not Unfold's, which the mixin's docstring blamed) rendered no next field, so a login from a bare /admin/login/ fell back to LOGIN_REDIRECT_URL, the storefront's account page. AdminSiteLoginNextMixin worked around it by redirecting every bare GET to ?next=/admin/. The form now posts next itself, which AdminSite.login fills with the requested page or the site's index, and the mixin is gone from both sites. The tests assert what the page carries on the platform host and on a store host, instead of the redirect.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(contact): leave email format to the serializer's EmailField
+
+validate_contact_content and validate_feedback_content ran their own ASCII-only regex after the serializer's EmailField had already validated the address, and refused valid internationalised ones: a Greek domain, punycode (xn--...) or Unicode. The format is now Django's EmailValidator alone; the utilities keep the disposable-domain check. The invalid-format cases moved to the serializer tests, which also prove a Greek domain is accepted.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(core): read the template VERSION from settings.RELEASE_VERSION
+
+core.context_processors re-read pyproject.toml relative to the working directory and answered 0.0.0, with a warning, whenever the process ran from elsewhere, while settings.RELEASE_VERSION already holds the same value read from BASE_DIR (the footer and the response cache use it).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+* fix(order): parse AADE's myDATA answers with defusedxml
+
+parse_response_doc and parse_requested_doc read XML that comes over the network with the stdlib parser, including a second document re-parsed from an element's text. defusedxml, already a dependency for SVG uploads, refuses entity declarations and external references in both; a test proves an entity-bearing answer is refused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+### Testing
+
+* test(core): pin both sides of the unpaginated-actions rule
+
+The PaginationModelViewSet unit test assumed ?pagination=false returns the whole list on any view. It now opts its action in for that case, and a second test proves a view that has not opted in ignores the flag and goes through the paginator.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`2b70543`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b70543b09192d6e240f0bedc40f7a8ded3c9d97))
+
+## v3.236.1 (2026-11-08)
+
+### Bug fixes
+
+* fix(search): cap the id lists a search request may carry (#535) ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): cap the id lists the public product search accepts
+
+parse_int_csv had no length limit, and the public (AllowAny) product
+search turns categories, attribute_values and brands into Meilisearch
+IN [...] filters (categories expanded to their whole subtree). One
+crafted URL could therefore drive thousands of ids into a single filter.
+
+parse_int_csv now takes a keyword max_items defaulting to
+MAX_INT_CSV_ITEMS (100), so every caller inherits the bound. The count is
+checked before any value is converted to int, so an oversized list costs
+one split. Over the limit is a 400 with code too_many_values and a
+translated message naming the limit; garbage is still invalid_integer_list.
+100 is far above any real selection: the storefront builds these lists
+from the filter chips a shopper ticks plus the listing's own category.
+The loyalty product-points preview keeps its stricter own check.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(loyalty): keep the points preview's own error for an oversized list
+
+The new default cap in parse_int_csv (100, the same as the points
+preview's own MAX_POINTS_PREVIEW_PRODUCTS) answered a 101-id request to
+GET /api/v1/loyalty/product/points with `too_many_values` before the
+view's documented `invalid_product_ids` check could run (found by
+coldtea-pr-lens). The existing test only asserted a 400, so it passed.
+
+`max_items=None` lets a caller that bounds the list itself right after
+parsing opt out; the points preview does, so one bound and one error
+answer it. A test now pins the code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+* fix(search): count distinct ids against the cap and pin the code in tests
+
+Review follow-ups (independent review on #535):
+- parse_int_csv counts distinct values, first occurrence kept. The
+  storefront's queryIdList neither dedupes nor caps, so a mangled or
+  stale filter link that repeats an id must not turn the listing into
+  a 400. The repeated values were never useful to the filter either.
+- The search endpoint test asserted only that the field was named in
+  the 400; it now pins `too_many_values`, so another 400 cannot pass for
+  it. A test covers a repeated id, and the count-before-conversion test
+  uses distinct garbage values.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`01788a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01788a1076b51fcd2d5d08caceea3b5cf0b47cf4))
+
+## v3.236.0 (2026-11-08)
+
+### Continuous integration
+
+* ci(infra): match Meilisearch v1.56.0 and RabbitMQ 4.3.7 to the cluster (#533)
+
+The cluster moves Meilisearch to chart 0.42.0 (engine v1.56.0) and the
+broker to rabbitmq:4.3.7-management in the cluster upgrades of
+2026-11-08/09 (grooveshop-infrastructure #269, #272-#275). CI's service
+containers and infra.compose.yml follow, so dev, CI and production run
+the same engines. Redis stays on redis:8-alpine (8.10, as the cluster
+now runs).
+
+The recommendations-engine page stated the cluster "runs v1.53.1";
+it now says that was the version at the time of the check.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrsePxr9Hv6yNYJdZTzpF
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`07fd55d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07fd55d5e94186c65add78a2d5ea76de7bddb8cd))
+
+### Features
+
+* feat(deps): run on Python 3.15.2 (#537)
+
+Django 6.1.3 is the first release that supports Python 3.15. 3.15.2, not
+3.15.0: it fixes the 3.15.0 import-lock deadlock (gh-159963) on
+concurrent first imports, which our function-level imports under the
+asgiref and Channels thread pools would meet.
+
+- .python-version, both Dockerfiles, requires-python, the ruff and ty
+  targets, CLAUDE.md and README. A new test keeps .python-version, the
+  Dockerfiles' PYTHON_VERSION and the tool targets in agreement, so a
+  mismatch fails the PR instead of the release image build.
+- Both images set UV_PYTHON_DOWNLOADS=0 (uv's Docker guidance). Without
+  it, a .python-version that differs from PYTHON_VERSION made uv
+  download its own interpreter into /root, and the production stage
+  shipped a venv with no interpreter.
+- [tool.uv] CVE floors are constraint-dependencies, not overrides. An
+  override replaced fonttools' brotlicffi requirement marker and all,
+  so the PyPy-only brotlicffi was compiled into every image (36 s in the
+  v3.234.4 build); it is no longer installed.
+- WeasyPrint libraries: the runtime image installs pango and
+  harfbuzz-subset (WeasyPrint warned it was missing) instead of cairo,
+  gdk-pixbuf and libffi; the builder drops python3-dev (it installed
+  Alpine's own Python) and the cairo/pango/gdk-pixbuf/libffi headers
+  (WeasyPrint is pure Python and dlopens its libraries). A Greek PDF
+  renders in the new image with no warning. The dev image moves to
+  trixie, uv 0.13.7, and drops the unused PostgreSQL server package.
+- Python 3.15 makes sentinel a builtin: the shipment cache in the order
+  serializer checks membership instead of a sentinel object, and a test
+  renames its local.
+- CI runs the locked ruff through uv instead of downloading it again
+  through ruff-action.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`acde187`](https://github.com/vasilistotskas/grooveshop-django-api/commit/acde1876f96b0828906aa012b42d2054ba60befd))
+
+## v3.235.0 (2026-11-08)
+
+### Bug fixes
+
+* fix(admin): small fixes found during the Django 6.1 upgrade
+
+- emails/checks.py: the Resend-key database check queries "default"
+  only when it is handed that database, as a database check must; 6.1's
+  check command now passes every database.
+- Remove 65 "classes": ("wide",) fieldset entries in 13 admins: Unfold
+  has no style for the class and Django 6.1 removed it.
+- test_only_transport_sends skips any virtualenv in the checkout, not
+  only one named .venv.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Chores
+
+* chore(deps): keep main's project version beside the Django 6.1.3 pin
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Features
+
+* feat(deps): move to Django 6.1.3 (#536) ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* feat(deps): move to Django 6.1.3
+
+- order/turnover.py: Django 6.1 applies the first model's Meta.ordering
+  to a union(), which then raised "ORDER BY term does not match any
+  column" because the values_list does not select PaymentTransaction's
+  created_at and id. Clear it with order_by() after combining, as the
+  release notes say. Turnover, profit and the store dashboard all read
+  through this one query.
+- tenant/admin.py: get_actions() takes action_location, and the bulk
+  delete keeps its last-owner guard through dataclasses.replace() on the
+  Action object instead of unpacking a tuple.
+- shipping_boxnow: drop a bare select_related(); the events serializer
+  reads no relation.
+- Django 6.1's blank choice label has no Greek translation. Django's
+  documented hook is to set BLANK_CHOICE_LABEL in an AppConfig.ready();
+  ours is core.forms.choices.BLANK_CHOICE_LABEL, translated in the el
+  catalogue and used by the chargeback dialog's hand-built select.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Refactoring
+
+* refactor(email): configure outgoing mail through MAILERS
+
+Django 6.1 deprecates EMAIL_BACKEND and the EMAIL_* settings in favour of
+MAILERS, and get_connection() with them. The default mailer is
+core.mail.DemoRecipientSuppressingBackend, which hands each send to a
+"relay" mailer, a fresh backend per call. The relay is built from the
+same EMAIL_* environment variables as before, so no deployment changes;
+the port is now a number. EMAIL_SEND_TIMEOUT carries EMAIL_TIMEOUT for
+the Resend request, since settings.EMAIL_TIMEOUT cannot exist beside
+MAILERS.
+
+In the same settings file:
+- CELERY_TASK_ROUTES sends meili.* to the meilisearch queue. Celery 5.7
+  deprecates a task's own queue= (removed in 6.0); the three meili tasks
+  drop it. Workers already consume celery,meilisearch.
+- The local log file is written as UTF-8 (on Windows the locale encoding
+  could not write a Greek line), and the bare-host LOGGING branch
+  declares the django logger like the other two, so Django's default
+  mail_admins handler is dropped there too.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* refactor(filters): end an ordering with the pk only when it is not total
+
+QuerySet.totally_ordered (Django 6.1) replaces our _ends_unique, which
+knew only the primary key: an ordering on a unique, non-null field is
+already total and no longer gets a redundant pk tiebreak.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+### Testing
+
+* test(core): read the editor's script order from the rendered media
+
+Django 6.1 keeps each entry of a Media's JS list as a django.forms.Script, so the test's str.endswith on the private _js list raised AttributeError. Media.render_js() gives the tags in page order through the public API.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+* test: skip nested virtualenvs and cover a translated ordering key
+
+test_only_transport_sends finds every directory holding a pyvenv.cfg, at any depth, and skips the files under it; the earlier change looked only at the checkout's top level, where the old .venv rule matched at any depth. The ordering test adds a translations__ key, an expression totally_ordered cannot count as unique, so pk still ends the order. Both from the CodeRabbit review.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`18018e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18018e92196fbcf00fd4d68d02784b10811c7056))
+
+## v3.234.5 (2026-11-08)
+
+### Bug fixes
+
+* fix(deps): take Django 6.0.10 for its security fixes (#534)
+
+Django 6.0.10 (2026-11-03) fixes six security issues in 6.0.9. Two of
+them reach this API:
+
+- CVE-2026-108147: a multipart upload sent with
+  Content-Transfer-Encoding: base64 was buffered whole in memory,
+  whatever FILE_UPLOAD_MAX_MEMORY_SIZE says.
+- CVE-2026-113593: an empty and a missing Vary header produced the same
+  cache key. core/utils/views.py wraps cache_page around
+  vary_on_headers("Authorization", "Cookie"). The new keys mean one cache
+  miss per cached page after the deploy.
+
+CVE-2026-113733 does not reach us: UserAccount builds on the abstract
+AbstractBaseUser, and no other model with a password hash is in an
+admin. The three GIS issues do not either: there is no contrib.gis.
+
+Only the pin and the lock change.
+
+
+Claude-Session: https://claude.ai/code/session_01JsrseRpdaQxGeF5hxVtk1J
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`225adc0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/225adc0ca573213265048ddab6971154ff917f0c))
+
+## v3.234.4 (2026-11-08)
+
+### Bug fixes
+
+* fix(core): count every rate limit in one Redis step so its window always ends (#532) ([`73e47ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73e47eaeb04de1654f423b801112cfb67f1e1263))
+
+## v3.234.3 (2026-11-08)
+
+### Bug fixes
+
+* fix(tenant): count only wrong staff sign-ins against an address (#531) ([`436dd31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/436dd3122b56f8fb7243cf034defc85458da5f64))
+
+### Chores
+
+* chore(api-contract): drop the overrides storefront v3.334.0 made unnecessary (#529) ([`95e7dba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95e7dba6653d0914825851a0a5127a79d01fb08a))
+
+## v3.234.2 (2026-11-08)
+
+### Bug fixes
+
+* fix(product): make the VAT rate NOT NULL and unique in the database (#528) ([`cf5f69d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf5f69dc5d9265471a80dcbe1d169f776fd66742))
+
+### Chores
+
+* chore(api-contract): expire the order and product overrides on storefront v3.334.0 (#526) ([`457c93b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/457c93b5c1144a846817fac84a02e788aac2e3e3))
+
+## v3.234.1 (2026-11-07)
+
+### Bug fixes
+
+* fix(shipping): answer 404 from the ACS station routes for a store without ACS credentials (#525)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ([`0cc7922`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0cc7922d1a45cf627a640ed537282b5e85dd99cf))
+
+## v3.234.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(order): freeze placed order lines and flag a double payment (#521) ([`f92c81c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f92c81c226630d241508eef2dac1fc711c2c909e))
+
+### Features
+
+* feat(search): find products by code, brand and category name (#522) ([`a24dbf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a24dbf232188355cabfae4dae3821eb5a3b3e2fa))
+
+## v3.233.0 (2026-11-07)
+
+### Bug fixes
+
+* fix(product): require a VAT rate on every product and protect it (#520) ([`fad37d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fad37d22abdc0d6987f6424322e02b7986514887))
+
+* fix(tenant): require a second factor and count wrong staff passwords (#519) ([`1146308`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1146308a6fc03cc841c851f8638ecbd3298bc805))
+
+* fix(cart): replace a cart's stock holds instead of stacking them (#517) ([`3eacc4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3eacc4b13019ba5d30896d1363b25f9906ce501f))
+
+### Features
+
+* feat(logging): add db_queries and db_ms to access and task log lines (#518) ([`c2e5d26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2e5d26af16773ba7890f6d771a42c2ef045f0f4))
+
+## v3.232.2 (2026-11-07)
+
+### Bug fixes
+
+* fix(deps): Celery 5.7, redis-py 8, allauth 65.21.1 and Python 3.14.9 (#523) ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
+* fix(deps): Celery 5.7, redis-py 8, allauth 65.21.1 and Python 3.14.9
+
+Runtime
+- Python 3.14.7 -> 3.14.9, Alpine 3.23 -> 3.24, uv 0.13.6 -> 0.13.7
+  (Dockerfile, .python-version, CI, required-version)
+- Node 26.13.0 for the Tailwind stage (node:25 is end of life);
+  tailwindcss 4.3.5
+- Celery and kombu 5.7.0; redis-py 6.4 -> 8.1 (Celery no longer caps it)
+- django-allauth 65.21.1 (passkey user verification, rate-limit window
+  security fixes), django-phonenumber-field 9, django-mptt 0.21.1,
+  pypdf 7, psycopg 3.3.8, django-tenants 4.0.1, unfold 0.110.1, knox
+  5.1.1 and the rest of the lock, all at least a day old
+- Django stays on 6.0.9: Django 6.1 ships as its own release
+
+redis-py 8 gives every connection a 5 s socket timeout, the same length
+as channels-redis's BZPOPMIN wait, so an idle websocket receive raised
+TimeoutError (django/channels_redis#422). The channel layer now sets
+socket_timeout to twice brpop_timeout.
+
+Tests
+- pytest 9.2 restores a monkeypatched attribute only if it was in the
+  target's own __dict__ (pytest #10644). django.db.connection is a proxy,
+  so undoing a patch on it deleted schema_name/tenant from the real
+  DatabaseWrapper. Patches now target connections[DEFAULT_DB_ALIAS].
+- test_cache_fail_open patched the global time.monotonic, which redis-py
+  8 also reads while connecting; it now replaces only core.caches.time.
+
+allauth-schema.yml regenerated: description text only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_013E4DGY6NJCtpdz6kzMGtMC ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
+* fix(deps): drop settings Celery 5.7 makes default, name the npm package
+
+- CELERY_CONTROL_QUEUE_EXCLUSIVE and CELERY_EVENT_QUEUE_EXCLUSIVE:
+  Celery 5.7 defaults both to True (5.6.3 had False), so the settings
+  and the comment about kombu 5.6 go
+- pypdf floor >=7.0.0, the major the lock now holds
+- package.json names itself django-deps, so package-lock.json no longer
+  takes the name of whatever folder npm ran in
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com> ([`cf3a669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3a66915de52bd3ca7193ae81bcfd5c108cd43a))
+
 ## v3.232.1 (2026-11-07)
 
 ### Bug fixes

@@ -12,6 +12,11 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from django.core.exceptions import ImproperlyConfigured
+        from django.db.models import fields
+
+        from core.forms.choices import BLANK_CHOICE_LABEL
+
+        fields.BLANK_CHOICE_LABEL = BLANK_CHOICE_LABEL
 
         # Every image a serializer takes passes the media service's rule,
         # not only the ones that remember to say so.
@@ -19,11 +24,18 @@ class CoreConfig(AppConfig):
 
         import core.signals.rosetta  # noqa: F401
         from core.api.image_field import ServableImageField
+        from core.api.url_field import WebURLField as WebURLSerializerField
         from core.fields.image import ImageAndSvgField
+        from core.fields.url import WebURLField
 
         serializers.ModelSerializer.serializer_field_mapping[
             ImageAndSvgField
         ] = ServableImageField
+        # Every URL a ModelSerializer takes is one the storefront's
+        # ``z.url()`` can parse (``core/fields/url.py``).
+        serializers.ModelSerializer.serializer_field_mapping[WebURLField] = (
+            WebURLSerializerField
+        )
         from core.admin import override_third_party_admins
         from core.tasks import validate_task_configuration
 
@@ -44,14 +56,9 @@ class CoreConfig(AppConfig):
         except ImproperlyConfigured as e:
             logger.error("Task configuration error: %s", e)
 
-        # Workaround: parler 2.3 + Django 6.0 + Unfold combination silently
-        # drops translated field updates between form validation and
-        # save_model on real HTTP POSTs (master saves, translations don't).
-        # The same flow run through RequestFactory works correctly, so the
-        # bug is in some interaction with the live request pipeline.
-        # Until the upstream root cause is found, force translation persistence
-        # via a direct ORM upsert in save_model.
-        _install_parler_admin_save_fix()
+        # A deferred-field load must not drop a translation the caller has
+        # set and not saved yet: see the function's docstring.
+        _keep_translations_on_a_partial_refresh()
 
         # Intentionally no apply_db_overlay() here: ready() runs during
         # Django setup, which can be triggered at import time by
@@ -63,56 +70,36 @@ class CoreConfig(AppConfig):
         # see core/middleware/translation_reload.py.
 
 
-def _install_parler_admin_save_fix() -> None:
-    from typing import Any
+def _keep_translations_on_a_partial_refresh() -> None:
+    """Keep a model's unsaved translations when only named fields reload.
 
-    from django.http import HttpRequest
-    from parler.admin import TranslatableAdmin
+    Django loads a deferred field with ``refresh_from_db(fields=[name])``.
+    parler's override clears every cached translation on any refresh, so a
+    deferred read between a form setting a translated field and the save
+    that persists it discarded the edit, and parler then saved nothing. In
+    the product admin, ``ProductAdmin.get_queryset`` defers most columns and
+    ``Product.save`` reads ``reduction_started_at`` for the pricing plan:
+    every description edited there was lost (reported 2026-04-27, traced
+    2026-11-08). A refresh of named fields reloads only those master
+    columns, which no translation is, so the translations stay; a full
+    refresh still drops them, as parler intends.
+    """
+    from parler.models import TranslatableModelMixin
 
-    if getattr(TranslatableAdmin, "_grooveshop_save_fix_installed", False):
+    if getattr(TranslatableModelMixin, "_keeps_translations_on_partial", False):
         return
 
-    original_save_model = TranslatableAdmin.save_model
+    parler_refresh = TranslatableModelMixin.refresh_from_db
 
-    def save_model(
-        self,
-        request: HttpRequest,
-        obj: Any,
-        form: Any,
-        change: Any,
-    ) -> None:
-        original_save_model(self, request, obj, form, change)
-
-        translated_fields = getattr(form, "_translated_fields", None)
-        language_code = getattr(form, "language_code", None)
-        if not translated_fields or not language_code or not obj.pk:
-            return
-
-        cleaned_data = getattr(form, "cleaned_data", None) or {}
-        translated_data = {
-            field_name: cleaned_data[field_name]
-            for field_name in translated_fields
-            if field_name in cleaned_data
-        }
-        if not translated_data:
-            return
-
-        try:
-            translation_model = obj._parler_meta.root_model
-        except AttributeError:
-            return
-
-        translation, created = translation_model.objects.get_or_create(
-            master=obj,
-            language_code=language_code,
-            defaults=translated_data,
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        if fields is None:
+            return parler_refresh(
+                self, using=using, fields=fields, from_queryset=from_queryset
+            )
+        return super(TranslatableModelMixin, self).refresh_from_db(
+            using=using, fields=fields, from_queryset=from_queryset
         )
-        if created:
-            return
 
-        for field_name, value in translated_data.items():
-            setattr(translation, field_name, value)
-        translation.save()
-
-    TranslatableAdmin.save_model = save_model
-    TranslatableAdmin._grooveshop_save_fix_installed = True
+    refresh_from_db.alters_data = True
+    TranslatableModelMixin.refresh_from_db = refresh_from_db
+    TranslatableModelMixin._keeps_translations_on_partial = True

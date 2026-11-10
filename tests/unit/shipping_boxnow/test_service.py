@@ -19,7 +19,7 @@ from django.utils import timezone
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
-from shipping_boxnow.exceptions import BoxNowAPIError
+from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowError
 from shipping_boxnow.factories import (
     BoxNowLockerFactory,
     BoxNowShipmentFactory,
@@ -581,6 +581,24 @@ class TestApplyWebhookEvent:
         )
 
 
+class TestFetchLabelBytes:
+    @pytest.mark.parametrize("parcel_id", [None, ""])
+    def test_a_shipment_with_no_parcel_id_is_refused(self, parcel_id):
+        """Before BoxNow assigns the parcel there is no label: neither
+        the cache nor BoxNow is asked for one under an empty id."""
+        shipment = BoxNowShipmentFactory.build(order=None, parcel_id=parcel_id)
+
+        with (
+            patch("shipping_boxnow.services.BoxNowClient") as client,
+            patch("shipping_boxnow.services.cache") as label_cache,
+            pytest.raises(BoxNowError, match="before the parcel is created"),
+        ):
+            BoxNowService.fetch_label_bytes(shipment)
+
+        label_cache.get.assert_not_called()
+        client.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # cancel_shipment
 # ---------------------------------------------------------------------------
@@ -671,6 +689,33 @@ class TestCancelShipment:
         assert len(cancellations) == 1
         assert cancellations[0]["reason"] == "admin status change"
         assert "no parcel_id" in cancellations[0]["note"]
+
+    def test_a_repeat_cancel_of_a_never_sent_shipment_changes_nothing(self):
+        """BoxNow: "Canceling a canceled parcel has no effect" (API Manual
+        v7.2, §3.7, p. 15). A shipment BoxNow never received is canceled
+        the same way: the second cancel kept moving ``cancel_requested_at``
+        and logged the cancellation twice (#599)."""
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+        with patch("shipping_boxnow.services.BoxNowClient", MagicMock()):
+            BoxNowService.cancel_shipment(shipment, reason="first")
+        shipment.refresh_from_db()
+        canceled_at = shipment.cancel_requested_at
+        metadata = shipment.metadata
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(shipment, reason="second")
+
+        mock_client.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.cancel_requested_at == canceled_at
+        assert shipment.metadata == metadata
+        assert len(shipment.metadata["cancellations"]) == 1
 
     def test_cancel_new_without_parcel_id_marks_local(self):
         """Defence-in-depth: a (theoretically impossible) NEW state

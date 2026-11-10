@@ -225,9 +225,7 @@ def _webhook_get_rate_limit(request) -> bool:
     ip = client_ip_or_peer(request)
     key = "viva_wh_get:" + hashlib.sha256(ip.encode()).hexdigest()[:24]
     try:
-        cache.add(key, 0, 3600)
-        count = cache.incr(key)
-        return count > 10
+        return cache.count_in_window(key, 3600) > 10
     except Exception:
         logger.warning("viva_webhook GET rate-limit: cache error, failing open")
         return False
@@ -1471,6 +1469,25 @@ def _handle_payment_created(order, event_data, transaction_id):
         publish_payment_status(order)
         return None
 
+    # A second payment on an order another transaction already paid: the
+    # ledger booked it above and, when it takes the order past what it is
+    # for, ``PaymentLedger.sync_overcharge`` told staff. The order keeps
+    # its first ``payment_id``; confirming it again would overwrite that
+    # id and mail the customer a second confirmation.
+    if (
+        order.payment_status == PaymentStatus.COMPLETED
+        and order.payment_id
+        and order.payment_id != transaction_id
+    ):
+        logger.error(
+            "Viva transaction %s is a second payment on order %s, already "
+            "paid by %s: recorded in the ledger, order left as it is",
+            transaction_id,
+            order.id,
+            order.payment_id,
+        )
+        return None
+
     # Guard: a stale or out-of-order Viva webhook must not un-refund or
     # un-cancel an order that is already in a settled financial state.
     # Viva does NOT guarantee delivery order.  COMPLETED is allowed
@@ -1695,7 +1712,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
 def _handle_reversal_created(order, event_data, transaction_id):
     """Book a refund Viva made against one of this order's payments.
 
-    Mirrors ``handle_stripe_charge_refunded``: the refund becomes a
+    Mirrors ``handle_stripe_refund_made``: the refund becomes a
     ``PaymentTransaction`` row, ``PaymentLedger.record_refund`` derives
     ``payment_status`` from the ledger's sums, and ``order_refunded`` fires
     so the refund email, live WS toast, and Meta CAPI Refund event all run.

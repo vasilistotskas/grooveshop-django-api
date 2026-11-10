@@ -66,6 +66,7 @@ class TestShopKinds:
 
 @pytest.mark.django_db
 class TestNearestLimit:
+    @pytest.mark.usefixtures("acs_configured_tenant")
     def test_limit_drives_endpoint_cap(self, acs_provider):
         # Spin up 6 stations all in the same postal-code prefix
         for i in range(6):

@@ -67,6 +67,9 @@ class FlatRateCarrier(ShippingCarrierInterface):
     def cancel_shipment(self, shipment: Any, *, reason: str = "") -> None:
         return None
 
+    def has_label(self, shipment: Any) -> bool:
+        return False
+
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         """No label exists — the merchant writes their own.
 

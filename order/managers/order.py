@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import (
     BooleanField,
+    Case,
     Count,
     ExpressionWrapper,
     F,
@@ -12,6 +13,7 @@ from django.db.models import (
     Q,
     Sum,
     Value,
+    When,
 )
 from djmoney.models.fields import MoneyField
 
@@ -73,6 +75,12 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             ),
         )
 
+    def overcharged(self) -> Self:
+        """Orders the customer paid more than once (``overcharged_at``,
+        kept by ``PaymentLedger.sync_overcharge``): the worklist for
+        refunding the excess, and the filter behind it."""
+        return self.filter(overcharged_at__isnull=False)
+
     def awaiting_chargeback_decision(self) -> Self:
         """Orders with a lost dispute whose goods staff have not yet said
         came back or stayed (``ChargebackDecision``): the worklist the
@@ -83,9 +91,9 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         ).distinct()
 
     def needing_follow_up(self, now=None) -> Self:
-        """Orders the shopper has waited on for ``ORDER_FOLLOW_UP_DAYS``
-        days: the one rule behind the admin badge, filter and counter
-        (``order.follow_up``)."""
+        """Orders that need follow-up (waited ``ORDER_FOLLOW_UP_DAYS``
+        days, or open behind a canceled parcel): the one rule behind the
+        admin badge, filter and counter (``order.follow_up``)."""
         from order.follow_up import follow_up_q
 
         rule = follow_up_q(now)
@@ -97,10 +105,17 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         from order.follow_up import follow_up_q
 
         rule = follow_up_q(now)
+        # ``Case`` rather than the bare ``Q``: the rule joins the carrier
+        # shipment, and an order with none reads NULL there, so a bare
+        # ``Q`` would annotate it NULL instead of False.
         return self.annotate(
-            needs_follow_up=Value(False, output_field=BooleanField())
-            if rule is None
-            else ExpressionWrapper(rule, output_field=BooleanField())
+            needs_follow_up=Case(
+                When(rule, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+            if rule is not None
+            else Value(False, output_field=BooleanField())
         )
 
     def with_user(self) -> Self:

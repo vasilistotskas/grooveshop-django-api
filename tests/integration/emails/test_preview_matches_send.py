@@ -10,8 +10,11 @@ order, and compares what a customer would read.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from django.core import mail
+from djmoney.money import Money
 
 from emails.preview import build_preview
 from emails.registry import registry
@@ -28,6 +31,7 @@ from order.tasks import (
     send_shipping_notification_email,
 )
 from pay_way.factories import PayWayFactory
+from product.factories.product import ProductFactory
 from tests.utils.staff import (
     bind_store_tenant,
     store_tenant,
@@ -224,15 +228,15 @@ class TestThePreviewRendersTheRealContext:
 
 
 class TestProductNamesFollowTheEmailsLanguage:
-    """parler fixes a model instance's language when it is created. The
-    confirmation task prefetched ``items__product__translations`` before
-    the email's language was chosen, so an English customer's order named
-    every product in the worker's language (Greek)."""
+    """A line is sold under the product's name in the ORDER's language,
+    fixed when it is created (``OrderItem.product_name``). The confirmation
+    task used to read the product at send time, in the worker's language
+    (Greek), so an English customer's order named every product in Greek."""
 
     def test_confirmation_names_products_in_the_orders_language(self):
-        order = OrderFactory(num_order_items=1, language_code="en")
+        order = OrderFactory(num_order_items=0, language_code="en")
         Order.objects.filter(pk=order.pk).update(metadata={})
-        product = order.items.get().product
+        product = ProductFactory.create(num_images=0, num_reviews=0)
         # Named here: the factory draws each translation's name from one
         # word list, so the two can come out equal and prove nothing.
         english, greek = "Wool socks", "Μάλλινες κάλτσες"
@@ -240,6 +244,9 @@ class TestProductNamesFollowTheEmailsLanguage:
             product.set_current_language(language)
             product.name = name
             product.save()
+        order.items.create(
+            product=product, price=Money(Decimal("9.00"), "EUR"), quantity=1
+        )
         mail.outbox.clear()
 
         assert send_order_confirmation_email.run(order.id) is True

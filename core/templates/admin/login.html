@@ -50,6 +50,10 @@
     <form action="{{ app_path }}" method="post" id="login-form">
         {% csrf_token %}
         <input type="hidden" name="step" value="{{ form.step }}">
+        {# AdminSite.login sets next to the requested page or this site's #}
+        {# index; without it a login falls back to LOGIN_REDIRECT_URL, the #}
+        {# storefront's account page. #}
+        <input type="hidden" name="next" value="{{ next }}">
 
         {% if form.step == "password" %}
             {% include "unfold/helpers/field.html" with field=form.username %}

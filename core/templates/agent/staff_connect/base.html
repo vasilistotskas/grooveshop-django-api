@@ -1,0 +1,45 @@
+{% load i18n static %}{% get_current_language as LANGUAGE_CODE %}<!DOCTYPE html>
+{% comment %}
+The frame of the staff connect host's pages (agent/staff_connect.py): signing in
+and approving an AI app's access to a store's admin tools. It wears the store
+being connected, read by the view under that store's schema, in the same
+account-* components as the store's own account pages (allauth/layouts/base.html);
+with no store known yet it shows the platform's name.
+{% endcomment %}
+<html lang="{{ LANGUAGE_CODE }}"{% if brand %} style="--brand: {{ brand.primary }}; --brand-dark: {{ brand.primary_dark }}"{% endif %}>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex">
+        <title>{% block head_title %}{% endblock head_title %} · {% if brand %}{{ brand.name }}{% else %}{{ platform_name }}{% endif %}</title>
+        {% if brand.favicon %}<link rel="icon" href="{{ brand.favicon }}">{% endif %}
+        <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    </head>
+    <body class="account-page">
+        <header class="account-header">
+            <span class="account-brand">
+                {% if brand.logo %}
+                    <picture>
+                        <source srcset="{{ brand.logo.dark }}" media="(prefers-color-scheme: dark)">
+                        <img src="{{ brand.logo.light }}" alt="{{ brand.name }}" class="account-logo">
+                    </picture>
+                {% elif brand %}
+                    {{ brand.name }}
+                {% else %}
+                    {{ platform_name }}
+                {% endif %}
+            </span>
+        </header>
+        {% if user.is_authenticated %}
+            <form class="account-session" method="post" action="{% url 'staff-connect-logout' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% blocktranslate with email=user.email %}Signed in as {{ email }}{% endblocktranslate %}
+                · <button type="submit" class="account-btn-link">{% translate "Use another account" %}</button>
+            </form>
+        {% endif %}
+        <main class="account-card">
+            {% block content %}{% endblock content %}
+        </main>
+    </body>
+</html>

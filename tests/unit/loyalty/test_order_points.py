@@ -28,6 +28,7 @@ from order.models.order import Order
 from product.factories import ProductFactory
 from tests.utils.loyalty import loyalty_settings
 from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -47,7 +48,7 @@ def _line(order, *, price, quantity, coefficient="1.00", fixed=0):
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         points_coefficient=Decimal(coefficient),
         points=fixed,
         num_images=0,

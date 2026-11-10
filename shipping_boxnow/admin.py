@@ -330,13 +330,13 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     def cancel_parcels(self, request, queryset):
         from shipping_boxnow.services import BoxNowService
 
-        cancelable = queryset.filter(parcel_state=BoxNowParcelState.NEW)
-        skipped = queryset.exclude(parcel_state=BoxNowParcelState.NEW).count()
-
         success_count = 0
-        error_count = 0
+        skipped = 0
 
-        for shipment in cancelable:
+        for shipment in queryset:
+            if not BoxNowService.can_cancel_shipment(shipment):
+                skipped += 1
+                continue
             try:
                 BoxNowService.cancel_shipment(
                     shipment, reason="admin bulk cancel"
@@ -355,7 +355,6 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                         "err": str(exc),
                     },
                 )
-                error_count += 1
 
         if success_count:
             messages.success(
@@ -424,26 +423,21 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         icon="folder_zip",
     )
     def download_labels_zip(self, request, queryset):
-        """Stream a single zip containing voucher PDFs for the queryset.
+        """Download one zip of the selected shipments' voucher PDFs.
 
         Saves the warehouse team N round-trips when batching pickups —
         select the day's shipments, click the action, get one zip with
-        all the labels named ``boxnow-voucher-<parcel_id>.pdf``.
-        Shipments without a ``parcel_id`` are silently skipped (the
-        BoxNow API has no voucher to issue yet).
+        all the labels. ``BoxNowService.fetch_labels_zip`` builds it and
+        leaves out a shipment that has no parcel yet.
         """
-
-        import io
-        import zipfile
 
         from django.http import HttpResponse
 
         from shipping_boxnow.services import BoxNowService
 
-        eligible = queryset.exclude(parcel_id__isnull=True).exclude(
-            parcel_id__exact=""
-        )
-        if not eligible.exists():
+        archive, failures = BoxNowService.fetch_labels_zip(queryset)
+
+        if not archive and not failures:
             messages.warning(
                 request,
                 _(
@@ -452,42 +446,24 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 ),
             )
             return None
-
-        buf = io.BytesIO()
-        ok = err = 0
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for shipment in eligible:
-                try:
-                    pdf = BoxNowService.fetch_label_bytes(shipment)
-                except Exception:
-                    logger.exception(
-                        "download_labels_zip failed for shipment %s",
-                        shipment.pk,
-                    )
-                    err += 1
-                    continue
-                zf.writestr(f"boxnow-voucher-{shipment.parcel_id}.pdf", pdf)
-                ok += 1
-
-        if not ok:
+        if not archive:
             messages.error(
                 request,
                 _("All %(err)d shipment(s) failed — see server logs.")
-                % {"err": err},
+                % {"err": len(failures)},
             )
             return None
-        if err:
+        if failures:
             messages.warning(
                 request,
                 _(
                     "%(err)d shipment(s) failed and were skipped — "
                     "see server logs."
                 )
-                % {"err": err},
+                % {"err": len(failures)},
             )
 
-        buf.seek(0)
-        response = HttpResponse(buf.read(), content_type="application/zip")
+        response = HttpResponse(archive, content_type="application/zip")
         response["Content-Disposition"] = (
             'attachment; filename="boxnow-vouchers.zip"'
         )
@@ -566,7 +542,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 )
             )
 
-        filename = f"boxnow-voucher-{shipment.parcel_id}.pdf"
+        filename = BoxNowService.label_filename(shipment)
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Content-Length"] = str(len(pdf_bytes))
@@ -684,7 +660,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 )
             )
 
-        if shipment.parcel_state != BoxNowParcelState.NEW:
+        if not BoxNowService.can_cancel_shipment(shipment):
             messages.warning(
                 request,
                 _(
@@ -708,7 +684,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             messages.success(
                 request,
                 _("Parcel %(parcel_id)s canceled successfully.")
-                % {"parcel_id": shipment.parcel_id},
+                % {"parcel_id": shipment.parcel_id or shipment.pk},
             )
         except Exception as exc:
             logger.exception(
@@ -770,7 +746,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "type",
                     "is_active",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -787,7 +762,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "lng",
                     "note",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -799,7 +773,6 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "created_at",
                     "updated_at",
                 ),
-                "classes": ("wide",),
             },
         ),
     )
@@ -895,7 +868,6 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
                     "event_time",
                     "received_at",
                 ),
-                "classes": ("wide",),
             },
         ),
         (
@@ -906,7 +878,6 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
                     "postal_code",
                     "additional_information",
                 ),
-                "classes": ("wide",),
             },
         ),
         (

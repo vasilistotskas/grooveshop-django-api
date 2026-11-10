@@ -17,7 +17,7 @@ from uuid import uuid4
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
 from django.http import HttpResponse, JsonResponse
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 from knox.models import get_token_model
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -32,13 +32,6 @@ from tests.utils.idempotency import enter, plain_view
 from user.factories.account import UserAccountFactory
 
 AuthToken = get_token_model()
-
-_LOCMEM = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "idempotency-scope-test",
-    }
-}
 
 
 class _StoreView(APIView):
@@ -63,7 +56,6 @@ def _bearer(user=None) -> dict[str, str]:
     return {"HTTP_AUTHORIZATION": f"Bearer {raw}"}
 
 
-@override_settings(CACHES=_LOCMEM)
 class IdempotencyScopeTest(TestCase):
     def setUp(self):
         caches["default"].clear()

@@ -2,11 +2,22 @@ import logging
 
 import django.dispatch
 from django.conf import settings
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import (
+    post_delete,
+    post_save,
+    pre_delete,
+    pre_save,
+)
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
+from meili.batching import collect_if_active, queue_documents
 from order.enum.stock_log_reason import StockLogReason
+from product.enum.search_text import SearchTextSource
+from product.models.attribute import Attribute
+from product.models.attribute_value import AttributeValue
+from product.models.brand import Brand
+from product.models.category import ProductCategory
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 from tenant.celery import dispatch_on_commit
@@ -45,9 +56,7 @@ def post_create_historical_record_callback(
         discount = price_amount * discount_pct / 100
         return price_amount + vat - discount
 
-    from decimal import Decimal
-
-    vat_rate = instance.vat_percent if instance.vat_id else Decimal(0)
+    vat_rate = instance.vat_percent
 
     old_price = _customer_price(
         prev_record.price.amount,
@@ -143,7 +152,12 @@ def reindex_products_by_pk(product_ids) -> int:
     fully searchable and buyable until the nightly sync. The admin
     reported success either way.
 
-    Returns the number of translation documents dispatched.
+    The documents go out in ``meili.index_documents`` batches
+    (``meili.batching.queue_documents``), or join the set of an open
+    ``collect_reindex()``.
+
+    Returns the number of translation documents dispatched (0 while
+    collecting: they are queued when the block exits).
     """
     if settings.MEILISEARCH.get("OFFLINE", False):
         return 0
@@ -151,8 +165,6 @@ def reindex_products_by_pk(product_ids) -> int:
     product_ids = list(product_ids)
     if not product_ids:
         return 0
-
-    from meili.tasks import index_document_task
 
     translation_pks = list(
         ProductTranslation.objects.filter(
@@ -162,19 +174,9 @@ def reindex_products_by_pk(product_ids) -> int:
     if not translation_pks:
         return 0
 
-    # Same dispatch shape as ``reindex_product_translations`` below —
-    # on commit, by pk, with the task re-loading each row. The schema is
-    # pinned here, at registration, not read when the hooks fire.
-    for pk in translation_pks:
-        dispatch_on_commit(
-            index_document_task,
-            kwargs={
-                "app_label": "product",
-                "model_name": "producttranslation",
-                "pk": pk,
-            },
-        )
-    return len(translation_pks)
+    # On commit, by pk, with the task re-loading each row. The schema is
+    # pinned at registration, not read when the hooks fire.
+    return queue_documents("product", "producttranslation", translation_pks)
 
 
 @receiver(
@@ -220,6 +222,8 @@ def reindex_product_translations(sender, instance, **kwargs):
             return
         logger.debug("Reindexing ProductTranslation Async")
 
+        if collect_if_active("product", "producttranslation", translation_pks):
+            return
         for pk in translation_pks:
             dispatch_on_commit(
                 index_document_task,
@@ -372,6 +376,8 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
 
+        if collect_if_active("product", "producttranslation", translation_pks):
+            return
         for pk in translation_pks:
             dispatch_on_commit(
                 index_document_task,
@@ -459,34 +465,134 @@ def sync_prices_on_vat_change(sender, instance, created, raw=False, **kwargs):
         )
 
 
+def _watch_search_text(
+    sender, source: SearchTextSource, field: str, *, translated: bool
+) -> None:
+    """Reindex a row's products when its ``field`` changes.
+
+    The product document carries this text, but the row is saved on its
+    own, so ``Product``'s receivers never run. Only a changed value
+    queues work: a category edited for its description would otherwise
+    reindex every product in it. A translation added to or removed from a
+    row that has products changes the text of that language's documents;
+    a brand created just now has none.
+
+    The receivers are closures, so they are connected with ``weak=False``:
+    a weak reference to a function that goes out of scope when this
+    returns is collected, and the signal silently loses it (``DEBUG``
+    keeps them alive through a cache, which hides it in development).
+    """
+    uid = f"product.search_text.{sender._meta.label_lower}"
+
+    def remember_text(sender, instance, **kwargs):
+        instance._search_text_before = (
+            sender._base_manager.filter(pk=instance.pk)
+            .values_list(field, flat=True)
+            .first()
+            if instance.pk
+            else None
+        )
+
+    def queue(instance) -> None:
+        if settings.MEILISEARCH.get("OFFLINE", False):
+            return
+
+        from product.tasks import reindex_products_for_search_text
+
+        dispatch_on_commit(
+            reindex_products_for_search_text,
+            kwargs={
+                "source": source.value,
+                "pk": getattr(instance, "master_id", None) or instance.pk,
+            },
+        )
+
+    def reindex_after_save(sender, instance, created, **kwargs):
+        if created and not translated:
+            return
+        if instance._search_text_before == getattr(instance, field):
+            return
+        queue(instance)
+
+    def reindex_after_delete(sender, instance, **kwargs):
+        queue(instance)
+
+    pre_save.connect(
+        remember_text,
+        sender=sender,
+        dispatch_uid=f"{uid}.before",
+        weak=False,
+    )
+    post_save.connect(
+        reindex_after_save,
+        sender=sender,
+        dispatch_uid=f"{uid}.saved",
+        weak=False,
+    )
+    if translated:
+        post_delete.connect(
+            reindex_after_delete,
+            sender=sender,
+            dispatch_uid=f"{uid}.deleted",
+            weak=False,
+        )
+
+
+_watch_search_text(Brand, SearchTextSource.BRAND, "name", translated=False)
+_watch_search_text(
+    ProductCategory._parler_meta.root_model,
+    SearchTextSource.CATEGORY,
+    "name",
+    translated=True,
+)
+_watch_search_text(
+    Attribute._parler_meta.root_model,
+    SearchTextSource.ATTRIBUTE,
+    "name",
+    translated=True,
+)
+_watch_search_text(
+    AttributeValue._parler_meta.root_model,
+    SearchTextSource.ATTRIBUTE_VALUE,
+    "value",
+    translated=True,
+)
+
+
 @receiver(
     pre_delete,
-    sender=Vat,
-    dispatch_uid="product.remember_vat_products_on_delete",
+    sender=Brand,
+    dispatch_uid="product.search_text.reindex_products_of_deleted_brand",
 )
-def remember_vat_products_on_delete(sender, instance, **kwargs):
-    """Take the rate's product ids while the rows still point at it.
+def reindex_products_of_deleted_brand(sender, instance, **kwargs):
+    """Reindex a brand's products when the brand is deleted.
 
-    Deleting a rate leaves its products without VAT (``SET_NULL``), a
-    bulk update that saves no Product and leaves no way to find them
-    afterwards.
+    ``Product.brand`` is ``SET_NULL``: the collector nulls it with one
+    UPDATE and no signal, so the documents would keep the brand's name
+    and id. The products are collected here, before the delete: after it
+    nothing points at the brand any more. The documents are re-read on
+    commit, by then without the brand.
     """
-    instance._repriced_product_ids = list(
-        Product._base_manager.filter(vat=instance).values_list("pk", flat=True)
+    reindex_products_by_pk(
+        Product.objects.filter(brand=instance).values_list("pk", flat=True)
     )
 
 
 @receiver(
-    post_delete,
-    sender=Vat,
-    dispatch_uid="product.sync_prices_on_vat_delete",
+    pre_delete,
+    sender=ProductCategory,
+    dispatch_uid="product.search_text.reindex_products_of_deleted_category",
 )
-def sync_prices_on_vat_delete(sender, instance, **kwargs):
-    """Re-price the products the deleted rate left without VAT."""
-    from product.tasks import sync_price_records
+def reindex_products_of_deleted_category(sender, instance, **kwargs):
+    """Reindex the products of a deleted category and all its children.
 
-    product_ids = getattr(instance, "_repriced_product_ids", [])
-    if product_ids:
-        dispatch_on_commit(
-            sync_price_records, kwargs={"product_ids": product_ids}
-        )
+    ``Product.category`` is ``SET_NULL`` (one UPDATE, no signal) and the
+    child categories CASCADE, so every product in the subtree loses its
+    category. They are collected before the delete, while the subtree
+    exists.
+    """
+    reindex_products_by_pk(
+        Product.objects.filter(
+            category__in=instance.get_descendants(include_self=True)
+        ).values_list("pk", flat=True)
+    )

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers in production, Uvicorn `--reload` locally) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
+GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers in production, Uvicorn `--reload` locally) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.15, managed with uv.
 
 ## Common Commands
 
@@ -30,6 +30,10 @@ uv run ruff format
 
 # Type check (required before commit; not covered by pre-commit)
 uv run ty check
+
+# Import contracts between apps ([tool.importlinter] in pyproject.toml).
+# A contract's ignore_imports only shrinks: fix the import, delete its line.
+uv run lint-imports
 
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
@@ -86,7 +90,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 - **builder/** — The storefront page builder: versioned documents (theme, section groups, templates, pages), immutable releases, the staff API and the public read of the current release; the block catalogue is the storefront's
 - **meta_capi/** — Meta Conversions API event dispatch
 - **indexnow/** — IndexNow notifications: a published product or blog post that changes is queued and sent to search engines in one batched POST per store
-- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway
+- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway: the shopper tools (`/mcp`, the store's own issuer and customers) and the store-admin tools (`/agent/staff/*` behind `/mcp/admin`, read only). Staff tokens come from the platform's staff issuer on `STAFF_CONNECT_HOST` (`agent/staff.py`, `agent/staff_connect.py`, `agent.urls_connect`): `allauth.idp.oidc` is in SHARED_APPS too, so staff tokens live in `public` and customers' in each store's schema
 - **search/** — Meilisearch product and blog search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
@@ -287,7 +291,7 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 ## Code Style
 
 - **Line length**: 80 characters
-- **Formatter/Linter**: Ruff (`target-version = "py314"`)
+- **Formatter/Linter**: Ruff (`target-version = "py315"`)
 - **Type checker**: `ty` (config under `[tool.ty]`). Not in pre-commit — run
   `uv run ty check` yourself before committing; the `.claude` PostToolUse hook
   reports per-file findings as you edit but never blocks.
@@ -298,7 +302,13 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
   Exempt in `tests/`: pytest injects fixtures positionally and
   `@mock.patch` passes each mock as a positional argument.
 - Migrations are excluded from linting (`**/migrations/**`)
-- Semantic release: `feat` → minor, `fix`/`perf` → patch
+- **Moving code.** A Celery task that changes module keeps its name with
+  `name="<the name it has today>"`: queued messages, the beat schedule and
+  `DeferredDispatch` rows address it by that string, and
+  `tests/unit/core/test_celery_task_names_are_locked.py` fails otherwise. A
+  doc, rule or skill that names a moved file changes in the same PR
+  (`tests/unit/test_doc_references.py`).
+- Semantic release: `feat` → minor, `fix`/`perf`/`refactor` → patch (a `refactor` moves code that runs in production, so it ships and is verified as its own release)
 
 ## MCP servers
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -68,6 +69,7 @@ def timing_out():
         "flushdb",
         "scan_iter",
         "info",
+        "eval",
     ):
         getattr(client, command).side_effect = RedisTimeoutError("timed out")
     client.pipeline.return_value.execute.side_effect = RedisTimeoutError(
@@ -148,6 +150,13 @@ class TestDecisionsAndAdminStillRaise:
         with pytest.raises((RedisConnectionError, RedisTimeoutError)):
             down.incr("counter")
 
+    def test_count_in_window_and_uncount_raise(self, down):
+        # Every rate limit decides its own outage policy from the error.
+        with pytest.raises((RedisConnectionError, RedisTimeoutError)):
+            down.count_in_window("counter", 60)
+        with pytest.raises((RedisConnectionError, RedisTimeoutError)):
+            down.uncount("counter")
+
     def test_clear_raises(self, down):
         with pytest.raises((RedisConnectionError, RedisTimeoutError)):
             down.clear()
@@ -189,8 +198,13 @@ class TestOneWarningPerBurst:
         self, stopped, caplog
     ):
         clock = iter([1000.0, 1001.0, 1002.0, 1100.0])
+        # Replace only the module's ``time`` name: ``core.caches.time`` is
+        # the global module, and patching its ``monotonic`` also feeds this
+        # clock to redis-py's own timing, which then exhausts it.
         with (
-            patch("core.caches.time.monotonic", lambda: next(clock)),
+            patch.object(
+                caches, "time", SimpleNamespace(monotonic=lambda: next(clock))
+            ),
             caplog.at_level(logging.WARNING, logger="core.caches"),
         ):
             for _ in range(4):

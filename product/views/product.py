@@ -100,14 +100,6 @@ serializers_config: SerializersConfig = {
                 default="pageNumber",
             ),
             OpenApiParameter(
-                name="pagination",
-                description=_("Enable or disable pagination"),
-                required=False,
-                type=str,
-                enum=["true", "false"],
-                default="true",
-            ),
-            OpenApiParameter(
                 name="page_size",
                 description=_("Number of results to return per page"),
                 required=False,

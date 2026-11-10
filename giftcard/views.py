@@ -78,12 +78,18 @@ serializers_config: SerializersConfig = {
 }
 
 
+# The account summary shows every card a customer holds: a short list,
+# their own, read in full.
+UNPAGINATED_ACTIONS = frozenset({"mine"})
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=GiftCard,
         display_config={"tag": "Gift Cards"},
         serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
+        unpaginated_actions=UNPAGINATED_ACTIONS,
     )
 )
 class GiftCardViewSet(BaseModelViewSet):
@@ -97,6 +103,7 @@ class GiftCardViewSet(BaseModelViewSet):
 
     queryset = GiftCard.objects.none()
     serializers_config = serializers_config
+    unpaginated_actions = UNPAGINATED_ACTIONS
 
     def get_permissions(self):
         # A purchase's status keeps answering after either switch goes

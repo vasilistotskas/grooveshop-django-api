@@ -28,7 +28,7 @@ from giftcard.emails import GiftCardReversal
 from giftcard.enum import GiftCardPurchaseStatus
 from giftcard.factories import GiftCardPurchaseFactory
 from giftcard.services import GiftCardService
-from order.emails import RefundFailed
+from order.emails import Overcharged, RefundFailed
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.services import OrderService
@@ -183,6 +183,21 @@ class TestAcsAlerts:
 
         assert_sent("ops_unattributable_cod_payouts", language)
 
+    def test_voucher_request_unknown(self, language):
+        AcsService._alert_voucher_request_unknown(
+            1234,
+            "ACS [ACS_Create_Voucher]: ACS timeout after 15s: Read timed out.",
+        )
+
+        assert_sent("ops_acs_voucher_request_unknown", language)
+
+    def test_unrecognised_vouchers(self, language):
+        AcsService._raise_unrecognised_vouchers(
+            ["7401573174", "7401573175"], date(2026, 3, 13)
+        )
+
+        assert_sent("ops_acs_unrecognised_vouchers", language)
+
 
 class TestPaymentAlerts:
     def _canceled_order(self):
@@ -221,6 +236,21 @@ class TestPaymentAlerts:
         )
 
         assert_sent("ops_payment_mismatch", language)
+
+    def test_overcharged(self, language):
+        # ``PaymentLedger.sync_overcharge`` raises it; its own tests cover
+        # when (``test_overcharge.py``).
+        send_email(
+            "ops.overcharged",
+            Overcharged(
+                order_id=1234,
+                payment_id="pi_3QxExample",
+                provider="stripe",
+                excess=Money(Decimal("45.50"), "EUR"),
+            ),
+        )
+
+        assert_sent("ops_overcharged", language)
 
     def test_refund_failed(self, language):
         # The handler that raises it (``handle_stripe_refund_failed``) needs

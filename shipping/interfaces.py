@@ -27,6 +27,8 @@ from shipping.exceptions import ShippingProviderNotFoundError
 if TYPE_CHECKING:
     from decimal import Decimal
 
+    from django.db.models import Q
+
     from order.models.order import Order
     from pay_way.enum.settlement import PaySettlement
     from shipping.enum import ShippingKind
@@ -84,9 +86,34 @@ class ShippingCarrierInterface(ABC):
         """
         return True
 
+    def canceled_shipment_q(self) -> Q | None:
+        """Orders whose shipment with this carrier is canceled, as a ``Q``
+        on ``Order``, for a carrier that leaves the order open behind it.
+
+        Such an order ships nothing until staff create a new shipment or
+        cancel the order, so it needs follow-up (``order.follow_up``).
+        Default ``None``: a carrier that cancels the order together with
+        its canceled shipment (ACS, ``cancel_for_dead_shipment``) never
+        leaves one waiting.
+        """
+        return None
+
+    @abstractmethod
+    def has_label(self, shipment: Any) -> bool:
+        """Whether the carrier has a label for ``shipment`` yet.
+
+        Judged from local data only, never a carrier call. A shipment
+        row exists from checkout, but its label exists only once the
+        carrier has booked it (an ACS voucher, a BoxNow parcel), so a
+        caller asks this before :meth:`fetch_label_bytes`.
+        """
+
     @abstractmethod
     def fetch_label_bytes(self, shipment: Any) -> bytes:
-        """Return the raw label PDF bytes (provider-format may vary)."""
+        """Return the raw label PDF bytes (provider-format may vary).
+
+        Raises when :meth:`has_label` is false.
+        """
 
     @abstractmethod
     def fetch_tracking_events(self, shipment: Any) -> list[dict[str, Any]]:
@@ -310,3 +337,8 @@ def get_provider(code: str) -> ShippingCarrierInterface:
 def is_registered(code: str) -> bool:
     """Return True when an adapter is registered under ``code``."""
     return code in _REGISTRY
+
+
+def registered_providers() -> tuple[ShippingCarrierInterface, ...]:
+    """Every registered adapter, for a rule that asks each carrier."""
+    return tuple(_REGISTRY.values())

@@ -19,7 +19,7 @@ from core.api.permissions import (
 from core.api.serializers import DetailSerializer, ErrorResponseSerializer
 from core.api.throttling import NewsletterSubscribeThrottle
 from core.api.views import BaseModelViewSet
-from core.client_ip import trusted_client_ip
+from core.client_ip import edge_client_ip
 from core.utils.i18n import resolve_request_language
 from core.utils.serializers import (
     ActionConfig,
@@ -431,7 +431,7 @@ class UserSubscriptionViewSet(BaseModelViewSet):
         token = request.data.get("token")
         outcome = subscription.confirm(
             token if isinstance(token, str) else "",
-            ip=trusted_client_ip(request),
+            ip=edge_client_ip(request),
         )
         if outcome == ConfirmOutcome.EXPIRED:
             return Response(
@@ -482,7 +482,7 @@ class NewsletterSubscribeView(APIView):
     The consent snapshot is taken HERE, because it describes this
     request: the exact sentence the visitor agreed to (supplied by the
     storefront server, which renders it), the visitor's IP as far as it
-    can be proven (``core.client_ip.trusted_client_ip``), the user agent,
+    can be proven (``core.client_ip.edge_client_ip``), the user agent,
     the request language and the time.
 
     One exception to the uniform answer, and it is not a leak: a SIGNED-IN
@@ -597,7 +597,7 @@ class NewsletterSubscribeView(APIView):
                 "topic_id": topic.pk,
                 "email": email,
                 "consent_text": serializer.validated_data["consent_text"],
-                "consent_ip": trusted_client_ip(request),
+                "consent_ip": edge_client_ip(request),
                 "consent_user_agent": request.headers.get("User-Agent", "")[
                     :512
                 ],
@@ -665,7 +665,7 @@ class ConfirmSubscriptionByTokenView(APIView):
             .first()
         )
         outcome = (
-            subscription.confirm(token, ip=trusted_client_ip(request))
+            subscription.confirm(token, ip=edge_client_ip(request))
             if subscription is not None
             else ConfirmOutcome.INVALID
         )

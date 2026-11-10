@@ -32,9 +32,9 @@ class TestPatternBuilders:
         )
 
     def test_function_patterns_target_the_functions_prefix(self):
-        assert _nuxt_functions("sitemap", "RssFeed") == (
+        assert _nuxt_functions("sitemap", "rss") == (
             "cache:nitro:functions:sitemap*",
-            "cache:nitro:functions:RssFeed*",
+            "cache:nitro:functions:rss*",
         )
 
     def test_fragment_patterns_lead_with_a_star(self):
@@ -96,7 +96,7 @@ class TestSurfacesPurgeRenderedPages:
     def test_sitemap_surface_targets_cached_functions(self):
         patterns = get_surface("sitemap_seo").nuxt_patterns
         assert "cache:nitro:functions:sitemap*" in patterns
-        assert "cache:nitro:functions:RssFeed*" in patterns
+        assert "cache:nitro:functions:rss*" in patterns
         # Regression: these used to be `cache:nitro:routes:__sitemap__*`
         # and `:rss*`, which match no key Nitro ever writes.
         assert not any(p.startswith("cache:nitro:routes:__") for p in patterns)

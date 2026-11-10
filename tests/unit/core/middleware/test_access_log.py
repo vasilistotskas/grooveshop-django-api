@@ -20,8 +20,10 @@ from django.conf import settings
 from django.db import connection
 from django.http import HttpResponse
 from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework.response import Response
 
+from core import db_cost
 from core.logging import (
     CorrelationIdFilter,
     JsonFormatter,
@@ -291,6 +293,78 @@ class TestMeasurement:
         assert record.fields["status"] == 201
 
 
+class TestDatabaseCost:
+    """``db_queries`` and ``db_ms`` say where a slow route spent its time."""
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("count", [1, 3, 7])
+    def test_the_line_counts_the_queries_the_view_ran(
+        self, count, access_lines
+    ):
+        def view(request):
+            for _ in range(count):
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+            return HttpResponse("ok")
+
+        with CaptureQueriesContext(connection) as django_count:
+            AccessLogMiddleware(view)(RequestFactory().get("/anything"))
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        # Django's own count includes the ``SET search_path`` django-tenants
+        # issues once per connection, which is a real round trip.
+        assert payload["db_queries"] == len(django_count)
+        assert count <= payload["db_queries"] <= count + 1
+        assert isinstance(payload["db_ms"], int | float)
+        assert 0 < payload["db_ms"] <= payload["duration_ms"]
+
+    def test_a_request_with_no_query_logs_zero(self, access_lines):
+        AccessLogMiddleware(lambda request: HttpResponse("ok"))(
+            RequestFactory().get("/anything")
+        )
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert payload["db_queries"] == 0
+        assert payload["db_ms"] == 0
+
+    @pytest.mark.django_db
+    def test_a_real_request_through_the_stack_carries_the_fields(
+        self, client, access_lines
+    ):
+        client.get("/api/v1/product/999999")
+
+        (record,) = access_lines()
+        payload = _as_json(record)
+        assert payload["db_queries"] >= 1
+        assert payload["db_ms"] > 0
+
+    @pytest.mark.django_db
+    def test_a_query_that_fails_is_still_counted(self):
+        with CaptureQueriesContext(connection) as django_count:
+            with db_cost.measure() as cost:
+                with (
+                    pytest.raises(Exception, match="division by zero"),
+                    connection.cursor() as cursor,
+                ):
+                    cursor.execute("SELECT 1/0")
+
+        assert cost.queries == len(django_count) >= 1
+        assert cost.seconds > 0
+        assert connection.execute_wrappers == []
+
+    @pytest.mark.django_db
+    def test_an_exception_leaves_no_wrapper_installed(self):
+        def view(request):
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            AccessLogMiddleware(view)(RequestFactory().get("/anything"))
+
+        assert connection.execute_wrappers == []
+
+
 class TestPlacementInMiddleware:
     """The position is the contract, so pin it. The module docstring
     gives the reason for each neighbour."""
@@ -308,15 +382,13 @@ class TestPlacementInMiddleware:
         assert probe < cid < access
 
     def test_it_sits_above_tenant_resolution(self):
-        """``TenantMainMiddleware`` is stripped from the unit-test
+        """The tenant routing middleware is stripped from the unit-test
         settings, so read the declared order from the settings module
         itself rather than ``settings.MIDDLEWARE``."""
         import settings as project_settings
 
         order = project_settings.MIDDLEWARE
-        tenant = order.index(
-            "django_tenants.middleware.main.TenantMainMiddleware"
-        )
+        tenant = order.index("tenant.middleware.PlatformTenantMainMiddleware")
         access = order.index("core.middleware.access_log.AccessLogMiddleware")
 
         assert access < tenant

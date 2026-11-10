@@ -102,6 +102,7 @@ consumed by tasks and integrations.
 | `CONTACT_ATTACHMENTS_ENABLED` | (a) `contact_attachments` | fails closed |
 | `CHAT_WIDGET_ENABLED` | (a) `chat_widget` | needs agent commerce, both tiers |
 | `CART_ENABLED` | (a) `cart` | needs `catalogue` |
+| `STAFF_AI_ACCESS_ENABLED` | (a) `staff_ai_access` | fails closed: off until the store chooses to let its team's AI apps read it, since what they read goes to the app's provider |
 | `CATALOGUE_ENABLED` | (a) `catalogue` | `favourites`, `gift_cards`, `product_alerts`, `product_suggestions` and `cart` need it |
 | `B2B_INVOICING_ENABLED` | (a) `b2b_invoicing` | no plan flag; refused by order validation (400, `invoicing_disabled`), not a 404 gate |
 | `MOBILE_BOTTOM_NAV_ENABLED` | (b) `mobile_bottom_nav` | |
@@ -109,6 +110,7 @@ consumed by tasks and integrations.
 | `RECENTLY_VIEWED_ENABLED` | (b) `recently_viewed` | history is client-side |
 | `PRODUCT_ASSURANCES_ENABLED` | (b) `product_assurances` | the product page's delivery / payment / returns box; each row hides itself without data |
 | `DEMO_ACCOUNT_ENABLED` | (b) `demo_account` | demo credentials card on the sign-in page |
+| `EXTERNAL_LINKS_NEW_TAB_ENABLED` | (b) `external_links_new_tab` | off by default; rich-text links to another host open in a new tab, the store's own keep the editor's choice |
 | `AGENT_COMMERCE_ENABLED`, `AGENT_HOSTED_PAYMENT_ENABLED`, `PRODUCT_FEEDS_ENABLED` | agent surface | folded into `TenantConfig` as `agentCommerceEnabled` and friends, enforced by the gateway; `chat_widget` builds on the first |
 | `INDEXNOW_ENABLED` | (s) | the batched IndexNow notification (`docs/indexnow.md`); only its key is read by the storefront, from `TenantConfig.indexnowKey`, empty while off |
 | `META_CAPI_ENABLED`, `MYDATA_ENABLED`, `ACS_DYNAMIC_PRICING_ENABLED`, `B2B_LOYALTY_ENABLED`, `LOYALTY_NEW_CUSTOMER_BONUS_ENABLED`, `LOYALTY_TIER_MULTIPLIER_ENABLED` | (s) | never read by a client |
@@ -139,6 +141,7 @@ settings.
 | `contact_attachments` | | `CONTACT_ATTACHMENTS_ENABLED` | `contact/views.py` (`contact-attachment`) |
 | `chat_widget` | `agent_commerce_enabled` | `AGENT_COMMERCE_ENABLED`, `CHAT_WIDGET_ENABLED` | `/api/v1/agent/*` by the agent-commerce gates; the gateway's own `/chat` is enforced there |
 | `catalogue` | | `CATALOGUE_ENABLED` | `product/views/` (products and their public actions, categories, category images, product images, brands, attributes, attribute values), `search/views.py` (`product_meili_search`, and `search_trending` for the product queries) |
+| `staff_ai_access` | | `STAFF_AI_ACCESS_ENABLED` | `agent/staff_views.py` (all of `/api/v1/agent/staff/*`, a connected app's token included), and the staff consent on the connect host (`agent/staff_connect.py`); the gateway refuses `/mcp/admin` on the same answer |
 | `cart` | | `CATALOGUE_ENABLED`, `CART_ENABLED` | `cart/views/` (every cart and cart-item action but the staff `cart/list`), `order/views/order.py` (`create`; listing, reading and paying existing orders stay open) |
 
 `chat_widget` is the one feature whose consumer endpoint is not Django's:

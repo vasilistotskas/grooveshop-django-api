@@ -19,6 +19,7 @@ from b2b.factories import (
 )
 from product.factories import ProductFactory
 from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -27,7 +28,7 @@ def _product(price="100.00"):
     return ProductFactory(
         price=Money(Decimal(price), "EUR"),
         discount_percent=Decimal(0),
-        vat=None,
+        vat=VatFactory(value=0),
         stock=10,
         active=True,
     )
@@ -95,7 +96,7 @@ class TestPricesEndpoint:
         inactive = ProductFactory(
             price=Money(Decimal("100.00"), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=10,
             active=False,
         )

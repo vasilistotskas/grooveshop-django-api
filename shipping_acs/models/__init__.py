@@ -5,6 +5,7 @@ from shipping_acs.models.pickup_list_run import AcsPickupListRun
 from shipping_acs.models.shipment import AcsShipment
 from shipping_acs.models.station import AcsStation
 from shipping_acs.models.tracking_event import AcsTrackingEvent
+from shipping_acs.models.unrecognised_voucher import AcsUnrecognisedVoucher
 
 __all__ = [
     "AcsApiCall",
@@ -14,4 +15,5 @@ __all__ = [
     "AcsShipment",
     "AcsStation",
     "AcsTrackingEvent",
+    "AcsUnrecognisedVoucher",
 ]

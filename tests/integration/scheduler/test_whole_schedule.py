@@ -65,7 +65,7 @@ def test_every_entry_fires_at_every_slot_exactly_once(monkeypatch):
     # and a Kubernetes pod, which declares no Docker-only development entry.
     monkeypatch.setattr(settings_module, "DEBUG", False)
     monkeypatch.setattr(settings_module, "DATABASE_BACKUPS_ENABLED", True)
-    monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+    monkeypatch.setattr(settings_module, "IS_KUBERNETES", True)
     declared = settings_module.get_celery_beat_schedule()
     schedule = {}
     for name, entry in declared.items():

@@ -68,6 +68,7 @@ class StoreFeaturesSerializer(serializers.Serializer):
     price_history = serializers.BooleanField(read_only=True)
     contact_attachments = serializers.BooleanField(read_only=True)
     chat_widget = serializers.BooleanField(read_only=True)
+    staff_ai_access = serializers.BooleanField(read_only=True)
     catalogue = serializers.BooleanField(read_only=True)
     cart = serializers.BooleanField(read_only=True)
 
@@ -87,6 +88,7 @@ class StorePreferencesSerializer(serializers.Serializer):
     recently_viewed = serializers.BooleanField(read_only=True)
     product_assurances = serializers.BooleanField(read_only=True)
     demo_account = serializers.BooleanField(read_only=True)
+    external_links_new_tab = serializers.BooleanField(read_only=True)
 
     def to_representation(self, instance) -> dict[str, bool]:
         from tenant.features import effective_preferences

@@ -59,6 +59,12 @@ tenant-schema row (see `is_platform_superuser`).
 | `sort` | string | No | — |
 | `facets` | comma-separated strings | No | — |
 
+The three id lists (`categories`, `attributeValues`, `brands`) take at most
+100 distinct ids each (`MAX_INT_CSV_ITEMS` in `core/api/query_params.py`; a
+repeated id counts once, so a mangled link does not empty the listing); more
+is a 400 with code `too_many_values`, so a request can never drive an
+unbounded filter into Meilisearch.
+
 `categories` stands for each category's whole subtree: the view expands the
 ids to every descendant before filtering. `inStock=true` keeps products with
 stock above zero. `onOffer=true` keeps the products that are
@@ -115,8 +121,9 @@ products:
 - `reindex_offer_window_changes_task` (beat, every 5 minutes, fanned out per
   tenant by `fanout_reindex_offer_window_changes`) reindexes the products of
   promotions whose `starts_at` / `ends_at` passed since the last run. The
-  cursor lives in the tenant's cache and only moves after the reindex was
-  dispatched; a missing cursor falls back to a one-day window.
+  cursor is a `core.SweepCursor` row (`core/sweeps.py`, durable, unlike the
+  cache, which fails open) and only moves after the reindex was dispatched; a
+  store's very first run looks back one day.
 
 Flipping promotions off or on (the store's `PROMOTIONS_ENABLED` or the plan's
 `promotions_enabled`) queues the store's whole price sweep at once

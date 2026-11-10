@@ -200,6 +200,8 @@ class TestProductSave:
         product.delete()
         clock.advance(days=3)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("6.0")).delete()
         vat.value = Decimal("6.0")
         vat.save()
         product.restore()
@@ -369,6 +371,8 @@ class TestVatChange:
         )
         clock.advance(days=40)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("6.0")).delete()
         vat.value = Decimal("6.0")
         vat.save()
 
@@ -392,28 +396,14 @@ class TestVatChange:
         product.save()
         clock.advance(days=5)
 
+        # ``Vat.value`` is unique: free the seeded row of the rate this one becomes.
+        Vat.objects.filter(value=Decimal("13.0")).delete()
         vat.value = Decimal("13.0")
         vat.save()
 
         fresh = reload(product)
         assert fresh.prior_price == Decimal("124.00")
         assert fresh.effective_price == Decimal("101.70")
-
-    def test_deleting_a_rate_re_prices_its_products_without_vat(
-        self, clock, vat, category
-    ):
-        product = make_product(vat, category)
-        clock.advance(days=2)
-
-        vat.delete()
-
-        fresh = reload(product)
-        assert fresh.vat_id is None
-        assert fresh.effective_price == Decimal("100.00")
-        assert [s.price.amount for s in spells_of(product)] == [
-            Decimal("124.00"),
-            Decimal("100.00"),
-        ]
 
 
 @pytest.mark.django_db

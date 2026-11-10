@@ -6,6 +6,7 @@ from djmoney.money import Money
 
 from cart.factories import CartFactory, CartItemFactory
 from product.factories import ProductFactory
+from vat.factories import VatFactory
 
 
 @pytest.fixture
@@ -36,7 +37,7 @@ def make_cart(db):
             product = ProductFactory(
                 price=Money(Decimal(str(price)), "EUR"),
                 discount_percent=Decimal(0),
-                vat=None,
+                vat=VatFactory(value=0),
                 stock=1000,
                 active=True,
             )

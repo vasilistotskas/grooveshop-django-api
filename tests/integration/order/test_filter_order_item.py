@@ -245,14 +245,14 @@ class OrderItemFilterTest(APITestCase):
     def test_product_relationship_filters(self):
         url = reverse("order-item-list")
 
-        product_name = self.product1.safe_translation_getter(
-            "name", any_language=True
-        )
-        if product_name:
-            response = self.client.get(url, {"product__name": product_name[:5]})
-            self.assertEqual(response.status_code, 200)
-            result_ids = [r["id"] for r in response.data["results"]]
-            self.assertGreaterEqual(len(result_ids), 1)
+        # The name filter reads the line's own snapshot, the name shown
+        # for it, not whatever the product is called now.
+        product_name = self.item1.product_name
+        self.assertTrue(product_name)
+        response = self.client.get(url, {"product__name": product_name[:5]})
+        self.assertEqual(response.status_code, 200)
+        result_ids = [r["id"] for r in response.data["results"]]
+        self.assertIn(self.item1.id, result_ids)
 
         response = self.client.get(url, {"product__sku": "PROD001"})
         self.assertEqual(response.status_code, 200)

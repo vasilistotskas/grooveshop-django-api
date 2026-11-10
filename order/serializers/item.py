@@ -17,6 +17,8 @@ class OrderItemSerializer(serializers.ModelSerializer[OrderItem]):
             "uuid",
             "order",
             "product",
+            "product_name",
+            "sku",
             "price",
             "quantity",
             "is_refunded",
@@ -29,6 +31,8 @@ class OrderItemSerializer(serializers.ModelSerializer[OrderItem]):
         read_only_fields = (
             "id",
             "uuid",
+            "product_name",
+            "sku",
             "created_at",
             "updated_at",
             "total_price",
@@ -61,43 +65,6 @@ class OrderItemDetailSerializer(OrderItemSerializer):
             "net_price",
             "sort_order",
         )
-
-
-class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
-    class Meta:
-        model = OrderItem
-        fields = (
-            "order",
-            "product",
-            "quantity",
-            "notes",
-        )
-
-    def validate_quantity(self, value: int) -> int:
-        if value <= 0:
-            raise serializers.ValidationError(
-                _("Quantity must be a positive number."),
-                code="quantity_not_positive",
-            )
-        return value
-
-    def validate(self, attrs: dict) -> dict:
-        product = attrs.get("product")
-        quantity = attrs.get("quantity")
-
-        if product and product.stock < quantity:
-            raise serializers.ValidationError(
-                {
-                    "quantity": _(
-                        "Not enough stock available. Only {product_stock} remaining."
-                    ).format(
-                        product_stock=product.stock,
-                    )
-                },
-                code="insufficient_stock",
-            )
-
-        return attrs
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):

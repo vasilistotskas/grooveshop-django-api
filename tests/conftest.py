@@ -7,7 +7,7 @@ import pytest
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import caches
-from django.db import connection, connections
+from django.db import DEFAULT_DB_ALIAS, connection, connections
 from django.test import TestCase, TransactionTestCase
 from django_tenants.utils import get_public_schema_name
 from hypothesis import HealthCheck
@@ -259,11 +259,12 @@ settings.DATABASES["default"]["OPTIONS"] = _test_db_options
 # tests don't need per-schema separation.
 settings.DATABASE_ROUTERS = []
 
-# Remove TenantMainMiddleware so tests don't need a TenantDomain for "testserver"
+# Remove the tenant routing middleware so tests don't need a TenantDomain
+# for "testserver"
 settings.MIDDLEWARE = [
     m
     for m in settings.MIDDLEWARE
-    if m != "django_tenants.middleware.main.TenantMainMiddleware"
+    if m != "tenant.middleware.PlatformTenantMainMiddleware"
 ]
 
 # Use ROOT_URLCONF directly (not PUBLIC_SCHEMA_URLCONF) for tests
@@ -641,7 +642,9 @@ def bind_tenant(monkeypatch):
     """
 
     def _bind(t, *, with_schema=False):
-        monkeypatch.setattr(connection, "tenant", t, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", t, raising=False
+        )
         # Also pin `schema_name` — to whatever it is right now unless
         # `with_schema` asks for the tenant's. Unchanged, this is a no-op
         # during the test, but it makes monkeypatch RESTORE it at
@@ -658,7 +661,9 @@ def bind_tenant(monkeypatch):
             if with_schema
             else connection.schema_name
         )
-        monkeypatch.setattr(connection, "schema_name", schema, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "schema_name", schema, raising=False
+        )
 
     return _bind
 

@@ -139,6 +139,15 @@ def is_permanent_smtp_failure(exc: BaseException) -> bool:
     return bool(codes) and all(500 <= code < 600 for code in codes)
 
 
+def is_permanent_http_status(status: int) -> bool:
+    """Whether a response status says the request itself is wrong.
+
+    A 4xx fails again, except 408 and 429, where the server asks for
+    another attempt. A 5xx and anything else is not a verdict.
+    """
+    return 400 <= status < 500 and status not in _RETRYABLE_CLIENT_STATUSES
+
+
 def is_permanent_http_failure(exc: BaseException) -> bool:
     """Whether retrying a ``requests.HTTPError`` could ever succeed.
 
@@ -148,8 +157,7 @@ def is_permanent_http_failure(exc: BaseException) -> bool:
     """
     if not isinstance(exc, requests.HTTPError) or exc.response is None:
         return False
-    status = exc.response.status_code
-    return 400 <= status < 500 and status not in _RETRYABLE_CLIENT_STATUSES
+    return is_permanent_http_status(exc.response.status_code)
 
 
 def is_recipient_refused(exc: BaseException) -> bool:

@@ -6,6 +6,7 @@ from pathlib import Path
 import django_stubs_ext
 import dotenv
 from celery.schedules import crontab
+from channels_redis.core import RedisChannelLayer
 from corsheaders.defaults import (
     default_headers,
 )
@@ -104,6 +105,13 @@ _fallback = getenv("SECRET_KEY_FALLBACK", "")
 SECRET_KEY_FALLBACKS = [_fallback] if _fallback else []
 
 DEBUG = getenv("DEBUG", "False") == "True"
+
+# Where this process runs: a Kubernetes pod, a container of the compose
+# stack, a developer's machine. The log configuration and the beat
+# schedule's development-only entry follow these.
+IS_KUBERNETES = getenv("KUBERNETES_SERVICE_HOST") is not None
+IS_DOCKER = path.exists("/.dockerenv")
+IS_DEVELOPMENT = DEBUG or SYSTEM_ENV == "dev"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = (
     getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
@@ -232,6 +240,13 @@ SHARED_APPS = [
     # user row lives, which for platform staff is the public schema. Also
     # in TENANT_APPS for customers' own authenticators.
     "allauth.mfa",
+    # The staff issuer: on the public schema the OIDC provider connects a
+    # store's STAFF (platform identities) to an AI app, for the store-admin
+    # tools on ``/mcp/admin``; its clients and tokens live where those users
+    # do. Also in TENANT_APPS, where each store's own issuer links its
+    # CUSTOMERS. Two token tables, so neither kind is ever found where the
+    # other is checked (``agent/staff.py``).
+    "allauth.idp.oidc",
 ]
 
 TENANT_APPS = [
@@ -357,7 +372,8 @@ MIDDLEWARE = [
     # dialing backend-service directly (no resolvable tenant Host) —
     # must answer BEFORE tenant resolution.
     "tenant.internal.InternalDomainsMiddleware",
-    "django_tenants.middleware.main.TenantMainMiddleware",
+    # django-tenants' host routing, plus the staff connect host.
+    "tenant.middleware.PlatformTenantMainMiddleware",
     # Immediately after tenant resolution and before anything that
     # serves data: django_tenants resolves a host without looking at
     # ``is_active``, so a SUSPENDED store kept answering its API in full.
@@ -497,6 +513,24 @@ STAFF_PASSWORD_RESET = {
     ),
 }
 
+# Attempts at a platform-staff sign-in (the Django admin login and the staff
+# token endpoint, ``tenant.staff_login_limits``): counted per account and
+# proven address, per account, and per proven address inside
+# ``WINDOW_SECONDS``; past a budget even the right password is refused. allauth's limiter covers neither.
+STAFF_LOGIN_LIMITS = {
+    # One account from one proven address: the strict budget.
+    "MAX_FAILURES_PER_ACCOUNT_ADDRESS": int(
+        getenv("STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT_ADDRESS", "5")
+    ),
+    # One account from anywhere: the ceiling for a run spread over many
+    # addresses, and the only account limit without a proven address.
+    "MAX_FAILURES_PER_ACCOUNT": int(
+        getenv("STAFF_LOGIN_MAX_FAILURES_PER_ACCOUNT", "50")
+    ),
+    "MAX_FAILURES_PER_IP": int(getenv("STAFF_LOGIN_MAX_FAILURES_PER_IP", "20")),
+    "WINDOW_SECONDS": int(getenv("STAFF_LOGIN_WINDOW_SECONDS", "900")),
+}
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
@@ -578,6 +612,9 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         # Each mint hands out a credential for the shopper's cart.
         "cart_agent_token": None if DEBUG else "10/minute",
+        # The store-admin agent surface, per staff member and store. An AI
+        # app answering one question may call several tools in a row.
+        "agent_staff": None if DEBUG else "120/minute",
         # Order creation moves stock, can mint a courier voucher and can
         # open a provider payment session — and guest checkout means the
         # anonymous budget is the one that matters.
@@ -1086,12 +1123,8 @@ if not CELERY_BROKER_URL:
 # database one. ``core.result_backend`` is ``django-db`` plus the store a
 # failed task belongs to.
 CELERY_RESULT_BACKEND = "core.result_backend.TenantDatabaseBackend"
-CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
 # Task execution
-CELERY_TASK_TRACK_STARTED = (
-    False  # Disable to reduce DB load and avoid connection issues
-)
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_SOFT_TIME_LIMIT = 1500
@@ -1136,6 +1169,13 @@ CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
 # whenever this is set (celery/beat.py).
 CELERY_RESULT_EXPIRES = datetime.timedelta(days=30)
 
+# Minutes a provider refund attempt may stay PENDING before the provider is
+# asked what became of it (``order.tasks.reconcile_pending_refunds``) and the
+# store's dashboard lists it. Must stay under the 24 hours Stripe remembers an
+# idempotency key for: until then a retry may reuse the attempt's key.
+REFUND_RECONCILE_AFTER_MINUTES = int(
+    getenv("REFUND_RECONCILE_AFTER_MINUTES", "60")
+)
 # Retention sweeps (``core.retention``): primary keys deleted per statement.
 RETENTION_PURGE_BATCH_SIZE = int(getenv("RETENTION_PURGE_BATCH_SIZE", "1000"))
 # Days a ``CachePurgeLog`` audit row (public schema, every store's purges)
@@ -1161,15 +1201,6 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
-
-# RabbitMQ 4.3 denies the deprecated ``transient_nonexcl_queues``
-# feature, so the transient non-exclusive pidbox/event queues Celery
-# declares by default are rejected with 541 INTERNAL_ERROR and the
-# worker/flower reconnect-loop (kombu #2237). Exclusive queues are
-# the upstream replacement — kombu 5.7 makes them the pidbox default;
-# these settings adopt that behavior on kombu 5.6.
-CELERY_CONTROL_QUEUE_EXCLUSIVE = True
-CELERY_EVENT_QUEUE_EXCLUSIVE = True
 
 # Worker settings
 CELERY_WORKER_SEND_TASK_EVENTS = True
@@ -1202,16 +1233,16 @@ CELERY_WORKER_PROC_ALIVE_TIMEOUT = 30.0
 CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
 CELERY_RESULT_BACKEND_MAX_RETRIES = 3
 CELERY_RESULT_EXTENDED = True
-CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {"retry_policy": {"timeout": 5.0}}
-# Retention lives with the ignore-result block above as
-# ``CELERY_RESULT_EXPIRES``; the pre-4.0 name that stood here was dead
-# configuration.
-CELERY_RESULT_PERSISTENT = False  # Don't persist to disk for better performance
 
 # Serialization
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
+
+# Search indexing has its own queue, which every worker consumes beside
+# ``celery`` (``-Q celery,meilisearch``). Celery 5.7 deprecates a task's
+# own ``queue=`` (removed in 6.0) in favour of this setting.
+CELERY_TASK_ROUTES = {"meili.*": {"queue": "meilisearch"}}
 
 # Beat scheduler
 CELERY_BEAT_SCHEDULER = "scheduler.beat:CodeOwnedScheduler"
@@ -1237,7 +1268,6 @@ SCHEDULE_PRESETS = {
     "monthly_first_6am": crontab(hour="6", minute="0", day_of_month="1"),
     "monthly_first_4am": crontab(hour="4", minute="0", day_of_month="1"),
     # Bi-monthly schedules
-    "bimonthly_4am": crontab(hour="4", minute="0", day_of_month="1,15"),
     "bimonthly_6am": crontab(hour="6", minute="0", day_of_month="1,15"),
     # Frequent schedules
     "every_minute": crontab(minute="*"),
@@ -1272,6 +1302,12 @@ DATABASE_BACKUP_BEAT_ENTRIES = (
 )
 
 
+def hourly_under_debug(schedule):
+    """``schedule``, or every hour under DEBUG: a developer's beat runs
+    the nightly, weekly and monthly jobs within the hour."""
+    return SCHEDULE_PRESETS["every_hour"] if DEBUG else schedule
+
+
 def get_celery_beat_schedule():
     base_schedule = {
         "monitor-system-health": {
@@ -1290,67 +1326,57 @@ def get_celery_beat_schedule():
             # actually fills, so the extra latency is spent on warning
             # time we did not have at all before.
             "task": "core.tasks.monitor_system_health",
-            "schedule": SCHEDULE_PRESETS["every_30_min"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["every_30_min"]),
         },
         "scheduled-database-backup": {
             "task": "core.tasks.scheduled_database_backup",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "cleanup-old-backups": {
             "task": "core.tasks.cleanup_old_backups",
-            "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["weekly_sunday_5am"]
+            ),
             "kwargs": {"days": 30, "backup_dir": "backups"},
         },
         "clear-duplicate-history": {
             "task": "tenant.tasks.fanout_clear_duplicate_history",
-            "schedule": SCHEDULE_PRESETS["daily_5am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_5am"]),
         },
         "clear-old-history": {
             "task": "tenant.tasks.fanout_clear_old_history",
-            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["weekly_sunday_3am"]
+            ),
         },
         # Runs in PUBLIC — purges expired platform-staff sessions.
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
-            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["weekly_monday_4am"]
+            ),
         },
         # Fans the same task into every tenant schema — django_session is
         # per-schema, so the public pass above never touches a store's
         # own customer sessions.
         "clear-expired-sessions-tenants": {
             "task": "tenant.tasks.fanout_clear_expired_sessions",
-            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["weekly_monday_4am"]
+            ),
         },
         "update-search-click-scores": {
             # Fanout: SearchClick/Product/BlogPost are per-tenant; beat
             # fires in public.
             "task": "tenant.tasks.fanout_update_click_scores",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "reevaluate-price-episodes": {
             # Fanout: Product and its price spells are per-tenant; beat
             # fires in public. The net under the EU Omnibus price
             # records: reconciles every product with its live price.
             "task": "tenant.tasks.fanout_reevaluate_price_episodes",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "recompute-recommendation-candidates": {
             # Fanout: RecommendationCandidate is per-tenant; beat fires
@@ -1358,18 +1384,14 @@ def get_celery_beat_schedule():
             # (attributes, co_purchase) for the whole catalogue — a
             # product save rebuilds only its own.
             "task": "tenant.tasks.fanout_recompute_recommendation_candidates",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "learn-recommendation-weights": {
             # Fanout: RecommendationSlot/Event are per-tenant; beat
             # fires in public. Re-weights each learning slot from the
             # attach rates of the trailing window.
             "task": "tenant.tasks.fanout_learn_recommendation_weights",
-            "schedule": SCHEDULE_PRESETS["daily_5am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_5am"]),
         },
         "reindex-offer-window-changes": {
             # Fanout: Promotion/Product are per-tenant; beat fires in
@@ -1380,13 +1402,23 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["every_5_minute"],
             "options": {"queue": "celery", "expires": 240},
         },
+        "release-due-publications": {
+            # Fanout: blog posts, content pages and reviews are
+            # per-tenant; beat fires in public. A row dated in the future
+            # goes live with no save, so no signal purges the surfaces
+            # that render it or announces it to IndexNow; this sweep
+            # does, per tenant, every minute (core/publication.py).
+            "task": "tenant.tasks.fanout_release_due_publications",
+            "schedule": SCHEDULE_PRESETS["every_minute"],
+            "options": {"queue": "celery", "expires": 50},
+        },
         "anonymize-old-search-queries": {
             # Fanout: SearchQuery is per-tenant; beat fires in public.
             # kwargs (days=90) live in the wrapper body, not here.
             "task": "tenant.tasks.fanout_anonymize_old_search_queries",
-            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["weekly_sunday_3am"]
+            ),
         },
         "reap-unclaimed-contact-attachments": {
             # Fanout: ContactAttachment is per-tenant; beat fires in
@@ -1400,99 +1432,75 @@ def get_celery_beat_schedule():
             # Fanout: drops the BYTES of claimed attachments past the
             # store's retention window, keeping the rows.
             "task": "tenant.tasks.fanout_purge_expired_attachment_files",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-acs-api-calls": {
             # Fanout: AcsApiCall is per-tenant. Deletes the ACS call
             # history older than ACS_API_CALL_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_acs_api_calls",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-acs-tracking-events": {
             # Fanout: AcsTrackingEvent is per-tenant. Deletes checkpoints
             # of settled shipments older than
             # CARRIER_TRACKING_EVENT_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_acs_tracking_events",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-boxnow-parcel-events": {
             # Fanout: BoxNowParcelEvent is per-tenant; same period as the
             # ACS checkpoints above.
             "task": "tenant.tasks.fanout_purge_expired_boxnow_parcel_events",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-recommendation-events": {
             # Fanout: RecommendationEvent is per-tenant. Deletes events
             # older than RECOMMENDATION_EVENT_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_recommendation_events",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-pending-payment-fees": {
             # Fanout: PendingPaymentFee is per-tenant. Deletes fees whose
             # payment was never booked, older than
             # PENDING_PAYMENT_FEE_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_pending_payment_fees",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-expired-meta-capi-event-logs": {
             # Fanout: MetaCapiEventLog is per-tenant. Deletes delivery
             # rows older than META_CAPI_EVENT_LOG_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_meta_capi_event_logs",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         # Runs in PUBLIC: the platform staff's own audit trail, under the
         # ADMIN_LOG_RETENTION_DAYS stored in the public schema.
         "purge-expired-admin-log-entries": {
             "task": "core.tasks.purge_expired_admin_log_entries",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         # Runs in PUBLIC: the platform types' EmailLog, under the
         # EMAIL_LOG_RETENTION_DAYS stored in the public schema.
         "purge-expired-email-logs": {
             "task": "emails.tasks.purge_expired_email_logs",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         # Fans the same task into every store: EmailLog is per schema, so
         # the public pass above never reaches a store's rows.
         "purge-expired-email-logs-tenants": {
             "task": "tenant.tasks.fanout_purge_expired_email_logs",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         # Fans the same task into every store: django_admin_log is per
         # schema, so the public pass above never reaches a store's rows.
         "purge-expired-admin-log-entries-tenants": {
             "task": "tenant.tasks.fanout_purge_expired_admin_log_entries",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         # Runs in PUBLIC: CachePurgeLog exists only there (every store's
         # purges, tagged by schema_name).
         "purge-expired-cache-purge-logs": {
             "task": "core.tasks.purge_expired_cache_purge_logs",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "redispatch-deferred-tasks": {
             # Public scope, no fanout: the rows live in ``public``. A task
@@ -1513,9 +1521,7 @@ def get_celery_beat_schedule():
             # Fanout: share-preview links hold frozen drafts; an expired one
             # opens nothing and is removed (``builder.preview_links``).
             "task": "tenant.tasks.fanout_purge_expired_builder_preview_links",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "rescan-pending-contact-attachments": {
             # Fanout: an attachment whose scan was queued by a worker that
@@ -1528,50 +1534,37 @@ def get_celery_beat_schedule():
             # rows (and, through the attachment signal, their files)
             # older than the store's CONTACT_RETENTION_DAYS.
             "task": "tenant.tasks.fanout_purge_expired_contact_records",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-unconfirmed-guest-subscriptions": {
             # Fanout: UserSubscription is per-tenant. A guest newsletter
             # signup never confirmed within 30 days is an address and a
             # consent record nobody gave us permission to keep.
             "task": "tenant.tasks.fanout_purge_unconfirmed_guest_subscriptions",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "purge-unconfirmed-guest-alerts": {
             # Fanout: ProductAlert is per-tenant. A guest's alert never
             # confirmed within its link's week is an address nobody gave
             # us permission to keep.
             "task": "tenant.tasks.fanout_purge_unconfirmed_guest_alerts",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "cleanup-expired-data-exports": {
             # Fanout: UserDataExport is per-tenant; beat fires in public.
             "task": "tenant.tasks.fanout_cleanup_expired_data_exports",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "send-inactive-user-notifications": {
             "task": "tenant.tasks.fanout_send_inactive_user_notifications",
-            "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(
+                SCHEDULE_PRESETS["monthly_first_6am"]
+            ),
         },
         "clear-all-cache": {
             "task": "core.tasks.clear_all_cache_task",
-            # NOTE: the only beat entry with no DEBUG override. Every
-            # sibling reads `... if not DEBUG else "every_hour"`; this one
-            # had "monthly_first_4am" on BOTH branches, so the conditional
-            # never did anything. Collapsed rather than "fixed" to
-            # every_hour, because that would start clearing the whole
-            # cache hourly in development — a behaviour change to decide
-            # deliberately, not to infer from the neighbours.
+            # Not ``hourly_under_debug``, on purpose: that would clear
+            # the whole cache every hour in development.
             "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
         },
         "reset-demo-stores": {
@@ -1586,27 +1579,19 @@ def get_celery_beat_schedule():
         },
         "cleanup-abandoned-carts": {
             "task": "tenant.tasks.fanout_cleanup_abandoned_carts",
-            "schedule": SCHEDULE_PRESETS["daily_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
         },
         "cleanup-old-guest-carts": {
             "task": "tenant.tasks.fanout_cleanup_old_guest_carts",
-            "schedule": SCHEDULE_PRESETS["daily_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_6am"]),
         },
         "clear-expired-notifications": {
             "task": "tenant.tasks.fanout_clear_expired_notifications",
-            "schedule": SCHEDULE_PRESETS["bimonthly_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["bimonthly_6am"]),
         },
         "sync-meilisearch-indexes": {
             "task": "tenant.tasks.fanout_sync_meilisearch_indexes",
-            "schedule": SCHEDULE_PRESETS["daily_2am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_2am"]),
         },
         "cleanup-expired-stock-reservations": {
             "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
@@ -1626,9 +1611,7 @@ def get_celery_beat_schedule():
             # NOT a fanout: billing terms and dunning bookkeeping are
             # public-schema Tenant rows — one pass covers the estate.
             "task": "tenant.tasks.process_tenant_billing",
-            "schedule": SCHEDULE_PRESETS["daily_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_6am"]),
         },
         # The scheduled domain tasks below run via tenant fanout
         # wrappers — the beat scheduler dispatches once against public,
@@ -1636,29 +1619,21 @@ def get_celery_beat_schedule():
         # every active tenant schema with the right _schema_name header.
         "process-loyalty-points-expiration": {
             "task": "tenant.tasks.fanout_process_points_expiration",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "expire-gift-cards": {
             "task": "tenant.tasks.fanout_expire_gift_cards",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
         },
         "deliver-scheduled-gift-cards": {
             # Cards bought with a future deliver_at — a daily sweep
             # instead of far-future ETAs, which brokers redeliver badly.
             "task": "tenant.tasks.fanout_deliver_scheduled_gift_cards",
-            "schedule": SCHEDULE_PRESETS["daily_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_6am"]),
         },
         "send-gift-card-expiry-reminders": {
             "task": "tenant.tasks.fanout_send_gift_card_expiry_reminders",
-            "schedule": SCHEDULE_PRESETS["daily_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_6am"]),
         },
         "auto-cancel-stuck-pending-orders": {
             "task": "tenant.tasks.fanout_auto_cancel_stuck_pending_orders",
@@ -1672,6 +1647,19 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_complete_paid_delivered_orders",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
+        # Provider refunds still PENDING after
+        # ``REFUND_RECONCILE_AFTER_MINUTES``: the provider is asked what
+        # became of each. A pending attempt holds its money until resolved.
+        "reconcile-pending-refunds": {
+            "task": "tenant.tasks.fanout_reconcile_pending_refunds",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        # Refunds, attempts and chargeback decisions booked without an
+        # allocation (by a release that predates it) are allocated here.
+        "allocate-credit-sources": {
+            "task": "tenant.tasks.fanout_allocate_credit_sources",
+            "schedule": SCHEDULE_PRESETS["every_5_minute"],
+        },
         "check-low-stock-products": {
             "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],
@@ -1683,9 +1671,7 @@ def get_celery_beat_schedule():
         },
         "send-review-request-emails": {
             "task": "tenant.tasks.fanout_send_review_request_emails",
-            "schedule": SCHEDULE_PRESETS["daily_noon"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_noon"]),
         },
         # One IndexNow POST per store per run, with the product and blog
         # pages that changed since the last one. IndexNow asks for at
@@ -1696,18 +1682,14 @@ def get_celery_beat_schedule():
         },
         "send-checkout-abandonment-emails": {
             "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
-            "schedule": SCHEDULE_PRESETS["daily_6am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_6am"]),
         },
         "sync-boxnow-lockers": {
             # Fanout: BoxNowLocker lives in each tenant schema; a direct
             # beat call would sync into the empty public schema. Per-tenant
             # fanout keeps every tenant's locker cache fresh.
             "task": "tenant.tasks.fanout_sync_boxnow_lockers",
-            "schedule": SCHEDULE_PRESETS["daily_2am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_2am"]),
             "options": {"queue": "celery"},
         },
         # Poll BoxNow's REST API every 15 min for non-terminal
@@ -1739,9 +1721,7 @@ def get_celery_beat_schedule():
         "sync-acs-stations": {
             # Fanout: AcsStation is per-tenant; beat fires in public.
             "task": "tenant.tasks.fanout_sync_acs_stations",
-            "schedule": SCHEDULE_PRESETS["daily_3am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_3am"]),
             "options": {"queue": "celery"},
         },
         # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens, the
@@ -1797,9 +1777,7 @@ def get_celery_beat_schedule():
             # dispatch per-schema or the reconciliation runs against the
             # empty public schema.
             "task": "tenant.tasks.fanout_reconcile_acs_cod_payouts",
-            "schedule": crontab(hour="2", minute="30")
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(crontab(hour="2", minute="30")),
             "options": {"queue": "celery"},
         },
         # Half an hour after the reconcile, so a payout that landed
@@ -1808,9 +1786,7 @@ def get_celery_beat_schedule():
         # anything more often just repeats the same list.
         "alert-unremitted-acs-cod": {
             "task": "tenant.tasks.fanout_alert_unremitted_cod_payouts",
-            "schedule": crontab(hour="3", minute="0")
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
+            "schedule": hourly_under_debug(crontab(hour="3", minute="0")),
             "options": {"queue": "celery"},
         },
     }
@@ -1819,18 +1795,12 @@ def get_celery_beat_schedule():
         for name in DATABASE_BACKUP_BEAT_ENTRIES:
             del base_schedule[name]
 
-    if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
-        base_schedule.update(
-            {
-                "clear-development-logs": {
-                    "task": "core.tasks.clear_development_log_files_task",
-                    "schedule": SCHEDULE_PRESETS["daily_4am"]
-                    if not DEBUG
-                    else SCHEDULE_PRESETS["every_hour"],
-                    "kwargs": {"days": 7},
-                },
-            }
-        )
+    if IS_DOCKER and not IS_KUBERNETES:
+        base_schedule["clear-development-logs"] = {
+            "task": "core.tasks.clear_development_log_files_task",
+            "schedule": hourly_under_debug(SCHEDULE_PRESETS["daily_4am"]),
+            "kwargs": {"days": 7},
+        }
 
     return base_schedule
 
@@ -1839,11 +1809,23 @@ def get_celery_beat_schedule():
 # when beat starts. To change when a job runs, change it here and deploy.
 CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 
+# channels-redis waits for a message with BZPOPMIN for ``brpop_timeout``
+# seconds, and redis-py 8 gives every connection a socket timeout of the
+# same 5 seconds, so an idle receive raised TimeoutError and closed the
+# consumer (django/channels_redis#422). The read timeout must outlast the
+# blocking wait; twice that still notices a dead connection.
+CHANNEL_LAYER_SOCKET_TIMEOUT = RedisChannelLayer.brpop_timeout * 2
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL],
+            "hosts": [
+                {
+                    "address": REDIS_URL,
+                    "socket_timeout": CHANNEL_LAYER_SOCKET_TIMEOUT,
+                }
+            ],
             "capacity": 1500,
             "expiry": 300,
         },
@@ -2429,6 +2411,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "EXTERNAL_LINKS_NEW_TAB_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Open every link to another site in a new tab, in the rich "
+            "text of posts, pages and products. Links to the store's own "
+            "pages keep what the editor chose. A store UI preference, "
+            "served in TenantConfig.preferences."
+        ),
+    },
+    {
         "name": "PRODUCT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,
@@ -2618,6 +2611,20 @@ EXTRA_SETTINGS_DEFAULTS = [
             "MCP/UCP/ACP, feeds and the chatbot. Cached with the "
             "tenant-resolve payload — changes take effect on cache "
             "invalidation (automatic on save)."
+        ),
+    },
+    {
+        "name": "STAFF_AI_ACCESS_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Lets the store's team connect their own AI app (Claude, "
+            "ChatGPT and others) to read the store through the store-admin "
+            "MCP server, /mcp/admin: orders, products and stock, customers, "
+            "reviews, contact messages and, by role, sales and profit. What "
+            "the app reads is sent to its provider, so it stays off until "
+            "the store turns it on. Off: no one can connect, and an app "
+            "already connected is refused at its next call."
         ),
     },
     {
@@ -3209,21 +3216,16 @@ EXTRA_SETTINGS_DEFAULTS = [
     },
 ]
 
-# The backend that actually delivers. Still env-driven, so console/
-# locmem/SMTP selection is unchanged; it is simply reached through the
-# wrapper below.
-EMAIL_DELEGATE_BACKEND = getenv(
+# Outgoing mail is configured in MAILERS (below), built from the same
+# EMAIL_* environment variables as before. Django 6.1 deprecates the
+# EMAIL_* settings and refuses them beside MAILERS, so the values live in
+# these lowercase names, which Django does not read as settings.
+#
+# The backend that actually delivers: console, locmem or SMTP.
+_email_relay_backend = getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
-# Every sender in the codebase goes through django.core.mail, so this is
-# the one place a store's SHARED demo login can be kept out of the
-# recipient list. A passthrough everywhere else: the suppression list is
-# empty unless DEMO_ACCOUNT_ENABLED is on for that schema.
-EMAIL_BACKEND = "core.mail.DemoRecipientSuppressingBackend"
-EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
-EMAIL_PORT = getenv("EMAIL_PORT", "25")
-EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
-EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
+_email_host_password = getenv("EMAIL_HOST_PASSWORD", "changeme")
 # Which transport carries the pipeline's mail (``emails.transport``): the
 # SMTP relay above, or Resend's HTTP API. Production stays on SMTP until the
 # platform's Resend team exists and one live send is verified.
@@ -3250,7 +3252,7 @@ RESEND_WEBHOOK_MAX_BODY_BYTES = int(
 if PRODUCTION_PROFILE:
     from django.core.exceptions import ImproperlyConfigured
 
-    if EMAIL_TRANSPORT == "smtp" and EMAIL_HOST_PASSWORD == "changeme":
+    if EMAIL_TRANSPORT == "smtp" and _email_host_password == "changeme":
         raise ImproperlyConfigured(
             "EMAIL_HOST_PASSWORD must be set in production "
             "(current value is the insecure default 'changeme')."
@@ -3268,9 +3270,9 @@ if PRODUCTION_PROFILE:
 # Cloudflare Email Service (smtp.mx.cloudflare.net:465) and the :465
 # endpoints of Resend, Postmark and SES among them. Defaulting SSL to off
 # keeps the existing STARTTLS behaviour unchanged.
-EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
-EMAIL_USE_SSL = getenv("EMAIL_USE_SSL", "False") == "True"
-if EMAIL_USE_TLS and EMAIL_USE_SSL:
+_email_use_tls = getenv("EMAIL_USE_TLS", "True") == "True"
+_email_use_ssl = getenv("EMAIL_USE_SSL", "False") == "True"
+if _email_use_tls and _email_use_ssl:
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -3288,8 +3290,37 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
 # from both nodes, and the first send against it hung indefinitely rather
 # than erroring. The value is a per-operation socket timeout, not a deadline
 # for the whole message, so it stays comfortable for large invoice-PDF
-# attachments.
-EMAIL_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
+# attachments. Resend's HTTP API (``emails.resend``) uses the same value.
+EMAIL_SEND_TIMEOUT = int(getenv("EMAIL_TIMEOUT", "20"))
+_SMTP_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+MAILERS = {
+    # Every sender goes through this one, so it is the one place a store's
+    # SHARED demo login is kept out of the recipient list
+    # (``core.mail``). A passthrough everywhere else: the suppression list
+    # is empty unless DEMO_ACCOUNT_ENABLED is on for that schema.
+    "default": {
+        "BACKEND": "core.mail.DemoRecipientSuppressingBackend",
+        "OPTIONS": {"relay": "relay"},
+    },
+    # What "default" hands the mail to. Only the SMTP backend takes
+    # connection options; console and locmem refuse unknown ones.
+    "relay": {
+        "BACKEND": _email_relay_backend,
+        "OPTIONS": (
+            {
+                "host": getenv("EMAIL_HOST", "localhost"),
+                "port": int(getenv("EMAIL_PORT", "25")),
+                "username": getenv("EMAIL_HOST_USER", "localhost@gmail.com"),
+                "password": _email_host_password,
+                "use_tls": _email_use_tls,
+                "use_ssl": _email_use_ssl,
+                "timeout": EMAIL_SEND_TIMEOUT,
+            }
+            if _email_relay_backend == _SMTP_BACKEND
+            else {}
+        ),
+    },
+}
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 # The platform operators' address is the ADMINS setting: the ADMIN_EMAIL env
@@ -3398,218 +3429,6 @@ PARLER_LANGUAGES = {
 # Anything that lists translated rows must prefetch them
 # (`with_translations()`, or `prefetch_translations` on an admin).
 PARLER_ENABLE_CACHING = False
-
-LANGUAGE_COUNTRY_MAPPING = {
-    "el": {
-        "alpha_2": "GR",
-        "alpha_3": "GRC",
-        "iso_cc": 300,
-        "phone_code": "30",
-        "names": {"el": "Ελλάδα", "en": "Greece"},
-    },
-    "en": {
-        "alpha_2": "GB",
-        "alpha_3": "GBR",
-        "iso_cc": 826,
-        "phone_code": "44",
-        "names": {
-            "el": "Ηνωμένο Βασίλειο",
-            "en": "United Kingdom",
-        },
-    },
-}
-
-COUNTRY_REGIONS_MAPPING = {
-    "GR": [
-        {
-            "alpha": "EMT",
-            "names": {
-                "el": "Ανατολική Μακεδονία και Θράκη",
-                "en": "East Macedonia and Thrace",
-            },
-        },
-        {
-            "alpha": "CMA",
-            "names": {
-                "el": "Κεντρική Μακεδονία",
-                "en": "Central Macedonia",
-            },
-        },
-        {
-            "alpha": "WMA",
-            "names": {
-                "el": "Δυτική Μακεδονία",
-                "en": "West Macedonia",
-            },
-        },
-        {
-            "alpha": "EPI",
-            "names": {"el": "Ήπειρος", "en": "Epirus"},
-        },
-        {
-            "alpha": "THS",
-            "names": {"el": "Θεσσαλία", "en": "Thessaly"},
-        },
-        {
-            "alpha": "ION",
-            "names": {
-                "el": "Ιόνια Νησιά",
-                "en": "Ionian Islands",
-            },
-        },
-        {
-            "alpha": "WGR",
-            "names": {
-                "el": "Δυτική Ελλάδα",
-                "en": "West Greece",
-            },
-        },
-        {
-            "alpha": "CGR",
-            "names": {
-                "el": "Στερεά Ελλάδα",
-                "en": "Central Greece",
-            },
-        },
-        {
-            "alpha": "ATT",
-            "names": {"el": "Αττική", "en": "Attica"},
-        },
-        {
-            "alpha": "PEL",
-            "names": {
-                "el": "Πελοπόννησος",
-                "en": "Peloponnese",
-            },
-        },
-        {
-            "alpha": "NAE",
-            "names": {
-                "el": "Βόρειο Αιγαίο",
-                "en": "North Aegean",
-            },
-        },
-        {
-            "alpha": "SAE",
-            "names": {
-                "el": "Νότιο Αιγαίο",
-                "en": "South Aegean",
-            },
-        },
-        {
-            "alpha": "CRT",
-            "names": {"el": "Κρήτη", "en": "Crete"},
-        },
-    ],
-    "GB": [
-        {
-            "alpha": "ENG",
-            "names": {"el": "Αγγλία", "en": "England"},
-        },
-        {
-            "alpha": "SCT",
-            "names": {"el": "Σκωτία", "en": "Scotland"},
-        },
-        {
-            "alpha": "WLS",
-            "names": {"el": "Ουαλία", "en": "Wales"},
-        },
-        {
-            "alpha": "NIR",
-            "names": {
-                "el": "Βόρεια Ιρλανδία",
-                "en": "Northern Ireland",
-            },
-        },
-    ],
-    "DE": [
-        {
-            "alpha": "BW",
-            "names": {
-                "el": "Βάδη-Βυρτεμβέργη",
-                "en": "Baden-Württemberg",
-            },
-        },
-        {
-            "alpha": "BY",
-            "names": {"el": "Βαυαρία", "en": "Bavaria"},
-        },
-        {
-            "alpha": "BE",
-            "names": {"el": "Βερολίνο", "en": "Berlin"},
-        },
-        {
-            "alpha": "BB",
-            "names": {
-                "el": "Βρανδεμβούργο",
-                "en": "Brandenburg",
-            },
-        },
-        {
-            "alpha": "HB",
-            "names": {"el": "Βρέμη", "en": "Bremen"},
-        },
-        {
-            "alpha": "HH",
-            "names": {"el": "Αμβούργο", "en": "Hamburg"},
-        },
-        {"alpha": "HE", "names": {"el": "Έσση", "en": "Hesse"}},
-        {
-            "alpha": "MV",
-            "names": {
-                "el": "Μεκλεμβούργο-Πομερανία",
-                "en": "Mecklenburg-Western Pomerania",
-            },
-        },
-        {
-            "alpha": "NI",
-            "names": {
-                "el": "Κάτω Σαξονία",
-                "en": "Lower Saxony",
-            },
-        },
-        {
-            "alpha": "NW",
-            "names": {
-                "el": "Βόρεια Ρηνανία-Βεστφαλία",
-                "en": "North Rhine-Westphalia",
-            },
-        },
-        {
-            "alpha": "RP",
-            "names": {
-                "el": "Ρηνανία-Παλατινάτο",
-                "en": "Rhineland-Palatinate",
-            },
-        },
-        {
-            "alpha": "SL",
-            "names": {"el": "Σάαρλαντ", "en": "Saarland"},
-        },
-        {
-            "alpha": "SN",
-            "names": {"el": "Σαξονία", "en": "Saxony"},
-        },
-        {
-            "alpha": "ST",
-            "names": {
-                "el": "Σαξονία-Άνχαλτ",
-                "en": "Saxony-Anhalt",
-            },
-        },
-        {
-            "alpha": "SH",
-            "names": {
-                "el": "Σλέσβιχ-Χολστάιν",
-                "en": "Schleswig-Holstein",
-            },
-        },
-        {
-            "alpha": "TH",
-            "names": {"el": "Θουριγγία", "en": "Thuringia"},
-        },
-    ],
-}
 
 PHONENUMBER_DEFAULT_REGION = "GR"
 
@@ -3726,212 +3545,11 @@ UNFOLD_PLATFORM = {
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
     ],
+    # Built per request, like the store's (admin/navigation.py).
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
-        "navigation": [
-            {
-                "title": _("Control plane"),
-                "separator": True,
-                "items": [
-                    {
-                        "title": _("Dashboard"),
-                        "icon": "hub",
-                        "link": reverse_lazy(
-                            "platform_admin:index",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Tenants"),
-                        "icon": "storefront",
-                        "link": reverse_lazy(
-                            "platform_admin:tenant_tenant_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Plan & Billing"),
-                        "icon": "payments",
-                        "link": reverse_lazy(
-                            "platform_admin:plan_billing",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Tenant Domains"),
-                        "icon": "dns",
-                        "link": reverse_lazy(
-                            "platform_admin:tenant_tenantdomain_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Memberships"),
-                        "icon": "badge",
-                        "link": reverse_lazy(
-                            "platform_admin:tenant_usertenantmembership_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    # What offboarding kept of a destroyed store.
-                    {
-                        "title": _("Tenant Archives"),
-                        "icon": "inventory",
-                        "link": reverse_lazy(
-                            "platform_admin:tenant_tenantarchive_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            {
-                "title": _("Identity"),
-                "separator": True,
-                "items": [
-                    {
-                        "title": _("Platform Staff"),
-                        "icon": "manage_accounts",
-                        "link": reverse_lazy(
-                            "platform_admin:user_useraccount_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Groups"),
-                        "icon": "group",
-                        "link": reverse_lazy(
-                            "platform_admin:auth_group_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    # Platform staff's own signed-in sessions (public
-                    # schema); each store's are in its own admin.
-                    {
-                        "title": _("User Sessions"),
-                        "icon": "devices",
-                        "link": reverse_lazy(
-                            "platform_admin:usersessions_usersession_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            {
-                "title": _("Platform"),
-                "separator": True,
-                "items": [
-                    # extra_settings deliberately NOT here: every knob
-                    # in EXTRA_SETTINGS is STORE-scoped and read from
-                    # the tenant's own schema — nothing that runs in
-                    # the public schema reads Setting at all (verified
-                    # across beat tasks and the platform dashboard).
-                    # Exposing the section here materialized meaningless
-                    # public-schema rows and invited edits that
-                    # silently change nothing for any store.
-                    {
-                        "title": _("Countries"),
-                        "icon": "public",
-                        "link": reverse_lazy(
-                            "platform_admin:country_country_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Regions"),
-                        "icon": "map",
-                        "link": reverse_lazy(
-                            "platform_admin:region_region_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    # One public-schema row per purge, across every
-                    # store — platform operations, not one merchant's.
-                    {
-                        "title": _("Cache Purge Log"),
-                        "icon": "cleaning_services",
-                        "link": reverse_lazy(
-                            "platform_admin:core_cachepurgelog_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    # One ``django_site`` row per store domain (public
-                    # schema, minted by ``tenant.provisioning.ensure_site``)
-                    # — what allauth resolves a per-store SocialApp
-                    # against. Platform-global, so managed only here.
-                    {
-                        "title": _("Sites"),
-                        "icon": "language",
-                        "link": reverse_lazy(
-                            "platform_admin:sites_site_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    # The platform's own mail (billing notices, staff
-                    # password reset, health and backup alerts): what it
-                    # sent and what failed, its log and suppression list.
-                    {
-                        "title": _("Emails"),
-                        "icon": "mail",
-                        "link": reverse_lazy(
-                            "platform_admin:emails_emailswitch_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Email log"),
-                        "icon": "history",
-                        "link": reverse_lazy(
-                            "platform_admin:emails_emaillog_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Suppression list"),
-                        "icon": "block",
-                        "link": reverse_lazy(
-                            "platform_admin:emails_emailsuppression_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                ],
-            },
-            # The Celery beat schedule and the task-result tables live in
-            # the PUBLIC schema and drive every store's fan-out tasks —
-            # platform operations, never a store's. (Task Results holds
-            # task failures only: ``CELERY_TASK_IGNORE_RESULT``.)
-            {
-                "title": _("Background Jobs"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Periodic Tasks"),
-                        "icon": "task_alt",
-                        "link": reverse_lazy(
-                            "platform_admin:scheduler_periodictask_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Task Results"),
-                        "icon": "checklist",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_results_taskresult_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                    {
-                        "title": _("Group Results"),
-                        "icon": "ballot",
-                        "link": reverse_lazy(
-                            "platform_admin:django_celery_results_groupresult_changelist",
-                            urlconf=PUBLIC_SCHEMA_URLCONF,
-                        ),
-                    },
-                ],
-            },
-        ],
+        "navigation": "admin.navigation.platform_sidebar",
     },
 }
 
@@ -4272,7 +3890,6 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
-SESSION_FILE_PATH = None
 SESSION_SERIALIZER = "django.contrib.sessions.serializers.JSONSerializer"
 
 SPECTACULAR_SETTINGS = {
@@ -4389,44 +4006,40 @@ STATICFILES_DIRS = [
     path.join(BASE_DIR, "static"),
 ]
 
-if not DEBUG:
-    STATIC_URL = f"{STATIC_BASE_URL}/static/"
-    STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")
-    MEDIA_URL = f"{STATIC_BASE_URL}/media/"
-    MEDIA_ROOT = path.join(BASE_DIR, "web", "mediafiles")
-    STORAGES = {
-        "default": {
-            "BACKEND": "tenant.storage.TenantFileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
-        },
-    }
-else:
+# ``MEDIA_URL`` is ABSOLUTE in every environment, local dev included:
+# every ``ImageField``/``FileField`` DRF renders surfaces
+# ``storage.url(name)`` to the frontend, drf-spectacular emits it with
+# ``format: 'uri'`` and the storefront's Zod schema validates it with
+# ``z.url()``, which rejects a relative path. ``/media/...`` failed every
+# endpoint that exposes an uploaded image (PayWay icons, product images,
+# shipping provider logos, ...) in dev. ``STATIC_BASE_URL`` defaults to
+# ``http://localhost:8000``; a developer running Django on another port
+# sets it in the environment.
+MEDIA_URL = f"{STATIC_BASE_URL}/media/"
+
+if DEBUG:
     STATIC_URL = "/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
-    # ``MEDIA_URL`` must be ABSOLUTE in every environment, even local
-    # dev, because every ``ImageField``/``FileField`` rendered by
-    # DRF surfaces ``storage.url(name)`` to the frontend — drf-
-    # spectacular emits it with ``format: 'uri'`` and the Nuxt-side
-    # Zod 4 schema validates it with ``z.url()`` which rejects
-    # relative paths. Returning ``/media/...`` blew up every endpoint
-    # that exposes an uploaded image (PayWay icons, product images,
-    # shipping provider logos, ...) in dev with a Zod ZodError.
-    # ``STATIC_BASE_URL`` already defaults to ``http://localhost:8000``
-    # so the dev experience is unchanged for the default Django port;
-    # devs running Django on a different port override it via env var
-    # the same way ``elif not DEBUG`` does.
-    MEDIA_URL = f"{STATIC_BASE_URL}/media/"
     MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
-    STORAGES = {
-        "default": {
-            "BACKEND": "tenant.storage.TenantFileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    }
+    _staticfiles_storage = (
+        "django.contrib.staticfiles.storage.StaticFilesStorage"
+    )
+else:
+    STATIC_URL = f"{STATIC_BASE_URL}/static/"
+    STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")
+    MEDIA_ROOT = path.join(BASE_DIR, "web", "mediafiles")
+    _staticfiles_storage = (
+        "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+    )
+
+STORAGES = {
+    "default": {
+        "BACKEND": "tenant.storage.TenantFileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": _staticfiles_storage,
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Tenant offboarding — retention of legally-mandated records
@@ -4464,11 +4077,28 @@ TINYMCE_DEFAULT_CONFIG = {
     "plugins": "advlist,autolink,lists,link,image,charmap,preview,anchor,"
     "searchreplace,visualblocks,code,fullscreen,insertdatetime,media,table,"
     "code,help,wordcount,accordion",
-    "toolbar": "undo redo | bold italic underline strikethrough | fontselect fontsizeselect formatselect | alignleft "
-    "aligncenter alignright alignjustify | outdent indent |  numlist bullist checklist | forecolor "
-    "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
-    "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample accordion | "
-    "a11ycheck ltr rtl | showcomments addcomment code",
+    # TinyMCE 7 names, each one registered by the core or a plugin above
+    # (the bundle is 7.8). The 5.x ``fontselect fontsizeselect
+    # formatselect`` and the premium or unloaded items that stood here
+    # rendered nothing; ``blocks`` is what ``formatselect`` became.
+    "toolbar": "undo redo | blocks | bold italic underline strikethrough | "
+    "alignleft aligncenter alignright alignjustify | outdent indent | "
+    "numlist bullist | forecolor backcolor removeformat | charmap | "
+    "image media link anchor accordion | fullscreen preview code",
+    # The default Format menu of 7.8 without ``fontfamily fontsize``: a
+    # store's typeface and type size are its theme's (``docs/rich-text.md``).
+    "menu": {
+        "format": {
+            "title": "Format",
+            "items": "bold italic underline strikethrough superscript "
+            "subscript codeformat | styles blocks align lineheight | "
+            "forecolor backcolor | language | removeformat",
+        },
+    },
+    # The same declarations the save drops (``core/utils/sanitize.py``),
+    # stripped by the editor too, so a paste shows the author what will
+    # be stored.
+    "invalid_styles": "font font-family font-size",
     # Custom upload handler instead of `images_upload_url`. The built-in
     # uploader sends FormData with cookies (via `images_upload_credentials`)
     # but never attaches an `X-CSRFToken` header, so Django's
@@ -4565,8 +4195,14 @@ BLOG_COMMENT_AUTO_APPROVE = (
     getenv("BLOG_COMMENT_AUTO_APPROVE", "True") == "True"
 )
 
-# Related Posts Strategies Configuration
+# Related Posts Strategies Configuration. In order of closeness: the posts
+# of the same category on the same topic (the words they share), then the rest
+# of the category, then posts sharing a tag.
 RELATED_POSTS_STRATEGIES = [
+    {
+        "strategy": "blog.strategies.shared_terms_related_posts_strategy.SharedTermsRelatedPostsStrategy",
+        "weight": 1.0,
+    },
     {
         "strategy": "blog.strategies.default_related_posts_strategy.DefaultRelatedPostsStrategy",
         "weight": 0.6,
@@ -4577,90 +4213,100 @@ RELATED_POSTS_STRATEGIES = [
     },
 ]
 RELATED_POSTS_LIMIT = 8
+# How many of the store's newest published posts, of every category, the
+# shared-words strategy reads: a word's rarity is measured over them, and
+# the candidates are those of the post's category
+# (docs/blog-related-posts.md).
+RELATED_POSTS_CANDIDATES = int(getenv("RELATED_POSTS_CANDIDATES", "500"))
+
+# Postgres text search configuration per language (lower case, accents
+# off, stemming), for comparing texts in the database; a language with no
+# configuration of its own is only lower-cased and split ("simple").
+TEXT_SEARCH_CONFIGS = {"el": "greek", "en": "english"}
+TEXT_SEARCH_DEFAULT_CONFIG = "simple"
 # The most posts the RSS feed endpoint (``/blog/post/feed``) returns.
 BLOG_FEED_LIMIT = 50
 
-# Logging
-IS_KUBERNETES = getenv("KUBERNETES_SERVICE_HOST") is not None
-IS_DOCKER = path.exists("/.dockerenv")
-IS_DEVELOPMENT = DEBUG or SYSTEM_ENV == "dev"
-
+# Logging: Kubernetes writes one stream for the log collector (JSON under
+# the production profile); the compose stack and a developer's machine
+# write a short console line and a rotating file; anything else (CI) a
+# console line only.
 logging_level = getenv("LOGGING_LEVEL", "INFO")
 
+_log_line_format = (
+    "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] "
+    "[cid=%(correlation_id)s] [schema=%(schema_name)s] "
+    "%(funcName)s: %(message)s"
+)
+_log_filter_classes = {
+    "add_hostname": "core.logging.HostnameFilter",
+    "add_correlation_id": "core.logging.CorrelationIdFilter",
+    "add_tenant_context": "core.logging.TenantContextFilter",
+    # Silences the CancelledError tracebacks asyncio emits when an ASGI
+    # client disconnects mid-request.
+    "drop_asyncio_cancelled": "core.logging.DropAsyncioCancelledError",
+    # Flower's clean shutdown.
+    "drop_system_exit": "core.logging.DropSystemExit",
+}
+# ``django`` is declared in every environment so dictConfig drops the
+# handlers Django attaches by default (``mail_admins``): a server error
+# is a log line, not an email.
+_service_loggers = {
+    "django": {
+        "level": "WARNING",
+        "propagate": True,
+    },
+    "celery": {
+        "level": logging_level,
+        "propagate": True,
+    },
+    "asyncio": {
+        "level": logging_level,
+        "filters": ["drop_asyncio_cancelled"],
+        "propagate": True,
+    },
+    "tornado.application": {
+        "level": logging_level,
+        "filters": ["drop_system_exit"],
+        "propagate": True,
+    },
+}
+
 if IS_KUBERNETES:
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            # A real serialiser, not a format string that looks like
-            # JSON. The string version could not escape the message and
-            # appended tracebacks outside the object — see JsonFormatter.
-            "json": {
-                "()": "core.logging.JsonFormatter",
-                "datefmt": "%Y-%m-%dT%H:%M:%S",
-            },
-            "console": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] [schema=%(schema_name)s] %(funcName)s: %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
+    _log_formatters = {
+        # A real serialiser, not a format string that looks like JSON.
+        # The string version could not escape the message and appended
+        # tracebacks outside the object — see JsonFormatter.
+        "json": {
+            "()": "core.logging.JsonFormatter",
+            "datefmt": "%Y-%m-%dT%H:%M:%S",
         },
-        "filters": {
-            "add_hostname": {
-                "()": "core.logging.HostnameFilter",
-            },
-            "add_correlation_id": {
-                "()": "core.logging.CorrelationIdFilter",
-            },
-            "add_tenant_context": {
-                "()": "core.logging.TenantContextFilter",
-            },
-            "drop_asyncio_cancelled": {
-                "()": "core.logging.DropAsyncioCancelledError",
-            },
-            "drop_system_exit": {
-                "()": "core.logging.DropSystemExit",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "json" if PRODUCTION_PROFILE else "console",
-                "level": logging_level,
-                "filters": [
-                    "add_hostname",
-                    "add_correlation_id",
-                    "add_tenant_context",
-                ],
-            },
-        },
-        "root": {
-            "handlers": ["console"],
-            "level": logging_level,
-        },
-        "loggers": {
-            "django": {
-                "level": "WARNING",
-                "propagate": True,
-            },
-            "celery": {
-                "level": logging_level,
-                "propagate": True,
-            },
-            # Suppress asyncio's CancelledError tracebacks emitted when an
-            # ASGI client disconnects mid-request. See DropAsyncioCancelledError.
-            "asyncio": {
-                "level": logging_level,
-                "filters": ["drop_asyncio_cancelled"],
-                "propagate": True,
-            },
-            # Flower's clean shutdown, see DropSystemExit.
-            "tornado.application": {
-                "level": logging_level,
-                "filters": ["drop_system_exit"],
-                "propagate": True,
-            },
+        "console": {
+            "format": _log_line_format,
+            "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     }
+    _log_filters = (
+        "add_hostname",
+        "add_correlation_id",
+        "add_tenant_context",
+        "drop_asyncio_cancelled",
+        "drop_system_exit",
+    )
+    _log_handlers = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json" if PRODUCTION_PROFILE else "console",
+            "level": logging_level,
+            "filters": [
+                "add_hostname",
+                "add_correlation_id",
+                "add_tenant_context",
+            ],
+        },
+    }
+    _log_root_level = logging_level
+    _log_loggers = _service_loggers
 
 elif IS_DOCKER or IS_DEVELOPMENT:
     log_dir = path.join(BASE_DIR, "logs")
@@ -4671,104 +4317,82 @@ elif IS_DOCKER or IS_DEVELOPMENT:
 
     backup_count = int(getenv("LOG_BACKUP_COUNT", "30"))
 
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "verbose": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] [schema=%(schema_name)s] %(funcName)s: %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
-            "simple": {
-                "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
-                "datefmt": "%H:%M:%S",
-            },
+    _log_formatters = {
+        "verbose": {
+            "format": _log_line_format,
+            "datefmt": "%Y-%m-%d %H:%M:%S",
         },
-        "filters": {
-            "add_correlation_id": {
-                "()": "core.logging.CorrelationIdFilter",
-            },
-            "add_tenant_context": {
-                "()": "core.logging.TenantContextFilter",
-            },
-            "drop_asyncio_cancelled": {
-                "()": "core.logging.DropAsyncioCancelledError",
-            },
-            "drop_system_exit": {
-                "()": "core.logging.DropSystemExit",
-            },
+        "simple": {
+            "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+            "datefmt": "%H:%M:%S",
         },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "simple",
-                "level": "INFO",
-            },
-            "app_file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": app_log_file,
-                "maxBytes": 10 * 1024 * 1024,
-                "backupCount": backup_count,
-                "level": logging_level,
-                "formatter": "verbose",
-                "filters": ["add_correlation_id", "add_tenant_context"],
-            },
+    }
+    _log_filters = (
+        "add_correlation_id",
+        "add_tenant_context",
+        "drop_asyncio_cancelled",
+        "drop_system_exit",
+    )
+    _log_handlers = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "level": "INFO",
         },
-        "root": {
-            "handlers": ["console", "app_file"],
+        "app_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": app_log_file,
+            # Not the locale's encoding: on Windows that is cp1252,
+            # which cannot write a Greek log line.
+            "encoding": "utf-8",
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": backup_count,
             "level": logging_level,
+            "formatter": "verbose",
+            "filters": ["add_correlation_id", "add_tenant_context"],
         },
-        "loggers": {
-            "django": {
-                "level": "WARNING",
-                "propagate": True,
-            },
-            "celery": {
-                "level": logging_level,
-                "propagate": True,
-            },
-            # See DropAsyncioCancelledError — silences ASGI client-disconnect noise.
-            "asyncio": {
-                "level": logging_level,
-                "filters": ["drop_asyncio_cancelled"],
-                "propagate": True,
-            },
-            # Flower's clean shutdown, see DropSystemExit.
-            "tornado.application": {
-                "level": logging_level,
-                "filters": ["drop_system_exit"],
-                "propagate": True,
-            },
+    }
+    _log_root_level = logging_level
+    _log_loggers = _service_loggers
+
+else:
+    _log_formatters = {
+        "simple": {
+            "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    }
+    _log_filters = ("add_tenant_context",)
+    _log_handlers = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "filters": ["add_tenant_context"],
+        },
+    }
+    _log_root_level = "INFO"
+    # INFO is Django's own default level for this logger.
+    _log_loggers = {
+        "django": {
+            "level": "INFO",
+            "propagate": True,
         },
     }
 
-else:
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "simple": {
-                "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
-        },
-        "filters": {
-            "add_tenant_context": {
-                "()": "core.logging.TenantContextFilter",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "simple",
-                "filters": ["add_tenant_context"],
-            },
-        },
-        "root": {
-            "handlers": ["console"],
-            "level": "INFO",
-        },
-    }
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": _log_formatters,
+    "filters": {
+        name: {"()": _log_filter_classes[name]} for name in _log_filters
+    },
+    "handlers": _log_handlers,
+    "root": {
+        "handlers": list(_log_handlers),
+        "level": _log_root_level,
+    },
+    "loggers": _log_loggers,
+}
 
 # PAYMENT SETTINGS
 # Stripe Configuration (dj-stripe format)
@@ -5090,3 +4714,16 @@ IDP_OIDC_DCR_REQUIRES_INITIAL_ACCESS_TOKEN = False
 # opaque access tokens without it); provisioned via sealed secret.
 IDP_OIDC_PRIVATE_KEY = getenv("IDP_OIDC_PRIVATE_KEY", "")
 IDP_OIDC_ADAPTER = "agent.oidc.AgentOIDCAdapter"
+
+# ---------- Store-admin tools over MCP (agent/staff.py) --------------------
+# The host a store's staff connect an AI app on: the staff issuer of the
+# public schema, served alone through ``agent.urls_connect``
+# (``tenant.middleware.PlatformTenantMainMiddleware``) and outside the
+# platform host's basic-auth. Empty turns the host off.
+STAFF_CONNECT_HOST = getenv("STAFF_CONNECT_HOST", "")
+# The most rows one list on ``/api/v1/agent/staff/*`` returns.
+STAFF_AGENT_LIST_LIMIT = int(getenv("STAFF_AGENT_LIST_LIMIT", "50"))
+# The days a sales or profit report covers when no start is given.
+STAFF_AGENT_REPORT_DEFAULT_DAYS = int(
+    getenv("STAFF_AGENT_REPORT_DEFAULT_DAYS", "30")
+)

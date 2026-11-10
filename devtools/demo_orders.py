@@ -94,7 +94,7 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
         spread_by_remaining_value,
     )
     from order.enum.status import DISPATCHED_STATUSES
-    from order.models.item import OrderItem
+    from order.models.item import OrderItem, product_name_for
     from order.models.order import Order
     from order.vat_snapshot import write_vat_lines
 
@@ -119,8 +119,13 @@ def create_orders(fixtures: Sequence[FixtureOrder]) -> list[Any]:
                     original_quantity=line.quantity,
                     price=line.price,
                     # ``bulk_create`` skips ``OrderItem.save``, which is
-                    # what snapshots the rate for every other writer.
+                    # what snapshots the rate, name and SKU for every
+                    # other writer.
                     vat_rate=line.product.vat_percent,
+                    product_name=product_name_for(
+                        line.product, order.language_code
+                    ),
+                    sku=line.product.sku,
                     is_refunded=line.refunded,
                     refunded_quantity=line.quantity if line.refunded else 0,
                 )

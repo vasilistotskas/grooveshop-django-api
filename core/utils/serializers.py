@@ -234,6 +234,19 @@ def _build_language_parameter(include_language_param):
         return None
 
 
+#: ``?pagination=false`` on an operation whose view lists that action in
+#: ``unpaginated_actions``; ``create_schema_view_config`` adds it there and
+#: nowhere else, because every other list ignores it.
+PAGINATION_PARAMETER = OpenApiParameter(
+    name="pagination",
+    description=_("false returns the whole list in one response"),
+    required=False,
+    type=str,
+    enum=["true", "false"],
+    default="true",
+)
+
+
 def _build_pagination_parameters(include_pagination_params):
     """Build pagination OpenAPI parameters if enabled."""
     if not include_pagination_params:
@@ -246,14 +259,6 @@ def _build_pagination_parameters(include_pagination_params):
             type=str,
             enum=["pageNumber", "cursor", "limitOffset"],
             default="pageNumber",
-        ),
-        OpenApiParameter(
-            name="pagination",
-            description=_("Enable or disable pagination"),
-            required=False,
-            type=str,
-            enum=["true", "false"],
-            default="true",
         ),
         OpenApiParameter(
             name="page_size",
@@ -355,6 +360,14 @@ _NO_400_ACTIONS = {"retrieve", "destroy"}
 _NO_500_ACTIONS = {"destroy"}
 
 
+def _with_pagination_switch(parameters, action_name, unpaginated_actions):
+    """*parameters*, plus ``PAGINATION_PARAMETER`` for an action that
+    honours ``?pagination=false``."""
+    if action_name not in unpaginated_actions:
+        return parameters
+    return [*(parameters or []), PAGINATION_PARAMETER]
+
+
 def create_schema_view_config(
     model_class: type[models.Model],
     serializers_config: SerializersConfig,
@@ -362,6 +375,8 @@ def create_schema_view_config(
     display_config: DisplayConfig | Mapping[str, Any] | None = None,
     include_language_param: bool = True,
     include_pagination_params: bool = True,
+    *,
+    unpaginated_actions: frozenset[str] = frozenset(),
 ):
     """
     Create schema configuration for a ViewSet with translation support.
@@ -370,6 +385,9 @@ def create_schema_view_config(
     actions – and auto-generates ``@extend_schema`` for each. Per-action
     response overrides are set via ``ActionConfig.responses`` on the
     matching ``serializers_config`` entry — no separate parameter.
+    ``unpaginated_actions`` names the actions whose view honours
+    ``?pagination=false`` (the view's own ``unpaginated_actions``);
+    only their operations document ``PAGINATION_PARAMETER``.
     """
     if display_config is None:
         display_config = {}
@@ -485,7 +503,9 @@ def create_schema_view_config(
             summary=str(summary) if summary else None,
             description=str(description) if description else None,
             tags=tags,
-            parameters=parameters,
+            parameters=_with_pagination_switch(
+                parameters, action_name, unpaginated_actions
+            ),
             request=request_body,
             responses=responses,
             deprecated=ac.deprecated if ac.deprecated else None,
@@ -539,7 +559,9 @@ def create_schema_view_config(
                 summary=tpl["summary"] % {"name": name_for_tpl},
                 description=tpl["description"] % {"name": name_for_tpl},
                 tags=[tag],
-                parameters=parameters,
+                parameters=_with_pagination_switch(
+                    parameters, crud_action, unpaginated_actions
+                ),
                 responses={crud_default_status: None, **responses}
                 if crud_default_status not in responses
                 else responses,

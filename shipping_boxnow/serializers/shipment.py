@@ -85,7 +85,7 @@ class BoxNowShipmentDetailSerializer(BoxNowShipmentSerializer):
         # iterable-as-list at the JSON layer; we omit the explicit
         # ``-> list`` annotation so ty doesn't complain about the
         # internal ReturnDict subtype.
-        qs = obj.events.order_by("-event_time").select_related()[:20]
+        qs = obj.events.order_by("-event_time")[:20]
         return BoxNowParcelEventSerializer(
             qs, many=True, context=self.context
         ).data

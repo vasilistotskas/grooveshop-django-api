@@ -29,12 +29,14 @@ and correct means the request came through our zone, so its Cloudflare
 IP header is Cloudflare's; absent or wrong means fall back.
 
 It fails SAFE: if the Transform Rule is missing, the secret is unset, or
-the two drift apart, ``trusted_client_ip`` returns ``None`` and callers
+the two drift apart, ``edge_client_ip`` returns ``None`` and callers
 key on the peer Traefik saw (``client_ip_or_peer``), which is coarse but
 cannot be chosen by the caller.
 """
 
 from __future__ import annotations
+
+from ipaddress import ip_address
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -50,6 +52,20 @@ from django.utils.crypto import constant_time_compare
 _IP_HEADERS = ("HTTP_CF_CONNECTING_IP", "HTTP_X_REAL_IP")
 
 
+def _is_ip(value: str) -> bool:
+    """True for a literal IPv4 or IPv6 address.
+
+    A header value is caller-controlled text until proven otherwise, and the
+    callers store or key on the result (``GenericIPAddressField`` raises on
+    anything else), so a hop that is not an address is not an answer.
+    """
+    try:
+        ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
 def request_came_through_edge(request: HttpRequest) -> bool:
     """True when this request provably transited our Cloudflare edge."""
     secret = getattr(settings, "ORIGIN_VERIFY_SECRET", "") or ""
@@ -63,7 +79,7 @@ def request_came_through_edge(request: HttpRequest) -> bool:
     return constant_time_compare(presented, secret)
 
 
-def trusted_client_ip(request: HttpRequest) -> str | None:
+def edge_client_ip(request: HttpRequest) -> str | None:
     """Return the real client IP, or ``None`` if it cannot be trusted.
 
     ``None`` is a deliberate, meaningful answer: it means "provenance not
@@ -80,7 +96,9 @@ def trusted_client_ip(request: HttpRequest) -> str | None:
             # A forwarded chain can appear here if an upstream ever
             # concatenates; take the first entry, which Cloudflare sets
             # to the connecting visitor.
-            return value.split(",")[0].strip()
+            first = value.split(",")[0].strip()
+            if _is_ip(first):
+                return first
     return None
 
 
@@ -100,7 +118,7 @@ def client_ip_or_peer(request: HttpRequest) -> str:
     from the visitor's own ``CF-Connecting-IP``, which a caller hitting a
     node IP can set to anything.
     """
-    edge_ip = trusted_client_ip(request)
+    edge_ip = edge_client_ip(request)
     if edge_ip:
         return edge_ip
     hops = [
@@ -108,6 +126,6 @@ def client_ip_or_peer(request: HttpRequest) -> str:
         for hop in (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")
         if hop.strip()
     ]
-    if hops:
+    if hops and _is_ip(hops[-1]):
         return hops[-1]
     return request.META.get("REMOTE_ADDR", "") or ""

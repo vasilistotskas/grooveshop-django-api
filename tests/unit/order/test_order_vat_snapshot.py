@@ -4,7 +4,7 @@ The invoice and the myDATA payload used to back the VAT out of each
 line's gross at the product's CURRENT VAT row, days after the sale. A
 ``Vat`` row edited or deleted in between rewrote a tax document for money
 already earned (an order paid at 24% reported at 13%, or at 0% once the
-row was gone — ``Product.vat`` is ``SET_NULL``). Every creation path now
+row was gone — ``Product.vat`` was ``SET_NULL``). Every creation path now
 writes the rate on the line and the documents read only that.
 """
 
@@ -20,6 +20,7 @@ import pytest
 from django.contrib import admin
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+from django.db.models import ProtectedError
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from djmoney.money import Money
@@ -66,7 +67,7 @@ def _product(rate, price="10.00", **kwargs):
         stock=10,
         price=Money(D(price), "EUR"),
         discount_percent=D(0),
-        vat=VatFactory(value=D(rate)) if rate is not None else None,
+        vat=VatFactory(value=D(rate)),
         active=True,
         **kwargs,
     )
@@ -176,18 +177,6 @@ class TestSnapshotOnCreation:
         item.refresh_from_db()
         assert item.vat_rate == D("13")
 
-    def test_a_product_with_no_vat_is_snapshotted_at_zero(self):
-        order = OrderFactory(num_order_items=0)
-        item = OrderItem.objects.create(
-            order=order,
-            product=_product(None),
-            price=Money(D("5.00"), "EUR"),
-            quantity=1,
-        )
-
-        item.refresh_from_db()
-        assert item.vat_rate == D("0")
-
     def test_a_stated_rate_wins_over_the_products(self):
         order = OrderFactory(num_order_items=0)
         item = OrderItem.objects.create(
@@ -210,7 +199,7 @@ class TestSnapshotOnCreation:
             price=Money(D("12.40"), "EUR"),
             quantity=1,
         )
-        product.vat.value = D("13")
+        product.vat.value = D("9")
         product.vat.save()
 
         item = OrderItem.objects.get(pk=item.pk)
@@ -223,14 +212,14 @@ class TestSnapshotOnCreation:
 
 class TestCheckoutWritesTheRateTheCartUsed:
     def test_the_offline_path_snapshots_each_lines_rate(self):
-        standard, reduced, none = _product("24"), _product("6"), _product(None)
+        standard, reduced, zero = _product("24"), _product("6"), _product("0")
 
-        order = _offline_checkout(_cart(standard, reduced, none))
+        order = _offline_checkout(_cart(standard, reduced, zero))
 
         assert _rates(order) == {
             standard.id: D("24"),
             reduced.id: D("6"),
-            none.id: D("0"),
+            zero.id: D("0"),
         }
 
     def test_the_payment_first_path_snapshots_each_lines_rate(self):
@@ -272,7 +261,7 @@ class TestCheckoutWritesTheRateTheCartUsed:
         product = _product("24")
         order = _offline_checkout(_cart(product))
 
-        product.vat.value = D("13")
+        product.vat.value = D("9")
         product.vat.save()
 
         assert _rates(order) == {product.id: D("24")}
@@ -318,18 +307,21 @@ class TestIssuedDocumentsIgnoreTheCatalogue:
     def test_editing_the_vat_row_changes_neither_document(self):
         order, product = self._order()
 
-        product.vat.value = D("13")
+        product.vat.value = D("9")
         product.vat.save()
 
         self._assert_still_24_percent(order)
 
-    def test_deleting_the_vat_row_changes_neither_document(self):
-        """``Product.vat`` is SET_NULL: the line used to fall into 0%."""
+    def test_deleting_the_vat_row_is_refused_and_changes_neither_document(
+        self,
+    ):
+        """``Product.vat`` was SET_NULL: the line used to fall into 0%."""
         order, product = self._order()
 
-        product.vat.delete()
+        with pytest.raises(ProtectedError):
+            product.vat.delete()
         product.refresh_from_db()
-        assert product.vat is None
+        assert product.vat is not None
 
         self._assert_still_24_percent(order)
 
@@ -371,14 +363,6 @@ class TestBackfill:
         standard.refresh_from_db()
         reduced.refresh_from_db()
         assert (standard.vat_rate, reduced.vat_rate) == (D("24"), D("6"))
-
-    def test_a_product_with_no_vat_stays_at_zero(self):
-        item = self._line(None)
-
-        self._run()
-
-        item.refresh_from_db()
-        assert item.vat_rate == D("0")
 
     def test_running_twice_changes_nothing(self):
         item = self._line("13")
@@ -425,46 +409,6 @@ class TestAdmin:
             backend="tenant.auth_backends.PlatformStaffBackend",
         )
         return client
-
-    def test_a_new_line_is_not_asked_for_a_rate(self):
-        item_admin = admin.site._registry[OrderItem]
-        request = self._request()
-        shown = [
-            name
-            for _title, options in item_admin.get_fieldsets(request, None)
-            for name in options["fields"]
-        ]
-
-        assert "vat_rate" not in shown
-        assert "vat_rate" not in item_admin.get_form(request).base_fields
-
-    def test_the_add_page_renders_and_a_new_line_takes_its_products_rate(
-        self,
-    ):
-        """Showing the rate read-only on the add page 500ed: an unsaved
-        line holds a ``DatabaseDefault``, which the admin cannot format."""
-        client = self._client()
-        order = OrderFactory(num_order_items=0)
-        product = _product("13")
-
-        assert (
-            client.get(reverse("admin:order_orderitem_add")).status_code == 200
-        )
-        response = client.post(
-            reverse("admin:order_orderitem_add"),
-            {
-                "order": order.pk,
-                "product": product.pk,
-                "quantity": 2,
-                "price_0": "11.30",
-                "price_1": "EUR",
-                "refunded_quantity": 0,
-                "notes": "",
-            },
-        )
-
-        assert response.status_code == 302, response.context["errors"]
-        assert order.items.get().vat_rate == D("13")
 
     def test_an_existing_lines_change_page_offers_the_rate_until_a_mark(self):
         line = self._line()

@@ -22,6 +22,7 @@ from order.discounts import (
     order_discount_total,
 )
 from tests.utils.discounts import snapshot_discounts
+from vat.factories import VatFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -40,7 +41,7 @@ def _order_with_lines(lines, discount=None, loyalty=None, snapshot=True):
         product = ProductFactory(
             price=M(Decimal(str(price)), "EUR"),
             discount_percent=Decimal(0),
-            vat=None,
+            vat=VatFactory(value=0),
             stock=100,
         )
         order.items.create(
@@ -174,7 +175,7 @@ class TestSnapshotMustAddUp:
 
         order = _order_with_lines([(10, 1)], discount="2.00")
         added = order.items.create(
-            product=ProductFactory(vat=None, stock=10),
+            product=ProductFactory(vat=VatFactory(value=0), stock=10),
             price=Money(D("5.00"), "EUR"),
             quantity=1,
         )

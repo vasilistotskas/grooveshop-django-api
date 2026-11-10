@@ -4,7 +4,6 @@ import logging
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -13,9 +12,6 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from b2b.models.group import CustomerGroup
-from b2b.services import B2BPricingService
-from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -31,7 +27,6 @@ from order.serializers.item import (
     OrderItemRestockResponseSerializer,
     OrderItemRestockSerializer,
     OrderItemSerializer,
-    OrderItemWriteSerializer,
 )
 from tenant.membership import is_store_staff
 
@@ -39,7 +34,6 @@ serializers_config: SerializersConfig = {
     **crud_config(
         list=OrderItemSerializer,
         detail=OrderItemDetailSerializer,
-        write=OrderItemWriteSerializer,
     ),
     "restock": ActionConfig(
         request=OrderItemRestockSerializer,
@@ -72,7 +66,6 @@ class OrderItemViewSet(BaseModelViewSet):
     # Reads: the queryset is user-scoped and schema-isolated, so an
     # authenticated caller is by construction a customer of THIS store.
     # Tenancy is not an extra permission here (see tenant/membership.py).
-    # Writes are not customer self-service: see ``get_permissions``.
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [
@@ -85,24 +78,12 @@ class OrderItemViewSet(BaseModelViewSet):
     ]
     ordering = ["sort_order", "-created_at"]
     search_fields = [
-        "product__translations__name",
+        "product_name",
         "notes",
         "order__first_name",
         "order__last_name",
         "order__email",
     ]
-
-    def get_permissions(self):
-        # An order line carries the price, the quantity and, through the
-        # order total, the amount owed, and a quantity change moves stock.
-        # Once an order exists that is a merchant operation, not
-        # something the order's owner edits: customers read their lines
-        # here and change an order only through the order endpoints.
-        # DELETE maps to ``delete_orderitem``, which ADMIN/OWNER hold and
-        # STAFF deliberately does not (tenant.role_scopes).
-        if self.action in {"create", "update", "partial_update", "destroy"}:
-            return [StoreStaffModelPermissions()]
-        return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user
@@ -138,55 +119,6 @@ class OrderItemViewSet(BaseModelViewSet):
                 _("You do not have permission to access this order."),
                 code="order_access_denied",
             )
-
-    def perform_create(self, serializer):
-        # Attaching an item to an order is only allowed for the order's owner
-        # (or staff); otherwise any authenticated user could add items to
-        # arbitrary orders by posting a foreign order id.
-        self.check_order_permission(serializer.validated_data["order"])
-        # ``price`` is not a writable field on OrderItemWriteSerializer,
-        # so the line price always comes from the product here — a
-        # client cannot name its own price.
-        order = serializer.validated_data["order"]
-        product = serializer.validated_data["product"]
-        serializer.save(price=self._line_price(order, product))
-
-    @staticmethod
-    def _line_price(order, product) -> Money:
-        """What one unit of ``product`` costs on ``order``, VAT included.
-
-        The same figure checkout stores (the cart line's ``final_price``),
-        never the product's net ``price``. A wholesale-priced order is
-        priced by the group that priced it at checkout, which the order
-        stamps in ``metadata["b2b_pricing"]``, not by the buyer's group
-        today. If that group no longer exists, nothing says what the line
-        should cost, so the line is refused rather than sold at retail.
-        """
-        stamp = (order.metadata or {}).get("b2b_pricing")
-        if stamp is None:
-            return product.final_price
-        group = CustomerGroup.objects.filter(pk=stamp["group_id"]).first()
-        if group is None:
-            raise DRFValidationError(
-                {
-                    "order": _(
-                        "The wholesale group that priced this order no "
-                        "longer exists, so a new line cannot be priced "
-                        "for it."
-                    )
-                }
-            )
-        return B2BPricingService.resolve_single(product, group).final
-
-    def perform_update(self, serializer):
-        # `order` is a writable FK, so an update could reassign the item to a
-        # different order. get_object() only validated the item's CURRENT
-        # order — the TARGET order must be owned too, or an owner could move an
-        # item into a foreign order. `order` may be absent on a PATCH.
-        target_order = serializer.validated_data.get("order")
-        if target_order is not None:
-            self.check_order_permission(target_order)
-        serializer.save()
 
     @action(detail=True, methods=["POST"])
     def restock(self, request, pk=None):

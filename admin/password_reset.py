@@ -57,6 +57,7 @@ from unfold.widgets import (
 )
 
 from core.client_ip import client_ip_or_peer
+from tenant import staff_login_limits
 from tenant.celery import dispatch_on_commit
 from tenant.membership import get_current_tenant, get_membership
 
@@ -95,8 +96,7 @@ def _over_budget(scope: str, identity: str, limit: int) -> bool:
     )
     window = settings.STAFF_PASSWORD_RESET["WINDOW_SECONDS"]
     try:
-        cache.add(key, 0, window)
-        return cache.incr(key) > limit
+        return cache.count_in_window(key, window) > limit
     except Exception:
         logger.exception("Staff password reset budget unavailable")
         return True
@@ -140,6 +140,11 @@ class StaffSetPasswordForm(SetPasswordForm):
     def save(self, commit=True):
         from tenant.models import PlatformStaffToken
 
+        if commit:
+            # Whoever proves the mailbox may sign in again at once: attempts
+            # against the old password no longer count. First, so a cache
+            # that cannot be written fails the reset before anything changes.
+            staff_login_limits.clear_account(self.user.email)
         with schema_context(get_public_schema_name()):
             user = super().save(commit)
             if commit:

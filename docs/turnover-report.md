@@ -84,8 +84,8 @@ Money that went back, in the month it went back:
 
 | Source | When | Sign |
 |---|---|---|
-| `PaymentTransaction` kind `REFUND` | `created_at` | + |
-| `PaymentTransaction` kind `REFUND_REVERSAL` (a refund the provider reported failed) | `created_at` | - |
+| `PaymentTransaction` kind `REFUND`, its goods part only | `created_at` | + |
+| `PaymentTransaction` kind `REFUND_REVERSAL` (a refund the provider reported failed), its goods part only | `created_at` | - |
 | `GiftCardTransaction` kind `REFUND_CREDIT` | `created_at` | + |
 | `PaymentTransaction` kind `CHARGEBACK` with a `ChargebackDecision` `goods_returned` | `decided_at` | + |
 | A shipped order that closed unpaid (`payment_status` `CANCELED`), whole | `status_updated_at` | + |
@@ -96,12 +96,37 @@ when staff decided the goods came back. Points restored are not counted: a
 loyalty redemption is a discount already taken off the sale. A return whose
 order never shipped is not counted (the sale it would reverse was never earned).
 
+**Only the goods part of a provider refund is a return.** A refund pays a
+duplicate payment back first, and that part is no return of the sale: it gets no
+credit document and takes no room on the receipt (`order.credit_allocation`,
+`docs/order-system.md` section 7). Turnover reads each refund's goods from
+`CreditAllocation.goods_claimed`, which is written once when the money is claimed
+or booked and never scaled afterwards, capped to what the refund really moved
+(`order.turnover._ledger_goods`). A refund with no allocation at all (not decided
+yet, or older than allocations) counts whole. A provider reversal takes the
+duplicate part back first and then the goods, as `credit_allocation.goods_returned`
+does: after reversing `c` the refund stands for `max(min(goods, paid - c), 0)`, and
+the reversal row counts the drop, in its own month. A reversal with no refund row
+counts whole.
+
+**A past month never moves.** Each figure is read from append-only ledger rows
+(`created_at`, a refund and its one reversal per provider reference) and the fixed
+`goods_claimed`. The allocation rows themselves are rewritten in place when a
+refund is reversed (`credit_allocation.scale`), so nothing reads their amounts or
+rates per month. Known limit: a refund that is *undecided* when a month closes
+(booked while another claim is still PENDING) counts whole until it is decided,
+and then drops its duplicate part in the month it was booked.
+
+Gift-card `REFUND_CREDIT` is unchanged: a gift card is payment the receipt holds
+and has no duplicate-payment part. A chargeback's decision allocation is capped to
+the receipt's headroom but the chargeback counts whole, as before.
+
 A refund is gross money, not a list of lines. It is brought to net and VAT pro
 rata over the receipt, as a credit document does:
 
 ```
-returned net   = round(amount * order net / receipt gross, 2)
-returned VAT   = amount - returned net
+returned net   = round(goods * order net / receipt gross, 2)
+returned VAT   = goods - returned net
 receipt gross  = the order's OrderVatLine net + VAT
 ```
 
@@ -198,12 +223,12 @@ Three queries for a range however many orders there are, one per breakdown: the
 sales over `OrderVatLine` joined to `Order` (filtered on `Order.shipped_at`,
 indexed `order_shipped_at_ix`, then the lines through their `order` foreign key),
 the orders and what is awaiting over `Order`, and one `UNION ALL` of the four
-return sources (`tests/unit/order/test_turnover.py::TestQueries`). The figures are
+return sources (`tests/unit/order/test_turnover.py::TestQueries`; the goods of each refund are correlated subqueries inside it). The figures are
 not cached on the page: it is opened rarely.
 
 ## Tests
 
-`tests/unit/order/test_turnover.py` (definition, rounding, basis, returns,
+`tests/integration/order/test_turnover_returns.py` (duplicate payments, reversals, month stability through the real ledger paths), `tests/unit/order/test_turnover.py` (definition, rounding, basis, returns,
 buckets, prior year, breakdowns, timezone edges, query count),
 `tests/integration/order/test_vat_snapshot.py` (the snapshots, both creation
 paths, the backfills), `tests/integration/order/test_migration_turnover_snapshots.py`,

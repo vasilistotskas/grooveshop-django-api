@@ -8,6 +8,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
+from core.fields.url import WebURLField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.image_paths import image_to_media_path
 from product.managers.image import ProductImageManager
@@ -25,6 +26,18 @@ class ProductImage(
     )
     image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
     is_main = models.BooleanField(_("Is Main"), default=False)
+    # Where a catalogue import fetched the file from, and the digest of
+    # the bytes kept, so a second import skips an image it already has.
+    source_url = WebURLField(
+        _("Source URL"), max_length=2048, blank=True, default="", db_default=""
+    )
+    source_sha256 = models.CharField(
+        _("Source SHA-256"),
+        max_length=64,
+        blank=True,
+        default="",
+        db_default="",
+    )
     translations = TranslatedFields(
         alt_text=models.CharField(
             _("Alt Text"),

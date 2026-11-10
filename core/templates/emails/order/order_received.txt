@@ -26,7 +26,7 @@
 {% endif %}{% trans "Check these details carefully — the store issues your invoice with exactly what is shown here." %}
 
 {% endif %}{% trans "ORDER ITEMS" %}
-{% for item in items %}{{ item.product.name }} - {{ item.quantity }} x {{ item.price }} = {{ item.total_price }}
+{% for item in items %}{{ item.product_name }} - {{ item.quantity }} x {{ item.price }} = {{ item.total_price }}
 {% endfor %}
 {% trans "Subtotal" %}: {{ order.total_price_items }}
 {% trans "Shipping" %}: {{ order.shipping_price }}

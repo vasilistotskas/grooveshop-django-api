@@ -19,7 +19,7 @@ Two contracts are covered here:
 from __future__ import annotations
 
 import pytest
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 
 from tenant.credentials import (
     _get_tenant_field,
@@ -58,14 +58,18 @@ class TestGetTenantField:
         assert result == "SETTINGS_API_KEY"
 
     def test_falls_back_to_settings_when_no_tenant(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         settings.VIVA_WALLET_API_KEY = "ENV_API_KEY"
 
         result = _get_tenant_field("viva_wallet_api_key", "VIVA_WALLET_API_KEY")
         assert result == "ENV_API_KEY"
 
     def test_returns_empty_string_when_both_absent(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         if hasattr(settings, "VIVA_WALLET_API_KEY"):
             del settings.VIVA_WALLET_API_KEY
 
@@ -73,7 +77,9 @@ class TestGetTenantField:
         assert result == ""
 
     def test_no_fallback_setting_returns_empty(self, monkeypatch):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         result = _get_tenant_field("viva_wallet_api_key", None)
         assert result == ""
 
@@ -278,7 +284,9 @@ class TestTenantContactEmail:
     ):
         from extra_settings.models import Setting
 
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         settings.INFO_EMAIL = "info@global.com"
         Setting.objects.filter(name="CONTACT_EMAIL").delete()
         assert tenant_contact_email() == "info@global.com"
@@ -294,7 +302,7 @@ class TestTenantContactEmail:
         from extra_settings.models import Setting
 
         monkeypatch.setattr(
-            connection,
+            connections[DEFAULT_DB_ALIAS],
             "tenant",
             SimpleNamespace(schema_name=get_public_schema_name()),
             raising=False,
@@ -339,7 +347,9 @@ class TestTenantSiteName:
         assert tenant_site_name() == "Platform Default"
 
     def test_no_tenant_uses_settings(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         settings.SITE_NAME = "GlobalShop"
         assert tenant_site_name() == "GlobalShop"
 
@@ -378,7 +388,9 @@ class TestTenantLogoUrl:
         assert tenant_logo_url() == ""
 
     def test_empty_with_no_active_tenant(self, monkeypatch):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         assert tenant_logo_url() == ""
 
 
@@ -406,7 +418,9 @@ class TestTenantTotpIssuer:
         assert tenant_totp_issuer() == "Brand Shop"
 
     def test_no_tenant_uses_the_platform_site_name(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
         settings.SITE_NAME = "GlobalShop"
         assert tenant_totp_issuer() == "GlobalShop"
 
@@ -647,7 +661,9 @@ class TestStripeCredentials:
         # tenant row means no Stripe identity, full stop.
         from tenant.credentials import stripe_credentials
 
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        monkeypatch.setattr(
+            connections[DEFAULT_DB_ALIAS], "tenant", None, raising=False
+        )
 
         creds = stripe_credentials()
         assert creds["secret_key"] == ""

@@ -6,7 +6,7 @@ Every path that can move a product's public price goes through here:
 
 * ``Product.save`` (price, markdown, VAT) — ``plan_for_save`` /
   ``record_spells``, so the derived columns ride the same UPDATE;
-* a ``Vat`` rate change or deletion — ``product.tasks.sync_price_records``;
+* a ``Vat`` rate change — ``product.tasks.sync_price_records``;
 * an unconditional automatic promotion starting, ending or being edited —
   ``promotion.offer_sync.refresh_products``;
 * the nightly ``product.tasks.reevaluate_price_episodes`` sweep, which

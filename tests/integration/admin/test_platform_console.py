@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django_tenants.utils import get_public_schema_name
 
 #: The hidden field the login form posts ``next`` in.
@@ -180,9 +180,9 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             f"platform-only sections in the store sidebar: {stray}"
         )
 
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_the_platform_sidebar_links_every_model_of_them(self):
-        from django.conf import settings
-
+        from admin.navigation import platform_sidebar
         from admin.platform_site import platform_admin_site
 
         registered = {
@@ -190,7 +190,7 @@ class TestPlatformOnlySectionsLiveOnTheControlPlane(TestCase):
             for model in platform_admin_site._registry
             if model._meta.app_label in self.INFRA_LABELS
         }
-        linked = self._linked(settings.UNFOLD_PLATFORM["SIDEBAR"]["navigation"])
+        linked = self._linked(platform_sidebar(RequestFactory().get("/admin/")))
         assert registered, "the platform site registers none of these apps"
         assert registered <= linked, (
             "registered on the control plane but reachable only by URL: "

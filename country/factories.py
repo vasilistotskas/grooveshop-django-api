@@ -7,6 +7,7 @@ from django.conf import settings
 from faker import Faker
 
 from country.models import Country
+from country.seed_data import LANGUAGE_COUNTRY_MAPPING
 from devtools.factories import (
     CustomDjangoModelFactory,
     SeedingResult,
@@ -42,8 +43,6 @@ def _random_reserved_alpha_3() -> str:
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
-
-LANGUAGE_COUNTRY_MAPPING = getattr(settings, "LANGUAGE_COUNTRY_MAPPING", {})
 
 
 class CountryTranslationFactory(factory.django.DjangoModelFactory):

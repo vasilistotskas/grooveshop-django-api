@@ -96,10 +96,6 @@ SEARCH_TOP_QUERIES = 5
 BEST_SELLERS = 5
 RECENT_ORDERS = 6
 
-# Active products with 0 < stock < LOW_STOCK_BELOW are "replenish soon";
-# stock 0 is out of stock, a different concern.
-LOW_STOCK_BELOW = 10
-
 # Contact messages carry no read state; "new" is this many days back.
 NEW_MESSAGES_DAYS = 7
 
@@ -488,8 +484,11 @@ def attention_counts() -> dict[str, int]:
         "failing_emails": model("emails.EmailLog")
         .objects.filter(figures.failing_since())
         .count(),
+        # Active products at or below their own low-stock threshold
+        # (``StockState``); out of stock is a different concern.
         "low_stock": model("product.Product")
-        .objects.filter(active=True, stock__gt=0, stock__lt=LOW_STOCK_BELOW)
+        .objects.low_stock()
+        .filter(active=True)
         .count(),
         "pending_reviews": model("product.ProductReview")
         .objects.filter(status=ReviewStatus.NEW)

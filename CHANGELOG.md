@@ -3,6 +3,66 @@
 
 
 
+## v3.242.8 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping): the carrier HTTP layers never send a POST or PUT a second time (#607) ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping_boxnow): the HTTP layer never sends a POST or PUT a second time
+
+The client's urllib3 retry sent every method again after a 500, 502, 503
+or 504 and after a read timeout, although its own comment said only
+idempotent methods were. A parcel creation whose answer was lost was
+sent again in the same call.
+
+BoxNow's API manual v7.2 says orderNumber "must be unique for each
+request" (3.4, p. 10) and answers a second one with P410 (5, p. 21), so
+the second creation could not succeed: it returned a 400 and the client
+reported a refusal for a parcel that exists. The manual does not say
+what two overlapping creations do, has no idempotency key and no retry
+guidance.
+
+allowed_methods is now GET only. urllib3 applies it to read errors and
+to status_forcelist, never to connection errors, so a request that never
+connected is still sent again whatever its method, a GET is still sent
+again after a 5xx or a lost answer, and a write surfaces as
+BoxNowRetryableError for its caller (Celery's autoretry_for over the
+mint claim, for the creation). The same rule as shipping_acs/client.py.
+
+Closes #582 ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+* fix(shipping): never re-send a BoxNow or ACS write after an error of unknown timing
+
+urllib3 retries an error that is neither a connect nor a read error for any
+method unless other=0, so a POST or PUT could be sent twice after a TLS
+failure. Set other=0 on both clients and cover it with tests. ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+### Documentation
+
+* docs(shipping): state what the carrier retry comments and order-system 5.2 really cover
+
+The BoxNow and ACS comments over _RETRY_CONFIG read as if the mint claim
+guards the Celery retry. It is released on any error, so the task re-sends
+the request; for BoxNow a parcel that exists answers P410 (issue 606). ([`eea6909`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eea6909b522f8fade6d3e248c883efc621ceb871))
+
+## v3.242.7 (2026-11-10)
+
+### Bug fixes
+
+* fix(builder): a page setting can be translated before its default language has one (#618) ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a page setting can be translated before its default language has one
+
+A page or template draft with no root settings refused an @document
+translation as unknown_node at /i18n/<locale>/@document, a path the
+editor maps to no field, so writing the English SEO title or heading
+first failed the save with nothing marked. The overlay is now checked
+against the root's schema over no settings, and the public read answers
+the translation alone. A kind with no root still refuses it. ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a root translated before the draft has settings answers to the whole root schema ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
 ## v3.242.6 (2026-11-10)
 
 ### Bug fixes

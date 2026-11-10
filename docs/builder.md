@@ -67,7 +67,11 @@ declared per kind of document by the catalogue's `documentKinds`
 catalogue `hash`). A kind the catalogue gives no root takes no `settings`
 (`document_settings_not_allowed`). The overlay addresses them with the
 reserved node id `@document` (`i18n[locale]["@document"]["/seoTitle"]`), and the
-public read answers each document's `settings` already localised.
+public read answers each document's `settings` already localised. A kind with a
+root takes that overlay even when the draft has no `settings` (the editor drops
+an empty one, and a store may write the English title before the Greek one): it
+is checked against the root's schema over no settings, and the read answers the
+translation alone.
 
 Ids match `[A-Za-z0-9_-]{1,64}` and are unique across the whole document
 (the overlay addresses nodes by id). `order` and `blockOrder` list every

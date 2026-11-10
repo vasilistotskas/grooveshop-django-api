@@ -150,9 +150,12 @@ def resolve_document(key: str, source: Source, locale: str) -> dict[str, Any]:
         "sections": sections,
         "order": list(sections),
     }
-    if "settings" in source.data:
+    # A translation of the root settings stands even when the default
+    # language set none (``validation._check_root``).
+    document_overlay = overlay.get(DOCUMENT_NODE) or {}
+    if "settings" in source.data or document_overlay:
         resolved["settings"] = localised(
-            source.data["settings"], overlay.get(DOCUMENT_NODE) or {}
+            source.data.get("settings", {}), document_overlay
         )
     return resolved
 

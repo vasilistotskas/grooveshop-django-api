@@ -90,13 +90,14 @@ class TestPlanBillingRouting(SimpleTestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_the_sidebar_links_to_it(self):
-        """str() forces the lazy reverse, so the public urlconf (where
-        the ``platform_admin`` namespace lives) must be active."""
-        from django.conf import settings
+        """The sidebar reverses against the active urlconf, so the
+        public one (where the ``platform_admin`` namespace lives) must
+        be active."""
+        from admin.navigation import platform_sidebar
 
         links = [
-            str(item.get("link", ""))
-            for group in settings.UNFOLD_PLATFORM["SIDEBAR"]["navigation"]
+            item.get("link", "")
+            for group in platform_sidebar(RequestFactory().get("/admin/"))
             for item in group.get("items", [])
         ]
         assert any("plan-billing" in link for link in links)

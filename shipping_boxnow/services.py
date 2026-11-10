@@ -1784,7 +1784,7 @@ class BoxNowService:
         but a cancel so signals and history logging fire correctly, and
         ``OrderService.cancel_for_dead_shipment`` for a ``canceled``
         parcel, because a cancel is more than a status.  Swallows
-        ``InvalidStatusTransitionError`` and ``OrderCancellationError``
+        ``InvalidStatusTransitionError`` and ``OrderNotCancelableError``
         with a warning so that an out-of-order or duplicate webhook event
         cannot roll back the already-recorded ``BoxNowParcelEvent``.
 
@@ -1805,7 +1805,7 @@ class BoxNowService:
         # Lazy imports avoid circular dependencies at startup.
         from order.exceptions import (
             InvalidStatusTransitionError,
-            OrderCancellationError,
+            OrderNotCancelableError,
         )
         from order.services import OrderService
 
@@ -1866,7 +1866,12 @@ class BoxNowService:
                 OrderService.cancel_for_dead_shipment(
                     order, carrier="BoxNow", silent_for_customer=False
                 )
-            except OrderCancellationError as exc:
+            except OrderNotCancelableError as exc:
+                # The order moved on between the read above and the
+                # cancel's own lock. A cancel that FAILED is not caught:
+                # it rolls this event back, so the redelivery or the next
+                # poll cancels the order instead of leaving it active
+                # with its stock held.
                 logger.warning(
                     "BoxNow: order=%s was not canceled for its canceled "
                     "parcel: %s",

@@ -46,6 +46,7 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    OrderNotCancelableError,
     ParcelWithCourierError,
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
@@ -356,6 +357,14 @@ class LegalAcceptance:
     source: LegalAcceptanceSource
     documents: tuple[LegalDocumentVersion, ...]
 
+
+# ``metadata['cancellation']['shipment_cancel']`` of an order canceled
+# because its shipment already was: the courier was not asked, and the
+# shipment is canceled. The same shape ``cancel_attached_shipment`` writes.
+SHIPMENT_ALREADY_CANCELED: dict[str, Any] = {
+    "attempted": False,
+    "dispatched": True,
+}
 
 LEGAL_DOCUMENT_UNAVAILABLE_DETAIL = _(
     "The store's terms of use or privacy policy cannot be shown right "
@@ -2865,8 +2874,14 @@ class OrderService:
         canceled_by: int | None = None,
         *,
         customer_initiated: bool = True,
+        shipment_already_canceled: bool = False,
     ) -> tuple[Order, dict[str, Any] | None]:
         """Cancel an order: stock back, status CANCELED, voucher, refund.
+
+        ``shipment_already_canceled`` is for a cancel that follows the
+        shipment's own (:meth:`cancel_for_dead_shipment`): the courier is
+        not asked at all, before or after, and the order records
+        :data:`SHIPMENT_ALREADY_CANCELED`.
 
         ``customer_initiated`` is the caller's call, taken from what it
         already knows (the cancel endpoint: the requester is not store
@@ -2887,11 +2902,12 @@ class OrderService:
         history note. The default is the strict one, so a caller that
         forgets to choose is held to the courier's answer.
         """
-        shipment_cancel = (
-            cls._ask_courier_to_cancel(order, reason)
-            if customer_initiated
-            else None
-        )
+        if shipment_already_canceled:
+            shipment_cancel = dict(SHIPMENT_ALREADY_CANCELED)
+        elif customer_initiated:
+            shipment_cancel = cls._ask_courier_to_cancel(order, reason)
+        else:
+            shipment_cancel = None
         try:
             canceled = cls._cancel_order_locked(
                 order,
@@ -3132,7 +3148,7 @@ class OrderService:
             logger.warning(
                 "Cannot cancel order %s: %s", order.id, error_message
             )
-            raise OrderCancellationError(
+            raise OrderNotCancelableError(
                 order_id=order.id, reason=error_message
             )
 
@@ -4659,6 +4675,14 @@ class OrderService:
         The refund is left to a human: nobody asked for this cancel, and
         on a replay the event is historic — moving money without someone
         looking is worse than one WARNING.
+
+        The courier is not asked to cancel: the shipment already is, and
+        the caller is a tracking sync holding the shipment's row lock, so
+        a call to the courier here would run inside its transaction.
+
+        Raises ``OrderNotCancelableError`` when the order's status no
+        longer allows a cancel, and ``OrderCancellationError`` when the
+        cancel failed on the way and is worth another attempt.
         """
         if silent_for_customer:
             cls._suppress_customer_status_notifications(
@@ -4676,6 +4700,7 @@ class OrderService:
             reason=f"{carrier} shipment canceled before dispatch",
             refund_payment=False,
             customer_initiated=False,
+            shipment_already_canceled=True,
         )
 
     @classmethod

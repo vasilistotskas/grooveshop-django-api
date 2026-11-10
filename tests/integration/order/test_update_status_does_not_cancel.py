@@ -10,6 +10,7 @@ one that releases stock, refunds and records.
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
@@ -18,7 +19,11 @@ from rest_framework.test import APIClient
 
 from order.enum.payment_transaction import PaymentTransactionKind
 from order.enum.status import OrderStatus, PaymentStatus
-from order.exceptions import InvalidStatusTransitionError
+from order.exceptions import (
+    InvalidStatusTransitionError,
+    OrderCancellationError,
+    OrderNotCancelableError,
+)
 from order.factories import OrderFactory, PaymentTransactionFactory
 from order.models import OrderItem, PaymentTransaction
 from order.services import OrderService
@@ -202,3 +207,59 @@ class TestTheCancelActionIsTheCancel:
         assert order.metadata["cancellation"]["previous_status"] == (
             OrderStatus.PENDING
         )
+
+
+class TestCancelForDeadShipment:
+    """The cancel a tracking sync asks for when the shipment is already
+    canceled at the courier."""
+
+    def test_the_courier_is_not_asked(self):
+        # The caller holds the shipment's row lock inside its own
+        # transaction: a courier call from here would run inside it, for
+        # a shipment that is already canceled.
+        order, _product = _order_holding_stock(status=OrderStatus.PROCESSING)
+
+        with patch(
+            "shipping.services.ShippingService.cancel_shipment"
+        ) as cancel_shipment:
+            OrderService.cancel_for_dead_shipment(
+                order, carrier="BoxNow", silent_for_customer=False
+            )
+
+        cancel_shipment.assert_not_called()
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert order.metadata["cancellation"]["shipment_cancel"] == {
+            "attempted": False,
+            "dispatched": True,
+        }
+
+    def test_an_order_that_moved_on_is_a_refusal_of_its_own_class(self):
+        order = OrderFactory(status=OrderStatus.SHIPPED)
+
+        with pytest.raises(OrderNotCancelableError):
+            OrderService.cancel_for_dead_shipment(
+                order, carrier="BoxNow", silent_for_customer=False
+            )
+
+    def test_a_cancel_that_failed_is_not_that_class(self):
+        # Whatever broke on the way (here the stock restore) may work on
+        # the next attempt, so the caller must be able to tell it from a
+        # refusal.
+        order, _product = _order_holding_stock(status=OrderStatus.PROCESSING)
+
+        with (
+            patch.object(
+                StockManager,
+                "lock_products",
+                side_effect=RuntimeError("lock timeout"),
+            ),
+            pytest.raises(OrderCancellationError) as raised,
+        ):
+            OrderService.cancel_for_dead_shipment(
+                order, carrier="BoxNow", silent_for_customer=False
+            )
+
+        assert not isinstance(raised.value, OrderNotCancelableError)
+        order.refresh_from_db()
+        assert order.status == OrderStatus.PROCESSING

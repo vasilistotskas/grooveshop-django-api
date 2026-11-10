@@ -221,12 +221,18 @@ class ShippingService:
 
     @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:
-        """Return the label PDF for ``order`` or None when unavailable."""
+        """Return the label PDF for ``order``, or None when it has none.
+
+        None covers every "no label" case: no carrier, no shipment row,
+        or a shipment the carrier has not booked yet
+        (:meth:`ShippingCarrierInterface.has_label`). The carrier is
+        called only for a label that exists.
+        """
         adapter = cls.adapter_for_order(order)
         if adapter is None:
             return None
         shipment = adapter.shipment_for_order(order)
-        if shipment is None:
+        if shipment is None or not adapter.has_label(shipment):
             return None
         return adapter.fetch_label_bytes(shipment)
 

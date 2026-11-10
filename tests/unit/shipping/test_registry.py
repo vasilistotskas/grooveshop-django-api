@@ -27,6 +27,9 @@ class _DummyCarrier(ShippingCarrierInterface):
     def cancel_shipment(self, shipment, *, reason="") -> None:
         return None
 
+    def has_label(self, shipment) -> bool:
+        return False
+
     def fetch_label_bytes(self, shipment) -> bytes:
         return b""
 

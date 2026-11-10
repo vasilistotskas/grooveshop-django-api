@@ -64,6 +64,9 @@ class BoxNowCarrier(ShippingCarrierInterface):
         # (``BoxNowService._apply_order_status_transition``).
         return Q(boxnow_shipment__parcel_state=BoxNowParcelState.CANCELED)
 
+    def has_label(self, shipment: Any) -> bool:
+        return bool(shipment.parcel_id)
+
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         from shipping_boxnow.services import BoxNowService
 

@@ -19,7 +19,7 @@ from django.utils import timezone
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
-from shipping_boxnow.exceptions import BoxNowAPIError
+from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowError
 from shipping_boxnow.factories import (
     BoxNowLockerFactory,
     BoxNowShipmentFactory,
@@ -579,6 +579,24 @@ class TestApplyWebhookEvent:
         assert (
             meta.get(f"suppress_status_ws_{OrderStatus.RETURNED.value}") is None
         )
+
+
+class TestFetchLabelBytes:
+    @pytest.mark.parametrize("parcel_id", [None, ""])
+    def test_a_shipment_with_no_parcel_id_is_refused(self, parcel_id):
+        """Before BoxNow assigns the parcel there is no label: neither
+        the cache nor BoxNow is asked for one under an empty id."""
+        shipment = BoxNowShipmentFactory.build(order=None, parcel_id=parcel_id)
+
+        with (
+            patch("shipping_boxnow.services.BoxNowClient") as client,
+            patch("shipping_boxnow.services.cache") as label_cache,
+            pytest.raises(BoxNowError, match="before the parcel is created"),
+        ):
+            BoxNowService.fetch_label_bytes(shipment)
+
+        label_cache.get.assert_not_called()
+        client.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

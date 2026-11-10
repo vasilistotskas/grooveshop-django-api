@@ -168,6 +168,13 @@ def _claim_age(started_raw: object) -> float | None:
     return (timezone.now() - started).total_seconds()
 
 
+def _stale_claim_message(age: float) -> str:
+    return (
+        f"A voucher request started {age:.0f}s ago and its result was never "
+        "saved (the worker stopped, or is still waiting on ACS)."
+    )
+
+
 def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
     """Return a PII-scrubbed copy of the create-voucher params."""
     return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
@@ -487,10 +494,7 @@ class AcsService:
                         "claim_age_seconds": claim_age,
                     },
                 )
-                stale_claim = (
-                    f"A voucher request started {claim_age:.0f}s ago and "
-                    "its result was never saved (the worker stopped)."
-                )
+                stale_claim = _stale_claim_message(claim_age)
                 cls._set_voucher_request_unknown(shipment)
             else:
                 stale_claim = ""
@@ -596,6 +600,12 @@ class AcsService:
                 )
                 try:
                     client.delete_voucher(voucher_no)
+                    cls._settle_unrecognised_vouchers(
+                        [voucher_no],
+                        AcsUnrecognisedVoucherResolution.DELETED,
+                        note="Deleted at ACS by the voucher mint as a "
+                        "duplicate of the saved voucher.",
+                    )
                 except AcsAPIError as exc:
                     logger.error(
                         "Failed to cancel duplicate voucher %s for order=%s: %s "
@@ -647,7 +657,9 @@ class AcsService:
                 ]
             )
             cls._settle_unrecognised_vouchers(
-                [voucher_no, *children], shipment, user=None
+                [voucher_no, *children],
+                AcsUnrecognisedVoucherResolution.ADOPTED,
+                shipment=shipment,
             )
 
         if late_answer:
@@ -1274,13 +1286,37 @@ class AcsService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _require_voucher_request_unknown(shipment: AcsShipment) -> None:
+    def _require_voucher_request_unknown(
+        shipment: AcsShipment, *, order_needs_a_voucher: bool
+    ) -> None:
+        """Refuse unless the shipment's voucher request has an unknown
+        outcome and the order needs a voucher (adopt, request again) or
+        no longer needs one (close); the order is ``shipment.order``."""
+        from shipping_acs.attention import needs_no_voucher
+
         if shipment.voucher_no or shipment.voucher_request_unknown_at is None:
             raise AcsVoucherResolutionError(
                 gettext(
                     "Only a shipment whose voucher request has an unknown "
                     "outcome can be resolved this way."
                 )
+            )
+        if order_needs_a_voucher and needs_no_voucher(shipment):
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "Order #%(order)s no longer needs a voucher (the order "
+                    "or its shipment is canceled). Use “No voucher needed: "
+                    "close”; if ACS holds the lost voucher, delete it there."
+                )
+                % {"order": shipment.order_id}
+            )
+        if not order_needs_a_voucher and not needs_no_voucher(shipment):
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "Order #%(order)s still needs its voucher: adopt the one "
+                    "ACS holds, or request again."
+                )
+                % {"order": shipment.order_id}
             )
 
     @staticmethod
@@ -1312,20 +1348,62 @@ class AcsService:
             )
 
     @staticmethod
-    def _confirm_voucher_at_acs(
-        client: AcsClient, order: Order, voucher_no: str
-    ) -> str:
-        """Which ACS answer confirms that the voucher is this order's.
+    def _recipient_sent(shipment: AcsShipment) -> str:
+        """The ``Recipient_Name`` the lost request carried.
 
-        ``ACS_Trackingsummary`` (manual, April 2026, p. 18-19) answers by
-        voucher number alone, so any voucher ACS knows would pass; its
-        ``recipient`` must be the ``Recipient_Name`` this order's requests
-        send. Its other fields (``sender``, ``recipient_address``,
-        ``pickup_date``) are not compared: the manual does not say how ACS
-        spells them, nor whether ``pickup_date`` is set before the courier
-        collects. Without a summary that names a recipient, the voucher
-        must be one ACS named for this account on a refused pickup list
-        (p. 14) that staff have not resolved yet.
+        The order's name may be edited after the request; ACS holds what
+        was sent. Read from the request recorded with the failure
+        (``metadata["last_error"]``), else from the call history
+        (``AcsApiCall``), else, when the request was never recorded (a
+        worker that stopped mid-request), from the order as it is.
+        """
+        from shipping_acs.models import AcsApiCall
+
+        recorded = ((shipment.metadata or {}).get("last_error") or {}).get(
+            "request_params"
+        ) or {}
+        if recorded.get("Recipient_Name"):
+            return str(recorded["Recipient_Name"])
+        call = (
+            AcsApiCall.objects.filter(
+                alias="ACS_Create_Voucher", order_id=shipment.order_id
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        sent = ((call.request_params if call else None) or {}).get(
+            "Recipient_Name"
+        )
+        return str(sent) if sent else _recipient_name(shipment.order)
+
+    @classmethod
+    def _confirm_voucher_at_acs(
+        cls,
+        client: AcsClient,
+        shipment: AcsShipment,
+        voucher_no: str,
+        *,
+        confirmed_by_hand: str,
+    ) -> str:
+        """Which answer confirms that the voucher is this order's.
+
+        First ACS must hold the voucher for the store: a row from
+        ``ACS_Trackingsummary`` (manual, April 2026, p. 18-19), or an
+        open row ACS named on a refused pickup list (p. 14). Nothing
+        overrides that.
+
+        Then it must be this order's. The summary answers by number alone,
+        so its ``recipient`` is compared with the ``Recipient_Name`` the
+        lost request sent (:meth:`_recipient_sent`), without accents,
+        case or extra spaces. The manual documents no format for it: its
+        example response is "ενδεικτικό" and every personal value in it is
+        masked (``"recipient": "XXXXXXXXXX"``, like the request's own
+        credentials), so ACS may spell, abbreviate or truncate it. Equal
+        is the only automatic yes; anything else, or a summary with no
+        recipient, needs a staff member's written confirmation
+        (``confirmed_by_hand``), recorded on the order. A row ACS named on
+        a refused pickup list with no summary is accepted as before: ACS
+        names it for this account and no shipment holds it.
         """
         try:
             summary = client.tracking_summary(voucher_no)
@@ -1333,33 +1411,44 @@ class AcsService:
             raise
         except AcsAPIError:
             summary = {}
-        reported = summary.get("recipient") if summary else None
-        if reported:
-            if _comparable(reported) != _comparable(_recipient_name(order)):
-                raise AcsVoucherResolutionError(
-                    gettext(
-                        "ACS reports voucher %(voucher)s for “%(recipient)s”, "
-                        "not for this order's recipient. Check the number in "
-                        "the ACS portal."
-                    )
-                    % {"voucher": voucher_no, "recipient": reported}
-                )
-            return TRACKING_SUMMARY_ALIAS
-        if AcsUnrecognisedVoucher.objects.filter(
+        named_by_acs = AcsUnrecognisedVoucher.objects.filter(
             voucher_no=voucher_no, resolved_at__isnull=True
-        ).exists():
+        ).exists()
+        if not summary and not named_by_acs:
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "ACS does not report voucher %(voucher)s for this store. "
+                    "Check the number in the ACS portal."
+                )
+                % {"voucher": voucher_no}
+            )
+        reported = str(summary.get("recipient") or "") if summary else ""
+        if reported and _comparable(reported) == _comparable(
+            cls._recipient_sent(shipment)
+        ):
+            return TRACKING_SUMMARY_ALIAS
+        if not summary:
             return "ACS_Issue_Pickup_List"
+        if confirmed_by_hand.strip():
+            return "staff"
         raise AcsVoucherResolutionError(
             gettext(
-                "ACS does not report voucher %(voucher)s for this store. "
-                "Check the number in the ACS portal."
+                "ACS reports voucher %(voucher)s for “%(recipient)s”, which "
+                "does not match the recipient the voucher request sent. If "
+                "you checked in the ACS portal that it is this order's "
+                "parcel, adopt it again and write how you confirmed it."
             )
-            % {"voucher": voucher_no}
+            % {"voucher": voucher_no, "recipient": reported or "—"}
         )
 
     @classmethod
     def adopt_voucher(
-        cls, shipment: AcsShipment, voucher_no: str, *, user: Any
+        cls,
+        shipment: AcsShipment,
+        voucher_no: str,
+        *,
+        user: Any,
+        confirmed_by_hand: str = "",
     ) -> AcsShipment:
         """Give a shipment the voucher ACS made for its lost request.
 
@@ -1374,12 +1463,14 @@ class AcsService:
         current = AcsShipment.objects.select_related("order").get(
             pk=shipment.pk
         )
-        cls._require_voucher_request_unknown(current)
+        cls._require_voucher_request_unknown(
+            current, order_needs_a_voucher=True
+        )
         cls._refuse_a_voucher_held_elsewhere(voucher_no, current.pk)
 
         client = AcsClient()
         confirmed_by = cls._confirm_voucher_at_acs(
-            client, current.order, voucher_no
+            client, current, voucher_no, confirmed_by_hand=confirmed_by_hand
         )
 
         children: list[str] = []
@@ -1401,7 +1492,9 @@ class AcsService:
                     .select_related("order")
                     .get(pk=shipment.pk)
                 )
-                cls._require_voucher_request_unknown(fresh)
+                cls._require_voucher_request_unknown(
+                    fresh, order_needs_a_voucher=True
+                )
                 cls._refuse_a_voucher_held_elsewhere(voucher_no, fresh.pk)
                 metadata = fresh.metadata or {}
                 metadata.pop("last_error", None)
@@ -1429,7 +1522,10 @@ class AcsService:
                     ]
                 )
                 cls._settle_unrecognised_vouchers(
-                    [voucher_no, *children], fresh, user=user
+                    [voucher_no, *children],
+                    AcsUnrecognisedVoucherResolution.ADOPTED,
+                    shipment=fresh,
+                    user=user,
                 )
         except IntegrityError as exc:
             # Another shipment saved the number after the check above
@@ -1449,6 +1545,11 @@ class AcsService:
             note=(
                 f"ACS voucher {voucher_no} adopted by staff for the voucher "
                 "request of unknown outcome; no new voucher was requested."
+                + (
+                    f" Confirmed by hand: {confirmed_by_hand.strip()}"
+                    if confirmed_by == "staff"
+                    else ""
+                )
             ),
         )
         order.add_tracking_info(voucher_no, "acs")
@@ -1457,18 +1558,59 @@ class AcsService:
 
     @staticmethod
     def _settle_unrecognised_vouchers(
-        numbers: Iterable[str], shipment: AcsShipment, *, user: Any
+        numbers: Iterable[str],
+        resolution: AcsUnrecognisedVoucherResolution,
+        *,
+        shipment: AcsShipment | None = None,
+        user: Any = None,
+        note: str = "",
     ) -> None:
-        """Resolve the open rows ACS named for numbers a shipment now
-        carries: the mint saved them, or staff adopted them."""
+        """Resolve the open rows ACS named for numbers our own code has
+        now accounted for: a shipment saved them, staff adopted them, or
+        a mint deleted its duplicate at ACS."""
         AcsUnrecognisedVoucher.objects.filter(
             voucher_no__in=list(numbers), resolved_at__isnull=True
         ).update(
             resolved_at=timezone.now(),
-            resolution=AcsUnrecognisedVoucherResolution.ADOPTED,
+            resolution=resolution,
             resolved_by_id=staff_id(user),
+            resolution_note=note,
             shipment=shipment,
         )
+
+    @classmethod
+    def _record_expired_claims(cls) -> None:
+        """Turn every mint claim past its TTL into the unknown state.
+
+        A claim older than its TTL with no voucher means a request that
+        may still be waiting on ACS (or a worker that stopped after
+        sending it). Its answer could be any voucher ACS names, so before
+        a voucher is judged unrecognised or deleted it becomes a waiting
+        order, alerted once, exactly as the next mint attempt would make
+        it.
+        """
+        stamps = AcsShipment.objects.filter(
+            voucher_no__isnull=True, metadata__has_key="mint_started_at"
+        ).values_list("pk", "metadata__mint_started_at")
+        for pk, stamp in stamps:
+            age = _claim_age(stamp)
+            if age is None or age < cls._MINT_CLAIM_TTL_SECONDS:
+                continue
+            with transaction.atomic():
+                fresh = AcsShipment.objects.select_for_update().get(pk=pk)
+                age = _claim_age((fresh.metadata or {}).get("mint_started_at"))
+                entered = (
+                    age is not None
+                    and age >= cls._MINT_CLAIM_TTL_SECONDS
+                    and not fresh.voucher_no
+                    and fresh.voucher_request_unknown_at is None
+                )
+                if entered:
+                    cls._set_voucher_request_unknown(fresh)
+            if entered and age is not None:
+                cls._alert_voucher_request_unknown(
+                    fresh.order_id, _stale_claim_message(age)
+                )
 
     @classmethod
     def _mint_in_flight(cls) -> bool:
@@ -1505,7 +1647,9 @@ class AcsService:
                 .select_related("order")
                 .get(pk=shipment.pk)
             )
-            cls._require_voucher_request_unknown(fresh)
+            cls._require_voucher_request_unknown(
+                fresh, order_needs_a_voucher=True
+            )
             fresh.voucher_request_unknown_at = None
             fresh._change_reason = (
                 "No voucher at ACS for the request of unknown outcome; "
@@ -1522,6 +1666,53 @@ class AcsService:
             dispatch_on_commit(create_acs_voucher_for_order, [fresh.order_id])
         logger.info(
             "request_voucher_again: shipment=%s order=%s by staff=%s",
+            fresh.pk,
+            fresh.order_id,
+            staff_id(user),
+        )
+
+    @classmethod
+    def close_voucher_request(
+        cls, shipment: AcsShipment, *, user: Any, note: str
+    ) -> None:
+        """End a voucher request of unknown outcome for an order that no
+        longer needs a voucher (the shipment retired, the order canceled
+        or refunded), without minting anything.
+
+        ACS may still hold the lost voucher, so the note says what staff
+        did about it (deleted in the ACS portal, found nothing, ...); it
+        is kept on the shipment's history and the order.
+        """
+        from order.models.history import OrderHistory
+
+        if not note.strip():
+            raise AcsVoucherResolutionError(
+                gettext("Write what you checked at ACS.")
+            )
+        with transaction.atomic():
+            fresh = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+            cls._require_voucher_request_unknown(
+                fresh, order_needs_a_voucher=False
+            )
+            fresh.voucher_request_unknown_at = None
+            fresh._change_reason = (
+                "Voucher request of unknown outcome closed, no voucher "
+                f"needed: {note.strip()}"
+            )
+            fresh.save(update_fields=["voucher_request_unknown_at"])
+            OrderHistory.log_note(
+                order=fresh.order,
+                note=(
+                    "Voucher request of unknown outcome closed by staff; the "
+                    f"order needs no voucher: {note.strip()}"
+                ),
+            )
+        logger.info(
+            "close_voucher_request: shipment=%s order=%s by staff=%s",
             fresh.pk,
             fresh.order_id,
             staff_id(user),
@@ -1567,6 +1758,7 @@ class AcsService:
         staff about each the first time. Never raises: the pickup-list
         run it follows has already happened at ACS."""
         try:
+            cls._record_expired_claims()
             unrecognised = cls.vouchers_matching_no_shipment(named)
             if not unrecognised:
                 return
@@ -1622,23 +1814,31 @@ class AcsService:
 
     @classmethod
     def delete_unrecognised_voucher(
-        cls, row: AcsUnrecognisedVoucher, *, user: Any
+        cls, row: AcsUnrecognisedVoucher, *, user: Any, note: str
     ) -> None:
         """Delete at ACS a voucher that matches no shipment.
 
         ``ACS_Delete_Voucher`` works only while the voucher is on no
         pickup list (manual, April 2026, p. 11-12); ACS's refusal is
-        raised as is and the row stays open.
-        """
-        from shipping_acs.attention import voucher_requests_unknown
+        raised as is and the row stays open. ``note`` (why staff delete
+        it) is kept on the row.
 
+        Why no store-wide lock around the ACS call (the call stays outside
+        any transaction, as every ACS call here): ACS gives every create a
+        new number, so the voucher being deleted can only be the answer of
+        a request already sent when the checks below run. Every such
+        request is visible then: a mint claim younger than its TTL (in
+        flight: refused), a claim past its TTL (turned into a waiting
+        order first by :meth:`_record_expired_claims`: refused), or a
+        recorded unknown outcome (a waiting order: refused). A request
+        sent after the checks cannot return this number, so a lock would
+        only delay the store's mints without closing any case.
+        """
+        from shipping_acs.attention import voucher_requests_waiting
+
+        cls._record_expired_claims()
         with transaction.atomic():
-            # The row lock serialises two deletes. The checks below cover
-            # every way the number can be ours: a shipment carrying it,
-            # a mint in flight that may be about to save it (its claim is
-            # stamped before its POST, so a request that starts after
-            # this check cannot return an existing number), and a lost
-            # request whose voucher this may be.
+            # The row lock serialises two deletes of the same row.
             fresh = AcsUnrecognisedVoucher.objects.select_for_update().get(
                 pk=row.pk
             )
@@ -1647,7 +1847,14 @@ class AcsService:
                     gettext("Voucher %(voucher)s is already resolved.")
                     % {"voucher": fresh.voucher_no}
                 )
-            if cls._voucher_held_by_a_shipment(fresh.voucher_no):
+            # A shipment's own live voucher (or a child of it) is never
+            # deleted from here. Its recorded duplicates and earlier
+            # vouchers (``orphan_vouchers``, ``previous_vouchers``) may
+            # be: they are exactly what should go.
+            if AcsShipment.objects.filter(
+                Q(voucher_no=fresh.voucher_no)
+                | Q(metadata__multipart_vouchers__contains=[fresh.voucher_no])
+            ).exists():
                 raise AcsVoucherResolutionError(
                     gettext(
                         "Voucher %(voucher)s now belongs to a shipment: "
@@ -1667,9 +1874,11 @@ class AcsService:
             # The voucher may be the only copy of a waiting order's lost
             # voucher, and a delete cannot be undone (an order whose
             # voucher is gone at ACS cannot adopt it). Staff resolve the
-            # waiting orders first; afterwards nothing can claim it.
+            # waiting orders first. An order that no longer needs a
+            # voucher (retired shipment, canceled order) does not hold
+            # this back: its lost voucher, if any, is one to delete.
             waiting = sorted(
-                voucher_requests_unknown().values_list("order_id", flat=True)
+                voucher_requests_waiting().values_list("order_id", flat=True)
             )
             if waiting:
                 raise AcsVoucherResolutionError(
@@ -1692,6 +1901,7 @@ class AcsService:
             resolved_at=timezone.now(),
             resolution=AcsUnrecognisedVoucherResolution.DELETED,
             resolved_by_id=staff_id(user),
+            resolution_note=note,
         )
 
     @classmethod

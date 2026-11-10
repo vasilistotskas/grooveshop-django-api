@@ -40,6 +40,8 @@ from tests.utils.orders import courier_cash_order
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
 
+DELETE_NOTE = "Not ours: made in the ACS portal for a return."
+
 V1 = "7401573174"
 V2 = "7401573175"
 
@@ -60,6 +62,7 @@ class _Acs:
     first_error: Exception | None = None
     summaries: dict[str, dict] = {}
     deleted: list[str] = []
+    delete_error: Exception | None = None
 
     def create_voucher(self, params):
         _Acs.creates.append(params)
@@ -74,6 +77,8 @@ class _Acs:
         return _Acs.summaries.get(voucher_no, {})
 
     def delete_voucher(self, voucher_no):
+        if _Acs.delete_error is not None:
+            raise _Acs.delete_error
         _Acs.deleted.append(voucher_no)
 
 
@@ -85,6 +90,7 @@ def acs(monkeypatch):
     _Acs.first_error = _lost_answer()
     _Acs.summaries = {}
     _Acs.deleted = []
+    _Acs.delete_error = None
     monkeypatch.setattr(services, "AcsClient", _Acs)
     return _Acs
 
@@ -101,8 +107,12 @@ def _types(sent) -> list[str]:
 
 
 def _shipment(**kwargs):
+    from order.enum.status import OrderStatus
+
     return AcsShipmentFactory(
-        order=courier_cash_order(),
+        # A status that needs a voucher: the factory picks one at random,
+        # a canceled order included.
+        order=courier_cash_order(status=OrderStatus.PENDING),
         voucher_no=None,
         shipment_state=AcsShipmentState.PENDING_CREATION,
         **kwargs,
@@ -562,6 +572,254 @@ class TestResetForRemint:
         AcsService.adopt_voucher(shipment, V1, user=None)
         shipment.refresh_from_db()
         assert shipment.voucher_no == V1
+
+
+class TestAdoptWhenAcsSpellsTheRecipientOtherwise:
+    """Second review of #626, finding 2. The manual's tracking examples are
+    redacted (p. 19: ``"recipient": "XXXXXXXXXX"``), so ACS's spelling is
+    unknown: a mismatch is refused unless staff confirm it by hand."""
+
+    def _masked(self, acs, shipment):
+        acs.summaries[V1] = {"voucher_no": V1, "recipient": "ΠΑΠ*****"}
+
+    def test_staff_can_confirm_by_hand_with_a_note(self, acs, sent):
+        shipment = _unknown_shipment(acs)
+        self._masked(acs, shipment)
+
+        AcsService.adopt_voucher(
+            shipment,
+            V1,
+            user=None,
+            confirmed_by_hand="Same parcel in the ACS portal: address, COD.",
+        )
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no == V1
+        adopted = shipment.metadata["adopted_voucher"]
+        assert adopted["confirmed_by"] == "staff"
+        assert any(
+            "Same parcel in the ACS portal" in note
+            for note in _notes(shipment.order_id)
+        )
+
+    def test_a_blank_note_is_not_a_confirmation(self, acs, sent):
+        shipment = _unknown_shipment(acs)
+        self._masked(acs, shipment)
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(
+                shipment, V1, user=None, confirmed_by_hand="  "
+            )
+
+    def test_a_number_acs_does_not_know_is_refused_even_by_hand(
+        self, acs, sent
+    ):
+        shipment = _unknown_shipment(acs)
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(
+                shipment, V1, user=None, confirmed_by_hand="I am sure."
+            )
+
+    def test_the_name_sent_with_the_lost_request_is_what_is_compared(
+        self, acs, sent
+    ):
+        """The order's name may be edited between the request and the
+        adopt; ACS holds the name the request carried."""
+        shipment = _unknown_shipment(acs)
+        sent_name = _as_acs_prints_it(shipment.order)
+        order = shipment.order
+        order.first_name, order.last_name = "Renamed", "Later"
+        order.save(update_fields=["first_name", "last_name"])
+        acs.summaries[V1] = {"voucher_no": V1, "recipient": sent_name}
+
+        AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no == V1
+
+
+class TestALateAnswerAfterStaffAdopted:
+    """Both vouchers stay accounted for: one on the shipment, the other
+    deleted at ACS or recorded as an orphan."""
+
+    def _late_answer_after_adopt(self, acs, monkeypatch):
+        acs.first_error = None
+        shipment = _shipment()
+
+        def answer_after_staff_adopted(self, params):
+            _Acs.creates.append(params)
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_request_unknown_at=timezone.now(), metadata={}
+            )
+            _Acs.summaries[V1] = {
+                "voucher_no": V1,
+                "recipient": _as_acs_prints_it(shipment.order),
+            }
+            AcsService.adopt_voucher(shipment, V1, user=None)
+            return {"Voucher_No": V2, "Error_Message": ""}
+
+        monkeypatch.setattr(_Acs, "create_voucher", answer_after_staff_adopted)
+        AcsService.create_voucher_for_order(shipment.order)
+        shipment.refresh_from_db()
+        return shipment
+
+    def test_the_late_voucher_is_deleted_at_acs(self, acs, sent, monkeypatch):
+        shipment = self._late_answer_after_adopt(acs, monkeypatch)
+
+        assert shipment.voucher_no == V1
+        assert acs.deleted == [V2]
+
+    def test_a_late_voucher_acs_will_not_delete_is_kept_as_an_orphan(
+        self, acs, sent, monkeypatch
+    ):
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="refused"
+        )
+
+        shipment = self._late_answer_after_adopt(acs, monkeypatch)
+
+        assert shipment.voucher_no == V1
+        assert shipment.metadata["orphan_vouchers"] == [V2]
+
+
+class TestALateWorkerAndARequestAgain:
+    """Second review, finding 3: late worker A saves first and pops the
+    claim of mint C (a "request again"); a pickup-list run then records
+    C's voucher as unrecognised; C's save deletes it at ACS as a
+    duplicate, and the row must not stay open with a dead number."""
+
+    def test_the_duplicate_our_mint_deleted_resolves_its_row(
+        self, acs, sent, monkeypatch
+    ):
+        acs.first_error = None
+        shipment = _shipment()
+
+        def c_answers_after_a_saved(self, params):
+            _Acs.creates.append(params)
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                voucher_no=V1,
+                shipment_state=AcsShipmentState.NEW,
+                metadata={},
+            )
+            AcsService._raise_unrecognised_vouchers([V2], timezone.localdate())
+            return {"Voucher_No": V2, "Error_Message": ""}
+
+        monkeypatch.setattr(_Acs, "create_voucher", c_answers_after_a_saved)
+
+        AcsService.create_voucher_for_order(shipment.order)
+
+        assert acs.deleted == [V2]
+        row = AcsUnrecognisedVoucher.objects.get(voucher_no=V2)
+        assert row.resolution == AcsUnrecognisedVoucherResolution.DELETED
+        assert row.resolved_at is not None
+
+
+class TestAnOrderThatNoLongerNeedsAVoucher:
+    """Second review, finding 1: a waiting shipment that is retired, or
+    whose order is canceled, stays visible (ACS may hold a billed
+    voucher) but blocks nothing and never forces a new mint."""
+
+    @pytest.fixture(params=["retired", "order-canceled"])
+    def dead(self, request, acs, sent):
+        from order.enum.status import OrderStatus
+        from order.models.order import Order
+
+        shipment = _unknown_shipment(acs)
+        if request.param == "retired":
+            AcsShipment.objects.filter(pk=shipment.pk).update(
+                shipment_state=AcsShipmentState.CANCELED
+            )
+        else:
+            Order.objects.filter(pk=shipment.order_id).update(
+                status=OrderStatus.CANCELED
+            )
+        shipment.refresh_from_db()
+        return shipment
+
+    def test_it_stays_counted_until_closed(self, dead):
+        from shipping_acs.attention import voucher_requests_unknown
+
+        assert list(voucher_requests_unknown()) == [dead]
+
+        AcsService.close_voucher_request(
+            dead, user=None, note="Order canceled; nothing at ACS."
+        )
+
+        dead.refresh_from_db()
+        assert dead.voucher_request_unknown_at is None
+        assert not voucher_requests_unknown().exists()
+        assert any("nothing at ACS" in note for note in _notes(dead.order_id))
+
+    def test_it_does_not_block_deleting_a_voucher_matching_no_order(self, dead):
+        row = AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+        )
+
+        AcsService.delete_unrecognised_voucher(row, user=None, note=DELETE_NOTE)
+
+        row.refresh_from_db()
+        assert row.resolution == AcsUnrecognisedVoucherResolution.DELETED
+
+    def test_it_is_never_requested_again(self, dead, acs):
+        with (
+            patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ) as dispatched,
+            pytest.raises(AcsVoucherResolutionError),
+        ):
+            AcsService.request_voucher_again(dead, user=None, note="x")
+
+        dispatched.assert_not_called()
+
+    def test_a_voucher_is_not_adopted_onto_it(self, dead, acs):
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": _as_acs_prints_it(dead.order),
+        }
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(dead, V1, user=None)
+
+    def test_an_order_still_waiting_cannot_be_closed(self, acs, sent):
+        shipment = _unknown_shipment(acs)
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.close_voucher_request(shipment, user=None, note="x")
+
+
+class TestAnExpiredClaimSeenByADelete:
+    """Second review, finding 4: a claim past its TTL may belong to a
+    worker still waiting on ACS whose answer could be the very voucher
+    being deleted. The delete records it as unknown and refuses."""
+
+    def test_the_delete_turns_it_into_a_waiting_order_and_refuses(
+        self, acs, sent
+    ):
+        stale = timezone.now() - timedelta(
+            seconds=AcsService._MINT_CLAIM_TTL_SECONDS + 1
+        )
+        shipment = _shipment(metadata={"mint_started_at": stale.isoformat()})
+        row = AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+        )
+
+        with pytest.raises(AcsVoucherResolutionError) as exc_info:
+            AcsService.delete_unrecognised_voucher(
+                row, user=None, note=DELETE_NOTE
+            )
+
+        assert f"#{shipment.order_id}" in str(exc_info.value)
+        assert acs.deleted == []
+        shipment.refresh_from_db()
+        assert shipment.voucher_request_unknown_at is not None
+        assert _types(sent) == ["ops.acs_voucher_request_unknown"]
 
 
 class TestRequestAgain:

@@ -1178,8 +1178,8 @@ msgid "ACS rejected the cancellation."
 msgstr "ACS rejected the cancellation."
 
 #, python-format
-msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
-msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
+msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
 
 msgid "ACS shipment"
 msgstr "ACS shipment"
@@ -3248,6 +3248,9 @@ msgstr "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy and re-activ
 msgid "Close"
 msgstr "Close"
 
+msgid "Close the voucher check"
+msgstr "Close the voucher check"
+
 msgid "CloudEvents 'id' field — idempotency key"
 msgstr "CloudEvents 'id' field — idempotency key"
 
@@ -3468,6 +3471,9 @@ msgstr "Confirmed From IP"
 
 msgid "Confirmed at"
 msgstr "Confirmed at"
+
+msgid "Confirmed by hand"
+msgstr "Confirmed by hand"
 
 msgid "Connection or timeout"
 msgstr "Connection or timeout"
@@ -9202,6 +9208,9 @@ msgstr "No voucher available for order #%(order_id)s — the %(carrier)s shipmen
 msgid "No voucher available — shipment is in state '%(state)s'. The BoxNow delivery-request task has not yet assigned a parcel ID for this order."
 msgstr "No voucher available — shipment is in state '%(state)s'. The BoxNow delivery-request task has not yet assigned a parcel ID for this order."
 
+msgid "No voucher needed: close"
+msgstr "No voucher needed: close"
+
 msgid "No vouchers are waiting for a pickup list."
 msgstr "No vouchers are waiting for a pickup list."
 
@@ -9530,6 +9539,9 @@ msgstr "Only used when target scope is 'Specific categories'; subcategories are 
 msgid "Only used when target scope is 'Specific products'"
 msgstr "Only used when target scope is 'Specific products'"
 
+msgid "Only when ACS spells the recipient differently from the voucher request: how you confirmed in the ACS portal that this is the order's parcel. Kept on the order."
+msgstr "Only when ACS spells the recipient differently from the voucher request: how you confirmed in the ACS portal that this is the order's parcel. Kept on the order."
+
 msgid "Opaque cursor (cursor pagination strategy)"
 msgstr "Opaque cursor (cursor pagination strategy)"
 
@@ -9657,6 +9669,14 @@ msgstr "Order #%(order)s has not been paid yet — the voucher is issued automat
 #, python-format
 msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
 msgstr "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
+
+#, python-format
+msgid "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."
+msgstr "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."
+
+#, python-format
+msgid "Order #%(order)s still needs its voucher: adopt the one ACS holds, or request again."
+msgstr "Order #%(order)s still needs its voucher: adopt the one ACS holds, or request again."
 
 #, python-format
 msgid "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
@@ -14994,6 +15014,9 @@ msgstr "The value free shipping and a free payment fee are judged on: the produc
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "The visitor ticked the consent box. Must be true."
 
+msgid "The voucher check was closed."
+msgstr "The voucher check was closed."
+
 msgid "The voucher is already cancelled."
 msgstr "The voucher is already cancelled."
 
@@ -15992,6 +16015,9 @@ msgstr "Usage limit per code"
 msgid "Use another account"
 msgstr "Use another account"
 
+msgid "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
+msgstr "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
+
 msgid "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 msgstr "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 
@@ -16872,6 +16898,9 @@ msgstr "Working hours"
 
 msgid "Write a review"
 msgstr "Write a review"
+
+msgid "Write what you checked at ACS."
+msgstr "Write what you checked at ACS."
 
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Writes an ADJUST row on the ledger — the card history stays auditable."
@@ -17781,6 +17810,10 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
+
+#, python-format
+#~ msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
+#~ msgstr "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
 
 #~ msgid "About Content"
 #~ msgstr "About Content"

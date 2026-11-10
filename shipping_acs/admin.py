@@ -108,6 +108,16 @@ class AdoptVoucherForm(BaseDialogForm):
         widget=UnfoldAdminTextInputWidget(),
         help_text=_("The voucher number as the ACS portal shows it."),
     )
+    confirmed_by_hand = forms.CharField(
+        label=_("Confirmed by hand"),
+        required=False,
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 3}),
+        help_text=_(
+            "Only when ACS spells the recipient differently from the voucher "
+            "request: how you confirmed in the ACS portal that this is the "
+            "order's parcel. Kept on the order."
+        ),
+    )
 
 
 class RequestVoucherAgainForm(BaseDialogForm):
@@ -466,6 +476,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     actions_detail = [
         "adopt_voucher",
         "request_voucher_again",
+        "close_voucher_request",
         "record_cod_received_outside_acs",
         "cancel_voucher_only",
     ]
@@ -828,7 +839,10 @@ class AcsShipmentAdmin(BaseModelAdmin):
         shipment = AcsShipment.objects.get(pk=object_id)
         try:
             AcsService.adopt_voucher(
-                shipment, form.cleaned_data["voucher_no"], user=request.user
+                shipment,
+                form.cleaned_data["voucher_no"],
+                user=request.user,
+                confirmed_by_hand=form.cleaned_data["confirmed_by_hand"],
             )
         except AcsError as exc:
             self.message_user(request, str(exc), messages.ERROR)
@@ -874,6 +888,38 @@ class AcsShipmentAdmin(BaseModelAdmin):
                 request,
                 _("A new voucher request was queued."),
                 messages.SUCCESS,
+            )
+        return self._back_to_shipment(object_id)
+
+    @action(
+        description=_("No voucher needed: close"),
+        icon="block",
+        dialog=ActionDialog(
+            title=_("Close the voucher check"),
+            description=_(
+                "Use it when the order no longer needs a voucher (the order "
+                "or its shipment is canceled). Nothing is sent to ACS. If "
+                "ACS holds the lost voucher, delete it there and say so."
+            ),
+            form_class=RequestVoucherAgainForm,
+        ),
+    )
+    def close_voucher_request(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipment.objects.get(pk=object_id)
+        try:
+            AcsService.close_voucher_request(
+                shipment, user=request.user, note=form.cleaned_data["note"]
+            )
+        except AcsError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+        else:
+            self.message_user(
+                request, _("The voucher check was closed."), messages.SUCCESS
             )
         return self._back_to_shipment(object_id)
 
@@ -1144,7 +1190,9 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
 
         row = AcsUnrecognisedVoucher.objects.get(pk=object_id)
         try:
-            AcsService.delete_unrecognised_voucher(row, user=request.user)
+            AcsService.delete_unrecognised_voucher(
+                row, user=request.user, note=form.cleaned_data["note"]
+            )
         except AcsError as exc:
             self.message_user(request, str(exc), messages.ERROR)
         else:

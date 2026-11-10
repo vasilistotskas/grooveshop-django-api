@@ -124,18 +124,28 @@ shipment:
 
 - **Adopt ACS voucher** (number): refused when any shipment carries the
   number (its voucher, a multipart child, a previous or duplicate voucher).
-  ACS must confirm it is this order's: the `recipient` of its
-  `ACS_Trackingsummary` row (p. 18-19) must equal the order's
-  `Recipient_Name`, compared without accents, case or extra spaces; the
-  summary's `sender`, `recipient_address` and `pickup_date` are not
-  compared, because the manual does not say how ACS spells them. Without a
-  summary naming a recipient, the number must be an open "voucher matching
-  no order" that ACS named on a refused pickup list. The checks run again
-  under the row lock; a concurrent adopt of the same number gets the same
-  refusal. Saves the voucher, fetches multipart children, never calls
-  `ACS_Create_Voucher`.
+  ACS must hold it for the store (an `ACS_Trackingsummary` row, p. 18-19,
+  or an open "voucher matching no order" that ACS named on a refused
+  pickup list); nothing overrides that. Then it must be this order's: the
+  summary's `recipient` must equal the `Recipient_Name` the lost request
+  sent (from `metadata["last_error"]`, else the `AcsApiCall` row, else the
+  order), compared without accents, case or extra spaces. The manual
+  documents no format for `recipient`: its example response is
+  "ενδεικτικό" and every personal value in it is masked (`"XXXXXXXXXX"`).
+  So a mismatch, or a summary without a recipient, is refused unless staff
+  fill "Confirmed by hand" with how they checked in the ACS portal; that
+  text goes on the order note and `confirmed_by: "staff"` on the shipment.
+  The checks run again under the row lock; a concurrent adopt of the same
+  number gets the same refusal. Saves the voucher, fetches multipart
+  children, never calls `ACS_Create_Voucher`.
 - **No voucher at ACS: request again** (a note on how you checked): clears
   the state and queues the mint once.
+- **No voucher needed: close** (a note): for a shipment that is retired
+  (CANCELED) or whose order is canceled or refunded. Adopt and request
+  again refuse those; the shipment stays counted (ACS may hold a billed
+  voucher) until closed. Nothing is sent to ACS; delete a lost voucher in
+  the ACS portal or from "ACS vouchers matching no order", and say so in
+  the note.
 
 A late answer settles it too: when a worker's request outlives the claim's
 TTL, another worker records the outcome as unknown, and the first one's
@@ -166,12 +176,25 @@ calls ACS, so a lone orphan surfaces on the next day that has one.
   nothing and the next run decides.
 - A shipment that saves a number (the mint, or an adopt) resolves the open
   row for it, children included.
-- **Delete at ACS** re-checks under the row's lock: refused when a
-  shipment carries the number, while a mint is in flight, and while any
-  order waits in the unknown state (the voucher may be that order's lost
-  one, and a deleted voucher cannot be adopted). Resolve the waiting order
-  first, by adopting the voucher or requesting again; then it can be
+- When the mint deletes its own duplicate at ACS (a late answer after
+  another voucher was saved), the row for that number is resolved as
   deleted.
+- **Delete at ACS** (a note, kept on the row) first turns every mint claim
+  past its TTL into the unknown state (that request may still be waiting
+  on ACS, and its answer could be this voucher), then re-checks under the
+  row's lock. It is refused:
+  - when a shipment's live voucher or child is this number;
+  - while a mint is in flight;
+  - while an order that still needs its voucher waits in the unknown state
+    (the voucher may be that order's lost one, and a deleted voucher cannot
+    be adopted). Resolve that order first, by adopting or requesting again.
+
+  A recorded duplicate (`orphan_vouchers`) or an earlier voucher can be
+  deleted, and so can a voucher while only orders that need none wait.
+  ACS gives every create a new number, so only a request already sent when
+  these checks run can answer with this voucher, and each such request is
+  then visible. That is why there is no store-wide lock around the ACS
+  call.
 
 ## What did ACS answer for call Y?
 

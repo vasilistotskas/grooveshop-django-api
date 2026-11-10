@@ -1183,8 +1183,8 @@ msgid "ACS rejected the cancellation."
 msgstr "Η ACS απέρριψε την ακύρωση."
 
 #, python-format
-msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
-msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», όχι για τον παραλήπτη αυτής της παραγγελίας. Ελέγξτε τον αριθμό στην πύλη της ACS."
+msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, which does not match the recipient the voucher request sent. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», που δεν ταιριάζει με τον παραλήπτη που έστειλε το αίτημα voucher. Αν επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα αυτής της παραγγελίας, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
 
 msgid "ACS shipment"
 msgstr "Αποστολή ACS"
@@ -3255,6 +3255,9 @@ msgstr "Κλωνοποιήθηκε το προϊόν #%(orig)s → πρόχει�
 msgid "Close"
 msgstr "Κλείσιμο"
 
+msgid "Close the voucher check"
+msgstr "Κλείσιμο του ελέγχου voucher"
+
 msgid "CloudEvents 'id' field — idempotency key"
 msgstr "Πεδίο 'id' του CloudEvents — κλειδί ιδεμποτεντίας"
 
@@ -3472,6 +3475,9 @@ msgstr "IP επιβεβαίωσης"
 
 msgid "Confirmed at"
 msgstr "Επιβεβαιώθηκε"
+
+msgid "Confirmed by hand"
+msgstr "Επιβεβαιώθηκε χειροκίνητα"
 
 msgid "Connection or timeout"
 msgstr "Σύνδεση ή χρονικό όριο"
@@ -9209,6 +9215,9 @@ msgstr "Δεν υπάρχει διαθέσιμο voucher για την παρα�
 msgid "No voucher available — shipment is in state '%(state)s'. The BoxNow delivery-request task has not yet assigned a parcel ID for this order."
 msgstr "Δεν υπάρχει διαθέσιμο voucher — η αποστολή βρίσκεται σε κατάσταση '%(state)s'. Η εργασία αιτήματος παράδοσης BoxNow δεν έχει αναθέσει ακόμη parcel ID για αυτή την παραγγελία."
 
+msgid "No voucher needed: close"
+msgstr "Δεν χρειάζεται voucher: κλείσιμο"
+
 msgid "No vouchers are waiting for a pickup list."
 msgstr "Δεν υπάρχουν vouchers σε αναμονή για λίστα παραλαβής."
 
@@ -9536,6 +9545,9 @@ msgstr "Χρησιμοποιείται μόνο όταν το εύρος στό�
 msgid "Only used when target scope is 'Specific products'"
 msgstr "Χρησιμοποιείται μόνο όταν το εύρος στόχευσης είναι 'Συγκεκριμένα προϊόντα'"
 
+msgid "Only when ACS spells the recipient differently from the voucher request: how you confirmed in the ACS portal that this is the order's parcel. Kept on the order."
+msgstr "Μόνο όταν η ACS γράφει τον παραλήπτη διαφορετικά από το αίτημα voucher: πώς επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα της παραγγελίας. Φυλάσσεται στην παραγγελία."
+
 msgid "Opaque cursor (cursor pagination strategy)"
 msgstr "Αδιαφανής δείκτης (στρατηγική σελιδοποίησης cursor)"
 
@@ -9664,6 +9676,14 @@ msgstr "Η παραγγελία #%(order)s δεν έχει πληρωθεί ακ
 #, python-format
 msgid "Order #%(order)s is canceled — a new parcel would ship an order nobody wants."
 msgstr "Η παραγγελία #%(order)s είναι ακυρωμένη — ένα νέο δέμα θα έστελνε παραγγελία που κανείς δεν θέλει."
+
+#, python-format
+msgid "Order #%(order)s no longer needs a voucher (the order or its shipment is canceled). Use “No voucher needed: close”; if ACS holds the lost voucher, delete it there."
+msgstr "Η παραγγελία #%(order)s δεν χρειάζεται πλέον voucher (η παραγγελία ή η αποστολή της έχει ακυρωθεί). Χρησιμοποιήστε την ενέργεια «Δεν χρειάζεται voucher: κλείσιμο»· αν η ACS έχει το χαμένο voucher, διαγράψτε το εκεί."
+
+#, python-format
+msgid "Order #%(order)s still needs its voucher: adopt the one ACS holds, or request again."
+msgstr "Η παραγγελία #%(order)s χρειάζεται ακόμη το voucher της: υιοθετήστε αυτό που έχει η ACS ή υποβάλετε νέο αίτημα."
 
 #, python-format
 msgid "Order #%(order_id)s already has a receipt, so the decision that the goods came back can no longer be changed."
@@ -14996,6 +15016,9 @@ msgstr "Η αξία με την οποία κρίνονται τα δωρεάν 
 msgid "The visitor ticked the consent box. Must be true."
 msgstr "Ο επισκέπτης επέλεξε το πλαίσιο συγκατάθεσης. Πρέπει να είναι true."
 
+msgid "The voucher check was closed."
+msgstr "Ο έλεγχος voucher έκλεισε."
+
 msgid "The voucher is already cancelled."
 msgstr "Το voucher έχει ήδη ακυρωθεί."
 
@@ -15994,6 +16017,9 @@ msgstr "Όριο χρήσης ανά κωδικό"
 msgid "Use another account"
 msgstr "Χρήση άλλου λογαριασμού"
 
+msgid "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
+msgstr "Χρησιμοποιήστε το όταν η παραγγελία δεν χρειάζεται πλέον voucher (η παραγγελία ή η αποστολή της έχει ακυρωθεί). Τίποτα δεν στέλνεται στην ACS. Αν η ACS έχει το χαμένο voucher, διαγράψτε το εκεί και σημειώστε το."
+
 msgid "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 msgstr "Χρησιμοποιήστε το όταν γνωρίζετε το voucher (δημιουργήθηκε στην πύλη της ACS, διευθετήθηκε σε κατάστημα ACS). Παύει να μετριέται· τίποτα δεν στέλνεται στην ACS."
 
@@ -16874,6 +16900,9 @@ msgstr "Ωράριο λειτουργίας"
 
 msgid "Write a review"
 msgstr "Γράψτε κριτική"
+
+msgid "Write what you checked at ACS."
+msgstr "Γράψτε τι ελέγξατε στην ACS."
 
 msgid "Writes an ADJUST row on the ledger — the card history stays auditable."
 msgstr "Καταχωρεί μια γραμμή ADJUST στο καθολικό — το ιστορικό της κάρτας παραμένει ελέγξιμο."
@@ -17873,6 +17902,10 @@ msgstr "…και {count} ακόμη γραμμές με σφάλματα."
 
 #~ msgid "ACS origin station code (up to 8 chars). No platform fallback — empty disables ACS."
 #~ msgstr "Κωδικός σταθμού προέλευσης ACS (έως 8 χαρακτήρες). Χωρίς εναλλακτική τιμή πλατφόρμας — κενό απενεργοποιεί την ACS."
+
+#, python-format
+#~ msgid "ACS reports voucher %(voucher)s for “%(recipient)s”, not for this order's recipient. Check the number in the ACS portal."
+#~ msgstr "Η ACS αναφέρει το voucher %(voucher)s για «%(recipient)s», όχι για τον παραλήπτη αυτής της παραγγελίας. Ελέγξτε τον αριθμό στην πύλη της ACS."
 
 #~ msgid "About Content"
 #~ msgstr "Περιεχόμενο «Σχετικά με εμάς»"

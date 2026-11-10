@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 from django.utils import timezone
 
+from order.enum.status import OrderStatus
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError, AcsVoucherResolutionError
 from shipping_acs.factories import AcsShipmentFactory
@@ -25,8 +26,11 @@ from shipping_acs.models.unrecognised_voucher import (
 )
 from shipping_acs.services import AcsService
 from shipping_acs.tasks import issue_daily_acs_pickup_list
+from tests.utils.orders import courier_cash_order
 
 pytestmark = [pytest.mark.django_db, pytest.mark.assert_english]
+
+DELETE_NOTE = "Not ours: made in the ACS portal for a return."
 
 OURS = "9700000101"
 CHILD = "9700000102"
@@ -147,12 +151,26 @@ class TestResolution:
     def test_deleting_at_acs_resolves_it(self, acs):
         row = self._row()
 
-        AcsService.delete_unrecognised_voucher(row, user=None)
+        AcsService.delete_unrecognised_voucher(row, user=None, note=DELETE_NOTE)
 
         row.refresh_from_db()
         assert acs.deleted == [FOREIGN]
         assert row.resolution == AcsUnrecognisedVoucherResolution.DELETED
         assert row.resolved_at is not None
+        # The dialog asks for a note: it is kept, as for "Mark as checked".
+        assert row.resolution_note == DELETE_NOTE
+
+    def test_a_duplicate_a_shipment_recorded_can_be_deleted(self, acs):
+        """``orphan_vouchers``: a duplicate the mint could not delete. It
+        is no shipment's voucher, and deleting it is the point."""
+        AcsShipmentFactory(
+            voucher_no="9700000777", metadata={"orphan_vouchers": [FOREIGN]}
+        )
+        row = self._row()
+
+        AcsService.delete_unrecognised_voucher(row, user=None, note=DELETE_NOTE)
+
+        assert acs.deleted == [FOREIGN]
 
     def test_an_acs_refusal_to_delete_leaves_it_open(self, acs):
         acs.delete_error = AcsAPIError(
@@ -163,7 +181,9 @@ class TestResolution:
         row = self._row()
 
         with pytest.raises(AcsAPIError):
-            AcsService.delete_unrecognised_voucher(row, user=None)
+            AcsService.delete_unrecognised_voucher(
+                row, user=None, note=DELETE_NOTE
+            )
 
         row.refresh_from_db()
         assert row.resolved_at is None
@@ -177,7 +197,9 @@ class TestResolution:
         )
 
         with pytest.raises(AcsVoucherResolutionError):
-            AcsService.delete_unrecognised_voucher(row, user=None)
+            AcsService.delete_unrecognised_voucher(
+                row, user=None, note=DELETE_NOTE
+            )
 
         assert acs.deleted == []
 
@@ -188,13 +210,18 @@ class TestResolution:
         order's lost one; deleting it would destroy the only copy."""
         row = self._row()
         waiting = AcsShipmentFactory(
+            # An order that still needs its voucher (the factory's own
+            # order may be in any status, a canceled one included).
+            order=courier_cash_order(status=OrderStatus.PENDING),
             voucher_no=None,
             shipment_state=AcsShipmentState.PENDING_CREATION,
             voucher_request_unknown_at=timezone.now(),
         )
 
         with pytest.raises(AcsVoucherResolutionError) as exc_info:
-            AcsService.delete_unrecognised_voucher(row, user=None)
+            AcsService.delete_unrecognised_voucher(
+                row, user=None, note=DELETE_NOTE
+            )
 
         assert f"#{waiting.order_id}" in str(exc_info.value)
         assert acs.deleted == []
@@ -217,6 +244,8 @@ class TestResolution:
         AcsService.mark_unrecognised_voucher_checked(row, user=None, note="x")
 
         with pytest.raises(AcsVoucherResolutionError):
-            AcsService.delete_unrecognised_voucher(row, user=None)
+            AcsService.delete_unrecognised_voucher(
+                row, user=None, note=DELETE_NOTE
+            )
 
         assert acs.deleted == []

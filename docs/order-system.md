@@ -1218,11 +1218,14 @@ accepting Cyprus orders at the Greek flat rate.
   noted, `ops.acs_voucher_request_unknown` is sent once, and every caller
   (the task, its retries, a re-dispatch, "Issue ACS voucher now") is
   refused with `AcsVoucherRequestUnknownError` until staff use **Adopt ACS
-  voucher** (the number may belong to no other shipment, and ACS must
-  confirm it is this order's: the `ACS_Trackingsummary` recipient equals
-  the order's `Recipient_Name`, or ACS named it on a refused pickup list
-  and it is still open; no create is sent) or **No voucher at ACS: request
-  again** (a note is required; queues the mint once). A late answer that
+  voucher** (the number may belong to no other shipment; ACS must hold it,
+  and its `ACS_Trackingsummary` recipient must equal the `Recipient_Name`
+  the lost request sent, or staff confirm by hand with a written note,
+  because the manual documents no format for that field; no create is
+  sent) or **No voucher at ACS: request again** (a note is required;
+  queues the mint once). A shipment that no longer needs a voucher (retired,
+  or its order canceled or refunded) stays counted but can only be closed
+  (**No voucher needed: close**, a note), never adopted onto or minted for. A late answer that
   arrives after another worker recorded the outcome as unknown is saved
   and clears the state. Nothing is automatic: no documented call ties a voucher to our
   `Reference_Key1` before the pickup list. `docs/acs-debugging.md` has the
@@ -1234,9 +1237,11 @@ accepting Cyprus orders at the Greek flat rate.
   sends `ops.acs_unrecognised_vouchers` the first time it is named, and the
   task result lists them under `unrecognised`. Staff adopt it from the
   order's shipment, delete it at ACS (`ACS_Delete_Voucher`, only before a
-  pickup list; refused while a mint is in flight or any order waits in the
-  unknown state, since it may be that order's voucher) or mark it as
-  checked (a note is required). A run during an in-flight mint records
+  pickup list; refused while a mint is in flight or an order that still
+  needs its voucher waits in the unknown state, since it may be that
+  order's voucher; expired claims are turned into that state first) or mark
+  it as checked. Both ask for a note and keep it on the row. A duplicate
+  the mint deletes at ACS resolves its row. A run during an in-flight mint records
   nothing, and a shipment that saves a number resolves its row.
   `_build_create_voucher_params` uses `order.country_id` verbatim as
   `Recipient_Country` (no lookup — `Country.pk` IS the alpha-2 code)

@@ -3,6 +3,27 @@
 
 
 
+## v3.242.14 (2026-11-10)
+
+### Bug fixes
+
+* fix(core): make sanitize_html a fixed point for links (#627)
+
+nh3's link_rel appends rel after dropping any rel the editor typed, and
+ammonia removes an attribute the attribute_filter drops with swap_remove,
+which moves that last attribute into the gap. A link losing its Word
+class or a font style came out as <a rel href> and, on the next pass,
+<a href rel>, so normalise_rich_text needed two runs to settle and such a
+row was rewritten on a save that edited nothing.
+
+rel is now an allowed link attribute whose value set_tag_attribute_values
+overwrites where it stands, with link_rel off. A typed rel is still
+replaced, every link still gets noopener noreferrer, and once placed the
+attribute no longer moves. A hypothesis test asserts that any markup is
+stable after one pass.
+
+Closes #615 ([`6252796`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6252796cfdcc8824a126bdd06df59a0fcd3206b3))
+
 ## v3.242.13 (2026-11-10)
 
 ### Bug fixes

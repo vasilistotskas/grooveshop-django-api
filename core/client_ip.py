@@ -36,6 +36,8 @@ cannot be chosen by the caller.
 
 from __future__ import annotations
 
+from ipaddress import ip_address
+
 from django.conf import settings
 from django.http import HttpRequest
 from django.utils.crypto import constant_time_compare
@@ -48,6 +50,20 @@ from django.utils.crypto import constant_time_compare
 # ``CF-Connecting-IP`` and forwards it as ``X-Real-IP``, which is why the
 # fallback is still needed.
 _IP_HEADERS = ("HTTP_CF_CONNECTING_IP", "HTTP_X_REAL_IP")
+
+
+def _is_ip(value: str) -> bool:
+    """True for a literal IPv4 or IPv6 address.
+
+    A header value is caller-controlled text until proven otherwise, and the
+    callers store or key on the result (``GenericIPAddressField`` raises on
+    anything else), so a hop that is not an address is not an answer.
+    """
+    try:
+        ip_address(value)
+    except ValueError:
+        return False
+    return True
 
 
 def request_came_through_edge(request: HttpRequest) -> bool:
@@ -80,7 +96,9 @@ def edge_client_ip(request: HttpRequest) -> str | None:
             # A forwarded chain can appear here if an upstream ever
             # concatenates; take the first entry, which Cloudflare sets
             # to the connecting visitor.
-            return value.split(",")[0].strip()
+            first = value.split(",")[0].strip()
+            if _is_ip(first):
+                return first
     return None
 
 
@@ -108,6 +126,6 @@ def client_ip_or_peer(request: HttpRequest) -> str:
         for hop in (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")
         if hop.strip()
     ]
-    if hops:
+    if hops and _is_ip(hops[-1]):
         return hops[-1]
     return request.META.get("REMOTE_ADDR", "") or ""

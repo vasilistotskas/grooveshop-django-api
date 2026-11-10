@@ -240,3 +240,72 @@ class OrderItemHistoryTestCase(TestCase):
         )
         self.assertIn("Refund processed for 1 items", result.description)
         self.assertIn("Damaged item", result.description)
+
+
+EDGE_SECRET = "s3cret-edge-token"
+VISITOR = "203.0.113.9"
+TRAEFIK_PEER = "198.51.100.7"
+
+_RECORDERS = [
+    pytest.param(
+        lambda order, request: OrderHistory.log_status_change(
+            order=order,
+            previous_status=OrderStatus.PENDING,
+            new_status=OrderStatus.PROCESSING,
+            request=request,
+        ),
+        id="status",
+    ),
+    pytest.param(
+        lambda order, request: OrderHistory.log_note(
+            order=order, note="n", request=request
+        ),
+        id="note",
+    ),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("record", _RECORDERS)
+class TestOrderHistoryRecordsTheVisitorAddress:
+    """The history row used to store ``REMOTE_ADDR``: behind Traefik, the
+    proxy. ``tests/unit/core/test_client_ip_only_through_the_helper.py``
+    keeps every call site (all five recorders) on ``client_ip_or_peer``."""
+
+    def test_a_request_through_the_edge_records_the_visitor(
+        self, record, settings, rf
+    ):
+        settings.ORIGIN_VERIFY_SECRET = EDGE_SECRET
+        request = rf.get(
+            "/",
+            REMOTE_ADDR="10.42.1.0",
+            HTTP_X_ORIGIN_VERIFY=EDGE_SECRET,
+            HTTP_CF_CONNECTING_IP=VISITOR,
+            HTTP_X_FORWARDED_FOR=f"{VISITOR}, {TRAEFIK_PEER}",
+        )
+        row = record(OrderFactory(num_order_items=0), request)
+        assert row.ip_address == VISITOR
+
+    def test_without_the_proof_it_records_the_peer_not_a_chosen_header(
+        self, record, settings, rf
+    ):
+        settings.ORIGIN_VERIFY_SECRET = EDGE_SECRET
+        request = rf.get(
+            "/",
+            REMOTE_ADDR="10.42.1.0",
+            HTTP_CF_CONNECTING_IP="1.2.3.4",
+            HTTP_X_REAL_IP="1.2.3.4",
+            HTTP_X_FORWARDED_FOR=f"1.2.3.4, {TRAEFIK_PEER}",
+        )
+        row = record(OrderFactory(num_order_items=0), request)
+        assert row.ip_address == TRAEFIK_PEER
+
+    def test_a_forwarded_hop_that_is_not_an_address_does_not_break_the_save(
+        self, record, settings, rf
+    ):
+        settings.ORIGIN_VERIFY_SECRET = EDGE_SECRET
+        request = rf.get(
+            "/", REMOTE_ADDR="10.42.1.0", HTTP_X_FORWARDED_FOR="garbage"
+        )
+        row = record(OrderFactory(num_order_items=0), request)
+        assert row.ip_address == "10.42.1.0"

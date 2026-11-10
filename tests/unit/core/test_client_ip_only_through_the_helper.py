@@ -28,19 +28,16 @@ _FORBIDDEN = frozenset({"REMOTE_ADDR", "X_FORWARDED_FOR", "X_REAL_IP"})
 # Reads that stay, each with its reason. A module here is not a model to
 # copy: an entry only shrinks, by routing the read through the helper.
 ALLOWED = {
-    # Diagnostic log lines that print the raw peer and forwarded headers
-    # next to each other while Viva's webhook ranges are being verified.
-    # They record what arrived and decide nothing.
-    "order/views/viva_webhook.py": "logs the raw headers, decides nothing",
-    # Believes X-Real-IP without the edge proof, which the helper refuses
-    # (its docstring: "Never X-Real-IP without the proof"). Moving it to
-    # ``client_ip_or_peer`` changes the address Meta receives for signup
-    # events, a decision for the owner, not a refactor.
-    "meta_capi/signals.py": "believes X-Real-IP; owner decision to change",
-    # Its own copy of the peer rule, with a private-address test on
-    # REMOTE_ADDR that ``client_ip_or_peer`` does not make. Unifying them
-    # changes which address search analytics stores.
-    "search/middleware.py": "own copy of the peer rule; to unify",
+    # Every read is an argument to ``logger.info`` / ``logger.warning``
+    # (they print REMOTE_ADDR, X-Forwarded-For and X-Real-IP); none feeds
+    # a decision. The decisions in this module use ``client_ip_or_peer``.
+    "order/views/viva_webhook.py": "log lines only, decides nothing",
+    # Believes X-Real-IP without the edge proof, which the helper refuses.
+    # A potential defect, not a decision: issue #638.
+    "meta_capi/signals.py": "believes X-Real-IP; issue #638",
+    # Its own copy of the peer rule, storing an unchecked forwarded hop in
+    # a GenericIPAddressField: issue #639.
+    "search/middleware.py": "own copy of the peer rule; issue #639",
 }
 SKIP_DIRS = {
     "tests",

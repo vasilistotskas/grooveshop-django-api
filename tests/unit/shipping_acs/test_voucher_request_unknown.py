@@ -1017,6 +1017,105 @@ class TestALateAnswerAfterStaffResolvedTheCheck:
         assert acs.deleted == []
 
 
+class TestARefusedDeleteMeetsAnExistingRow:
+    """Migration review of #634: the refused-delete record and a
+    pickup-list record of the same voucher. The more specific fact (it is
+    our own unused voucher, from this shipment) always wins."""
+
+    def _refused_late_answer(self, acs, monkeypatch):
+        helper = TestALateAnswerAfterStaffResolvedTheCheck()
+        acs.delete_error = AcsAPIError(
+            alias="ACS_Delete_Voucher", error_message="temporarily refused"
+        )
+        return helper._late_answer(
+            acs, monkeypatch, lambda s: helper._request_again(s)
+        )
+
+    def _named_first(self, **fields):
+        return AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+            **fields,
+        )
+
+    def test_a_row_the_pickup_list_made_first_learns_where_it_came_from(
+        self, acs, sent, monkeypatch
+    ):
+        from shipping_acs.models.unrecognised_voucher import (
+            AcsUnrecognisedVoucherSource,
+        )
+
+        row = self._named_first()
+
+        shipment = self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.source == AcsUnrecognisedVoucherSource.REFUSED_DELETE
+        assert row.duplicate_of_id == shipment.pk
+        assert AcsUnrecognisedVoucher.objects.count() == 1
+
+    def test_a_row_staff_marked_checked_is_reopened(
+        self, acs, sent, monkeypatch
+    ):
+        """Staff judged it without knowing it is our own voucher that ACS
+        will not delete: it may be live and billed, so it asks again."""
+        row = self._named_first(
+            resolved_at=timezone.now(),
+            resolution=AcsUnrecognisedVoucherResolution.CHECKED,
+            resolution_note="Not ours.",
+        )
+
+        self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.resolved_at is None
+        assert row.resolution == ""
+        assert row.resolution_note == "Not ours."
+
+    def test_a_row_deleted_at_acs_stays_resolved_with_the_link(
+        self, acs, sent, monkeypatch
+    ):
+        """Deleted at ACS: it is dead, which is also why ACS refuses our
+        delete now. Reopening would ask staff to delete it again."""
+        row = self._named_first(
+            resolved_at=timezone.now(),
+            resolution=AcsUnrecognisedVoucherResolution.DELETED,
+        )
+
+        shipment = self._refused_late_answer(acs, monkeypatch)
+
+        row.refresh_from_db()
+        assert row.resolution == AcsUnrecognisedVoucherResolution.DELETED
+        assert row.duplicate_of_id == shipment.pk
+
+    def test_a_database_error_while_recording_never_fails_the_mint(
+        self, acs, sent, monkeypatch, caplog
+    ):
+        """Phase 3 has committed by then: the record is best effort, and
+        its failure is logged at ERROR with the voucher number."""
+        from django.db import DatabaseError
+
+        def broken(*args, **kwargs):
+            raise DatabaseError("connection lost")
+
+        monkeypatch.setattr(
+            AcsService, "_keep_unrecognised_vouchers", staticmethod(broken)
+        )
+
+        with caplog.at_level("ERROR", logger="shipping_acs.services"):
+            shipment = self._refused_late_answer(acs, monkeypatch)
+
+        assert shipment.metadata["orphan_vouchers"] == [V1]
+        assert any(
+            r.levelname == "ERROR"
+            and V1 in r.getMessage()
+            and "could not be recorded" in r.getMessage()
+            for r in caplog.records
+        )
+
+
 class TestAResetWhileAMintIsInFlight:
     """Cold review of #634: the shipment was canceled while a mint was out
     (no voucher yet), then staff press "Issue ACS voucher now", which

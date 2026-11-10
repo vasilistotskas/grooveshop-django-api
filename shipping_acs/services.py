@@ -717,13 +717,34 @@ class AcsService:
             if refused_delete:
                 # A live (maybe billed) voucher ACS would not delete is
                 # recorded where staff already look, at once, not only
-                # if a later refused pickup list happens to name it.
-                cls._keep_unrecognised_vouchers(
-                    [voucher_no],
-                    _voucher_pickup_date(params),
-                    source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
-                    duplicate_of=shipment,
-                )
+                # if a later refused pickup list happens to name it. Phase
+                # 3 has committed: this runs in its own transaction
+                # (``_keep_unrecognised_vouchers``), best effort like the
+                # pickup-list path, so a failure here never fails a mint
+                # whose outcome is already saved; the ERROR line keeps the
+                # number (it is also in ``metadata["orphan_vouchers"]``).
+                try:
+                    cls._keep_unrecognised_vouchers(
+                        [voucher_no],
+                        _voucher_pickup_date(params),
+                        source=AcsUnrecognisedVoucherSource.REFUSED_DELETE,
+                        duplicate_of=shipment,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Voucher %s that ACS would not delete (order=%s) "
+                        "could not be recorded as a voucher matching no "
+                        "order; delete it at ACS by hand.",
+                        voucher_no,
+                        order.id,
+                        extra={
+                            "order_id": order.id,
+                            "shipment_pk": shipment.pk,
+                            "carrier": "acs",
+                            "voucher_no": voucher_no,
+                            "phase": "phase3_unused_record_failed",
+                        },
+                    )
             return shipment
 
         if late_answer:
@@ -1947,12 +1968,23 @@ class AcsService:
         """Record vouchers ACS holds that no shipment uses, one row per
         number whoever finds it first (a refused pickup list, or our own
         delete ACS refused), and return the numbers recorded now for the
-        first time. Counted by ``attention.unrecognised_vouchers``."""
+        first time. Counted by ``attention.unrecognised_vouchers``.
+
+        The more specific fact wins, never the other way round: when our
+        own refused delete meets a row a pickup list made, the row learns
+        that it is our unused voucher and which shipment it came from. A
+        row staff had marked CHECKED is reopened then: they judged it
+        without knowing it is ours and that ACS will not delete it, so it
+        may be a live, billed voucher nobody is acting on. A row resolved
+        as DELETED (dead at ACS, which is why our delete is refused now)
+        or ADOPTED (a shipment uses it) keeps its resolution and gains the
+        link only.
+        """
         now = timezone.now()
         first_time: list[str] = []
         with transaction.atomic():
             for voucher_no in numbers:
-                _row, created = AcsUnrecognisedVoucher.objects.get_or_create(
+                row, created = AcsUnrecognisedVoucher.objects.get_or_create(
                     voucher_no=voucher_no,
                     defaults={
                         "pickup_date": pickup_date,
@@ -1964,6 +1996,26 @@ class AcsService:
                 )
                 if created:
                     first_time.append(voucher_no)
+                elif source == AcsUnrecognisedVoucherSource.REFUSED_DELETE:
+                    row.source = source
+                    row.duplicate_of = duplicate_of
+                    if (
+                        row.resolution
+                        == AcsUnrecognisedVoucherResolution.CHECKED
+                    ):
+                        row.resolved_at = None
+                        row.resolution = ""
+                        row.resolved_by_id = None
+                    row.save(
+                        update_fields=[
+                            "source",
+                            "duplicate_of",
+                            "resolved_at",
+                            "resolution",
+                            "resolved_by_id",
+                            "updated_at",
+                        ]
+                    )
             AcsUnrecognisedVoucher.objects.filter(
                 voucher_no__in=numbers
             ).update(last_seen_at=now)

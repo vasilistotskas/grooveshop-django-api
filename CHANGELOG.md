@@ -3,6 +3,139 @@
 
 
 
+## v3.242.3 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_boxnow): the shipment admin follows the service's cancel rule; the service builds the label zip (#603)
+
+The two cancel actions of BoxNowShipmentAdmin tested parcel_state == NEW
+themselves. BoxNowService.can_cancel_shipment is the rule cancel_shipment
+and the order's canBeCanceled read, and it also allows a shipment BoxNow
+never received (no parcel_id), which cancels locally. The admin refused
+that shipment, and a change to the rule would not have reached it. Both
+actions now call can_cancel_shipment.
+
+The bulk voucher zip was assembled inside the admin action. It moves to
+BoxNowService.fetch_labels_zip, the counterpart of
+AcsService.fetch_labels_pdf: it returns the archive and the labels that
+failed, and the action only reports and returns the download. The
+voucher file name has one definition, BoxNowService.label_filename.
+
+shipping_acs: retire_shipments skips TERMINAL_STATES instead of its own
+copy of the four states, and the AcsTrackingEventAdmin docstring no
+longer calls the polled tracking rows webhook deliveries.
+
+Closes #583 ([`563f9fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/563f9fbbcf077cd216715b4a88e0f9e0e2e75809))
+
+### Testing
+
+* test(agent): generate the staff test password at run time (#605)
+
+The literal password in the staff MCP schema-binding test tripped GitGuardian's generic-password detector on every branch that merges main. The test only needs a password it can sign in with, so it now draws one from secrets.token_urlsafe per run. ([`6d13dad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d13dad9ac12a6fca30eb4a64957d66fc49576c5))
+
+## v3.242.2 (2026-11-09)
+
+### Bug fixes
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read (#598) ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): every URL field refuses a URL the storefront's parser cannot read
+
+Django's and DRF's URLField accept a port past 65535 (`:65536`), which
+the storefront's z.url() refuses: one such value saved would fail the
+storefront's parse, with a 422, on every response that carries it.
+
+- core.fields.url.WebURLField (model) and core.api.url_field.WebURLField
+  (serializer) validate with WebURLValidator. CoreConfig.ready maps the
+  model field to the serializer field for every ModelSerializer.
+- Every model and serializer URL field uses them (blog, builder, order,
+  product, shipping_boxnow, tenant, user). The migrations only record
+  the field class: no SQL.
+- tests/unit/core/test_url_fields_are_web_urls.py fails on a bare
+  Django/DRF URLField in the source or a plain URLField on a project
+  model, and checks the model, a generated serializer field and a
+  declared one refuse the port.
+
+Production checked read-only first: 741 URL values in 4 schemas, none
+refused.
+
+Closes #553 ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+* fix(core): one URL check per value, so a bad URL gets one error
+
+DRF's URLField appends a plain URLValidator, which WebURLValidator
+already runs first, so an invalid URL got the same error twice. The
+serializer WebURLField drops that one and adds WebURLValidator only when
+the caller passed none (the author sameAs field passes one narrowed to
+http/https). ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Chores
+
+* chore(cache): purge the storefront feeds by their rss: function names only
+
+The storefront's feeds read through functions named rss:<what> since
+storefront #433; RssFeed, cachedBlogPostFeed, cachedBlogCategory and
+cachedProductCategoryDetail name no cache any more. ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+### Testing
+
+* test(core): the URL-field rule catches bare and subclassed URLFields ([`6e0c1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e0c1bf212b247f57a88c1168c0a99ffb90e28ad))
+
+## v3.242.1 (2026-11-09)
+
+### Bug fixes
+
+* fix(user): subscription admin actions work from the changelist and end a subscription through unsubscribe() (#601)
+
+The changelist hands an action a queryset that joins
+list_select_related ("user", "topic"). "user" is nullable (a guest
+subscription), and PostgreSQL refuses FOR UPDATE on the nullable side
+of an outer join, so "Resend confirmation" answered 500 for every
+selection. The lock now names the subscription rows only.
+
+"Deactivate selected subscriptions" wrote status and unsubscribed_at
+with a queryset update, which left updated_at at its old value. It now
+locks the rows and calls UserSubscription.unsubscribe(), the rule the
+customer's own unsubscribe uses.
+
+Tests run both actions through the changelist, and pin that
+deactivating a topic subscription is not a marketing opt-out and that
+a loyalty adjustment moves the balance and leaves XP alone. ([`0e3b0d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e3b0d1fbd5e86da1534235c5b27782ce3f1aeb5))
+
+### Chores
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check (#602) ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+* chore(arch): lock Celery task names, add import contracts and a doc-reference check
+
+A task's name is its address: queued messages, the beat schedule and
+DeferredDispatch rows hold it, and a deploy runs two releases side by
+side. The 200 first-party task names are now a committed list, and a
+task that leaves its module without name="<old name>" fails a test.
+
+import-linter checks three boundaries in CI: core imports no domain app
+(tenant excepted), the two carrier apps do not import each other, and a
+carrier app is reached only through shipping. Each contract lists the
+imports that break it today; the lists only shrink.
+
+A test holds every backticked repo path in CLAUDE.md, README.md, docs/
+and .claude/ to a file that exists, and refuses a citation of a Claude
+memory note, which is in no repository.
+
+refactor commits now cut a patch release, so moved code ships and is
+verified as its own release. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
+### Testing
+
+* test(docs): keep a package checked after it moves under a source root
+
+The doc-reference check decided "is this a path of this repository" by
+the first segment being an entry at the repository root. Once a package
+moves into src/, its name is no longer at the root, so every stale
+reference to it would have been read as another repository's path and
+skipped. The entries of src/ now count as first-party roots too. ([`e707b4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e707b4e88f489d3249bfce9bf4b98b5b6ca1148b))
+
 ## v3.242.0 (2026-11-09)
 
 ### Bug fixes

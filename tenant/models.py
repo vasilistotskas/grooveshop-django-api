@@ -15,6 +15,7 @@ from knox.models import AbstractAuthToken
 from simple_history.models import HistoricalRecords
 
 from core.db.encrypted_fields import EncryptedCharField
+from core.fields.url import WebURLField
 from core.json_schema import JSONSchemaValidator
 from core.models import TimeStampMixinModel, UUIDModel
 from core.utils.tenant_urls import (
@@ -212,9 +213,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
 
     # Assets
-    logo_light_url = models.URLField(_("Logo (Light)"), blank=True, default="")
-    logo_dark_url = models.URLField(_("Logo (Dark)"), blank=True, default="")
-    favicon_url = models.URLField(_("Favicon URL"), blank=True, default="")
+    logo_light_url = WebURLField(_("Logo (Light)"), blank=True, default="")
+    logo_dark_url = WebURLField(_("Logo (Dark)"), blank=True, default="")
+    favicon_url = WebURLField(_("Favicon URL"), blank=True, default="")
 
     # The platform's own storefront. At most one store carries this: it
     # renders the brand assets bundled in the storefront image (navbar
@@ -648,7 +649,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     # === Social Links ===
 
-    socials_discord = models.URLField(
+    socials_discord = WebURLField(
         _("Discord URL"),
         blank=True,
         default="",
@@ -658,7 +659,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_facebook = models.URLField(
+    socials_facebook = WebURLField(
         _("Facebook URL"),
         blank=True,
         default="",
@@ -668,7 +669,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_instagram = models.URLField(
+    socials_instagram = WebURLField(
         _("Instagram URL"),
         blank=True,
         default="",
@@ -678,7 +679,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_pinterest = models.URLField(
+    socials_pinterest = WebURLField(
         _("Pinterest URL"),
         blank=True,
         default="",
@@ -692,7 +693,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_reddit = models.URLField(
+    socials_reddit = WebURLField(
         _("Reddit URL"),
         blank=True,
         default="",
@@ -702,7 +703,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_tiktok = models.URLField(
+    socials_tiktok = WebURLField(
         _("TikTok URL"),
         blank=True,
         default="",
@@ -715,7 +716,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # LinkedIn was the conspicuous omission in a set of eight consumer
     # networks: it is the ONLY social presence a B2B engineering
     # practice keeps.
-    socials_linkedin = models.URLField(
+    socials_linkedin = WebURLField(
         _("LinkedIn URL"),
         blank=True,
         default="",
@@ -729,7 +730,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_twitter = models.URLField(
+    socials_twitter = WebURLField(
         _("Twitter / X URL"),
         blank=True,
         default="",
@@ -739,7 +740,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → link hidden in storefront footer."
         ),
     )
-    socials_youtube = models.URLField(
+    socials_youtube = WebURLField(
         _("YouTube URL"),
         blank=True,
         default="",

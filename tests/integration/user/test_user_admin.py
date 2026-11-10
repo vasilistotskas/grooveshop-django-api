@@ -5,7 +5,8 @@ import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
+from django.urls import reverse
 from django.utils import formats, timezone
 
 from country.factories import CountryFactory
@@ -850,6 +851,114 @@ class TestUserSubscriptionAdmin:
         )
 
         mock_message_user.assert_called_once()
+
+    @patch.object(UserSubscriptionAdmin, "message_user")
+    def test_deactivate_subscriptions_stamps_the_row_like_unsubscribe(
+        self, mock_message_user, admin_request
+    ):
+        # ``UserSubscription.unsubscribe`` is the one rule for ending a
+        # subscription, and it moves ``updated_at`` with the status.
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+        subscription = UserSubscriptionFactory(
+            user=UserAccountFactory(),
+            topic=SubscriptionTopicFactory(),
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        )
+        subscribed = timezone.now() - timedelta(days=30)
+        UserSubscription.objects.filter(pk=subscription.pk).update(
+            updated_at=subscribed
+        )
+
+        admin.deactivate_subscriptions(
+            admin_request,
+            UserSubscription.objects.filter(pk=subscription.pk),
+        )
+
+        subscription.refresh_from_db()
+        assert subscription.unsubscribed_at is not None
+        assert subscription.updated_at >= subscription.unsubscribed_at
+
+    @patch.object(UserSubscriptionAdmin, "message_user")
+    def test_deactivate_subscriptions_is_not_a_marketing_opt_out(
+        self, mock_message_user, admin_request
+    ):
+        # The action ends topic subscriptions, as the customer's own
+        # per-topic unsubscribe does. An objection to marketing mail is
+        # recorded on the customer (``UserAdmin.save_model``), not here.
+        from emails import optout
+        from emails.models import EmailOptOut
+
+        admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
+        user = UserAccountFactory()
+        subscription = UserSubscriptionFactory(
+            user=user,
+            topic=SubscriptionTopicFactory(),
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        )
+
+        admin.deactivate_subscriptions(
+            admin_request,
+            UserSubscription.objects.filter(pk=subscription.pk),
+        )
+
+        user.refresh_from_db()
+        assert user.marketing_opted_out_at is None
+        assert not EmailOptOut.objects.filter(
+            address_hash=optout.address_hash(user.email)
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestSubscriptionActionsFromTheChangelist:
+    """The actions as staff run them: the changelist hands an action a
+    queryset that joins ``list_select_related``, which a direct call with
+    a plain queryset never exercises."""
+
+    @pytest.fixture
+    def staff_client(self):
+        client = Client()
+        client.force_login(
+            UserAccountFactory(admin=True),
+            backend="tenant.auth_backends.PlatformStaffBackend",
+        )
+        return client
+
+    def _run(self, client, action, subscription):
+        return client.post(
+            reverse("admin:user_usersubscription_changelist"),
+            {"action": action, "_selected_action": [subscription.pk]},
+        )
+
+    def test_resend_confirmation_rearms_and_queues_the_mail(self, staff_client):
+        pending = UserSubscriptionFactory(
+            user=UserAccountFactory(),
+            topic=SubscriptionTopicFactory(),
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="old-token",
+        )
+
+        with patch(
+            "user.services.subscription.dispatch_confirmation"
+        ) as mock_dispatch:
+            response = self._run(staff_client, "resend_confirmation", pending)
+
+        assert response.status_code == 302
+        pending.refresh_from_db()
+        assert pending.confirmation_token not in ("", "old-token")
+        mock_dispatch.assert_called_once()
+
+    def test_deactivate_subscriptions_ends_the_subscription(self, staff_client):
+        active = UserSubscriptionFactory(
+            user=UserAccountFactory(),
+            topic=SubscriptionTopicFactory(),
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        )
+
+        response = self._run(staff_client, "deactivate_subscriptions", active)
+
+        assert response.status_code == 302
+        active.refresh_from_db()
+        assert active.status == UserSubscription.SubscriptionStatus.UNSUBSCRIBED
 
 
 @pytest.mark.django_db

@@ -701,7 +701,7 @@ def register_default_surfaces() -> None:
             # These are cached FUNCTIONS, not routes: the sitemap source
             # and the RSS feed build their data through
             # ``defineCachedFunction`` (``sitemap:blog-posts``,
-            # ``rss:products``, ``RssFeed``, ...), so the previous
+            # ``rss:feed``, ``rss:blog-posts``, ...), so the previous
             # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
             # matched no key in Redis and this surface's Nuxt half was a
             # no-op. Verified against the live keyspace.
@@ -711,18 +711,11 @@ def register_default_surfaces() -> None:
             # pod's memory, where no purge reached it, so the storefront
             # turned it off and caches the response in Redis instead.
             #
-            # The feed's own reads (``cachedBlogPostFeed``,
-            # ``cachedBlogCategory``, ``cachedProductCategoryDetail``) are
-            # functions of their own name: without them a purge left the
-            # feed rebuilt from the posts it cached before the change.
-            nuxt_patterns=_nuxt_functions(
-                "sitemap",
-                "rss",
-                "RssFeed",
-                "cachedBlogPostFeed",
-                "cachedBlogCategory",
-                "cachedProductCategoryDetail",
-            )
+            # Every read the feeds make is a function named ``rss:<what>``
+            # (the storefront's ``server/utils/rssFeed.ts``), so ``rss``
+            # purges the feed and the posts and categories it was built
+            # from.
+            nuxt_patterns=_nuxt_functions("sitemap", "rss")
             + _nuxt_routes("/sitemap.xml")
             + _nuxt("nuxt-ai-ready"),
             # What the sitemap and the feeds list. A row that goes live at

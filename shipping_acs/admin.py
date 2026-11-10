@@ -38,7 +38,7 @@ from shipping_acs.attention import (
     unremitted_cod_shipments,
 )
 from shipping_acs.diagnostics import shipment_timeline
-from shipping_acs.enum.shipment_state import AcsShipmentState
+from shipping_acs.enum.shipment_state import TERMINAL_STATES, AcsShipmentState
 from shipping_acs.models import (
     AcsApiCall,
     AcsCodPayout,
@@ -545,14 +545,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
         ``.update()``) so simple-history records who retired what.
         """
         retired = 0
-        for shipment in queryset.exclude(
-            shipment_state__in=[
-                AcsShipmentState.DELIVERED,
-                AcsShipmentState.RETURNED,
-                AcsShipmentState.CANCELED,
-                AcsShipmentState.LOST,
-            ]
-        ):
+        for shipment in queryset.exclude(shipment_state__in=TERMINAL_STATES):
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment._change_reason = "Retired via admin action"
             shipment.save(update_fields=["shipment_state"])
@@ -1075,7 +1068,8 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
 @admin.register(AcsTrackingEvent)
 class AcsTrackingEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
-    """Read-only audit trail of ACS tracking webhook deliveries."""
+    """Read-only audit trail of the tracking checkpoints the ACS poll
+    recorded (ACS has no webhook)."""
 
     list_display = (
         "shipment",

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import logging
 import time
+import zipfile
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
@@ -24,6 +26,8 @@ from shipping_boxnow.models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
@@ -1709,6 +1713,59 @@ class BoxNowService:
         )
         cache.set(cache_key, label_bytes, timeout=_LABEL_CACHE_TTL)
         return label_bytes
+
+    @staticmethod
+    def label_filename(shipment: BoxNowShipment) -> str:
+        """The file name a parcel's voucher PDF is downloaded under."""
+        return f"boxnow-voucher-{shipment.parcel_id}.pdf"
+
+    @classmethod
+    def fetch_labels_zip(
+        cls, shipments: Iterable[BoxNowShipment]
+    ) -> tuple[bytes, list[dict[str, Any]]]:
+        """Bundle the voucher PDFs for ``shipments`` into one zip archive.
+
+        One :meth:`fetch_label_bytes` call per parcel (each cached for an
+        hour), stored under :meth:`label_filename`. A shipment with no
+        ``parcel_id`` is left out: BoxNow has no voucher for it yet.
+
+        A label that fails is collected and reported, never raised, so
+        one bad parcel does not stop the others. Returns
+        ``(zip_bytes, failures)``; ``zip_bytes`` is empty when no label
+        was bundled.
+        """
+        buffer = io.BytesIO()
+        bundled = 0
+        failures: list[dict[str, Any]] = []
+
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for shipment in shipments:
+                if not shipment.parcel_id:
+                    continue
+                try:
+                    pdf = cls.fetch_label_bytes(shipment)
+                except Exception as exc:
+                    logger.exception(
+                        "fetch_labels_zip: parcel %s (order #%s) could not "
+                        "be fetched — continuing with the rest",
+                        shipment.parcel_id,
+                        shipment.order_id,
+                    )
+                    failures.append(
+                        {
+                            "shipment_id": shipment.pk,
+                            "order_id": shipment.order_id,
+                            "parcel_id": shipment.parcel_id,
+                            "error": str(exc),
+                        }
+                    )
+                    continue
+                archive.writestr(cls.label_filename(shipment), pdf)
+                bundled += 1
+
+        if not bundled:
+            return b"", failures
+        return buffer.getvalue(), failures
 
     # ------------------------------------------------------------------
     # Private helpers

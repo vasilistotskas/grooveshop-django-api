@@ -3,6 +3,14 @@
 
 
 
+## v3.242.4 (2026-11-10)
+
+### Bug fixes
+
+* fix(agent): a profit report with any margin serializes (#614)
+
+StaffProfitRowSerializer bounded gross_margin to seven digits, but a percentage of revenue has no bound: a day whose sales were mostly returned leaves cents of revenue against euros of cost, and DRF raised InvalidOperation, a 500 on profit_report for that range every time. The field is now unbounded. ([`67bc91b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67bc91b8cb1ce38d0a57b30b41e1e7d375e48ba1))
+
 ## v3.242.3 (2026-11-10)
 
 ### Bug fixes

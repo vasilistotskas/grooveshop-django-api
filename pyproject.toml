@@ -1,5 +1,5 @@
 [project]
-version = "3.242.0"
+version = "3.242.3"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -96,6 +96,7 @@ dev = [
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
     "hypothesis==6.170.15",
+    "import-linter==2.16",
     "ty==0.0.99",
     "pytest-split==0.11.0",
     # Uvicorn's `--reload` (local dev server) uses it, and only with it
@@ -206,7 +207,7 @@ allowed_tags = [
     "test",
 ]
 minor_tags = ["feat"]
-patch_tags = ["fix", "perf"]
+patch_tags = ["fix", "perf", "refactor"]
 
 [tool.semantic_release.branches.main]
 match = "(main|master)"
@@ -552,3 +553,198 @@ include = ["order/payment.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
+
+# ─────────────────────────────────────────────────────────
+# Import contracts (import-linter): `uv run lint-imports`
+# ─────────────────────────────────────────────────────────
+# Which app may import which. grimp reads every import statement,
+# `lazy` ones and those inside functions included. `ignore_imports`
+# is the list of imports that broke a contract on the day it was
+# written (issue #558): it only shrinks. Fix the import and delete
+# its line; never add one. `allow_indirect_imports` keeps a contract
+# about what a module itself imports.
+[tool.importlinter]
+root_packages = [
+    "admin",
+    "agent",
+    "asgi",
+    "b2b",
+    "blog",
+    "builder",
+    "cart",
+    "contact",
+    "core",
+    "country",
+    "devtools",
+    "emails",
+    "giftcard",
+    "indexnow",
+    "loyalty",
+    "meili",
+    "meta_capi",
+    "notification",
+    "order",
+    "page_config",
+    "pay_way",
+    "product",
+    "promotion",
+    "recommendation",
+    "region",
+    "scheduler",
+    "search",
+    "shipping",
+    "shipping_acs",
+    "shipping_boxnow",
+    "tag",
+    "tenant",
+    "texts",
+    "user",
+    "vat",
+]
+
+[[tool.importlinter.contracts]]
+name = "core imports no domain app (tenant excepted)"
+type = "forbidden"
+source_modules = ["core"]
+forbidden_modules = [
+    "admin",
+    "agent",
+    "b2b",
+    "blog",
+    "builder",
+    "cart",
+    "contact",
+    "country",
+    "devtools",
+    "emails",
+    "giftcard",
+    "indexnow",
+    "loyalty",
+    "meili",
+    "meta_capi",
+    "notification",
+    "order",
+    "page_config",
+    "pay_way",
+    "product",
+    "promotion",
+    "recommendation",
+    "region",
+    "scheduler",
+    "search",
+    "shipping",
+    "shipping_acs",
+    "shipping_boxnow",
+    "tag",
+    "texts",
+    "user",
+    "vat",
+]
+ignore_imports = [
+    "core.admin -> admin.base",
+    "core.admin -> admin.mixins",
+    "core.admin -> admin.platform_site",
+    "core.api.serializers -> product.models",
+    "core.api.throttling -> cart.agent_token",
+    "core.api.views -> contact.attachments",
+    "core.cache.service -> builder.data_purge",
+    "core.emails -> emails.declare",
+    "core.emails -> emails.types",
+    "core.generators -> user.models.account",
+    "core.management.commands.reset_staff_mfa -> admin.staff_mfa",
+    "core.management.commands.reset_staff_mfa -> user.models",
+    "core.middleware.idempotency -> cart.agent_token",
+    "core.middleware.idempotency -> cart.services",
+    "core.tasks -> cart.models",
+    "core.tasks -> emails.send",
+    "core.templatetags.store_brand -> admin.branding",
+    "core.urls -> emails.webhooks",
+    "core.urls -> order.views.viva_webhook",
+    "core.urls -> shipping_boxnow.views.webhook",
+    "core.utils.files -> search.transliteration",
+    "core.validators.address -> country.models",
+    "core.validators.address -> region.models",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "shipping_acs does not import shipping_boxnow"
+type = "forbidden"
+source_modules = ["shipping_acs"]
+forbidden_modules = ["shipping_boxnow"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "shipping_boxnow does not import shipping_acs"
+type = "forbidden"
+source_modules = ["shipping_boxnow"]
+forbidden_modules = ["shipping_acs"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "a carrier app is reached only through shipping"
+type = "forbidden"
+source_modules = [
+    "admin",
+    "agent",
+    "asgi",
+    "b2b",
+    "blog",
+    "builder",
+    "cart",
+    "contact",
+    "core",
+    "country",
+    "devtools",
+    "emails",
+    "giftcard",
+    "indexnow",
+    "loyalty",
+    "meili",
+    "meta_capi",
+    "notification",
+    "order",
+    "page_config",
+    "pay_way",
+    "product",
+    "promotion",
+    "recommendation",
+    "region",
+    "scheduler",
+    "search",
+    "tag",
+    "tenant",
+    "texts",
+    "user",
+    "vat",
+]
+forbidden_modules = ["shipping_acs", "shipping_boxnow"]
+ignore_imports = [
+    "admin.dashboard.store.queries -> shipping_acs.attention",
+    "admin.displays -> shipping_acs.enum.shipment_state",
+    "admin.displays -> shipping_boxnow.enum",
+    "admin.features -> shipping_acs.carrier",
+    "admin.features -> shipping_boxnow.carrier",
+    "core.urls -> shipping_boxnow.views.webhook",
+    "devtools.demo_account -> shipping_acs.models",
+    "devtools.demo_account -> shipping_boxnow.models",
+    "devtools.demo_shipments -> shipping_acs.enum.charge_type",
+    "devtools.demo_shipments -> shipping_acs.enum.cod_payment_way",
+    "devtools.demo_shipments -> shipping_acs.models",
+    "devtools.demo_shipments -> shipping_boxnow.enum.compartment_size",
+    "devtools.demo_shipments -> shipping_boxnow.enum.payment_mode",
+    "devtools.demo_shipments -> shipping_boxnow.models",
+    "order.admin -> shipping_acs.admin",
+    "order.admin -> shipping_boxnow.admin",
+    "order.emails -> shipping_acs.models",
+    "order.emails -> shipping_boxnow.models",
+    "order.serializers.order -> shipping_acs.serializers.shipment",
+    "order.serializers.order -> shipping_boxnow.serializers.shipment",
+    "order.views.order -> shipping_acs.exceptions",
+    "order.views.order -> shipping_acs.services",
+    "order.views.order -> shipping_boxnow.exceptions",
+    "order.views.order -> shipping_boxnow.services",
+    "user.services.gdpr -> shipping_acs.models",
+    "user.services.gdpr -> shipping_boxnow.models.shipment",
+]
+allow_indirect_imports = true

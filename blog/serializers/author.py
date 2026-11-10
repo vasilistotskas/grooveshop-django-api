@@ -12,6 +12,7 @@ from blog.models.author import (
     BlogAuthor,
 )
 from core.api.schema import generate_schema_multi_lang
+from core.api.url_field import WebURLField
 from core.utils.serializers import TranslatedFieldExtended
 from user.serializers.account import UserPublicSerializer
 
@@ -31,7 +32,7 @@ class BlogAuthorSerializer(
     # Read-only here so the schema states it on every author read: the
     # list is always there, empty when the author has none.
     same_as = serializers.ListField(
-        child=serializers.URLField(max_length=PROFILE_URL_MAX_LENGTH),
+        child=WebURLField(max_length=PROFILE_URL_MAX_LENGTH),
         read_only=True,
         help_text=_(
             "Links to the author's public profiles on other sites, such as"
@@ -143,7 +144,7 @@ class BlogAuthorWriteSerializer(
     # URLField, which accepts ``ftp:`` and leaves the model's scheme
     # validator behind.
     same_as = serializers.ListField(
-        child=serializers.URLField(
+        child=WebURLField(
             max_length=PROFILE_URL_MAX_LENGTH,
             validators=[PROFILE_URL_VALIDATOR],
         ),

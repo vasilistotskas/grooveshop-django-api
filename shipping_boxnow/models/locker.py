@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.fields.url import WebURLField
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping_boxnow.enum.locker_type import BoxNowLockerType
 
@@ -32,7 +33,7 @@ class BoxNowLocker(UUIDModel, TimeStampMixinModel):
         choices=BoxNowLockerType.choices,
         default=BoxNowLockerType.APM,
     )
-    image_url = models.URLField(
+    image_url = WebURLField(
         _("Image URL"),
         max_length=500,
         blank=True,

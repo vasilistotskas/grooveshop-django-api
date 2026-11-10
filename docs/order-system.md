@@ -1393,6 +1393,19 @@ accepting Cyprus orders at the Greek flat rate.
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
   new request with `P410` (duplicate) raises the usual creation alert.
+- **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
+  BoxNow never received (no `parcel_id`) cancels locally with no API
+  call; a parcel cancels only while it is `new` (BoxNow answers P420
+  otherwise); an already `canceled` one is a no-op. `cancel_shipment`,
+  the order's `canBeCanceled` and the shipment admin's two cancel
+  actions ("Cancel parcels via BoxNow API" on the list, "Cancel parcel
+  via BoxNow API" on the detail page) all read it, so the admin skips or
+  refuses exactly what the service would refuse.
+- "Download voucher PDFs (zip)" (shipment list action) returns the
+  archive `BoxNowService.fetch_labels_zip` builds: one cached
+  `fetch_label_bytes` call per parcel, a shipment with no parcel left
+  out, a label that fails reported and the rest still bundled (the
+  counterpart of `AcsService.fetch_labels_pdf`).
 - **The compartment size is derived from the products' dimensions**
   (`shipping_boxnow/packing.py`). `Product.length` / `width` / `height`
   are nullable `Distance` fields (stored in metres, edited in cm, mm, m or

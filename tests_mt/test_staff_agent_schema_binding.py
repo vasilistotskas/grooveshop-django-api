@@ -40,7 +40,7 @@ from django_tenants.utils import (
 pytestmark = pytest.mark.django_db
 
 CONNECT_HOST = "connect.test"
-PASSWORD = "a-passw0rd!"
+PASSWORD = secrets.token_urlsafe(16)
 REDIRECT_URI = "https://agent.example/callback"
 
 STAFF_ENDPOINTS = (

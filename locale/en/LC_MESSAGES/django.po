@@ -573,6 +573,10 @@ msgid "%(seen)d/%(total)d seen (%(rate).0f%%)"
 msgstr "%(seen)d/%(total)d seen (%(rate).0f%%)"
 
 #, python-format
+msgid "%(state)s (%(stock)s)"
+msgstr "%(state)s (%(stock)s)"
+
+#, python-format
 msgid "%(store)s reached billing stage %(stage)s"
 msgstr "%(store)s reached billing stage %(stage)s"
 
@@ -1364,12 +1368,11 @@ msgstr "Active Tags"
 msgid "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 msgstr "Active payment methods this (provider, kind) can settle, by the same rules checkout applies when the shopper picks it. Stated as a fact per option rather than as 'exclusive to this row': the storefront collapses several carriers into one home-delivery card, so only it knows which rows it actually renders and can work out what a given choice uniquely unlocks. Lets the delivery step advertise a carrier-only product — BOX NOW Αντικαταβολή is reachable ONLY via a BoxNow locker, and a shopper who never picks one has no way to discover it exists."
 
+msgid "Active products at or below their low-stock threshold"
+msgstr "Active products at or below their low-stock threshold"
+
 msgid "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
 msgstr "Active products with all their attributes and images, for catalogue feeds. Filtered, sorted and paginated like the product list."
-
-#, python-format
-msgid "Active products with fewer than %(count)s left"
-msgstr "Active products with fewer than %(count)s left"
 
 msgid "Activity"
 msgstr "Activity"
@@ -3773,15 +3776,8 @@ msgstr "Credited receipt"
 msgid "Credits receipt %(number)s"
 msgstr "Credits receipt %(number)s"
 
-#, python-format
-msgid "Critical (%(stock)s)"
-msgstr "Critical (%(stock)s)"
-
 msgid "Critical Priority"
 msgstr "Critical Priority"
-
-msgid "Critical Stock (1-5)"
-msgstr "Critical Stock (1-5)"
 
 msgid "Crypto-random, uppercased; the bearer secret"
 msgstr "Crypto-random, uppercased; the bearer secret"
@@ -7094,9 +7090,6 @@ msgstr "High Rate"
 msgid "High Reservations (>50% stock)"
 msgstr "High Reservations (>50% stock)"
 
-msgid "High Stock (>50)"
-msgstr "High Stock (>50)"
-
 msgid "High Usage (21-50)"
 msgstr "High Usage (21-50)"
 
@@ -7383,9 +7376,6 @@ msgstr "Imported: {created} created, {updated} updated."
 msgid "Impression"
 msgstr "Impression"
 
-msgid "In Stock (>0)"
-msgstr "In Stock (>0)"
-
 #, python-format
 msgid "In case you forgot, your username is %(username)s."
 msgstr "In case you forgot, your username is %(username)s."
@@ -7398,10 +7388,6 @@ msgstr "In depot"
 
 msgid "In stock"
 msgstr "In stock"
-
-#, python-format
-msgid "In stock (%(stock)s)"
-msgstr "In stock (%(stock)s)"
 
 #, python-format
 msgid "In the last %(days)s days"
@@ -8166,18 +8152,11 @@ msgstr "Loved (High Likes)"
 msgid "Low"
 msgstr "Low"
 
-#, python-format
-msgid "Low (%(stock)s)"
-msgstr "Low (%(stock)s)"
-
 msgid "Low Priority"
 msgstr "Low Priority"
 
 msgid "Low Rate"
 msgstr "Low Rate"
-
-msgid "Low Stock (1-10)"
-msgstr "Low Stock (1-10)"
 
 msgid "Low Stock Alert"
 msgstr "Low Stock Alert"
@@ -9931,9 +9910,6 @@ msgstr "Other expenses"
 
 msgid "Out for delivery"
 msgstr "Out for delivery"
-
-msgid "Out of Stock (0)"
-msgstr "Out of Stock (0)"
 
 msgid "Out of stock"
 msgstr "Out of stock"
@@ -17583,6 +17559,10 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Active (Last 24h)"
 #~ msgstr "Active (Last 24h)"
 
+#, python-format
+#~ msgid "Active products with fewer than %(count)s left"
+#~ msgstr "Active products with fewer than %(count)s left"
+
 #~ msgid "Admin display name for this layout."
 #~ msgstr "Admin display name for this layout."
 
@@ -17664,6 +17644,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Contact Panel"
 #~ msgstr "Contact Panel"
+
+#~ msgid "Critical Stock (1-5)"
+#~ msgstr "Critical Stock (1-5)"
 
 #~ msgid "Crontab Schedules"
 #~ msgstr "Crontab Schedules"
@@ -17774,6 +17757,9 @@ msgstr "…and {count} more lines with errors."
 #~ msgid "Hero Carousel"
 #~ msgstr "Hero Carousel"
 
+#~ msgid "High Stock (>50)"
+#~ msgstr "High Stock (>50)"
+
 #~ msgid "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
 #~ msgstr "Identifier for the page (e.g. \"home\", \"products\", \"blog\")."
 
@@ -17788,6 +17774,13 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Image Gallery"
 #~ msgstr "Image Gallery"
+
+#~ msgid "In Stock (>0)"
+#~ msgstr "In Stock (>0)"
+
+#, python-format
+#~ msgid "In stock (%(stock)s)"
+#~ msgstr "In stock (%(stock)s)"
 
 #~ msgid "Inactive user notification"
 #~ msgstr "Inactive user notification"
@@ -17831,6 +17824,13 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Location Map"
 #~ msgstr "Location Map"
+
+#, python-format
+#~ msgid "Low (%(stock)s)"
+#~ msgstr "Low (%(stock)s)"
+
+#~ msgid "Low Stock (1-10)"
+#~ msgstr "Low Stock (1-10)"
 
 #~ msgid "Loyalty & Engagement"
 #~ msgstr "Loyalty & Engagement"
@@ -17936,6 +17936,9 @@ msgstr "…and {count} more lines with errors."
 
 #~ msgid "Order Reminder"
 #~ msgstr "Order Reminder"
+
+#~ msgid "Out of Stock (0)"
+#~ msgstr "Out of Stock (0)"
 
 #~ msgid "Page Hero"
 #~ msgstr "Page Hero"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import reduce
+from operator import or_
 from typing import TYPE_CHECKING, cast
 
 from django.db.models import (
@@ -11,6 +13,7 @@ from django.db.models import (
     IntegerField,
     OuterRef,
     Prefetch,
+    Q,
     Subquery,
     Value,
     When,
@@ -23,6 +26,7 @@ from core.managers import (
 )
 from core.mixins import SoftDeleteQuerySetMixin
 from product.enum.review import ReviewStatus
+from product.enum.stock import StockState
 from product.managers.image import ORDERED_IMAGES
 
 if TYPE_CHECKING:
@@ -89,6 +93,13 @@ def review_average_expression(product: str = "pk") -> Coalesce:
     )
 
 
+STOCK_STATE_FILTERS: dict[StockState, Q] = {
+    StockState.OUT_OF_STOCK: Q(stock=0),
+    StockState.LOW_STOCK: Q(stock__gt=0, stock__lte=F("low_stock_threshold")),
+    StockState.IN_STOCK: Q(stock__gt=F("low_stock_threshold")),
+}
+
+
 class ProductQuerySet(
     SoftDeleteQuerySetMixin,
     TranslatableOptimizedQuerySet,
@@ -123,11 +134,23 @@ class ProductQuerySet(
     def inactive(self) -> Self:
         return self.filter(active=False)
 
-    def in_stock(self) -> Self:
-        return self.filter(stock__gt=0)
+    def by_stock_state(self, *states: StockState) -> Self:
+        """Products in any of ``states``, by the rule ``StockState`` states.
+
+        The three filters partition the table and match
+        ``Product.stock_state`` row for row. Low needs stock above 0 and at
+        or below the threshold, so a threshold of 0 (alerts off) is never
+        low: such a product is out of stock at 0 and in stock above it.
+        """
+        return self.filter(
+            reduce(or_, (STOCK_STATE_FILTERS[state] for state in states))
+        )
+
+    def low_stock(self) -> Self:
+        return self.by_stock_state(StockState.LOW_STOCK)
 
     def out_of_stock(self) -> Self:
-        return self.filter(stock=0)
+        return self.by_stock_state(StockState.OUT_OF_STOCK)
 
     def with_category(self) -> Self:
         """Select related category, VAT and brand."""

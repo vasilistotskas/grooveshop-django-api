@@ -73,6 +73,17 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "request again”."
         ),
     )
+    voucher_request_held_at = models.DateTimeField(
+        _("Voucher request held since"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Set when the voucher request was not sent because ACS was "
+            "failing (an ACS voucher hold was in force). Nothing reached "
+            "ACS; the request is sent automatically once ACS answers "
+            "again."
+        ),
+    )
 
     # ── Pickup list (daily manifest) ────────────────────────────────
     pickup_list = models.ForeignKey(

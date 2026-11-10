@@ -419,7 +419,23 @@ def recent_orders() -> list[dict[str, Any]]:
 
 
 @dashboard_query(
-    "store:attention:v2",
+    "store:acs-voucher-hold:v1",
+    ttl=60,
+    depends_on=("shipping_acs.AcsVoucherHold",),
+)
+def acs_voucher_hold_since() -> datetime | None:
+    """Since when the store's ACS voucher requests are held, or None."""
+    from shipping_acs import attention as acs
+
+    return (
+        acs.voucher_holds_in_force()
+        .values_list("started_at", flat=True)
+        .first()
+    )
+
+
+@dashboard_query(
+    "store:attention:v3",
     ttl=60,
     depends_on=(
         "order.Order",
@@ -432,6 +448,7 @@ def recent_orders() -> list[dict[str, Any]]:
         "shipping_acs.AcsShipment",
         "shipping_acs.AcsCodPayout",
         "shipping_acs.AcsUnrecognisedVoucher",
+        "shipping_acs.AcsVoucherHold",
         # A canceled or re-issued parcel moves the follow-up count.
         "shipping_boxnow.BoxNowShipment",
         # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
@@ -467,6 +484,9 @@ def attention_counts() -> dict[str, int]:
         "stale_shipments": acs.stale_shipments(now).count(),
         "acs_voucher_requests_unknown": acs.voucher_requests_unknown().count(),
         "acs_unrecognised_vouchers": acs.unrecognised_vouchers().count(),
+        # One state, however many orders wait behind it: voucher requests
+        # held while ACS is failing (``shipping_acs.voucher_hold``).
+        "acs_voucher_holds": acs.voucher_holds_in_force().count(),
         "unremitted_cod": acs.unremitted_cod_shipments(now=now).count(),
         "unattributed_cod_payouts": acs.unattributed_payouts().count(),
         "canceled_still_paid": model("order.Order")

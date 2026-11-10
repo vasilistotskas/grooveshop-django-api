@@ -103,6 +103,7 @@ the request may have reached ACS (`AcsClient._exchange`):
 |---|---|---|
 | `ConnectTimeout`; `ConnectionError` wrapping a `MaxRetryError` whose reason is `NewConnectionError` / `NameResolutionError`; the request cap (`ACS request cap: ...`) | `AcsRetryableError` | never reached ACS: claim released, Celery retries |
 | 403 / 406 | `AcsAuthError` | the manual's rejections (p. 1-2): claim released, Celery retries |
+| an ACS voucher hold in force (`Not sent: ...`) | `AcsVoucherRequestHeldError` | never sent: no claim kept, `voucher_request_held_at` stamped, sent later by `issue_held_acs_vouchers` (below) |
 | `ACSExecution_HasError`, a value row `Error_Message`, any other 4xx | `AcsAPIError` | ACS refused: claim released, `ops.shipment_rejected` |
 | `ReadTimeout`, any other `ConnectionError` (urllib3's `ProtocolError`, a connection dropped after the body left, arrives as a plain `ConnectionError`), any 5xx, a non-JSON 200 | `AcsOutcomeUnknownError` | **unknown** |
 | an exception the client does not classify; a 200 with neither `Voucher_No` nor `Error_Message`; a claim older than `_MINT_CLAIM_TTL_SECONDS` (a worker stopped between the request and the save) | | **unknown** |
@@ -162,6 +163,29 @@ and keeps one on a shipment with no voucher (it was canceled before the
 lost request was resolved; both resolutions still work).
 
 LogsQL: `phase:phase2_outcome_unknown` or `phase:phase1_stale_claim`.
+
+## Voucher requests held while ACS is failing
+
+An unknown outcome of a create the store sent begins an `AcsVoucherHold`
+(admin: ACS voucher holds; `docs/order-system.md` §5.1 has the states).
+While it is in force no `ACS_Create_Voucher` is sent for the store: the
+task returns `{"status": "voucher_request_held"}`, the shipment carries
+`voucher_request_held_at` (shipment list, `attention=voucher_held`) and
+ACS API Calls shows no create for it, or one whose error starts with
+"Not sent" (a request stopped at its slot, with no HTTP status). A held
+order needs nothing from
+staff. Only the orders whose request was really sent and lost are "ACS
+voucher requests to check".
+
+To see why a hold has not ended, read its row: `reason` is the last lost
+answer, `failed_trials` how many times the one request sent first lost
+its answer too, and "ACS is asked again after" the next time
+`issue_held_acs_vouchers` asks ACS a read (`ACS_Get_Pickup_Lists` in ACS
+API Calls, every tick after that time until one is answered). If ACS is
+known to answer, press **ACS answers again: send one request** on the
+hold.
+
+LogsQL: `"ACS voucher hold"` or `"ACS voucher requests are held"`.
 
 ## A voucher ACS names that matches no order
 

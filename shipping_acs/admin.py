@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import StackedInline, TabularInline
@@ -35,12 +36,15 @@ from admin.base import BaseModelAdmin
 from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.models.order import Order
+from shipping_acs import voucher_hold
 from shipping_acs.attention import (
     needs_no_voucher,
     stale_shipment_q,
     unattributed_payout_q,
     unremitted_cod_shipments,
     unresolved_unrecognised_voucher_q,
+    voucher_hold_in_force_q,
+    voucher_request_held_q,
     voucher_request_unknown,
     voucher_request_unknown_q,
 )
@@ -55,7 +59,10 @@ from shipping_acs.models import (
     AcsStation,
     AcsTrackingEvent,
     AcsUnrecognisedVoucher,
+    AcsVoucherHold,
 )
+from shipping_acs.tasks import issue_held_acs_vouchers
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +85,11 @@ def _back_to_changelist(model_admin):
     return redirect(
         reverse(f"admin:{opts.app_label}_{opts.model_name}_changelist")
     )
+
+
+def _local_time(moment) -> str:
+    """``moment`` in the store's time zone, as the admin writes dates."""
+    return date_format(timezone.localtime(moment), "SHORT_DATETIME_FORMAT")
 
 
 class CodReceivedOutsideAcsForm(BaseDialogForm):
@@ -298,6 +310,10 @@ class NeedsAttentionFilter(DropdownFilter):
                 "voucher_unknown",
                 _("Voucher request with an unknown outcome"),
             ),
+            (
+                "voucher_held",
+                _("Voucher request held while ACS is failing"),
+            ),
             ("unremitted_cod", _("Delivered COD never paid out by ACS")),
         ]
 
@@ -307,6 +323,8 @@ class NeedsAttentionFilter(DropdownFilter):
                 return queryset.filter(stale_shipment_q())
             case "voucher_unknown":
                 return queryset.filter(voucher_request_unknown_q())
+            case "voucher_held":
+                return queryset.filter(voucher_request_held_q())
             case "unremitted_cod":
                 return queryset.filter(
                     pk__in=unremitted_cod_shipments().values("pk")
@@ -377,6 +395,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     readonly_fields = (
         "voucher_no",
         "voucher_request_unknown_at",
+        "voucher_request_held_at",
         "shipment_state",
         "label_printed_at",
         "last_polled_at",
@@ -403,6 +422,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
                     "order",
                     "voucher_no",
                     "voucher_request_unknown_at",
+                    "voucher_request_held_at",
                     "shipment_state",
                     "delivery_kind",
                     "pickup_list",
@@ -933,7 +953,6 @@ class AcsShipmentAdmin(BaseModelAdmin):
         from shipping_acs.models import AcsShipment as _Shipment
         from shipping_acs.services import AcsService
         from shipping_acs.tasks import create_acs_voucher_for_order
-        from tenant.celery import dispatch_on_commit
 
         try:
             shipment = _Shipment.objects.get(pk=object_id)
@@ -1005,7 +1024,21 @@ class AcsShipmentAdmin(BaseModelAdmin):
             )
 
         dispatch_on_commit(create_acs_voucher_for_order, [shipment.order_id])
-        messages.info(request, _("Voucher creation task dispatched."))
+        # The mint holds the request too (``AcsVoucherRequestHeldError``),
+        # in a Celery task whose answer never reaches this page.
+        hold = voucher_hold.in_force()
+        if hold is not None:
+            messages.warning(
+                request,
+                _(
+                    "ACS voucher requests are held since %(since)s because "
+                    "ACS is failing. This one is sent automatically once ACS "
+                    "answers again."
+                )
+                % {"since": _local_time(hold.started_at)},
+            )
+        else:
+            messages.info(request, _("Voucher creation task dispatched."))
         return _back_to_changelist(self)
 
 
@@ -1250,6 +1283,132 @@ class AcsUnrecognisedVoucherAdmin(BaseModelAdmin):
                 messages.SUCCESS,
             )
         return self._back_to_voucher(object_id)
+
+
+class VoucherHoldInForceFilter(DropdownFilter):
+    """The hold in force is what the dashboard row counts, by the same
+    ``Q`` (:func:`shipping_acs.attention.voucher_hold_in_force_q`)."""
+
+    title = _("In force")
+    parameter_name = "in_force"
+
+    def lookups(self, request, model_admin):
+        return [("yes", _("In force")), ("no", _("Ended"))]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "yes":
+                return queryset.filter(voucher_hold_in_force_q())
+            case "no":
+                return queryset.exclude(voucher_hold_in_force_q())
+            case _:
+                return queryset
+
+
+@admin.register(AcsVoucherHold)
+class AcsVoucherHoldAdmin(BaseModelAdmin):
+    """The spans in which the store's voucher requests waited for ACS.
+
+    A record, never edited: a hold begins with a voucher request whose
+    answer was lost and ends when ACS answers one again
+    (:mod:`shipping_acs.voucher_hold`). The one thing staff do here is
+    say that ACS answers again, which sends one request at once instead
+    of after the wait.
+    """
+
+    list_display = (
+        "started_at",
+        "ended_at",
+        "state",
+        "failed_trials",
+        "last_failure_at",
+        "reason",
+    )
+    list_filter = (VoucherHoldInForceFilter,)
+    readonly_fields = (
+        "started_at",
+        "ended_at",
+        "state",
+        "reason",
+        "last_failure_at",
+        "failed_trials",
+        "asked_again_after",
+        "trial_allowed_at",
+        "trial_until",
+    )
+    fields = readonly_fields
+    actions_detail = ["allow_one_request"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("State"))
+    def state(self, obj: AcsVoucherHold) -> str:
+        if obj.ended_at is not None:
+            return str(_("Ended: ACS answered"))
+        if obj.trial_allowed_at is None:
+            return str(_("Held: nothing is sent"))
+        return str(_("One request first"))
+
+    @admin.display(description=_("ACS is asked again after"))
+    def asked_again_after(self, obj: AcsVoucherHold) -> str:
+        if obj.ended_at is not None or obj.trial_allowed_at is not None:
+            return "-"
+        return _local_time(obj.retry_after)
+
+    @action(
+        description=_("ACS answers again: send one request"),
+        icon="play_arrow",
+        variant=ActionVariant.PRIMARY,
+        permissions=["change"],
+        dialog=ActionDialog(
+            title=_("Send one voucher request to ACS now"),
+            description=_(
+                "Use it when you know ACS answers again and do not want to "
+                "wait. One held voucher request is sent first; the others "
+                "follow only after ACS answers it. If that answer is lost "
+                "too, that one order has to be checked at the ACS portal "
+                "and the rest keep waiting."
+            ),
+        ),
+    )
+    def allow_one_request(
+        self, request: HttpRequest, form, object_id=None, **kwargs
+    ) -> HttpResponse:
+        hold = voucher_hold.in_force()
+        if hold is None or str(hold.pk) != str(object_id):
+            self.message_user(
+                request,
+                _("This hold is no longer in force."),
+                messages.WARNING,
+            )
+        else:
+            voucher_hold.allow_trial()
+            self.log_change(
+                request,
+                hold,
+                "Said ACS answers again: one voucher request sent first",
+            )
+            dispatch_on_commit(issue_held_acs_vouchers)
+            self.message_user(
+                request,
+                _(
+                    "One held voucher request is being sent to ACS. The "
+                    "others follow once ACS answers it."
+                ),
+                messages.SUCCESS,
+            )
+        return HttpResponse(
+            headers={
+                "HX-Redirect": reverse(
+                    "admin:shipping_acs_acsvoucherhold_change",
+                    args=[object_id],
+                ),
+            }
+        )
 
 
 @admin.register(AcsApiCall)

@@ -32,6 +32,7 @@ from pay_way.enum.settlement import PaySettlement
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
+from shipping_acs import voucher_hold
 from shipping_acs.client import TRACKING_SUMMARY_ALIAS, AcsClient
 from shipping_acs.emails import UnrecognisedVouchers, VoucherRequestUnknown
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -41,6 +42,7 @@ from shipping_acs.exceptions import (
     AcsOutcomeUnknownError,
     AcsRetryableError,
     AcsUnprintedVouchersError,
+    AcsVoucherRequestHeldError,
     AcsVoucherRequestUnknownError,
     AcsVoucherResolutionError,
 )
@@ -427,6 +429,15 @@ class AcsService:
         :meth:`adopt_voucher` or :meth:`request_voucher_again`. Only a
         request that never reached ACS, or that ACS refused, releases the
         claim for a retry.
+
+        **While ACS is failing the request waits** (#631). The unknown
+        outcome of a request sent here begins the store's voucher hold
+        (``shipping_acs.voucher_hold``). While it is in force nothing is
+        sent: the shipment is stamped ``voucher_request_held_at`` and
+        :class:`AcsVoucherRequestHeldError` is raised, before the claim
+        or, for a request that waited for a slot while the hold began,
+        from the slot itself with the claim released.
+        ``issue_held_acs_vouchers`` sends it once ACS answers again.
         """
         client = AcsClient()
         # ----- Phase 1: claim the row + sync COD amount -----
@@ -497,14 +508,23 @@ class AcsService:
                     },
                 )
                 stale_claim = _stale_claim_message(claim_age)
+                hold = None
                 cls._set_voucher_request_unknown(shipment)
             else:
                 stale_claim = ""
-                cls._claim_mint(order, shipment, metadata)
+                # ACS is failing: this request waits, with no claim to
+                # expire into the unknown state.
+                hold = voucher_hold.holding()
+                if hold is None:
+                    cls._claim_mint(order, shipment, metadata)
+                else:
+                    cls._mark_voucher_request_held(shipment)
 
         if stale_claim:
             cls._alert_voucher_request_unknown(order.id, stale_claim)
             raise AcsVoucherRequestUnknownError(stale_claim)
+        if hold is not None:
+            raise voucher_hold.held_error(hold)
 
         logger.info(
             "create_voucher_for_order: claim acquired for order=%s "
@@ -532,10 +552,19 @@ class AcsService:
             raise
         try:
             result = client.create_voucher(params)
+        except AcsVoucherRequestHeldError:
+            # The hold began while this request waited for its slot, so
+            # the client did not send it. Not an ACS error to record.
+            cls._release_mint_claim(shipment, held=True)
+            raise
         except Exception as exc:
             cls._record_last_error(shipment, params, exc)
             if not cls._outcome_is_known(exc):
                 cls._voucher_request_lost(order, shipment, exc)
+            if not isinstance(exc, AcsRetryableError):
+                # ACS refused it: an answer, which ends a hold that had
+                # let this request go first.
+                voucher_hold.record_answer()
             # Known outcome: the request never reached ACS (a connection
             # never made, the request cap) or ACS refused it. Release the
             # claim so the retry, or staff, can send it again.
@@ -570,8 +599,10 @@ class AcsService:
                 # A success envelope without a number or a reason: ACS
                 # executed the call and nothing says it made no voucher.
                 cls._voucher_request_lost(order, shipment, api_error)
+            voucher_hold.record_answer()
             cls._release_mint_claim(shipment)
             raise api_error
+        voucher_hold.record_answer()
 
         children: list[str] = []
         if shipment.item_quantity > 1:
@@ -756,9 +787,24 @@ class AcsService:
                 exc_info=True,
             )
 
+    @staticmethod
+    def _mark_voucher_request_held(shipment: AcsShipment) -> None:
+        """Stamp a request the voucher hold kept from ACS, on a row the
+        caller holds locked. The first stamp stays: it is how long the
+        order has waited, and the order the held requests are sent in."""
+        if shipment.voucher_request_held_at is None:
+            shipment.voucher_request_held_at = timezone.now()
+            shipment._change_reason = "Voucher request held: ACS is failing"
+            shipment.save(update_fields=["voucher_request_held_at"])
+
     @classmethod
-    def _release_mint_claim(cls, shipment: AcsShipment) -> None:
+    def _release_mint_claim(
+        cls, shipment: AcsShipment, *, held: bool = False
+    ) -> None:
         """Drop the ``mint_started_at`` flag so a retry can proceed.
+
+        ``held`` also stamps the request as held by the voucher hold, in
+        the same save.
 
         Best effort — a failure here just means the next retry has to
         wait for the TTL to expire.
@@ -779,6 +825,8 @@ class AcsService:
                 if metadata.pop("mint_started_at", None) is not None:
                     fresh.metadata = metadata
                     fresh.save(update_fields=["metadata"])
+                if held:
+                    cls._mark_voucher_request_held(fresh)
         except Exception:
             logger.warning(
                 "Failed to release mint claim for shipment=%s — next retry "
@@ -822,6 +870,12 @@ class AcsService:
         update_fields = ["metadata"]
         metadata["mint_started_at"] = timezone.now().isoformat()
         shipment.metadata = metadata
+        if shipment.voucher_request_held_at is not None:
+            # The hold let it through: from here it is a request like
+            # any other, with its own outcome.
+            shipment.voucher_request_held_at = None
+            shipment._change_reason = "Held voucher request sent"
+            update_fields.append("voucher_request_held_at")
 
         # The contract is COD-only, so the carrier sets
         # ``charge_type=COD`` for every voucher regardless of how the
@@ -894,6 +948,8 @@ class AcsService:
             )
             if entered:
                 cls._set_voucher_request_unknown(fresh)
+        # ACS just lost an answer: the store's further requests wait.
+        voucher_hold.record_unknown_outcome(str(exc))
         logger.error(
             "create_voucher_for_order: the voucher request for order=%s "
             "shipment=%s has an unknown outcome — ACS may hold a voucher; "
@@ -953,6 +1009,26 @@ class AcsService:
                 "Could not send the unknown voucher request alert for order %s",
                 order_id,
             )
+
+    @staticmethod
+    def acs_answers_a_read() -> bool:
+        """Whether ACS answers a read right now.
+
+        ``ACS_Get_Pickup_Lists`` for today (manual, April 2026, p. 15-16):
+        it writes nothing at ACS, needs no voucher of ours and is an alias
+        the store's key already calls. Every alias is one URL, so an
+        answer shows the endpoint, the key and the dispatcher work; it
+        cannot show that ``ACS_Create_Voucher`` does, which is why the
+        voucher hold then sends one request first.
+        """
+        try:
+            AcsClient().get_pickup_lists(
+                pickup_date=timezone.localdate().isoformat()
+            )
+        except AcsError as exc:
+            logger.warning("ACS did not answer a read: %s", exc)
+            return False
+        return True
 
     @classmethod
     def _build_create_voucher_params(

@@ -1112,6 +1112,9 @@ msgstr "ACS alias"
 msgid "ACS already reported a payout for this voucher; there is nothing to settle."
 msgstr "ACS already reported a payout for this voucher; there is nothing to settle."
 
+msgid "ACS answers again: send one request"
+msgstr "ACS answers again: send one request"
+
 msgid "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty disables ACS."
 msgstr "ACS billing code (e.g. 'ΑΚ12345678'). No platform fallback — empty disables ACS."
 
@@ -1145,9 +1148,15 @@ msgstr "ACS does not report voucher %(voucher)s for this store. Check the number
 msgid "ACS error message"
 msgstr "ACS error message"
 
+msgid "ACS failure"
+msgstr "ACS failure"
+
 #, python-format
 msgid "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
 msgstr "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+
+msgid "ACS is asked again after"
+msgstr "ACS is asked again after"
 
 msgid "ACS may hold a voucher: adopt it or request again"
 msgstr "ACS may hold a voucher: adopt it or request again"
@@ -1215,6 +1224,12 @@ msgstr "ACS tracking event"
 msgid "ACS tracking events"
 msgstr "ACS tracking events"
 
+msgid "ACS voucher hold"
+msgstr "ACS voucher hold"
+
+msgid "ACS voucher holds"
+msgstr "ACS voucher holds"
+
 msgid "ACS voucher matching no order"
 msgstr "ACS voucher matching no order"
 
@@ -1223,6 +1238,13 @@ msgstr "ACS voucher number — links back to AcsShipment.voucher_no without a ha
 
 msgid "ACS voucher request with an unknown outcome"
 msgstr "ACS voucher request with an unknown outcome"
+
+msgid "ACS voucher requests are held"
+msgstr "ACS voucher requests are held"
+
+#, python-format
+msgid "ACS voucher requests are held since %(since)s because ACS is failing. This one is sent automatically once ACS answers again."
+msgstr "ACS voucher requests are held since %(since)s because ACS is failing. This one is sent automatically once ACS answers again."
 
 msgid "ACS voucher requests to check"
 msgstr "ACS voucher requests to check"
@@ -4683,6 +4705,12 @@ msgstr "Ended"
 msgid "Ended At"
 msgstr "Ended At"
 
+msgid "Ended at"
+msgstr "Ended at"
+
+msgid "Ended: ACS answered"
+msgstr "Ended: ACS answered"
+
 msgid "Ends At"
 msgstr "Ends At"
 
@@ -5006,6 +5034,9 @@ msgstr "Failed"
 
 msgid "Failed background tasks (24h)"
 msgstr "Failed background tasks (24h)"
+
+msgid "Failed first requests"
+msgstr "Failed first requests"
 
 #, python-brace-format
 msgid "Failed to cancel order: {error}"
@@ -6302,6 +6333,9 @@ msgstr "First name"
 msgid "First named by ACS at"
 msgstr "First named by ACS at"
 
+msgid "First request in flight until"
+msgstr "First request in flight until"
+
 msgid "Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting."
 msgstr "Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting."
 
@@ -7130,6 +7164,12 @@ msgstr "Heavy Discount (>20%)"
 msgid "Height"
 msgstr "Height"
 
+msgid "Held since"
+msgstr "Held since"
+
+msgid "Held: nothing is sent"
+msgstr "Held: nothing is sent"
+
 #, python-format
 msgid "Hello %(first_name)s,"
 msgstr "Hello %(first_name)s,"
@@ -7223,6 +7263,9 @@ msgstr "How it was paid back"
 
 msgid "How it works"
 msgstr "How it works"
+
+msgid "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
+msgstr "How many times the one request sent first also lost its answer. Each one doubles the wait before ACS is asked again."
 
 msgid "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
 msgstr "How the money arrived (bank transfer reference, hand delivery, ...). Recorded on the shipment's audit trail."
@@ -7475,6 +7518,9 @@ msgstr "In case you have forgotten about this, use the link below to recover you
 
 msgid "In depot"
 msgstr "In depot"
+
+msgid "In force"
+msgstr "In force"
 
 msgid "In stock"
 msgstr "In stock"
@@ -7902,6 +7948,9 @@ msgstr "Last error"
 
 msgid "Last event at"
 msgstr "Last event at"
+
+msgid "Last lost answer at"
+msgstr "Last lost answer at"
 
 msgid "Last movement"
 msgstr "Last movement"
@@ -9454,11 +9503,20 @@ msgstr "On pickup list %(no)s"
 msgid "One"
 msgstr "One"
 
+msgid "One held voucher request is being sent to ACS. The others follow once ACS answers it."
+msgstr "One held voucher request is being sent to ACS. The others follow once ACS answers it."
+
 msgid "One of the files is no longer available. Please re-attach it."
 msgstr "One of the files is no longer available. Please re-attach it."
 
 msgid "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
 msgstr "One product per line: sku;net price (VAT-exclusive). Comma also works as separator and as decimal mark. Existing rows for this group are updated in place."
+
+msgid "One request allowed since"
+msgstr "One request allowed since"
+
+msgid "One request first"
+msgstr "One request first"
 
 msgid "One-click unsubscribe"
 msgstr "One-click unsubscribe"
@@ -12809,6 +12867,9 @@ msgstr "Send a contact message to the site administrators."
 msgid "Send as the X-Cart-Token header."
 msgstr "Send as the X-Cart-Token header."
 
+msgid "Send one voucher request to ACS now"
+msgstr "Send one voucher request to ACS now"
+
 msgid "Send receipt to myDATA"
 msgstr "Send receipt to myDATA"
 
@@ -13064,11 +13125,17 @@ msgstr "Set up your authenticator app"
 msgid "Set up your authenticator app in the admin first, then connect again."
 msgstr "Set up your authenticator app in the admin first, then connect again."
 
+msgid "Set when ACS answered a read, or staff said it answers again. One voucher request is then sent first; the rest follow only after ACS answers it."
+msgstr "Set when ACS answered a read, or staff said it answers again. One voucher request is then sent first; the rest follow only after ACS answers it."
+
 msgid "Set when a voucher request was sent to ACS and its answer was lost (a timeout, a dropped connection, a server error, or a worker that stopped before saving). ACS may hold a voucher for this order, so no new request is sent while this is set. Staff clear it with “Adopt ACS voucher” or “No voucher at ACS: request again”."
 msgstr "Set when a voucher request was sent to ACS and its answer was lost (a timeout, a dropped connection, a server error, or a worker that stopped before saving). ACS may hold a voucher for this order, so no new request is sent while this is set. Staff clear it with “Adopt ACS voucher” or “No voucher at ACS: request again”."
 
 msgid "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
 msgstr "Set when the customer unsubscribed from all marketing email (the one-click link in a marketing email). Every marketing send skips the account while this is set."
+
+msgid "Set when the voucher request was not sent because ACS was failing (an ACS voucher hold was in force). Nothing reached ACS; the request is sent automatically once ACS answers again."
+msgstr "Set when the voucher request was not sent because ACS was failing (an ACS voucher hold was in force). Nothing reached ACS; the request is sent automatically once ACS answers again."
 
 msgid "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
 msgstr "Set while the payment ledger holds more money for the order than it is for (a customer paid twice). Cleared when refunds bring it back. Nothing is refunded automatically."
@@ -13290,6 +13357,10 @@ msgstr "Signup"
 
 msgid "Similar product"
 msgstr "Similar product"
+
+#, python-format
+msgid "Since %(since)s, because ACS is failing. They are sent when it answers again"
+msgstr "Since %(since)s, because ACS is failing. They are sent when it answers again"
 
 msgid "Single Use (1)"
 msgstr "Single Use (1)"
@@ -14599,6 +14670,9 @@ msgstr "The last voucher request for order #%(order)s may have reached ACS witho
 msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."
 msgstr "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."
 
+msgid "The last voucher request whose answer was lost, as ACS or the network reported it."
+msgstr "The last voucher request whose answer was lost, as ACS or the network reported it."
+
 msgid "The law requires your online store to show your business details. Please fill in what is missing:"
 msgstr "The law requires your online store to show your business details. Please fill in what is missing:"
 
@@ -15145,6 +15219,9 @@ msgstr "This field is required"
 
 msgid "This file cannot be used."
 msgstr "This file cannot be used."
+
+msgid "This hold is no longer in force."
+msgstr "This hold is no longer in force."
 
 msgid "This id is used twice."
 msgstr "This id is used twice."
@@ -16006,6 +16083,9 @@ msgstr "Use another account"
 msgid "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
 msgstr "Use it when the order no longer needs a voucher (the order or its shipment is canceled). Nothing is sent to ACS. If ACS holds the lost voucher, delete it there and say so."
 
+msgid "Use it when you know ACS answers again and do not want to wait. One held voucher request is sent first; the others follow only after ACS answers it. If that answer is lost too, that one order has to be checked at the ACS portal and the rest keep waiting."
+msgstr "Use it when you know ACS answers again and do not want to wait. One held voucher request is sent first; the others follow only after ACS answers it. If that answer is lost too, that one order has to be checked at the ACS portal and the rest keep waiting."
+
 msgid "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 msgstr "Use it when you know the voucher (made in the ACS portal, handled at an ACS store). It stops being counted; nothing is sent to ACS."
 
@@ -16478,6 +16558,12 @@ msgstr "Voucher creation task dispatched."
 
 msgid "Voucher number"
 msgstr "Voucher number"
+
+msgid "Voucher request held since"
+msgstr "Voucher request held since"
+
+msgid "Voucher request held while ACS is failing"
+msgstr "Voucher request held while ACS is failing"
 
 msgid "Voucher request outcome unknown since"
 msgstr "Voucher request outcome unknown since"

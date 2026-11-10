@@ -21,6 +21,7 @@ import pytest
 from django.utils import timezone
 
 from order.models.history import OrderHistory
+from shipping_acs import voucher_hold
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import (
     AcsAPIError,
@@ -30,7 +31,11 @@ from shipping_acs.exceptions import (
     AcsVoucherResolutionError,
 )
 from shipping_acs.factories import AcsShipmentFactory
-from shipping_acs.models import AcsShipment, AcsUnrecognisedVoucher
+from shipping_acs.models import (
+    AcsShipment,
+    AcsUnrecognisedVoucher,
+    AcsVoucherHold,
+)
 from shipping_acs.models.unrecognised_voucher import (
     AcsUnrecognisedVoucherResolution,
 )
@@ -335,6 +340,19 @@ def _unknown_shipment(acs):
     return shipment
 
 
+def _another_request_was_in_flight() -> None:
+    """Let the next request be sent although an answer was just lost.
+
+    A lost answer holds the store's further voucher requests (#631), so
+    two orders are both of unknown outcome only when both requests were
+    in flight when ACS failed. These tests are about what staff do with
+    two such orders, not about the hold.
+    """
+    AcsVoucherHold.objects.filter(ended_at__isnull=True).update(
+        ended_at=timezone.now()
+    )
+
+
 class TestAdoptTheVoucherAcsHolds:
     def test_adopting_saves_the_voucher_without_a_second_create(
         self, acs, sent
@@ -465,6 +483,7 @@ class TestAdoptConfirmsTheVoucherIsThisOrders:
         """The other adopt commits between our pre-check and our lock."""
         rival = _unknown_shipment(acs)
         acs.creates.clear()  # the next create loses its answer as well
+        _another_request_was_in_flight()
         shipment = _unknown_shipment(acs)
 
         def summary_while_the_rival_saves(self, voucher_no):
@@ -685,6 +704,7 @@ class TestOnlyAnExactNameIsAnAutomaticYes:
         tell which one the voucher is for."""
         shipment = _unknown_shipment(acs)
         acs.creates.clear()
+        _another_request_was_in_flight()
         twin = _unknown_shipment(acs)
         for order in (shipment.order, twin.order):
             order.first_name, order.last_name = "Maria", "Papadopoulou"
@@ -1025,6 +1045,12 @@ class TestRequestAgain:
             AcsService.request_voucher_again(
                 shipment, user=None, note="Checked the ACS portal: none."
             )
+        # The lost answer began a voucher hold (#631): the new request
+        # waits until ACS answers again, and is then the one sent first.
+        held = create_acs_voucher_for_order.run(shipment.order_id)
+        assert held["status"] == "voucher_request_held"
+        assert len(acs.creates) == 1
+        assert voucher_hold.allow_trial()
         create_acs_voucher_for_order.run(shipment.order_id)
 
         dispatched.assert_called_once()

@@ -24,6 +24,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 from urllib3.util.retry import Retry
 
+from shipping_acs import voucher_hold
 from shipping_acs.concurrency import acs_request_slot
 from shipping_acs.exceptions import (
     AcsAPIError,
@@ -31,6 +32,7 @@ from shipping_acs.exceptions import (
     AcsConfigError,
     AcsOutcomeUnknownError,
     AcsRetryableError,
+    AcsVoucherRequestHeldError,
 )
 from shipping_acs.observability import Exchange, observe_call
 
@@ -246,15 +248,18 @@ class AcsClient:
             "ACSInputParameters": {**self._creds(), **(params or {})},
         }
 
+        lease_seconds = worst_case_request_seconds(self.timeout)
         try:
             # Every ACS call, whatever the alias, takes a slot: ACS
             # rejects overlapping calls from one account with a 406.
             with acs_request_slot(
                 account=self.company_id,
                 alias=alias,
-                lease_seconds=worst_case_request_seconds(self.timeout),
+                lease_seconds=lease_seconds,
                 background=background,
             ):
+                if alias == voucher_hold.HELD_ALIAS:
+                    self._admit_voucher_request(lease_seconds)
                 response = self._session.post(
                     self.api_base_url,
                     json=body,
@@ -365,6 +370,29 @@ class AcsClient:
             or {}
         )
 
+    @staticmethod
+    def _admit_voucher_request(lease_seconds: float) -> None:
+        """Ask the store's voucher hold whether this request may be sent.
+
+        Asked inside the slot, as the last thing before the POST: a
+        request that waited for its slot behind one that failed is then
+        held, so a failing ACS costs the requests in flight and not the
+        ones queued behind them. Nothing was sent when this raises, and
+        that includes a hold that could not be read: it must never look
+        like a request of unknown outcome.
+        """
+        try:
+            voucher_hold.admit(lease_seconds=lease_seconds)
+        except AcsVoucherRequestHeldError:
+            raise
+        except Exception as exc:
+            raise AcsRetryableError(
+                alias=voucher_hold.HELD_ALIAS,
+                error_message=(
+                    f"Not sent: the ACS voucher hold could not be read: {exc}"
+                ),
+            ) from exc
+
     # ------------------------------------------------------------------
     # Helpers for unwrapping common response shapes
     # ------------------------------------------------------------------
@@ -396,7 +424,7 @@ class AcsClient:
         contains ``Voucher_No`` (and ``Voucher_No_Return`` when
         ``With_Return_Voucher`` was requested).
         """
-        envelope = self._call("ACS_Create_Voucher", params)
+        envelope = self._call(voucher_hold.HELD_ALIAS, params)
         return self._value_output(envelope)
 
     def get_multipart_vouchers(self, main_voucher_no: str) -> list[str]:

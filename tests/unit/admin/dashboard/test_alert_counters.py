@@ -19,6 +19,7 @@ from django.core.cache import cache
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.formats import date_format
 from djmoney.money import Money
 
 from admin.dashboard.store import queries, widgets
@@ -35,6 +36,7 @@ from shipping_acs.models import (
     AcsCodPayout,
     AcsShipment,
     AcsUnrecognisedVoucher,
+    AcsVoucherHold,
 )
 from shipping_acs.tasks import (
     _unremitted_cod_rows,
@@ -443,3 +445,72 @@ class TestTheListsTheRowsOpen:
 
         assert _listed(client, changelist, "reconciled=yes") == {done.pk}
         assert _listed(client, changelist, "reconciled=no") == {open_payout.pk}
+
+
+class TestAcsVoucherHold:
+    """Voucher requests held while ACS is failing are ONE state on the
+    dashboard, whatever the number of orders that wait (#631)."""
+
+    @staticmethod
+    def _hold(**fields):
+        now = timezone.now()
+        return AcsVoucherHold.objects.create(
+            started_at=now, last_failure_at=now, **fields
+        )
+
+    def test_a_hold_is_counted_while_it_is_in_force(self):
+        hold = self._hold(reason="ACS server error 502")
+
+        assert _counts()["acs_voucher_holds"] == 1
+
+        AcsVoucherHold.objects.filter(pk=hold.pk).update(
+            ended_at=timezone.now()
+        )
+
+        assert _counts()["acs_voucher_holds"] == 0
+
+    def test_the_row_says_since_when_and_opens_the_hold(self):
+        hold = self._hold()
+        for _ in range(3):
+            _shipment(
+                voucher_no=None,
+                shipment_state=AcsShipmentState.PENDING_CREATION,
+                voucher_request_held_at=timezone.now(),
+            )
+
+        rows = _rows()
+
+        row = rows["ACS voucher requests are held"]
+        since = date_format(
+            timezone.localtime(hold.started_at), "SHORT_DATETIME_FORMAT"
+        )
+        assert since in str(row["detail"])
+        # One state, not one per waiting order.
+        assert row["count"] == "1"
+        assert row["href"].endswith("in_force=yes")
+
+    def test_no_hold_draws_no_row(self):
+        self._hold(ended_at=timezone.now())
+
+        assert "ACS voucher requests are held" not in _rows()
+
+    def test_the_lists_show_exactly_what_was_counted(self, client):
+        hold = self._hold()
+        self._hold(ended_at=timezone.now())
+        held = _shipment(
+            voucher_no=None,
+            shipment_state=AcsShipmentState.PENDING_CREATION,
+            voucher_request_held_at=timezone.now(),
+        )
+        _shipment(voucher_no="9700000009")
+
+        assert _listed(
+            client,
+            "admin:shipping_acs_acsvoucherhold_changelist",
+            "in_force=yes",
+        ) == {hold.pk}
+        assert _listed(
+            client,
+            "admin:shipping_acs_acsshipment_changelist",
+            "attention=voucher_held",
+        ) == {held.pk}

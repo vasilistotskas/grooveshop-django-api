@@ -26,6 +26,10 @@ from shipping_acs.exceptions import (
     AcsRetryableError,
 )
 
+# A voucher request asks the store's voucher hold, a row, whether it may
+# be sent (``AcsClient._admit_voucher_request``, #631).
+pytestmark = pytest.mark.django_db
+
 
 def _make_response(status_code: int, body=None):
     resp = MagicMock(spec=requests.Response)

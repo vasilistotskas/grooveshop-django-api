@@ -91,6 +91,18 @@ class AcsOutcomeUnknownError(AcsRetryableError):
     """
 
 
+class AcsVoucherRequestHeldError(AcsRetryableError):
+    """The voucher request was not sent: an ``AcsVoucherHold`` is in force.
+
+    ACS just left a voucher request of this store with an unknown outcome,
+    so no further one is sent until ACS answers again
+    (``shipping_acs.voucher_hold``). Nothing reached ACS, so this is a
+    known outcome and the request is sent later, by
+    ``shipping_acs.tasks.issue_held_acs_vouchers``; it never becomes a
+    voucher request of unknown outcome.
+    """
+
+
 class AcsVoucherRequestUnknownError(AcsError):
     """The shipment's voucher request has an unknown outcome.
 

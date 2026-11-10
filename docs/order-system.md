@@ -5,7 +5,7 @@ Keep this file synchronised when invariants change. Cross-references
 are file paths + line numbers; the system has enough load-bearing
 "don't undo this" pieces that drift here is expensive.
 
-Last refresh: 2026-11-09 (CANCELED is reached only through `cancel_order`: `update_order_status` and the `update_status` endpoint refuse it, a BoxNow `canceled` parcel cancels the order properly, and the `order_canceled` voucher safety net is gone, §2.1 / §7.1; before that 2026-10-29: the order emails' subject and context are built once in `order/emails.py` for the sender and the admin preview, §6.1; marketing mail honours the account-level opt-out the one-click link records, §6.5; the store's contact/feedback notifications and the allauth account emails, §6.6 / §6.7; before that 2026-10-18: value-based refunds and the negative-balance setting, §7.2; refunds claim, call and record with no transaction open across the provider, `RefundAttempt`, Stripe `refund.failed` reversal, §4.2.0 / §7.2; before that 2026-10-13: refunding collected cash on delivery, §7.2; before that 2026-10-12: the myDATA retail document lifecycle: a receipt at shipment, a credit document per refund, no platform invoices, §7.4; before that the payment ledger: partial refunds, §7.2 / §7.3; before that 2026-09-30: every payment start refuses a non-PENDING order, a change during the provider call wins with 409, webhook history/emails only for an applied event, BoxNow webhook 400 for a non-object, non-UTF-8 or too-deep body; before that: order acquisition source, admin payment-method column, then no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
+Last refresh: 2026-11-10 (a BoxNow `canceled` parcel event no longer cancels the order: it records the shipment CANCELED and an open order behind it needs follow-up, §2.1 / §2.3 / §5.2 / §7.1; a repeat cancel of a canceled BoxNow shipment changes nothing, §5.2; before that 2026-11-09: CANCELED is reached only through `cancel_order`: `update_order_status` and the `update_status` endpoint refuse it, and the `order_canceled` voucher safety net is gone, §2.1 / §7.1; before that 2026-10-29: the order emails' subject and context are built once in `order/emails.py` for the sender and the admin preview, §6.1; marketing mail honours the account-level opt-out the one-click link records, §6.5; the store's contact/feedback notifications and the allauth account emails, §6.6 / §6.7; before that 2026-10-18: value-based refunds and the negative-balance setting, §7.2; refunds claim, call and record with no transaction open across the provider, `RefundAttempt`, Stripe `refund.failed` reversal, §4.2.0 / §7.2; before that 2026-10-13: refunding collected cash on delivery, §7.2; before that 2026-10-12: the myDATA retail document lifecycle: a receipt at shipment, a credit document per refund, no platform invoices, §7.4; before that the payment ledger: partial refunds, §7.2 / §7.3; before that 2026-09-30: every payment start refuses a non-PENDING order, a change during the provider call wins with 409, webhook history/emails only for an applied event, BoxNow webhook 400 for a non-object, non-UTF-8 or too-deep body; before that: order acquisition source, admin payment-method column, then no mint before payment, payment-after-cancel ahead of the settled guard, admin status read-only, ACS pickup-list `blocked_unprinted`, postcode refusal). See git log for changes since.
 
 ## 1. Overview
 
@@ -75,7 +75,8 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
   - `SHIPPED → DELIVERED` from carrier events.
   - `DELIVERED → COMPLETED` for paid orders (`OrderService.maybe_advance_to_completed`), applied inline by the carrier poll and the COD reconcile and swept hourly by `order.tasks.complete_paid_delivered_orders` for everything that lands outside those two moments (a payment entered by hand, a webhook after delivery, an inline attempt that failed once — prod orders 252, 253, 73, 92 on 2026-09-20).
   - `PROCESSING → SHIPPED` also from an ACS `attempted` state: a failed delivery attempt proves the parcel shipped (prod order 267 sat at PROCESSING for the ten days ACS held it). And a shipment the summary still calls `new` is lifted to `in_transit` when `ACS_TrackingDetails` holds any checkpoint that is not a print (`_has_left_sender`), because ACS reports `shipment_status=5` / `delivery_flag=0` / no reason for a parcel waiting at a Smartpoint (prod order 284).
-  - A CANCELED shipment state (only ever produced by the admin retire action or a voucher cancel, never by tracking) routes the order through `OrderService.cancel_order` (`OrderService.cancel_for_dead_shipment`, `refund_payment=False`: a paid order logs a WARNING, shows in "Canceled orders to refund" (`OrderQuerySet.refund_owed`) and staff refund it) — stock back, payment settled, cancellation recorded — never a bare status write. Reached from `manage.py reconcile_acs_order_status`, and only for an order not yet shipped (`AcsService.order_status_for_shipment_state`): a voucher retired after the order shipped is a fact about the voucher, so the order keeps its status and the replay lists the pair as its own informational line (dry run and `--apply`; `AcsService.voucher_retired_on_shipped_order`), not as drift. A BoxNow `canceled` parcel event (webhook or poll) on a PENDING / PROCESSING order takes the same method (`BoxNowService._apply_order_status_transition`); on an order that already shipped it is logged and ignored.
+  - A CANCELED shipment state (only ever produced by the admin retire action or a voucher cancel, never by tracking) routes the order through `OrderService.cancel_order` (`OrderService.cancel_for_dead_shipment`, `refund_payment=False`: a paid order logs a WARNING, shows in "Canceled orders to refund" (`OrderQuerySet.refund_owed`) and staff refund it) — stock back, payment settled, cancellation recorded — never a bare status write. Reached from `manage.py reconcile_acs_order_status`, and only for an order not yet shipped (`AcsService.order_status_for_shipment_state`): a voucher retired after the order shipped is a fact about the voucher, so the order keeps its status and the replay lists the pair as its own informational line (dry run and `--apply`; `AcsService.voucher_retired_on_shipped_order`), not as drift.
+  - A BoxNow `canceled` parcel event (webhook or poll) **never moves the order** (`BoxNowService._apply_order_status_transition`). BoxNow defines it as "Parcel has been canceled by the sender" (Webhook-Based Parcel Tracking Guide v1.4.6, p. 2; API Manual v7.2, §6.5.3, p. 49), and the sender is the store: the event reports a decision the store already made. The shipment is recorded CANCELED. An order that was canceled has nothing left to do (its `cancel_order` already ran); a PENDING / PROCESSING order keeps its status, its stock and its payment, and needs follow-up (§2.3) until staff create a new parcel ("Create BoxNow parcel now", §5.2) or cancel the order; a shipped one is logged and left alone. Owner's decision of 2026-11-10 (#600), which reversed v3.242.6, where the event canceled the order through `cancel_for_dead_shipment`: a staff member who canceled a parcel to replace it lost the order, and the event could cancel an order before the customer's own cancel (which refunds) reached its lock.
   - Carrier bridge: when a carrier reports DELIVERED or RETURNED while the order is still PENDING/PROCESSING (state jump between polls / missed webhook), `_apply_order_status_transition` walks the missing SHIPPED step first. The SHIPPED hop is customer-silent on the RETURNED path (`update_order_status(..., silent_for_customer=True)`) — prod orders 179 & 189 (2026-07) were stuck because the direct PROCESSING → RETURNED was rejected forever.
 
 ### 2.2 PaymentStatus transitions
@@ -100,18 +101,35 @@ total is a sum over the order's lines.
 ### 2.3 The follow-up flag (`order/follow_up.py`)
 
 A shopper who ordered N calendar days ago and still has no parcel is about
-to write in. The admin flags that order. It is computed, never stored: no
-column, job or email, and the flag disappears by itself when the order is
-delivered, completed, returned, canceled or refunded.
+to write in, and an open order whose parcel was canceled ships nothing
+until someone decides. The admin flags both. It is computed, never stored:
+no column, job or email, and the flag disappears by itself when the order
+is delivered, completed, returned, canceled or refunded, or when its
+canceled parcel is replaced.
 
-An order needs follow-up when **all** of these hold:
+An order needs follow-up when it is not an online order still waiting for
+its payment (below) and **either** of these holds:
 
-- it was placed on a store-timezone day at least `ORDER_FOLLOW_UP_DAYS`
-  days ago (store setting, default 7, `0` = off). Whole calendar days: an
-  order placed on day D is flagged from 00:00 on day D+N, not 24 h × N
-  after it was placed (`follow_up_cutoff`);
-- its status is PENDING, PROCESSING or SHIPPED
-  (`OrderStatus.get_status_groups()` `needs_processing` + `in_transit`);
+- **It waited.** It was placed on a store-timezone day at least
+  `ORDER_FOLLOW_UP_DAYS` days ago (store setting, default 7, `0` switches
+  this part off). Whole calendar days: an order placed on day D is flagged
+  from 00:00 on day D+N, not 24 h × N after it was placed
+  (`follow_up_cutoff`). Its status is PENDING, PROCESSING or SHIPPED
+  (`OrderStatus.get_status_groups()` `needs_processing` + `in_transit`).
+- **Its parcel was canceled while it is open.** Its status is PENDING or
+  PROCESSING and its carrier shipment is canceled, whatever its age and
+  whatever `ORDER_FOLLOW_UP_DAYS` says (`canceled_shipment_q`). Each
+  carrier answers through its adapter
+  (`ShippingCarrierInterface.canceled_shipment_q`, OR-ed by
+  `ShippingService.canceled_shipment_q`, so `order` never imports a
+  carrier app): BoxNow matches a `canceled` parcel, which leaves its
+  order open (§2.1); ACS keeps the default `None`, because its canceled
+  shipment cancels the order (`cancel_for_dead_shipment`). Staff create a
+  new parcel ("Create BoxNow parcel now", which moves the shipment back to
+  `pending_creation`) or cancel the order; either clears the flag.
+
+The unpaid-online exclusion, for both:
+
 - it is not an online order still waiting for its payment
   (`OrderQuerySet.awaiting_online_payment()`: `pay_way.settlement=online`
   and `payment_status` not in `SETTLED_PAYMENT_STATUSES`). An unpaid card
@@ -126,9 +144,12 @@ per row), the "Needs follow-up" filter (`follow_up=yes|no`) and the
 The changelist shows a blue "Follow up" badge beside the status; the
 change page adds a read-only line with the reason ("Not shipped yet" for
 PENDING/PROCESSING, "In transit" for SHIPPED), since when, and the
-carrier's last event (`AcsShipment` / `BoxNowShipment.last_event_at`). The
-counter is a row of the dashboard's "Needs attention" list linking to the
-filtered list; the Orders sidebar badge keeps the pending count.
+carrier's last event (`AcsShipment` / `BoxNowShipment.last_event_at`); for
+a canceled parcel the line says so and names the two ways out instead of a
+date (`has_canceled_shipment`). The counter is a row of the dashboard's
+"Needs attention" list linking to the filtered list; a `BoxNowShipment`
+write refreshes it (`depends_on`). The Orders sidebar badge keeps the
+pending count.
 
 ## 3. Order creation paths
 
@@ -1407,10 +1428,27 @@ accepting Cyprus orders at the Greek flat rate.
   shipment unchanged; it refuses when the order itself is cancelled.
   BoxNow's `orderNumber` is still the order id, so BoxNow answering the
   new request with `P410` (duplicate) raises the usual creation alert.
+  The manual says it will: `orderNumber` "must be unique for each
+  request" (API Manual v7.2, §3.4, p. 10), and P410 is "Order number
+  conflict. You are trying to create a delivery request for order ID that
+  has already been created. Choose another order ID." (§5, p. 21), with
+  no exception for a canceled request. Not yet tried on stage (#606).
+- **A `canceled` parcel event leaves the order alone** (§2.1): the
+  shipment is recorded CANCELED, and an order still PENDING / PROCESSING
+  behind it needs follow-up (§2.3) until staff re-issue the parcel or
+  cancel the order. The event is the same whoever canceled the parcel
+  (the shipment admin, an order cancel, BoxNow support at the store's
+  request: "For other instances please refer to care@boxnow.gr", §3.7,
+  p. 15); the webhook guide says partners "receive notifications for all
+  parcel status changes and events" (p. 1), so a cancel made through the
+  API is expected to arrive as one too (not yet verified on stage).
 - **One cancel rule**: `BoxNowService.can_cancel_shipment`. A shipment
   BoxNow never received (no `parcel_id`) cancels locally with no API
   call; a parcel cancels only while it is `new` (BoxNow answers P420
-  otherwise); an already `canceled` one is a no-op. `cancel_shipment`,
+  otherwise); an already `canceled` one, sent to BoxNow or not, is a no-op
+  that changes nothing, `cancel_requested_at` and the
+  `metadata["cancellations"]` log included (BoxNow: "Canceling a canceled
+  parcel has no effect", §3.7, p. 15; #599). `cancel_shipment`,
   the order's `canBeCanceled` and the shipment admin's two cancel
   actions ("Cancel parcels via BoxNow API" on the list, "Cancel parcel
   via BoxNow API" on the detail page) all read it, so the admin skips or
@@ -1500,6 +1538,8 @@ accepting Cyprus orders at the Greek flat rate.
 3. Decorate the adapter with `@register_provider` and import it in the app's `AppConfig.ready()`.
 4. Add `ShippingProvider` row in DB (admin or migration).
 5. Implement `_apply_order_status_transition` if your carrier emits state events.
+   If a canceled shipment leaves the order open (BoxNow), override
+   `canceled_shipment_q` so the order shows under follow-up (§2.3).
 6. Wire the COD path if applicable (see ACS for the pattern).
 
 ### 5.4 Operational alert emails (`shipping/alerts.py`)
@@ -1876,7 +1916,8 @@ fails there until it is covered.
 - **Admin**: same `cancel_order` (`customer_initiated=False`) via the "Cancel selected orders and restore stock" action. The change form's `status` field is **read-only**: a form save wrote the column straight to the row, bypassing both `cancel_order` (no stock restore — prod orders 242 and 213, 2026-09-08) and the transition table in `update_order_status`. Every other transition is an action too (`mark_as_processing` … `mark_as_returned`, `mark_as_refunded`), routed through `update_order_status`. RETURNED and REFUNDED deliberately leave stock alone (§5.1).
 - **Auto**: `auto_cancel_stuck_pending_orders` Celery beat (every 15 minutes) — cancels an unpaid online order once its payment hold has ended (`customer_initiated=False`), see §7.1.0.
   An unpaid online order holds its stock until then, so how many one customer can have waiting is bounded per store: `ORDER_MAX_UNPAID_ONLINE_ORDERS` (default 5, `0` = off; `OrderService._enforce_unpaid_order_limit`, checked in `create_order_from_cart_offline` for online methods only). The customer is the account, or the email (case-insensitive) for a guest; PENDING+PENDING online orders count, offline (COD) and paid ones do not. An order over the limit is refused with a plain message. Counted under the cart lock, so two carts of one customer racing can overshoot by the number in flight.
-- **Carrier-driven**: `OrderService.cancel_for_dead_shipment` (`customer_initiated=False`, `refund_payment=False`; the shipment is already canceled), called by the ACS status sync for a CANCELED shipment of an order not yet shipped and by BoxNow for a `canceled` parcel event (§2.1). The courier is not asked to cancel, before or after: the order records `shipment_cancel = {attempted: false, dispatched: true}` (`SHIPMENT_ALREADY_CANCELED`), so no courier call runs inside the tracking sync's transaction. An order whose status no longer allows a cancel raises `OrderNotCancelableError`, which BoxNow's sync drops with a warning; any other `OrderCancellationError` is a cancel that failed on the way and is not caught, so the parcel event and the shipment's state roll back. BoxNow does not send the webhook again (the endpoint answered 200 before the event was applied): the operators are alerted, and the tracking poll, which keeps reading a shipment that is not in a final state (`poll_boxnow_tracking_batch`), applies the event on a later run.
+- **Carrier-driven (ACS only)**: `OrderService.cancel_for_dead_shipment` (`customer_initiated=False`, `refund_payment=False`; the shipment is already canceled), called by the ACS status sync for a CANCELED shipment of an order not yet shipped (§2.1). The courier is not asked to cancel, before or after: the order records `shipment_cancel = {attempted: false, dispatched: true}` (`SHIPMENT_ALREADY_CANCELED`), so no courier call runs inside the tracking sync's transaction. An order whose status no longer allows a cancel raises `OrderNotCancelableError`; any other `OrderCancellationError` is a cancel that failed on the way.
+- **Not a cancel path: a BoxNow `canceled` parcel event.** It records the shipment CANCELED and leaves the order to the customer, staff or the sweep above (§2.1). An open order behind it needs follow-up (§2.3). So a customer cancel whose parcel event lands before the order row is locked (§7.1.1, step 4) still cancels and refunds: before #600 the event canceled the order first, without a refund, and the customer's own cancel then failed its status check.
 
 There is no other path. `update_order_status` refuses CANCELED (§2.1), the admin change form cannot write `status`, and the order write serializer keeps it read-only, so `cancel_order` is the only code that sets it on an existing order. The `order_canceled` receiver that used to backfill `metadata['cancellation']` and cancel the voucher for a status written some other way (`handle_order_canceled`) is gone with the last such path; `order_canceled` still fires on every cancel for the gift-card credit and the loyalty reversal.
 
@@ -1922,7 +1963,7 @@ An order stays PENDING / PROCESSING from the moment its voucher exists until a t
    - **Anything else** is a fault of ours, not the courier's answer: it propagates and the endpoint answers 500 through its error log.
 
    The split rides the carrier exception hierarchy: every carrier app's errors derive from `shipping.exceptions.CarrierError`, and the no-answer ones (`AcsRetryableError` and with it `AcsAuthError`, `AcsConfigError`, `BoxNowRetryableError`, `BoxNowAuthError`, `BoxNowConfigError`) also from `CarrierUnavailableError`. A new carrier gets the same answers by deriving its errors the same way.
-4. The courier is asked before the order row is locked, so the order can move on while it answers; the locked re-check then refuses the cancel with the usual status error. The shipment was already canceled by then (at the courier, or locally when no voucher had been issued), so the order is live with no voucher behind it; any other failure of the locked cancel ends the same way. `OrderService._note_shipment_canceled_without_order` logs an ERROR (the logged-errors alert) and leaves a staff-only NOTE (`The customer asked to cancel this order and its shipment was canceled, but the order itself was not canceled (its status is …)`) telling staff to create a new voucher. An order another request canceled in the meantime needs neither.
+4. The courier is asked before the order row is locked, so the order can move on while it answers; the locked re-check then refuses the cancel with the usual status error. The shipment was already canceled by then (at the courier, or locally when no voucher had been issued), so the order is live with no voucher behind it; any other failure of the locked cancel ends the same way. `OrderService._note_shipment_canceled_without_order` logs an ERROR (the logged-errors alert) and leaves a staff-only NOTE (`The customer asked to cancel this order and its shipment was canceled, but the order itself was not canceled (its status is …)`) telling staff to create a new voucher. An order another request canceled in the meantime needs neither. A BoxNow order left that way also shows under follow-up (§2.3) until it is re-issued or canceled.
 
 Both carriers' cancel is idempotent on an already canceled shipment, so a customer who retries after a cancel that stopped half way is not refused (`BoxNowService.cancel_shipment` returns on a CANCELED parcel, as `AcsService.cancel_voucher` already did).
 
@@ -2076,8 +2117,9 @@ the linked memory note or the originating PR's commit message.
 | A second payment on an already paid order keeps the first `payment_id`, flags `Order.overcharged_at` and alerts ops once; nothing is refunded automatically | §7.3 |
 | A placed order's lines (product, quantity, price) are read-only in every admin surface; the name and SKU on an invoice, email or API line are the line's own snapshot | §3.7 |
 | Order `status` changes only through admin actions / `OrderService`, never the change form; CANCELED only through `OrderService.cancel_order`, never `update_order_status` or the `update_status` endpoint | §2.1, §7.1 above |
+| A BoxNow `canceled` parcel event never changes the order (status, stock, payment): it records the shipment CANCELED, and an open order behind it is "follow up" until staff re-issue the parcel or cancel the order. Only ACS routes a canceled shipment to `cancel_for_dead_shipment` | §2.1, §2.3, §7.1 above (#600) |
 | Operational mail to a store's operators is an `ops.*` email type sent through `send_email` only (the store's `EmailSwitch` is the one gate); an alert a store may switch off has a dashboard counter by the same rule as its email | §5.4 above |
-| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment` | §2.3 above |
+| "Follow up" is computed (`OrderQuerySet.needing_follow_up`), never stored, and its unpaid-online exclusion is `awaiting_online_payment()` (settled statuses), not `Order.awaits_online_payment`; its canceled-parcel part asks each carrier through `ShippingService.canceled_shipment_q`, never a carrier import in `order` | §2.3 above |
 | One order per provider payment: `Order.payment_id` is unique when non-empty (`order_payment_id_unique`), and `create_order_from_cart` answers a repeat of the same cart's intent with the first order (found before the provider is asked, and again under the cart lock, both before cart validation) and refuses an intent of another cart or of a canceled / deleted order, a unique-index race between two carts included, all as `payment_verification` | §3.1 above |
 | No provider HTTP call inside the order-creation transaction (nor in a view-level `atomic`): the intent is read first, and the transaction only re-compares its amount and currency with the total computed under lock | §3.1 above |
 | Product rows are locked in ascending pk order, in one statement, before the first row that references a product is inserted (`StockManager.lock_products`); a cart-item lock never joins the products (`of=("self",)`) | §3.1 above |

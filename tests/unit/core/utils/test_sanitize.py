@@ -1,5 +1,8 @@
 import unittest
 
+from hypothesis import given
+from hypothesis import strategies as st
+
 from core.utils.sanitize import (
     drop_empty_headings,
     has_visible_content,
@@ -226,6 +229,77 @@ class TestSanitizeHtmlTypography(unittest.TestCase):
             ),
             [],
         )
+
+
+# Values each attribute can take, chosen so every branch of the policy is
+# reached: kept as written, rewritten by the attribute filter, dropped by
+# the filter, dropped by the allowlist, and ``rel`` that nh3 sets itself.
+_ATTRIBUTE_VALUES = {
+    "class": ["MsoNormal", "msocomanchor", "intro", "MsoNormal intro"],
+    "style": [
+        "color: red",
+        "font-size: 14pt",
+        "font-family: arial; color: red",
+        "--darkreader-inline-color: #fff",
+        "/* c */ font: 12px a; margin: 0",
+    ],
+    "rel": ["nofollow", "noopener noreferrer"],
+    "href": ["#c1", "/p/1", "https://example.com/"],
+    "src": [
+        "https://www.youtube.com/embed/x",
+        "https://evil.example/x",
+        "/media/a.png",
+    ],
+    "id": ["_anchor_2"],
+    "title": ["t"],
+    "target": ["_blank"],
+    "data-x": ["1"],
+    "onclick": ["alert(1)"],
+}
+_TAGS = ["a", "p", "span", "img", "iframe", "div", "video"]
+
+
+@st.composite
+def _element(draw) -> str:
+    tag = draw(st.sampled_from(_TAGS))
+    names = draw(
+        st.lists(st.sampled_from(sorted(_ATTRIBUTE_VALUES)), unique=True)
+    )
+    attributes = "".join(
+        f' {name}="{draw(st.sampled_from(_ATTRIBUTE_VALUES[name]))}"'
+        for name in names
+    )
+    return f"<{tag}{attributes}>x</{tag}>"
+
+
+class TestSanitizeHtmlIsAFixedPoint(unittest.TestCase):
+    """A second pass changes nothing, so ``normalise_rich_text`` settles in
+    one run and a row is not rewritten on a save that edited nothing."""
+
+    def test_a_link_whose_filter_drops_an_attribute_is_stable(self):
+        for html in (
+            '<a class="msocomanchor" id="_anchor_2" href="#_msocom_2">[1]</a>',
+            '<a class="MsoX" rel="x" href="/a">b</a>',
+            '<a href="/a" class="MsoX" title="t">b</a>',
+            '<a style="font-size: 3px" href="/a" id="i">b</a>',
+        ):
+            with self.subTest(html=html):
+                once = sanitize_html(html)
+
+                self.assertEqual(sanitize_html(once), once)
+                self.assertIn('rel="noopener noreferrer"', once)
+
+    def test_replaces_the_rel_an_editor_typed(self):
+        self.assertEqual(
+            sanitize_html('<a href="/a" rel="nofollow">b</a>'),
+            '<a href="/a" rel="noopener noreferrer">b</a>',
+        )
+
+    @given(st.lists(_element(), min_size=1, max_size=4))
+    def test_any_markup_is_stable_after_one_pass(self, elements):
+        once = sanitize_html("".join(elements))
+
+        self.assertEqual(sanitize_html(once), once)
 
 
 class TestHasVisibleContent(unittest.TestCase):

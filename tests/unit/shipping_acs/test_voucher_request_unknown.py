@@ -360,7 +360,8 @@ class TestAdoptTheVoucherAcsHolds:
     ):
         """ACS's own statement that it holds the voucher for our account
         (``ACS_Issue_Pickup_List``, p. 14), even where its tracking
-        summary has nothing for a voucher that is not on a list yet."""
+        summary has nothing for a voucher that is not on a list yet. It
+        says nothing about WHICH order, so staff confirm by hand."""
         shipment = _unknown_shipment(acs)
         AcsUnrecognisedVoucher.objects.create(
             voucher_no=V1,
@@ -369,7 +370,12 @@ class TestAdoptTheVoucherAcsHolds:
             last_seen_at=timezone.now(),
         )
 
-        AcsService.adopt_voucher(shipment, V1, user=None)
+        AcsService.adopt_voucher(
+            shipment,
+            V1,
+            user=None,
+            confirmed_by_hand="Portal shows the parcel for this order.",
+        )
 
         row = AcsUnrecognisedVoucher.objects.get(voucher_no=V1)
         assert row.resolution == AcsUnrecognisedVoucherResolution.ADOPTED
@@ -637,6 +643,118 @@ class TestAdoptWhenAcsSpellsTheRecipientOtherwise:
 
         shipment.refresh_from_db()
         assert shipment.voucher_no == V1
+
+
+class TestOnlyAnExactNameIsAnAutomaticYes:
+    """Third review of #626: every confirmation but an exact, unambiguous
+    recipient match needs a written hand confirmation."""
+
+    def _named(self):
+        AcsUnrecognisedVoucher.objects.create(
+            voucher_no=V1,
+            pickup_date=timezone.localdate(),
+            first_seen_at=timezone.now(),
+            last_seen_at=timezone.now(),
+        )
+
+    def test_a_number_acs_only_named_on_a_pickup_list_needs_a_hand_note(
+        self, acs, sent
+    ):
+        """Orders A and B both wait; ACS names X (B's). Without a note,
+        nothing ties X to A."""
+        shipment = _unknown_shipment(acs)
+        self._named()
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+
+    def test_a_summary_without_a_recipient_needs_a_hand_note(self, acs, sent):
+        shipment = _unknown_shipment(acs)
+        acs.summaries[V1] = {"voucher_no": V1}
+
+        with pytest.raises(AcsVoucherResolutionError):
+            AcsService.adopt_voucher(shipment, V1, user=None)
+
+    def test_a_name_another_waiting_order_shares_needs_a_hand_note(
+        self, acs, sent
+    ):
+        """Two waiting orders for the same person: a matching name cannot
+        tell which one the voucher is for."""
+        shipment = _unknown_shipment(acs)
+        acs.creates.clear()
+        twin = _unknown_shipment(acs)
+        for order in (shipment.order, twin.order):
+            order.first_name, order.last_name = "Maria", "Papadopoulou"
+            order.save(update_fields=["first_name", "last_name"])
+        for waiting in (shipment, twin):
+            metadata = waiting.metadata
+            metadata["last_error"]["request_params"]["Recipient_Name"] = (
+                "Maria Papadopoulou"
+            )
+            AcsShipment.objects.filter(pk=waiting.pk).update(metadata=metadata)
+        acs.summaries[V1] = {
+            "voucher_no": V1,
+            "recipient": "MARIA PAPADOPOULOU",
+        }
+
+        with pytest.raises(AcsVoucherResolutionError) as exc_info:
+            AcsService.adopt_voucher(shipment, V1, user=None)
+        assert f"#{twin.order_id}" in str(exc_info.value)
+
+        AcsService.adopt_voucher(
+            shipment, V1, user=None, confirmed_by_hand="COD and address match."
+        )
+        shipment.refresh_from_db()
+        assert shipment.metadata["adopted_voucher"]["confirmed_by"] == "staff"
+
+
+class TestIssueVoucherNowFollowsTheRule:
+    """Third review of #626: the admin button points to the action that
+    can actually resolve the shipment."""
+
+    def _press(self, shipment):
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+
+        from shipping_acs.admin import AcsShipmentAdmin
+
+        request = RequestFactory().get("/")
+        request.user = get_user_model()(id=1, username="staff")
+        with (
+            patch(
+                "shipping_acs.tasks.create_acs_voucher_for_order.apply_async"
+            ) as dispatched,
+            patch("django.contrib.messages.error") as refused,
+        ):
+            AcsShipmentAdmin(AcsShipment, AdminSite()).issue_voucher_now(
+                request, shipment.pk
+            )
+        dispatched.assert_not_called()
+        [call] = refused.call_args_list
+        return str(call.args[1])
+
+    def test_a_retired_shipment_is_pointed_to_close(self, acs, sent):
+        shipment = _unknown_shipment(acs)
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            shipment_state=AcsShipmentState.CANCELED
+        )
+
+        message = self._press(shipment)
+
+        assert "No voucher needed: close" in message
+        assert "Adopt" not in message
+
+    def test_a_waiting_order_is_pointed_to_adopt_or_request_again(
+        self, acs, sent
+    ):
+        message = self._press(_unknown_shipment(acs))
+
+        assert "Adopt ACS voucher" in message
+        assert "No voucher needed" not in message
 
 
 class TestALateAnswerAfterStaffAdopted:

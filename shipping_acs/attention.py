@@ -105,6 +105,14 @@ def voucher_request_unknown_q() -> Q:
     return Q(voucher_request_unknown_at__isnull=False, voucher_no__isnull=True)
 
 
+def voucher_request_unknown(shipment: AcsShipment) -> bool:
+    """:func:`voucher_request_unknown_q` for one loaded shipment."""
+    return (
+        shipment.voucher_request_unknown_at is not None
+        and not shipment.voucher_no
+    )
+
+
 def voucher_requests_unknown() -> QuerySet[AcsShipment]:
     """Every shipment with a voucher request staff must still check.
 

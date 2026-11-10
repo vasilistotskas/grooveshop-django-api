@@ -1146,6 +1146,10 @@ msgstr "Η ACS δεν αναφέρει το voucher %(voucher)s για αυτό 
 msgid "ACS error message"
 msgstr "Μήνυμα σφάλματος ACS"
 
+#, python-format
+msgid "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "Η ACS δεν δίνει παραλήπτη για το voucher %(voucher)s, οπότε τίποτα δεν το συνδέει με αυτή την παραγγελία. Αν επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα αυτής της παραγγελίας, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
+
 msgid "ACS may hold a voucher: adopt it or request again"
 msgstr "Η ACS ίσως έχει voucher: υιοθετήστε το ή ζητήστε νέο"
 
@@ -9847,6 +9851,10 @@ msgstr "Παραγγελία %(order_id)s: το chargeback διευθετήθη�
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
 msgstr "Παραγγελία %(order_id)s: μη αναμενόμενο σφάλμα (%(error)s) — ελέγξτε τα logs"
 
+#, python-format
+msgid "Order %(orders)s also waits for a voucher for the same recipient, so the name cannot tell which order voucher %(voucher)s is for. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "Και η παραγγελία %(orders)s περιμένει voucher για τον ίδιο παραλήπτη, οπότε το όνομα δεν δείχνει σε ποια παραγγελία ανήκει το voucher %(voucher)s. Αν επιβεβαιώσατε στην πύλη της ACS ότι είναι το δέμα αυτής της παραγγελίας, υιοθετήστε το ξανά και γράψτε πώς το επιβεβαιώσατε."
+
 msgid "Order & Locker"
 msgstr "Παραγγελία & Locker"
 
@@ -14608,6 +14616,10 @@ msgstr "Η γλώσσα στην οποία έκανε εγγραφή ο επι�
 
 msgid "The last digit of this GTIN does not match the others."
 msgstr "Το τελευταίο ψηφίο αυτού του GTIN δεν ταιριάζει με τα υπόλοιπα."
+
+#, python-format
+msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, and the order no longer needs a voucher. If ACS holds one, delete it there, then use “No voucher needed: close” on the shipment."
+msgstr "Το τελευταίο αίτημα voucher για την παραγγελία #%(order)s μπορεί να έφτασε στην ACS χωρίς απάντηση, και η παραγγελία δεν χρειάζεται πλέον voucher. Αν η ACS έχει voucher, διαγράψτε το εκεί και έπειτα χρησιμοποιήστε την ενέργεια «Δεν χρειάζεται voucher: κλείσιμο» στην αποστολή."
 
 #, python-format
 msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."

@@ -132,9 +132,15 @@ shipment:
   order), compared without accents, case or extra spaces. The manual
   documents no format for `recipient`: its example response is
   "ενδεικτικό" and every personal value in it is masked (`"XXXXXXXXXX"`).
-  So a mismatch, or a summary without a recipient, is refused unless staff
-  fill "Confirmed by hand" with how they checked in the ACS portal; that
-  text goes on the order note and `confirmed_by: "staff"` on the shipment.
+  An exact match is the only automatic yes, and only while no other
+  waiting order sent the same name. Everything else needs "Confirmed by
+  hand", with how staff checked in the ACS portal: a different or masked
+  name, a summary without a recipient, a number known only from a refused
+  pickup list (which says nothing of which order), or a name another
+  waiting order shares. That text goes on the order note, and
+  `confirmed_by: "staff"` on the shipment. "Issue ACS voucher now" on a
+  shipment of unknown outcome points to the action that applies: adopt or
+  request again, or close when the order needs no voucher.
   The checks run again under the row lock; a concurrent adopt of the same
   number gets the same refusal. Saves the voucher, fetches multipart
   children, never calls `ACS_Create_Voucher`.

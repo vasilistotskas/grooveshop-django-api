@@ -463,7 +463,9 @@ class AcsService:
             # voucher for this order, and ``ACS_Create_Voucher`` has no
             # idempotency key, so nothing sends another one until staff
             # resolve it (``adopt_voucher`` / ``request_voucher_again``).
-            if shipment.voucher_request_unknown_at is not None:
+            from shipping_acs.attention import voucher_request_unknown
+
+            if voucher_request_unknown(shipment):
                 raise AcsVoucherRequestUnknownError(
                     f"The voucher request for order {order.id} has an "
                     "unknown outcome since "
@@ -1355,7 +1357,10 @@ class AcsService:
         was sent. Read from the request recorded with the failure
         (``metadata["last_error"]``), else from the call history
         (``AcsApiCall``), else, when the request was never recorded (a
-        worker that stopped mid-request), from the order as it is.
+        worker that stopped mid-request), from the order as it is. A name
+        edited since then therefore fails the comparison and asks for a
+        hand confirmation; it never turns into an automatic yes on its
+        own.
         """
         from shipping_acs.models import AcsApiCall
 
@@ -1392,19 +1397,22 @@ class AcsService:
         open row ACS named on a refused pickup list (p. 14). Nothing
         overrides that.
 
-        Then it must be this order's. The summary answers by number alone,
-        so its ``recipient`` is compared with the ``Recipient_Name`` the
-        lost request sent (:meth:`_recipient_sent`), without accents,
-        case or extra spaces. The manual documents no format for it: its
+        Then it must be this order's, and the only automatic yes is the
+        summary's ``recipient`` equal to the ``Recipient_Name`` the lost
+        request sent (:meth:`_recipient_sent`), without accents, case or
+        extra spaces, when no other waiting shipment of the store sent the
+        same name (two orders for one person: the name cannot tell them
+        apart). The manual documents no format for ``recipient``: its
         example response is "ενδεικτικό" and every personal value in it is
         masked (``"recipient": "XXXXXXXXXX"``, like the request's own
-        credentials), so ACS may spell, abbreviate or truncate it. Equal
-        is the only automatic yes; anything else, or a summary with no
-        recipient, needs a staff member's written confirmation
-        (``confirmed_by_hand``), recorded on the order. A row ACS named on
-        a refused pickup list with no summary is accepted as before: ACS
-        names it for this account and no shipment holds it.
+        credentials). Everything else (a different or masked name, a
+        summary without a recipient, a voucher known only from a refused
+        pickup list, which says nothing of WHICH order, or a name another
+        waiting order shares) needs a staff member's written confirmation
+        (``confirmed_by_hand``), recorded on the order.
         """
+        from shipping_acs.attention import voucher_requests_waiting
+
         try:
             summary = client.tracking_summary(voucher_no)
         except AcsRetryableError:
@@ -1422,24 +1430,54 @@ class AcsService:
                 )
                 % {"voucher": voucher_no}
             )
-        reported = str(summary.get("recipient") or "") if summary else ""
-        if reported and _comparable(reported) == _comparable(
-            cls._recipient_sent(shipment)
-        ):
-            return TRACKING_SUMMARY_ALIAS
-        if not summary:
-            return "ACS_Issue_Pickup_List"
         if confirmed_by_hand.strip():
             return "staff"
-        raise AcsVoucherResolutionError(
-            gettext(
-                "ACS reports voucher %(voucher)s for “%(recipient)s”, which "
-                "does not match the recipient the voucher request sent. If "
-                "you checked in the ACS portal that it is this order's "
-                "parcel, adopt it again and write how you confirmed it."
+
+        reported = str((summary or {}).get("recipient") or "")
+        sent = _comparable(cls._recipient_sent(shipment))
+        if not reported:
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "ACS gives no recipient for voucher %(voucher)s, so "
+                    "nothing ties it to this order. If you checked in the "
+                    "ACS portal that it is this order's parcel, adopt it "
+                    "again and write how you confirmed it."
+                )
+                % {"voucher": voucher_no}
             )
-            % {"voucher": voucher_no, "recipient": reported or "—"}
+        if _comparable(reported) != sent:
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "ACS reports voucher %(voucher)s for “%(recipient)s”, "
+                    "which does not match the recipient the voucher request "
+                    "sent. If you checked in the ACS portal that it is this "
+                    "order's parcel, adopt it again and write how you "
+                    "confirmed it."
+                )
+                % {"voucher": voucher_no, "recipient": reported}
+            )
+        twins = sorted(
+            other.order_id
+            for other in voucher_requests_waiting()
+            .exclude(pk=shipment.pk)
+            .select_related("order")
+            if _comparable(cls._recipient_sent(other)) == sent
         )
+        if twins:
+            raise AcsVoucherResolutionError(
+                gettext(
+                    "Order %(orders)s also waits for a voucher for the same "
+                    "recipient, so the name cannot tell which order voucher "
+                    "%(voucher)s is for. If you checked in the ACS portal "
+                    "that it is this order's parcel, adopt it again and "
+                    "write how you confirmed it."
+                )
+                % {
+                    "voucher": voucher_no,
+                    "orders": ", ".join(f"#{n}" for n in twins),
+                }
+            )
+        return TRACKING_SUMMARY_ALIAS
 
     @classmethod
     def adopt_voucher(

@@ -1220,9 +1220,10 @@ accepting Cyprus orders at the Greek flat rate.
   refused with `AcsVoucherRequestUnknownError` until staff use **Adopt ACS
   voucher** (the number may belong to no other shipment; ACS must hold it,
   and its `ACS_Trackingsummary` recipient must equal the `Recipient_Name`
-  the lost request sent, or staff confirm by hand with a written note,
-  because the manual documents no format for that field; no create is
-  sent) or **No voucher at ACS: request again** (a note is required;
+  the lost request sent, with no other waiting order sharing that name;
+  anything else, a number known only from a refused pickup list included,
+  needs a written hand confirmation, because the manual documents no
+  format for that field; no create is sent) or **No voucher at ACS: request again** (a note is required;
   queues the mint once). A shipment that no longer needs a voucher (retired,
   or its order canceled or refunded) stays counted but can only be closed
   (**No voucher needed: close**, a note), never adopted onto or minted for. A late answer that

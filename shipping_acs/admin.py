@@ -36,10 +36,12 @@ from admin.displays import SHIPMENT_STATE_VARIANT, change_link, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.models.order import Order
 from shipping_acs.attention import (
+    needs_no_voucher,
     stale_shipment_q,
     unattributed_payout_q,
     unremitted_cod_shipments,
     unresolved_unrecognised_voucher_q,
+    voucher_request_unknown,
     voucher_request_unknown_q,
 )
 from shipping_acs.diagnostics import shipment_timeline
@@ -959,15 +961,25 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
         # The mint refuses it too (``AcsVoucherRequestUnknownError``), but
         # in a Celery task whose refusal never reaches this page.
-        if shipment.voucher_request_unknown_at is not None:
+        if voucher_request_unknown(shipment):
             messages.error(
                 request,
-                _(
-                    "The last voucher request for order #%(order)s may have "
-                    "reached ACS without an answer, so ACS may already hold a "
-                    "voucher for it. Check the ACS portal, then use “Adopt "
-                    "ACS voucher” or “No voucher at ACS: request again” on "
-                    "the shipment."
+                (
+                    _(
+                        "The last voucher request for order #%(order)s may "
+                        "have reached ACS without an answer, and the order "
+                        "no longer needs a voucher. If ACS holds one, delete "
+                        "it there, then use “No voucher needed: close” on the "
+                        "shipment."
+                    )
+                    if needs_no_voucher(shipment)
+                    else _(
+                        "The last voucher request for order #%(order)s may "
+                        "have reached ACS without an answer, so ACS may "
+                        "already hold a voucher for it. Check the ACS portal, "
+                        "then use “Adopt ACS voucher” or “No voucher at ACS: "
+                        "request again” on the shipment."
+                    )
                 )
                 % {"order": shipment.order_id},
             )

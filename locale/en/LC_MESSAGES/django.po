@@ -1141,6 +1141,10 @@ msgstr "ACS does not report voucher %(voucher)s for this store. Check the number
 msgid "ACS error message"
 msgstr "ACS error message"
 
+#, python-format
+msgid "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "ACS gives no recipient for voucher %(voucher)s, so nothing ties it to this order. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+
 msgid "ACS may hold a voucher: adopt it or request again"
 msgstr "ACS may hold a voucher: adopt it or request again"
 
@@ -9840,6 +9844,10 @@ msgstr "Order %(order_id)s: the chargeback is settled."
 msgid "Order %(order_id)s: unexpected error (%(error)s) — check logs"
 msgstr "Order %(order_id)s: unexpected error (%(error)s) — check logs"
 
+#, python-format
+msgid "Order %(orders)s also waits for a voucher for the same recipient, so the name cannot tell which order voucher %(voucher)s is for. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+msgstr "Order %(orders)s also waits for a voucher for the same recipient, so the name cannot tell which order voucher %(voucher)s is for. If you checked in the ACS portal that it is this order's parcel, adopt it again and write how you confirmed it."
+
 msgid "Order & Locker"
 msgstr "Order & Locker"
 
@@ -14606,6 +14614,10 @@ msgstr "The language the visitor subscribed in, which their alert email is writt
 
 msgid "The last digit of this GTIN does not match the others."
 msgstr "The last digit of this GTIN does not match the others."
+
+#, python-format
+msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, and the order no longer needs a voucher. If ACS holds one, delete it there, then use “No voucher needed: close” on the shipment."
+msgstr "The last voucher request for order #%(order)s may have reached ACS without an answer, and the order no longer needs a voucher. If ACS holds one, delete it there, then use “No voucher needed: close” on the shipment."
 
 #, python-format
 msgid "The last voucher request for order #%(order)s may have reached ACS without an answer, so ACS may already hold a voucher for it. Check the ACS portal, then use “Adopt ACS voucher” or “No voucher at ACS: request again” on the shipment."

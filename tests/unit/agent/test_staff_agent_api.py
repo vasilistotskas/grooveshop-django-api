@@ -467,3 +467,31 @@ class StaffIssuerAdapterTestCase(APITestCase):
                 token=None,
                 bearer_token=None,
             )
+
+
+def test_a_margin_of_any_size_serializes():
+    """Cents of revenue against euros of cost: no 500 on the report."""
+    from decimal import Decimal
+
+    from agent.staff_serializers import StaffProfitRowSerializer
+
+    row = dict.fromkeys(
+        (
+            "revenue",
+            "cogs",
+            "gross_profit",
+            "payment_fees",
+            "delivery_costs",
+            "other_expenses",
+            "operating_profit",
+        ),
+        Decimal("0.05"),
+    )
+    row.update(
+        period=None,
+        gross_margin=Decimal("-119900.0"),
+        cost_coverage=None,
+        fee_coverage=None,
+    )
+    data = StaffProfitRowSerializer(row).data
+    assert data["gross_margin"] == Decimal("-119900.00")

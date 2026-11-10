@@ -3,6 +3,53 @@
 
 
 
+## v3.242.20 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_acs): a late answer after staff resolved the voucher check is not saved (#634) ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): a late answer after staff resolved the voucher check is not saved
+
+Phase 3 saved any answer while the shipment had no voucher. After staff
+requested again, a late answer arriving first became the voucher (it may
+have been deleted in the ACS portal) and the new mint then deleted its
+own live voucher as the duplicate; after a close, a dead voucher landed
+on a canceled order's shipment. Phase 3 now compares the claim it was
+sent under: once the claim is gone and the check is resolved, the answer
+takes the duplicate path (deleted at ACS, or kept as an orphan). ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): refuse a reset for re-mint while a voucher request is in flight
+
+A shipment canceled while its request was out and then reset would drop
+the live claim: the answer is then stale and deleted at ACS, and a
+refused re-mint would leave the order with no voucher. The reset now
+waits for a live claim and turns an expired one into the unknown state.
+Adds the arrival-order, orphan, same-number adopt and one-record tests. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): tell a stale late answer apart from a duplicate in the log
+
+The resolved-meanwhile branch logged "saved voucher None". It now has its
+own message (a late answer after staff resolved the check, the voucher,
+what is done with it) and phase "phase3_stale_answer"; the duplicate
+keeps its message with phase "phase3_duplicate". ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): refuse the reset on an unknown outcome and show refused deletes at once
+
+A reset that finds an expired claim records the unknown state (committed,
+alerted once) and refuses with AcsVoucherRequestUnknownError, so "Issue
+ACS voucher now" queues nothing and shows its guard's guidance. A voucher
+ACS would not delete is recorded at once as a voucher matching no order
+(source refused_delete, duplicate_of), counted on the dashboard, instead
+of only in metadata. Migration 0017 adds the two fields. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
+* fix(shipping_acs): a refused delete upgrades an existing voucher record and never fails the mint
+
+When our own refused delete meets a row a pickup list made first, the
+row learns it is our unused voucher and which shipment it came from; a
+row staff had marked checked is reopened. The record runs after Phase 3
+committed, best effort, logged at ERROR with the voucher number. ([`0f0f87a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f0f87aaf64967fe698a75fa36031bdca9669831))
+
 ## v3.242.19 (2026-11-10)
 
 ### Bug fixes

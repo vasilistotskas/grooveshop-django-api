@@ -106,7 +106,7 @@ def test_pasted_text_is_accepted():
 
 def test_pasted_text_keeps_direction_language_and_tooltip():
     assert sanitize_html(PASTED) == (
-        '<p dir="ltr" lang="el" class="MsoNormal"><span dir="ltr" '
+        '<p dir="ltr" lang="el"><span dir="ltr" '
         'lang="EN-US" title="t">Τι είναι τα mAh;</span></p>'
     )
 

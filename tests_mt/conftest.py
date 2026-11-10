@@ -24,8 +24,15 @@ xdist parallelism would need per-worker schemas for no benefit here).
 
 from __future__ import annotations
 
+import os
+from unittest import mock
+
 import pytest
 from django.conf import settings
+from django_tenants.management.commands.migrate_schemas import (
+    MigrateSchemasCommand as _MigrateSchemasCommand,
+)
+from django_tenants.utils import get_public_schema_name
 
 from tests.db_lifecycle import django_db_keepdb  # noqa: F401
 from tests.utils.emails import catalogue, probe_templates  # noqa: F401
@@ -84,47 +91,133 @@ def _connection_back_to_public():
     connection.set_schema_to_public()
 
 
+# ── the store schemas are built side by side ────────────────────────
+# A store schema costs a full migration replay, about 160 s on a CI
+# runner, and the lane has three: the seeded ``webside`` and the two
+# below. Built one after the other (``webside`` by the ``migrate`` that
+# creates the test database, the other two by ``Tenant.save()``) they
+# were 8 of the lane's 12 minutes on 2026-11-10, and the 251 tests one.
+# So that ``migrate`` now builds the public schema only, and
+# ``mt_store_schemas`` builds the three stores at once.
+_migrate_as_asked = _MigrateSchemasCommand.handle
+
+
+def _migrate_public_unless_stores_are_asked_for(self, *args, **options):
+    if not (options.get("tenant") or options.get("schema_name")):
+        options = {**options, "shared": True}
+    return _migrate_as_asked(self, *args, **options)
+
+
+_MigrateSchemasCommand.handle = _migrate_public_unless_stores_are_asked_for
+
 # The one tenant this whole lane shares.
 MT_TENANT_SCHEMA = "mt_smoke"
 MT_TENANT_DOMAIN = "mt-smoke.test"
 
+# A SECOND tenant, for the tests that need two real schemas side by
+# side (a token issued by one store presented to another).
+MT_TENANT_B_SCHEMA = "mt_smoke_b"
+MT_TENANT_B_DOMAIN = "mt-smoke-b.test"
+
+_MT_STORES = {
+    MT_TENANT_SCHEMA: {
+        "domain": MT_TENANT_DOMAIN,
+        "name": "MT Smoke Tenant",
+        "slug": "mt-smoke",
+        "owner_email": "mt-smoke@example.com",
+    },
+    MT_TENANT_B_SCHEMA: {
+        "domain": MT_TENANT_B_DOMAIN,
+        "name": "MT Smoke Tenant B",
+        "slug": "mt-smoke-b",
+        "owner_email": "mt-smoke-b@example.com",
+    },
+}
+
 
 @pytest.fixture(scope="session")
-def mt_tenant(django_db_setup, django_db_blocker):
-    """The one provisioned tenant this lane's smoke tests share.
+def mt_store_schemas(django_db_setup, django_db_blocker):
+    """The lane's two tenants, their schemas migrated with ``webside``'s.
 
-    Provisioned exactly like ``django_tenants.test.cases.TenantTestCase``
-    does: instantiate the real (non-historical) ``Tenant`` model and
-    ``save()`` it. ``TenantMixin.save()`` (``auto_create_schema=True``
-    by default) creates the Postgres schema and runs
-    ``migrate_schemas --schema=mt_smoke`` for it automatically — this
-    IS the one expensive part of the lane (a full migration replay),
-    done ONCE per session.
+    ``TenantMixin.save()`` would create each schema and replay the whole
+    migration history into it, one store after the other. Here the row
+    is saved without that, the schema is created empty, and
+    ``migrate_schemas --tenant`` then migrates every store with
+    django-tenants' ``subprocess`` executor: one
+    ``manage.py migrate_schemas --schema <name>`` process per store, the
+    command a deploy runs, all at the same time. Each schema is still
+    built from the first migration to the last.
+
+    The child processes read their settings from the environment, so
+    ``DB_NAME`` names the test database while they run. They do not see
+    what this file assigns to ``settings``; ``MEILI_OFFLINE`` gives them
+    the one assignment a migration could reach.
+
+    With ``--reuse-db`` the schemas exist already and the same call
+    applies only the migrations added since.
+    """
+    from django.core.management import call_command
+    from django.db import connection
+    from django_tenants.utils import schema_exists
+
+    from tenant.models import Tenant, TenantDomain
+
+    with django_db_blocker.unblock():
+        connection.set_schema_to_public()
+        tenants = {}
+        for schema_name, store in _MT_STORES.items():
+            tenant = Tenant.objects.filter(schema_name=schema_name).first()
+            if tenant is None:
+                tenant = Tenant(
+                    schema_name=schema_name,
+                    name=store["name"],
+                    slug=store["slug"],
+                    owner_email=store["owner_email"],
+                )
+                tenant.auto_create_schema = False
+                tenant.save()
+            TenantDomain.objects.get_or_create(
+                domain=store["domain"],
+                defaults={"tenant": tenant, "is_primary": True},
+            )
+            assert tenant.get_primary_domain() is not None, (
+                f"tenant '{schema_name}' has no primary domain — "
+                "TenantClient needs one to set the Host header."
+            )
+            if not schema_exists(schema_name):
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        f"CREATE SCHEMA {connection.ops.quote_name(schema_name)}"
+                    )
+            tenants[schema_name] = tenant
+
+        child_environment = {
+            "DB_NAME": connection.settings_dict["NAME"],
+            "MEILI_OFFLINE": "True",
+        }
+        with mock.patch.dict(os.environ, child_environment):
+            call_command(
+                "migrate_schemas",
+                tenant=True,
+                executor="subprocess",
+                parallel=Tenant.objects.exclude(
+                    schema_name=get_public_schema_name()
+                ).count(),
+                interactive=False,
+            )
+        connection.set_schema_to_public()
+        yield tenants
+
+
+@pytest.fixture(scope="session")
+def mt_tenant(mt_store_schemas):
+    """The one provisioned tenant this lane's smoke tests share.
 
     Session-scoped: every test that touches it should either use data
     that tolerates being shared (append-only assertions) or clean up
     after itself, same discipline as any other session fixture.
     """
-    with django_db_blocker.unblock():
-        from tenant.models import Tenant, TenantDomain
-
-        tenant, _created = Tenant.objects.get_or_create(
-            schema_name=MT_TENANT_SCHEMA,
-            defaults={
-                "name": "MT Smoke Tenant",
-                "slug": "mt-smoke",
-                "owner_email": "mt-smoke@example.com",
-            },
-        )
-        TenantDomain.objects.get_or_create(
-            domain=MT_TENANT_DOMAIN,
-            defaults={"tenant": tenant, "is_primary": True},
-        )
-        assert tenant.get_primary_domain() is not None, (
-            f"tenant '{MT_TENANT_SCHEMA}' has no primary domain — "
-            "TenantClient needs one to set the Host header."
-        )
-        yield tenant
+    return mt_store_schemas[MT_TENANT_SCHEMA]
 
 
 @pytest.fixture(scope="session")
@@ -159,34 +252,7 @@ def mt_public_tenant(django_db_setup, django_db_blocker):
         yield tenant
 
 
-# A SECOND provisioned tenant, for the few tests that need two real
-# schemas side by side (a token issued by one store presented to
-# another). Costs one more migration replay per session, so only tests
-# that ask for it pay.
-MT_TENANT_B_SCHEMA = "mt_smoke_b"
-MT_TENANT_B_DOMAIN = "mt-smoke-b.test"
-
-
 @pytest.fixture(scope="session")
-def mt_tenant_b(django_db_setup, django_db_blocker):
-    # Created lazily, so the connection may still be bound to a schema an
-    # earlier test switched to — and django-tenants refuses to create a
-    # tenant outside the public schema.
-    from django_tenants.utils import get_public_schema_name, schema_context
-
-    with django_db_blocker.unblock(), schema_context(get_public_schema_name()):
-        from tenant.models import Tenant, TenantDomain
-
-        tenant, _created = Tenant.objects.get_or_create(
-            schema_name=MT_TENANT_B_SCHEMA,
-            defaults={
-                "name": "MT Smoke Tenant B",
-                "slug": "mt-smoke-b",
-                "owner_email": "mt-smoke-b@example.com",
-            },
-        )
-        TenantDomain.objects.get_or_create(
-            domain=MT_TENANT_B_DOMAIN,
-            defaults={"tenant": tenant, "is_primary": True},
-        )
-        yield tenant
+def mt_tenant_b(mt_store_schemas):
+    """The second tenant, built with the first (``mt_store_schemas``)."""
+    return mt_store_schemas[MT_TENANT_B_SCHEMA]

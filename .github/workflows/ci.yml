@@ -17,9 +17,14 @@ on:
       - '.editorconfig'
   workflow_dispatch:
 
+# A new push to a pull request cancels the run it supersedes. A run on
+# main is never cancelled in progress: it may be in the middle of a
+# release (a version commit pushed, its tag not yet). Runs on main wait
+# for each other instead, and GitHub keeps only the newest waiting one,
+# whose tree holds every commit before it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -488,9 +493,15 @@ jobs:
         # within 0.7% of each other and they ran 9-16 minutes on CI.
         # Tests missing from the file are assumed average, so drift
         # costs balance, never correctness. Four shards, not more:
-        # each shard pays a fixed ~3 min creating its xdist worker
-        # test-databases (validated locally with ``--create-db -n 4``),
-        # so extra shards mostly buy overhead.
+        # each shard pays a fixed ~3.5 min before its first test, the
+        # migration replay that builds each xdist worker's database
+        # (three pull_request runs of 2026-11-10), so extra shards
+        # mostly buy overhead.
+        # ``-n logical``, not the ``-n auto`` of ``addopts``: with
+        # psutil installed ``auto`` counts PHYSICAL cores, and a
+        # standard runner has 4 vCPUs on 2 cores, so ``auto`` started 2
+        # workers ("created: 2/2 workers" in those runs' logs) and half
+        # the runner idled.
         # Coverage: shards upload raw data files; the ``coverage`` job
         # combines them and enforces ``fail_under`` for the whole suite.
         # A single shard's percentage is meaningless, so the per-shard
@@ -503,7 +514,7 @@ jobs:
         run: >
           cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
           uv run pytest --cov=. --cov-report= --cov-fail-under=0
-          --cov-config=pyproject.toml -n auto --dist loadfile
+          --cov-config=pyproject.toml -n logical --dist loadfile
           --splits 4 --group ${{ matrix.group }}
           --durations-path test-durations-shard-${{ matrix.group }}.json
           --store-durations --clean-durations
@@ -540,15 +551,16 @@ jobs:
     needs: tested-in-pr
     if: needs.tested-in-pr.outputs.tested != 'true'
     runs-on: ubuntu-latest
-    # Nearly all of the lane is building its two store schemas through
-    # the full migration history: locally on 2026-10-22, 244 s for the
-    # first and 89 s for the second, against under a minute for the 150
-    # tests. That cost grows with every migration, and splitting the lane
-    # would not cut it, since each shard would build the schemas again.
-    # Its green CI runs took 8-14 minutes on 2026-10-21/22, and one was
-    # cancelled at the old 15-minute limit right after "150 passed". 25
-    # leaves room for slower runners; raise it again only with a fresh
-    # measurement. (Creating the second schema by cloning the first,
+    # Nearly all of the lane is the migration replays that build its
+    # schemas: public, then the stores ``webside``, ``mt_smoke`` and
+    # ``mt_smoke_b``, about 160 s each on a runner, against one minute
+    # for the 251 tests (three pull_request runs of 2026-11-10: 10 to 13
+    # minutes in pytest, 8 of them before the first test). That cost
+    # grows with every migration, and splitting the lane into jobs would
+    # not cut it, since each job would build the schemas again. So
+    # ``tests_mt/conftest.py`` builds the three store schemas at the
+    # same time, one process each. 25 leaves room for slower runners.
+    # (Creating a store schema by cloning another,
     # TENANT_CREATION_FAKES_MIGRATIONS, is not the way out: django-tenants
     # warns it can be slower, and it would copy the first store's test
     # rows into the store the isolation tests compare it with.)
@@ -633,9 +645,8 @@ jobs:
         run: uv run python manage.py compilemessages --ignore=.venv
 
       - name: Run MT lane
-        # Serial (-n 0): the lane is small (~10 tests) and schema
-        # switching is process-global via ``connection`` — xdist would
-        # need per-worker schemas for no real benefit here.
+        # Serial (-n 0): the tests take a minute, and every xdist worker
+        # would build its own database with all four schemas again.
         run: uv run pytest tests_mt -n 0
 
   coverage:
@@ -731,7 +742,26 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
+      - name: Still the tip of main
+        # Runs on main are not cancelled, so this one may have tested a
+        # commit that is no longer the tip. A version commit made on it
+        # could not be pushed. The run on the newer commit releases both:
+        # semantic-release reads every commit since the last tag.
+        id: tip
+        run: |
+          tip="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ -z "$tip" ]; then
+            echo "::error::could not read the tip of main"
+            exit 1
+          fi
+          if [ "$tip" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main moved to $tip. The run on that commit releases this one too."
+          fi
+
       - name: Python Semantic Release
+        if: steps.tip.outputs.current == 'true'
         # Inline instead of the python-semantic-release ACTION: its
         # Docker image pip-installs dependencies UNPINNED at workflow
         # runtime, so a transitive release can break every run at once

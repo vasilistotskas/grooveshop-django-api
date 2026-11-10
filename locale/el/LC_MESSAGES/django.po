@@ -8744,6 +8744,9 @@ msgstr "Χρειάζεται παρακολούθηση"
 msgid "Needs follow-up since"
 msgstr "Χρειάζεται παρακολούθηση από"
 
+msgid "Needs follow-up: the parcel was canceled while the order is still open. Create a new parcel or cancel the order."
+msgstr "Χρειάζεται παρακολούθηση: το δέμα ακυρώθηκε ενώ η παραγγελία είναι ακόμη ανοιχτή. Δημιουργήστε νέο δέμα ή ακυρώστε την παραγγελία."
+
 msgid "Nested BoxNow locker details"
 msgstr "Ενσωματωμένα στοιχεία locker BoxNow"
 

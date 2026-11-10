@@ -74,6 +74,7 @@ from order.exceptions import PaymentError, RefundOutstandingError
 from order.follow_up import (
     follow_up_days,
     follow_up_reason,
+    has_canceled_shipment,
     last_carrier_event_at,
 )
 from order.invoicing import (
@@ -305,10 +306,10 @@ class ChargebackDecisionFilter(DropdownFilter):
 
 
 class FollowUpFilter(DropdownFilter):
-    """Orders the shopper has waited on for the store's follow-up
-    threshold (``ORDER_FOLLOW_UP_DAYS``); the rule is
-    ``OrderQuerySet.needing_follow_up``, the same one behind the badge
-    and the dashboard counter."""
+    """Orders that need follow-up (``order.follow_up``: waited the
+    store's ``ORDER_FOLLOW_UP_DAYS``, or open behind a canceled parcel);
+    the rule is ``OrderQuerySet.needing_follow_up``, the same one behind
+    the badge and the dashboard counter."""
 
     title = _("Needs follow-up")
     parameter_name = "follow_up"
@@ -1732,20 +1733,31 @@ class OrderAdmin(BaseModelAdmin):
         carrier's last word on the parcel."""
         if not obj or not getattr(obj, "needs_follow_up", False):
             return "—"
+        last_event = last_carrier_event_at(obj)
+        carrier = format_html(
+            "{}: {}",
+            _("Last carrier event"),
+            format_dt(last_event) if last_event else _("none yet"),
+        )
+        if has_canceled_shipment(obj):
+            return format_html(
+                "{} {}",
+                _(
+                    "Needs follow-up: the parcel was canceled while the "
+                    "order is still open. Create a new parcel or cancel "
+                    "the order."
+                ),
+                carrier,
+            )
         since = timezone.localdate(obj.created_at) + timedelta(
             days=follow_up_days()
         )
-        last_event = last_carrier_event_at(obj)
         return format_html(
             "{} {}: {}. {}",
             _("Needs follow-up since"),
             formats.date_format(since, "SHORT_DATE_FORMAT"),
             follow_up_reason(obj),
-            format_html(
-                "{}: {}",
-                _("Last carrier event"),
-                format_dt(last_event) if last_event else _("none yet"),
-            ),
+            carrier,
         )
 
     # The facts an operator opens an order for, above the tabs.

@@ -3,6 +3,39 @@
 
 
 
+## v3.242.15 (2026-11-10)
+
+### Bug fixes
+
+* fix(product): one stock state from each product's low-stock threshold (#621) ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): one stock state from each product's low-stock threshold
+
+The admin's stock filter and changelist badge used fixed bands (low 1-10,
+critical 1-5, high >50) and the dashboard counter used stock below 10,
+while the low-stock email and the stock-history page compared stock with
+the product's own low_stock_threshold. A product with threshold 20 and 15
+in stock was emailed as low but listed as in stock; one with threshold 0
+(alerts off) and 4 in stock showed "Critical".
+
+StockState is now the one rule: out of stock at 0, low above 0 and at or
+below the threshold (a threshold of 0 is never low), otherwise in stock.
+Product.stock_state decides it for a row and ProductQuerySet.by_stock_state
+(with low_stock() and out_of_stock()) for a queryset. The filter, badge,
+stock-history page, low-stock email task, dashboard counter and sidebar
+badge, and the staff agent's lowStock list all read it. The fixed bands
+and LOW_STOCK_BELOW are removed, and the unused in_stock() queryset
+method, whose meaning contradicted the new state, is deleted.
+
+Closes #589 ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
+* fix(product): say the low-stock tile counts in-stock products only
+
+The dashboard tile counts StockState.LOW_STOCK (stock above 0), but its
+description read as if sold-out products at their threshold were counted
+too. The test of its link now follows the href the widget renders rather
+than a query string of its own. ([`f02c9db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02c9db9785ea247eca7aba9cd1e76ede5d4ba7c))
+
 ## v3.242.14 (2026-11-10)
 
 ### Bug fixes

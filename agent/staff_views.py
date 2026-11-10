@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Count, F, Max, Q
+from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -62,6 +62,7 @@ from order import profit, turnover
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.order import Order
 from product.enum.review import ReviewStatus
+from product.enum.stock import RESTOCK_STATES
 from product.models.product import Product
 from product.models.review import ProductReview
 from tenant.membership import get_current_tenant, get_membership
@@ -475,9 +476,9 @@ class StaffAgentProductsView(StaffAgentAPIView):
                 match |= Q(id=int(search))
             products = products.filter(match).distinct()
         if request.query_params.get("low_stock") in {"true", "1"}:
-            products = products.filter(
-                stock__lte=F("low_stock_threshold")
-            ).order_by("stock", "id")
+            products = products.by_stock_state(*RESTOCK_STATES).order_by(
+                "stock", "id"
+            )
         else:
             products = products.order_by("-updated_at", "-id")
         rows = []
@@ -498,7 +499,7 @@ class StaffAgentProductsView(StaffAgentAPIView):
                     "currency": str(price.currency),
                     "stock": product.stock,
                     "low_stock_threshold": product.low_stock_threshold,
-                    "low_stock": product.stock <= product.low_stock_threshold,
+                    "low_stock": product.stock_state in RESTOCK_STATES,
                     "published": product.active,
                 }
             )

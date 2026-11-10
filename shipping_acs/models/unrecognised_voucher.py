@@ -71,6 +71,7 @@ class AcsUnrecognisedVoucher(TimeStampMixinModel):
         verbose_name = _("ACS voucher matching no order")
         verbose_name_plural = _("ACS vouchers matching no order")
         ordering = ["-last_seen_at"]
+        indexes = [*TimeStampMixinModel.Meta.indexes]
 
     def __str__(self) -> str:
         return self.voucher_no

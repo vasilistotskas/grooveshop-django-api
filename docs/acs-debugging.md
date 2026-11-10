@@ -156,7 +156,15 @@ shipment:
 A late answer settles it too: when a worker's request outlives the claim's
 TTL, another worker records the outcome as unknown, and the first one's
 answer then arrives with a voucher, the save clears the flag (history:
-"A late answer from ACS ... resolved ..."; an order note). Resetting a
+"A late answer saved voucher ..."; an order note). That holds only while
+the check is still open. Once staff have resolved it (request again, or
+close), the answer is stale: they may have deleted that voucher in the
+ACS portal, and a request-again mint brings the voucher the order uses.
+Phase 3 then compares the claim it was sent under with the shipment's
+and treats the answer like a duplicate: deleted at ACS, or kept in
+`orphan_vouchers` when ACS refuses. Deleting a voucher in the portal
+without resolving the check in the admin is the one case the code cannot
+see: if the late answer arrives first, it saves that voucher. Resetting a
 canceled shipment for a re-mint clears a flag left beside a real voucher
 and keeps one on a shipment with no voucher (it was canceled before the
 lost request was resolved; both resolutions still work).
@@ -182,6 +190,12 @@ calls ACS, so a lone orphan surfaces on the next day that has one.
   nothing and the next run decides.
 - A shipment that saves a number (the mint, or an adopt) resolves the open
   row for it, children included.
+- When ACS refuses to delete one of our own unused answers (a duplicate,
+  or a late answer after the check was resolved), the voucher is recorded
+  at once as a row with "Found by" = our own unused voucher and the
+  shipment it came from (`source = refused_delete`, `duplicate_of`); it
+  is counted like the rest, with no email. A later refused pickup list
+  naming it finds the same row.
 - When the mint deletes its own duplicate at ACS (a late answer after
   another voucher was saved), the row for that number is resolved as
   deleted.

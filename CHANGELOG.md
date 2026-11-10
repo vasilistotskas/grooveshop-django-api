@@ -3,6 +3,37 @@
 
 
 
+## v3.242.3 (2026-11-10)
+
+### Bug fixes
+
+* fix(shipping_boxnow): the shipment admin follows the service's cancel rule; the service builds the label zip (#603)
+
+The two cancel actions of BoxNowShipmentAdmin tested parcel_state == NEW
+themselves. BoxNowService.can_cancel_shipment is the rule cancel_shipment
+and the order's canBeCanceled read, and it also allows a shipment BoxNow
+never received (no parcel_id), which cancels locally. The admin refused
+that shipment, and a change to the rule would not have reached it. Both
+actions now call can_cancel_shipment.
+
+The bulk voucher zip was assembled inside the admin action. It moves to
+BoxNowService.fetch_labels_zip, the counterpart of
+AcsService.fetch_labels_pdf: it returns the archive and the labels that
+failed, and the action only reports and returns the download. The
+voucher file name has one definition, BoxNowService.label_filename.
+
+shipping_acs: retire_shipments skips TERMINAL_STATES instead of its own
+copy of the four states, and the AcsTrackingEventAdmin docstring no
+longer calls the polled tracking rows webhook deliveries.
+
+Closes #583 ([`563f9fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/563f9fbbcf077cd216715b4a88e0f9e0e2e75809))
+
+### Testing
+
+* test(agent): generate the staff test password at run time (#605)
+
+The literal password in the staff MCP schema-binding test tripped GitGuardian's generic-password detector on every branch that merges main. The test only needs a password it can sign in with, so it now draws one from secrets.token_urlsafe per run. ([`6d13dad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d13dad9ac12a6fca30eb4a64957d66fc49576c5))
+
 ## v3.242.2 (2026-11-09)
 
 ### Bug fixes

@@ -1236,6 +1236,16 @@ class AcsService:
 
         Refuses unless the shipment is CANCELED and not already in a
         pickup list (an issued manifest is immutable).
+
+        Also refuses while a voucher request is in flight (a mint claim
+        younger than its TTL: the shipment was canceled while the request
+        was out). Before #634 the reset dropped that claim, the request's
+        answer was saved and the re-mint stopped at it; after #634 such an
+        answer is stale and deleted at ACS, so if ACS then refused the
+        re-mint the order would be left with no voucher. Waiting for the
+        claim keeps the answer and never makes a second voucher. An
+        expired claim becomes the unknown state (alerted), as any later
+        mint would make it, and staff resolve it from the shipment.
         """
         with transaction.atomic():
             shipment = AcsShipment.objects.select_for_update().get(
@@ -1258,6 +1268,30 @@ class AcsService:
                         "pickup list."
                     ),
                 )
+            # A mint may be out for this shipment (it was canceled while
+            # the request was in flight). Dropping a live claim would make
+            # that request's good answer stale (deleted at ACS in Phase 3),
+            # and if ACS then refused the re-mint the order would have no
+            # voucher; keeping it and re-minting would make two. So: wait
+            # for a live claim to end, and an expired one is what any
+            # later mint would make of it, an unknown outcome.
+            claim_age = _claim_age(
+                (shipment.metadata or {}).get("mint_started_at")
+            )
+            if (
+                claim_age is not None
+                and claim_age < cls._MINT_CLAIM_TTL_SECONDS
+            ):
+                raise AcsAPIError(
+                    alias="reset_for_remint",
+                    error_message=(
+                        "A voucher request for this shipment is in progress; "
+                        "try again in a few minutes."
+                    ),
+                )
+            expired_claim = claim_age is not None
+            if expired_claim and not shipment.voucher_no:
+                cls._set_voucher_request_unknown(shipment)
 
             metadata = shipment.metadata or {}
             if shipment.voucher_no:
@@ -1297,6 +1331,10 @@ class AcsService:
                 shipment.pk,
                 shipment.order_id,
                 previous_voucher,
+            )
+        if expired_claim and not previous_voucher:
+            cls._alert_voucher_request_unknown(
+                shipment.order_id, _stale_claim_message(claim_age or 0.0)
             )
 
     # ------------------------------------------------------------------

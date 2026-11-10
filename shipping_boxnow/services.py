@@ -18,7 +18,11 @@ from shipping.exceptions import ShipmentAwaitingPaymentError
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
-from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowConfigError
+from shipping_boxnow.exceptions import (
+    BoxNowAPIError,
+    BoxNowConfigError,
+    BoxNowError,
+)
 from shipping_boxnow.models import (
     BoxNowLocker,
     BoxNowParcelEvent,
@@ -1703,8 +1707,13 @@ class BoxNowService:
             Raw PDF bytes.
 
         Raises:
+            BoxNowError: The shipment has no parcel id yet.
             BoxNowAPIError: The BoxNow API returned an error.
         """
+        if not shipment.parcel_id:
+            raise BoxNowError(
+                "Cannot fetch a label before the parcel is created."
+            )
         cache_key = f"boxnow:label:{shipment.parcel_id}"
         cached: bytes | None = cache.get(cache_key)
         if cached is not None:

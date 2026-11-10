@@ -54,6 +54,9 @@ class AcsCarrier(ShippingCarrierInterface):
 
         return AcsService.can_cancel_voucher(shipment)
 
+    def has_label(self, shipment: Any) -> bool:
+        return bool(shipment.voucher_no)
+
     def fetch_label_bytes(self, shipment: Any) -> bytes:
         from shipping_acs.services import AcsService
 

@@ -11,7 +11,8 @@ admin, DRF, a shell, a command), in this order:
 2. **Sanitise.** `sanitize_html` reduces the markup to the allowlist in
    `core/utils/sanitize.py`. Residue no reader sees (`data-*`, event
    handlers, CSS custom properties such as Dark Reader's
-   `--darkreader-inline-color` in a `style`) is dropped without refusing.
+   `--darkreader-inline-color` in a `style`) is dropped without refusing,
+   and so is the text's own typography (next section).
 3. **Drop empty headings.** `core.utils.sanitize.drop_empty_headings`: the
    editor leaves `<h2 id="..."></h2>` behind when a heading's text is moved.
    A screen reader announces it and it is a hole in the page's outline. Not
@@ -21,6 +22,40 @@ admin, DRF, a shell, a command), in this order:
 
 The storefront re-sanitises the same markup on render, so it can only ever
 show less than what is stored.
+
+## Typography belongs to the theme
+
+A store's typeface and type size are its theme's. Text pasted from Word or a
+web page carries its own (`font-family: arial; font-size: 14pt` drew a
+webside post's body at 18.7 px against the store's 20 px, and a named face
+is downloaded mid-render), so the policy drops, from every `style`:
+
+- `font`, `font-family` and `font-size`;
+- Word's `mso-*` properties, which no browser reads;
+- CSS custom properties (`--name: ...`, browser-extension residue);
+
+and Word's classes (`MsoNormal`, `msocomanchor`) from every `class`. Colour,
+alignment, spacing, weight and style stay: they are the author's. A `style`
+or `class` left empty goes with its attribute. None of this is lost content,
+so a save is never refused for it.
+
+The editor agrees: `TINYMCE_DEFAULT_CONFIG` names no font family or size
+control (the Format menu is TinyMCE 7.8's default without `fontfamily
+fontsize`) and sets `invalid_styles` to `font font-family font-size`, so a
+paste already shows what will be stored. Rows saved before are brought in
+line by `manage.py normalise_rich_text` (below), which stores what a save
+would (`stored_rich_text`).
+
+A comment in a `style` is removed with them, and a property name spelled with
+a CSS escape is dropped: a browser reads `font-size/**/: 14pt` and
+`font-s9ze: 14pt` as a type size.
+
+The page builder's rich-text settings pass the same sanitiser when a draft is
+saved (`builder/validation.py`), so the rule holds for them from the next
+save. Builder documents are not backfilled: versions and releases are
+immutable, so a setting saved before keeps its typeface until it is edited.
+The storefront therefore keeps its own rule that ignores a typeface and a
+size in rendered rich text.
 
 ## Image sizes
 
@@ -61,8 +96,10 @@ uv run python manage.py normalise_rich_text --all-tenants [--dry-run]
 ```
 
 (`--tenant <schema>` for one store). It discovers the `RichTextField` columns
-from the app registry, writes the column directly (no re-validation, history
-or reindex) and is idempotent. The search index holds visible text only (next
+from the app registry, stores what a save would (the policy, no empty
+headings, the image sizes), writes the column directly (no history or
+reindex) and is idempotent. A row holding content a save refuses is left as it
+is and counted as skipped: edit it in the admin. The search index holds visible text only (next
 section), so the sizes cannot change a document. The storefront serves its
 cached pages until they expire; run `purge_edge_cache` afterwards to use the
 sizes at once.

@@ -125,6 +125,109 @@ class TestSanitizeHtmlStyleResidue(unittest.TestCase):
         self.assertEqual(sanitize_html(html), html)
 
 
+class TestSanitizeHtmlTypography(unittest.TestCase):
+    """A store's typeface and type size are its theme's, not the text's."""
+
+    def test_drops_the_typeface_and_size_pasted_text_carries(self):
+        # Webside's post 82: Arial at 14pt drew the body at 18.7 px.
+        self.assertEqual(
+            sanitize_html(
+                '<p style="font-family: arial; font-size: 14pt;'
+                ' color: #333; text-align: justify">x</p>'
+            ),
+            '<p style="color: #333; text-align: justify;">x</p>',
+        )
+
+    def test_drops_the_font_shorthand_and_word_properties(self):
+        self.assertEqual(
+            sanitize_html(
+                '<span style="font: 12px/1.5 Roboto; mso-ansi-language: EL;'
+                " MSO-BIDI-FONT-FAMILY: 'Times'; margin-left: 4px\">x</span>"
+            ),
+            '<span style="margin-left: 4px;">x</span>',
+        )
+
+    def test_keeps_properties_that_only_start_like_a_dropped_one(self):
+        html = '<p style="font-weight: bold; font-style: italic">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_a_style_of_only_typography_is_dropped(self):
+        self.assertEqual(
+            sanitize_html('<summary style="font-size: 15pt;">Q</summary>'),
+            "<summary>Q</summary>",
+        )
+
+    def test_reads_a_semicolon_inside_a_url_or_a_string_as_part_of_it(self):
+        self.assertEqual(
+            sanitize_html(
+                "<p style=\"background: url('a;b.png'); font-size: 9pt;"
+                " content: ';'\">x</p>"
+            ),
+            "<p style=\"background: url('a;b.png'); content: ';';\">x</p>",
+        )
+
+    def test_drops_words_classes_and_keeps_the_authors(self):
+        self.assertEqual(
+            sanitize_html('<p class="MsoNormal intro">x</p>'),
+            '<p class="intro">x</p>',
+        )
+        self.assertEqual(
+            sanitize_html('<a class="msocomanchor" href="#c1">[1]</a>'),
+            '<a rel="noopener noreferrer" href="#c1">[1]</a>',
+        )
+
+    def test_keeps_a_class_that_only_starts_like_words(self):
+        html = '<p class="msonry-grid mso">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_reads_a_comment_the_way_a_browser_does(self):
+        # A browser skips a comment anywhere between tokens.
+        for style in (
+            "/**/font-size: 14pt; color: red",
+            "font-size/**/: 14pt; color: red",
+            "color: red; /* note */ font-family: arial",
+            "color: red /* it's */; font-size: 14pt",
+        ):
+            with self.subTest(style=style):
+                self.assertEqual(
+                    sanitize_html(f'<p style="{style}">x</p>'),
+                    '<p style="color: red;">x</p>',
+                )
+
+    def test_dropping_a_declaration_never_uncomments_another(self):
+        self.assertEqual(
+            sanitize_html(
+                '<p style="font: /*; position: fixed; */ 12px a;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
+    def test_keeps_a_comment_mark_inside_a_string(self):
+        html = "<p style=\"content: '/*'; color: red\">x</p>"
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_drops_a_property_name_spelled_with_an_escape(self):
+        self.assertEqual(
+            sanitize_html(
+                r'<p style="font-s\69ze: 14pt; \66ont-family: arial;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
+    def test_dropping_typography_is_not_content_the_save_refuses(self):
+        self.assertEqual(
+            lost_content(
+                '<p class="MsoNormal" style="font-family: arial">x</p>'
+            ),
+            [],
+        )
+
+
 class TestHasVisibleContent(unittest.TestCase):
     def test_empty_markup_shows_nothing(self):
         for html in (

@@ -3,6 +3,48 @@
 
 
 
+## v3.242.5 (2026-11-10)
+
+### Bug fixes
+
+* fix(core): rich text drops the typeface, the type size and Word's residue at save (#557) ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+* fix(core): rich text drops the typeface, the type size and Word's residue at save
+
+A store's typography is its theme's. The rich-text policy now drops
+`font`, `font-family`, `font-size` and `mso-*` declarations (beside CSS
+custom properties) from every `style`, and Word's `Mso*` classes from
+every `class`, in every RichTextField of every store; colour, alignment,
+spacing, weight and style stay. A style or class left empty goes with
+its attribute. None of it is lost content, so no save is refused.
+
+Declarations are split on top-level semicolons only, so a `;` inside a
+`url(...)` or a string stays part of its value.
+
+TinyMCE: the toolbar names TinyMCE 7 items only (the 5.x fontselect,
+fontsizeselect and formatselect, and premium or unloaded items, rendered
+nothing; `blocks` replaces formatselect), the Format menu is 7.8's
+default without fontfamily/fontsize, and `invalid_styles` strips the same
+declarations in the editor.
+
+Rows saved before are normalised by `normalise_rich_text`.
+
+Closes #549 ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+* fix(core): the rich-text backfill stores what a save does, and a style's comments and escaped names are read as a browser reads them ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+### Chores
+
+* chore(builder): refresh the storefront catalogue copy (page heading root setting, image refs) ([`9ed5e6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed5e6a580447e6450fb4259384204ebde01f1bd))
+
+## v3.242.4 (2026-11-10)
+
+### Bug fixes
+
+* fix(agent): a profit report with any margin serializes (#614)
+
+StaffProfitRowSerializer bounded gross_margin to seven digits, but a percentage of revenue has no bound: a day whose sales were mostly returned leaves cents of revenue against euros of cost, and DRF raised InvalidOperation, a 500 on profit_report for that range every time. The field is now unbounded. ([`67bc91b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67bc91b8cb1ce38d0a57b30b41e1e7d375e48ba1))
+
 ## v3.242.3 (2026-11-10)
 
 ### Bug fixes

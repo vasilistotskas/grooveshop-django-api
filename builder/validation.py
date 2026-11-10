@@ -618,12 +618,19 @@ def _check_node_overlay(
         pointers.set_at(merged, concrete, value)
         overlay[pointer] = value
         applied.append((concrete, field_where))
+    # A root translated before the draft has settings stands on its own in
+    # that language (``published.resolve_document``), so it answers to the
+    # whole schema, as an empty ``settings`` in the draft would.
+    whole = node_id == DOCUMENT_NODE and "settings" not in data
     for error in definition.validator.iter_errors(merged):
         error_path = tuple(error.absolute_path)
         for concrete, field_where in applied:
             if error_path[: len(concrete)] == concrete:
                 walk.add(field_where, "invalid_settings", error.message)
                 break
+        else:
+            if whole:
+                walk.add(where, "invalid_settings", error.message)
 
 
 def _clean_rich_value(walk: _Walk, value: Any, where: str) -> Any:

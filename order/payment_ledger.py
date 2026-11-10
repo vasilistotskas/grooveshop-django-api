@@ -315,11 +315,6 @@ class PaymentLedger:
             )
         ).aggregate(total=_taken_out())["total"]
 
-    @staticmethod
-    def reserved_on(charge: PaymentTransaction) -> Decimal:
-        """What PENDING refund attempts hold back from this one payment."""
-        return _total(charge.refund_attempts.live())
-
     @classmethod
     def balances(cls, order: Order) -> list[ChargeBalance]:
         """Every payment of *order* with money left in it, oldest first: a

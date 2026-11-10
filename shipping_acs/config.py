@@ -69,10 +69,7 @@ def _provider_metadata() -> dict[str, Any]:
     everywhere (including ``shipping_acs/services.py`` at import time)
     without circular-import risk on ``ShippingProvider``.
     """
-    try:
-        from shipping.models import ShippingProvider
-    except Exception:
-        return {}
+    from shipping.models import ShippingProvider
 
     try:
         provider = (

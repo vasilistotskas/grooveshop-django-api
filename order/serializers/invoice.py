@@ -67,11 +67,7 @@ class InvoiceDownloadResponseSerializer(serializers.ModelSerializer):
     def _money_amount(self, money_field) -> str | None:
         if money_field is None:
             return None
-        amount = getattr(money_field, "amount", money_field)
-        try:
-            return str(amount)
-        except Exception:
-            return None
+        return str(getattr(money_field, "amount", money_field))
 
     def get_total(self, obj: Invoice) -> str | None:
         return self._money_amount(obj.total)

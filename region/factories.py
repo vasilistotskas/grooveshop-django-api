@@ -46,7 +46,6 @@ class RegionTranslationFactory(factory.django.DjangoModelFactory):
 
 @custom_seeding(
     description="Creates regions based on COUNTRY_REGIONS_MAPPING for existing countries",
-    settings_key="COUNTRY_REGIONS_MAPPING",
 )
 class RegionFactory(CustomDjangoModelFactory):
     auto_translations = False

@@ -50,10 +50,6 @@ def _resolve_token() -> str | None:
     return getattr(settings, "AGENT_GATEWAY_INTERNAL_SECRET", "") or None
 
 
-def is_configured() -> bool:
-    return bool(_resolve_endpoint() and _resolve_token())
-
-
 def invalidate_feeds(
     schema_name: str | None = None, *, timeout: float | None = None
 ) -> GatewayPurgeResult:

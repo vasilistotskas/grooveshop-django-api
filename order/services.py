@@ -233,9 +233,6 @@ class _ShareDeclined:
     declined: dict[str, Any]
 
 
-__all__ = ["OrderService", "PaymentEventOutcome", "RefundResult"]
-
-
 def _violated_constraint(error: IntegrityError) -> str | None:
     """The constraint a database integrity error names, when the driver
     says (psycopg reports it as ``diag.constraint_name``, which for a

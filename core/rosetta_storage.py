@@ -74,11 +74,7 @@ def _overlay_rows(language_code: str) -> list[tuple[str, str, int, str]]:
     migrate not yet run), the DB is unreachable, or a test harness
     (e.g. pytest-django) is actively blocking database access.
     """
-    try:
-        from core.models import Translation
-    except Exception as exc:  # pragma: no cover — ImportError during teardown
-        logger.debug("Translation model unavailable: %s", exc)
-        return []
+    from core.models import Translation
 
     try:
         return list(

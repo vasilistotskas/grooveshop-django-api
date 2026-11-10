@@ -107,6 +107,17 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
             | Q(published_at__isnull=True, is_published=True)
         )
 
+    def scheduled(self) -> Self:
+        """Posts set to go live later: published, dated in the future.
+
+        The complement of ``published()`` among the posts with
+        ``is_published`` set. The beat sweep ``core.publication`` makes
+        them live when the date passes.
+        """
+        from django.utils import timezone
+
+        return self.filter(is_published=True, published_at__gt=timezone.now())
+
     def visible_to(self, user) -> Self:
         """Public visibility gate for the read-only blog endpoints.
 

@@ -121,8 +121,11 @@ class StaffProfitRowSerializer(serializers.Serializer):
     revenue = serializers.DecimalField(max_digits=14, decimal_places=2)
     cogs = serializers.DecimalField(max_digits=14, decimal_places=2)
     gross_profit = serializers.DecimalField(max_digits=14, decimal_places=2)
+    # A percentage of revenue has no bound: a day whose sales were mostly
+    # returned leaves cents of revenue against euros of cost, a margin of
+    # minus a hundred thousand percent and more.
     gross_margin = serializers.DecimalField(
-        max_digits=7, decimal_places=2, allow_null=True
+        max_digits=None, decimal_places=2, allow_null=True
     )
     payment_fees = serializers.DecimalField(max_digits=14, decimal_places=2)
     delivery_costs = serializers.DecimalField(max_digits=14, decimal_places=2)

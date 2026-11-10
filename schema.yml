@@ -52194,10 +52194,6 @@ components:
         grossMargin:
           type: number
           format: double
-          maximum: 100000
-          minimum: -100000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
           nullable: true
         paymentFees:
           type: number

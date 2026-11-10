@@ -8732,6 +8732,9 @@ msgstr "Needs follow-up"
 msgid "Needs follow-up since"
 msgstr "Needs follow-up since"
 
+msgid "Needs follow-up: the parcel was canceled while the order is still open. Create a new parcel or cancel the order."
+msgstr "Needs follow-up: the parcel was canceled while the order is still open. Create a new parcel or cancel the order."
+
 msgid "Nested BoxNow locker details"
 msgstr "Nested BoxNow locker details"
 

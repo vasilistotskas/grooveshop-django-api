@@ -10,7 +10,9 @@ price/availability/weight-cap via the DB-backed ``ShippingRate`` row.
 from __future__ import annotations
 
 import logging
+import operator
 from collections.abc import Iterable, Iterator, Mapping
+from functools import reduce
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -27,6 +29,7 @@ from shipping.interfaces import (
     ShippingCarrierInterface,
     get_provider,
     is_registered,
+    registered_providers,
 )
 from shipping.models import ShippingProvider, ShippingRate
 
@@ -202,6 +205,19 @@ class ShippingService:
         if shipment is None:
             return True
         return adapter.can_cancel_shipment(shipment)
+
+    @classmethod
+    def canceled_shipment_q(cls) -> Q | None:
+        """Orders a carrier left open behind a canceled shipment, as a
+        ``Q`` on ``Order``: every carrier's answer
+        (:meth:`ShippingCarrierInterface.canceled_shipment_q`) OR-ed, or
+        ``None`` when no carrier leaves one."""
+        rules = [
+            rule
+            for adapter in registered_providers()
+            if (rule := adapter.canceled_shipment_q()) is not None
+        ]
+        return reduce(operator.or_, rules) if rules else None
 
     @classmethod
     def fetch_label_bytes(cls, order: Order) -> bytes | None:

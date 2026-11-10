@@ -1,28 +1,36 @@
-"""The "follow up" flag: an order the shopper has waited on for N days.
+"""The "follow up" flag: an order a person has to look at before it ships.
 
 The store owner's purpose is customer service. A shopper who ordered N
 calendar days ago and has no parcel is about to write in; counting from
 placement catches both an order nobody shipped and a parcel stuck in
-transit, and a reason says which.
+transit, and a reason says which. An open order whose parcel the carrier
+canceled ships nothing until staff decide, so it is flagged at once.
 
 The rule is one queryset (``OrderQuerySet.needing_follow_up``); the
 admin badge, its filter and the dashboard counter all read it, so they
 cannot disagree. Nothing is stored: the flag disappears by itself when the
-order is delivered, completed, returned, canceled or refunded.
+order is delivered, completed, returned, canceled or refunded, or when its
+canceled parcel is replaced.
 
-An order needs follow-up when ALL of these hold:
+An order needs follow-up when it is not an online order still waiting for
+its payment (an unpaid card order is an abandoned checkout, not a parcel to
+chase) and EITHER:
 
 * it was placed on a local day at least ``ORDER_FOLLOW_UP_DAYS`` days ago
   (store timezone, whole calendar days: an order placed on day D is
-  flagged from 00:00 on day D+N); ``0`` switches the flag off;
-* its status is PENDING, PROCESSING or SHIPPED;
-* it is not an online order still waiting for its payment: an unpaid card
-  order is an abandoned checkout, not a parcel to chase.
+  flagged from 00:00 on day D+N) and its status is PENDING, PROCESSING or
+  SHIPPED; ``0`` switches this part off; OR
+* its status is PENDING or PROCESSING and its carrier shipment is canceled
+  (``ShippingService.canceled_shipment_q``: a BoxNow parcel canceled while
+  the order stayed open), whatever its age: staff create a new parcel or
+  cancel the order.
 """
 
 from __future__ import annotations
 
+import operator
 from datetime import datetime, time, timedelta
+from functools import reduce
 from typing import TYPE_CHECKING
 
 from django.db.models import Q
@@ -71,19 +79,51 @@ def follow_up_cutoff(days: int, now: datetime | None = None) -> datetime | None:
     )
 
 
-def follow_up_q(now: datetime | None = None) -> Q | None:
-    """The rule as a ``Q`` on ``Order``; ``None`` when the flag is off."""
+def _waited_q(now: datetime | None = None) -> Q | None:
+    """The shopper waited ``ORDER_FOLLOW_UP_DAYS``; ``None`` when off."""
     cutoff = follow_up_cutoff(follow_up_days(), now)
     if cutoff is None:
         return None
+    return Q(status__in=follow_up_statuses(), created_at__lt=cutoff)
+
+
+def canceled_shipment_q() -> Q | None:
+    """An open order whose carrier shipment is canceled; ``None`` when no
+    carrier leaves one."""
+    from shipping.services import ShippingService
+
+    canceled = ShippingService.canceled_shipment_q()
+    if canceled is None:
+        return None
+    needs_processing = OrderStatus.get_status_groups()["needs_processing"]
+    return Q(status__in=needs_processing) & canceled
+
+
+def follow_up_q(now: datetime | None = None) -> Q | None:
+    """The rule as a ``Q`` on ``Order``; ``None`` when it can flag
+    nothing."""
+    rules = [
+        rule
+        for rule in (_waited_q(now), canceled_shipment_q())
+        if rule is not None
+    ]
+    if not rules:
+        return None
+    return reduce(operator.or_, rules) & ~awaiting_online_payment_q()
+
+
+def has_canceled_shipment(order: Order) -> bool:
+    """Whether ``order`` is flagged for its canceled shipment."""
+    rule = canceled_shipment_q()
     return (
-        Q(status__in=follow_up_statuses(), created_at__lt=cutoff)
-        & ~awaiting_online_payment_q()
+        rule is not None
+        and type(order).objects.filter(rule, pk=order.pk).exists()
     )
 
 
 def follow_up_reason(order: Order) -> _StrPromise | None:
-    """Why the order is flagged: not shipped yet, or on its way."""
+    """Why an order flagged for the days it waited is flagged: not
+    shipped yet, or on its way."""
     groups = OrderStatus.get_status_groups()
     if order.status in groups["needs_processing"]:
         return _("Not shipped yet")

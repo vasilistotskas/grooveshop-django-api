@@ -20,12 +20,15 @@ from order.factories.order import OrderFactory
 from order.follow_up import (
     FOLLOW_UP_DAYS_SETTING,
     follow_up_reason,
+    has_canceled_shipment,
     last_carrier_event_at,
 )
 from order.models.order import Order
 from pay_way.enum.settlement import PaySettlement
 from pay_way.factories import PayWayFactory
 from shipping_acs.factories import AcsShipmentFactory
+from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+from shipping_boxnow.factories import BoxNowShipmentFactory
 from tests.utils.orders import courier_cash_order
 
 pytestmark = pytest.mark.django_db
@@ -229,6 +232,78 @@ class TestUnpaidOnlineOrders:
         Order.objects.filter(pk=order.pk).update(created_at=self.OLD)
 
         assert _flagged() == {order.pk}
+
+
+class TestCanceledParcel:
+    """An open order behind a canceled parcel ships nothing until staff
+    create a new parcel or cancel the order (#600)."""
+
+    def _behind_canceled_parcel(self, **fields) -> Order:
+        # Placed a moment before NOW: never flagged for the days it waited.
+        order = _placed(NOW, **fields)
+        BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.CANCELED,
+        )
+        return order
+
+    @pytest.mark.parametrize(
+        "status", [OrderStatus.PENDING, OrderStatus.PROCESSING]
+    )
+    def test_an_open_order_is_flagged_at_once(self, status):
+        order = self._behind_canceled_parcel(status=status)
+
+        assert _flagged() == {order.pk}
+        assert has_canceled_shipment(order)
+
+    def test_switching_the_days_off_does_not_hide_it(self):
+        _days_setting(0)
+        order = self._behind_canceled_parcel()
+
+        assert _flagged() == {order.pk}
+
+    @pytest.mark.parametrize(
+        "status", [OrderStatus.SHIPPED, OrderStatus.CANCELED]
+    )
+    def test_an_order_past_processing_is_not(self, status):
+        order = self._behind_canceled_parcel(status=status)
+
+        assert _flagged() == set()
+        assert not has_canceled_shipment(order)
+
+    def test_a_live_parcel_is_not(self):
+        order = _placed(NOW)
+        BoxNowShipmentFactory(order=order, with_parcel=True)
+
+        assert _flagged() == set()
+        assert not has_canceled_shipment(order)
+
+    def test_an_unpaid_online_order_is_not(self):
+        """An abandoned checkout, as for the days rule."""
+        order = OrderFactory(
+            pay_way=PayWayFactory.create(
+                active=True, settlement=PaySettlement.ONLINE
+            ),
+            payment_status=PaymentStatus.PENDING,
+            status=OrderStatus.PENDING,
+            num_order_items=0,
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.CANCELED,
+        )
+
+        assert _flagged() == set()
+
+    def test_the_annotation_agrees_with_the_filter(self):
+        order = self._behind_canceled_parcel()
+
+        assert (
+            Order.objects.with_follow_up(NOW).get(pk=order.pk).needs_follow_up
+        )
 
 
 class TestAwaitingOnlinePayment:

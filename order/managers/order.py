@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import (
     BooleanField,
+    Case,
     Count,
     ExpressionWrapper,
     F,
@@ -12,6 +13,7 @@ from django.db.models import (
     Q,
     Sum,
     Value,
+    When,
 )
 from djmoney.models.fields import MoneyField
 
@@ -89,9 +91,9 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         ).distinct()
 
     def needing_follow_up(self, now=None) -> Self:
-        """Orders the shopper has waited on for ``ORDER_FOLLOW_UP_DAYS``
-        days: the one rule behind the admin badge, filter and counter
-        (``order.follow_up``)."""
+        """Orders that need follow-up (waited ``ORDER_FOLLOW_UP_DAYS``
+        days, or open behind a canceled parcel): the one rule behind the
+        admin badge, filter and counter (``order.follow_up``)."""
         from order.follow_up import follow_up_q
 
         rule = follow_up_q(now)
@@ -103,10 +105,17 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         from order.follow_up import follow_up_q
 
         rule = follow_up_q(now)
+        # ``Case`` rather than the bare ``Q``: the rule joins the carrier
+        # shipment, and an order with none reads NULL there, so a bare
+        # ``Q`` would annotate it NULL instead of False.
         return self.annotate(
-            needs_follow_up=Value(False, output_field=BooleanField())
-            if rule is None
-            else ExpressionWrapper(rule, output_field=BooleanField())
+            needs_follow_up=Case(
+                When(rule, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+            if rule is not None
+            else Value(False, output_field=BooleanField())
         )
 
     def with_user(self) -> Self:

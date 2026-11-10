@@ -436,6 +436,8 @@ def recent_orders() -> list[dict[str, Any]]:
         "shipping_acs.AcsShipment",
         "shipping_acs.AcsCodPayout",
         "shipping_acs.AcsUnrecognisedVoucher",
+        # A canceled or re-issued parcel moves the follow-up count.
+        "shipping_boxnow.BoxNowShipment",
         # ``ORDER_FOLLOW_UP_DAYS`` moves the follow-up count.
         "extra_settings.Setting",
     ),

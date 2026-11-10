@@ -223,7 +223,7 @@ class TestCancelForDeadShipment:
             "shipping.services.ShippingService.cancel_shipment"
         ) as cancel_shipment:
             OrderService.cancel_for_dead_shipment(
-                order, carrier="BoxNow", silent_for_customer=False
+                order, carrier="ACS", silent_for_customer=False
             )
 
         cancel_shipment.assert_not_called()
@@ -239,7 +239,7 @@ class TestCancelForDeadShipment:
 
         with pytest.raises(OrderNotCancelableError):
             OrderService.cancel_for_dead_shipment(
-                order, carrier="BoxNow", silent_for_customer=False
+                order, carrier="ACS", silent_for_customer=False
             )
 
     def test_a_cancel_that_failed_is_not_that_class(self):
@@ -257,7 +257,7 @@ class TestCancelForDeadShipment:
             pytest.raises(OrderCancellationError) as raised,
         ):
             OrderService.cancel_for_dead_shipment(
-                order, carrier="BoxNow", silent_for_customer=False
+                order, carrier="ACS", silent_for_customer=False
             )
 
         assert not isinstance(raised.value, OrderNotCancelableError)

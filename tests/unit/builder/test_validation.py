@@ -523,10 +523,76 @@ class TestDocumentRootSettings:
 
         assert codes(issues) == {"/settings": "document_settings_not_allowed"}
 
-    def test_an_overlay_needs_settings_to_translate(self):
+    def test_a_root_setting_is_translated_before_the_default_language_has_one(
+        self,
+    ):
+        # The editor drops an empty ``settings``; the English title may
+        # still come first.
         issues, _ = run(
             document(("a", hero())),
             i18n={"en": {"@document": {"/seoTitle": "x"}}},
+        )
+
+        assert codes(issues) == {}
+
+    def test_that_translation_is_checked_like_the_default(self):
+        issues, _ = run(
+            document(("a", hero())),
+            i18n={"en": {"@document": {"/seoTitle": "x" * 71}}},
+        )
+
+        assert codes(issues) == {
+            "/i18n/en/@document/seoTitle": "invalid_settings"
+        }
+
+    def test_that_translation_answers_to_the_whole_root_schema(self):
+        # It is the language's whole root: a key the schema requires must
+        # be there, as it must in a draft whose ``settings`` is empty.
+        kinds = default_document_kinds()
+        kinds["template"] = {
+            **kinds["template"],
+            "schema": {
+                **kinds["template"]["schema"],
+                "required": ["seoDescription"],
+            },
+        }
+        catalogue = parse_catalogue(
+            {
+                "hash": HASH,
+                "blocks": default_blocks(),
+                "documentKinds": kinds,
+                "templates": ["home"],
+            }
+        )
+
+        issues, _ = validate_document(
+            key="template:home",
+            data=document(("a", hero())),
+            i18n={"en": {"@document": {"/seoTitle": "x"}}},
+            catalogue=catalogue,
+            feature_on=lambda name: True,
+        )
+
+        assert codes(issues) == {"/i18n/en/@document": "invalid_settings"}
+
+    def test_a_kind_without_root_settings_still_refuses_a_root_overlay(self):
+        kinds = default_document_kinds()
+        del kinds["template"]
+        catalogue = parse_catalogue(
+            {
+                "hash": HASH,
+                "blocks": default_blocks(),
+                "documentKinds": kinds,
+                "templates": ["home"],
+            }
+        )
+
+        issues, _ = validate_document(
+            key="template:home",
+            data=document(("a", hero())),
+            i18n={"en": {"@document": {"/seoTitle": "x"}}},
+            catalogue=catalogue,
+            feature_on=lambda name: True,
         )
 
         assert codes(issues) == {"/i18n/en/@document": "unknown_node"}

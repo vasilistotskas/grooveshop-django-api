@@ -51,11 +51,19 @@ logger = logging.getLogger("shipping_boxnow.client")
 # - The manual has no retry guidance, no idempotency key and no 5xx
 #   semantics for any of these.
 #
-# urllib3 applies ``allowed_methods`` to read errors and to
-# ``status_forcelist``, never to connection errors, which is exactly
-# the rule above. Back-off between attempts: 0 s, 1 s, 2 s.
+# urllib3 sorts an error by when it happened. A connect error (a connect
+# timeout or a refused connection) means the request never reached
+# BoxNow and is retried for any method. A read error (a read timeout or
+# a dropped connection) means it may have, so ``allowed_methods`` decides
+# and a POST or PUT is never sent again. Every other error (a TLS
+# failure, say) is retried for any method unless ``other`` is 0, because
+# urllib3 does not check the method for it: ``other=0`` stops it, and a
+# GET therefore gets no retry after such an error either. A 5xx is
+# retried only for a method in ``allowed_methods``. Back-off between
+# attempts: 0 s, 1 s, 2 s.
 _RETRY_CONFIG = Retry(
     total=3,
+    other=0,
     backoff_factor=0.5,
     status_forcelist=[500, 502, 503, 504],
     allowed_methods=["GET"],

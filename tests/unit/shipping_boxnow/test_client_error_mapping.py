@@ -21,8 +21,11 @@ from requests.adapters import HTTPAdapter
 from urllib3 import HTTPSConnectionPool
 from urllib3.exceptions import (
     ConnectTimeoutError,
+    MaxRetryError,
+    NewConnectionError,
     ProtocolError,
     ReadTimeoutError,
+    SSLError,
 )
 
 from shipping_boxnow.client import _RETRY_CONFIG, BoxNowClient
@@ -127,6 +130,21 @@ class TestRetryPolicy:
         for error in errors:
             with pytest.raises(type(error)):
                 _RETRY_CONFIG.increment(method=method, error=error)
+
+    @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
+    def test_an_error_of_unknown_timing_is_not_sent_again(self, method):
+        # Neither a connect nor a read error (a TLS failure here): urllib3
+        # retries it for every method unless ``other`` is 0, and the
+        # request might have reached BoxNow.
+        with pytest.raises(MaxRetryError):
+            _RETRY_CONFIG.increment(method=method, error=SSLError("tls"))
+
+    def test_a_refused_connection_is_sent_again(self):
+        after = _RETRY_CONFIG.increment(
+            method="POST", error=NewConnectionError(None, "refused")
+        )
+
+        assert after.total == 2
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
     def test_a_request_that_never_connected_is_sent_again(self, method):

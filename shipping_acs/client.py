@@ -56,6 +56,7 @@ _RETRY_CONFIG = Retry(
     connect=3,
     read=0,
     status=0,
+    other=0,
     backoff_factor=0.5,
     raise_on_status=False,
 )

@@ -57,6 +57,13 @@ def normalise_rich_text(html: str) -> str:
     return record_natural_sizes(drop_empty_headings(html))
 
 
+def stored_rich_text(html: str) -> str:
+    """What a save stores for ``html``: the policy applied, then
+    normalised. For markup ``validate_rich_text`` accepts; the save and
+    the backfill (``manage.py normalise_rich_text``) both store this."""
+    return normalise_rich_text(sanitize_html(html))
+
+
 class RichTextField(HTMLField):
     """An ``HTMLField`` held to the policy in ``core.utils.sanitize``.
 
@@ -88,6 +95,6 @@ class RichTextField(HTMLField):
                 validate_rich_text(value)
             except ValidationError as exc:
                 raise ValidationError({self.name: exc.error_list}) from exc
-            value = normalise_rich_text(sanitize_html(value))
+            value = stored_rich_text(value)
             setattr(model_instance, self.attname, value)
         return value

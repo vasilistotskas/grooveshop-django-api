@@ -43,7 +43,19 @@ The editor agrees: `TINYMCE_DEFAULT_CONFIG` names no font family or size
 control (the Format menu is TinyMCE 7.8's default without `fontfamily
 fontsize`) and sets `invalid_styles` to `font font-family font-size`, so a
 paste already shows what will be stored. Rows saved before are brought in
-line by `normalise_rich_text` (below), which applies the same policy.
+line by `manage.py normalise_rich_text` (below), which stores what a save
+would (`stored_rich_text`).
+
+A comment in a `style` is removed with them, and a property name spelled with
+a CSS escape is dropped: a browser reads `font-size/**/: 14pt` and
+`font-s9ze: 14pt` as a type size.
+
+The page builder's rich-text settings pass the same sanitiser when a draft is
+saved (`builder/validation.py`), so the rule holds for them from the next
+save. Builder documents are not backfilled: versions and releases are
+immutable, so a setting saved before keeps its typeface until it is edited.
+The storefront therefore keeps its own rule that ignores a typeface and a
+size in rendered rich text.
 
 ## Image sizes
 
@@ -84,8 +96,10 @@ uv run python manage.py normalise_rich_text --all-tenants [--dry-run]
 ```
 
 (`--tenant <schema>` for one store). It discovers the `RichTextField` columns
-from the app registry, writes the column directly (no re-validation, history
-or reindex) and is idempotent. The search index holds visible text only (next
+from the app registry, stores what a save would (the policy, no empty
+headings, the image sizes), writes the column directly (no history or
+reindex) and is idempotent. A row holding content a save refuses is left as it
+is and counted as skipped: edit it in the admin. The search index holds visible text only (next
 section), so the sizes cannot change a document. The storefront serves its
 cached pages until they expire; run `purge_edge_cache` afterwards to use the
 sizes at once.

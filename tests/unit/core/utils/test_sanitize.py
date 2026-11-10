@@ -177,6 +177,48 @@ class TestSanitizeHtmlTypography(unittest.TestCase):
             '<a rel="noopener noreferrer" href="#c1">[1]</a>',
         )
 
+    def test_keeps_a_class_that_only_starts_like_words(self):
+        html = '<p class="msonry-grid mso">x</p>'
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_reads_a_comment_the_way_a_browser_does(self):
+        # A browser skips a comment anywhere between tokens.
+        for style in (
+            "/**/font-size: 14pt; color: red",
+            "font-size/**/: 14pt; color: red",
+            "color: red; /* note */ font-family: arial",
+            "color: red /* it's */; font-size: 14pt",
+        ):
+            with self.subTest(style=style):
+                self.assertEqual(
+                    sanitize_html(f'<p style="{style}">x</p>'),
+                    '<p style="color: red;">x</p>',
+                )
+
+    def test_dropping_a_declaration_never_uncomments_another(self):
+        self.assertEqual(
+            sanitize_html(
+                '<p style="font: /*; position: fixed; */ 12px a;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
+    def test_keeps_a_comment_mark_inside_a_string(self):
+        html = "<p style=\"content: '/*'; color: red\">x</p>"
+
+        self.assertEqual(sanitize_html(html), html)
+
+    def test_drops_a_property_name_spelled_with_an_escape(self):
+        self.assertEqual(
+            sanitize_html(
+                r'<p style="font-s\69ze: 14pt; \66ont-family: arial;'
+                ' color: red">x</p>'
+            ),
+            '<p style="color: red;">x</p>',
+        )
+
     def test_dropping_typography_is_not_content_the_save_refuses(self):
         self.assertEqual(
             lost_content(

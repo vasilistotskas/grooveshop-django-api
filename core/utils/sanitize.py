@@ -180,8 +180,41 @@ _DROPPED_PROPERTY = re.compile(
     r"--[\w-]+|font|font-family|font-size|mso-[\w-]+", re.IGNORECASE
 )
 
-# Word's paragraph and comment classes (``MsoNormal``, ``msocomanchor``).
-_WORD_CLASS = re.compile(r"mso", re.IGNORECASE)
+# Word's paragraph and comment classes (``MsoNormal``, ``msocomanchor``),
+# in the two shapes Word writes them, so a store's own ``msonry`` stays.
+_WORD_CLASS = re.compile(r"Mso[A-Z]\w*|msocom\w+")
+
+
+def _without_comments(style: str) -> str:
+    """``style`` without its CSS comments, which a browser skips anywhere
+    between tokens: ``font-size/**/: 14pt`` is a type size, and a comment
+    can hold a ``;`` or a quote that is neither. A ``/*`` inside a string
+    is text. An unclosed comment runs to the end, as a browser reads it."""
+    if "/*" not in style:
+        return style
+    kept: list[str] = []
+    quote = ""
+    index = 0
+    while index < len(style):
+        char = style[index]
+        if quote:
+            if char == "\\" and index + 1 < len(style):
+                kept.append(style[index : index + 2])
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif style.startswith("/*", index):
+            end = style.find("*/", index + 2)
+            if end == -1:
+                break
+            index = end + 2
+            continue
+        kept.append(char)
+        index += 1
+    return "".join(kept)
 
 
 def _declarations(style: str) -> list[str]:
@@ -213,17 +246,22 @@ def _declarations(style: str) -> list[str]:
     return [d.strip() for d in declarations if d.strip()]
 
 
+def _is_dropped(declaration: str) -> bool:
+    """Whether a declaration sets a property a stored style never keeps.
+    A name written with a CSS escape (``font-s\69ze``) is dropped too: no
+    property needs one, and a browser reads it as the name it spells."""
+    name = declaration.split(":", 1)[0].strip()
+    return "\\" in name or bool(_DROPPED_PROPERTY.fullmatch(name))
+
+
 def _clean_style(style: str) -> str | None:
-    """``style`` without the declarations ``_DROPPED_PROPERTY`` names. A
-    style with nothing to drop stays exactly as written; one left empty
-    is dropped with its attribute."""
-    declarations = _declarations(style)
-    kept = [
-        declaration
-        for declaration in declarations
-        if not _DROPPED_PROPERTY.fullmatch(declaration.split(":", 1)[0].strip())
-    ]
-    if len(kept) == len(declarations):
+    """``style`` without its comments and the declarations
+    ``_DROPPED_PROPERTY`` names. A style with neither stays exactly as
+    written; one left empty is dropped with its attribute."""
+    bare = _without_comments(style)
+    declarations = _declarations(bare)
+    kept = [d for d in declarations if not _is_dropped(d)]
+    if len(kept) == len(declarations) and bare == style:
         return style
     return f"{'; '.join(kept)};" if kept else None
 
@@ -231,7 +269,7 @@ def _clean_style(style: str) -> str | None:
 def _clean_class(classes: str) -> str | None:
     """``classes`` without Word's; an attribute left empty is dropped."""
     names = classes.split()
-    kept = [name for name in names if not _WORD_CLASS.match(name)]
+    kept = [name for name in names if not _WORD_CLASS.fullmatch(name)]
     if len(kept) == len(names):
         return classes
     return " ".join(kept) or None

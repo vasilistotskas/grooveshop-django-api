@@ -18948,7 +18948,8 @@ paths:
   /api/v1/order/{id}/update_status:
     post:
       operationId: updateOrderStatus
-      description: Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας
+      description: 'Ενημέρωση της κατάστασης υπάρχουσας παραγγελίας. Η κατάσταση CANCELED
+        απορρίπτεται: η ακύρωση παραγγελίας γίνεται μέσω της ενέργειας ακύρωσης.'
       summary: Ενημέρωση κατάστασης παραγγελίας
       parameters:
       - in: path
@@ -52194,10 +52195,6 @@ components:
         grossMargin:
           type: number
           format: double
-          maximum: 100000
-          minimum: -100000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
           nullable: true
         paymentFees:
           type: number

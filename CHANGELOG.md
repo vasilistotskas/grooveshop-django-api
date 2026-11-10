@@ -3,6 +3,23 @@
 
 
 
+## v3.242.7 (2026-11-10)
+
+### Bug fixes
+
+* fix(builder): a page setting can be translated before its default language has one (#618) ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a page setting can be translated before its default language has one
+
+A page or template draft with no root settings refused an @document
+translation as unknown_node at /i18n/<locale>/@document, a path the
+editor maps to no field, so writing the English SEO title or heading
+first failed the save with nothing marked. The overlay is now checked
+against the root's schema over no settings, and the public read answers
+the translation alone. A kind with no root still refuses it. ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
+* fix(builder): a root translated before the draft has settings answers to the whole root schema ([`189f7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/189f7cda8720bbe8a52b4d7136a705d5e6e14650))
+
 ## v3.242.6 (2026-11-10)
 
 ### Bug fixes

@@ -17,6 +17,7 @@ Exception Hierarchy:
     ├── OrderNotFoundError
     ├── InvalidStatusTransitionError
     ├── OrderCancellationError
+    │   └── OrderNotCancelableError
     │   └── ParcelWithCourierError
     └── PaymentError
         ├── PaymentNotFoundError
@@ -335,6 +336,18 @@ class OrderCancellationError(OrderServiceError):
         self.order_id = order_id
         self.reason = reason
         super().__init__(f"Cannot cancel order {order_id}: {reason}")
+
+
+class OrderNotCancelableError(OrderCancellationError):
+    """
+    Raised when the order's status no longer allows a cancel.
+
+    The order shipped, was delivered or is already canceled: asking again
+    gives the same answer. Every other ``OrderCancellationError`` is a
+    cancel that failed on the way (a lock that timed out, a write that
+    did not go through) and may succeed when it is tried again, so a
+    caller that drops refusals must catch this class, not its parent.
+    """
 
 
 class ParcelWithCourierError(OrderCancellationError):

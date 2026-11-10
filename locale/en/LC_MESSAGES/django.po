@@ -240,6 +240,10 @@ msgstr[0] "%(count)d review was rejected."
 msgstr[1] "%(count)d reviews were rejected."
 
 #, python-format
+msgid "%(count)d scheduled posts were left scheduled. Open a scheduled post and change its Published At date to publish it now."
+msgstr "%(count)d scheduled posts were left scheduled. Open a scheduled post and change its Published At date to publish it now."
+
+#, python-format
 msgid "%(count)d shipment(s) skipped — no parcel ID assigned yet."
 msgstr "%(count)d shipment(s) skipped — no parcel ID assigned yet."
 

@@ -245,6 +245,10 @@ msgstr[0] "%(count)d αξιολόγηση απορρίφθηκε."
 msgstr[1] "%(count)d αξιολογήσεις απορρίφθηκαν."
 
 #, python-format
+msgid "%(count)d scheduled posts were left scheduled. Open a scheduled post and change its Published At date to publish it now."
+msgstr "%(count)d προγραμματισμένα άρθρα παρέμειναν προγραμματισμένα. Ανοίξτε ένα προγραμματισμένο άρθρο και αλλάξτε την ημερομηνία «Δημοσιεύθηκε στις» για να το δημοσιεύσετε τώρα."
+
+#, python-format
 msgid "%(count)d shipment(s) skipped — no parcel ID assigned yet."
 msgstr "%(count)d αποστολή/ές παραλείφθηκαν — δεν έχει ανατεθεί ακόμη parcel ID."
 

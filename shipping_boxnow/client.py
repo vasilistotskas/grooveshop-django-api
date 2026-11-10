@@ -26,9 +26,13 @@ logger = logging.getLogger("shipping_boxnow.client")
 #   connection reset): it changes nothing at BoxNow;
 # - a POST or PUT is never sent again once it may have reached BoxNow.
 #   The 5xx or the timeout becomes ``BoxNowRetryableError`` and the
-#   caller decides; for the parcel creation that is Celery's
-#   ``autoretry_for`` over the claim in
-#   ``BoxNowService.create_shipment_for_order``.
+#   caller decides. For the parcel creation the caller is
+#   ``create_boxnow_shipment_for_order``: ``autoretry_for`` re-runs it
+#   on ``BoxNowRetryableError``, and ``create_shipment_for_order``
+#   releases its mint claim on any error, so the re-run sends the same
+#   ``orderNumber`` again. If the first request did create the parcel,
+#   BoxNow answers P410 and the task reports a business error; finding
+#   the parcel in that case is issue #606.
 #
 # Why, from the BoxNow API Manual v7.2 (Partner API 1.65):
 #

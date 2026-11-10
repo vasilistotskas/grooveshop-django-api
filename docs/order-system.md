@@ -1372,7 +1372,13 @@ accepting Cyprus orders at the Greek flat rate.
   write is a `BoxNowRetryableError` and the caller decides. BoxNow refuses
   a second creation for one `orderNumber` with `P410` (manual v7.2, §3.4
   and §5), so a re-sent creation could only turn a parcel that exists into
-  a reported refusal.
+  a reported refusal. Today the caller for the creation is the Celery task
+  `create_boxnow_shipment_for_order`: it runs again on
+  `BoxNowRetryableError`, `create_shipment_for_order` has released its
+  claim, and the same `orderNumber` is sent again. A parcel that the first
+  request did create answers `P410` and the task reports a business error;
+  recovering that parcel is issue #606. A GET also gets no retry after an
+  error of unknown timing (`other=0`).
 - **Environment is per tenant.** `Tenant.box_now_live_mode` says whether
   the tenant's keys are BoxNow production keys (on) or stage keys (off,
   the default). `BoxNowClient` maps it to the platform's

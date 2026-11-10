@@ -47,10 +47,11 @@ TRACKING_ALIASES = (TRACKING_SUMMARY_ALIAS, TRACKING_DETAILS_ALIAS)
 # is a POST and write aliases like ``ACS_Create_Voucher`` are not
 # idempotent — re-POSTing a voucher request after a 502 has been
 # observed in stage to mint an orphan voucher (project memory:
-# ``project_acs_voucher_orphan_prevention.md``).  Celery's
-# ``autoretry_for=(AcsRetryableError,)`` plus the 3-phase claim/mint
-# /persist design in ``shipping_acs/services.py`` is the durable
-# retry path for everything that can have a server-side effect.
+# ``project_acs_voucher_orphan_prevention.md``).  The caller decides:
+# ``create_acs_voucher_for_order`` has ``autoretry_for=(AcsRetryableError,)``
+# and ``AcsService.create_voucher_for_order`` releases its mint claim on
+# any API error, so a retry sends the voucher request again.  The claim
+# only keeps two workers from minting at once.
 _RETRY_CONFIG = Retry(
     total=3,
     connect=3,

@@ -442,3 +442,30 @@ class TestWhatStopsAStore:
         after = BuilderVersion.objects.get(pk=version.pk)
         assert after.data["sections"]["a"]["settings"]["imageUrl"] == url
         assert alt_of(asset, "el") == ""
+
+    def test_an_image_saved_while_it_runs_is_reported(
+        self, admin, stored_image, run
+    ):
+        url = stored_image(72)
+        imported(url)
+        doc = save_and_publish(admin, document(("a", banner(imageUrl=url))))
+        version = doc.versions.get()
+        late = document(("a", banner(imageUrl=stored_image(73, "late.png"))))
+        read = media_migration.stored_uses
+
+        def read_then_someone_saves():
+            uses = read()
+            BuilderDocument.objects.filter(pk=doc.pk).update(draft=late)
+            return uses
+
+        with (
+            mock.patch.object(
+                media_migration, "stored_uses", read_then_someone_saves
+            ),
+            pytest.raises(CommandError, match="run it again"),
+        ):
+            run()
+
+        after = BuilderVersion.objects.get(pk=version.pk)
+        assert after.data["sections"]["a"]["settings"]["imageUrl"] == url
+        assert not BuilderRelease.objects.filter(number=2).exists()

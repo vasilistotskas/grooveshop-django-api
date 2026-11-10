@@ -38,6 +38,7 @@ from django.db import connection
 
 from builder import media_services, pointers
 from builder.block_upgrades import nodes_of
+from builder.document_rewrite import DocumentRefused
 from builder.errors import BuilderError
 from builder.models import BuilderDocument, BuilderVersion, MediaAsset
 from builder.services import published_versions
@@ -432,6 +433,18 @@ def decide_alts(
     return decisions
 
 
+def _asset_of(url: str, assets: Mapping[str, int]) -> int:
+    """The asset *url* became. One the store's read did not find was saved
+    since: the documents are locked only after it."""
+    try:
+        return assets[url]
+    except KeyError:
+        raise DocumentRefused(
+            f"{url!r} was saved after the store's images were read, "
+            "run it again"
+        ) from None
+
+
 def migrate_document(
     data: Any, i18n: Any, assets: Mapping[str, int]
 ) -> tuple[Any, Any, Counter[str]]:
@@ -469,14 +482,16 @@ def migrate_document(
                 continue
             if legacy.is_list:
                 ids = [
-                    assets[url.strip()]
+                    _asset_of(url.strip(), assets)
                     for url in value or []
                     if isinstance(url, str) and url.strip()
                 ]
                 if ids:
                     node_settings[legacy.target] = ids
             elif isinstance(value, str) and value.strip():
-                node_settings[legacy.target] = assets[value.strip()]
+                node_settings[legacy.target] = _asset_of(
+                    value.strip(), assets
+                )
     return migrated, _without_empties(overlay), moved
 
 

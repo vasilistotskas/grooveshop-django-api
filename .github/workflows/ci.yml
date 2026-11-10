@@ -457,6 +457,32 @@ jobs:
         # a missing one.
         run: uv run python manage.py compilemessages --ignore=.venv
 
+      - name: Build the test database once, copy it for each worker
+        # Every xdist worker used to build its own database by replaying
+        # the whole migration history: 3.5 minutes with two workers side
+        # by side, 4.5 to 5 with four (runs 42867810779 and 42872796937,
+        # 2026-11-10). One serial pytest run builds ``test_postgres``
+        # through the same conftest, and PostgreSQL copies it to
+        # ``test_postgres_gw<N>``. The shard run below finds each
+        # worker's database in place (``--reuse-db`` in ``addopts``),
+        # applies no migration and restores the seed snapshot the copy
+        # carries. The history is still replayed in full, once per
+        # shard. The one test named here reads the rows the build left,
+        # and a missing node id fails the step.
+        run: |
+          workers="$(nproc)"
+          echo "XDIST_WORKERS=$workers" >> "$GITHUB_ENV"
+          uv run pytest -n 0 --cov=. --cov-report= --cov-fail-under=0 \
+            --cov-config=pyproject.toml \
+            "tests/unit/test_migration_seed.py::TestRestore::test_a_restore_puts_back_exactly_the_migrated_rows"
+          for worker in $(seq 0 $((workers - 1))); do
+            docker exec ci-postgres psql -U postgres -v ON_ERROR_STOP=1 \
+              -c "CREATE DATABASE test_postgres_gw${worker} TEMPLATE test_postgres"
+          done
+        timeout-minutes: 10
+        env:
+          HYPOTHESIS_PROFILE: ci
+
       - name: Run Tests (shard)
         # ``--dist loadfile`` is mandatory for stability per
         # ``project_test_suite_stability.md`` — interleaving tests
@@ -493,28 +519,30 @@ jobs:
         # within 0.7% of each other and they ran 9-16 minutes on CI.
         # Tests missing from the file are assumed average, so drift
         # costs balance, never correctness. Four shards, not more:
-        # each shard pays a fixed ~3.5 min before its first test, the
-        # migration replay that builds each xdist worker's database
-        # (three pull_request runs of 2026-11-10), so extra shards
-        # mostly buy overhead.
-        # ``-n logical``, not the ``-n auto`` of ``addopts``: with
-        # psutil installed ``auto`` counts PHYSICAL cores, and a
-        # standard runner has 4 vCPUs on 2 cores, so ``auto`` started 2
-        # workers ("created: 2/2 workers" in those runs' logs) and half
-        # the runner idled.
+        # each shard pays about 4.5 minutes before its tests (setup,
+        # then the migration replay above), and the longest shards are
+        # bound by single files that ``loadfile`` keeps on one worker
+        # (tests/unit/devtools/test_demo_store.py alone was 354 s on
+        # 2026-11-10), so extra shards mostly buy overhead.
+        # One worker per vCPU (``XDIST_WORKERS``), not the ``-n auto``
+        # of ``addopts``: with psutil installed ``auto`` counts PHYSICAL
+        # cores, and a standard runner has 4 vCPUs on 2 cores, so
+        # ``auto`` started 2 workers ("created: 2/2 workers" in the logs
+        # of that day's runs).
         # Coverage: shards upload raw data files; the ``coverage`` job
         # combines them and enforces ``fail_under`` for the whole suite.
         # A single shard's percentage is meaningless, so the per-shard
         # run must not gate (``--cov-fail-under=0``) and prints no
-        # report (``--cov-report=``). Note the coverage CORE is not a
+        # report (``--cov-report=``). ``--cov-append`` keeps what the
+        # database build above measured. Note the coverage CORE is not a
         # lever here: an A/B of CI runs (2026-08-25, ctrace 31:44 vs
         # sysmon 34:27) showed the suite is DB/fixture-bound. If a shard
         # creeps toward its timeout, profile first:
         # pytest --durations=25.
         run: >
           cp .test_durations test-durations-shard-${{ matrix.group }}.json &&
-          uv run pytest --cov=. --cov-report= --cov-fail-under=0
-          --cov-config=pyproject.toml -n logical --dist loadfile
+          uv run pytest --cov=. --cov-append --cov-report= --cov-fail-under=0
+          --cov-config=pyproject.toml -n "$XDIST_WORKERS" --dist loadfile
           --splits 4 --group ${{ matrix.group }}
           --durations-path test-durations-shard-${{ matrix.group }}.json
           --store-durations --clean-durations

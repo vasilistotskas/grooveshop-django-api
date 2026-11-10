@@ -208,6 +208,8 @@ Factories of translatable models extend `CustomDjangoModelFactory` from `devtool
 
 Tests in `tests/` (`unit/`, `integration/`, `utils/`) and the multi-tenant lane `tests_mt/` (run it with `uv run pytest tests_mt -n 0`). A second parallel run beside a full one needs its own `DB_NAME`. Read [`docs/testing.md`](docs/testing.md) before writing a test that commits, touches seeds, settings or the cache, or before changing `tests/settings.py` / a `conftest.py`.
 
+**What to run before pushing.** A small PR runs the static gates (`ruff`, `ty check`, `lint-imports`) and the tests of what it touched; CI runs the full suite. Run the full suite locally only for a wide change (settings, a `conftest.py`, a shared base class, moved code) or when CI is unavailable.
+
 ### Infrastructure (Docker)
 
 - `infra.compose.yml` — PostgreSQL 18, Redis, RabbitMQ, Meilisearch, pgAdmin, RedisInsight
@@ -277,12 +279,12 @@ change.
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) jobs:
-0. **Already tested in its PR** — on a push to `main` whose tree is exactly what a green pull_request run tested (the PR branch was up to date with `main`), jobs 2-6 are skipped and release starts at once (`.github/scripts/tested_in_pr.sh` holds the rule). Any other push runs everything. Merging a branch that is behind `main` therefore costs a full second run; updating it first does not.
+0. **Already tested in its PR** — on a push to `main` whose tree is exactly what a green pull_request run tested (the PR branch was up to date with `main`), jobs 2-6 are skipped and release starts at once (`.github/scripts/tested_in_pr.sh` holds the rule). Any other push runs everything. So a branch that is behind `main` may be merged as it is when its files do not overlap what landed on `main` since it branched: `main` then runs the full suite before it releases. Nothing untested is released; the cost is that `main` can be red for that one run. Update the branch first when the files overlap, or when either side touched a migration, `schema.yml` or `uv.lock`. A new push cancels the superseded run of a pull request; a run on `main` is never cancelled, the next one waits for it, and its release step skips a commit that is no longer the tip (the newer run releases both).
 1. **Security Scan** — Trivy filesystem scan (HIGH/CRITICAL fail the job).
 2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation, and the committed `schema.yml` matching the code (structurally, via oasdiff).
 3. **Migration Check** — replays a deploy: migrates at the base commit, then runs the head's `makemigrations --check` and `migration_preflight`, then both django-tenants migration paths on top.
-4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`) against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
-5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware.
+4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`), one xdist worker per runner vCPU, each on a copy of a database the shard builds once, against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
+5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware; its three store schemas are migrated at the same time (`mt_store_schemas` in `tests_mt/conftest.py`).
 6. **Coverage Gate** — combines the shard data and enforces `fail_under`.
 7. **Release** — python-semantic-release (run from the locked dev group) cuts the version, changelog and GitHub release on `main`; its version commit also carries the re-locked `uv.lock` (`build_command` + `assets` in `pyproject.toml`), so `main` never holds a stale lock. The Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
 

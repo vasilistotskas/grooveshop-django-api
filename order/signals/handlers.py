@@ -49,7 +49,6 @@ from order.signals import (
     order_delivered,
     order_paid,
     order_refunded,
-    order_returned,
     order_shipment_dispatched,
     order_shipped,
     order_status_changed,
@@ -657,37 +656,6 @@ def handle_order_stored_value_returned(
         request_credit_documents(order.id)
     except Exception:
         logger.exception("Error handling order_stored_value_returned signal")
-
-
-@receiver(order_returned, dispatch_uid="order.handle_order_returned")
-def handle_order_returned(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Handle order returned signal."""
-    try:
-        return_reason = kwargs.get("reason", "")
-        return_items = kwargs.get("items", [])
-
-        items_text = ""
-        if return_items:
-            items_text = "Items: " + ", ".join(
-                f"{item.get('product_name', 'Unknown')} (qty: {item.get('quantity', 0)})"
-                for item in return_items
-            )
-
-        OrderHistory.log_note(
-            order=order,
-            note=(
-                f"Order returned. "
-                f"{items_text}. "
-                f"Reason: {return_reason or 'Not specified'}"
-            ),
-        )
-
-        logger.info("Order %s returned", order.id)
-
-    except Exception:
-        logger.exception("Error handling order_returned signal")
 
 
 @djstripe_receiver("payment_intent.succeeded")

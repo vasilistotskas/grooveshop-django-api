@@ -5,11 +5,11 @@
 
 {% block email_content %}
 <h1>{% trans "Check the ACS voucher of an order" %}</h1>
-<p>{% blocktrans %}A voucher request for order #{{ order_id }} may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check.{% endblocktrans %}</p>
+{% if after_resolution %}<p>{% blocktrans %}A voucher request for order #{{ order_id }} sent before its check was resolved has now ended without an answer. ACS may hold one more voucher for this order that nothing records.{% endblocktrans %}</p>{% else %}<p>{% blocktrans %}A voucher request for order #{{ order_id }} may have reached ACS, but no answer came back. ACS may have created a voucher, so no new request is sent until you check.{% endblocktrans %}</p>{% endif %}
 
 <div class="email-card" style="border-left: 4px solid #d97706;">
     <p><strong>{% trans "What happened" %}:</strong> {{ error }}</p>
 </div>
 
-<p class="mt-3">{% blocktrans %}Look in the ACS portal for a voucher of order #{{ order_id }} (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”.{% endblocktrans %}</p>
+{% if after_resolution %}<p class="mt-3">{% blocktrans %}Look in the ACS portal for the vouchers of order #{{ order_id }} (their reference is the order number). Delete there any voucher the order's ACS shipment does not use.{% endblocktrans %}</p>{% else %}<p class="mt-3">{% blocktrans %}Look in the ACS portal for a voucher of order #{{ order_id }} (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”.{% endblocktrans %}</p>{% endif %}
 {% endblock %}

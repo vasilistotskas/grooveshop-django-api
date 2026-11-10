@@ -1038,16 +1038,26 @@ class AcsService:
         durable state, tell staff once, and stop the caller.
 
         Only while the row still holds this request's own claim. When its
-        claim was taken (it expired and was already recorded as unknown,
-        and staff may have resolved that or requested again), this
-        request's outcome was already put to staff once: marking the row
-        unknown again would hang a later request's claim on it, or
-        re-open a check staff closed. Its possible voucher surfaces as one
-        matching no order if a pickup list names it. Logged at ERROR.
+        claim was taken (it expired and was recorded as unknown), the row
+        is left as it is: marking it unknown again would hang a later
+        request's claim on it, or re-open a check staff closed. Then:
+
+        * that check is still open for this request: nothing more to say;
+        * staff already resolved it (adopted, closed, requested again):
+          they looked in the portal before this request landed there, so
+          a voucher it may have made is known to nobody. Staff are told
+          once, through the same note and alert with wording for this
+          case. The claim is kept in ``metadata["late_unknown_alerted"]``
+          under the row lock, so a retry never alerts twice. That is the
+          honest maximum: with no voucher number there is nothing to put
+          on the dashboard's list of vouchers matching no order, and the
+          shipment's own state is not this request's to change.
         """
+        late_after_resolution = False
         with transaction.atomic():
             fresh = AcsShipment.objects.select_for_update().get(pk=shipment.pk)
-            ours = (fresh.metadata or {}).get("mint_started_at") == claim
+            metadata = fresh.metadata or {}
+            ours = metadata.get("mint_started_at") == claim
             entered = (
                 ours
                 and fresh.voucher_request_unknown_at is None
@@ -1055,6 +1065,21 @@ class AcsService:
             )
             if entered:
                 cls._set_voucher_request_unknown(fresh)
+            elif not ours:
+                still_open = (
+                    fresh.voucher_request_unknown_at is not None
+                    and metadata.get("unknown_request") == claim
+                )
+                alerted = list(metadata.get("late_unknown_alerted") or [])
+                if claim and not still_open and claim not in alerted:
+                    late_after_resolution = True
+                    metadata["late_unknown_alerted"] = [*alerted, claim]
+                    fresh.metadata = metadata
+                    fresh.save(update_fields=["metadata"])
+        if late_after_resolution:
+            cls._alert_voucher_request_unknown(
+                order.id, str(exc), after_resolution=True
+            )
         if not ours:
             logger.error(
                 "create_voucher_for_order: a voucher request for order=%s "
@@ -1096,8 +1121,15 @@ class AcsService:
         ) from exc
 
     @staticmethod
-    def _alert_voucher_request_unknown(order_id: int, error: str) -> None:
+    def _alert_voucher_request_unknown(
+        order_id: int, error: str, *, after_resolution: bool = False
+    ) -> None:
         """Note the check on the order and email the store's operators.
+
+        ``after_resolution``: a request sent before its check was
+        resolved ended without an answer afterwards, so ACS may hold one
+        more voucher that nothing records (see ``_voucher_request_lost``).
+        Same channel, wording for that case.
 
         Best effort: neither failure may hide the state, which the
         dashboard counts whatever happens here.
@@ -1111,6 +1143,15 @@ class AcsService:
                 OrderHistory.log_note(
                     order=order,
                     note=(
+                        "A voucher request sent before the ACS voucher "
+                        "check was resolved ended without an answer: "
+                        f"{error.rstrip('.')}. ACS may hold one more "
+                        "voucher for this order; check the ACS portal and "
+                        "delete any voucher the order's ACS shipment does "
+                        "not use."
+                    )
+                    if after_resolution
+                    else (
                         f"ACS voucher request outcome unknown: {error.rstrip('.')}. ACS "
                         "may hold a voucher for this order, so none is "
                         "requested again. Check the ACS portal, then use "
@@ -1126,7 +1167,11 @@ class AcsService:
         try:
             send_email(
                 "ops.acs_voucher_request_unknown",
-                VoucherRequestUnknown(order_id=order_id, error=error),
+                VoucherRequestUnknown(
+                    order_id=order_id,
+                    error=error,
+                    after_resolution=after_resolution,
+                ),
             )
         except Exception:
             logger.exception(

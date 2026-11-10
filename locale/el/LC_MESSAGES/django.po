@@ -1014,6 +1014,10 @@ msgid "A voucher request for order #%(order_id)s may have reached ACS, but no an
 msgstr "Ένα αίτημα voucher για την παραγγελία #%(order_id)s μπορεί να έφτασε στην ACS, αλλά δεν ήρθε απάντηση. Η ACS μπορεί να έχει δημιουργήσει voucher, γι' αυτό δεν στέλνεται νέο αίτημα μέχρι να το ελέγξετε."
 
 #, python-format
+msgid "A voucher request for order #%(order_id)s sent before its check was resolved has now ended without an answer. ACS may hold one more voucher for this order that nothing records."
+msgstr "Ένα αίτημα voucher για την παραγγελία #%(order_id)s που στάλθηκε πριν διευθετηθεί ο έλεγχός του ολοκληρώθηκε τώρα χωρίς απάντηση. Η ACS μπορεί να έχει ένα ακόμη voucher για αυτή την παραγγελία που δεν καταγράφεται πουθενά."
+
+#, python-format
 msgid "A voucher request is in progress and voucher %(voucher)s may be its answer. Try again in a few minutes."
 msgstr "Ένα αίτημα voucher βρίσκεται σε εξέλιξη και το voucher %(voucher)s μπορεί να είναι η απάντησή του. Δοκιμάστε ξανά σε λίγα λεπτά."
 
@@ -8241,6 +8245,10 @@ msgstr "Γεωγραφικό μήκος (συμβολοσειρά όπως επ�
 #, python-format
 msgid "Look in the ACS portal for a voucher of order #%(order_id)s (its reference is the order number). Then open the order's ACS shipment: if you found one, use “Adopt ACS voucher” and enter its number; if there is none, use “No voucher at ACS: request again”."
 msgstr "Αναζητήστε στην πύλη της ACS voucher της παραγγελίας #%(order_id)s (κλειδί αναφοράς του είναι ο αριθμός της παραγγελίας). Έπειτα ανοίξτε την αποστολή ACS της παραγγελίας: αν βρήκατε voucher, χρησιμοποιήστε την ενέργεια «Υιοθέτηση voucher ACS» και καταχωρίστε τον αριθμό του· αν δεν υπάρχει, χρησιμοποιήστε την ενέργεια «Κανένα voucher στην ACS: νέο αίτημα»."
+
+#, python-format
+msgid "Look in the ACS portal for the vouchers of order #%(order_id)s (their reference is the order number). Delete there any voucher the order's ACS shipment does not use."
+msgstr "Αναζητήστε στην πύλη της ACS τα voucher της παραγγελίας #%(order_id)s (κλειδί αναφοράς τους είναι ο αριθμός της παραγγελίας). Διαγράψτε εκεί όποιο voucher δεν χρησιμοποιεί η αποστολή ACS της παραγγελίας."
 
 msgid "Look up an order from Viva Wallet's post-payment redirect params"
 msgstr "Αναζήτηση παραγγελίας από τις παραμέτρους ανακατεύθυνσης μετά την πληρωμή του Viva Wallet"
